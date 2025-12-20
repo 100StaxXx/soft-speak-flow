@@ -6,214 +6,1637 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ELEMENT_EFFECTS = {
-  fire: "glowing embers dancing upward, molten lava veins, flame trails with realistic heat distortion, warm orange-red volumetric aura with ember particles",
-  water: "flowing liquid water droplets, dynamic ripple patterns with realistic refraction, cool blue translucent mist, bioluminescent aquatic glow",
-  earth: "weathered stone textures with moss growth, crystalline mineral formations catching light, floating dust particles, ancient runic carvings",
-  air: "swirling wind currents with visible motion blur, delicate feather details with realistic barbs, cumulus cloud wisps, atmospheric pressure waves",
-  lightning: "branching electric arcs following realistic paths, crackling purple-blue plasma glow, electromagnetic field distortions, ozone shimmer",
-  ice: "intricate frost patterns with hexagonal crystals, sharp ice shards refracting light, cold cyan vapor condensation, frozen breath effects",
-  light: "divine radiant beams with god rays, holy luminescence with lens flare, iridescent sparkle particles, prismatic rainbow refraction",
-  shadow: "volumetric dark purple tendrils, mysterious smoke with depth, ethereal darkness with subtle gradients, void energy wisps",
+// ============================================================================
+// CHARACTER DNA SYSTEM - All 65 creatures with exact anatomical specifications
+// ============================================================================
+
+interface CreatureAnatomy {
+  category: string;
+  limbCount: number;
+  hasWings: boolean;
+  hasTail: boolean;
+  bodyType: string;
+  babyFeatures: string;
+  adultFeatures: string;
+  anatomyNotes: string;
+  prohibitedFeatures: string;
+  realWorldRef: string;
+}
+
+const CREATURE_ANATOMY: Record<string, CreatureAnatomy> = {
+  // === CANINES ===
+  "Wolf": {
+    category: "canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "oversized floppy ears, round snout, fluffy round body, huge paws relative to body, soft puppy fur",
+    adultFeatures: "pointed erect ears, long elegant snout, thick fur ruff around neck, bushy tail, muscular shoulders",
+    anatomyNotes: "Digitigrade legs, 4 toes per foot with non-retractable claws, distinctive wolf ear shape, golden/amber eyes typical",
+    prohibitedFeatures: "wings, horns, multiple tails, scales, extra heads",
+    realWorldRef: "grey wolf, timber wolf"
+  },
+  "Fox": {
+    category: "canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "ENORMOUS ears relative to tiny head, button nose, fluffy round body, tiny legs",
+    adultFeatures: "large pointed triangular ears, slender elegant build, extremely bushy tail, narrow pointed snout, white chest",
+    anatomyNotes: "Slender legs, smaller than wolf, distinctive ear-to-head ratio is KEY feature, vertical slit pupils",
+    prohibitedFeatures: "wings, multiple tails (unless Kitsune), horns, blunt snout",
+    realWorldRef: "red fox"
+  },
+  "Arctic Fox": {
+    category: "canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "pure white fluffy ball, tiny dark nose, small rounded ears, extra fluffy coat",
+    adultFeatures: "thick white/silver coat, compact body, small rounded ears (heat retention), bushy tail wraps around body",
+    anatomyNotes: "Compact body for cold, SHORTER snout than red fox, SMALL ears (unlike other foxes), thick fur on paws",
+    prohibitedFeatures: "wings, horns, long ears (ears MUST be small and rounded)",
+    realWorldRef: "arctic fox in winter coat"
+  },
+  "Fennec Fox": {
+    category: "canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "ABSOLUTELY ENORMOUS ears even as baby (signature feature), tiny cream-colored fluffy body",
+    adultFeatures: "MASSIVE bat-like ears (larger than head width), tiny body, cream/sand coloring, large dark eyes",
+    anatomyNotes: "SMALLEST canine species, ears are 6 inches on 8-inch body - ears MUST be comically oversized, huge eyes for nocturnal hunting",
+    prohibitedFeatures: "wings, small ears (ears MUST be ENORMOUS - this is non-negotiable), large body",
+    realWorldRef: "fennec fox"
+  },
+  "Dog": {
+    category: "canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "floppy ears, round puppy face, oversized paws, soft puppy fur, short snout",
+    adultFeatures: "friendly expression, floppy or erect ears depending on breed, wagging tail, loyal loving eyes",
+    anatomyNotes: "Domesticated wolf descendant, expressive face, can have variety of ear shapes, 4 toes visible per foot",
+    prohibitedFeatures: "wings, horns, scales, cat features",
+    realWorldRef: "golden retriever, german shepherd"
+  },
+  "Hyena": {
+    category: "canine-like",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "spotted fluffy fur, rounded ears, short snout, compact round body",
+    adultFeatures: "sloped back (front higher than rear), large rounded ears, powerful jaw, spotted coat, mane along spine",
+    anatomyNotes: "UNIQUE sloped back profile (front legs longer than back), large rounded ears, powerful neck and jaw muscles",
+    prohibitedFeatures: "wings, level back (back MUST slope down), wolf-like proportions",
+    realWorldRef: "spotted hyena"
+  },
+  "Tanuki": {
+    category: "canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "round fluffy body, dark mask markings around eyes, stubby legs, round face",
+    adultFeatures: "raccoon-like mask markings, fluffy body, bushy striped tail, round face, short legs",
+    anatomyNotes: "Japanese raccoon dog - NOT a raccoon, rounder body than fox, distinctive dark eye mask, fluffy cheeks",
+    prohibitedFeatures: "wings, raccoon hands (these are paws not hands), tall legs",
+    realWorldRef: "Japanese raccoon dog (tanuki)"
+  },
+  
+  // === MYTHICAL CANINES ===
+  "Fenrir": {
+    category: "mythical-canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-giant",
+    babyFeatures: "oversized wolf pup with fierce eyes, dark/shadow fur, tiny fangs visible, intense gaze even as baby",
+    adultFeatures: "MASSIVE wolf of world-ending scale, chains/bindings often depicted, enormous fangs, cosmic-dark fur",
+    anatomyNotes: "Norse giant wolf - WOLF anatomy but at colossal scale, glowing fierce eyes, thick shaggy fur, massive paws",
+    prohibitedFeatures: "wings, multiple heads, non-wolf features, small size at adult stages",
+    realWorldRef: "giant wolf from Norse mythology"
+  },
+  "Cerberus": {
+    category: "mythical-canine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-multihead",
+    babyFeatures: "THREE adorable puppy heads sharing one body, dark fur, red/orange eyes, stubby legs",
+    adultFeatures: "THREE fierce dog heads on one muscular body, dark fur, hellfire eyes, serpent tail possible, massive",
+    anatomyNotes: "EXACTLY THREE HEADS (no more, no less), single powerful body, each head can have different expression, Greek hellhound",
+    prohibitedFeatures: "wings, two heads, one head, more than three heads, non-dog features",
+    realWorldRef: "three-headed Greek hellhound"
+  },
+  
+  // === FELINES ===
+  "Cat": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "huge eyes relative to face, tiny triangle ears, fluffy round body, short stubby legs",
+    adultFeatures: "elegant slender body, pointed triangle ears, expressive almond eyes, long graceful tail",
+    anatomyNotes: "Retractable claws, vertical slit pupils, whiskers, pink nose pad, 5 front toes 4 back toes",
+    prohibitedFeatures: "wings, floppy ears, blunt face, dog-like features",
+    realWorldRef: "domestic cat"
+  },
+  "Lion": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "spotted fluffy cub, oversized paws, round face, no mane yet, playful expression",
+    adultFeatures: "MALES: magnificent mane framing face, powerful muscular build, tufted tail, regal posture",
+    anatomyNotes: "Largest African cat, males have mane (females don't), tufted tail tip, rounded ears, golden eyes",
+    prohibitedFeatures: "wings, stripes, mane on female lions, long fur on body (only mane is long)",
+    realWorldRef: "African lion"
+  },
+  "Tiger": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "fluffy striped cub, oversized paws, round face, blue eyes (cubs have blue eyes)",
+    adultFeatures: "bold black stripes on orange coat, white chest/belly, powerful build, distinctive facial markings",
+    anatomyNotes: "STRIPES are unique like fingerprints, white spots behind ears, amber eyes (adult), massive paws",
+    prohibitedFeatures: "wings, spots instead of stripes, mane, solid color coat",
+    realWorldRef: "Bengal tiger, Siberian tiger"
+  },
+  "Panther": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "solid dark fluffy cub, golden/green eyes stand out against dark fur, oversized paws",
+    adultFeatures: "sleek solid black/dark coat, muscular build, glowing golden or green eyes, rosettes visible in certain light",
+    anatomyNotes: "Actually melanistic leopard/jaguar - may have faint rosettes visible, extremely muscular, luminous eyes",
+    prohibitedFeatures: "wings, obvious spots/stripes, mane, blue eyes",
+    realWorldRef: "black panther (melanistic leopard)"
+  },
+  "Snow Leopard": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "fluffy grey-white spotted cub, EXTREMELY long fluffy tail, blue-grey eyes",
+    adultFeatures: "pale grey coat with black rosettes, EXTREMELY LONG thick tail (for balance), small rounded ears",
+    anatomyNotes: "SIGNATURE: Tail is almost as long as body and very thick/fluffy, pale grey-white coat, rosette patterns, GREEN eyes",
+    prohibitedFeatures: "wings, short tail, orange coloring, stripes",
+    realWorldRef: "snow leopard"
+  },
+  "Cheetah": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-lean",
+    babyFeatures: "fluffy grey mane down back, spotted coat, oversized paws, black tear marks on face",
+    adultFeatures: "LEAN athletic build, solid black spots (NOT rosettes), distinctive black tear marks from eyes to mouth",
+    anatomyNotes: "LEANEST cat - built for speed, solid spots NOT rosettes, black tear lines on face are SIGNATURE, small round head",
+    prohibitedFeatures: "wings, muscular bulky build, rosettes, missing tear marks",
+    realWorldRef: "cheetah"
+  },
+  "Jaguar": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "fluffy spotted cub with rosettes, stocky build even as baby, large paws",
+    adultFeatures: "stocky powerful build, rosettes with spots inside them, massive jaw muscles, shorter legs than leopard",
+    anatomyNotes: "STOCKIEST big cat, rosettes have SPOTS INSIDE them (unlike leopard), massive head and jaw, short powerful legs",
+    prohibitedFeatures: "wings, lean build, solid spots, missing spots-in-rosettes",
+    realWorldRef: "jaguar"
+  },
+  "Lynx": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "fluffy spotted kitten, ear tufts already visible, short stubby tail, big paws",
+    adultFeatures: "distinctive black EAR TUFTS, spotted coat, very short bobbed tail, ruff of fur around face, large paws",
+    anatomyNotes: "SIGNATURE: Black tufts on ear tips, very SHORT tail (bobbed), facial ruff, long legs, spotted coat",
+    prohibitedFeatures: "wings, long tail, missing ear tufts, smooth ears",
+    realWorldRef: "Eurasian lynx, Canadian lynx"
+  },
+  "Puma / Cougar": {
+    category: "feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "SPOTTED cubs (they lose spots as adults), blue eyes, oversized paws",
+    adultFeatures: "solid tawny/tan coat (NO spots as adult), small round head, long tail with dark tip, muscular build",
+    anatomyNotes: "Adults are SOLID colored (not spotted), small head relative to body, long thick tail, can purr unlike big cats",
+    prohibitedFeatures: "wings, spots on adults, mane, stripes",
+    realWorldRef: "mountain lion, cougar, puma"
+  },
+  
+  // === MYTHICAL FELINES ===
+  "Sphinx": {
+    category: "mythical-feline",
+    limbCount: 4,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "quadruped-winged",
+    babyFeatures: "lion cub body with small wing nubs, human-like wise eyes, short coat",
+    adultFeatures: "lion body with large eagle/feathered wings, serene wise expression, regal posture, often shown with headdress",
+    anatomyNotes: "Egyptian: lion body + wings + wise expression (NOT human head in this fantasy version), majestic feathered wings",
+    prohibitedFeatures: "human head, multiple heads, serpent features",
+    realWorldRef: "Egyptian sphinx with wings"
+  },
+  "Kitsune": {
+    category: "mythical-feline",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-multitail",
+    babyFeatures: "adorable fox kit with 1-2 small fluffy tails, white/golden fur, large ears",
+    adultFeatures: "elegant fox with MULTIPLE flowing tails (up to 9), white/golden/silver fur, mystical flames, wise eyes",
+    anatomyNotes: "Japanese fox spirit - MORE TAILS = MORE POWERFUL (1-9 tails), often white/gold/silver, fox fire flames, elegant",
+    prohibitedFeatures: "wings, single tail at high stages, non-fox body",
+    realWorldRef: "Japanese nine-tailed fox spirit"
+  },
+  
+  // === DRAGONS & REPTILES ===
+  "Dragon": {
+    category: "dragon",
+    limbCount: 4,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "quadruped-winged",
+    babyFeatures: "small cute dragon with oversized head, tiny wing nubs, stubby tail, soft scales, big curious eyes",
+    adultFeatures: "4 legs + 2 wings (6 limbs total), scales, horns, powerful tail, fire/element breath, majestic wingspan",
+    anatomyNotes: "Western dragon: 4 legs + 2 wings = 6 limbs total, scales cover body, horns on head, powerful claws, long neck",
+    prohibitedFeatures: "feathers instead of scales, no wings, more than 6 limbs, furry body",
+    realWorldRef: "Western European dragon"
+  },
+  "Wyvern": {
+    category: "dragon",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "small wyvern with oversized wings that serve as front limbs, 2 back legs, big eyes",
+    adultFeatures: "2 back legs ONLY, wings ARE the front limbs (like a bat), barbed tail, sleek predatory build",
+    anatomyNotes: "ONLY 2 legs + 2 wings (4 limbs total), wings double as front limbs, often has barbed/poisoned tail tip",
+    prohibitedFeatures: "4 legs (wyverns have 2 legs only), front legs separate from wings",
+    realWorldRef: "wyvern - bat-like dragon with 2 legs"
+  },
+  "Hydra": {
+    category: "dragon",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-multihead",
+    babyFeatures: "small serpentine creature with 2-3 small heads, scales, stubby legs",
+    adultFeatures: "MULTIPLE serpentine heads (5-9 typical) on long necks from one body, reptilian, no wings, powerful legs",
+    anatomyNotes: "MULTIPLE HEADS on long serpentine necks, regenerating heads in myth, no wings, dragon-like body",
+    prohibitedFeatures: "wings, single head, feathers, fur",
+    realWorldRef: "Greek Lernaean Hydra"
+  },
+  "Basilisk": {
+    category: "reptile",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "serpent",
+    babyFeatures: "small serpent with crown-like crest on head, scales, large deadly eyes",
+    adultFeatures: "massive serpent with crown/crest, deadly gaze, iridescent scales, no limbs, may have small wings",
+    anatomyNotes: "King of serpents - crown-like crest, deadly gaze, serpentine body with NO legs, may have vestigial wings",
+    prohibitedFeatures: "legs, chicken features (that's a cockatrice), fur",
+    realWorldRef: "mythological basilisk serpent"
+  },
+  "T-Rex": {
+    category: "dinosaur",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "biped",
+    babyFeatures: "adorable baby T-Rex with oversized head, tiny arms, fluffy feathers possible, big curious eyes",
+    adultFeatures: "massive bipedal dinosaur, TINY arms with 2 fingers, enormous head with massive teeth, powerful legs, long tail",
+    anatomyNotes: "Bipedal on 2 powerful legs, TINY useless arms with 2 fingers, massive skull and teeth, horizontal body balanced by tail",
+    prohibitedFeatures: "wings, long arms, quadruped stance, no teeth",
+    realWorldRef: "Tyrannosaurus Rex"
+  },
+  "Velociraptor": {
+    category: "dinosaur",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "biped",
+    babyFeatures: "small feathered raptor, big intelligent eyes, tiny claws, fluffy down feathers",
+    adultFeatures: "sleek feathered raptor, large sickle claw on each foot, intelligent eyes, FEATHERS covering body",
+    anatomyNotes: "Actually had FEATHERS, sickle-shaped killing claw on each foot, intelligent pack hunter, NOT scaly like in movies",
+    prohibitedFeatures: "wings, scales (they had feathers), large size (they were turkey-sized)",
+    realWorldRef: "feathered velociraptor (scientifically accurate)"
+  },
+  "Crocodile": {
+    category: "reptile",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-low",
+    babyFeatures: "tiny croc with oversized head, eyes on top of head, little teeth visible, yellow-green coloring",
+    adultFeatures: "armored scaly body, long snout with visible teeth, eyes and nostrils on top of head, powerful tail",
+    anatomyNotes: "Low-slung body, eyes/nostrils on TOP of head (for water surface), interlocking teeth visible, armored scales",
+    prohibitedFeatures: "wings, fur, upright stance, alligator snout shape",
+    realWorldRef: "saltwater crocodile, Nile crocodile"
+  },
+  "Snake": {
+    category: "reptile",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "serpent",
+    babyFeatures: "small coiled serpent, tiny scales, curious forked tongue, bright eyes",
+    adultFeatures: "elegant serpent body, scales, forked tongue, no limbs, mesmerizing eyes, various patterns possible",
+    anatomyNotes: "NO LIMBS at all, scales covering entire body, forked tongue for sensing, can be any color/pattern",
+    prohibitedFeatures: "legs, arms, wings, fur, ears",
+    realWorldRef: "python, cobra, any snake"
+  },
+  "Sea Turtle": {
+    category: "reptile-aquatic",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-flippers",
+    babyFeatures: "tiny turtle with oversized shell, flipper limbs, big dark eyes, cute round head",
+    adultFeatures: "large domed shell, powerful flipper limbs (NOT legs), beak-like mouth, wise ancient eyes",
+    anatomyNotes: "FLIPPERS not legs (cannot walk on land well), domed shell, beak-like mouth without teeth, ancient appearance",
+    prohibitedFeatures: "legs/feet (has flippers), teeth, wings",
+    realWorldRef: "green sea turtle, leatherback"
+  },
+  
+  // === BIRDS ===
+  "Eagle": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "fluffy grey/white chick, oversized beak, downy feathers, large eyes, wobbly stance",
+    adultFeatures: "powerful hooked beak, fierce golden eyes, massive wingspan, sharp talons, white head (bald eagle)",
+    anatomyNotes: "2 legs with powerful talons, 2 wings, hooked beak, fierce forward-facing eyes, feathered body",
+    prohibitedFeatures: "4 legs, teeth, fur, scales on body",
+    realWorldRef: "bald eagle, golden eagle"
+  },
+  "Falcon": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "fluffy white chick, oversized head, dark eyes, downy feathers",
+    adultFeatures: "sleek aerodynamic body, pointed wings, dark facial markings, extremely fast, sharp talons",
+    anatomyNotes: "FASTEST animal alive, pointed swept-back wings, dark mustache marks on face, smaller than eagle",
+    prohibitedFeatures: "4 legs, rounded wings, teeth, large bulky build",
+    realWorldRef: "peregrine falcon"
+  },
+  "Hawk": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "fluffy chick with large eyes, downy feathers, oversized feet",
+    adultFeatures: "broad rounded wings, keen eyes, hooked beak, banded tail feathers, powerful talons",
+    anatomyNotes: "Broader wings than falcon, red-tailed variety has distinctive rust-colored tail, fierce gaze",
+    prohibitedFeatures: "4 legs, teeth, fur, pointed falcon-like wings",
+    realWorldRef: "red-tailed hawk"
+  },
+  "Owl": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "round fluffy owlet, ENORMOUS eyes, heart-shaped or round face, downy white/grey feathers",
+    adultFeatures: "round flat face, ENORMOUS forward-facing eyes, ear tufts (some species), silent flight feathers",
+    anatomyNotes: "HUGE forward-facing eyes, flat facial disc, can rotate head 270°, silent flight feathers, ear tufts vary by species",
+    prohibitedFeatures: "4 legs, small eyes, side-facing eyes, teeth",
+    realWorldRef: "great horned owl, snowy owl, barn owl"
+  },
+  "Raven": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "fluffy black chick, large beak, curious intelligent eyes, downy feathers",
+    adultFeatures: "glossy black feathers with iridescent sheen, large curved beak, intelligent eyes, shaggy throat feathers",
+    anatomyNotes: "Larger than crow, wedge-shaped tail in flight, intelligent eyes, iridescent black plumage, thick beak",
+    prohibitedFeatures: "4 legs, colorful feathers, small beak, teeth",
+    realWorldRef: "common raven"
+  },
+  "Parrot": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "fluffy colorful chick, oversized curved beak, pin feathers emerging",
+    adultFeatures: "vibrant colorful plumage, large curved beak, zygodactyl feet (2 toes forward, 2 back), intelligent eyes",
+    anatomyNotes: "CURVED beak for cracking seeds, zygodactyl feet for climbing, vibrant colors, can mimic sounds",
+    prohibitedFeatures: "4 legs, straight beak, dull colors, teeth",
+    realWorldRef: "macaw, African grey parrot"
+  },
+  "Hummingbird": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged-tiny",
+    babyFeatures: "absolutely TINY fluffy chick, long thin beak already visible, iridescent hints",
+    adultFeatures: "TINY body, extremely fast-beating wings (blur when flying), long thin beak, iridescent gorget",
+    anatomyNotes: "SMALLEST bird, wings move in figure-8 (can hover), long needle-like beak for nectar, iridescent throat",
+    prohibitedFeatures: "large size, 4 legs, short beak, slow wings",
+    realWorldRef: "ruby-throated hummingbird"
+  },
+  "Penguin": {
+    category: "bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-flightless",
+    babyFeatures: "fluffy grey/brown chick, oversized head, stubby flipper wings, waddling stance",
+    adultFeatures: "tuxedo black and white coloring, flipper wings (cannot fly), upright waddling stance, waterproof feathers",
+    anatomyNotes: "CANNOT FLY - wings are flippers for swimming, upright stance, black back white front, webbed feet",
+    prohibitedFeatures: "flight capability, 4 legs, colorful plumage (except emperor penguin chicks), fur",
+    realWorldRef: "emperor penguin, king penguin"
+  },
+  
+  // === MYTHICAL BIRDS ===
+  "Phoenix": {
+    category: "mythical-bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged",
+    babyFeatures: "tiny bird made of gentle flames, ember eyes, small wing nubs, warm glow",
+    adultFeatures: "majestic fire bird, flaming plumage in reds/oranges/golds, long elegant tail feathers, radiant glow",
+    anatomyNotes: "Bird of fire and rebirth, flames instead of or merged with feathers, golden/red coloring, long tail plumes",
+    prohibitedFeatures: "4 legs, ice/cold colors, no flames, dark coloring",
+    realWorldRef: "mythological phoenix, firebird"
+  },
+  "Thunderbird": {
+    category: "mythical-bird",
+    limbCount: 2,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "biped-winged-giant",
+    babyFeatures: "storm-colored fluffy chick, crackling feathers, bright electric eyes",
+    adultFeatures: "MASSIVE eagle-like bird, storm clouds in wings, lightning crackling, thunder with wingbeats",
+    anatomyNotes: "Native American myth - enormous eagle that controls storms, lightning in feathers, storm clouds follow",
+    prohibitedFeatures: "4 legs, small size, no storm/lightning elements, fire element",
+    realWorldRef: "Native American thunderbird"
+  },
+  
+  // === EQUINES ===
+  "Horse (Stallion)": {
+    category: "equine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "long-legged wobbly foal, oversized head, fuzzy coat, curious eyes, tiny mane",
+    adultFeatures: "powerful muscular build, flowing mane and tail, elegant long legs, noble expression",
+    anatomyNotes: "Single-toed hooves, flowing mane down neck, long tail from dock, muscular neck, expressive eyes",
+    prohibitedFeatures: "wings, horn, split hooves, claws",
+    realWorldRef: "Arabian horse, thoroughbred"
+  },
+  "Unicorn": {
+    category: "mythical-equine",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "adorable foal with tiny horn nub on forehead, flowing mane, pure white/pastel coat, innocent eyes",
+    adultFeatures: "elegant horse with SINGLE SPIRAL HORN on forehead, flowing ethereal mane, cloven hooves possible, pure coat",
+    anatomyNotes: "SINGLE spiral horn center of forehead, often white/silver, flowing magical mane/tail, can have cloven hooves",
+    prohibitedFeatures: "wings (that's a pegasus/alicorn), multiple horns, no horn, dark evil appearance",
+    realWorldRef: "mythological unicorn"
+  },
+  "Pegasus": {
+    category: "mythical-equine",
+    limbCount: 4,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "quadruped-winged",
+    babyFeatures: "adorable foal with small fluffy wing nubs, soft coat, oversized hooves, curious expression",
+    adultFeatures: "majestic horse with LARGE FEATHERED WINGS, powerful build, flowing mane/tail, often white",
+    anatomyNotes: "Horse with FEATHERED BIRD WINGS (4 legs + 2 wings = 6 limbs), typically white, graceful flyer",
+    prohibitedFeatures: "horn (that's an alicorn), bat wings, no wings, dragon features",
+    realWorldRef: "Greek mythological Pegasus"
+  },
+  
+  // === AQUATIC ===
+  "Dolphin": {
+    category: "aquatic-mammal",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "aquatic-streamlined",
+    babyFeatures: "small sleek calf, oversized head, playful expression, lighter coloring",
+    adultFeatures: "streamlined body, dorsal fin, tail flukes (horizontal), curved beak-like snout, intelligent eyes",
+    anatomyNotes: "NO LEGS - only fins, horizontal tail flukes (mammal), dorsal fin, blowhole on top, curved snout",
+    prohibitedFeatures: "legs, vertical tail (fish), gills, fur",
+    realWorldRef: "bottlenose dolphin"
+  },
+  "Shark": {
+    category: "aquatic-fish",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "aquatic-streamlined",
+    babyFeatures: "small shark pup, all fins present, large dark eyes, tiny teeth visible",
+    adultFeatures: "powerful streamlined body, multiple fins, VERTICAL tail (fish), multiple rows of teeth, gill slits",
+    anatomyNotes: "NO LEGS - only fins, VERTICAL tail fin (fish), gill slits on sides, multiple tooth rows, cartilage skeleton",
+    prohibitedFeatures: "legs, horizontal tail, lungs/blowhole, fur, bones",
+    realWorldRef: "great white shark"
+  },
+  "Orca": {
+    category: "aquatic-mammal",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "aquatic-streamlined",
+    babyFeatures: "small calf with black and white pattern, orange tint to white patches (newborn), oversized head",
+    adultFeatures: "black and white pattern, tall dorsal fin, horizontal tail flukes, white eye patch, powerful build",
+    anatomyNotes: "NO LEGS - flippers only, distinctive black/white pattern, TALL dorsal fin (especially males), horizontal flukes",
+    prohibitedFeatures: "legs, vertical tail, gills, all-black coloring, fur",
+    realWorldRef: "killer whale, orca"
+  },
+  "Blue Whale": {
+    category: "aquatic-mammal",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "aquatic-streamlined",
+    babyFeatures: "relatively small calf (still huge), mottled blue-grey, horizontal flukes, small flippers",
+    adultFeatures: "ENORMOUS blue-grey body, mottled pattern, tiny dorsal fin, horizontal flukes, throat grooves",
+    anatomyNotes: "LARGEST ANIMAL EVER, NO LEGS, blue-grey mottled, very small dorsal fin far back, baleen plates not teeth",
+    prohibitedFeatures: "legs, teeth (has baleen), large dorsal fin, gills, fur",
+    realWorldRef: "blue whale"
+  },
+  "Jellyfish": {
+    category: "aquatic-invertebrate",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: false,
+    bodyType: "aquatic-bell",
+    babyFeatures: "tiny translucent bell, developing tentacles, gentle pulsing",
+    adultFeatures: "translucent bell-shaped body, flowing tentacles beneath, bioluminescent glow possible, ethereal",
+    anatomyNotes: "NO skeleton, translucent bell body, trailing tentacles, no brain, pulses to move, often bioluminescent",
+    prohibitedFeatures: "legs, skeleton, eyes, solid body, fur",
+    realWorldRef: "moon jellyfish, lion's mane jellyfish"
+  },
+  "Octopus": {
+    category: "aquatic-invertebrate",
+    limbCount: 8,
+    hasWings: false,
+    hasTail: false,
+    bodyType: "aquatic-tentacle",
+    babyFeatures: "tiny translucent octopus, oversized head, 8 tiny tentacles, curious eyes",
+    adultFeatures: "bulbous head, 8 suckered tentacles, color-changing skin, highly intelligent eyes, no skeleton",
+    anatomyNotes: "EXACTLY 8 tentacles with suckers, bulbous head/mantle, beak in center, can change color/texture, very intelligent",
+    prohibitedFeatures: "legs, more or fewer than 8 tentacles, skeleton, fur, 10 limbs (that's squid)",
+    realWorldRef: "common octopus, giant Pacific octopus"
+  },
+  "Manta Ray": {
+    category: "aquatic-fish",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "aquatic-flat",
+    babyFeatures: "small ray with developing wing-like fins, long thin tail, curious expression",
+    adultFeatures: "MASSIVE flat diamond body, wing-like pectoral fins, cephalic fins (horns) near mouth, gentle giant",
+    anatomyNotes: "Flat diamond shape, NO LEGS, wing-like fins for swimming, horn-like cephalic fins, very long thin tail, filter feeder",
+    prohibitedFeatures: "legs, thick body, stinger (mantas don't sting), fur",
+    realWorldRef: "giant oceanic manta ray"
+  },
+  
+  // === MYTHICAL AQUATIC ===
+  "Kraken": {
+    category: "mythical-aquatic",
+    limbCount: 8,
+    hasWings: false,
+    hasTail: false,
+    bodyType: "aquatic-tentacle-giant",
+    babyFeatures: "small but fierce cephalopod, 8 tentacles, glowing eyes, dark coloring",
+    adultFeatures: "MASSIVE octopus/squid hybrid, 8-10 enormous tentacles, glowing eyes, ship-destroying size, deep sea horror",
+    anatomyNotes: "Giant cephalopod of myth, 8-10 massive tentacles, enormous eyes, can grab ships, deep sea monster",
+    prohibitedFeatures: "legs, fur, small size, friendly appearance",
+    realWorldRef: "mythological kraken, giant squid"
+  },
+  "Leviathan": {
+    category: "mythical-aquatic",
+    limbCount: 0,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "aquatic-serpent-giant",
+    babyFeatures: "small sea serpent, scales, glowing eyes, serpentine body",
+    adultFeatures: "COLOSSAL sea serpent/dragon, massive scales, world-ending size, primordial ocean god",
+    anatomyNotes: "Biblical sea monster, serpentine body, may have fins, enormous beyond comprehension, ancient and powerful",
+    prohibitedFeatures: "legs, small size, cute appearance, fur",
+    realWorldRef: "Biblical Leviathan, sea serpent"
+  },
+  
+  // === OTHER MAMMALS ===
+  "Bear": {
+    category: "mammal",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-heavy",
+    babyFeatures: "tiny fluffy cub, oversized paws, round face, curious eyes, playful",
+    adultFeatures: "massive heavy build, thick fur, powerful paws with claws, small rounded ears, short tail",
+    anatomyNotes: "Plantigrade feet (walks on whole foot like humans), powerful shoulders, small ears, very short tail, thick fur",
+    prohibitedFeatures: "wings, long tail, digitigrade legs, thin build",
+    realWorldRef: "grizzly bear, polar bear"
+  },
+  "Elephant": {
+    category: "mammal",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-heavy",
+    babyFeatures: "adorable baby elephant, oversized ears, tiny trunk, fuzzy sparse hair, playful",
+    adultFeatures: "MASSIVE body, long prehensile trunk, large fan-like ears, tusks (ivory), thick legs, wise eyes",
+    anatomyNotes: "Trunk is extended nose/lip, large ears for cooling, column-like legs, tusks are elongated teeth, tiny tail with tuft",
+    prohibitedFeatures: "wings, no trunk, no ears, thin legs, fur coat",
+    realWorldRef: "African elephant"
+  },
+  "Gorilla": {
+    category: "mammal-primate",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: false,
+    bodyType: "quadruped-knuckle",
+    babyFeatures: "small infant gorilla, expressive face, clinging to imaginary parent, large eyes",
+    adultFeatures: "powerful muscular build, silver back (males), knuckle-walking posture, intelligent expressive face, NO TAIL",
+    anatomyNotes: "NO TAIL (great apes lack tails), knuckle-walking, silver back on males, intelligent human-like eyes, powerful arms",
+    prohibitedFeatures: "wings, tail, fur-covered face, non-primate features",
+    realWorldRef: "mountain gorilla, silverback"
+  },
+  "Rhino": {
+    category: "mammal",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-heavy",
+    babyFeatures: "small rhino calf, tiny horn nub, thick skin, oversized head, playful",
+    adultFeatures: "massive armored-looking body, 1-2 HORNS on snout, thick grey skin, small ears, tiny eyes",
+    anatomyNotes: "Horn made of keratin (hair protein), thick folded skin, 3 toes per foot, poor eyesight but good hearing",
+    prohibitedFeatures: "wings, smooth skin, no horn, large eyes, fur",
+    realWorldRef: "white rhino, black rhino"
+  },
+  "Hippo": {
+    category: "mammal-semiaquatic",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-heavy",
+    babyFeatures: "small pink/grey calf, oversized head, stubby legs, in water with eyes/ears above surface",
+    adultFeatures: "MASSIVE barrel body, huge mouth with tusks, eyes/ears on top of head, short legs, semi-aquatic",
+    anatomyNotes: "Eyes/ears/nostrils on TOP of head (for water surface), ENORMOUS mouth opening 180°, short stubby legs, pink secretion",
+    prohibitedFeatures: "wings, long legs, small mouth, fully aquatic (needs to surface)",
+    realWorldRef: "hippopotamus"
+  },
+  "Mammoth": {
+    category: "mammal-extinct",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-heavy",
+    babyFeatures: "fluffy baby mammoth, long shaggy fur, tiny curved tusks beginning, cute trunk",
+    adultFeatures: "massive elephant-like body, LONG SHAGGY FUR, huge curved tusks, trunk, small ears (for cold)",
+    anatomyNotes: "Like elephant but with LONG WOOLLY FUR, tusks curve MORE than elephant, SMALLER ears (heat retention), cold-adapted",
+    prohibitedFeatures: "wings, no fur (must be woolly), straight tusks, large ears",
+    realWorldRef: "woolly mammoth"
+  },
+  "Kangaroo": {
+    category: "mammal-marsupial",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "biped-hopping",
+    babyFeatures: "tiny joey, oversized back legs developing, may peek from pouch, large ears",
+    adultFeatures: "powerful back legs for hopping, small arms, large ears, thick balancing tail, pouch (females)",
+    anatomyNotes: "HOPS on powerful back legs, small front arms with hands, THICK muscular tail for balance, large upright ears",
+    prohibitedFeatures: "wings, walking on all fours, small tail, no pouch on females",
+    realWorldRef: "red kangaroo"
+  },
+  "Sloth": {
+    category: "mammal",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "arboreal",
+    babyFeatures: "tiny baby sloth clinging to branch or parent, long curved claws, sleepy expression, fuzzy",
+    adultFeatures: "long limbs with LONG CURVED CLAWS for hanging, slow-moving, algae-tinged fur, peaceful sleepy face",
+    anatomyNotes: "LONG CURVED CLAWS for branch-hanging, extremely slow, spends life upside-down, algae grows in fur (greenish tint)",
+    prohibitedFeatures: "wings, fast movement, short claws, energetic expression",
+    realWorldRef: "three-toed sloth"
+  },
+  "Reindeer": {
+    category: "mammal-cervid",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "spotted fawn, developing antler bumps, long legs, white spots on brown coat",
+    adultFeatures: "thick winter coat, BOTH males and females have antlers, wide hooves for snow, white neck ruff",
+    anatomyNotes: "ONLY deer where females ALSO have antlers, wide flat hooves for snow, thick double coat, white rump",
+    prohibitedFeatures: "wings, no antlers on adults, thin coat, narrow hooves",
+    realWorldRef: "reindeer, caribou"
+  },
+  "Wolverine": {
+    category: "mammal-mustelid",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "small fierce kit, dark fur, stocky build even young, determined expression",
+    adultFeatures: "stocky powerful build, dark brown fur with lighter stripes, bear-like face, incredibly fierce, short legs",
+    anatomyNotes: "Largest land mustelid, EXTREMELY powerful for size, dark fur with tan/blonde side stripes, fierce temper, thick fur",
+    prohibitedFeatures: "wings, slender build, wolf-like appearance (not a wolf), long legs",
+    realWorldRef: "wolverine (gulo gulo)"
+  },
+  
+  // === MYTHICAL HYBRIDS ===
+  "Gryphon": {
+    category: "mythical-hybrid",
+    limbCount: 4,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "quadruped-winged",
+    babyFeatures: "adorable cub/chick hybrid, lion body with eagle head developing, small wing nubs, mixed fur and down",
+    adultFeatures: "EAGLE head + front talons + wings on LION body + back legs + tail, majestic hybrid, noble bearing",
+    anatomyNotes: "Eagle head with beak, eagle wings, eagle FRONT TALONS, lion BACK LEGS/BODY/TAIL, 6 limbs total",
+    prohibitedFeatures: "all-eagle, all-lion, other animal parts, no beak, no wings",
+    realWorldRef: "mythological gryphon/griffin"
+  },
+  "Hippogriff": {
+    category: "mythical-hybrid",
+    limbCount: 4,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "quadruped-winged",
+    babyFeatures: "adorable foal/chick hybrid, horse body with eagle head developing, small wing nubs, mixed fur and down",
+    adultFeatures: "EAGLE head + wings + front talons on HORSE body + back hooves + tail, noble bearing, faster than gryphon",
+    anatomyNotes: "Eagle head with beak, eagle wings, eagle FRONT TALONS, horse BACK LEGS/BODY/TAIL with hooves, 6 limbs total",
+    prohibitedFeatures: "lion parts (that's gryphon), all-eagle, all-horse, no beak, no wings",
+    realWorldRef: "mythological hippogriff"
+  },
+  "Chimera": {
+    category: "mythical-hybrid",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped-multihead",
+    babyFeatures: "strange hybrid baby with lion features, small goat head emerging from back, serpent tail developing",
+    adultFeatures: "LION primary body/head, GOAT head rising from back/spine, SERPENT for tail, fire-breathing, monstrous",
+    anatomyNotes: "Greek monster: lion body + lion head + goat head on back + serpent tail head, fire-breathing, terrifying",
+    prohibitedFeatures: "wings, eagle parts, single head, friendly appearance",
+    realWorldRef: "Greek mythological Chimera"
+  },
+  
+  // === INVERTEBRATES ===
+  "Butterfly": {
+    category: "insect",
+    limbCount: 6,
+    hasWings: true,
+    hasTail: false,
+    bodyType: "insect",
+    babyFeatures: "caterpillar form with many segments, tiny legs, cute face, fuzzy body, or chrysalis stage",
+    adultFeatures: "delicate body, LARGE colorful wings with patterns, 6 thin legs, antennae, proboscis (tongue)",
+    anatomyNotes: "6 legs, 4 wings (2 forewings, 2 hindwings), compound eyes, curled proboscis tongue, antennae with clubs",
+    prohibitedFeatures: "2 legs, 2 wings, fur, vertebrate features, moth antennae (moths are feathery)",
+    realWorldRef: "monarch butterfly, blue morpho"
+  },
+  
+  // === MECHANICAL ===
+  "Mechanical Dragon": {
+    category: "construct",
+    limbCount: 4,
+    hasWings: true,
+    hasTail: true,
+    bodyType: "quadruped-winged-mechanical",
+    babyFeatures: "small clockwork dragon, brass gears visible, steam wisps, glowing eyes, articulated joints",
+    adultFeatures: "steampunk dragon of metal and gears, articulated plates, steam/energy breath, glowing core, mechanical wings",
+    anatomyNotes: "Dragon anatomy but MECHANICAL: gears, pistons, metal plates, rivets, steam vents, glowing power core, articulated joints",
+    prohibitedFeatures: "organic scales, flesh, bones, fur, non-mechanical elements",
+    realWorldRef: "steampunk mechanical dragon"
+  }
 };
 
-const EVOLUTION_STAGES = {
-  0: { 
-    name: "Dormant Egg", 
-    prompt: "A mystical egg floating in gentle {element} energy. The egg has a smooth, opalescent surface with subtle {color} undertones. Deep within the translucent shell, a dark shadowy silhouette is barely visible - the mysterious outline of a powerful, mature {spirit} creature curled in dormant slumber. The silhouette should be a dark, featureless shadow showing only the basic shape and posture of what will become a majestic creature at stage 15. Faint {element} glow pulses around the egg.",
+// ============================================================================
+// STORY TONE VISUAL MODIFIERS
+// ============================================================================
+
+const STORY_TONE_MODIFIERS = {
+  soft_gentle: {
+    lighting: "soft golden hour lighting, warm glow, gentle shadows, diffused light",
+    atmosphere: "peaceful meadow feeling, soft clouds, gentle magical sparkles",
+    expression: "gentle, kind, nurturing expression, soft eyes",
+    colors: "pastel enhancement, soft gradients, warm undertones"
+  },
+  epic_adventure: {
+    lighting: "dramatic heroic lighting, bold shadows, strong rim lighting",
+    atmosphere: "dynamic energy, wind effects, action-ready environment",
+    expression: "determined, brave, confident expression, alert posture",
+    colors: "bold saturated colors, high contrast, vibrant"
+  },
+  emotional_heartfelt: {
+    lighting: "warm intimate lighting, soft focus edges, golden tones",
+    atmosphere: "cozy atmosphere, gentle particles, feeling of safety and love",
+    expression: "loving, emotional, deep connection in eyes",
+    colors: "warm color temperature, golden tones, soft saturation"
+  },
+  dark_intense: {
+    lighting: "moody dramatic lighting, deep shadows, mysterious",
+    atmosphere: "mysterious environment, fog, dramatic intensity",
+    expression: "fierce, determined, powerful, intense gaze",
+    colors: "deep rich colors, high contrast shadows, dramatic"
+  },
+  whimsical_playful: {
+    lighting: "bright cheerful lighting, sparkles everywhere, magical",
+    atmosphere: "magical bubbles, floating elements, pure joy",
+    expression: "playful, joyful, mischievous, fun",
+    colors: "vibrant candy colors, iridescent highlights, rainbow hints"
+  }
+};
+
+// ============================================================================
+// ELEMENT EFFECTS AS PURE OVERLAY (does NOT change body color)
+// ============================================================================
+
+const ELEMENT_AS_OVERLAY: Record<string, string> = {
+  fire: "glowing ember PARTICLES floating around creature (NOT changing body color), heat shimmer aura, flame wisps nearby, warm orange glow AROUND not ON creature",
+  water: "floating water DROPLETS around creature (NOT changing body color), ripple aura effects, bioluminescent sparkles in air, cool blue glow AROUND not ON creature",
+  earth: "floating dust PARTICLES and small stones orbiting creature (NOT changing body color), crystal formations nearby, nature energy, earthen glow AROUND not ON creature",
+  air: "swirling wind CURRENTS visible around creature (NOT changing body color), cloud wisps, feather particles floating, silvery glow AROUND not ON creature",
+  lightning: "electric ARCS crackling around creature (NOT changing body color), plasma glow effects, energy field, purple-blue electricity AROUND not ON creature",
+  ice: "frost PARTICLES and snowflakes around creature (NOT changing body color), cold vapor, ice crystal formations, cyan glow AROUND not ON creature",
+  light: "divine RAYS and sparkles around creature (NOT changing body color), holy glow, lens flares, golden radiance AROUND not ON creature",
+  shadow: "dark TENDRILS and wisps around creature (NOT changing body color), mysterious smoke, void particles, purple-black energy AROUND not ON creature"
+};
+
+// ============================================================================
+// COMPLETE 21 EVOLUTION STAGES - Ultra-detailed prompts
+// ============================================================================
+
+const EVOLUTION_STAGES: Record<number, { name: string; prompt: string; useFutureSilhouette?: boolean; futureStage?: number }> = {
+  // === EGG STAGES ===
+  0: {
+    name: "Dormant Egg",
+    prompt: `A mystical egg floating in gentle elemental energy.
+
+EGG APPEARANCE:
+- Smooth opalescent surface with subtle iridescent shimmer
+- {color} undertones glowing softly throughout shell
+- Semi-translucent crystalline quality
+- Size of a large ostrich egg
+
+SILHOUETTE WITHIN:
+- Deep inside the translucent shell, a DARK SHADOWY SILHOUETTE is barely visible
+- The silhouette shows the basic shape of a powerful, mature {spirit} curled in sleep
+- Just a dark featureless shadow - mysterious and intriguing
+- Hints at the magnificent creature that will emerge
+
+ENVIRONMENT:
+- Floating in soft {element} energy particles
+- Gentle magical glow surrounding the egg
+- Peaceful, anticipatory atmosphere`,
     useFutureSilhouette: true,
     futureStage: 15
   },
-  1: { 
-    name: "Cracking Awakening", 
-    prompt: "The same mystical egg now with luminous cracks spreading across its surface, leaking {element} energy. Through the larger cracks, a dark shadowy silhouette is more visible - the outline of an even more powerful {spirit} creature in its ultimate form (stage 20), still curled but beginning to stir. The silhouette remains a dark, featureless shadow showing only the magnificent shape and presence of the creature's final evolution. {color} light emanates from the fractures.",
+  1: {
+    name: "Cracking Awakening",
+    prompt: `The same mystical egg now with luminous cracks spreading across its surface.
+
+CRACKING EGG:
+- Same egg from Stage 0, but now with glowing cracks spreading
+- {color} light emanating from fractures
+- {element} energy leaking through the cracks
+- Shell beginning to fragment but not yet broken
+
+SILHOUETTE WITHIN:
+- Through the cracks, the shadowy silhouette is MORE visible now
+- Shows the outline of the ULTIMATE form (stage 20) of a {spirit}
+- Still a dark, featureless shadow but now stirring slightly
+- Beginning to move, about to awaken
+
+ENVIRONMENT:
+- More intense {element} particles swirling around
+- Building anticipation and energy
+- The moment just before emergence`,
     useFutureSilhouette: true,
     futureStage: 20
   },
-  // STAGES 2-7: BABY/YOUNG STAGES - Very slow progression, color consistency enforced
-  2: { 
-    name: "Hatchling", 
-    prompt: `A TINY baby {spirit} that JUST emerged from its egg seconds ago.
 
-SIZE: Palm-sized - fits easily in a human hand. Maximum 10% of adult size. EXTREMELY SMALL.
+  // === BABY STAGES 2-7 (Ultra-specific, minimal changes between each) ===
+  2: {
+    name: "Hatchling",
+    prompt: `A TINY {spirit} that JUST emerged from its egg SECONDS ago.
 
-APPEARANCE (CRITICAL):
-- Wet/damp looking as if just hatched, still glistening
+━━━ SIZE (CRITICAL) ━━━
+- PALM-SIZED: Fits easily in a cupped human hand
+- Only 8-10% of adult size
+- Think: newborn hamster or just-hatched chick
+
+━━━ JUST-HATCHED APPEARANCE ━━━
+- WET/DAMP looking, still glistening from egg
 - Eyes barely opening, squinting at first light
-- Extremely soft, vulnerable, completely helpless
-- Body extremely round, squishy, NO muscle definition at all
+- Body extremely ROUND and SQUISHY
+- Zero muscle definition - pure soft baby fat
 - Oversized head (60% of total body mass)
-- Tiny stubby limbs barely visible, pressed close to body
-- If wings: just tiny wet nubs pressed flat against body, not visible yet
+- Tiny stubby limbs pressed close to body
+- If species has wings: just tiny wet nubs, flat against body, invisible
 
-POSTURE: Same curled position as seen in the egg, barely moved
+━━━ POSTURE ━━━
+- Still in same curled position as in the egg
+- Barely moved since hatching
+- Lying/resting, cannot stand yet
 
-COLORS: {color} tones - soft, muted, newborn coloring. Gentle {element} shimmer.
+━━━ COLORS ━━━
+- {color} in soft, muted, newborn tones
+- Baby coloring - less vibrant than adult will be
 
-THIS IS A NEWBORN - think seconds-old baby bird or puppy, eyes barely open, completely helpless and precious.`
+━━━ EXPRESSION ━━━
+- Eyes: barely open slits, squinting
+- Completely helpless, vulnerable, precious
+- Pure innocence
+
+REAL-WORLD COMPARISON: A bird that hatched 30 seconds ago, or a newborn puppy with eyes still sealed.`
   },
-  3: { 
-    name: "Nestling", 
-    prompt: `A TINY baby {spirit}, NEARLY IDENTICAL to Stage 2 but now with eyes fully open.
+  3: {
+    name: "Nestling",
+    prompt: `A TINY {spirit} baby, NEARLY IDENTICAL to Stage 2 but eyes now open.
 
-SIZE: Still palm-sized. Maximum 12% of adult size. STILL EXTREMELY SMALL.
+━━━ SIZE (UNCHANGED) ━━━
+- Still palm-sized: 10-12% of adult size
+- Still EXTREMELY small
 
-CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
-- Eyes now fully open (big, curious, innocent, taking up most of face)
-- Slightly drier/fluffier than wet hatchling
-- Can hold head up slightly, looking around with wonder
+━━━ CHANGES FROM STAGE 2 (ONLY THESE 2 CHANGES) ━━━
+1. Eyes now FULLY OPEN (big, curious, innocent, taking up most of face)
+2. Slightly drier/fluffier than wet hatchling look
 
-EVERYTHING ELSE IDENTICAL TO STAGE 2:
+━━━ EVERYTHING ELSE IDENTICAL TO STAGE 2 ━━━
 - Same tiny round body shape
-- Same soft squishy proportions  
-- Same stubby limbs and tiny wing nubs
+- Same soft squishy proportions
+- Same stubby limbs pressed to body
+- Same oversized head
 - Same helpless baby appearance
-- Same curled posture, just head lifted
+- Same curled posture (maybe head lifted slightly to look around)
+- If wings: still tiny nubs, flat, not visible
 
-COLORS: EXACT SAME {color} as Stage 2 - absolutely NO COLOR CHANGES. Same {element} shimmer.
+━━━ COLORS (MUST BE IDENTICAL) ━━━
+- EXACT SAME {color} palette as Stage 2
+- NO color shifting or changes whatsoever
 
-Think: 3-day-old puppy or kitten - eyes just opened, still wobbly and helpless.`
+━━━ EXPRESSION ━━━
+- Eyes: now fully open, HUGE relative to face
+- Curious, wondering, taking in the world
+- Still completely helpless
+
+REAL-WORLD COMPARISON: A 3-day-old puppy or kitten - eyes just opened, still wobbly and helpless.`
   },
-  4: { 
-    name: "Fledgling", 
-    prompt: `A small baby {spirit}, NEARLY IDENTICAL to Stage 3 with slightly more coordination.
+  4: {
+    name: "Fledgling",
+    prompt: `A small {spirit} baby, NEARLY IDENTICAL to Stage 3 with slightly more coordination.
 
-SIZE: Still very small, now 15% of adult size. Still fits in cupped hands.
+━━━ SIZE ━━━
+- Still very small: 12-15% of adult size
+- Fits in cupped hands
 
-CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
-- Can now sit upright steadily instead of just lying curled
-- Limbs slightly more defined but still short and stubby
-- Beginning to show playful curiosity in expression
+━━━ CHANGES FROM STAGE 3 (ONLY THESE 2-3 CHANGES) ━━━
+1. Can now SIT UPRIGHT steadily (no longer just lying curled)
+2. Limbs slightly more defined but still short and stubby
+3. Beginning to show playful curiosity in expression
 
-EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+━━━ EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES ━━━
 - Same round baby proportions (big head, tiny body)
-- Same fluffy/soft texture
-- Same big innocent eyes
-- Still clearly a helpless baby, cannot walk yet
+- Same fluffy/soft baby texture
+- Same big innocent eyes from Stage 3
+- Still clearly a helpless baby
+- Cannot walk yet - just learned to sit
+- If wings: still tiny nubs, maybe slightly more visible
 
-COLORS: EXACT SAME {color} palette - identical to Stage 2 and 3. NO color changes allowed. {element} glow slightly more visible.
+━━━ COLORS (MUST BE IDENTICAL) ━━━
+- EXACT SAME {color} palette as Stages 2-3
+- NO color changes whatsoever
 
-Think: 3-week-old puppy - can sit up, playful but still very much a baby.`
+━━━ EXPRESSION ━━━
+- Playful curiosity beginning to show
+- Still innocent and baby-like
+- Maybe tiny smile
+
+REAL-WORLD COMPARISON: A 3-week-old puppy - can sit up, playful but still very much a baby.`
   },
-  5: { 
-    name: "Cub", 
+  5: {
+    name: "Cub",
     prompt: `A small {spirit} cub, NEARLY IDENTICAL to Stage 4 but now mobile.
 
-SIZE: Small - 20% of adult size. Still fits on a lap easily.
+━━━ SIZE ━━━
+- Small: 18-20% of adult size
+- Fits on a lap easily
 
-CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
-- Can walk/toddle around (wobbly but mobile)
-- Body slightly less perfectly round (baby fat still very present)
-- If wings: now small visible buds instead of flat nubs
+━━━ CHANGES FROM STAGE 4 (ONLY THESE 2-3 CHANGES) ━━━
+1. Can now WALK/TODDLE around (wobbly but mobile)
+2. Body slightly less perfectly round (baby fat still very present)
+3. If species has wings: now small visible BUDS instead of flat nubs
 
-EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+━━━ EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES ━━━
 - Same adorable baby face with big eyes
 - Same soft fluffy texture
 - Same baby proportions overall
-- Still clearly a young baby, not a juvenile
+- Still clearly a young baby, NOT a juvenile
+- Limbs still short and stubby
 
-COLORS: {color} - COMPLETELY UNCHANGED from earlier stages. Exact same color palette. {element} trails visible when moving.
+━━━ COLORS (MUST BE IDENTICAL) ━━━
+- EXACT SAME {color} as Stages 2-4
+- Completely unchanged color palette
 
-Think: 6-week-old puppy - playful, wobbly walking, but obviously still a baby.`
+━━━ EXPRESSION ━━━
+- Curious and exploring
+- Playful wobbliness
+- Still innocent baby expression
+
+REAL-WORLD COMPARISON: A 6-week-old puppy - playful, wobbly walking, but obviously still a baby.`
   },
-  6: { 
-    name: "Pup", 
-    prompt: `A young {spirit} pup, NEARLY IDENTICAL to Stage 5 but slightly larger.
+  6: {
+    name: "Pup",
+    prompt: `A young {spirit} pup, NEARLY IDENTICAL to Stage 5 with minor growth.
 
-SIZE: 25% of adult size. Small and young.
+━━━ SIZE ━━━
+- 22-25% of adult size
+- Small and young
 
-CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
-- Slightly longer limbs (still short, still puppy-like proportions)
-- Face slightly less perfectly round
-- More coordinated movement, less wobbly
-- If wings: small but now can flutter slightly
+━━━ CHANGES FROM STAGE 5 (ONLY THESE 2-3 CHANGES) ━━━
+1. Limbs slightly longer (still short, still puppy proportions)
+2. Face very slightly less perfectly round
+3. More coordinated movement, less wobbly
+4. If wings: small but now can flutter slightly
 
-EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+━━━ EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES ━━━
 - Same soft baby texture
-- Same playful innocent expression  
-- Same baby proportions overall
+- Same playful innocent expression
+- Same baby proportions overall (just slightly less extreme)
 - Still clearly a baby/young creature
 
-COLORS: EXACT SAME {color} as Stages 2-5 - absolutely NO color shifting or changes. Consistent {element} aura.
+━━━ COLORS (MUST BE IDENTICAL) ━━━
+- EXACT SAME {color} as Stages 2-5
+- NO color shifting or changes
 
-Think: 3-month-old puppy - growing but still very much a baby in appearance and proportions.`
+━━━ EXPRESSION ━━━
+- Playful and happy
+- Growing confidence
+- Still innocent and young
+
+REAL-WORLD COMPARISON: A 3-month-old puppy - growing but still very much a baby.`
   },
-  7: { 
-    name: "Kit", 
-    prompt: `A young {spirit} kit, NEARLY IDENTICAL to Stage 6 with early signs of growth.
+  7: {
+    name: "Kit",
+    prompt: `A young {spirit} kit, NEARLY IDENTICAL to Stage 6 with early growth signs.
 
-SIZE: 30% of adult size. Still clearly young and small.
+━━━ SIZE ━━━
+- 28-30% of adult size
+- Still clearly young and small
 
-CHANGES FROM PREVIOUS STAGE (ONLY THESE - everything else identical):
-- Limbs proportionally slightly longer
-- Species-specific features becoming slightly clearer
-- Slightly more athletic movement capability
-- If wings: now visible small wings, about 40% of adult wing size
+━━━ CHANGES FROM STAGE 6 (ONLY THESE 2-3 CHANGES) ━━━
+1. Limbs proportionally slightly longer
+2. Species-specific features becoming slightly clearer
+3. Slightly more athletic movement capability
+4. If wings: now visible small wings, about 40% of adult wing size
 
-EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES:
+━━━ EVERYTHING ELSE IDENTICAL TO PREVIOUS STAGES ━━━
 - Same cute youthful face with expressive eyes
 - Same soft texture (maybe slightly less fluffy)
 - Same innocent expression
 - Still clearly a young creature, NOT an adolescent or teen
 
-COLORS: {color} - SAME AS ALL PREVIOUS STAGES, only very slightly more vibrant. {element} effects slightly more defined.
+━━━ COLORS (SAME, SLIGHTLY MORE VIBRANT) ━━━
+- {color} - same base palette
+- Perhaps VERY slightly more vibrant (5% more saturated)
 
-Think: 5-month-old puppy - growing taller but still very puppy-like, not yet approaching teenage proportions.`
+━━━ EXPRESSION ━━━
+- Growing curiosity and playfulness
+- Still young and innocent
+- Beginning to show personality
+
+REAL-WORLD COMPARISON: A 5-month-old puppy - growing taller but still very puppy-like.`
   },
-  // STAGES 8+: Adolescent through Adult and Beyond
-  8: { name: "Seasoned Guardian", prompt: "An imposing {spirit} at full adult size with flawless species anatomy and heroic proportions. Powerful physique showing realistic muscle tension and relaxation. Every anatomical detail perfect: teeth/fangs with proper dental structure, eyes with corneal reflection and depth, skin showing appropriate thickness and texture variation. Dynamic pose mid-motion with realistic momentum. {element} energy creating environmental interaction: heat waves, water displacement, ground fissures. Cinematic wide-angle composition with depth of field." },
-  9: { name: "Mature Protector", prompt: "A battle-hardened {spirit} in its prime, anatomically perfect with scars and weathering that tell a story. Peak physical condition with defined musculature showing proper insertion points and fiber direction. Regal commanding pose with perfect posture and balance. Environment responding realistically: wind-blown debris, displaced water, crackling energy, gravitational distortion. {element} power radiating with volumetric lighting effects. {color} markings intricate and luminous. Dramatic low-angle cinematic framing emphasizing power." },
-  10: { name: "Veteran Form", prompt: "A legendary {spirit} with refined elegant anatomy showing both power and grace. Muscles/feathers/scales/skin exhibiting masterful detail: individual muscle striations, scale iridescence, feather microstructures, skin pores and texture. Wise battle-scarred face with deep intelligent eyes showing inner light. Poised stance radiating authority. {element} markings pulsing with rhythmic energy following circulatory patterns. {color} accents creating focal points. Museum-quality rendering with perfect subsurface scattering and ambient occlusion." },
-  11: { name: "Elevated Form", prompt: "A transcendent {spirit} achieving weightless grace while maintaining perfect anatomical accuracy. Slight gravitational defiance with realistic physics: fur/feathers flowing upward, subtle ground separation with energy cushion. {element} trails creating realistic motion paths with particle physics. Eyes glowing with inner luminescence showing proper eye anatomy with magical enhancement. Every muscle, bone, and feature rendered flawlessly. Ethereal atmospheric lighting with volumetric god rays." },
-  12: { name: "Ascended Form", prompt: "A majestic {spirit} hovering in concentrated ambient energy field, species anatomy 100% preserved and enhanced. Powerful physique showing peak evolutionary form with perfect proportions. {element} forming a brilliant radiant outline following exact body contours with proper light diffusion. {color} aura intensifying with realistic energy physics. Heroic floating pose with proper center of gravity. IMAX-quality cinematic composition with dramatic scale and atmospheric depth. Photorealistic fur/scale/feather rendering with every detail visible." },
-  13: { name: "Ether-Born Avatar", prompt: "A reality-bending {spirit} with semi-transparent layers of {element} energy phasing around its physically perfect body. Cosmiq or elemental sacred geometry patterns emerging organically on anatomically accurate fur/feathers/scales in {color} luminescence. Base creature silhouette completely unaltered, just cosmiqly enhanced. Multiple energy layers creating depth with atmospheric perspective. Mystical aura suggesting dimensional transcendence while maintaining biological perfection. Octane render quality with path-traced lighting." },
-  14: { name: "Primordial Aspect", prompt: "A monumentally enlarged {spirit} radiating ancient primordial power while maintaining exact anatomical proportions at massive scale. {element} energy condensing into luminous runic lines and glyphs wrapping around body following natural anatomy (veins, muscle groups, bone structure) without modifying base form. Reality warping subtly around the creature with spacetime distortion effects. Ground cracking beneath its weight with realistic physics. Ancient cosmiq power radiating in {color} hues. Epic fantasy art quality with perfect anatomy at titan scale." },
-  15: { name: "Colossus Form", prompt: "A colossal mythic-scale {spirit} towering with divine presence. Every anatomical feature identical to base species but rendered at monumental scale with museum-quality detail: individual scales/feathers visible despite size, proper muscle definition throughout, correct skeletal structure, accurate proportions maintained. {element} effects manifesting as massive environmental phenomena in {color} brilliance. Kaiju-scale cinematography with proper forced perspective. The creature is impossibly large yet perfectly anatomically sound. Photoreal rendering showing atmospheric scattering and scale depth cues." },
-  16: { name: "Cosmiq Guardian", prompt: "A celestial {spirit} merged with cosmiq forces while retaining perfect biological anatomy. Surrounded by photorealistic nebula clouds in {element} energy and {color} star matter. Eyes containing actual galaxies with realistic astronomical detail while maintaining proper eye structure. Body covered in bioluminescent patterns following natural markings with complex sacred geometry overlays. Every anatomical feature present and correct beneath cosmiq enhancement. Space-based environment with realistic stellar lighting. NASA-quality astrophotography meets natural history museum specimen." },
-  17: { name: "Astral Overlord", prompt: "A dimension-transcending {spirit} with crystal-clear anatomical definition. Multiple ghost-image echoes trailing behind showing motion through dimensional space, each maintaining perfect species anatomy. {element} energy creating chromatic aberration effects and reality ripples. {color} aura expanding into a massive presence field with realistic energy falloff. Main body hyper-detailed showing every muscle fiber, scale ridge, feather barbule in sharp focus. Dramatic dutch angle with impossible scale. Reality fragmenting around absolute power while creature remains anatomically flawless." },
-  18: { name: "Universal Sovereign", prompt: "A world-ending scale {spirit} appearing catastrophically powerful yet anatomically pristine. {element} manifesting as apocalyptic environmental phenomena: hurricane-force winds, tsunami waves, seismic ruptures, plasma storms swirling in {color} cosmiq fury. The creature itself maintains perfect unchanged anatomy simply existing at impossible planetary scale. Every biological detail correct and visible despite godlike size. Satellite-view composition showing creature affecting continental-scale environment. Photoreal disaster-movie cinematography with the creature as unstoppable natural force." },
-  19: { name: "Mythic Apex", prompt: "A deity-tier {spirit} standing as the perfected mythological ideal of its species. Floating runes and sigils orbiting in {element} script with ancient divine power. Physically flawless with every anatomical detail representing the absolute peak of evolutionary design: perfect symmetry, ideal muscle definition, pristine features, divine proportions following golden ratio. Light and shadow playing across form in {color} divine radiance emphasizing every species-specific detail like a Baroque religious painting. Heroic pose on cosmiq throne or platform. Worshipful low-angle composition with dramatic chiaroscuro lighting." },
-  20: { name: "Origin of Creation", prompt: "The absolute ultimate {spirit}: the primordial template from which all others descend. Pure embodiment of {element} in its creation-myth form while retaining EXACT anatomical accuracy of face, eyes, skull structure, body, musculature, skeletal system, limb articulation, wings, fins, tail, and every species-defining feature of base creature. Every surface glowing with {color} cosmiq genesis energy pulsing through perfect fur/feathers/scales like living stardust. The creature that existed before time, perfect in every biological detail. Background shows universe being born from its presence. Biblical/mythological grandeur with museum-specimen anatomical accuracy. This is perfection incarnate: the Original, the First, the Eternal - recognizably the same beloved companion but ascended to absolute divine completion." }
+
+  // === ADOLESCENT/YOUNG ADULT STAGES 8-12 ===
+  8: {
+    name: "Juvenile",
+    prompt: `An adolescent {spirit} showing first signs of approaching maturity.
+
+━━━ SIZE ━━━
+- 35-40% of adult size
+- No longer a baby but not yet adult
+
+━━━ TRANSITION FROM BABY TO ADOLESCENT ━━━
+- Body proportions shifting toward adult (head less oversized)
+- Limbs lengthening, more gangly "teenage" look
+- Still soft but beginning to show future muscle definition
+- If wings: 50% of adult size, can glide short distances
+- Species-specific adult features beginning to emerge
+
+━━━ APPEARANCE ━━━
+- Cute but less baby-round
+- Athletic potential visible
+- Still some baby softness remaining
+- Eyes still large but less dominating
+
+━━━ COLORS ━━━
+- {color} becoming more defined and vibrant
+- Adult color patterns emerging
+
+EXPRESSION: Curious, playful, eager, showing personality.`
+  },
+  9: {
+    name: "Yearling",
+    prompt: `A young adolescent {spirit} in the middle of growth.
+
+━━━ SIZE ━━━
+- 45-50% of adult size
+
+━━━ ADOLESCENT FEATURES ━━━
+- Gangly proportions typical of teenage growth
+- Limbs long, body catching up
+- Muscle definition beginning to show
+- If wings: 60% of adult size, can fly short distances
+- Adult features more visible but not fully developed
+
+━━━ COLORS ━━━
+- {color} fully vibrant now
+- Adult color pattern established
+
+EXPRESSION: Growing confidence, eager, adventurous.`
+  },
+  10: {
+    name: "Young Adult",
+    prompt: `A {spirit} on the cusp of full adulthood.
+
+━━━ SIZE ━━━
+- 55-65% of adult size
+
+━━━ NEAR-ADULT FEATURES ━━━
+- Proportions almost adult-like
+- Athletic build developing
+- Species features nearly complete
+- If wings: 75% of adult size, proficient flyer
+- Face maturing, less round
+
+━━━ COLORS ━━━
+- {color} at full adult vibrancy
+- All markings and patterns complete
+
+EXPRESSION: Confident, capable, on the verge of greatness.`
+  },
+  11: {
+    name: "Prime Form",
+    prompt: `A {spirit} reaching peak physical condition.
+
+━━━ SIZE ━━━
+- 75-85% of adult size
+
+━━━ PRIME FEATURES ━━━
+- Full adult proportions achieved
+- Athletic, powerful build
+- All species features fully developed
+- If wings: 90% of adult size, strong flyer
+- Peak physical beauty of species
+
+━━━ ELEMENTAL MANIFESTATION ━━━
+- {element} energy now visibly manifests around creature
+- Element-specific effects becoming prominent
+
+━━━ COLORS ━━━
+- {color} rich and vibrant
+- May show slight magical enhancement
+
+EXPRESSION: Powerful, confident, majestic.`
+  },
+  12: {
+    name: "Full Adult",
+    prompt: `A fully mature {spirit} at complete adult development.
+
+━━━ SIZE ━━━
+- 100% adult size
+
+━━━ FULL ADULT FEATURES ━━━
+- Perfect species anatomy at full adult scale
+- Peak muscle definition and power
+- All features fully developed and refined
+- If wings: full adult wingspan, powerful flight
+- Magnificent specimen of species
+
+━━━ ELEMENTAL POWER ━━━
+- {element} energy clearly manifests
+- Environmental effects visible
+
+━━━ COLORS ━━━
+- {color} at peak beauty
+- Magical luminescence beginning
+
+EXPRESSION: Wise, powerful, magnificent.`
+  },
+
+  // === MYTHIC STAGES 13-17 ===
+  13: {
+    name: "Enhanced Form",
+    prompt: `A {spirit} beginning to transcend normal limits.
+
+━━━ SIZE ━━━
+- 110-120% of normal adult size
+
+━━━ MYTHIC ENHANCEMENTS ━━━
+- Core species anatomy preserved perfectly
+- Size slightly enhanced beyond normal
+- {element} energy now part of being
+- Subtle glow emanating from creature
+- May develop minor mythic additions (small horns, energy trails)
+
+━━━ ELEMENTAL INTEGRATION ━━━
+- {element} effects now integral part of appearance
+- Environment responds to presence
+
+━━━ COLORS ━━━
+- {color} enhanced with magical luminescence
+- Patterns may glow softly
+
+EXPRESSION: Commanding, wise, otherworldly awareness.`
+  },
+  14: {
+    name: "Mythic Form",
+    prompt: `A {spirit} of legendary proportions and power.
+
+━━━ SIZE ━━━
+- 130-150% of normal adult size
+- Imposing presence
+
+━━━ LEGENDARY FEATURES ━━━
+- Species anatomy maintained at mythic scale
+- Heroic proportions and posture
+- {element} effects creating environmental phenomena
+- Possible additional mythic features (divine horns, energy wings on non-winged creatures)
+- Ancient power radiating from form
+
+━━━ COLORS ━━━
+- {color} with divine luminescence
+- Patterns pulse with power
+
+EXPRESSION: Ancient wisdom, barely contained power.`
+  },
+  15: {
+    name: "Titan Form",
+    prompt: `A colossal {spirit} of earth-shaking presence.
+
+━━━ SIZE ━━━
+- MASSIVE - building-sized
+- Titan scale
+
+━━━ TITAN FEATURES ━━━
+- Species identity clear even at colossal size
+- Every anatomical detail visible at massive scale
+- {element} manifesting as massive environmental effects
+- Ground trembles, air crackles, water churns from presence
+- Divine/mythic enhancements fully developed
+
+━━━ ELEMENTAL POWER ━━━
+- {element} creating major phenomena
+- Reality bends slightly around creature
+
+━━━ COLORS ━━━
+- {color} blazing with power
+- Entire form seems to glow
+
+EXPRESSION: Ancient god-like power, terrifying majesty.`
+  },
+  16: {
+    name: "Celestial Form",
+    prompt: `A {spirit} merged with cosmic forces.
+
+━━━ SIZE ━━━
+- COLOSSAL - mountain-sized
+- Celestial scale
+
+━━━ CELESTIAL FEATURES ━━━
+- Species anatomy visible through cosmic enhancement
+- Stars and nebulae reflected in form
+- {element} now cosmic-scale phenomenon
+- Reality warping around presence
+- Divine geometry patterns visible
+
+━━━ COSMIC INTEGRATION ━━━
+- Stars visible within body
+- Cosmic energy flowing through form
+- Celestial glow and presence
+
+━━━ COLORS ━━━
+- {color} mixed with starlight
+- Nebula patterns in fur/scales/feathers
+
+EXPRESSION: Beyond mortal comprehension, ancient cosmic awareness.`
+  },
+  17: {
+    name: "Divine Form",
+    prompt: `A {spirit} approaching godhood.
+
+━━━ SIZE ━━━
+- PLANETARY scale
+- Divine proportions
+
+━━━ DIVINE FEATURES ━━━
+- Species essence visible through divine form
+- Multiple dimensional echoes possible
+- {element} as universal force
+- Space-time distorts around presence
+- Divine halos, crowns, or similar manifestations
+
+━━━ GODLIKE POWER ━━━
+- Reality reshapes to will
+- Stars orbit around form
+- Divine energy radiates endlessly
+
+━━━ COLORS ━━━
+- {color} as pure divine light
+- Transcendent luminescence
+
+EXPRESSION: Benevolent deity, infinite wisdom and power.`
+  },
+
+  // === COSMIC/DIVINE STAGES 18-20 ===
+  18: {
+    name: "Universal Form",
+    prompt: `A {spirit} of universe-shaping power.
+
+━━━ SIZE ━━━
+- STELLAR scale - size of stars
+
+━━━ UNIVERSAL FEATURES ━━━
+- Species identity core to cosmic form
+- Galaxies flow around and through form
+- {element} as fundamental universal force
+- Creates and destroys stars with presence
+- Multiple form echoes through dimensions
+
+━━━ COSMIC MANIFESTATION ━━━
+- Is becoming part of universe itself
+- Other celestial bodies respond to presence
+- {color} light bends reality
+
+EXPRESSION: Universal consciousness, beyond individual awareness.`
+  },
+  19: {
+    name: "Primordial Form",
+    prompt: `A {spirit} as a primordial universal force.
+
+━━━ SIZE ━━━
+- GALACTIC scale
+
+━━━ PRIMORDIAL FEATURES ━━━
+- Species essence is the core of galactic-scale being
+- Existed before time, will exist after
+- {element} as primordial force of creation
+- Reality, time, and space bow to will
+- Divine perfection in every detail
+
+━━━ CREATION POWER ━━━
+- Universes spawn in wake of movement
+- Is becoming the element itself
+- {color} is the color of creation
+
+EXPRESSION: The infinite, the eternal, the primordial.`
+  },
+  20: {
+    name: "Origin Form",
+    prompt: `The ULTIMATE {spirit} - the primordial template from which all others descend.
+
+━━━ SCALE ━━━
+- UNIVERSE scale - contains multitudes
+
+━━━ THE ORIGIN ━━━
+- This is THE FIRST {spirit} - the original from which all descend
+- Perfect species anatomy visible through divine cosmic form:
+  - Face structure 100% {spirit}
+  - Eye shape and placement exactly correct
+  - Body proportions matching species perfectly
+  - All species-defining features present
+- Every surface glowing with {color} cosmic genesis energy
+- Fur/feathers/scales shimmer like living stardust
+- Background shows universes being born from presence
+
+━━━ ELEMENTAL APOTHEOSIS ━━━
+- IS the {element} - not just controls it, IS it
+- All {element} in existence flows from this being
+
+━━━ DIVINE PRESENCE ━━━
+- Perfect in every biological detail
+- Infinite in cosmic power
+- The beloved companion ascended to absolute divine completion
+- Recognizably the same creature, transcended to godhood
+
+━━━ COLORS ━━━
+- {color} as the color of reality itself
+- Every hue and shade originates here
+
+THIS IS PERFECTION INCARNATE: The Original, The First, The Eternal.`
+  }
 };
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function getDefaultAnatomy(spiritAnimal: string): CreatureAnatomy {
+  // Fallback for any creature not in our database
+  return {
+    category: "unknown",
+    limbCount: 4,
+    hasWings: false,
+    hasTail: true,
+    bodyType: "quadruped",
+    babyFeatures: "round fluffy body, oversized head, big eyes, stubby limbs",
+    adultFeatures: "fully developed adult features appropriate to species",
+    anatomyNotes: `Follow real-world ${spiritAnimal} anatomy exactly`,
+    prohibitedFeatures: "extra limbs, multiple heads, wings (unless naturally has them)",
+    realWorldRef: spiritAnimal
+  };
+}
+
+function generateCharacterDNA(
+  spiritAnimal: string,
+  element: string,
+  favoriteColor: string,
+  eyeColor: string | undefined,
+  furColor: string | undefined,
+  stage: number
+): string {
+  const anatomy = CREATURE_ANATOMY[spiritAnimal] || getDefaultAnatomy(spiritAnimal);
+  const isBabyStage = stage >= 2 && stage <= 7;
+
+  return `
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    CHARACTER DNA - IMMUTABLE IDENTITY                        ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ SPECIES: ${spiritAnimal.toUpperCase().padEnd(65)}║
+║ Category: ${anatomy.category.padEnd(64)}║
+║ Body Type: ${anatomy.bodyType.padEnd(63)}║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                          ANATOMICAL REQUIREMENTS                             ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ Limb Count: EXACTLY ${anatomy.limbCount} limbs (never more, never less)${' '.repeat(39 - String(anatomy.limbCount).length)}║
+║ Has Wings: ${anatomy.hasWings ? 'YES - species naturally has wings' : 'NO - do NOT add wings under any circumstances'}${' '.repeat(anatomy.hasWings ? 31 : 14)}║
+║ Has Tail: ${anatomy.hasTail ? 'YES - include tail' : 'NO - no tail'}${' '.repeat(anatomy.hasTail ? 46 : 52)}║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                          COLOR LOCK (NEVER CHANGE)                           ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ Primary Body Color: ${favoriteColor} - THIS IS THE MAIN COLOR${' '.repeat(Math.max(0, 35 - favoriteColor.length))}║
+║ Eye Color: ${(eyeColor || favoriteColor)} - SAME in EVERY stage${' '.repeat(Math.max(0, 43 - (eyeColor || favoriteColor).length))}║
+║ Fur/Feather/Scale Color: ${(furColor || favoriteColor)}${' '.repeat(Math.max(0, 48 - (furColor || favoriteColor).length))}║
+║ Element Effects: ${element} glow/particles ONLY (does NOT change body color)${' '.repeat(Math.max(0, 7 - element.length))}║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                          STAGE-SPECIFIC FEATURES                             ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+${isBabyStage ? `║ BABY FEATURES (Stages 2-7):                                                  ║
+║ ${anatomy.babyFeatures.substring(0, 74).padEnd(74)}║` : `║ ADULT FEATURES (Stages 8+):                                                  ║
+║ ${anatomy.adultFeatures.substring(0, 74).padEnd(74)}║`}
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ ANATOMY NOTES:                                                               ║
+║ ${anatomy.anatomyNotes.substring(0, 74).padEnd(74)}║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ REAL-WORLD REFERENCE: ${anatomy.realWorldRef.substring(0, 51).padEnd(51)}║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                         PROHIBITED (NEVER INCLUDE)                           ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ ${anatomy.prohibitedFeatures.substring(0, 74).padEnd(74)}║
+╚══════════════════════════════════════════════════════════════════════════════╝`;
+}
+
+function getNegativePrompts(stage: number, spiritAnimal: string, anatomy: CreatureAnatomy): string {
+  const base = [
+    "different color than specified in Character DNA",
+    "color drift or shift from previous stages",
+    "wrong species features",
+    "hybrid creature (unless specifically a hybrid species)",
+    "human features or anthropomorphism",
+    "wrong number of limbs",
+    "extra heads (unless Cerberus/Hydra)",
+    "merged or fused body parts"
+  ];
+
+  // Baby stages (2-7): Prevent mature appearances
+  const babyNegatives = stage >= 2 && stage <= 7 ? [
+    "muscular build",
+    "athletic appearance",
+    "adult proportions",
+    "mature features",
+    "battle scars or weathering",
+    "fierce/intimidating expression",
+    "large size",
+    "fully developed wings (wings should be nubs/buds)",
+    "long limbs (limbs should be stubby)"
+  ] : [];
+
+  // Adolescent stages (8-12): Prevent both baby and mythic features
+  const adolescentNegatives = stage >= 8 && stage <= 12 ? [
+    "baby proportions",
+    "cosmic/divine features",
+    "reality-warping effects",
+    "planet-sized scale"
+  ] : [];
+
+  // Creature-specific negatives
+  const creatureNegatives: string[] = [];
+  if (!anatomy.hasWings) {
+    creatureNegatives.push("wings of any kind", "feathered wings", "bat wings", "energy wings (at realistic stages)");
+  }
+  if (!anatomy.hasTail) {
+    creatureNegatives.push("tail of any kind");
+  }
+  if (anatomy.limbCount === 0) {
+    creatureNegatives.push("legs", "arms", "limbs of any kind");
+  }
+
+  const allNegatives = [...base, ...babyNegatives, ...adolescentNegatives, ...creatureNegatives];
+
+  return `
+━━━ NEGATIVE PROMPTS - DO NOT INCLUDE ━━━
+${allNegatives.map(n => `✗ ${n}`).join('\n')}
+
+SPECIES-SPECIFIC PROHIBITED:
+✗ ${anatomy.prohibitedFeatures}`;
+}
+
+function getStoryToneModifiers(tone?: string): string {
+  const selectedTone = STORY_TONE_MODIFIERS[tone as keyof typeof STORY_TONE_MODIFIERS] || STORY_TONE_MODIFIERS.epic_adventure;
+  
+  return `
+━━━ STORY TONE STYLING ━━━
+Lighting: ${selectedTone.lighting}
+Atmosphere: ${selectedTone.atmosphere}
+Expression: ${selectedTone.expression}
+Color Enhancement: ${selectedTone.colors}`;
+}
+
+function getElementOverlay(element: string): string {
+  const overlay = ELEMENT_AS_OVERLAY[element.toLowerCase()] || ELEMENT_AS_OVERLAY.light;
+  
+  return `
+━━━ ELEMENTAL EFFECTS (OVERLAY ONLY - NOT BODY COLOR) ━━━
+CRITICAL: These effects appear AROUND the creature, NOT changing its body color!
+${overlay}`;
+}
+
+// ============================================================================
+// MAIN SERVER
+// ============================================================================
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     console.log("Generating companion image - request received");
-    
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       console.error("No authorization header provided");
       return new Response(
-        JSON.stringify({ 
-          error: "Authentication required. Please refresh the page and try again.",
-          code: "NO_AUTH_HEADER"
-        }), 
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-          status: 401 
-        }
+        JSON.stringify({ error: "Authentication required. Please refresh the page and try again.", code: "NO_AUTH_HEADER" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     if (!supabaseUrl || !supabaseKey) {
       console.error("Supabase configuration missing");
       return new Response(
-        JSON.stringify({ 
-          error: "Server configuration error. Please contact support.",
-          code: "SERVER_CONFIG_ERROR"
-        }), 
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-          status: 500 
-        }
+        JSON.stringify({ error: "Server configuration error. Please contact support.", code: "SERVER_CONFIG_ERROR" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
-    
+
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
     const token = authHeader.replace("Bearer ", "");
@@ -221,20 +1644,25 @@ serve(async (req) => {
     if (authError || !user) {
       console.error("Authentication failed:", authError);
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid authentication. Please refresh the page and try again.",
-          code: "INVALID_AUTH"
-        }), 
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-          status: 401 
-        }
+        JSON.stringify({ error: "Invalid authentication. Please refresh the page and try again.", code: "INVALID_AUTH" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
 
     console.log(`User authenticated: ${user.id}`);
 
-    const { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor, retryAttempt = 0 } = await req.json();
+    const {
+      spiritAnimal,
+      element,
+      stage,
+      favoriteColor,
+      eyeColor,
+      furColor,
+      retryAttempt = 0,
+      storyTone,
+      previousStageImageUrl, // NEW: For image-to-image editing
+      companionId // NEW: To fetch previous stage if not provided
+    } = await req.json();
 
     console.log(`Request params - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}, Retry: ${retryAttempt}`);
 
@@ -243,299 +1671,257 @@ serve(async (req) => {
     if (stage === undefined || stage === null) throw new Error("stage is required");
     if (!favoriteColor) throw new Error("favoriteColor is required");
 
-    // Enhanced anatomical enforcement for retry attempts
-    const getRetryEnforcement = (attempt: number): string => {
-      if (attempt === 0) return '';
-      
-      const enforcements = [
-        `\n\nCRITICAL ANATOMY ENFORCEMENT (RETRY ${attempt}):
-- SINGLE HEAD ONLY - absolutely NO multiple heads, NO extra faces
-- COUNT LIMBS CAREFULLY - exactly the correct number for ${spiritAnimal} species
-- NO EXTRA LIMBS - no phantom legs, no duplicate arms, no additional appendages
-- NO MERGED BODY PARTS - each limb must be separate and distinct
-- ANATOMICALLY CORRECT - follow real ${spiritAnimal} bone structure exactly`,
+    const anatomy = CREATURE_ANATOMY[spiritAnimal] || getDefaultAnatomy(spiritAnimal);
+    const stageInfo = EVOLUTION_STAGES[stage as number];
 
-        `\n\nMANDATORY ANATOMICAL CORRECTNESS (FINAL ATTEMPT):
-- THIS IS CRITICAL: Generate a ${spiritAnimal} with EXACTLY the correct anatomy
-- ONE HEAD - never two heads, never fused heads, ONE face only
-- CORRECT LIMB COUNT - real ${spiritAnimal} have a specific number of legs/arms - match exactly
-- NO ANOMALIES - no extra eyes, no extra ears, no phantom limbs
-- CLEAN ANATOMY - every body part distinct and properly connected
-- REFERENCE: Study a real ${spiritAnimal} photograph for correct anatomy`
-      ];
-
-      return enforcements[Math.min(attempt - 1, enforcements.length - 1)];
-    };
-
-    const retryEnforcement = getRetryEnforcement(retryAttempt);
-
-    const stageInfo = EVOLUTION_STAGES[stage as keyof typeof EVOLUTION_STAGES];
     if (!stageInfo) {
       console.error(`Invalid stage provided: ${stage}`);
       throw new Error(`Invalid stage: ${stage}`);
     }
 
-    const elementEffect = ELEMENT_EFFECTS[element.toLowerCase() as keyof typeof ELEMENT_EFFECTS] || ELEMENT_EFFECTS.light;
-    
-    let fullPrompt: string;
-    
-    // Stage 0 uses special silhouette prompt
-    if (stage === 0) {
-      fullPrompt = `STYLIZED FANTASY ART - Digital painting style:
+    // ========================================================================
+    // IMAGE-TO-IMAGE FOR BABY STAGES (2-7)
+    // ========================================================================
+    let useImageToImage = false;
+    let previousImageUrl: string | null = null;
 
-SUBJECT: A mystical egg floating in ${element} elemental energy.
+    if (stage >= 2 && stage <= 7) {
+      // Try to get previous stage image
+      if (previousStageImageUrl) {
+        previousImageUrl = previousStageImageUrl;
+        useImageToImage = true;
+        console.log(`Using provided previous stage image for image-to-image editing`);
+      } else if (companionId && stage > 2) {
+        // Fetch from companion_evolutions table
+        const previousStage = stage - 1;
+        const { data: prevEvolution } = await supabase
+          .from('companion_evolutions')
+          .select('image_url')
+          .eq('companion_id', companionId)
+          .eq('stage', previousStage)
+          .single();
 
-EGG DETAILS:
-- Smooth opalescent surface with iridescent shimmer
-- ${favoriteColor} undertones with magical patterns
-- Semi-translucent crystalline shell
-- Soft painterly shading
-
-SILHOUETTE INSIDE:
-Within the shell, a dark silhouette of a ${spiritAnimal.toUpperCase()} curled up sleeping.
-- Recognizable ${spiritAnimal} features in shadow form
-- Mysterious and magical
-
-ELEMENTAL EFFECTS:
-- ${element} energy and gentle particles around the egg
-- Soft glow in ${favoriteColor} tones
-
-STYLE: Stylized digital fantasy art, painterly, NOT photorealistic`;
-    } else {
-      const basePrompt = stageInfo.prompt.replace(/{spirit}/g, spiritAnimal).replace(/{element}/g, element).replace(/{color}/g, favoriteColor);
-      
-      // Progressive creative freedom based on stage
-      // Early stages (1-10): Strict realism
-      // Mid stages (11-14): Allow mythic enhancements
-      // Late stages (15-20): Full grandiose creativity
-      const stageLevel = stage <= 10 ? 'realistic' : stage <= 14 ? 'mythic' : 'legendary';
-      
-      // Special handling for aquatic creatures to prevent legs (applies to ALL tiers including legendary)
-      const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
-      const isAquatic = aquaticCreatures.some(creature => spiritAnimal.toLowerCase().includes(creature));
-      
-      // Stage-appropriate aquatic enforcement
-      let aquaticNote = '';
-      if (isAquatic) {
-        if (stageLevel === 'realistic' || stageLevel === 'mythic') {
-          aquaticNote = '\n\nCRITICAL AQUATIC ANATOMY:\n- This is a purely AQUATIC creature - NO LEGS OR LIMBS of any kind\n- Only fins, tail, and streamlined hydrodynamic body\n- Absolutely no legs, arms, feet, hands, or terrestrial limbs\n- Must follow real-world aquatic animal anatomy\n- Underwater environment with water physics';
-        } else {
-          // Legendary tier - aquatic still maintained even at cosmiq scale
-          aquaticNote = '\n\nCRITICAL AQUATIC ESSENCE (COSMIQ SCALE):\n- Even at universe-scale, this remains an AQUATIC entity - NO LEGS OR TERRESTRIAL LIMBS\n- Cosmiq fins, nebula tail flukes, galaxy-scale streamlined form\n- NEVER legs, arms, or terrestrial appendages - aquatic movement through space itself\n- Can have ethereal fins, stellar tail, cosmiq flippers - but must remain recognizably aquatic\n- Think: cosmiq whale swimming through stars, not a legged deity';
+        if (prevEvolution?.image_url) {
+          previousImageUrl = prevEvolution.image_url;
+          useImageToImage = true;
+          console.log(`Fetched previous stage ${previousStage} image for image-to-image editing`);
         }
       }
-      
-      // Stage-appropriate species enforcement
-      let speciesGuidance = '';
-      if (stageLevel === 'realistic') {
-        speciesGuidance = `
-SPECIES IDENTITY (ABSOLUTELY NON-NEGOTIABLE):
-THIS IS A ${spiritAnimal.toUpperCase()} - Nothing else, no exceptions, no creative interpretation.
+    }
 
-CRITICAL SPECIES REQUIREMENTS:
-- Species: Pure ${spiritAnimal} - 100% anatomically accurate to real-world ${spiritAnimal} biology
-- NO HYBRIDS: This is NOT a ${spiritAnimal}-dragon, NOT a ${spiritAnimal}-human, NOT any other species
-- NO ADDED FEATURES: Do not add wings unless ${spiritAnimal} naturally has wings in reality
-- NO REMOVED FEATURES: Do not remove limbs that real ${spiritAnimal} have
-- EXACT ${spiritAnimal} skeletal structure following real animal anatomy textbooks
-- EXACT ${spiritAnimal} proportions (head-to-body ratio, limb length, body shape)
-- Correct number of limbs: Real ${spiritAnimal} have [X] legs - match this exactly
-- Correct digit count: Real ${spiritAnimal} have [Y] toes/claws - match this exactly
-- Species-defining features: ${spiritAnimal} have specific ears/snout/tail - include all of them
-- Realistic muscle groups and bone structure for ${spiritAnimal} species
-- Species-appropriate posture, gait, and natural movement for ${spiritAnimal}${aquaticNote}
+    // ========================================================================
+    // BUILD THE PROMPT
+    // ========================================================================
 
-CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - never generate multiple heads, extra faces, or duplicate body parts.
+    const characterDNA = generateCharacterDNA(spiritAnimal, element, favoriteColor, eyeColor, furColor, stage);
+    const negativePrompts = getNegativePrompts(stage, spiritAnimal, anatomy);
+    const storyToneStyle = getStoryToneModifiers(storyTone);
+    const elementOverlay = getElementOverlay(element);
 
-REFERENCE: Imagine a ${spiritAnimal} from a nature documentary or zoo, then add magical elements WITHOUT changing the animal's anatomy.`;
-      } else if (stageLevel === 'mythic') {
-        speciesGuidance = `
-SPECIES IDENTITY (CORE FOUNDATION):
-THIS IS A ${spiritAnimal.toUpperCase()} - Recognizable species with mythic enhancements allowed.
+    // Replace template variables in stage prompt
+    const stagePrompt = stageInfo.prompt
+      .replace(/{spirit}/g, spiritAnimal)
+      .replace(/{element}/g, element)
+      .replace(/{color}/g, favoriteColor);
 
-ENHANCED SPECIES REQUIREMENTS:
-- Base Species: ${spiritAnimal} - core anatomy maintained but mythic features now permitted
-- Species recognizable: Should still be identifiable as ${spiritAnimal} at first glance
-- Core features preserved: Maintain ${spiritAnimal} head shape, body structure, limb configuration
-- Mythic enhancements allowed: Can add divine horns, ethereal wings, cosmiq patterns, reality-bending features
-- Size enhancement: Can be larger than real-world scale
-- Proportions can be heroic/idealized while maintaining ${spiritAnimal} identity
-- Elemental features can manifest as additional visual elements (energy wings, particle effects, auras)${aquaticNote}
+    // Retry enforcement
+    const retryEnforcement = retryAttempt > 0 ? `
 
-CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - never generate multiple heads, extra faces, or duplicate body parts.
+━━━ RETRY ENFORCEMENT (Attempt ${retryAttempt}) ━━━
+CRITICAL - Previous attempt had anatomical errors. This time:
+- EXACTLY ${anatomy.limbCount} limbs - count them carefully
+- ${anatomy.hasWings ? 'Include wings as species naturally has them' : 'NO WINGS - species does not have wings'}
+- SINGLE HEAD ONLY - no multiple heads or faces
+- Every limb distinct and separate
+- Follow EXACT ${spiritAnimal} bone structure
+- Reference: Study a real ${anatomy.realWorldRef} photograph` : '';
 
-CREATIVE FREEDOM: You may add mythic/divine features that enhance the ${spiritAnimal} into a legendary form, BUT the creature must remain recognizable as a ${spiritAnimal}.`;
-      } else {
-        speciesGuidance = `
-SPECIES IDENTITY (DIVINE EVOLUTION):
-THIS IS THE ULTIMATE ${spiritAnimal.toUpperCase()} - A god-tier, reality-breaking, cosmiq entity that transcends while maintaining ${spiritAnimal} essence.
+    let fullPrompt: string;
 
-LEGENDARY CREATIVE FREEDOM:
-- Base Species Recognition: ${spiritAnimal} identity visible through divine form
-- FULL CREATIVE LIBERTY: Add cosmiq wings, divine horns, multiple forms, reality fragments, celestial features
-- Scale: Colossal, planetary, universe-scale presence
-- Anatomy can be fantastical: Multiple ethereal limbs, cosmiq energy constructs, dimensional features
-- Can transcend physical form: Ghost images, dimensional echoes, astral projections
-- Divine enhancements: Halos, crowns, divine armor, cosmiq patterns, universe-birthing energy
-- Reality-bending: Environment warps around the creature, space-time distortions, cosmiq phenomena${aquaticNote}
+    if (stage === 0 || stage === 1) {
+      // Egg stages - special handling
+      fullPrompt = `STYLIZED FANTASY ART - Digital painting style:
 
-CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - even at god-tier, never generate multiple heads or extra faces. One head, one face.
+${stagePrompt}
 
-GRANDIOSE MANDATE: Make this creature LARGER THAN LIFE. This is the pinnacle of evolution - a living god, a force of nature, an entity of pure legend. Push creative boundaries while keeping the soul of the ${spiritAnimal} recognizable in the design.`;
-      }
-      
-      // Evolution consistency enforcement for baby stages (2-7)
-      const evolutionConsistencyNote = stage >= 2 && stage <= 7 ? `
-
-EVOLUTION CONSISTENCY (CRITICAL - READ CAREFULLY):
-- This creature should look NEARLY IDENTICAL to the previous stage
-- DO NOT dramatically change colors - use EXACT SAME color palette as earlier stages
-- DO NOT make the creature look more mature than described - follow SIZE PERCENTAGES exactly
-- Changes between stages should be SUBTLE and MINIMAL - think "spot the difference" level
-- At Stage ${stage}, creature is only ${stage === 2 ? '10%' : stage === 3 ? '12%' : stage === 4 ? '15%' : stage === 5 ? '20%' : stage === 6 ? '25%' : '30%'} of adult size
-- This is still a BABY - cute, round, helpless, NOT athletic or muscular
-- NO dramatic transformations - each stage is almost the same as the previous
-- Real-world comparison: ${stage === 2 ? 'seconds-old hatchling' : stage === 3 ? '3-day-old baby' : stage === 4 ? '3-week-old baby' : stage === 5 ? '6-week-old puppy' : stage === 6 ? '3-month-old puppy' : '5-month-old puppy'}
-` : '';
-      
-      fullPrompt = `STYLIZED FANTASY CREATURE - Digital painting style, appealing but not overly cute:
-
-CREATURE EVOLUTION STAGE ${stage}: ${stageInfo.name}
-
-STYLE DIRECTION:
-- Stylized digital fantasy art like high-quality game illustrations
-- Appealing and charming with expressive features
-- NOT photorealistic but NOT overly cartoonish either
-- Think: fantasy game art, digital painting, illustrated storybook quality
-- Soft painterly rendering with rich colors
-
-BASE DESCRIPTION:
-${basePrompt}
-${speciesGuidance}
-${retryEnforcement}
-${evolutionConsistencyNote}
-
-COLOR PALETTE:
-- Primary colors: Rich ${favoriteColor} tones
-- Eye color: ${eyeColor || favoriteColor} with expressive shine
-- Fur/Feathers/Scales: ${furColor || favoriteColor} with soft texture
-- Elemental glow: ${element} magical effects
+${characterDNA}
+${storyToneStyle}
+${elementOverlay}
 
 RENDERING STYLE:
-- Painterly digital art style
-- Soft but defined edges
-- Expressive eyes with personality
-- Rich saturated colors
-- Smooth gradients and soft shadows
+- Stylized digital fantasy art, high-quality game illustrations
+- Painterly with rich colors, soft edges
+- NOT photorealistic, NOT hyper-cartoonish
+- Magical and ethereal atmosphere`;
 
-ELEMENTAL INTEGRATION:
-- ${element} element as magical glowing effects
-- Soft particle effects and gentle auras
-- Enhances the creature without overwhelming
+    } else if (useImageToImage && previousImageUrl) {
+      // IMAGE-TO-IMAGE EDITING for baby stages 2-7
+      const stageChanges = {
+        2: "Just hatched - eyes barely opening, wet/damp appearance, still in egg-curled position",
+        3: "Eyes now FULLY OPEN (big, curious), slightly drier/fluffier than before",
+        4: "Can now SIT UPRIGHT steadily, limbs slightly more defined, playful curiosity showing",
+        5: "Can now WALK/TODDLE (wobbly), body slightly less round, tiny wing buds visible if species has wings",
+        6: "Limbs slightly longer, face slightly less round, more coordinated movement",
+        7: "Limbs proportionally longer, species features clearer, small wings visible if species has wings"
+      };
 
-STYLE REFERENCES:
-- High-quality fantasy game concept art
-- Digital painting / illustration style
-- Stylized but grounded fantasy creatures
-- NOT photorealistic, NOT hyper-cartoon`;
+      fullPrompt = `IMAGE EDITING INSTRUCTION - MAKE MINIMAL CHANGES ONLY
+
+I am providing an image of a Stage ${stage - 1} ${spiritAnimal} baby.
+Edit this image to create Stage ${stage} with ONLY these specific changes:
+
+━━━ SPECIFIC CHANGES FOR STAGE ${stage} ━━━
+${stageChanges[stage as keyof typeof stageChanges]}
+
+━━━ CRITICAL: WHAT MUST STAY IDENTICAL ━━━
+- EXACT SAME body color (${favoriteColor})
+- EXACT SAME eye color (${eyeColor || favoriteColor})
+- EXACT SAME fur/feather/scale color (${furColor || favoriteColor})
+- EXACT SAME face structure and features
+- EXACT SAME overall body shape (with minor specified changes)
+- EXACT SAME style and rendering quality
+
+━━━ THIS IS "SPOT THE DIFFERENCE" LEVEL CHANGE ━━━
+The two images should look nearly identical except for the 1-2 specific changes listed above.
+
+${characterDNA}
+${negativePrompts}`;
+
+    } else {
+      // Standard text-to-image generation
+      fullPrompt = `STYLIZED FANTASY CREATURE - Digital painting, game art quality
+
+${characterDNA}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EVOLUTION STAGE ${stage}: ${stageInfo.name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${stagePrompt}
+
+${storyToneStyle}
+${elementOverlay}
+${retryEnforcement}
+${negativePrompts}
+
+━━━ RENDERING STYLE ━━━
+- Stylized digital fantasy art like high-quality game illustrations
+- Appealing and charming with expressive features
+- NOT photorealistic, NOT hyper-cartoonish
+- Painterly digital art with rich saturated colors
+- Soft but defined edges, expressive eyes with personality`;
     }
+
+    // ========================================================================
+    // CALL AI FOR IMAGE GENERATION
+    // ========================================================================
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY not configured in environment");
       return new Response(
-        JSON.stringify({ 
-          error: "AI service not configured. Please contact support.",
-          code: "AI_SERVICE_NOT_CONFIGURED"
-        }), 
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-          status: 500 
-        }
+        JSON.stringify({ error: "AI service not configured. Please contact support.", code: "AI_SERVICE_NOT_CONFIGURED" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
-    console.log("Calling Lovable AI for image generation...");
+    console.log(`Calling Lovable AI for ${useImageToImage ? 'image-to-image' : 'text-to-image'} generation...`);
+
+    // Build the message content
+    let messageContent: any;
+
+    if (useImageToImage && previousImageUrl) {
+      // Image-to-image editing
+      messageContent = [
+        { type: "text", text: fullPrompt },
+        { type: "image_url", image_url: { url: previousImageUrl } }
+      ];
+    } else {
+      // Text-to-image generation
+      messageContent = fullPrompt;
+    }
+
     let aiResponse;
     try {
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-2.5-flash-image", messages: [{ role: "user", content: fullPrompt }], modalities: ["image", "text"] })
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          messages: [{ role: "user", content: messageContent }],
+          modalities: ["image", "text"]
+        })
       });
     } catch (fetchError) {
       console.error("Network error calling AI service:", fetchError);
       return new Response(
-        JSON.stringify({ 
-          error: "Network error. Please check your connection and try again.",
-          code: "NETWORK_ERROR"
-        }), 
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-          status: 503 
-        }
+        JSON.stringify({ error: "Network error. Please check your connection and try again.", code: "NETWORK_ERROR" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 }
       );
     }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("Lovable AI error:", errorText);
-      
-      // Handle specific error cases
+
       if (aiResponse.status === 402) {
         return new Response(
-          JSON.stringify({ 
-            error: "Insufficient AI credits. Please contact support or try again later.",
-            code: "INSUFFICIENT_CREDITS"
-          }), 
-          { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-            status: 402 
-          }
+          JSON.stringify({ error: "Insufficient AI credits. Please contact support or try again later.", code: "INSUFFICIENT_CREDITS" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 }
         );
       }
-      
+
       if (aiResponse.status === 429) {
         return new Response(
-          JSON.stringify({ 
-            error: "AI service is currently busy. Please wait a moment and try again.",
-            code: "RATE_LIMITED"
-          }), 
-          { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-            status: 429 
-          }
+          JSON.stringify({ error: "AI service is currently busy. Please wait a moment and try again.", code: "RATE_LIMITED" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
         );
       }
-      
+
       throw new Error(`Lovable AI request failed: ${aiResponse.status}`);
     }
 
     const aiData = await aiResponse.json();
     const imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
     if (!imageUrl) {
       console.error("No image URL in AI response:", JSON.stringify(aiData));
       throw new Error("No image URL in response");
     }
 
     console.log("Image generated successfully, uploading to storage...");
+
     const base64Data = imageUrl.split(",")[1];
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const filePath = `${user.id}/companion_${user.id}_stage${stage}_${Date.now()}.png`;
 
-    const { error: uploadError } = await supabase.storage.from("mentors-avatars").upload(filePath, binaryData, { contentType: "image/png", upsert: false });
+    const { error: uploadError } = await supabase.storage
+      .from("mentors-avatars")
+      .upload(filePath, binaryData, { contentType: "image/png", upsert: false });
+
     if (uploadError) {
       console.error("Storage upload error:", uploadError);
       throw uploadError;
     }
 
     const { data: { publicUrl } } = supabase.storage.from("mentors-avatars").getPublicUrl(filePath);
+
     console.log(`Companion image uploaded successfully: ${publicUrl}`);
 
-    return new Response(JSON.stringify({ imageUrl: publicUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    return new Response(
+      JSON.stringify({ imageUrl: publicUrl }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    );
+
   } catch (error) {
     console.error("Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new Response(JSON.stringify({ error: errorMessage }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
   }
 });
