@@ -24,7 +24,7 @@ export const STAGE_NAMES: Record<number, string> = {
   17: "Eternal",
   18: "Transcendent",
   19: "Apex",
-  20: "Ultimate",
+  20: "Ultimate Form",
 };
 
 export const getStageName = (stage: number): string => {

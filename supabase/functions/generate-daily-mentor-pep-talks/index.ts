@@ -203,6 +203,18 @@ serve(async (req) => {
           // Don't fail the whole process if library insert fails
         }
 
+        // Sync transcript for the daily pep talk to enable word-by-word highlighting
+        try {
+          console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
+          await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
+            body: { pepTalkId: dailyPepTalk.id }
+          });
+          console.log(`✓ Transcript synced for ${mentorSlug}`);
+        } catch (syncError) {
+          console.error(`Failed to sync transcript for ${mentorSlug}:`, syncError);
+          // Non-blocking - continue even if transcript sync fails
+        }
+
         console.log(`✓ Successfully generated daily pep talk for ${mentorSlug}`);
         results.push({ 
           mentor: mentorSlug, 
