@@ -66,10 +66,10 @@ serve(async (req) => {
       });
     }
 
-    // Fetch morning check-ins
+    // Fetch morning check-ins with intentions
     const { data: checkIns } = await supabase
       .from("daily_check_ins")
-      .select("check_in_date, mood")
+      .select("check_in_date, mood, intention")
       .eq("user_id", userId)
       .eq("check_in_type", "morning")
       .gte("check_in_date", weekStartStr)
@@ -185,18 +185,82 @@ serve(async (req) => {
         }
       }
 
+      // Build detailed mood journey
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const moodJourneyEntries: string[] = [];
+      
+      // Group moods by date
+      const moodsByDate = new Map<string, { morning?: string; evening?: string }>();
+      morningMoods.forEach(m => {
+        if (!moodsByDate.has(m.date)) moodsByDate.set(m.date, {});
+        moodsByDate.get(m.date)!.morning = m.mood;
+      });
+      eveningMoods.forEach(m => {
+        if (!moodsByDate.has(m.date)) moodsByDate.set(m.date, {});
+        moodsByDate.get(m.date)!.evening = m.mood;
+      });
+      
+      // Sort by date and format
+      const sortedDates = Array.from(moodsByDate.keys()).sort();
+      sortedDates.forEach(date => {
+        const dayName = dayNames[new Date(date).getDay()];
+        const moods = moodsByDate.get(date)!;
+        const parts: string[] = [];
+        if (moods.morning) parts.push(`morning: ${moods.morning}`);
+        if (moods.evening) parts.push(`evening: ${moods.evening}`);
+        if (parts.length > 0) {
+          moodJourneyEntries.push(`${dayName}: ${parts.join(" → ")}`);
+        }
+      });
+      
+      const moodJourneyText = moodJourneyEntries.length > 0 
+        ? moodJourneyEntries.join("\n") 
+        : "No mood entries this week";
+      
+      // Extract intentions
+      const intentions = (checkIns || [])
+        .filter(c => c.intention)
+        .map(c => c.intention as string);
+      const intentionsText = intentions.length > 0 
+        ? intentions.join("; ") 
+        : null;
+      
+      // Get full gratitude entries (not just themes)
+      const fullGratitudeEntries = (reflections || [])
+        .filter(r => r.gratitude)
+        .map(r => r.gratitude as string);
+      const gratitudeText = fullGratitudeEntries.length > 0 
+        ? fullGratitudeEntries.join("; ") 
+        : null;
+      
+      // Get all wins (not just 3)
+      const allWins = wins.length > 0 ? wins.join("; ") : null;
+
       const prompt = `You are ${mentorName}, a wellness mentor with the following tone: ${mentorTone}
 
-Review this user's week:
-- Mood trend: ${trend}
-- Morning check-ins: ${stats.checkIns}
-- Evening reflections: ${stats.reflections}
-- Quests completed: ${stats.quests}
-- Habits completed: ${stats.habits}
-${wins.length > 0 ? `- Key wins: ${wins.slice(0, 3).join("; ")}` : ""}
-${gratitudeThemes.length > 0 ? `- Gratitude themes: ${gratitudeThemes.join(", ")}` : ""}
+Here is the user's week in detail:
 
-Write a brief, personalized weekly insight (3-4 sentences). Acknowledge their progress, validate their experience, and offer gentle encouragement for the week ahead. Be specific to what they shared.`;
+## Mood Journey
+${moodJourneyText}
+Overall trend: ${trend}
+
+## Morning Intentions
+${intentionsText || "No intentions set this week"}
+
+## Evening Reflections
+Wins celebrated:
+${allWins || "None shared"}
+
+Gratitude expressed:
+${gratitudeText || "None shared"}
+
+## Activity Stats
+- ${stats.checkIns} morning check-ins
+- ${stats.reflections} evening reflections
+- ${stats.quests} quests completed
+- ${stats.habits} habits completed
+
+Write a personalized weekly insight (4-5 sentences). Reference specific things they shared - their moods on particular days, their intentions, wins, or gratitude. Acknowledge patterns you notice and offer encouragement for the week ahead. Be warm and specific.`;
 
       try {
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -211,7 +275,7 @@ Write a brief, personalized weekly insight (3-4 sentences). Acknowledge their pr
               { role: "system", content: "You are a supportive wellness mentor writing weekly recaps. Be warm, specific, and encouraging." },
               { role: "user", content: prompt },
             ],
-            max_tokens: 300,
+            max_tokens: 400,
           }),
         });
 
