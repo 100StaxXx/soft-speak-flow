@@ -76,15 +76,24 @@ export const PlacementInsightCard = ({
     navigate(`/cosmic/${placement}/${sign.toLowerCase()}`);
   };
 
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    handleClick();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
       onClick={handleClick}
-      className="cursor-pointer"
+      onTouchEnd={handleTouchEnd}
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer select-none"
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
-      <Card className="bg-gray-900/60 border-purple-500/30 hover:border-purple-500/50 transition-all hover:shadow-lg hover:shadow-purple-500/10 hover:scale-[1.02] p-4">
+      <Card className="bg-gray-900/60 border-purple-500/30 hover:border-purple-500/50 transition-all hover:shadow-lg hover:shadow-purple-500/10 sm:hover:scale-[1.02] active:scale-[0.98] p-4">
         <div className="flex items-start gap-3">
           {/* Icon */}
           <div 

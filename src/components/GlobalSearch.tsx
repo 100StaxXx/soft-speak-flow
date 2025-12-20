@@ -210,8 +210,15 @@ export const GlobalSearch = ({
                       {challenges.map((challenge) => (
                         <Card
                           key={challenge.id}
-                          className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                          className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
                           onClick={() => navigate("/challenges")}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            navigate("/challenges");
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                         >
                           <h4 className="font-semibold mb-1">{challenge.title}</h4>
                           <p className="text-sm text-muted-foreground">{challenge.description}</p>
@@ -237,8 +244,15 @@ export const GlobalSearch = ({
                       {epics.map((epic) => (
                         <Card
                           key={epic.id}
-                          className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                          className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
                           onClick={() => navigate("/epics")}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            navigate("/epics");
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                         >
                           <h4 className="font-semibold mb-1">{epic.title}</h4>
                           {epic.description && (
@@ -267,8 +281,15 @@ export const GlobalSearch = ({
                       {tasks.map((task) => (
                         <Card
                           key={task.id}
-                          className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                          className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
                           onClick={() => navigate("/tasks")}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            navigate("/tasks");
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1">
@@ -338,8 +359,15 @@ export const GlobalSearch = ({
               challenges.map((challenge) => (
                 <Card
                   key={challenge.id}
-                  className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                  className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
                   onClick={() => navigate("/challenges")}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    navigate("/challenges");
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                 >
                   <h4 className="font-semibold mb-1">{challenge.title}</h4>
                   <p className="text-sm text-muted-foreground">{challenge.description}</p>
@@ -365,8 +393,15 @@ export const GlobalSearch = ({
               epics.map((epic) => (
                 <Card
                   key={epic.id}
-                  className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                  className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
                   onClick={() => navigate("/epics")}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    navigate("/epics");
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                 >
                   <h4 className="font-semibold mb-1">{epic.title}</h4>
                   {epic.description && (
@@ -394,8 +429,15 @@ export const GlobalSearch = ({
               tasks.map((task) => (
                 <Card
                   key={task.id}
-                  className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                  className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
                   onClick={() => navigate("/tasks")}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    navigate("/tasks");
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">

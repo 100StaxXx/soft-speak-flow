@@ -47,15 +47,23 @@ export const BattleCardSelector = ({
         const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
         const rarityClass = RARITY_COLORS[card.rarity?.toLowerCase()] || "bg-gray-500";
 
+        const handleSelect = () => onCardSelect(card.id);
+        const handleTouchEnd = (e: React.TouchEvent) => {
+          e.preventDefault();
+          handleSelect();
+        };
+
         return (
           <button
             key={card.id}
-            onClick={() => onCardSelect(card.id)}
-            className={`relative transition-all ${
+            onClick={handleSelect}
+            onTouchEnd={handleTouchEnd}
+            className={`relative transition-all select-none ${
               isSelected
                 ? "ring-2 ring-primary scale-[1.02]"
-                : "hover:scale-[1.02] opacity-80 hover:opacity-100"
+                : "sm:hover:scale-[1.02] opacity-80 sm:hover:opacity-100 active:scale-[0.98]"
             }`}
+            style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
           >
             <Card className="overflow-hidden">
               {/* Selection Indicator */}

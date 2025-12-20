@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 const HABIT_TEMPLATES = [
   // Top featured habits
@@ -73,15 +73,28 @@ export const HabitTemplates = ({ onSelect, onCustom, existingHabits }: HabitTemp
           const Icon = template.icon;
           const isUsed = isHabitUsed(template.title);
           
+          const handleSelect = () => {
+            if (!isUsed) onSelect(template.title, template.frequency);
+          };
+
+          const handleTouchEnd = (e: React.TouchEvent) => {
+            e.preventDefault();
+            handleSelect();
+          };
+          
           return (
             <Card
               key={template.id}
-              className={`p-4 transition-all ${
+              className={`p-4 transition-all select-none ${
                 isUsed 
                   ? 'opacity-50 cursor-not-allowed bg-muted' 
-                  : 'cursor-pointer hover:border-primary/50 hover:bg-card/80'
+                  : 'cursor-pointer sm:hover:border-primary/50 sm:hover:bg-card/80 active:scale-[0.98]'
               }`}
-              onClick={() => !isUsed && onSelect(template.title, template.frequency)}
+              onClick={handleSelect}
+              onTouchEnd={handleTouchEnd}
+              role="button"
+              tabIndex={isUsed ? -1 : 0}
+              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
             >
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${isUsed ? 'bg-muted-foreground/10' : 'bg-primary/10'}`}>
@@ -134,8 +147,15 @@ export const HabitTemplates = ({ onSelect, onCustom, existingHabits }: HabitTemp
 
       {/* Custom habit button */}
       <Card
-        className="p-4 cursor-pointer hover:border-primary/50 transition-all hover:bg-card/80 border-dashed"
+        className="p-4 cursor-pointer sm:hover:border-primary/50 transition-all sm:hover:bg-card/80 border-dashed select-none active:scale-[0.98]"
         onClick={onCustom}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          onCustom();
+        }}
+        role="button"
+        tabIndex={0}
+        style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
       >
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-accent/10">
