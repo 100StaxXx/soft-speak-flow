@@ -724,7 +724,96 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
       throw new Error("No image URL in response");
     }
 
-    console.log("Image generated, uploading...");
+    console.log("Image generated, running quality analysis...");
+
+    // ========================================================================
+    // QUALITY SCORING - Analyze generated image for anatomical correctness
+    // ========================================================================
+    let qualityScore: { 
+      overall: number; 
+      limbCount: number; 
+      speciesFidelity: number; 
+      colorMatch: number;
+      issues: string[];
+      shouldRetry: boolean;
+    } | null = null;
+
+    try {
+      const qualityTool = {
+        type: "function",
+        function: {
+          name: "score_image_quality",
+          description: "Score the quality and correctness of a generated creature image",
+          parameters: {
+            type: "object",
+            properties: {
+              limbCountScore: { type: "number", description: "Score 0-100: Does the creature have the correct number of limbs? 100 = correct, 0 = wrong count" },
+              actualLimbCount: { type: "number", description: "How many limbs does the creature appear to have?" },
+              speciesFidelityScore: { type: "number", description: "Score 0-100: How well does this look like the intended species?" },
+              colorMatchScore: { type: "number", description: "Score 0-100: How well do the colors match the expected palette?" },
+              anatomyIssues: { type: "array", items: { type: "string" }, description: "List any anatomical issues (extra limbs, wrong body parts, mutations)" },
+              overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" }
+            },
+            required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "anatomyIssues", "overallQuality"],
+            additionalProperties: false
+          }
+        }
+      };
+
+      const qualityPrompt = `Analyze this ${spiritAnimal} creature image for quality and correctness.
+
+Expected characteristics:
+- Species: ${spiritAnimal}
+- Expected limbs: ${anatomy.limbCount}
+- Wings expected: ${anatomy.hasWings ? 'YES' : 'NO'}
+- Body type: ${anatomy.bodyType}
+- Primary color should be: ${favoriteColor}
+${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` : ''}
+
+Score each aspect from 0-100 and list any issues.`;
+
+      const qualityResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: qualityPrompt },
+              { type: "image_url", image_url: { url: imageUrl } }
+            ]
+          }],
+          tools: [qualityTool],
+          tool_choice: { type: "function", function: { name: "score_image_quality" } }
+        })
+      });
+
+      if (qualityResponse.ok) {
+        const qualityData = await qualityResponse.json();
+        const toolCall = qualityData.choices?.[0]?.message?.tool_calls?.[0];
+        
+        if (toolCall?.function?.arguments) {
+          const scores = JSON.parse(toolCall.function.arguments);
+          qualityScore = {
+            overall: scores.overallQuality || 0,
+            limbCount: scores.limbCountScore || 0,
+            speciesFidelity: scores.speciesFidelityScore || 0,
+            colorMatch: scores.colorMatchScore || 0,
+            issues: scores.anatomyIssues || [],
+            shouldRetry: scores.overallQuality < 60 || scores.limbCountScore < 50
+          };
+          console.log("Quality analysis:", qualityScore);
+        }
+      }
+    } catch (qualityError) {
+      console.warn("Quality analysis failed (non-blocking):", qualityError);
+    }
+
+    // ========================================================================
+    // UPLOAD TO STORAGE
+    // ========================================================================
+    console.log("Uploading to storage...");
 
     const base64Data = imageUrl.split(",")[1];
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
@@ -743,7 +832,21 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
 
     console.log(`Uploaded: ${publicUrl}`);
 
-    return new Response(JSON.stringify({ imageUrl: publicUrl, prompt: fullPrompt }), 
+    // Return response with quality score
+    const responseData: Record<string, unknown> = { 
+      imageUrl: publicUrl, 
+      prompt: fullPrompt 
+    };
+    
+    if (qualityScore) {
+      responseData.qualityScore = qualityScore;
+    }
+    
+    if (extractedMetadata) {
+      responseData.extractedMetadata = extractedMetadata;
+    }
+
+    return new Response(JSON.stringify(responseData), 
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
 
   } catch (error) {

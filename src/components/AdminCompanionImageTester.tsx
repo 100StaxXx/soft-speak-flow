@@ -36,11 +36,36 @@ const STAGE_NAMES = [
   "Prime", "Regal", "Eternal", "Transcendent", "Apex", "Ultimate Form"
 ];
 
+interface QualityScore {
+  overall: number;
+  limbCount: number;
+  speciesFidelity: number;
+  colorMatch: number;
+  issues: string[];
+  shouldRetry: boolean;
+}
+
+interface ExtractedMetadata {
+  hexPrimaryColor: string;
+  hexEyeColor: string;
+  hexAccentColor?: string;
+  primaryColorDesc: string;
+  eyeColorDesc: string;
+  markings: string;
+  viewingAngle: string;
+  pose: string;
+  expression: string;
+  artStyle: string;
+  distinctiveFeatures: string;
+}
+
 interface GeneratedImage {
   stage: number;
   imageUrl: string;
   prompt?: string;
   generationMode: string;
+  qualityScore?: QualityScore;
+  extractedMetadata?: ExtractedMetadata;
 }
 
 export const AdminCompanionImageTester = () => {
@@ -110,12 +135,27 @@ export const AdminCompanionImageTester = () => {
         imageUrl: data.imageUrl,
         prompt: data.prompt,
         generationMode,
+        qualityScore: data.qualityScore,
+        extractedMetadata: data.extractedMetadata,
       };
 
       setGeneratedChain(prev => ({ ...prev, [testData.stage]: newImage }));
       setCurrentPrompt(data.prompt || "Prompt not returned");
       setSelectedPreviewStage(testData.stage);
-      toast.success(`Stage ${testData.stage} image generated (${generationMode})`);
+      
+      // Show quality score in toast
+      if (data.qualityScore) {
+        const qs = data.qualityScore;
+        if (qs.shouldRetry) {
+          toast.warning(`Stage ${testData.stage} generated with issues (Score: ${qs.overall}/100)`, {
+            description: qs.issues?.slice(0, 2).join(", ") || "Quality below threshold"
+          });
+        } else {
+          toast.success(`Stage ${testData.stage} generated (Score: ${qs.overall}/100)`);
+        }
+      } else {
+        toast.success(`Stage ${testData.stage} image generated (${generationMode})`);
+      }
     } catch (error: any) {
       console.error("Error generating companion image:", error);
       toast.error(error.message || "Failed to generate companion image");
@@ -157,12 +197,20 @@ export const AdminCompanionImageTester = () => {
           imageUrl: data.imageUrl,
           prompt: data.prompt,
           generationMode,
+          qualityScore: data.qualityScore,
+          extractedMetadata: data.extractedMetadata,
         };
 
         setGeneratedChain(prev => ({ ...prev, [stage]: newImage }));
         previousImageUrl = data.imageUrl;
 
-        toast.success(`Stage ${stage} (${STAGE_NAMES[stage]}) complete`);
+        // Show quality in toast
+        if (data.qualityScore) {
+          const qs = data.qualityScore;
+          toast.success(`Stage ${stage} (${STAGE_NAMES[stage]}) - Score: ${qs.overall}/100`);
+        } else {
+          toast.success(`Stage ${stage} (${STAGE_NAMES[stage]}) complete`);
+        }
       }
 
       setChainProgress({ current: testData.stage + 1, total: testData.stage + 1 });
@@ -487,9 +535,16 @@ export const AdminCompanionImageTester = () => {
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 text-center">
                       {stage}
+                      {image.qualityScore && (
+                        <span className={`ml-1 ${image.qualityScore.overall >= 70 ? 'text-green-400' : 'text-amber-400'}`}>
+                          ({image.qualityScore.overall})
+                        </span>
+                      )}
                     </div>
                     <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-                      image.generationMode === "image-to-image" ? "bg-green-500" : "bg-blue-500"
+                      image.generationMode.includes("Visual Metadata") ? "bg-purple-500" : 
+                      image.generationMode.includes("Egg") ? "bg-amber-500" :
+                      image.generationMode.includes("Cosmic") ? "bg-indigo-500" : "bg-blue-500"
                     }`} />
                   </button>
                 );
@@ -497,7 +552,9 @@ export const AdminCompanionImageTester = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" /> T2I
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 ml-3 mr-1" /> I2I
+              <span className="inline-block w-2 h-2 rounded-full bg-purple-500 ml-3 mr-1" /> T2I + Metadata
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 ml-3 mr-1" /> Egg
+              <span className="inline-block w-2 h-2 rounded-full bg-indigo-500 ml-3 mr-1" /> Cosmic
             </p>
           </div>
         )}
@@ -511,9 +568,11 @@ export const AdminCompanionImageTester = () => {
                   Stage {selectedImage.stage} - {STAGE_NAMES[selectedImage.stage]}
                 </h3>
                 <span className={`text-xs ${
-                  selectedImage.generationMode === "image-to-image" ? "text-green-600" : "text-blue-600"
+                  selectedImage.generationMode.includes("Visual Metadata") ? "text-purple-600" : 
+                  selectedImage.generationMode.includes("Egg") ? "text-amber-600" :
+                  selectedImage.generationMode.includes("Cosmic") ? "text-indigo-600" : "text-blue-600"
                 }`}>
-                  {selectedImage.generationMode === "image-to-image" ? "Image-to-Image" : "Text-to-Image"}
+                  {selectedImage.generationMode}
                 </span>
               </div>
               <Button
@@ -540,6 +599,111 @@ export const AdminCompanionImageTester = () => {
                 className="max-w-md w-full rounded-2xl shadow-lg"
               />
             </div>
+
+            {/* Quality Score Panel */}
+            {selectedImage.qualityScore && (
+              <div className="p-4 rounded-xl bg-muted/50 border">
+                <Label className="mb-3 block">Quality Analysis</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="text-center p-2 rounded-lg bg-background">
+                    <div className={`text-2xl font-bold ${
+                      selectedImage.qualityScore.overall >= 70 ? 'text-green-600' : 
+                      selectedImage.qualityScore.overall >= 50 ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {selectedImage.qualityScore.overall}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Overall</div>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-background">
+                    <div className={`text-2xl font-bold ${selectedImage.qualityScore.limbCount >= 70 ? 'text-green-600' : 'text-amber-600'}`}>
+                      {selectedImage.qualityScore.limbCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Limbs</div>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-background">
+                    <div className={`text-2xl font-bold ${selectedImage.qualityScore.speciesFidelity >= 70 ? 'text-green-600' : 'text-amber-600'}`}>
+                      {selectedImage.qualityScore.speciesFidelity}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Species</div>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-background">
+                    <div className={`text-2xl font-bold ${selectedImage.qualityScore.colorMatch >= 70 ? 'text-green-600' : 'text-amber-600'}`}>
+                      {selectedImage.qualityScore.colorMatch}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Colors</div>
+                  </div>
+                </div>
+                {selectedImage.qualityScore.issues && selectedImage.qualityScore.issues.length > 0 && (
+                  <div className="mt-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <p className="text-xs font-medium text-red-600 mb-1">Issues Detected:</p>
+                    <ul className="text-xs text-red-600/80 list-disc list-inside">
+                      {selectedImage.qualityScore.issues.map((issue, i) => (
+                        <li key={i}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Extracted Metadata Panel */}
+            {selectedImage.extractedMetadata && (
+              <div className="p-4 rounded-xl bg-muted/50 border">
+                <Label className="mb-3 block">Extracted Visual Metadata</Label>
+                <div className="space-y-3">
+                  {/* Color Palette */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-20">Colors:</span>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-6 h-6 rounded-full border border-border shadow-sm" 
+                        style={{ backgroundColor: selectedImage.extractedMetadata.hexPrimaryColor }}
+                        title={`Primary: ${selectedImage.extractedMetadata.hexPrimaryColor}`}
+                      />
+                      <div 
+                        className="w-6 h-6 rounded-full border border-border shadow-sm" 
+                        style={{ backgroundColor: selectedImage.extractedMetadata.hexEyeColor }}
+                        title={`Eyes: ${selectedImage.extractedMetadata.hexEyeColor}`}
+                      />
+                      {selectedImage.extractedMetadata.hexAccentColor && (
+                        <div 
+                          className="w-6 h-6 rounded-full border border-border shadow-sm" 
+                          style={{ backgroundColor: selectedImage.extractedMetadata.hexAccentColor }}
+                          title={`Accent: ${selectedImage.extractedMetadata.hexAccentColor}`}
+                        />
+                      )}
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {selectedImage.extractedMetadata.hexPrimaryColor} / {selectedImage.extractedMetadata.hexEyeColor}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Pose & Composition */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="p-2 rounded bg-background">
+                      <span className="text-muted-foreground">Angle:</span>
+                      <span className="ml-1 font-medium">{selectedImage.extractedMetadata.viewingAngle}</span>
+                    </div>
+                    <div className="p-2 rounded bg-background">
+                      <span className="text-muted-foreground">Pose:</span>
+                      <span className="ml-1 font-medium">{selectedImage.extractedMetadata.pose}</span>
+                    </div>
+                    <div className="p-2 rounded bg-background">
+                      <span className="text-muted-foreground">Expression:</span>
+                      <span className="ml-1 font-medium">{selectedImage.extractedMetadata.expression}</span>
+                    </div>
+                    <div className="p-2 rounded bg-background">
+                      <span className="text-muted-foreground">Style:</span>
+                      <span className="ml-1 font-medium truncate">{selectedImage.extractedMetadata.artStyle.slice(0, 20)}...</span>
+                    </div>
+                  </div>
+                  {/* Markings */}
+                  <div className="text-xs">
+                    <span className="text-muted-foreground">Markings:</span>
+                    <span className="ml-2">{selectedImage.extractedMetadata.markings}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {currentPrompt && (
               <div className="space-y-2">
