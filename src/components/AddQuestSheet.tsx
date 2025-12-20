@@ -92,7 +92,7 @@ export function AddQuestSheet({
   };
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true}>
+    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="text-left">
           <DrawerTitle className="flex items-center gap-2">
