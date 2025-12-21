@@ -98,14 +98,17 @@ export function useAppleSubscription() {
         throw new Error("Purchase returned no data");
       }
       
-      // Verify receipt with backend
+      // Prefer transactionId for StoreKit 2 App Store Server API verification
+      // Fall back to receipt for legacy verification
+      const transactionId = purchase.transactionId;
       const receipt = purchase.receipt ?? purchase.transactionReceipt;
-      if (!receipt) {
-        throw new Error("No receipt data available");
+      
+      if (!transactionId && !receipt) {
+        throw new Error("No transaction ID or receipt data available");
       }
       
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
+        body: transactionId ? { transactionId } : { receipt },
       });
 
       if (error) throw error;
@@ -159,6 +162,7 @@ export function useAppleSubscription() {
       const isValidPurchase = (p: unknown): p is { 
         transactionDate?: number; 
         productId?: string;
+        transactionId?: string;
         transactionReceipt?: string;
         receipt?: string;
       } => {
@@ -187,15 +191,17 @@ export function useAppleSubscription() {
         return;
       }
 
-      // Safely access receipt field
+      // Prefer transactionId for StoreKit 2 App Store Server API verification
+      const transactionId = subscriptionPurchase.transactionId;
       const receipt = subscriptionPurchase.transactionReceipt ?? subscriptionPurchase.receipt;
-      if (!receipt) {
-        throw new Error("No receipt data available for subscription");
+      
+      if (!transactionId && !receipt) {
+        throw new Error("No transaction ID or receipt data available for subscription");
       }
 
-      // Verify with backend
+      // Verify with backend - prefer transactionId for modern API
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: { receipt },
+        body: transactionId ? { transactionId } : { receipt },
       });
 
       if (error) {
