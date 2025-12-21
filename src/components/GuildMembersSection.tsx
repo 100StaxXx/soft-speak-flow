@@ -15,6 +15,7 @@ import { Trophy, Medal, Flame, Swords, Megaphone, Crown, Users } from "lucide-re
 import { cn } from "@/lib/utils";
 import { ShoutType } from "@/data/shoutMessages";
 import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
+import { logger } from "@/utils/logger";
 
 interface LeaderboardMember {
   user_id: string;
@@ -100,7 +101,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Guild members subscription error:', status, err?.message);
+          logger.warn('Guild members subscription error', { status, error: err?.message });
         }
       });
 

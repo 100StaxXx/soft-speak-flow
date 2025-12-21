@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
+import { logger } from "@/utils/logger";
 
 interface ActivityItem {
   id: string;
@@ -60,7 +61,7 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
         setActivities([]);
       }
     } catch (error) {
-      console.error("Error fetching activities:", error);
+      logger.error("Error fetching activities", { error });
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +88,7 @@ export const EpicActivityFeed = ({ epicId }: EpicActivityFeedProps) => {
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Epic activity feed subscription error:', status, err?.message);
+          logger.warn('Epic activity feed subscription error', { status, error: err?.message });
         }
       });
 

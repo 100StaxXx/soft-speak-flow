@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 import { getShoutByKey, ShoutType } from "@/data/shoutMessages";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
+import { logger } from "@/utils/logger";
 
 export interface GuildShout {
   id: string;
@@ -132,7 +133,7 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
           shoutType,
           messageText: message?.text || 'Someone sent you a shout!',
         },
-      }).catch(err => console.error('Push notification failed:', err));
+      }).catch(err => logger.error('Push notification failed', { error: err }));
 
       return data;
     },
@@ -143,7 +144,7 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
     },
     onError: (error) => {
       toast.error("Failed to send shout");
-      console.error("Shout error:", error);
+      logger.error("Shout error", { error });
     },
   });
 
@@ -194,7 +195,7 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Guild shouts subscription error:', status, err?.message);
+          logger.warn('Guild shouts subscription error', { status, error: err?.message });
         }
       });
 

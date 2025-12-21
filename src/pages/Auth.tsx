@@ -63,12 +63,12 @@ const Auth = () => {
     try {
       await ensureProfile(session.user.id, session.user.email);
       const path = await getAuthRedirectPath(session.user.id);
-      console.log(`[Auth ${source}] Navigating to ${path}`);
+      logger.info(`[Auth ${source}] Navigating to ${path}`);
       safeNavigate(navigate, path);
     } catch (error) {
       // Reset on error so user can retry
       hasRedirected.current = false;
-      console.error(`[Auth ${source}] Navigation error:`, error);
+      logger.error(`[Auth ${source}] Navigation error`, { error });
       safeNavigate(navigate, '/onboarding');
     }
   }, [navigate]);
@@ -105,13 +105,13 @@ const Auth = () => {
           const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID;
           const iOSClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
 
-          console.log('[OAuth Init] Initializing with:', {
+          logger.debug('[OAuth Init] Initializing with', {
             hasWebClientId: !!webClientId,
             hasIOSClientId: !!iOSClientId
           });
 
           if (!webClientId || !iOSClientId) {
-            console.error('[OAuth Init] Missing Google Client IDs in environment variables');
+            logger.error('[OAuth Init] Missing Google Client IDs in environment variables');
             throw new Error('Google Client IDs not configured');
           }
 
@@ -123,14 +123,14 @@ const Auth = () => {
             }
           });
 
-          console.log('[OAuth Init] SocialLogin initialized successfully');
+          logger.info('[OAuth Init] SocialLogin initialized successfully');
           setGoogleNativeReady(true);
         } catch (error) {
-          console.error('[OAuth Init] Failed to initialize SocialLogin:', error);
+          logger.error('[OAuth Init] Failed to initialize SocialLogin', { error });
           setGoogleNativeReady(false);
         }
       } else {
-        console.warn('[OAuth Init] SocialLogin plugin unavailable - using web OAuth fallback');
+        logger.warn('[OAuth Init] SocialLogin plugin unavailable - using web OAuth fallback');
         setGoogleNativeReady(false);
       }
       initializationComplete.current = true;
@@ -153,7 +153,7 @@ const Auth = () => {
 
     const pluginAvailable = Capacitor.isPluginAvailable?.('SignInWithApple') ?? false;
     if (!pluginAvailable) {
-      console.warn('[OAuth Init] SignInWithApple plugin unavailable - falling back to web OAuth for Apple');
+      logger.warn('[OAuth Init] SignInWithApple plugin unavailable - falling back to web OAuth for Apple');
     }
     setAppleNativeReady(pluginAvailable);
   }, []);
@@ -184,7 +184,7 @@ const Auth = () => {
           }
         }
       } catch (error) {
-        console.error("[OAuth Callback] Failed to complete OAuth login:", error);
+        logger.error("[OAuth Callback] Failed to complete OAuth login", { error });
         toast({
           title: "Error",
           description: "Something went wrong signing you in. Please try again.",
@@ -221,12 +221,12 @@ const Auth = () => {
       if (['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session) {
         // Skip if already redirected by direct OAuth call, checkSession, or previous event
         if (hasRedirected.current) {
-          console.log(`[Auth onAuthStateChange] Skipping ${event} - already redirected`);
+          logger.debug(`[Auth onAuthStateChange] Skipping ${event} - already redirected`);
           return;
         }
         
         const timestamp = Date.now();
-        console.log(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
+        logger.info(`[Auth onAuthStateChange] Event: ${event} at ${timestamp}, redirecting...`);
         await new Promise(resolve => setTimeout(resolve, 100));
         await handlePostAuthNavigation(session, `onAuthStateChange:${event}`);
       }

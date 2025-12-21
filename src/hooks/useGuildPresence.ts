@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { logger } from "@/utils/logger";
 
 interface PresenceState {
   odentified: boolean;
@@ -102,17 +103,17 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
     });
 
     // Handle join
-    presenceChannel.on('presence', { event: 'join' }, async ({ key, newPresences }) => {
-      console.log('Member joined:', key);
+    presenceChannel.on('presence', { event: 'join' }, async ({ key }) => {
+      logger.debug('Guild member joined', { userId: key });
     });
 
     // Handle leave
     presenceChannel.on('presence', { event: 'leave' }, ({ key }) => {
-      console.log('Member left:', key);
+      logger.debug('Guild member left', { userId: key });
     });
 
     // Subscribe and track presence
-    presenceChannel.subscribe(async (status) => {
+    presenceChannel.subscribe(async (status, err) => {
       if (status === 'SUBSCRIBED') {
         setIsConnected(true);
         
@@ -126,6 +127,9 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
           display_name: userInfo.displayName,
           companion_image_url: userInfo.companionImageUrl,
         });
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        logger.warn('Guild presence subscription error', { status, error: err?.message });
+        setIsConnected(false);
       }
     });
 

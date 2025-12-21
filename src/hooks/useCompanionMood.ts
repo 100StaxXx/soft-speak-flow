@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useEffect } from "react";
 import { format } from "date-fns";
+import { logger } from "@/utils/logger";
 
 export const useCompanionMood = () => {
   const { user } = useAuth();
@@ -20,7 +21,7 @@ export const useCompanionMood = () => {
         .maybeSingle();
 
       if (error) {
-        console.error('Failed to fetch companion mood:', error);
+        logger.error('Failed to fetch companion mood', { error });
         throw error;
       }
       
@@ -88,7 +89,7 @@ export const useCompanionMood = () => {
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Companion mood subscription error:', status, err?.message);
+          logger.warn('Companion mood subscription error', { status, error: err?.message });
         }
       });
 
