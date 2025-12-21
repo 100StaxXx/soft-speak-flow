@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info, Search, HelpCircle } from "lucide-react";
-import { SearchBar } from "@/components/SearchBar";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, Search, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -42,6 +41,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// Quick Action Card Component
+const QuickActionCard = ({ 
+  icon: Icon, 
+  label, 
+  description,
+  onClick,
+  variant = "default"
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  description?: string;
+  onClick: () => void;
+  variant?: "default" | "accent";
+}) => (
+  <button
+    onClick={onClick}
+    className={`
+      group flex items-center gap-3 p-4 rounded-xl border transition-all text-left w-full
+      active:scale-[0.98] select-none
+      ${variant === "accent" 
+        ? "bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20 sm:hover:border-amber-500/40" 
+        : "bg-card/50 border-border/50 sm:hover:border-primary/40 sm:hover:bg-card/80"
+      }
+    `}
+    style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+  >
+    <div className={`
+      flex items-center justify-center w-10 h-10 rounded-lg shrink-0
+      ${variant === "accent" 
+        ? "bg-amber-500/20 text-amber-400" 
+        : "bg-primary/10 text-primary"
+      }
+    `}>
+      <Icon className="h-5 w-5" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <span className="font-medium text-foreground block">{label}</span>
+      {description && (
+        <span className="text-xs text-muted-foreground block truncate">{description}</span>
+      )}
+    </div>
+    <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
+  </button>
+);
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -122,7 +166,6 @@ const Profile = () => {
         .from("profiles")
         .update({ 
           selected_mentor_id: mentorId,
-          // Also ensure timezone is set if not already
           timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
         })
         .eq("id", user.id);
@@ -226,382 +269,250 @@ const Profile = () => {
 
   return (
     <PageTransition>
-      {/* Cosmiq Starfield Background */}
       <StarfieldBackground />
       
       <div className="min-h-screen pb-24 relative">
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 mb-6 safe-area-top">
-          <div className="max-w-4xl mx-auto px-4 py-4">
+        {/* Header */}
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 safe-area-top">
+          <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   Command Center
                 </h1>
-                <p className="text-sm text-muted-foreground">Manage your account and preferences</p>
+                <p className="text-sm text-muted-foreground">Your account & settings</p>
               </div>
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 space-y-6 relative z-10">
-          {/* Search Bar */}
-          <div className="max-w-md">
-            <SearchBar
-              placeholder="Search quotes, pep talks, mentors..."
-              onSearch={(query) => {
-                if (query.trim()) {
-                  navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-                }
-              }}
-            />
-          </div>
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 relative z-10">
+          {/* Quick Actions Grid */}
+          <section className="space-y-3">
+            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Quick Access</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <QuickActionCard 
+                icon={Search} 
+                label="Search" 
+                description="Find quotes, pep talks & more"
+                onClick={() => navigate("/search")} 
+              />
+              <QuickActionCard 
+                icon={BookHeart} 
+                label="Library" 
+                description="Favorites & downloads"
+                onClick={() => navigate("/library")} 
+              />
+              <QuickActionCard 
+                icon={HelpCircle} 
+                label="Help Center" 
+                description="Guides & tutorials"
+                onClick={() => navigate("/help")} 
+              />
+              <QuickActionCard 
+                icon={Sparkles} 
+                label="Weekly Recaps" 
+                description="Past reflections"
+                onClick={() => navigate("/recaps")} 
+                variant="accent"
+              />
+            </div>
+          </section>
 
-          <div className="max-w-md space-y-3">
-            <Card 
-              className="cursor-pointer sm:hover:border-primary/50 transition-all sm:hover:shadow-glow select-none active:scale-[0.98]" 
-              onClick={() => navigate("/library")} 
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                navigate("/library");
-              }}
-              role="button"
-              tabIndex={0}
-              data-tour="library"
-              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <BookHeart className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Library</CardTitle>
-                </div>
-                <CardDescription>View your saved favorites and downloads</CardDescription>
-              </CardHeader>
-            </Card>
-            <Card 
-              className="cursor-pointer sm:hover:border-primary/50 transition-all sm:hover:shadow-glow select-none active:scale-[0.98]" 
-              onClick={() => navigate("/help")}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                navigate("/help");
-              }}
-              role="button"
-              tabIndex={0}
-              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <HelpCircle className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">Help Center</CardTitle>
-                </div>
-                <CardDescription>In-depth guides for every feature</CardDescription>
-              </CardHeader>
-            </Card>
-            <Card 
-              className="cursor-pointer sm:hover:border-amber-500/50 transition-all sm:hover:shadow-glow select-none active:scale-[0.98]" 
-              onClick={() => navigate("/recaps")}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                navigate("/recaps");
-              }}
-              role="button"
-              tabIndex={0}
-              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-5 w-5 text-amber-400" />
-                  <CardTitle className="text-lg">Weekly Recaps</CardTitle>
-                </div>
-                <CardDescription>Review your past weekly reflections</CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="account">Account</TabsTrigger>
-              <TabsTrigger value="notifications">Notifications</TabsTrigger>
-              <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          {/* Settings Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+              <TabsTrigger value="account" className="text-xs sm:text-sm py-2">Account</TabsTrigger>
+              <TabsTrigger value="rewards" className="text-xs sm:text-sm py-2">Rewards</TabsTrigger>
+              <TabsTrigger value="notifications" className="text-xs sm:text-sm py-2">Alerts</TabsTrigger>
+              <TabsTrigger value="preferences" className="text-xs sm:text-sm py-2">Prefs</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="account" className="space-y-6">
-              {/* Faction Identity Card */}
+            {/* Account Tab */}
+            <TabsContent value="account" className="space-y-4">
+              {/* Faction Badge - compact */}
               {profile?.faction && (
                 <FactionBadge 
                   faction={profile.faction} 
                   variant="full"
                   showMotto={true}
-                  showTraits={true}
+                  showTraits={false}
                 />
               )}
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Information</CardTitle>
-                  <CardDescription>Your account details and settings</CardDescription>
+              {/* Account Info - compact */}
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="h-4 w-4 text-primary" />
+                    Account
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Email</Label>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </div>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Email</span>
+                    <span className="font-medium truncate ml-4">{user.email}</span>
                   </div>
                 </CardContent>
               </Card>
 
               <SubscriptionManagement />
 
-              <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-accent/5 border-primary/20 shadow-inner">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    Why Cosmiq is different
-                  </CardTitle>
-                  <CardDescription>
-                    App Review feedback called out saturated horoscope apps—here&apos;s what makes Cosmiq unique.
-                  </CardDescription>
+              {/* Mentor Selection - cleaner */}
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Your Mentor</CardTitle>
+                  <CardDescription className="text-xs">Change your AI mentor anytime</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm text-muted-foreground">
-                  <div className="flex gap-3">
-                    <MessageCircle className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-foreground">Adaptive mentor chat + nudges</p>
-                      <p>Choose an AI mentor, fire off one-tap prompts from Quick Chat, and receive mentor-authored nudges stored per user in Supabase.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-foreground">Evolving companion game loop</p>
-                      <p>Story-driven onboarding assigns a faction, zodiac profile, and living companion that unlocks 21 visual evolutions and quests.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <Shield className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-foreground">Referral cosmetics, not fortune spam</p>
-                      <p>Referral rewards only unlock limited companion skins—no recycled horoscope feeds or paywalled readings.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Mentor</CardTitle>
-                  <CardDescription>Change your AI mentor anytime</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   {selectedMentor && (
-                    <div className="flex items-center gap-3 p-3 bg-accent/10 rounded-xl">
-                      {selectedMentor.avatar_url && <img src={selectedMentor.avatar_url} alt={selectedMentor.name} className="w-12 h-12 rounded-full object-cover" loading="lazy" decoding="async" />}
-                      <div className="flex-1">
-                        <p className="font-semibold">{selectedMentor.name}</p>
-                        <p className="text-sm text-muted-foreground">{selectedMentor.tone_description}</p>
+                    <div className="flex items-center gap-3 p-2.5 bg-muted/30 rounded-lg">
+                      {selectedMentor.avatar_url && (
+                        <img 
+                          src={selectedMentor.avatar_url} 
+                          alt={selectedMentor.name} 
+                          className="w-10 h-10 rounded-full object-cover" 
+                          loading="lazy" 
+                          decoding="async" 
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{selectedMentor.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{selectedMentor.tone_description}</p>
                       </div>
                     </div>
                   )}
                   <Select value={profile?.selected_mentor_id || ""} onValueChange={handleChangeMentor} disabled={isChangingMentor}>
-                    <SelectTrigger disabled={isChangingMentor}>
-                      <SelectValue placeholder={isChangingMentor ? "Changing mentor..." : "Select a mentor"} />
+                    <SelectTrigger disabled={isChangingMentor} className="h-9">
+                      <SelectValue placeholder={isChangingMentor ? "Changing..." : "Select mentor"} />
                     </SelectTrigger>
                     <SelectContent>
                       {mentors?.map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button onClick={() => navigate("/mentor-selection")} variant="outline" size="sm"><User className="h-4 w-4 mr-2" />Browse All</Button>
-                    <Button onClick={() => navigate("/onboarding")} variant="outline" size="sm"><Repeat className="h-4 w-4 mr-2" />Retake Quiz</Button>
+                    <Button onClick={() => navigate("/mentor-selection")} variant="outline" size="sm" className="text-xs h-8">
+                      <User className="h-3 w-3 mr-1.5" />Browse All
+                    </Button>
+                    <Button onClick={() => navigate("/onboarding")} variant="outline" size="sm" className="text-xs h-8">
+                      <Repeat className="h-3 w-3 mr-1.5" />Retake Quiz
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Companion Reset */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Companion</CardTitle>
-                  <CardDescription>Reset your companion to create a new one</CardDescription>
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Companion</CardTitle>
+                  <CardDescription className="text-xs">Reset to create a new companion</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent>
                   <ResetCompanionButton />
                 </CardContent>
               </Card>
 
               {/* Legal Documents */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
                     Legal
                   </CardTitle>
-                  <CardDescription>Review our legal agreements and policies</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2">
                   <Button
-                    variant="outline"
-                    className="w-full justify-start"
+                    variant="ghost"
+                    className="w-full justify-start h-9 text-sm"
                     onClick={() => setViewingLegalDoc("terms")}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
                     Terms of Service
                   </Button>
                   <Button
-                    variant="outline"
-                    className="w-full justify-start"
+                    variant="ghost"
+                    className="w-full justify-start h-9 text-sm"
                     onClick={() => setViewingLegalDoc("privacy")}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
                     Privacy Policy
                   </Button>
                 </CardContent>
               </Card>
 
-              {/* Referrals Section */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <Gift className="h-6 w-6 text-primary" />
-                  <div>
-                    <h2 className="text-2xl font-bold">Referrals & Rewards</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Refer friends to unlock cosmetic companion skins for yourself. Applying a code just tags them so they earn a skin when you reach Stage 3—your access stays the same.
-                    </p>
-                  </div>
-                </div>
-                
-                <ReferralCodeRedeemCard />
-                <ReferralDashboard />
-                <Card className="border-dashed border-primary/40 bg-primary/5">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Info className="h-5 w-5 text-primary" />
-                      Referral FAQ
-                    </CardTitle>
-                    <CardDescription>Answers to App Review&apos;s questions about codes vs. rewards.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3 text-sm text-muted-foreground">
-                      <li>
-                        <span className="font-semibold text-foreground">Referral code:</span> a unique tag minted on signup so friends can credit you. Entering a code never unlocks extra content for the new user—it just ties their profile to the referrer for rewards tracking.
-                      </li>
-                      <li>
-                        <span className="font-semibold text-foreground">Referral rewards:</span> purely cosmetic companion skins automatically delivered to the referrer once a tagged friend reaches Stage 3. No paywalled horoscopes, chats, or quests unlock.
-                      </li>
-                      <li>
-                        <span className="font-semibold text-foreground">Digital content unlocked:</span> limited-run skin variants listed below in Companion Skins. They only change appearance for the referrer and never impact the recipient&apos;s access tier.
-                      </li>
-                    </ul>
-                  </CardContent>
-                </Card>
-                <CompanionSkins />
-              </div>
-
-              {/* Danger Zone */}
-              <Card className="border-destructive/40">
-                <CardHeader>
-                  <CardTitle className="text-destructive">Delete Account</CardTitle>
-                  <CardDescription>
-                    Permanently remove your profile, mentor progress, and saved data from Cosmiq.
-                  </CardDescription>
+              {/* Delete Account - moved to bottom, less prominent */}
+              <Card className="border-destructive/30 bg-destructive/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base text-destructive flex items-center gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Danger Zone
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    This action cannot be undone. You will lose access to your companion, streaks, referrals, and any
-                    personalized content tied to this account.
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Permanently delete your account, companion, and all progress.
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    You can delete your account at any time. This will permanently remove your data from our servers.
-                  </p>
-                  <Button
-                    variant="link"
-                    className="px-0 text-sm text-primary"
-                    onClick={() => navigate("/account-deletion")}
-                  >
-                    How account deletion works
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full border-destructive/60 text-destructive hover:bg-destructive/10"
-                    disabled={isDeletingAccount}
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {isDeletingAccount ? "Deleting..." : "Delete account"}
-                  </Button>
-                  <AlertDialog
-                    open={showDeleteDialog}
-                    onOpenChange={(open) => {
-                      if (isDeletingAccount) return;
-                      setShowDeleteDialog(open);
-                      if (!open) {
-                        setDeleteConfirmationText("");
-                      }
-                    }}
-                  >
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete your account, your companion, and your progress. This can&apos;t be
-                          undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <div className="space-y-2">
-                        <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
-                        <Input
-                          id="delete-confirmation-input"
-                          value={deleteConfirmationText}
-                          onChange={(event) => setDeleteConfirmationText(event.target.value)}
-                          placeholder='Type "delete"'
-                          autoComplete="off"
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          spellCheck={false}
-                          disabled={isDeletingAccount}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          This extra step prevents accidental deletions.
-                        </p>
-                      </div>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={handleDeleteAccount}
-                          disabled={isDeletingAccount || !isDeleteConfirmationValid}
-                        >
-                          {isDeletingAccount ? "Deleting..." : "Delete account"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="link"
+                      className="px-0 text-xs text-muted-foreground h-auto"
+                      onClick={() => navigate("/account-deletion")}
+                    >
+                      Learn more
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto border-destructive/40 text-destructive hover:bg-destructive/10 text-xs h-8"
+                      disabled={isDeletingAccount}
+                      onClick={() => setShowDeleteDialog(true)}
+                    >
+                      Delete Account
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-
             </TabsContent>
 
-            <TabsContent value="notifications" className="space-y-6">
+            {/* Rewards Tab (Referrals moved here) */}
+            <TabsContent value="rewards" className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Gift className="h-5 w-5 text-primary" />
+                <div>
+                  <h2 className="text-lg font-semibold">Referrals & Rewards</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Invite friends to unlock cosmetic companion skins
+                  </p>
+                </div>
+              </div>
+              
+              <ReferralCodeRedeemCard />
+              <ReferralDashboard />
+              <CompanionSkins />
+            </TabsContent>
+
+            {/* Notifications Tab */}
+            <TabsContent value="notifications" className="space-y-4">
               <PushNotificationSettings />
               <DailyQuoteSettings />
             </TabsContent>
 
-            <TabsContent value="preferences" className="space-y-6">
+            {/* Preferences Tab */}
+            <TabsContent value="preferences" className="space-y-4">
               <SoundSettings />
-              
               <AstrologySettings />
               
-              <Card>
-                <CardHeader>
-                  <CardTitle>Gameplay</CardTitle>
-                  <CardDescription>Customize your game experience</CardDescription>
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Gameplay</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent>
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="astral-encounters">Astral Encounters</Label>
+                      <Label htmlFor="astral-encounters" className="text-sm">Astral Encounters</Label>
                       <p className="text-xs text-muted-foreground">
-                        Enable mini-game boss battles that appear as you complete quests
+                        Mini-game boss battles when completing quests
                       </p>
                     </div>
                     <Switch
@@ -627,12 +538,12 @@ const Profile = () => {
             </TabsContent>
           </Tabs>
 
-          {/* Sign Out Button */}
-          <div className="mt-8 pb-6">
+          {/* Sign Out - subtle at bottom */}
+          <div className="pt-4">
             <Button
               onClick={handleSignOut}
-              variant="outline"
-              className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              variant="ghost"
+              className="w-full text-muted-foreground hover:text-destructive"
               disabled={isSigningOut}
             >
               <LogOut className="h-4 w-4 mr-2" />
@@ -642,6 +553,49 @@ const Profile = () => {
         </div>
       </div>
       <BottomNav />
+
+      {/* Delete Account Dialog */}
+      <AlertDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          if (isDeletingAccount) return;
+          setShowDeleteDialog(open);
+          if (!open) setDeleteConfirmationText("");
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your account, companion, and progress. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirmation-input">Type "delete" to confirm</Label>
+            <Input
+              id="delete-confirmation-input"
+              value={deleteConfirmationText}
+              onChange={(e) => setDeleteConfirmationText(e.target.value)}
+              placeholder='Type "delete"'
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              disabled={isDeletingAccount}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteAccount}
+              disabled={isDeletingAccount || !isDeleteConfirmationValid}
+            >
+              {isDeletingAccount ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Legal Document Viewer */}
       {viewingLegalDoc && (
