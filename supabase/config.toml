@@ -197,3 +197,9 @@ verify_jwt = false
 
 [functions.batch-generate-rhythm-tracks]
 verify_jwt = false
+
+[functions.google-calendar-auth]
+verify_jwt = true
+
+[functions.google-calendar-events]
+verify_jwt = true
