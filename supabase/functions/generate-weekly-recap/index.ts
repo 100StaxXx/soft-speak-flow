@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mentorNarrativeProfiles, getMentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -157,8 +158,9 @@ serve(async (req) => {
       habits: habits?.length || 0,
     };
 
-    // Generate mentor insight
+    // Generate mentor story
     let mentorInsight = null;
+    let mentorStory = null;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (LOVABLE_API_KEY && (stats.checkIns > 0 || stats.reflections > 0)) {
@@ -169,19 +171,21 @@ serve(async (req) => {
         .eq("id", userId)
         .single();
 
-      let mentorTone = "warm and supportive";
+      let mentorSlug = "eli"; // default
       let mentorName = "Your Mentor";
+      let narrativeProfile = getMentorNarrativeProfile("eli");
       
       if (profile?.selected_mentor_id) {
         const { data: mentor } = await supabase
           .from("mentors")
-          .select("name, tone_description")
+          .select("name, slug, tone_description")
           .eq("id", profile.selected_mentor_id)
           .single();
 
         if (mentor) {
-          mentorTone = mentor.tone_description || mentorTone;
+          mentorSlug = mentor.slug;
           mentorName = mentor.name;
+          narrativeProfile = getMentorNarrativeProfile(mentor.slug) || narrativeProfile;
         }
       }
 
@@ -225,42 +229,73 @@ serve(async (req) => {
         ? intentions.join("; ") 
         : null;
       
-      // Get full gratitude entries (not just themes)
+      // Get full gratitude entries
       const fullGratitudeEntries = (reflections || [])
         .filter(r => r.gratitude)
         .map(r => r.gratitude as string);
-      const gratitudeText = fullGratitudeEntries.length > 0 
+      const gratitudeTextFull = fullGratitudeEntries.length > 0 
         ? fullGratitudeEntries.join("; ") 
         : null;
       
-      // Get all wins (not just 3)
+      // Get all wins
       const allWins = wins.length > 0 ? wins.join("; ") : null;
 
-      const prompt = `You are ${mentorName}, a wellness mentor with the following tone: ${mentorTone}
+      // Build the storytelling prompt using mentor narrative profile
+      const storyPrompt = `You are ${mentorName}, reflecting on a week shared with someone you deeply care about guiding.
 
-Here is the user's week in detail:
+YOUR VOICE & STYLE:
+${narrativeProfile?.narrativeVoice || "Warm and supportive"}
 
-## Mood Journey
+YOUR SPEECH PATTERNS:
+${narrativeProfile?.speechPatterns?.map(p => `- ${p}`).join("\n") || "- Speaks with warmth and encouragement"}
+
+YOUR WISDOM STYLE:
+${narrativeProfile?.wisdomStyle || "Supportive guidance"}
+
+EXAMPLE OF HOW YOU SPEAK:
+${narrativeProfile?.exampleDialogue?.slice(0, 2).join("\n") || '"I see you. I believe in you."'}
+
+---
+
+THE WEEK'S JOURNEY:
+
+## Day-by-Day Mood Flow
 ${moodJourneyText}
-Overall trend: ${trend}
+Overall arc: ${trend === "improving" ? "Rising energy and spirits" : trend === "declining" ? "Some challenges along the way" : "Steady and grounded"}
 
-## Morning Intentions
-${intentionsText || "No intentions set this week"}
+## Morning Intentions Set
+${intentionsText || "They moved through the week with quiet purpose"}
 
-## Evening Reflections
-Wins celebrated:
-${allWins || "None shared"}
+## Victories Celebrated
+${allWins || "Small wins, even if unspoken"}
 
-Gratitude expressed:
-${gratitudeText || "None shared"}
+## Gratitude Expressed
+${gratitudeTextFull || "Moments of appreciation, felt if not named"}
 
-## Activity Stats
-- ${stats.checkIns} morning check-ins
-- ${stats.reflections} evening reflections
+## The Numbers Tell a Story
+- ${stats.checkIns} mornings began with intention
+- ${stats.reflections} evenings ended with reflection  
 - ${stats.quests} quests completed
-- ${stats.habits} habits completed
+- ${stats.habits} habits honored
 
-Write a personalized weekly insight (4-5 sentences). Reference specific things they shared - their moods on particular days, their intentions, wins, or gratitude. Acknowledge patterns you notice and offer encouragement for the week ahead. Be warm and specific.`;
+---
+
+WRITE A PERSONAL WEEKLY REFLECTION (300-400 words):
+
+Tell the story of their week as if you were sitting with them on Sunday evening, looking back together. This is NOT a list or summary—it's a narrative, a story told in your unique voice.
+
+Structure your reflection as:
+1. Opening: Set the scene of beginning the week together
+2. The Journey: Weave through specific moments—reference actual moods, intentions, wins, gratitude they shared
+3. Patterns & Growth: What did you notice about their week? What patterns emerged?
+4. Forward Gaze: End with encouragement for the week ahead, in your signature style
+
+IMPORTANT:
+- Write in second person ("you") speaking directly to them
+- Reference SPECIFIC things from their data (not generic advice)
+- Use your unique speech patterns and voice throughout
+- This should feel like a personal letter, not a report
+- End with something memorable in your style (a question, challenge, or blessing)`;
 
       try {
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -272,16 +307,21 @@ Write a personalized weekly insight (4-5 sentences). Reference specific things t
           body: JSON.stringify({
             model: "google/gemini-2.5-flash",
             messages: [
-              { role: "system", content: "You are a supportive wellness mentor writing weekly recaps. Be warm, specific, and encouraging." },
-              { role: "user", content: prompt },
+              { role: "system", content: `You are ${mentorName}, a wellness mentor who tells stories and reflects on journeys. You speak in first person as the mentor, addressing the user as "you". Your responses are warm, personal narratives—never lists or bullet points.` },
+              { role: "user", content: storyPrompt },
             ],
-            max_tokens: 400,
+            max_tokens: 800,
           }),
         });
 
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
-          mentorInsight = aiData.choices?.[0]?.message?.content?.trim();
+          mentorStory = aiData.choices?.[0]?.message?.content?.trim();
+          
+          // Also generate a shorter insight for backward compatibility
+          mentorInsight = mentorStory ? mentorStory.split('\n\n')[0].slice(0, 400) : null;
+        } else {
+          console.error("AI response not ok:", await aiResponse.text());
         }
       } catch (e) {
         console.error("AI generation failed:", e);
@@ -304,6 +344,7 @@ Write a personalized weekly insight (4-5 sentences). Reference specific things t
         win_highlights: wins.slice(0, 5),
         stats,
         mentor_insight: mentorInsight,
+        mentor_story: mentorStory,
       })
       .select()
       .single();

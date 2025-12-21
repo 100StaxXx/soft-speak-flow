@@ -4850,6 +4850,7 @@ export type Database = {
           gratitude_themes: string[] | null
           id: string
           mentor_insight: string | null
+          mentor_story: string | null
           mood_data: Json | null
           stats: Json | null
           user_id: string
@@ -4863,6 +4864,7 @@ export type Database = {
           gratitude_themes?: string[] | null
           id?: string
           mentor_insight?: string | null
+          mentor_story?: string | null
           mood_data?: Json | null
           stats?: Json | null
           user_id: string
@@ -4876,6 +4878,7 @@ export type Database = {
           gratitude_themes?: string[] | null
           id?: string
           mentor_insight?: string | null
+          mentor_story?: string | null
           mood_data?: Json | null
           stats?: Json | null
           user_id?: string

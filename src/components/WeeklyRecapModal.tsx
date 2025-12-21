@@ -1,49 +1,44 @@
-import { useRef } from "react";
-import { X, Share2, TrendingUp, TrendingDown, Minus, Calendar, CheckCircle2, Moon, Sparkles, Target, Heart } from "lucide-react";
+import { useRef, useState } from "react";
+import { X, Share2, Volume2, VolumeX, Calendar, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { useWeeklyRecap, WeeklyRecap } from "@/hooks/useWeeklyRecap";
-import { useProfile } from "@/hooks/useProfile";
+import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { downloadImage } from "@/utils/imageDownload";
 import { toPng } from "html-to-image";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-const MOOD_EMOJIS: Record<string, string> = {
-  great: "😊",
-  good: "🙂",
-  okay: "😐",
-  low: "😔",
-  rough: "😢",
-  energized: "⚡",
-  calm: "😌",
-  anxious: "😰",
-  grateful: "🙏",
-  motivated: "💪",
-};
-
-const TrendIcon = ({ trend }: { trend: string }) => {
-  switch (trend) {
-    case "improving":
-      return <TrendingUp className="h-4 w-4 text-green-400" />;
-    case "declining":
-      return <TrendingDown className="h-4 w-4 text-red-400" />;
-    default:
-      return <Minus className="h-4 w-4 text-yellow-400" />;
-  }
+const TrendBadge = ({ trend }: { trend: string }) => {
+  const config = {
+    improving: { icon: TrendingUp, label: "Rising", className: "text-green-400 bg-green-500/10 border-green-500/20" },
+    declining: { icon: TrendingDown, label: "Challenging", className: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+    stable: { icon: Minus, label: "Steady", className: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+  };
+  const { icon: Icon, label, className } = config[trend as keyof typeof config] || config.stable;
+  
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${className}`}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  );
 };
 
 export const WeeklyRecapModal = () => {
   const { isModalOpen, selectedRecap, closeRecap } = useWeeklyRecap();
-  const { profile } = useProfile();
   const mentor = useMentorPersonality();
   const cardRef = useRef<HTMLDivElement>(null);
+  const [isReading, setIsReading] = useState(false);
 
   if (!selectedRecap) return null;
 
   const startDate = parseISO(selectedRecap.week_start_date);
   const endDate = parseISO(selectedRecap.week_end_date);
-  const dateRange = `${format(startDate, "MMM d")} - ${format(endDate, "d, yyyy")}`;
+  const dateRange = `${format(startDate, "MMMM d")} – ${format(endDate, "d, yyyy")}`;
+
+  // Use mentor_story if available, fall back to mentor_insight
+  const storyContent = selectedRecap.mentor_story || selectedRecap.mentor_insight;
 
   const handleShare = async () => {
     if (!cardRef.current) return;
@@ -59,6 +54,31 @@ export const WeeklyRecapModal = () => {
     }
   };
 
+  const handleReadAloud = () => {
+    if (!storyContent) return;
+    
+    if (isReading) {
+      window.speechSynthesis.cancel();
+      setIsReading(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(storyContent);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.onend = () => setIsReading(false);
+    utterance.onerror = () => setIsReading(false);
+    
+    window.speechSynthesis.speak(utterance);
+    setIsReading(true);
+  };
+
+  const handleClose = () => {
+    window.speechSynthesis.cancel();
+    setIsReading(false);
+    closeRecap();
+  };
+
   return (
     <AnimatePresence>
       {isModalOpen && (
@@ -67,178 +87,117 @@ export const WeeklyRecapModal = () => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={closeRecap}
+          onClick={handleClose}
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-gradient-to-b from-background via-background to-background/95 border border-border/50 shadow-2xl"
+            className="w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl bg-background border border-border/50 shadow-2xl overflow-hidden"
           >
             {/* Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/95 backdrop-blur-sm border-b border-border/30">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-amber-400" />
-                Your Week in Review
-              </h2>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 bg-background/95 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-foreground">
+                    {mentor?.name || "Your Mentor"} Reflects
+                  </h2>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>{dateRange}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {storyContent && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handleReadAloud}
+                    className={isReading ? "text-amber-400" : ""}
+                  >
+                    {isReading ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </Button>
+                )}
                 <Button variant="ghost" size="icon" onClick={handleShare}>
                   <Share2 className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={closeRecap}>
+                <Button variant="ghost" size="icon" onClick={handleClose}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            {/* Content */}
-            <div ref={cardRef} className="p-6 space-y-6 bg-gradient-to-b from-background to-background/95">
-              {/* Date Range */}
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm">{dateRange}</span>
+            {/* Story Content */}
+            <ScrollArea className="flex-1 min-h-0">
+              <div ref={cardRef} className="p-6 space-y-6 bg-background">
+                {/* Trend Badge */}
+                <div className="flex items-center justify-center">
+                  <TrendBadge trend={selectedRecap.mood_data.trend} />
                 </div>
-              </div>
 
-              {/* Mood Journey */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Moon className="h-4 w-4 text-purple-400" />
-                  Mood Journey
-                </h3>
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
-                  {/* Morning moods */}
-                  {selectedRecap.mood_data.morning.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-xs text-muted-foreground mb-2">Mornings</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {selectedRecap.mood_data.morning.map((m, i) => (
-                          <div key={i} className="flex flex-col items-center">
-                            <span className="text-xl">{MOOD_EMOJIS[m.mood] || "😊"}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {format(parseISO(m.date), "EEE")}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Evening moods */}
-                  {selectedRecap.mood_data.evening.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">Evenings</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {selectedRecap.mood_data.evening.map((m, i) => (
-                          <div key={i} className="flex flex-col items-center">
-                            <span className="text-xl">{MOOD_EMOJIS[m.mood] || "😊"}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {format(parseISO(m.date), "EEE")}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Trend */}
-                  <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-center gap-2">
-                    <TrendIcon trend={selectedRecap.mood_data.trend} />
-                    <span className="text-sm text-muted-foreground capitalize">
-                      {selectedRecap.mood_data.trend} week
+                {/* The Story */}
+                {storyContent ? (
+                  <div className="space-y-4">
+                    <article className="prose prose-invert prose-sm max-w-none">
+                      {storyContent.split('\n\n').map((paragraph, i) => (
+                        <p 
+                          key={i} 
+                          className="text-foreground/90 leading-relaxed text-[15px] first:first-letter:text-2xl first:first-letter:font-bold first:first-letter:text-amber-400 first:first-letter:mr-1"
+                        >
+                          {paragraph}
+                        </p>
+                      ))}
+                    </article>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No story available for this week.
+                    </p>
+                  </div>
+                )}
+
+                {/* Compact Stats Footer */}
+                <div className="pt-4 border-t border-border/30">
+                  <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <span className="text-blue-400 font-medium">{selectedRecap.stats.checkIns}</span>
+                      check-ins
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-purple-400 font-medium">{selectedRecap.stats.reflections}</span>
+                      reflections
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-green-400 font-medium">{selectedRecap.stats.quests}</span>
+                      quests
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-amber-400 font-medium">{selectedRecap.stats.habits}</span>
+                      habits
                     </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-4 gap-2">
-                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
-                  <p className="text-2xl font-bold text-blue-400">{selectedRecap.stats.checkIns}</p>
-                  <p className="text-[10px] text-muted-foreground">Check-ins</p>
-                </div>
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
-                  <p className="text-2xl font-bold text-purple-400">{selectedRecap.stats.reflections}</p>
-                  <p className="text-[10px] text-muted-foreground">Reflections</p>
-                </div>
-                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
-                  <p className="text-2xl font-bold text-green-400">{selectedRecap.stats.quests}</p>
-                  <p className="text-[10px] text-muted-foreground">Quests</p>
-                </div>
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
-                  <p className="text-2xl font-bold text-amber-400">{selectedRecap.stats.habits}</p>
-                  <p className="text-[10px] text-muted-foreground">Habits</p>
+                {/* Branding */}
+                <div className="text-center pt-2">
+                  <p className="text-[10px] text-muted-foreground/50">
+                    ✨ Cosmiq Weekly Recap
+                  </p>
                 </div>
               </div>
-
-              {/* Gratitude Themes */}
-              {selectedRecap.gratitude_themes.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Heart className="h-4 w-4 text-pink-400" />
-                    Gratitude Highlights
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedRecap.gratitude_themes.map((theme, i) => (
-                      <span
-                        key={i}
-                        className="px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-xs text-pink-300"
-                      >
-                        {theme}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Top Wins */}
-              {selectedRecap.win_highlights.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Target className="h-4 w-4 text-green-400" />
-                    Top Wins
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedRecap.win_highlights.slice(0, 3).map((win, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20"
-                      >
-                        <CheckCircle2 className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                        <p className="text-sm text-foreground/90">{win}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Mentor Insight */}
-              {selectedRecap.mentor_insight && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-amber-400" />
-                    {mentor?.name || "Your Mentor"}'s Insight
-                  </h3>
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-red-500/10 border border-amber-500/20">
-                    <p className="text-sm text-foreground/90 italic leading-relaxed">
-                      "{selectedRecap.mentor_insight}"
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Cosmiq Branding */}
-              <div className="text-center pt-4 border-t border-border/30">
-                <p className="text-xs text-muted-foreground">
-                  ✨ Cosmiq Weekly Recap ✨
-                </p>
-              </div>
-            </div>
+            </ScrollArea>
 
             {/* Footer */}
-            <div className="sticky bottom-0 p-4 bg-background/95 backdrop-blur-sm border-t border-border/30">
-              <Button onClick={closeRecap} className="w-full">
-                Got it!
+            <div className="px-6 py-4 border-t border-border/30 bg-background/95 backdrop-blur-sm">
+              <Button onClick={handleClose} className="w-full">
+                Continue Your Journey
               </Button>
             </div>
           </motion.div>
