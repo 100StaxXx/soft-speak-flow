@@ -5,9 +5,10 @@ import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Loader2, Settings } from "lucide-react";
+import { Crown, Loader2, Settings, Bug, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type PlanOption = {
   id: 'monthly' | 'yearly';
@@ -39,6 +40,7 @@ export function SubscriptionManagement() {
   } = useAppleSubscription();
 
   const [selectedPlan, setSelectedPlan] = useState<PlanOption['id']>('yearly');
+  const [debugOpen, setDebugOpen] = useState(false);
 
   const productMap = useMemo(() => {
     return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
@@ -164,6 +166,81 @@ export function SubscriptionManagement() {
               In-App Purchases are only available on iOS devices
             </div>
           )}
+
+          {/* Debug Panel */}
+          <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
+                <Bug className="h-3 w-3 mr-1" />
+                {debugOpen ? "Hide Debug Info" : "Show Debug Info"}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border/60 text-xs font-mono space-y-2">
+                <div className="flex justify-between">
+                  <span>IAP Available:</span>
+                  <span className={isAvailable ? "text-green-500" : "text-red-500"}>
+                    {isAvailable ? "YES" : "NO"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Products Loading:</span>
+                  <span>{productsLoading ? "YES" : "NO"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Has Attempted Fetch:</span>
+                  <span>{hasLoadedProducts ? "YES" : "NO"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Products Count:</span>
+                  <span className={products.length > 0 ? "text-green-500" : "text-red-500"}>
+                    {products.length}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Error:</span>
+                  <span className="text-red-500 truncate max-w-[60%]">
+                    {productError || "None"}
+                  </span>
+                </div>
+                <div className="border-t border-border/60 pt-2">
+                  <p className="text-muted-foreground mb-1">Expected Product IDs:</p>
+                  <p className="break-all">{IAP_PRODUCTS.MONTHLY}</p>
+                  <p className="break-all">{IAP_PRODUCTS.YEARLY}</p>
+                </div>
+                <div className="border-t border-border/60 pt-2">
+                  <p className="text-muted-foreground mb-1">Loaded Products:</p>
+                  {products.length > 0 ? (
+                    products.map((p) => (
+                      <div key={p.productId} className="text-green-500">
+                        ✓ {p.productId}: {p.price}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-red-500">No products loaded</p>
+                  )}
+                </div>
+                <div className="border-t border-border/60 pt-2">
+                  <p className="text-muted-foreground mb-1">ProductMap Keys:</p>
+                  <p className="break-all">
+                    {Object.keys(productMap).length > 0 
+                      ? Object.keys(productMap).join(", ") 
+                      : "Empty"}
+                  </p>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full mt-2"
+                  onClick={() => { void reloadProducts(); }}
+                  disabled={productsLoading}
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${productsLoading ? 'animate-spin' : ''}`} />
+                  {productsLoading ? "Loading..." : "Reload Products"}
+                </Button>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <div className="grid gap-4 md:grid-cols-2">
             {planOptions.map((planOption) => {
