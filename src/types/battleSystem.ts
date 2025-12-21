@@ -108,7 +108,7 @@ export const GAME_DAMAGE_VALUES = {
   
   // Astral Frequency - damage on distance milestones
   astral_frequency: {
-    distanceMilestone: 20,    // Every 100m traveled
+    distanceMilestone: 12,    // Every 100m traveled (reduced for longer encounters)
     collision: 'tier_attack',
   },
 } as const;
