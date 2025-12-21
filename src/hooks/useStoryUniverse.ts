@@ -158,7 +158,13 @@ export const useRecordMentorTransition = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      const transitions = (current?.mentor_transitions as any[]) || [];
+      const transitions = (current?.mentor_transitions as Array<{
+        from_mentor_id: string;
+        from_mentor_name: string;
+        to_mentor_id: string;
+        to_mentor_name: string;
+        transitioned_at: string;
+      }>) || [];
       transitions.push({
         from_mentor_id: fromMentorId,
         from_mentor_name: fromMentorName,

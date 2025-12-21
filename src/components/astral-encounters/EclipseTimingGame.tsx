@@ -386,7 +386,12 @@ export const EclipseTimingGame = ({
     
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch((e) => {
+        // Audio play can fail due to autoplay policy - this is expected
+        if (e.name !== 'NotAllowedError') {
+          console.warn('Audio play failed:', e.message);
+        }
+      });
     }
   }, []);
 
@@ -621,7 +626,14 @@ export const EclipseTimingGame = ({
   useEffect(() => {
     if (audioRef.current) {
       if (gameState === 'paused') audioRef.current.pause();
-      else if (gameState === 'playing') audioRef.current.play().catch(() => {});
+      else if (gameState === 'playing') {
+        audioRef.current.play().catch((e) => {
+          // Audio play can fail due to autoplay policy - expected behavior
+          if (e.name !== 'NotAllowedError') {
+            console.warn('Audio play failed:', e.message);
+          }
+        });
+      }
     }
   }, [gameState]);
 

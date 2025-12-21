@@ -193,7 +193,7 @@ export const StoryOnboarding = () => {
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
 
@@ -235,7 +235,7 @@ export const StoryOnboarding = () => {
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       
@@ -415,7 +415,7 @@ export const StoryOnboarding = () => {
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       const explanationToSave = explanationOverride ?? mentorExplanation;
@@ -490,7 +490,7 @@ export const StoryOnboarding = () => {
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       

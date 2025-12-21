@@ -181,8 +181,12 @@ export function useHabits() {
           
           // Update companion attributes in background
           if (companion?.id) {
-            updateMindFromHabit(companion.id).catch(() => {});
-            updateBodyFromActivity(companion.id).catch(() => {});
+            updateMindFromHabit(companion.id).catch((e) => {
+              console.warn('Failed to update mind from habit:', e);
+            });
+            updateBodyFromActivity(companion.id).catch((e) => {
+              console.warn('Failed to update body from activity:', e);
+            });
           }
           
           // Check for streak achievements

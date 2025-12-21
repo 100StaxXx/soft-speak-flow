@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { CommunityWithMembership } from "@/hooks/useCommunity";
 import { GuildEmblem, EmblemIcon } from "./GuildEmblem";
-import { GuildBanner } from "./GuildBanner";
+import { GuildBanner, type BannerStyle } from "./GuildBanner";
 import { GuildParticles } from "./GuildParticles";
 import { Badge } from "@/components/ui/badge";
 import { Users, Crown, Shield, Globe, Lock, Sparkles } from "lucide-react";
@@ -84,7 +84,7 @@ export const GuildCard = ({ community, isSelected, onClick, memberCount }: Guild
     >
       {/* Animated Banner Background */}
       <GuildBanner 
-        style={banner_style as any} 
+        style={banner_style as BannerStyle} 
         color={community.theme_color}
         className="h-16"
       />
@@ -198,7 +198,7 @@ export const PublicGuildCard = ({ community, onClick, isJoining }: PublicGuildCa
     >
       {/* Banner */}
       <GuildBanner 
-        style={banner_style as any} 
+        style={banner_style as BannerStyle} 
         color={community.theme_color}
         className="h-12"
       />

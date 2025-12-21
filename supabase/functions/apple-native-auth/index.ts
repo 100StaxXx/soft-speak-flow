@@ -227,6 +227,7 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom verification type from native auth flow
     const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
       token_hash: verificationToken,
       type: verificationType as any,

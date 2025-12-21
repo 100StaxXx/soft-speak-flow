@@ -37,7 +37,9 @@ const milestoneColors: Record<number, string> = {
 };
 
 export const PostcardCard = ({ postcard, onClick }: PostcardCardProps) => {
-  const storyType = (postcard as any).story_type_slug as StoryTypeSlug | undefined;
+  const storyType = 'story_type_slug' in postcard 
+    ? (postcard.story_type_slug as StoryTypeSlug | undefined) 
+    : undefined;
   const hasNarrativeContent = !!(postcard.chapter_title || postcard.story_content);
   
   // Use story type colors if available, otherwise fallback to milestone colors

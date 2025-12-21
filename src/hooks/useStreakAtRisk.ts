@@ -24,7 +24,7 @@ export function useStreakAtRisk() {
         .from("profiles")
         .select("streak_at_risk, streak_at_risk_since, current_habit_streak, streak_freezes_available")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching streak at risk:", error);

@@ -77,7 +77,7 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
         .from("guild_blessing_charges")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
 
