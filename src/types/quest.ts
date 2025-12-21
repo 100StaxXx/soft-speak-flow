@@ -12,7 +12,7 @@ export type TaskDifficulty = 'easy' | 'medium' | 'hard';
 export interface CalendarTask {
   id: string;
   task_text: string;
-  task_date?: string;
+  task_date: string;
   scheduled_time: string | null;
   estimated_duration: number | null;
   completed: boolean;

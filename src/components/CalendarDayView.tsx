@@ -88,9 +88,8 @@ export const CalendarDayView = ({
   };
 
   const getTasksForTimeSlot = (hour: number, minute: number) => {
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return tasks.filter(task => {
-      if (!task.scheduled_time || task.task_date !== dateStr) return false;
+    return dayTasks.filter(task => {
+      if (!task.scheduled_time) return false;
       const [taskHour, taskMinute] = task.scheduled_time.split(':').map(Number);
       return taskHour === hour && taskMinute === minute;
     });
@@ -373,6 +372,7 @@ export const CalendarDayView = ({
               return (
                 <div
                   key={`${hour}-${minute}`}
+                  data-hour={isHourMark ? hour : undefined}
                   className={cn(
                     "flex border-b border-border/50 hover:bg-accent/30 transition-colors group",
                     isHourMark && "border-t border-border"
