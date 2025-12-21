@@ -5135,6 +5135,17 @@ export type Database = {
         }[]
       }
       delete_user_account: { Args: { p_user_id: string }; Returns: undefined }
+      find_community_by_invite_code: {
+        Args: { p_invite_code: string }
+        Returns: {
+          avatar_url: string
+          description: string
+          id: string
+          is_public: boolean
+          name: string
+          theme_color: string
+        }[]
+      }
       generate_referral_code: { Args: never; Returns: string }
       get_next_evolution_threshold: {
         Args: { current_stage: number }

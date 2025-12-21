@@ -205,19 +205,17 @@ export const useCommunity = (communityId?: string) => {
     },
   });
 
-  // Find community by invite code
+  // Find community by invite code (uses security definer function to bypass RLS)
   const findByInviteCode = async (code: string): Promise<Community | null> => {
     const { data, error } = await supabase
-      .from("communities")
-      .select("*")
-      .eq("invite_code", code.toUpperCase())
-      .single();
+      .rpc('find_community_by_invite_code', { p_invite_code: code.toUpperCase() });
 
-    if (error) {
+    if (error || !data || data.length === 0) {
       console.error("Find by invite code error:", error);
       return null;
     }
-    return data as Community;
+    
+    return data[0] as Community;
   };
 
   return {
