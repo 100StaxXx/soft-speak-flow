@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info, Search } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Moon, Trash2, Sparkles, MessageCircle, Info, Search, HelpCircle } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -235,7 +235,7 @@ const Profile = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Profile
+                  Command Center
                 </h1>
                 <p className="text-sm text-muted-foreground">Manage your account and preferences</p>
               </div>
@@ -276,6 +276,25 @@ const Profile = () => {
                   <CardTitle className="text-lg">Library</CardTitle>
                 </div>
                 <CardDescription>View your saved favorites and downloads</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card 
+              className="cursor-pointer sm:hover:border-primary/50 transition-all sm:hover:shadow-glow select-none active:scale-[0.98]" 
+              onClick={() => navigate("/help")}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                navigate("/help");
+              }}
+              role="button"
+              tabIndex={0}
+              style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <HelpCircle className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Help Center</CardTitle>
+                </div>
+                <CardDescription>In-depth guides for every feature</CardDescription>
               </CardHeader>
             </Card>
             <Card 
@@ -636,7 +655,7 @@ const Profile = () => {
       <PageInfoModal
         open={showPageInfo}
         onClose={() => setShowPageInfo(false)}
-        title="About Your Profile"
+        title="About Command Center"
         icon={User}
         description="Manage your account settings, notifications, and preferences all in one place."
         features={[
