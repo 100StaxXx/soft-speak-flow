@@ -3976,8 +3976,10 @@ export type Database = {
           created_at: string | null
           current_period_end: string
           current_period_start: string
+          environment: string | null
           id: string
           plan: string
+          source: string | null
           status: string
           stripe_customer_id: string
           stripe_subscription_id: string | null
@@ -3991,8 +3993,10 @@ export type Database = {
           created_at?: string | null
           current_period_end: string
           current_period_start: string
+          environment?: string | null
           id?: string
           plan: string
+          source?: string | null
           status: string
           stripe_customer_id: string
           stripe_subscription_id?: string | null
@@ -4006,8 +4010,10 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string
           current_period_start?: string
+          environment?: string | null
           id?: string
           plan?: string
+          source?: string | null
           status?: string
           stripe_customer_id?: string
           stripe_subscription_id?: string | null
