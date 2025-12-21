@@ -1,58 +1,53 @@
 /**
  * GuildRitualCard Component
- * Displays upcoming guild rituals and allows RSVP
+ * Displays guild rituals and allows marking attendance
  */
 
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Calendar,
   Clock,
-  Users,
-  Bell,
-  BellOff,
   Sparkles,
   Moon,
   Sun,
   Star,
+  Check,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, formatDistanceToNow, isPast } from "date-fns";
 
 interface GuildRitual {
   id: string;
   name: string;
   description: string | null;
   ritual_type: string;
-  scheduled_at: string;
-  duration_minutes: number;
-  xp_reward: number;
-  attendees?: Array<{
-    id: string;
-    displayName?: string;
-    avatarUrl?: string;
-  }>;
-  myRsvp?: boolean;
+  scheduled_time: string;
+  scheduled_days: number[];
+  is_active: boolean;
 }
 
 interface GuildRitualCardProps {
   ritual: GuildRitual;
-  onRsvp: (ritualId: string, attending: boolean) => void;
-  isRsvping: boolean;
+  onMarkAttendance: (ritualId: string) => void;
+  hasAttendedToday: boolean;
+  isMarking: boolean;
 }
+
+const getDayName = (dayNum: number) => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return days[dayNum] || '';
+};
 
 export const GuildRitualCard = ({
   ritual,
-  onRsvp,
-  isRsvping,
+  onMarkAttendance,
+  hasAttendedToday,
+  isMarking,
 }: GuildRitualCardProps) => {
-  const scheduledAt = new Date(ritual.scheduled_at);
-  const isUpcoming = !isPast(scheduledAt);
-  const timeUntil = isUpcoming ? formatDistanceToNow(scheduledAt, { addSuffix: true }) : "Started";
+  const today = new Date().getDay();
+  const isScheduledToday = ritual.scheduled_days.includes(today);
 
   const getRitualIcon = (type: string) => {
     switch (type) {
@@ -99,6 +94,15 @@ export const GuildRitualCard = ({
   const Icon = getRitualIcon(ritual.ritual_type);
   const colors = getRitualColor(ritual.ritual_type);
 
+  // Format time (HH:MM:SS to readable format)
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -107,7 +111,7 @@ export const GuildRitualCard = ({
       <Card className={cn(
         "overflow-hidden transition-all",
         colors.borderColor,
-        isUpcoming && "hover:shadow-lg"
+        isScheduledToday && "ring-2 ring-primary/50"
       )}>
         <CardHeader className={cn("pb-3", colors.bgColor)}>
           <div className="flex items-start justify-between">
@@ -128,9 +132,9 @@ export const GuildRitualCard = ({
               </div>
             </div>
 
-            {isUpcoming && (
-              <Badge variant={ritual.myRsvp ? "default" : "outline"} className="text-xs">
-                {ritual.myRsvp ? "Attending" : "RSVP"}
+            {isScheduledToday && (
+              <Badge variant={hasAttendedToday ? "default" : "secondary"} className="text-xs">
+                {hasAttendedToday ? "✓ Done" : "Today"}
               </Badge>
             )}
           </div>
@@ -141,67 +145,33 @@ export const GuildRitualCard = ({
             <p className="text-sm text-muted-foreground">{ritual.description}</p>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>{format(scheduledAt, 'MMM d, yyyy')}</span>
-            </div>
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>{format(scheduledAt, 'h:mm a')}</span>
+              <span>{formatTime(ritual.scheduled_time)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span>{ritual.scheduled_days.map(getDayName).join(', ')}</span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                {ritual.attendees?.length || 0} attending
-              </span>
-              {ritual.attendees && ritual.attendees.length > 0 && (
-                <div className="flex -space-x-2 ml-1">
-                  {ritual.attendees.slice(0, 4).map((attendee) => (
-                    <Avatar key={attendee.id} className="h-6 w-6 border-2 border-background">
-                      <AvatarImage src={attendee.avatarUrl} />
-                      <AvatarFallback className="text-xs">
-                        {attendee.displayName?.slice(0, 1).toUpperCase() || '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                </div>
-              )}
-            </div>
+          {isScheduledToday && !hasAttendedToday && (
+            <Button
+              size="sm"
+              onClick={() => onMarkAttendance(ritual.id)}
+              disabled={isMarking}
+              className="w-full gap-2"
+            >
+              <Check className="h-4 w-4" />
+              Mark Complete
+            </Button>
+          )}
 
-            <div className="flex items-center gap-1 text-xs">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
-              <span className="text-yellow-500 font-medium">{ritual.xp_reward} XP</span>
-            </div>
-          </div>
-
-          {isUpcoming && (
-            <div className="flex items-center gap-3 pt-2">
-              <div className="flex-1 text-sm text-muted-foreground">
-                {timeUntil}
-              </div>
-              <Button
-                size="sm"
-                variant={ritual.myRsvp ? "outline" : "default"}
-                onClick={() => onRsvp(ritual.id, !ritual.myRsvp)}
-                disabled={isRsvping}
-                className="gap-2"
-              >
-                {ritual.myRsvp ? (
-                  <>
-                    <BellOff className="h-3.5 w-3.5" />
-                    Cancel
-                  </>
-                ) : (
-                  <>
-                    <Bell className="h-3.5 w-3.5" />
-                    Join Ritual
-                  </>
-                )}
-              </Button>
+          {hasAttendedToday && (
+            <div className="flex items-center justify-center gap-2 text-sm text-green-500">
+              <Check className="h-4 w-4" />
+              Completed today!
             </div>
           )}
         </CardContent>
