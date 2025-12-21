@@ -5,7 +5,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { useCommunity, CommunityWithMembership } from "@/hooks/useCommunity";
 import { useCommunityMembers } from "@/hooks/useCommunityMembers";
-import { GuildCard, PublicGuildCard, GuildDetailHeader, GuildParticles } from "@/components/guild";
+import { 
+  GuildCard, 
+  PublicGuildCard, 
+  GuildDetailHeader, 
+  GuildParticles,
+  GuildOnlineBanner,
+  GuildBossCard,
+  ActiveBlessingsDisplay,
+  BlessingSendDialog,
+  HallOfLegends,
+} from "@/components/guild";
 import { CommunityMembersSection } from "@/components/community/CommunityMembersSection";
 import { CommunityInviteSection } from "@/components/community/CommunityInviteSection";
 import { CommunityShoutsFeed } from "@/components/community/CommunityShoutsFeed";
@@ -13,9 +23,13 @@ import { CreateCommunityDialog } from "@/components/community/CreateCommunityDia
 import { JoinCommunityDialog } from "@/components/community/JoinCommunityDialog";
 import { CommunityTutorialModal } from "@/components/community/CommunityTutorialModal";
 import { BottomNav } from "@/components/BottomNav";
-import { Plus, UserPlus, Users, Compass, Loader2, Sparkles, Shield } from "lucide-react";
+import { Plus, UserPlus, Users, Compass, Loader2, Sparkles, Shield, Crown, Skull, ScrollText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { useGuildPresence } from "@/hooks/useGuildPresence";
+import { useGuildBlessings } from "@/hooks/useGuildBlessings";
+import { useGuildBoss } from "@/hooks/useGuildBoss";
+import { useGuildLegends } from "@/hooks/useGuildLegends";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -269,7 +283,22 @@ interface CommunityDetailViewProps {
 }
 
 const CommunityDetailView = ({ community, onBack, onLeave, isLeaving, memberCount }: CommunityDetailViewProps) => {
+  const { user } = useAuth();
   const isOwner = community.role === 'owner';
+  const [activeTab, setActiveTab] = useState<'activity' | 'legends'>('activity');
+  const [showBlessingDialog, setShowBlessingDialog] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState<{ id: string; name: string; avatarUrl?: string } | null>(null);
+  
+  // Guild feature hooks
+  const { onlineMembers, isConnected } = useGuildPresence({ communityId: community.id });
+  const { myBlessings, charges, sendBlessing, isSending, blessingTypes } = useGuildBlessings({ communityId: community.id });
+  const { activeBoss, currentHp, hpPercentage, getTimeRemaining, damageLeaderboard, myTotalDamage } = useGuildBoss({ communityId: community.id });
+  const { legends, hasLegends, legendsByMonth, getLegendConfig, isLoading: isLoadingLegends } = useGuildLegends({ communityId: community.id });
+
+  const handleSendBlessing = (recipientId: string, recipientName: string, avatarUrl?: string) => {
+    setSelectedRecipient({ id: recipientId, name: recipientName, avatarUrl });
+    setShowBlessingDialog(true);
+  };
 
   return (
     <div className="h-screen bg-background overflow-y-auto relative">
@@ -291,36 +320,125 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving, memberCoun
 
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 mt-6 space-y-6 pb-28">
-        {/* Invite Section */}
+        {/* Online Presence Banner */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.1 }}
         >
-          <CommunityInviteSection
-            inviteCode={community.invite_code}
-            communityName={community.name}
+          <GuildOnlineBanner
+            onlineMembers={onlineMembers}
+            isConnected={isConnected}
           />
         </motion.div>
 
-        {/* Shouts Feed */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <CommunityShoutsFeed communityId={community.id} />
-        </motion.div>
+        {/* Active Blessings Display */}
+        {myBlessings && myBlessings.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <ActiveBlessingsDisplay blessings={myBlessings} />
+          </motion.div>
+        )}
 
-        {/* Members Leaderboard */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <CommunityMembersSection communityId={community.id} maxHeight="400px" />
-        </motion.div>
+        {/* Guild Boss Battle */}
+        {activeBoss && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <GuildBossCard
+              boss={activeBoss}
+              currentHp={currentHp}
+              hpPercentage={hpPercentage}
+              timeRemaining={getTimeRemaining()}
+              damageLeaderboard={damageLeaderboard}
+              myTotalDamage={myTotalDamage}
+            />
+          </motion.div>
+        )}
+
+        {/* Tabs for Activity vs Legends */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activity' | 'legends')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4 bg-muted/50 backdrop-blur-sm">
+            <TabsTrigger value="activity" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-md">
+              <Sparkles className="h-4 w-4" />
+              Activity
+            </TabsTrigger>
+            <TabsTrigger value="legends" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-md">
+              <Crown className="h-4 w-4" />
+              Legends
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activity" className="space-y-6">
+            {/* Invite Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <CommunityInviteSection
+                inviteCode={community.invite_code}
+                communityName={community.name}
+              />
+            </motion.div>
+
+            {/* Shouts Feed */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <CommunityShoutsFeed communityId={community.id} />
+            </motion.div>
+
+            {/* Members Leaderboard */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <CommunityMembersSection 
+                communityId={community.id} 
+                maxHeight="400px" 
+              />
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="legends">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <HallOfLegends
+                legendsByMonth={legendsByMonth}
+                getLegendConfig={getLegendConfig}
+                isLoading={isLoadingLegends}
+              />
+            </motion.div>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Blessing Send Dialog */}
+      {selectedRecipient && (
+        <BlessingSendDialog
+          open={showBlessingDialog}
+          onOpenChange={setShowBlessingDialog}
+          recipient={selectedRecipient}
+          blessingTypes={blessingTypes || []}
+          chargesRemaining={charges?.charges_remaining || 0}
+          onSend={(typeId, message) => {
+            sendBlessing.mutate({ recipientId: selectedRecipient.id, blessingTypeId: typeId, message });
+            setShowBlessingDialog(false);
+          }}
+          isSending={isSending}
+        />
+      )}
       
       <BottomNav />
     </div>
