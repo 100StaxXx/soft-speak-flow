@@ -24,6 +24,7 @@ export interface WeeklyRecap {
     habits: number;
   };
   mentor_insight: string | null;
+  mentor_story: string | null;
   created_at: string;
   viewed_at: string | null;
 }
