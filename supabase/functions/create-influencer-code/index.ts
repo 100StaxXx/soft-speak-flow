@@ -9,6 +9,8 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
  * Creates a code and stores payout information for future reward payments.
  * Sends a confirmation email with the code and dashboard link.
  * 
+ * SECURITY: Rate limited to 3 requests per IP per hour
+ * 
  * Request body:
  * {
  *   name: string - Influencer's name
@@ -24,6 +26,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limit: 3 requests per IP per hour
+const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
 function generateCodeFromHandle(handle: string): string {
   // Remove @ and special chars, uppercase
   const clean = handle.replace(/[@\s-]/g, "").toUpperCase();
@@ -31,6 +37,57 @@ function generateCodeFromHandle(handle: string): string {
   const base = clean.substring(0, 8);
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `COSMIQ-${base}${random}`;
+}
+
+function getClientIP(req: Request): string {
+  // Check common headers for real IP (in order of reliability)
+  const cfConnectingIP = req.headers.get("cf-connecting-ip");
+  if (cfConnectingIP) return cfConnectingIP;
+  
+  const xForwardedFor = req.headers.get("x-forwarded-for");
+  if (xForwardedFor) return xForwardedFor.split(",")[0].trim();
+  
+  const xRealIP = req.headers.get("x-real-ip");
+  if (xRealIP) return xRealIP;
+  
+  return "unknown";
+}
+
+async function checkRateLimit(
+  supabaseClient: any,
+  ip: string,
+  email: string
+): Promise<{ allowed: boolean; message?: string }> {
+  const oneHourAgo = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
+  
+  // Check requests from this IP in the last hour
+  const { count, error } = await supabaseClient
+    .from("influencer_creation_log")
+    .select("*", { count: "exact", head: true })
+    .eq("ip_address", ip)
+    .gte("created_at", oneHourAgo);
+  
+  if (error) {
+    console.error("Rate limit check failed:", error);
+    // Allow through if check fails (fail open for legitimate users)
+    return { allowed: true };
+  }
+  
+  if (count && count >= RATE_LIMIT_MAX) {
+    console.warn(`Rate limit exceeded for IP: ${ip}`);
+    return { 
+      allowed: false, 
+      message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX} code requests per hour.` 
+    };
+  }
+  
+  // Log this request
+  await supabaseClient.from("influencer_creation_log").insert({
+    ip_address: ip,
+    email: email,
+  });
+  
+  return { allowed: true };
 }
 
 async function sendConfirmationEmail(
@@ -189,6 +246,21 @@ serve(async (req) => {
       );
     }
 
+    // SECURITY: Check rate limit before processing
+    const clientIP = getClientIP(req);
+    const rateLimitResult = await checkRateLimit(supabaseClient, clientIP, email);
+    
+    if (!rateLimitResult.allowed) {
+      console.warn(`Rate limit blocked request from IP: ${clientIP}, email: ${email}`);
+      return new Response(
+        JSON.stringify({ error: rateLimitResult.message }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const appUrl = Deno.env.get("APP_URL") || "https://cosmiq.quest";
 
     // Check if influencer already has a code
@@ -272,7 +344,7 @@ serve(async (req) => {
     // Send confirmation email
     await sendConfirmationEmail(name, email, code, dashboardUrl, appLink);
 
-    console.log(`Created influencer code for ${name} (@${handle}): ${code}`);
+    console.log(`Created influencer code for ${name} (@${handle}): ${code} from IP: ${clientIP}`);
 
     return new Response(
       JSON.stringify({

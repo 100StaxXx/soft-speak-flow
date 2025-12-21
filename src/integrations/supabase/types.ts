@@ -2477,6 +2477,27 @@ export type Database = {
           },
         ]
       }
+      influencer_creation_log: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          ip_address: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          ip_address: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string
+        }
+        Relationships: []
+      }
       lesson_mentors: {
         Row: {
           created_at: string | null
@@ -4962,6 +4983,7 @@ export type Database = {
         }[]
       }
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
+      cleanup_old_influencer_logs: { Args: never; Returns: undefined }
       count_user_epics: { Args: { p_user_id: string }; Returns: number }
       create_companion_if_not_exists: {
         Args: {
