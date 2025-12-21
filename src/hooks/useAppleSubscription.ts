@@ -17,7 +17,12 @@ export function useAppleSubscription() {
   const [manageLoading, setManageLoading] = useState(false);
 
   const fetchProducts = useCallback(async () => {
+    console.log('[HOOK DEBUG] fetchProducts called');
+    console.log('[HOOK DEBUG] IAP_PRODUCTS:', JSON.stringify(IAP_PRODUCTS));
+    console.log('[HOOK DEBUG] isIAPAvailable:', isIAPAvailable());
+    
     if (!isIAPAvailable()) {
+      console.log('[HOOK DEBUG] IAP not available, setting error');
       setProducts([]);
       setProductError("In-App Purchases are only available on iOS devices");
       setHasAttemptedProductFetch(true);
@@ -28,22 +33,28 @@ export function useAppleSubscription() {
     setProductError(null);
 
     try {
+      console.log('[HOOK DEBUG] About to call getProducts...');
       const loadedProducts = await getProducts(Object.values(IAP_PRODUCTS));
+      console.log('[HOOK DEBUG] getProducts returned:', loadedProducts.length, 'products');
+      console.log('[HOOK DEBUG] Products:', JSON.stringify(loadedProducts));
 
       if (!loadedProducts.length) {
+        console.log('[HOOK DEBUG] No products returned, throwing error');
         throw new Error("No App Store products were returned");
       }
 
       setProducts(loadedProducts);
+      console.log('[HOOK DEBUG] Products set successfully');
       return loadedProducts;
     } catch (error) {
-      console.error('Product load error:', error);
+      console.error('[HOOK DEBUG] Product load error:', error);
       setProducts([]);
       setProductError(PRODUCT_FETCH_ERROR_MESSAGE);
       return [];
     } finally {
       setProductsLoading(false);
       setHasAttemptedProductFetch(true);
+      console.log('[HOOK DEBUG] fetchProducts complete');
     }
   }, []);
 

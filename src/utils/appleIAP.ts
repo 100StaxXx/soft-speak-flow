@@ -65,18 +65,32 @@ export const restorePurchases = async (): Promise<IAPPurchase[]> => {
 
 // Get product info
 export const getProducts = async (productIds: string[]): Promise<IAPProduct[]> => {
+  console.log('[IAP DEBUG] getProducts called with:', productIds);
+  console.log('[IAP DEBUG] isIAPAvailable:', isIAPAvailable());
+  console.log('[IAP DEBUG] Platform:', Capacitor.getPlatform());
+  console.log('[IAP DEBUG] isNative:', Capacitor.isNativePlatform());
+  
   if (!isIAPAvailable()) {
+    console.log('[IAP DEBUG] IAP not available, returning empty array');
     return [];
   }
 
   try {
+    console.log('[IAP DEBUG] Calling NativePurchases.getProducts...');
     const result = await NativePurchases.getProducts({
       productIdentifiers: productIds,
     }) as unknown;
 
-    return ((result as { products?: IAPProduct[] })?.products) || [];
+    console.log('[IAP DEBUG] Raw result from NativePurchases:', JSON.stringify(result, null, 2));
+    
+    const products = ((result as { products?: IAPProduct[] })?.products) || [];
+    console.log('[IAP DEBUG] Parsed products count:', products.length);
+    console.log('[IAP DEBUG] Parsed products:', JSON.stringify(products, null, 2));
+    
+    return products;
   } catch (error) {
-    console.error('Get products failed:', error);
+    console.error('[IAP DEBUG] Get products failed:', error);
+    console.error('[IAP DEBUG] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return [];
   }
 };
