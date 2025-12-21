@@ -238,11 +238,18 @@ export const useAstralEncounters = () => {
 
         // Roll for theme-specific loot at milestones
         if (shouldRollLoot && lootTier) {
+          // Build rarity filter based on loot tier
+          const allowedRarities = lootTier === 'legendary' 
+            ? ['rare', 'epic', 'legendary'] 
+            : lootTier === 'epic' 
+              ? ['rare', 'epic'] 
+              : ['rare'];
+          
           const { data: themeLoot } = await supabase
             .from('epic_rewards')
             .select('*')
             .eq('adversary_theme', theme)
-            .lte('rarity', lootTier === 'legendary' ? 'legendary' : lootTier === 'epic' ? 'epic' : 'rare');
+            .in('rarity', allowedRarities);
 
           if (themeLoot && themeLoot.length > 0) {
             // Pick a random reward based on weight

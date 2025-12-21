@@ -490,17 +490,17 @@ export const useAchievements = () => {
     timesDefeated: number
   ): Promise<{ shouldRollLoot: boolean; lootTier: 'rare' | 'epic' | 'legendary' | null }> => {
     const themeNames: Record<AdversaryTheme, { prefix: string; icon: string }> = {
-      distraction: { prefix: 'Focus', icon: '🎯' },
-      stagnation: { prefix: 'Momentum', icon: '🌊' },
-      anxiety: { prefix: 'Serenity', icon: '🧘' },
-      doubt: { prefix: 'Confidence', icon: '💪' },
-      chaos: { prefix: 'Order', icon: '⚡' },
-      laziness: { prefix: 'Drive', icon: '🔥' },
-      overthinking: { prefix: 'Clarity', icon: '🧠' },
-      fear: { prefix: 'Courage', icon: '🛡️' },
-      confusion: { prefix: 'Wisdom', icon: '✨' },
-      vulnerability: { prefix: 'Resilience', icon: '💎' },
-      imbalance: { prefix: 'Harmony', icon: '☯️' },
+      distraction: { prefix: 'Focus', icon: 'target' },
+      stagnation: { prefix: 'Momentum', icon: 'waves' },
+      anxiety: { prefix: 'Serenity', icon: 'heart' },
+      doubt: { prefix: 'Confidence', icon: 'shield' },
+      chaos: { prefix: 'Order', icon: 'zap' },
+      laziness: { prefix: 'Drive', icon: 'flame' },
+      overthinking: { prefix: 'Clarity', icon: 'brain' },
+      fear: { prefix: 'Courage', icon: 'shield' },
+      confusion: { prefix: 'Wisdom', icon: 'sparkles' },
+      vulnerability: { prefix: 'Resilience', icon: 'gem' },
+      imbalance: { prefix: 'Harmony', icon: 'scale' },
     };
 
     const { prefix, icon } = themeNames[theme];
