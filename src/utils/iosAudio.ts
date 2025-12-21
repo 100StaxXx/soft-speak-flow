@@ -9,6 +9,9 @@
 
 import { safeLocalStorage } from './storage';
 import { Capacitor } from '@capacitor/core';
+import { logger } from './logger';
+
+const log = logger.scope('iOS Audio');
 
 // Check if running on iOS
 export const isIOS = Capacitor.getPlatform() === 'ios' || 
@@ -34,7 +37,7 @@ export function getSharedAudioContext(): AudioContext | null {
         sharedAudioContext = new AudioContextClass();
       }
     } catch (e) {
-      console.error('[iOS Audio] Failed to create AudioContext:', e);
+      log.error('Failed to create AudioContext', { error: e });
     }
   }
   
@@ -52,10 +55,10 @@ export async function resumeAudioContext(): Promise<boolean> {
     try {
       await ctx.resume();
       audioContextResumed = true;
-      console.log('[iOS Audio] AudioContext resumed successfully');
+      log.debug('AudioContext resumed successfully');
       return true;
     } catch (e) {
-      console.error('[iOS Audio] Failed to resume AudioContext:', e);
+      log.error('Failed to resume AudioContext', { error: e });
       return false;
     }
   }
@@ -83,7 +86,7 @@ export function setupIOSAudioInteraction(): void {
     if (userInteractionReceived) return;
     userInteractionReceived = true;
     
-    console.log('[iOS Audio] User interaction detected, enabling audio...');
+    log.info('User interaction detected, enabling audio...');
     
     // Resume AudioContext
     await resumeAudioContext();
@@ -102,16 +105,16 @@ export function setupIOSAudioInteraction(): void {
           .then(() => {
             silentAudio.pause();
             silentAudio.src = '';
-            console.log('[iOS Audio] Audio unlocked via silent play');
+            log.debug('Audio unlocked via silent play');
           })
           .catch(() => {
             // Expected on some browsers, audio may still work
-            console.log('[iOS Audio] Silent play caught (expected on some platforms)');
+            log.debug('Silent play caught (expected on some platforms)');
           });
       }
     } catch (e) {
       // Silent audio unlock failed, but main audio may still work
-      console.log('[iOS Audio] Silent unlock failed (non-critical):', e);
+      log.debug('Silent unlock failed (non-critical)', { error: e });
     }
     
     // Remove listeners after first successful interaction
@@ -168,14 +171,14 @@ export async function safePlay(audio: HTMLAudioElement): Promise<boolean> {
   } catch (e) {
     const error = e as Error;
     if (error.name === 'NotAllowedError') {
-      console.log('[iOS Audio] Play blocked - waiting for user interaction');
+      log.debug('Play blocked - waiting for user interaction');
       return false;
     }
     if (error.name === 'AbortError') {
       // Play was interrupted (e.g., by pause call) - not a real error
       return false;
     }
-    console.error('[iOS Audio] Play failed:', e);
+    log.error('Play failed', { error: e });
     return false;
   }
 }
@@ -222,10 +225,10 @@ class IOSAudioStateManager {
   private handleVisibilityChange = () => {
     if (document.hidden) {
       // App backgrounded - audio will be suspended by iOS
-      console.log('[iOS Audio] App backgrounded');
+      log.info('App backgrounded');
     } else {
       // App foregrounded - resume audio if not muted
-      console.log('[iOS Audio] App foregrounded');
+      log.info('App foregrounded');
       if (!this.isMuted) {
         // Small delay to let iOS settle
         setTimeout(() => this.resumeAllAudio(), 100);
@@ -319,7 +322,7 @@ class IOSAudioStateManager {
       try {
         listener(this.isMuted);
       } catch (e) {
-        console.error('[iOS Audio] Listener error:', e);
+        log.error('Listener error', { error: e });
       }
     }
   }

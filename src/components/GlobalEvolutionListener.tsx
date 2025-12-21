@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useEvolution } from "@/contexts/EvolutionContext";
+import { createReconnectionHandler } from "@/hooks/useRealtimeSubscription";
+import { logger } from "@/utils/logger";
 
 export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
@@ -40,7 +42,7 @@ export const GlobalEvolutionListener = () => {
 
           // Validate required fields exist and are numbers
           if (!newData || !oldData) {
-            console.warn('Evolution listener: Missing payload data');
+            logger.warn('Evolution listener: Missing payload data');
             return;
           }
 
@@ -48,7 +50,7 @@ export const GlobalEvolutionListener = () => {
           const oldStage = typeof oldData.current_stage === 'number' ? oldData.current_stage : null;
 
           if (newStage === null || oldStage === null) {
-            console.warn('Evolution listener: Invalid stage values');
+            logger.warn('Evolution listener: Invalid stage values');
             return;
           }
 
@@ -57,7 +59,7 @@ export const GlobalEvolutionListener = () => {
             // Validate companion id exists
             const companionId = typeof newData.id === 'string' ? newData.id : null;
             if (!companionId) {
-              console.warn('Evolution listener: Missing companion id');
+              logger.warn('Evolution listener: Missing companion id');
               return;
             }
 
@@ -106,10 +108,9 @@ export const GlobalEvolutionListener = () => {
       )
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
-          // Successfully subscribed to realtime updates
+          // Successfully subscribed
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // Log but don't crash - realtime is a nice-to-have for evolution animation
-          console.warn('Evolution listener subscription error:', status, err?.message);
+          logger.warn('Evolution listener subscription error', { status, error: err?.message });
         }
       });
 

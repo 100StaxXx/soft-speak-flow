@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useEffect } from "react";
+import { logger } from "@/utils/logger";
 
 export interface GuildActivity {
   id: string;
@@ -55,7 +56,7 @@ export const useGuildActivity = (epicId?: string) => {
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Guild activity subscription error:', status, err?.message);
+          logger.warn('Guild activity subscription error', { status, error: err?.message });
         }
       });
 
