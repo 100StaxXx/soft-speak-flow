@@ -2192,6 +2192,757 @@ export type Database = {
         }
         Relationships: []
       }
+      guild_artifact_unlocks: {
+        Row: {
+          artifact_id: string
+          community_id: string | null
+          epic_id: string | null
+          id: string
+          unlocked_at: string
+          unlocked_by: string
+        }
+        Insert: {
+          artifact_id: string
+          community_id?: string | null
+          epic_id?: string | null
+          id?: string
+          unlocked_at?: string
+          unlocked_by: string
+        }
+        Update: {
+          artifact_id?: string
+          community_id?: string | null
+          epic_id?: string | null
+          id?: string
+          unlocked_at?: string
+          unlocked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_artifact_unlocks_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "guild_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_artifact_unlocks_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_artifact_unlocks_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_artifact_unlocks_unlocked_by_fkey"
+            columns: ["unlocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_artifacts: {
+        Row: {
+          artifact_type: string
+          created_at: string
+          css_effect: Json | null
+          description: string
+          icon: string
+          id: string
+          image_url: string | null
+          name: string
+          rarity: string
+          unlock_requirement_type: string
+          unlock_requirement_value: number
+        }
+        Insert: {
+          artifact_type: string
+          created_at?: string
+          css_effect?: Json | null
+          description: string
+          icon: string
+          id?: string
+          image_url?: string | null
+          name: string
+          rarity?: string
+          unlock_requirement_type: string
+          unlock_requirement_value: number
+        }
+        Update: {
+          artifact_type?: string
+          created_at?: string
+          css_effect?: Json | null
+          description?: string
+          icon?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          rarity?: string
+          unlock_requirement_type?: string
+          unlock_requirement_value?: number
+        }
+        Relationships: []
+      }
+      guild_blessing_charges: {
+        Row: {
+          charges_remaining: number
+          created_at: string
+          id: string
+          last_refresh_at: string
+          max_charges: number
+          user_id: string
+        }
+        Insert: {
+          charges_remaining?: number
+          created_at?: string
+          id?: string
+          last_refresh_at?: string
+          max_charges?: number
+          user_id: string
+        }
+        Update: {
+          charges_remaining?: number
+          created_at?: string
+          id?: string
+          last_refresh_at?: string
+          max_charges?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_blessing_charges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_blessing_types: {
+        Row: {
+          created_at: string
+          description: string
+          effect_duration_hours: number
+          effect_type: string
+          effect_value: number
+          icon: string
+          id: string
+          name: string
+          rarity: string
+          theme_color: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          effect_duration_hours?: number
+          effect_type: string
+          effect_value?: number
+          icon: string
+          id?: string
+          name: string
+          rarity?: string
+          theme_color?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          effect_duration_hours?: number
+          effect_type?: string
+          effect_value?: number
+          icon?: string
+          id?: string
+          name?: string
+          rarity?: string
+          theme_color?: string
+        }
+        Relationships: []
+      }
+      guild_blessings: {
+        Row: {
+          blessing_type_id: string
+          community_id: string | null
+          created_at: string
+          epic_id: string | null
+          expires_at: string
+          id: string
+          is_active: boolean
+          message: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          blessing_type_id: string
+          community_id?: string | null
+          created_at?: string
+          epic_id?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          message?: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          blessing_type_id?: string
+          community_id?: string | null
+          created_at?: string
+          epic_id?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          message?: string | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_blessings_blessing_type_id_fkey"
+            columns: ["blessing_type_id"]
+            isOneToOne: false
+            referencedRelation: "guild_blessing_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_blessings_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_blessings_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_blessings_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_blessings_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_boss_damage_log: {
+        Row: {
+          created_at: string
+          damage_amount: number
+          damage_source: string
+          encounter_id: string
+          id: string
+          is_killing_blow: boolean
+          source_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          damage_amount: number
+          damage_source: string
+          encounter_id: string
+          id?: string
+          is_killing_blow?: boolean
+          source_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          damage_amount?: number
+          damage_source?: string
+          encounter_id?: string
+          id?: string
+          is_killing_blow?: boolean
+          source_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_boss_damage_log_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "guild_boss_encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_boss_damage_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_boss_encounters: {
+        Row: {
+          boss_image_url: string | null
+          boss_lore: string | null
+          boss_name: string
+          boss_tier: string
+          boss_title: string | null
+          community_id: string | null
+          created_at: string
+          current_hp: number
+          defeated_at: string | null
+          epic_id: string | null
+          expires_at: string
+          id: string
+          max_hp: number
+          spawned_at: string
+          status: string
+          xp_reward: number
+        }
+        Insert: {
+          boss_image_url?: string | null
+          boss_lore?: string | null
+          boss_name: string
+          boss_tier?: string
+          boss_title?: string | null
+          community_id?: string | null
+          created_at?: string
+          current_hp?: number
+          defeated_at?: string | null
+          epic_id?: string | null
+          expires_at: string
+          id?: string
+          max_hp?: number
+          spawned_at?: string
+          status?: string
+          xp_reward?: number
+        }
+        Update: {
+          boss_image_url?: string | null
+          boss_lore?: string | null
+          boss_name?: string
+          boss_tier?: string
+          boss_title?: string | null
+          community_id?: string | null
+          created_at?: string
+          current_hp?: number
+          defeated_at?: string | null
+          epic_id?: string | null
+          expires_at?: string
+          id?: string
+          max_hp?: number
+          spawned_at?: string
+          status?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_boss_encounters_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_boss_encounters_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_legends: {
+        Row: {
+          community_id: string | null
+          description: string
+          epic_id: string | null
+          hero_ids: string[]
+          icon: string
+          id: string
+          legend_type: string
+          metadata: Json | null
+          recorded_at: string
+          title: string
+        }
+        Insert: {
+          community_id?: string | null
+          description: string
+          epic_id?: string | null
+          hero_ids?: string[]
+          icon: string
+          id?: string
+          legend_type: string
+          metadata?: Json | null
+          recorded_at?: string
+          title: string
+        }
+        Update: {
+          community_id?: string | null
+          description?: string
+          epic_id?: string | null
+          hero_ids?: string[]
+          icon?: string
+          id?: string
+          legend_type?: string
+          metadata?: Json | null
+          recorded_at?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_legends_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_legends_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_member_titles: {
+        Row: {
+          community_id: string | null
+          earned_at: string
+          epic_id: string | null
+          id: string
+          is_active: boolean
+          title_id: string
+          user_id: string
+        }
+        Insert: {
+          community_id?: string | null
+          earned_at?: string
+          epic_id?: string | null
+          id?: string
+          is_active?: boolean
+          title_id: string
+          user_id: string
+        }
+        Update: {
+          community_id?: string | null
+          earned_at?: string
+          epic_id?: string | null
+          id?: string
+          is_active?: boolean
+          title_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_member_titles_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_member_titles_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_member_titles_title_id_fkey"
+            columns: ["title_id"]
+            isOneToOne: false
+            referencedRelation: "guild_titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_member_titles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_prophecies: {
+        Row: {
+          community_id: string | null
+          created_at: string
+          epic_id: string | null
+          expires_at: string
+          fulfilled_at: string | null
+          id: string
+          is_fulfilled: boolean
+          prophecy_text: string
+          prophecy_type: string
+          prophet_id: string
+          subject_id: string
+          target_value: number | null
+          xp_reward: number
+        }
+        Insert: {
+          community_id?: string | null
+          created_at?: string
+          epic_id?: string | null
+          expires_at: string
+          fulfilled_at?: string | null
+          id?: string
+          is_fulfilled?: boolean
+          prophecy_text: string
+          prophecy_type: string
+          prophet_id: string
+          subject_id: string
+          target_value?: number | null
+          xp_reward?: number
+        }
+        Update: {
+          community_id?: string | null
+          created_at?: string
+          epic_id?: string | null
+          expires_at?: string
+          fulfilled_at?: string | null
+          id?: string
+          is_fulfilled?: boolean
+          prophecy_text?: string
+          prophecy_type?: string
+          prophet_id?: string
+          subject_id?: string
+          target_value?: number | null
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_prophecies_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_prophecies_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_prophecies_prophet_id_fkey"
+            columns: ["prophet_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_prophecies_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_raid_scores: {
+        Row: {
+          bosses_defeated: number
+          community_id: string | null
+          epic_id: string | null
+          id: string
+          members_active: number
+          rank: number | null
+          season_id: string
+          total_damage_dealt: number
+          total_score: number
+          updated_at: string
+        }
+        Insert: {
+          bosses_defeated?: number
+          community_id?: string | null
+          epic_id?: string | null
+          id?: string
+          members_active?: number
+          rank?: number | null
+          season_id: string
+          total_damage_dealt?: number
+          total_score?: number
+          updated_at?: string
+        }
+        Update: {
+          bosses_defeated?: number
+          community_id?: string | null
+          epic_id?: string | null
+          id?: string
+          members_active?: number
+          rank?: number | null
+          season_id?: string
+          total_damage_dealt?: number
+          total_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_raid_scores_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_raid_scores_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_raid_scores_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "guild_raid_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_raid_seasons: {
+        Row: {
+          created_at: string
+          ends_at: string
+          id: string
+          is_active: boolean
+          name: string
+          rewards: Json | null
+          starts_at: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at: string
+          id?: string
+          is_active?: boolean
+          name: string
+          rewards?: Json | null
+          starts_at: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          rewards?: Json | null
+          starts_at?: string
+        }
+        Relationships: []
+      }
+      guild_ritual_attendance: {
+        Row: {
+          attended_at: string
+          id: string
+          ritual_date: string
+          ritual_id: string
+          user_id: string
+        }
+        Insert: {
+          attended_at?: string
+          id?: string
+          ritual_date?: string
+          ritual_id: string
+          user_id: string
+        }
+        Update: {
+          attended_at?: string
+          id?: string
+          ritual_date?: string
+          ritual_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_ritual_attendance_ritual_id_fkey"
+            columns: ["ritual_id"]
+            isOneToOne: false
+            referencedRelation: "guild_rituals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_ritual_attendance_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guild_rituals: {
+        Row: {
+          community_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          epic_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          ritual_type: string
+          scheduled_days: number[]
+          scheduled_time: string
+        }
+        Insert: {
+          community_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          epic_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          ritual_type: string
+          scheduled_days?: number[]
+          scheduled_time: string
+        }
+        Update: {
+          community_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          epic_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          ritual_type?: string
+          scheduled_days?: number[]
+          scheduled_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guild_rituals_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_rituals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guild_rituals_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guild_rivalries: {
         Row: {
           community_id: string | null
@@ -2414,6 +3165,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      guild_titles: {
+        Row: {
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          rarity: string
+          requirement_type: string
+          requirement_value: number
+          theme_color: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          icon: string
+          id?: string
+          name: string
+          rarity?: string
+          requirement_type: string
+          requirement_value: number
+          theme_color?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          rarity?: string
+          requirement_type?: string
+          requirement_value?: number
+          theme_color?: string
+        }
+        Relationships: []
       }
       habit_completions: {
         Row: {
