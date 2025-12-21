@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import { Trophy, Star, Sparkles, XCircle, RefreshCw, Brain, Heart, Dumbbell } from 'lucide-react';
+import { Trophy, Star, Sparkles, XCircle, RefreshCw, Brain, Heart, Dumbbell, Skull, Shield } from 'lucide-react';
 import { Adversary, EncounterResult as ResultType } from '@/types/astralEncounters';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
@@ -46,12 +46,64 @@ const RESULT_CONFIG: Record<ResultType, {
     confettiColors: ['#8b5cf6', '#a855f7', '#c084fc', '#6366f1'],
   },
   fail: {
-    title: 'Defeated',
-    icon: XCircle,
-    color: 'text-red-400',
-    textGradient: 'from-red-400 to-rose-500',
+    title: 'Overcome by Shadow',
+    icon: Skull,
+    color: 'text-slate-400',
+    textGradient: 'from-slate-400 via-purple-400 to-slate-500',
     confettiColors: [],
   },
+};
+
+// Companion defeat messages
+const DEFEAT_MESSAGES = [
+  'steadies their resolve beside you',
+  'refuses to give up',
+  'gathers strength for the next attempt',
+  'stands ready to try again',
+  'believes in your strength',
+];
+
+// Falling ember particle component
+const FallingEmbers = () => {
+  const embers = useMemo(() => 
+    Array.from({ length: 12 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 4 + Math.random() * 3,
+      size: 2 + Math.random() * 3,
+    })), []
+  );
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {embers.map((ember) => (
+        <motion.div
+          key={ember.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${ember.left}%`,
+            top: '-5%',
+            width: ember.size,
+            height: ember.size,
+            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.8), rgba(100, 50, 150, 0.4))',
+            boxShadow: '0 0 6px rgba(168, 85, 247, 0.5)',
+          }}
+          animate={{
+            y: ['0vh', '110vh'],
+            opacity: [0, 0.8, 0.6, 0],
+            x: [0, Math.sin(ember.id) * 20, Math.cos(ember.id) * 15, 0],
+          }}
+          transition={{
+            duration: ember.duration,
+            delay: ember.delay,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        />
+      ))}
+    </div>
+  );
 };
 
 export const EncounterResultScreen = ({ 
@@ -70,6 +122,12 @@ export const EncounterResultScreen = ({
   const isSuccess = result !== 'fail';
   const statConfig = STAT_CONFIG[adversary.statType as keyof typeof STAT_CONFIG] || STAT_CONFIG.soul;
   const StatIcon = statConfig.icon;
+
+  // Get random defeat message
+  const defeatMessage = useMemo(() => 
+    DEFEAT_MESSAGES[Math.floor(Math.random() * DEFEAT_MESSAGES.length)], 
+    []
+  );
 
   // Trigger celebration effects
   useEffect(() => {
@@ -112,6 +170,9 @@ export const EncounterResultScreen = ({
           colors: config.confettiColors,
         });
       }, 300);
+    } else {
+      // Somber haptic for defeat
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
     }
   }, [isSuccess, config.confettiColors]);
 
@@ -124,25 +185,49 @@ export const EncounterResultScreen = ({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6 text-center overflow-hidden">
+    <div className="flex flex-col items-center gap-4 p-6 text-center overflow-hidden relative">
       {/* Animated background glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className={`absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-3xl ${isSuccess ? 'bg-primary/20' : 'bg-red-500/10'}`}
+          className={`absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-3xl ${isSuccess ? 'bg-primary/20' : 'bg-purple-900/30'}`}
           animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 3, repeat: Infinity }}
         />
+        
+        {/* Dark vignette for defeat */}
+        {!isSuccess && (
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{
+              background: 'radial-gradient(ellipse at center, transparent 20%, rgba(15, 10, 30, 0.6) 80%)',
+            }}
+          />
+        )}
       </div>
+
+      {/* Falling embers for defeat */}
+      {!isSuccess && <FallingEmbers />}
 
       {/* Result Icon with Glow */}
       <motion.div
         className="relative"
-        initial={{ scale: 0, rotate: -180 }}
+        initial={{ scale: 0, rotate: isSuccess ? -180 : 0 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', duration: 0.8 }}
       >
-        <div className={`absolute inset-0 blur-xl ${config.color} opacity-50`} />
+        <div className={`absolute inset-0 blur-xl ${isSuccess ? config.color : 'text-purple-500'} opacity-50`} />
         <Icon className={`w-16 h-16 ${config.color} relative z-10 drop-shadow-lg`} />
+        
+        {/* Pulse effect for defeat */}
+        {!isSuccess && (
+          <motion.div
+            className="absolute inset-0 rounded-full border-2 border-purple-500/30"
+            animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        )}
       </motion.div>
 
       {/* Result Title with Gradient */}
@@ -155,91 +240,140 @@ export const EncounterResultScreen = ({
         {config.title}
       </motion.h2>
 
-      {/* Companion with Essence Absorption */}
-      {isSuccess && companionImageUrl && (
+      {/* Companion Display - Shows for BOTH success and defeat */}
+      {companionImageUrl && (
         <motion.div
           className="relative my-2"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.3, type: 'spring' }}
         >
-          {/* Glow ring */}
+          {/* Glow ring - different color for defeat vs success */}
           <motion.div
-            className={`absolute inset-0 rounded-full bg-gradient-to-r ${statConfig.bg} blur-xl`}
-            animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.8, 0.5] }}
+            className={`absolute inset-0 rounded-full bg-gradient-to-r ${isSuccess ? statConfig.bg : 'from-slate-600/30 to-purple-900/30'} blur-xl`}
+            animate={{ 
+              scale: [1, 1.3, 1], 
+              opacity: isSuccess ? [0.5, 0.8, 0.5] : [0.3, 0.5, 0.3] 
+            }}
             transition={{ duration: 2, repeat: Infinity }}
           />
           
           {/* Companion image */}
-          <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-primary/50 shadow-lg shadow-primary/30">
+          <div className={`relative w-28 h-28 rounded-full overflow-hidden border-2 ${isSuccess ? 'border-primary/50 shadow-lg shadow-primary/30' : 'border-slate-500/40 shadow-lg shadow-purple-900/30'}`}>
             <img 
               src={companionImageUrl} 
               alt={companionName || 'Companion'} 
-              className="w-full h-full object-cover"
-            />
-          </div>
-          
-          {/* Floating sparkles */}
-          <motion.div
-            className="absolute -top-1 -right-1"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-          >
-            <Sparkles className={`w-5 h-5 ${statConfig.color}`} />
-          </motion.div>
-        </motion.div>
-      )}
-
-      {/* Essence Card - Cosmic Design */}
-      {isSuccess && (
-        <motion.div
-          className="w-full"
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className={`relative p-4 rounded-xl bg-gradient-to-br ${statConfig.bg} border border-white/10 backdrop-blur-sm overflow-hidden`}>
-            {/* Animated border glow */}
-            <motion.div
-              className={`absolute inset-0 rounded-xl border-2 ${statConfig.color.replace('text', 'border')} opacity-50`}
-              animate={{ opacity: [0.3, 0.7, 0.3] }}
-              transition={{ duration: 2, repeat: Infinity }}
+              className={`w-full h-full object-cover ${!isSuccess ? 'saturate-75' : ''}`}
             />
             
-            {/* Content */}
-            <div className="relative z-10">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Sparkles className={`w-4 h-4 ${statConfig.color}`} />
-                <p className={`text-sm font-bold uppercase tracking-wider ${statConfig.color}`}>
-                  Essence Absorbed
-                </p>
-                <Sparkles className={`w-4 h-4 ${statConfig.color}`} />
-              </div>
-              
-              <h3 className="text-xl font-bold text-foreground mb-1">
-                {adversary.essenceName}
-              </h3>
-              
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                "{adversary.essenceDescription}"
-              </p>
-              
-              {/* Stat boost badge */}
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/50 border border-white/10`}>
-                <StatIcon className={`w-5 h-5 ${statConfig.color}`} />
-                <span className="text-sm font-medium text-muted-foreground capitalize">
-                  {adversary.statType}
-                </span>
-                <span className={`text-lg font-bold ${statConfig.color}`}>
-                  +{adversary.statBoost}
-                </span>
-              </div>
-            </div>
+            {/* Overlay for defeat - subtle darkening */}
+            {!isSuccess && (
+              <div className="absolute inset-0 bg-gradient-to-t from-purple-900/30 to-transparent" />
+            )}
           </div>
+          
+          {/* Floating sparkles for success */}
+          {isSuccess && (
+            <motion.div
+              className="absolute -top-1 -right-1"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+            >
+              <Sparkles className={`w-5 h-5 ${statConfig.color}`} />
+            </motion.div>
+          )}
+          
+          {/* Shield icon for defeat - showing determination */}
+          {!isSuccess && (
+            <motion.div
+              className="absolute -bottom-1 -right-1"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <div className="w-8 h-8 rounded-full bg-slate-800/80 border border-purple-500/40 flex items-center justify-center">
+                <Shield className="w-4 h-4 text-purple-400" />
+              </div>
+            </motion.div>
+          )}
         </motion.div>
       )}
 
-      {/* XP Earned */}
+      {/* Companion Reaction Message */}
+      <motion.p
+        className={`text-sm italic ${isSuccess ? 'text-muted-foreground' : 'text-purple-300/80'}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        {isSuccess 
+          ? `${companionName || 'Your companion'} radiates with newfound power!` 
+          : `${companionName || 'Your companion'} ${defeatMessage}`}
+      </motion.p>
+
+      {/* Essence Card - Success shows absorbed, Defeat shows lost */}
+      <motion.div
+        className="w-full"
+        initial={{ y: 30, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5 }}
+      >
+        <div className={`relative p-4 rounded-xl ${isSuccess ? `bg-gradient-to-br ${statConfig.bg}` : 'bg-gradient-to-br from-slate-800/50 to-purple-900/30'} border ${isSuccess ? 'border-white/10' : 'border-slate-600/30'} backdrop-blur-sm overflow-hidden`}>
+          {/* Animated border glow */}
+          <motion.div
+            className={`absolute inset-0 rounded-xl border-2 ${isSuccess ? statConfig.color.replace('text', 'border') : 'border-slate-500/30'} opacity-50`}
+            animate={{ opacity: isSuccess ? [0.3, 0.7, 0.3] : [0.1, 0.3, 0.1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          
+          {/* Content */}
+          <div className="relative z-10">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              {isSuccess ? (
+                <>
+                  <Sparkles className={`w-4 h-4 ${statConfig.color}`} />
+                  <p className={`text-sm font-bold uppercase tracking-wider ${statConfig.color}`}>
+                    Essence Absorbed
+                  </p>
+                  <Sparkles className={`w-4 h-4 ${statConfig.color}`} />
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-4 h-4 text-slate-400" />
+                  <p className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                    Essence Slipped Away
+                  </p>
+                  <XCircle className="w-4 h-4 text-slate-400" />
+                </>
+              )}
+            </div>
+            
+            <h3 className={`text-xl font-bold ${isSuccess ? 'text-foreground' : 'text-slate-400'} mb-1`}>
+              {adversary.essenceName}
+            </h3>
+            
+            <p className={`text-sm ${isSuccess ? 'text-muted-foreground' : 'text-slate-500'} mb-3 line-clamp-2`}>
+              "{adversary.essenceDescription}"
+            </p>
+            
+            {/* Stat boost badge */}
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${isSuccess ? 'bg-background/50' : 'bg-slate-800/50'} border ${isSuccess ? 'border-white/10' : 'border-slate-600/30'}`}>
+              <StatIcon className={`w-5 h-5 ${isSuccess ? statConfig.color : 'text-slate-500'}`} />
+              <span className={`text-sm font-medium ${isSuccess ? 'text-muted-foreground' : 'text-slate-500'} capitalize`}>
+                {adversary.statType}
+              </span>
+              <span className={`text-lg font-bold ${isSuccess ? statConfig.color : 'text-slate-500 line-through'}`}>
+                +{adversary.statBoost}
+              </span>
+              {!isSuccess && (
+                <span className="text-xs text-slate-500 ml-1">(Not earned)</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* XP Earned - Only show on success */}
       {isSuccess && (
         <motion.div
           className="flex flex-col items-center gap-1"
@@ -274,11 +408,11 @@ export const EncounterResultScreen = ({
       >
         <div className="flex justify-between text-sm mb-1">
           <span className="text-muted-foreground">Accuracy</span>
-          <span className="font-bold text-foreground">{accuracy}%</span>
+          <span className={`font-bold ${isSuccess ? 'text-foreground' : 'text-slate-400'}`}>{accuracy}%</span>
         </div>
         <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
           <motion.div
-            className={`h-full rounded-full ${isSuccess ? 'bg-gradient-to-r from-primary to-accent' : 'bg-red-500/50'}`}
+            className={`h-full rounded-full ${isSuccess ? 'bg-gradient-to-r from-primary to-accent' : 'bg-gradient-to-r from-slate-600 to-purple-700/50'}`}
             initial={{ width: 0 }}
             animate={{ width: `${accuracy}%` }}
             transition={{ delay: 0.9, duration: 0.8, ease: 'easeOut' }}
@@ -286,52 +420,38 @@ export const EncounterResultScreen = ({
         </div>
       </motion.div>
 
-      {/* Fail state */}
-      {!isSuccess && (
+      {/* Retry info - Only for defeat */}
+      {!isSuccess && retryAvailableAt && (
         <motion.div
-          className="space-y-2 mt-2"
-          initial={{ y: 20, opacity: 0 }}
+          className="flex items-center justify-center gap-2 text-sm text-purple-300/70"
+          initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 1 }}
         >
-          <p className="text-muted-foreground">
-            The {adversary.name} has retreated into the void...
-          </p>
-          {retryAvailableAt && (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <RefreshCw className="w-4 h-4" />
-              {formatRetryTime()}
-            </div>
-          )}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </motion.div>
+          <span>{formatRetryTime()}</span>
         </motion.div>
       )}
 
-      {/* Companion reaction */}
-      <motion.p
-        className="text-sm italic text-muted-foreground mt-2"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.1 }}
-      >
-        {isSuccess 
-          ? `${companionName || 'Your companion'} radiates with newfound power!` 
-          : `${companionName || 'Your companion'} looks ready to try again.`}
-      </motion.p>
-
-      {/* Continue button */}
+      {/* Continue/Return button */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 1.2 }}
+        transition={{ delay: 1.1 }}
         className="mt-2"
       >
         <Button 
           onClick={onClose} 
-          className={`px-8 ${isSuccess ? 'bg-gradient-to-r from-primary to-accent hover:opacity-90' : ''}`}
+          className={`px-8 ${isSuccess ? 'bg-gradient-to-r from-primary to-accent hover:opacity-90' : 'bg-gradient-to-r from-slate-700 to-purple-800 hover:from-slate-600 hover:to-purple-700 border border-purple-500/30'}`}
           variant={isSuccess ? 'default' : 'outline'}
           size="lg"
         >
-          Continue
+          {isSuccess ? 'Continue' : 'Return to Safety'}
         </Button>
       </motion.div>
     </div>
