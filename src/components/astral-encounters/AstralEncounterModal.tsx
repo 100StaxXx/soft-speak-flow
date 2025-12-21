@@ -519,6 +519,8 @@ export const AstralEncounterModal = ({
                           : undefined
                       }
                       tiltBonus={finalResult.tiltBonus}
+                      companionImageUrl={companion?.current_image_url || undefined}
+                      companionName={currentCard?.creature_name || companion?.spirit_animal || 'Your companion'}
                     />
                   </motion.div>
                 )}
