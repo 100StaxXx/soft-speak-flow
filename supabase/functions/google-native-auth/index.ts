@@ -192,6 +192,7 @@ serve(async (req) => {
     // Create a client (not admin) to verify OTP and get session
     const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!);
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- custom verification type from native auth flow
     const { data: verifyData, error: verifyError } = await supabaseClient.auth.verifyOtp({
       token_hash: tokenHash,
       type: type as any,

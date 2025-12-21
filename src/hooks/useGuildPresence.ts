@@ -44,8 +44,8 @@ export const useGuildPresence = ({ epicId, communityId }: UseGuildPresenceOption
   // Fetch user display info for presence
   const fetchUserInfo = useCallback(async (userId: string) => {
     const [profileRes, companionRes] = await Promise.all([
-      supabase.from("profiles").select("email, onboarding_data").eq("id", userId).single(),
-      supabase.from("user_companion").select("current_image_url").eq("user_id", userId).single(),
+      supabase.from("profiles").select("email, onboarding_data").eq("id", userId).maybeSingle(),
+      supabase.from("user_companion").select("current_image_url").eq("user_id", userId).maybeSingle(),
     ]);
 
     const profile = profileRes.data;

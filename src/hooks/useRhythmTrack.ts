@@ -238,7 +238,7 @@ export const useRhythmTrack = (): UseRhythmTrackReturn => {
         .from('rhythm_tracks')
         .select('play_count')
         .eq('id', trackId)
-        .single();
+        .maybeSingle();
       
       if (currentTrack) {
         await supabase

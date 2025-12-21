@@ -29,7 +29,7 @@ export const useAdversaryImage = ({ theme, tier, name, enabled = true }: UseAdve
           .select('image_url')
           .eq('theme', theme)
           .eq('tier', tier)
-          .single();
+          .maybeSingle();
 
         if (cachedImage?.image_url) {
           console.log(`Using cached adversary image for ${theme}/${tier}`);

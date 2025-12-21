@@ -50,7 +50,7 @@ export const useEpicTemplates = () => {
         .from("epic_templates")
         .select("popularity_count")
         .eq("id", templateId)
-        .single();
+        .maybeSingle();
         
       if (template) {
         await supabase

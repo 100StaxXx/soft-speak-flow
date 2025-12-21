@@ -68,7 +68,7 @@ export async function sendWebPush(
     console.error('Web Push error:', error);
     
     // Handle specific error codes
-    const err = error as any;
+    const err = error as { statusCode?: number; message?: string };
     if (err.statusCode === 410 || err.statusCode === 404) {
       // Subscription expired or invalid - should be removed
       return {

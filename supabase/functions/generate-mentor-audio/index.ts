@@ -169,7 +169,7 @@ serve(async (req) => {
       );
     } catch (error) {
       clearTimeout(timeoutId);
-      const err = error as any;
+      const err = error as { name?: string; message?: string };
       if (err?.name === 'AbortError') {
         console.error("ElevenLabs API timeout after 55 seconds");
         throw new Error("Audio generation timed out. Please try again.");

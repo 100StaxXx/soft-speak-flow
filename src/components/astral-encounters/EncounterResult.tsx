@@ -132,8 +132,10 @@ export const EncounterResultScreen = ({
   // Trigger celebration effects
   useEffect(() => {
     if (isSuccess) {
-      // Haptic feedback
-      Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+      // Haptic feedback - may fail on non-native platforms
+      Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {
+        // Haptics not available on web - silently ignore
+      });
       
       // Confetti burst
       const duration = 2000;
@@ -171,8 +173,10 @@ export const EncounterResultScreen = ({
         });
       }, 300);
     } else {
-      // Somber haptic for defeat
-      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+      // Somber haptic for defeat - may fail on non-native platforms
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {
+        // Haptics not available on web - silently ignore
+      });
     }
   }, [isSuccess, config.confettiColors]);
 
