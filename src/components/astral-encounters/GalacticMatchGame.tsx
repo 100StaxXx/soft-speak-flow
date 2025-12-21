@@ -635,29 +635,94 @@ export const GalacticMatchGame = ({
           )}
         </AnimatePresence>
 
-        {/* Game over overlay */}
+        {/* Game over overlay - Enhanced defeat screen */}
         <AnimatePresence>
           {phase === 'gameOver' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="absolute inset-0 z-20 flex items-center justify-center bg-background/90 backdrop-blur-sm rounded-xl"
+              className="absolute inset-0 z-20 flex items-center justify-center rounded-xl overflow-hidden"
+              style={{
+                background: 'radial-gradient(ellipse at center, rgba(30, 20, 50, 0.95) 0%, rgba(15, 10, 30, 0.98) 100%)',
+              }}
             >
+              {/* Falling ember particles */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-1.5 h-1.5 rounded-full"
+                    style={{
+                      left: `${10 + i * 12}%`,
+                      top: '-5%',
+                      background: 'radial-gradient(circle, rgba(168, 85, 247, 0.8), rgba(100, 50, 150, 0.4))',
+                      boxShadow: '0 0 4px rgba(168, 85, 247, 0.5)',
+                    }}
+                    animate={{
+                      y: ['0%', '120%'],
+                      opacity: [0, 0.7, 0],
+                    }}
+                    transition={{
+                      duration: 3 + i * 0.3,
+                      delay: i * 0.4,
+                      repeat: Infinity,
+                      ease: 'linear',
+                    }}
+                  />
+                ))}
+              </div>
+              
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="text-center"
+                className="text-center px-4 relative z-10"
               >
-                <div className="text-4xl mb-2">{level >= 3 ? '🌟' : '💫'}</div>
-                <div className="text-xl font-bold">
-                  {level >= 5 ? 'Amazing Run!' : level >= 3 ? 'Good Try!' : 'Keep Practicing!'}
-                </div>
-                <div className="text-lg text-primary font-bold mt-2">
-                  Reached Level {level}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Final Score: {Math.min(score, MAX_XP)} XP
-                </div>
+                {/* Icon with glow */}
+                <motion.div 
+                  className="relative inline-block mb-3"
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <div className="absolute inset-0 blur-xl bg-purple-500/30 rounded-full" />
+                  <div className="text-4xl relative z-10">{level >= 3 ? '🌟' : '💫'}</div>
+                </motion.div>
+                
+                {/* Title with gradient */}
+                <motion.h3 
+                  className="text-xl font-black bg-gradient-to-r from-slate-300 via-purple-300 to-slate-400 bg-clip-text text-transparent mb-1"
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  {level >= 5 ? 'Amazing Run!' : level >= 3 ? 'Good Effort!' : 'The Void Prevails'}
+                </motion.h3>
+                
+                {/* Encouraging message */}
+                <motion.p 
+                  className="text-sm text-purple-300/70 mb-3 italic"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  {level >= 3 
+                    ? 'Your memory grows stronger each time' 
+                    : 'Every attempt brings you closer to mastery'}
+                </motion.p>
+                
+                {/* Stats */}
+                <motion.div 
+                  className="space-y-1"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <div className="text-lg font-bold text-purple-400">
+                    Reached Level {level}
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    Final Score: {Math.min(score, MAX_XP)} XP
+                  </div>
+                </motion.div>
               </motion.div>
             </motion.div>
           )}
