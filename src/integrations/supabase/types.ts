@@ -5150,6 +5150,14 @@ export type Database = {
         Args: { p_community_id: string; p_user_id: string }
         Returns: boolean
       }
+      is_community_member_safe: {
+        Args: { p_community_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_community_public: {
+        Args: { p_community_id: string }
+        Returns: boolean
+      }
       is_service_role: { Args: never; Returns: boolean }
       should_evolve: {
         Args: { current_stage: number; current_xp: number }
