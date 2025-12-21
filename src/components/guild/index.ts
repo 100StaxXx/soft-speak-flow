@@ -9,3 +9,7 @@ export { BlessingSendDialog } from './BlessingSendDialog';
 export { ActiveBlessingsDisplay } from './ActiveBlessingsDisplay';
 export { GuildBossCard } from './GuildBossCard';
 export { HallOfLegends } from './HallOfLegends';
+export { GuildTitlesDisplay } from './GuildTitlesDisplay';
+export { GuildRitualCard } from './GuildRitualCard';
+export { ProphecyBoard } from './ProphecyBoard';
+export { GuildArtifactsDisplay } from './GuildArtifactsDisplay';
