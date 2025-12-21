@@ -32,25 +32,35 @@ export function HourlyViewModal({
   // Auto-scroll to show previous hour at top when modal opens
   useEffect(() => {
     if (open && scrollRef.current) {
-      setTimeout(() => {
+      const scrollToCurrentTime = () => {
         const currentHour = new Date().getHours();
         const previousHour = Math.max(0, currentHour - 1);
         
-        // Find the time slot element for the previous hour using data-hour attribute
-        const timeSlotElement = scrollRef.current?.querySelector(
-          `[data-hour="${previousHour}"]`
-        ) as HTMLElement | null;
+        // Each hour = 2 slots × 60px = 120px per hour
+        const targetScroll = previousHour * 120;
         
-        if (timeSlotElement && scrollRef.current) {
-          // Calculate offset relative to scroll container
-          const containerTop = scrollRef.current.getBoundingClientRect().top;
-          const elementTop = timeSlotElement.getBoundingClientRect().top;
-          const currentScroll = scrollRef.current.scrollTop;
-          const targetScroll = currentScroll + (elementTop - containerTop);
+        if (scrollRef.current) {
+          try {
+            scrollRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
+          } catch {
+            scrollRef.current.scrollTop = targetScroll;
+          }
           
-          scrollRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
+          // iOS fallback - verify scroll worked
+          requestAnimationFrame(() => {
+            if (scrollRef.current && scrollRef.current.scrollTop === 0 && targetScroll > 0) {
+              scrollRef.current.scrollTop = targetScroll;
+            }
+          });
         }
-      }, 250);
+      };
+
+      // Wait for dialog animation + render
+      const timer = setTimeout(() => {
+        requestAnimationFrame(scrollToCurrentTime);
+      }, 350);
+
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
