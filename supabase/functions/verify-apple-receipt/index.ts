@@ -8,7 +8,18 @@ import {
   upsertSubscription,
   buildSubscriptionResponse,
 } from "../_shared/appleSubscriptions.ts";
+import {
+  verifyTransaction,
+  AppleTransactionInfo,
+} from "../_shared/appleServerAPI.ts";
 
+/**
+ * Verify Apple Receipt / Transaction
+ * 
+ * Supports two verification methods:
+ * 1. StoreKit 2 (preferred): Pass { transactionId: "..." }
+ * 2. Legacy receipts (fallback): Pass { receipt: "base64..." }
+ */
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -44,41 +55,86 @@ serve(async (req) => {
     }
 
     const body = await req.json();
+    const transactionId = body?.transactionId as string | undefined;
     const receipt = body?.receipt as string | undefined;
-    if (!receipt) {
-      throw new Error("Receipt data required");
+
+    // Prefer StoreKit 2 transaction verification
+    if (transactionId) {
+      console.log(`[verify-apple-receipt] Using App Store Server API v2 for transaction: ${transactionId}`);
+      
+      const { transactionInfo, environment } = await verifyTransaction(transactionId);
+      
+      const plan = resolvePlanFromProduct(transactionInfo.productId);
+      const expiresAt = transactionInfo.expiresDate 
+        ? new Date(transactionInfo.expiresDate) 
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days if no expiry
+      const purchaseDate = new Date(transactionInfo.purchaseDate);
+      const cancellationDate = transactionInfo.revocationDate 
+        ? new Date(transactionInfo.revocationDate) 
+        : undefined;
+
+      const subscription = await upsertSubscription(serviceClient, {
+        userId: user.id,
+        transactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
+        productId: transactionInfo.productId,
+        plan,
+        expiresAt,
+        purchaseDate,
+        cancellationDate,
+        environment,
+        source: "receipt",
+      });
+
+      console.log(`[verify-apple-receipt] Subscription verified via API v2: ${subscription?.id}`);
+
+      return jsonResponse(req, {
+        success: true,
+        environment,
+        verificationMethod: "app_store_server_api_v2",
+        subscription: buildSubscriptionResponse(subscription),
+      });
     }
 
-    const { result, environment } = await verifyReceiptWithApple(receipt);
-    const latestTransaction = extractLatestTransaction(result);
+    // Fallback to legacy receipt verification
+    if (receipt) {
+      console.log("[verify-apple-receipt] Using legacy verifyReceipt API");
+      
+      const { result, environment } = await verifyReceiptWithApple(receipt);
+      const latestTransaction = extractLatestTransaction(result);
 
-    if (!latestTransaction) {
-      throw new Error("No subscription transaction found in receipt");
+      if (!latestTransaction) {
+        throw new Error("No subscription transaction found in receipt");
+      }
+
+      if (!latestTransaction.transactionId) {
+        throw new Error("Missing transaction identifier");
+      }
+
+      const plan = resolvePlanFromProduct(latestTransaction.productId);
+
+      const subscription = await upsertSubscription(serviceClient, {
+        userId: user.id,
+        transactionId: latestTransaction.transactionId,
+        productId: latestTransaction.productId,
+        plan,
+        expiresAt: latestTransaction.expiresAt,
+        purchaseDate: latestTransaction.purchaseDate,
+        cancellationDate: latestTransaction.cancellationDate ?? undefined,
+        environment,
+        source: "receipt",
+      });
+
+      console.log(`[verify-apple-receipt] Subscription verified via legacy API: ${subscription?.id}`);
+
+      return jsonResponse(req, {
+        success: true,
+        environment,
+        verificationMethod: "legacy_verify_receipt",
+        subscription: buildSubscriptionResponse(subscription),
+      });
     }
 
-    if (!latestTransaction.transactionId) {
-      throw new Error("Missing transaction identifier");
-    }
-
-    const plan = resolvePlanFromProduct(latestTransaction.productId);
-
-    const subscription = await upsertSubscription(serviceClient, {
-      userId: user.id,
-      transactionId: latestTransaction.transactionId,
-      productId: latestTransaction.productId,
-      plan,
-      expiresAt: latestTransaction.expiresAt,
-      purchaseDate: latestTransaction.purchaseDate,
-      cancellationDate: latestTransaction.cancellationDate ?? undefined,
-      environment,
-      source: "receipt",
-    });
-
-    return jsonResponse(req, {
-      success: true,
-      environment,
-      subscription: buildSubscriptionResponse(subscription),
-    });
+    throw new Error("Either transactionId or receipt is required");
   } catch (error) {
     console.error("Error verifying receipt:", error);
 
