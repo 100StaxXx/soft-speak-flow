@@ -62,7 +62,7 @@ export const useGuildLegends = ({ epicId, communityId }: UseGuildLegendsOptions)
 
         return data.map(legend => ({
           ...legend,
-          heroes: (legend.hero_ids || []).map((id: string) => profileMap.get(id)).filter(Boolean),
+          heroes: ((legend.hero_ids as string[]) || []).map((id: string) => profileMap.get(id)).filter(Boolean),
         })) as GuildLegend[];
       }
 
