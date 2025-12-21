@@ -170,14 +170,32 @@ export function SubscriptionManagement() {
               const price = getPriceForProduct(planOption.productId);
               const isSelected = selectedPlan === planOption.id;
 
+              const handleSelect = () => setSelectedPlan(planOption.id);
+
               return (
                 <div
                   key={planOption.id}
-                  onClick={() => setSelectedPlan(planOption.id)}
+                  onClick={handleSelect}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    handleSelect();
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelect();
+                    }
+                  }}
                   className={[
-                    "rounded-2xl border p-4 flex flex-col gap-3 bg-card/60 backdrop-blur cursor-pointer transition-colors",
+                    "rounded-2xl border p-4 flex flex-col gap-3 bg-card/60 backdrop-blur cursor-pointer transition-colors select-none",
                     isSelected ? "border-primary shadow-glow" : "border-border/60 hover:border-primary/40"
                   ].join(" ")}
+                  style={{
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation',
+                  }}
                 >
                   <div>
                     <div className="flex items-center justify-between">
