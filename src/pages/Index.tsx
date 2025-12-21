@@ -267,7 +267,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         
         {/* Fixed Background Image */}
         {mentorImage && (
-          <div className="fixed inset-0 z-0">
+          <div className="fixed inset-0 z-0 pointer-events-none">
             <img
               src={mentorImage}
               alt="Mentor background"
