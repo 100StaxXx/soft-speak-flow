@@ -39,12 +39,18 @@ export function HourlyViewModal({
         // Find the time slot element for the previous hour using data-hour attribute
         const timeSlotElement = scrollRef.current?.querySelector(
           `[data-hour="${previousHour}"]`
-        );
+        ) as HTMLElement | null;
         
-        if (timeSlotElement) {
-          timeSlotElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (timeSlotElement && scrollRef.current) {
+          // Calculate offset relative to scroll container
+          const containerTop = scrollRef.current.getBoundingClientRect().top;
+          const elementTop = timeSlotElement.getBoundingClientRect().top;
+          const currentScroll = scrollRef.current.scrollTop;
+          const targetScroll = currentScroll + (elementTop - containerTop);
+          
+          scrollRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
         }
-      }, 200);
+      }, 250);
     }
   }, [open]);
 
