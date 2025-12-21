@@ -3,6 +3,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { playAchievementUnlock } from "@/utils/soundEffects";
 import { useCallback } from "react";
+import { AdversaryTheme } from "@/types/astralEncounters";
 
 interface AchievementData {
   type: string;
@@ -483,6 +484,83 @@ export const useAchievements = () => {
     });
   }, [awardAchievement]);
 
+  // Astral Hunter achievements - theme-based creature defeat progression
+  const checkAdversaryDefeatAchievements = useCallback(async (
+    theme: AdversaryTheme, 
+    timesDefeated: number
+  ): Promise<{ shouldRollLoot: boolean; lootTier: 'rare' | 'epic' | 'legendary' | null }> => {
+    const themeNames: Record<AdversaryTheme, { prefix: string; icon: string }> = {
+      distraction: { prefix: 'Focus', icon: '🎯' },
+      stagnation: { prefix: 'Momentum', icon: '🌊' },
+      anxiety: { prefix: 'Serenity', icon: '🧘' },
+      doubt: { prefix: 'Confidence', icon: '💪' },
+      chaos: { prefix: 'Order', icon: '⚡' },
+      laziness: { prefix: 'Drive', icon: '🔥' },
+      overthinking: { prefix: 'Clarity', icon: '🧠' },
+      fear: { prefix: 'Courage', icon: '🛡️' },
+      confusion: { prefix: 'Wisdom', icon: '✨' },
+      vulnerability: { prefix: 'Resilience', icon: '💎' },
+      imbalance: { prefix: 'Harmony', icon: '☯️' },
+    };
+
+    const { prefix, icon } = themeNames[theme];
+    let shouldRollLoot = false;
+    let lootTier: 'rare' | 'epic' | 'legendary' | null = null;
+
+    // Bronze: 3 defeats
+    if (timesDefeated === 3) {
+      await awardAchievement({
+        type: `astral_${theme}_3`,
+        title: `${prefix} Initiate`,
+        description: `Defeated 3 ${theme} adversaries`,
+        icon,
+        tier: 'bronze',
+        metadata: { theme, count: 3 }
+      });
+    }
+    // Silver: 10 defeats + roll for rare loot
+    else if (timesDefeated === 10) {
+      await awardAchievement({
+        type: `astral_${theme}_10`,
+        title: `${prefix} Warrior`,
+        description: `Defeated 10 ${theme} adversaries`,
+        icon,
+        tier: 'silver',
+        metadata: { theme, count: 10 }
+      });
+      shouldRollLoot = true;
+      lootTier = 'rare';
+    }
+    // Gold: 25 defeats + roll for epic/legendary loot
+    else if (timesDefeated === 25) {
+      await awardAchievement({
+        type: `astral_${theme}_25`,
+        title: `${prefix} Champion`,
+        description: `Defeated 25 ${theme} adversaries`,
+        icon,
+        tier: 'gold',
+        metadata: { theme, count: 25 }
+      });
+      shouldRollLoot = true;
+      lootTier = 'epic';
+    }
+    // Platinum: 50 defeats
+    else if (timesDefeated === 50) {
+      await awardAchievement({
+        type: `astral_${theme}_50`,
+        title: `${prefix} Transcendent`,
+        description: `Defeated 50 ${theme} adversaries`,
+        icon,
+        tier: 'platinum',
+        metadata: { theme, count: 50 }
+      });
+      shouldRollLoot = true;
+      lootTier = 'legendary';
+    }
+
+    return { shouldRollLoot, lootTier };
+  }, [awardAchievement]);
+
   return {
     awardAchievement,
     checkStreakAchievements,
@@ -497,5 +575,6 @@ export const useAchievements = () => {
     checkFullStorylineAchievement,
     checkComebackAchievement,
     checkArcadeDiscovery,
+    checkAdversaryDefeatAchievements,
   };
 };

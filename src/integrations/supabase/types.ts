@@ -1830,6 +1830,7 @@ export type Database = {
       }
       epic_rewards: {
         Row: {
+          adversary_theme: string | null
           created_at: string | null
           css_effect: Json | null
           description: string
@@ -1842,6 +1843,7 @@ export type Database = {
           story_type_slug: string | null
         }
         Insert: {
+          adversary_theme?: string | null
           created_at?: string | null
           css_effect?: Json | null
           description: string
@@ -1854,6 +1856,7 @@ export type Database = {
           story_type_slug?: string | null
         }
         Update: {
+          adversary_theme?: string | null
           created_at?: string | null
           css_effect?: Json | null
           description?: string
