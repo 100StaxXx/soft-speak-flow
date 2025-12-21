@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanion } from '@/hooks/useCompanion';
 import { useXPRewards } from '@/hooks/useXPRewards';
+import { useAchievements } from '@/hooks/useAchievements';
 import { 
   Adversary, 
   AstralEncounter, 
@@ -27,6 +28,7 @@ export const useAstralEncounters = () => {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { awardCustomXP } = useXPRewards();
+  const { checkAdversaryDefeatAchievements } = useAchievements();
   const queryClient = useQueryClient();
   
   const [activeEncounter, setActiveEncounter] = useState<{
@@ -203,7 +205,7 @@ export const useAstralEncounters = () => {
           rarity: activeEncounter.adversary.tier,
         });
 
-        // Update or insert codex entry
+        // Update or insert codex entry and check for achievements
         const { data: existingEntry } = await supabase
           .from('cosmic_codex_entries')
           .select('id, times_defeated')
@@ -211,11 +213,13 @@ export const useAstralEncounters = () => {
           .eq('adversary_theme', activeEncounter.adversary.theme)
           .single();
 
+        let newTimesDefeated = 1;
         if (existingEntry) {
+          newTimesDefeated = existingEntry.times_defeated + 1;
           await supabase
             .from('cosmic_codex_entries')
             .update({
-              times_defeated: existingEntry.times_defeated + 1,
+              times_defeated: newTimesDefeated,
               last_defeated_at: new Date().toISOString(),
             })
             .eq('id', existingEntry.id);
@@ -226,6 +230,54 @@ export const useAstralEncounters = () => {
             adversary_name: activeEncounter.adversary.name,
             adversary_lore: activeEncounter.adversary.lore,
           });
+        }
+
+        // Check for theme mastery achievements and potential loot rolls
+        const theme = activeEncounter.adversary.theme as AdversaryTheme;
+        const { shouldRollLoot, lootTier } = await checkAdversaryDefeatAchievements(theme, newTimesDefeated);
+
+        // Roll for theme-specific loot at milestones
+        if (shouldRollLoot && lootTier) {
+          const { data: themeLoot } = await supabase
+            .from('epic_rewards')
+            .select('*')
+            .eq('adversary_theme', theme)
+            .lte('rarity', lootTier === 'legendary' ? 'legendary' : lootTier === 'epic' ? 'epic' : 'rare');
+
+          if (themeLoot && themeLoot.length > 0) {
+            // Pick a random reward based on weight
+            const totalWeight = themeLoot.reduce((sum, r) => sum + (r.drop_weight || 100), 0);
+            let random = Math.random() * totalWeight;
+            let selectedReward = themeLoot[0];
+            
+            for (const reward of themeLoot) {
+              random -= (reward.drop_weight || 100);
+              if (random <= 0) {
+                selectedReward = reward;
+                break;
+              }
+            }
+
+            // Check if user already has this reward
+            const { data: existing } = await supabase
+              .from('user_epic_rewards')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('reward_id', selectedReward.id)
+              .maybeSingle();
+
+            if (!existing) {
+              // Award the loot
+              await supabase.from('user_epic_rewards').insert({
+                user_id: user.id,
+                reward_id: selectedReward.id,
+              });
+              
+              toast.success(`🎁 New Loot: ${selectedReward.name}!`, {
+                description: selectedReward.description,
+              });
+            }
+          }
         }
 
         // Update companion stats - validate statType is a valid field
