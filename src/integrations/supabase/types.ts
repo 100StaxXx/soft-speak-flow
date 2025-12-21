@@ -2106,6 +2106,65 @@ export type Database = {
         }
         Relationships: []
       }
+      external_calendar_events: {
+        Row: {
+          color: string | null
+          connection_id: string
+          description: string | null
+          end_time: string
+          external_event_id: string
+          id: string
+          is_all_day: boolean | null
+          location: string | null
+          raw_data: Json | null
+          source: string
+          start_time: string
+          synced_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          connection_id: string
+          description?: string | null
+          end_time: string
+          external_event_id: string
+          id?: string
+          is_all_day?: boolean | null
+          location?: string | null
+          raw_data?: Json | null
+          source: string
+          start_time: string
+          synced_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          connection_id?: string
+          description?: string | null
+          end_time?: string
+          external_event_id?: string
+          id?: string
+          is_all_day?: boolean | null
+          location?: string | null
+          raw_data?: Json | null
+          source?: string
+          start_time?: string
+          synced_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_calendar_events_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "user_calendar_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favorites: {
         Row: {
           content_id: string
@@ -4125,6 +4184,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_calendar_connections: {
+        Row: {
+          access_token: string | null
+          calendar_email: string | null
+          calendar_id: string | null
+          created_at: string | null
+          id: string
+          last_synced_at: string | null
+          provider: string
+          refresh_token: string | null
+          sync_enabled: boolean | null
+          sync_token: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_email?: string | null
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          provider: string
+          refresh_token?: string | null
+          sync_enabled?: boolean | null
+          sync_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          calendar_email?: string | null
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          refresh_token?: string | null
+          sync_enabled?: boolean | null
+          sync_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_challenges: {
         Row: {
