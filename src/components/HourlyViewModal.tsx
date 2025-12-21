@@ -32,19 +32,19 @@ export function HourlyViewModal({
   // Auto-scroll to show previous hour at top when modal opens
   useEffect(() => {
     if (open && scrollRef.current) {
-      const now = new Date();
-      const currentHour = now.getHours();
-      
-      // Each hour = 120px (2 slots × 60px per slot)
-      // Scroll to show the PREVIOUS hour at the top of the modal
-      const previousHour = Math.max(0, currentHour - 1);
-      const scrollTarget = previousHour * 120;
-      
       setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTo({ top: scrollTarget, behavior: "smooth" });
+        const currentHour = new Date().getHours();
+        const previousHour = Math.max(0, currentHour - 1);
+        
+        // Find the time slot element for the previous hour using data-hour attribute
+        const timeSlotElement = scrollRef.current?.querySelector(
+          `[data-hour="${previousHour}"]`
+        );
+        
+        if (timeSlotElement) {
+          timeSlotElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }, 150);
+      }, 200);
     }
   }, [open]);
 
