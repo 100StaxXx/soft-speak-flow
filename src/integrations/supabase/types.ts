@@ -5176,6 +5176,7 @@ export type Database = {
         Returns: boolean
       }
       is_service_role: { Args: never; Returns: boolean }
+      join_community_by_id: { Args: { p_community_id: string }; Returns: Json }
       should_evolve: {
         Args: { current_stage: number; current_xp: number }
         Returns: boolean
