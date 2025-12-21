@@ -10,8 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 type PlanType = "monthly" | "yearly";
 
 export const TrialExpiredPaywall = () => {
-  // Temporarily disabled - remove this line to re-enable
-  return null;
 
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
   const { 
@@ -205,9 +203,16 @@ export const TrialExpiredPaywall = () => {
           Restore Purchases
         </Button>
 
-        <p className="text-xs text-center text-muted-foreground">
-          Processed via Apple • Manage in iOS Settings • Cancel anytime
+        <p className="text-xs text-center text-muted-foreground leading-relaxed">
+          Payment will be charged to your Apple ID account at confirmation of purchase.
+          Subscription automatically renews unless canceled at least 24 hours before the end of the current period.
+          Your account will be charged for renewal within 24 hours prior to the end of the current period.
+          You can manage and cancel your subscriptions by going to Settings {">"} [Your Name] {">"} Subscriptions after purchase.
         </p>
+        <div className="flex justify-center gap-4 text-xs">
+          <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>
+          <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
+        </div>
       </div>
     </div>
   );
