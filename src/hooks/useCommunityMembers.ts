@@ -89,28 +89,23 @@ export const useCommunityMembers = (communityId?: string) => {
   // Get current user's membership
   const currentUserMember = members?.find(m => m.user_id === user?.id);
 
-  // Join a community
+  // Join a community (uses security definer function to bypass RLS for FK validation)
   const joinCommunity = useMutation({
     mutationFn: async (targetCommunityId: string) => {
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase
-        .from("community_members")
-        .insert({
-          community_id: targetCommunityId,
-          user_id: user.id,
-          role: 'member',
-        })
-        .select()
-        .single();
+        .rpc('join_community_by_id', { p_community_id: targetCommunityId });
 
-      if (error) {
-        if (error.code === '23505') {
-          throw new Error("You're already a member of this community");
-        }
-        throw error;
+      if (error) throw error;
+      
+      // Check the response from the function
+      const result = data as { success: boolean; error?: string };
+      if (!result.success) {
+        throw new Error(result.error || "Failed to join guild");
       }
-      return data;
+      
+      return result;
     },
     onSuccess: () => {
       toast.success("Welcome to the guild! 🎉");
