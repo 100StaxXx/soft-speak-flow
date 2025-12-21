@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useWeeklyRecapContext } from "@/contexts/WeeklyRecapContext";
 import { format } from "date-fns";
 
 export interface WeeklyRecap {
@@ -33,8 +34,7 @@ export const useWeeklyRecap = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedRecap, setSelectedRecap] = useState<WeeklyRecap | null>(null);
+  const { isModalOpen, selectedRecap, openRecap: contextOpenRecap, closeRecap: contextCloseRecap } = useWeeklyRecapContext();
 
   // Get previous week boundaries (Mon-Sun), recalculates for accuracy
   const getWeekBoundaries = () => {
@@ -144,11 +144,10 @@ export const useWeeklyRecap = () => {
       const dismissed = localStorage.getItem(dismissedKey);
       
       if (!dismissed) {
-        setSelectedRecap(currentRecap);
-        setIsModalOpen(true);
+        contextOpenRecap(currentRecap);
       }
     }
-  }, [isSunday, currentRecap, isLoading]);
+  }, [isSunday, currentRecap, isLoading, contextOpenRecap]);
 
   // Auto-generate recap on Sunday if it doesn't exist
   useEffect(() => {
@@ -158,8 +157,7 @@ export const useWeeklyRecap = () => {
   }, [isSunday, currentRecap, isLoading, user?.id, generateMutation.isPending]);
 
   const openRecap = (recap: WeeklyRecap) => {
-    setSelectedRecap(recap);
-    setIsModalOpen(true);
+    contextOpenRecap(recap);
     
     // Award XP if not viewed before
     if (!recap.viewed_at) {
@@ -179,8 +177,7 @@ export const useWeeklyRecap = () => {
         markViewedMutation.mutate(selectedRecap.id);
       }
     }
-    setIsModalOpen(false);
-    setSelectedRecap(null);
+    contextCloseRecap();
   };
 
   return {
