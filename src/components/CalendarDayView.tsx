@@ -96,13 +96,11 @@ export const CalendarDayView = ({
   };
 
   const getUnscheduledTasks = () => {
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return tasks.filter(task => task.task_date === dateStr && !task.scheduled_time && !task.completed);
+    return dayTasks.filter(task => !task.scheduled_time && !task.completed);
   };
 
   const getCompletedTasks = () => {
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return tasks.filter(task => task.task_date === dateStr && task.completed);
+    return dayTasks.filter(task => task.completed);
   };
 
   const calculateTaskHeight = (duration: number | null) => {
