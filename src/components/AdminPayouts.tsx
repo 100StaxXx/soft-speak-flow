@@ -16,6 +16,8 @@ import {
   Loader2,
   Users,
   AlertTriangle,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 
 interface ReferralPayout {
@@ -24,7 +26,7 @@ interface ReferralPayout {
   referee_id: string;
   referral_code_id: string | null;
   amount: number;
-  status: "pending" | "approved" | "paid" | "rejected";
+  status: "pending" | "approved" | "paid" | "rejected" | "requested" | "failed";
   payout_type: "first_month" | "first_year";
   apple_transaction_id: string | null;
   created_at: string;
@@ -33,6 +35,10 @@ interface ReferralPayout {
   rejected_at: string | null;
   admin_notes: string | null;
   paypal_transaction_id: string | null;
+  retry_count: number | null;
+  last_retry_at: string | null;
+  failure_reason: string | null;
+  next_retry_at: string | null;
   referral_code: {
     code: string;
     owner_type: "user" | "influencer";
@@ -233,6 +239,67 @@ export const AdminPayouts = () => {
     },
   });
 
+  // Retry failed payout mutation
+  const retryPayoutMutation = useMutation({
+    mutationFn: async (payoutId: string) => {
+      setProcessingId(payoutId);
+      // First reset the payout status to approved so it can be processed again
+      const { error: updateError } = await supabase
+        .from("referral_payouts")
+        .update({
+          status: "approved",
+          failure_reason: null,
+        })
+        .eq("id", payoutId);
+
+      if (updateError) throw updateError;
+
+      // Then process it
+      const { data, error } = await supabase.functions.invoke(
+        "process-paypal-payout",
+        {
+          body: { payout_id: payoutId },
+        }
+      );
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      toast.success(`Retry successful! PayPal Batch ID: ${data.payout_batch_id}`);
+      setProcessingId(null);
+    },
+    onError: (error) => {
+      console.error("Failed to retry payout:", error);
+      toast.error(`Failed to retry payout: ${error.message}`);
+      setProcessingId(null);
+    },
+  });
+
+  // Bulk retry all failed payouts
+  const bulkRetryMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "retry-failed-payouts",
+        {}
+      );
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
+      toast.success(`Retried ${data.processed || 0} failed payouts`);
+    },
+    onError: (error) => {
+      console.error("Failed to bulk retry:", error);
+      toast.error(`Failed to retry payouts: ${error.message}`);
+    },
+  });
+
   // Bulk approve all pending payouts for a referral code
   const bulkApproveMutation = useMutation({
     mutationFn: async (referralCodeId: string) => {
@@ -261,6 +328,9 @@ export const AdminPayouts = () => {
       toast.error("Failed to approve payouts");
     },
   });
+
+  // Calculate failed payouts count
+  const failedPayoutsCount = payouts?.filter((p) => p.status === "failed").length || 0;
 
   const selectedReferrerPayouts = payouts?.filter(
     (p) => p.referral_code_id === selectedReferrer
@@ -324,7 +394,41 @@ export const AdminPayouts = () => {
             {referrerSummaries.length}
           </p>
         </div>
+        <div className="bg-red-500/10 rounded-lg p-4 text-center border border-red-500/20">
+          <p className="text-xs text-muted-foreground mb-1">Failed</p>
+          <p className="text-xl font-bold text-red-500">
+            {failedPayoutsCount}
+          </p>
+        </div>
       </div>
+
+      {/* Failed Payouts Alert */}
+      {failedPayoutsCount > 0 && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <span className="font-medium text-red-600">
+                {failedPayoutsCount} failed payout(s) need attention
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-red-500 text-red-500 hover:bg-red-50"
+              onClick={() => bulkRetryMutation.mutate()}
+              disabled={bulkRetryMutation.isPending}
+            >
+              {bulkRetryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
+              Retry All Failed
+            </Button>
+          </div>
+        </div>
+      )}
 
       <p className="text-sm text-muted-foreground mb-4">
         <AlertTriangle className="h-4 w-4 inline mr-1 text-amber-500" />
