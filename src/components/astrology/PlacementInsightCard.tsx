@@ -1,3 +1,4 @@
+import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Brain, Zap, Heart, Sun, Moon, ArrowUpCircle } from "lucide-react";
@@ -71,15 +72,33 @@ export const PlacementInsightCard = ({
   const config = PLACEMENT_CONFIG[placement];
   const Icon = config.icon;
   const navigate = useNavigate();
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const MOVE_THRESHOLD = 10;
 
   const handleClick = () => {
     navigate(`/cosmic/${placement}/${sign.toLowerCase()}`);
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleClick();
-  };
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // Only navigate if finger moved less than threshold (tap, not scroll)
+    if (deltaX < MOVE_THRESHOLD && deltaY < MOVE_THRESHOLD) {
+      e.preventDefault();
+      handleClick();
+    }
+    
+    touchStartRef.current = null;
+  }, []);
 
   return (
     <motion.div
@@ -87,11 +106,12 @@ export const PlacementInsightCard = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
       onClick={handleClick}
+      onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       role="button"
       tabIndex={0}
       className="cursor-pointer select-none"
-      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'pan-y' }}
     >
       <Card className="bg-gray-900/60 border-purple-500/30 hover:border-purple-500/50 transition-all hover:shadow-lg hover:shadow-purple-500/10 sm:hover:scale-[1.02] active:scale-[0.98] p-4">
         <div className="flex items-start gap-3">

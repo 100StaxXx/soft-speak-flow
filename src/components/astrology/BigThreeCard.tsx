@@ -1,3 +1,4 @@
+import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Sun, Moon, ArrowUp } from "lucide-react";
@@ -44,15 +45,33 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
   const config = cardConfig[type];
   const Icon = config.icon;
   const navigate = useNavigate();
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const MOVE_THRESHOLD = 10;
 
   const handleClick = () => {
     navigate(`/cosmic/${type}/${sign.toLowerCase()}`);
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleClick();
-  };
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // Only navigate if finger moved less than threshold (tap, not scroll)
+    if (deltaX < MOVE_THRESHOLD && deltaY < MOVE_THRESHOLD) {
+      e.preventDefault();
+      handleClick();
+    }
+    
+    touchStartRef.current = null;
+  }, []);
 
   return (
     <motion.div
@@ -65,11 +84,12 @@ export const BigThreeCard = ({ type, sign, description, delay = 0 }: BigThreeCar
         stiffness: 100,
       }}
       onClick={handleClick}
+      onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       role="button"
       tabIndex={0}
       className="cursor-pointer select-none"
-      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'pan-y' }}
     >
       <Card className={`relative overflow-hidden border-2 ${config.borderColor} bg-obsidian/80 backdrop-blur-sm shadow-2xl ${config.glowColor} sm:hover:scale-105 active:scale-[0.98] transition-transform duration-300`}>
         {/* Animated cosmiq background */}
