@@ -90,15 +90,15 @@ export const GameHUD = memo(({
   const isTimeLow = timeLeft !== undefined && timeLeft <= 3;
 
   return (
-    <div className="w-full px-3 py-3 mb-3">
+    <div className="w-full px-3 py-2 mb-2">
       {/* Title row with premium glass effect */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-white tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+          <h3 className="text-base font-bold text-white tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
             {title}
           </h3>
           {subtitle && (
-            <p className="text-xs text-white/60 font-medium tracking-wide">{subtitle}</p>
+            <p className="text-[10px] text-white/60 font-medium tracking-wide">{subtitle}</p>
           )}
         </div>
         
@@ -124,7 +124,7 @@ export const GameHUD = memo(({
       </div>
 
       {/* Stats row with badges */}
-      <div className="flex items-center justify-between gap-2 mb-3 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center justify-between gap-2 mb-2 overflow-x-auto scrollbar-hide">
         {score !== undefined && (
           <StatBadge
             icon={<Star className="w-3.5 h-3.5 text-purple-400" />}

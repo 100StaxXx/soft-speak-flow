@@ -766,7 +766,7 @@ export default function AstralArcade() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="h-[500px]"
+                      className="min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto"
                     >
                       {renderGame()}
                     </motion.div>
