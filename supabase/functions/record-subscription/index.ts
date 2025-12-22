@@ -7,24 +7,26 @@ import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
  * 
  * Called by alilpush after successful Apple IAP purchase.
  * Creates a pending payout for the referrer and updates conversion metrics.
+ * Uses configurable commission rates from referral_config table.
  * 
  * SECURITY: This endpoint requires HMAC signature verification.
  * The caller must include an X-Signature header with HMAC-SHA256 of the request body.
- * 
- * Request headers:
- *   X-Signature: HMAC-SHA256 signature of JSON body using INTERNAL_FUNCTION_SECRET
- *   X-Timestamp: Unix timestamp (must be within 5 minutes)
- * 
- * Request body:
- * {
- *   user_id: string - UUID of the user who subscribed (from alilpush)
- *   referral_code: string - The referral code that referred this user
- *   plan: string - "monthly" or "yearly"
- *   amount: number - Subscription amount in USD
- *   apple_transaction_id?: string - Optional for deduplication
- *   source_app: string - Which app the purchase came from ("alilpush")
- * }
  */
+
+// Commission rate configuration interface
+interface CommissionConfig {
+  default: {
+    monthly_percent: number;
+    yearly_percent: number;
+  };
+  tiers: {
+    [key: string]: {
+      min_conversions: number;
+      monthly_percent: number;
+      yearly_percent: number;
+    };
+  };
+}
 
 // HMAC signature verification using Web Crypto API
 async function verifySignature(
@@ -74,6 +76,54 @@ function hexToArrayBuffer(hex: string): ArrayBuffer | null {
     return bytes.buffer;
   } catch {
     return null;
+  }
+}
+
+// Get commission rate from config
+// deno-lint-ignore no-explicit-any
+async function getCommissionRate(
+  supabaseClient: any,
+  referralCodeId: string,
+  plan: string,
+  totalConversions: number
+): Promise<number> {
+  try {
+    // Get commission config from database
+    const { data: configData } = await supabaseClient
+      .from("referral_config")
+      .select("config_value")
+      .eq("config_key", "commission_rates")
+      .single();
+
+    if (!configData?.config_value) {
+      console.log("No commission config found, using defaults");
+      return plan === "yearly" ? 20 : 50;
+    }
+
+    const config = configData.config_value as CommissionConfig;
+    const rateKey = plan === "yearly" ? "yearly_percent" : "monthly_percent";
+    
+    // Start with default rate
+    let rate = config.default?.[rateKey] || (plan === "yearly" ? 20 : 50);
+    let maxQualifyingConversions = -1;
+
+    // Find the best tier the user qualifies for
+    if (config.tiers) {
+      for (const [tierName, tierConfig] of Object.entries(config.tiers)) {
+        if (totalConversions >= tierConfig.min_conversions && 
+            tierConfig.min_conversions > maxQualifyingConversions) {
+          maxQualifyingConversions = tierConfig.min_conversions;
+          rate = tierConfig[rateKey];
+          console.log(`Applying tier ${tierName} with rate ${rate}% for ${totalConversions} conversions`);
+        }
+      }
+    }
+
+    return rate;
+  } catch (error) {
+    console.error("Error getting commission rate:", error);
+    // Fallback to defaults
+    return plan === "yearly" ? 20 : 50;
   }
 }
 
@@ -161,10 +211,10 @@ serve(async (req) => {
       return errorResponse(req, "Invalid amount", 400);
     }
 
-    // Look up referral_code_id
+    // Look up referral_code_id with current conversion count
     const { data: codeData, error: codeError } = await supabaseClient
       .from("referral_codes")
-      .select("id, code, owner_type")
+      .select("id, code, owner_type, total_conversions, tier")
       .eq("code", referral_code.toUpperCase())
       .single();
 
@@ -192,9 +242,18 @@ serve(async (req) => {
       }
     }
 
-    // Calculate commission
-    const payoutAmount = plan === "yearly" ? numAmount * 0.20 : numAmount * 0.50;
+    // Get commission rate from config (tier-based)
+    const commissionPercent = await getCommissionRate(
+      supabaseClient,
+      codeData.id,
+      plan,
+      codeData.total_conversions || 0
+    );
+    
+    const payoutAmount = numAmount * (commissionPercent / 100);
     const payoutType = plan === "yearly" ? "first_year" : "first_month";
+
+    console.log(`Calculated payout: $${numAmount} x ${commissionPercent}% = $${payoutAmount.toFixed(2)} (tier: ${codeData.tier || 'bronze'})`);
 
     // Create pending payout
     const { data: newPayout, error: payoutError } = await supabaseClient
@@ -207,6 +266,7 @@ serve(async (req) => {
         payout_type: payoutType,
         apple_transaction_id: apple_transaction_id || null,
         created_at: new Date().toISOString(),
+        retry_count: 0,
       })
       .select()
       .single();
@@ -226,7 +286,7 @@ serve(async (req) => {
     const newConversionCount = (currentData?.total_conversions || 0) + 1;
     const newRevenue = (currentData?.total_revenue || 0) + payoutAmount;
 
-    // Update with incremented values
+    // Update with incremented values (tier will be updated by trigger)
     const { error: updateError } = await supabaseClient
       .from("referral_codes")
       .update({ 
@@ -241,13 +301,15 @@ serve(async (req) => {
       // Don't fail the whole request, payout was created successfully
     }
 
-    console.log(`Created ${payoutType} payout of $${payoutAmount.toFixed(2)} for code ${referral_code} from ${source_app || 'unknown'}`);
+    console.log(`Created ${payoutType} payout of $${payoutAmount.toFixed(2)} (${commissionPercent}%) for code ${referral_code} from ${source_app || 'unknown'}`);
 
     return jsonResponse(req, {
       success: true,
       payout_id: newPayout.id,
       payout_amount: payoutAmount,
       payout_type: payoutType,
+      commission_percent: commissionPercent,
+      tier: codeData.tier || 'bronze',
       status: "pending",
       message: "Subscription recorded and payout created",
     });

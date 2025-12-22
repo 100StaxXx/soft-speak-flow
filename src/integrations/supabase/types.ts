@@ -4549,6 +4549,7 @@ export type Database = {
           owner_user_id: string | null
           payout_identifier: string | null
           payout_method: string | null
+          tier: string | null
           total_conversions: number | null
           total_revenue: number | null
           total_signups: number | null
@@ -4565,6 +4566,7 @@ export type Database = {
           owner_user_id?: string | null
           payout_identifier?: string | null
           payout_method?: string | null
+          tier?: string | null
           total_conversions?: number | null
           total_revenue?: number | null
           total_signups?: number | null
@@ -4581,9 +4583,37 @@ export type Database = {
           owner_user_id?: string | null
           payout_identifier?: string | null
           payout_method?: string | null
+          tier?: string | null
           total_conversions?: number | null
           total_revenue?: number | null
           total_signups?: number | null
+        }
+        Relationships: []
+      }
+      referral_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          created_at: string
+          description: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          config_key: string
+          config_value: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -4594,7 +4624,10 @@ export type Database = {
           apple_transaction_id: string | null
           approved_at: string | null
           created_at: string | null
+          failure_reason: string | null
           id: string
+          last_retry_at: string | null
+          next_retry_at: string | null
           paid_at: string | null
           payout_type: string
           paypal_payer_id: string | null
@@ -4603,6 +4636,7 @@ export type Database = {
           referral_code_id: string | null
           referrer_id: string | null
           rejected_at: string | null
+          retry_count: number | null
           status: string
           subscription_id: string | null
         }
@@ -4612,7 +4646,10 @@ export type Database = {
           apple_transaction_id?: string | null
           approved_at?: string | null
           created_at?: string | null
+          failure_reason?: string | null
           id?: string
+          last_retry_at?: string | null
+          next_retry_at?: string | null
           paid_at?: string | null
           payout_type: string
           paypal_payer_id?: string | null
@@ -4621,6 +4658,7 @@ export type Database = {
           referral_code_id?: string | null
           referrer_id?: string | null
           rejected_at?: string | null
+          retry_count?: number | null
           status?: string
           subscription_id?: string | null
         }
@@ -4630,7 +4668,10 @@ export type Database = {
           apple_transaction_id?: string | null
           approved_at?: string | null
           created_at?: string | null
+          failure_reason?: string | null
           id?: string
+          last_retry_at?: string | null
+          next_retry_at?: string | null
           paid_at?: string | null
           payout_type?: string
           paypal_payer_id?: string | null
@@ -4639,6 +4680,7 @@ export type Database = {
           referral_code_id?: string | null
           referrer_id?: string | null
           rejected_at?: string | null
+          retry_count?: number | null
           status?: string
           subscription_id?: string | null
         }
@@ -6077,6 +6119,10 @@ export type Database = {
         }[]
       }
       generate_referral_code: { Args: never; Returns: string }
+      get_commission_rate: {
+        Args: { p_plan: string; p_referral_code_id: string }
+        Returns: number
+      }
       get_next_evolution_threshold: {
         Args: { current_stage: number }
         Returns: number
