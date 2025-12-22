@@ -56,7 +56,6 @@ export const useTaskMutations = (taskDate: string) => {
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
 
-  const toggleInProgress = useRef(false);
   const addInProgress = useRef(false);
 
   const addTask = useMutation({
@@ -122,58 +121,52 @@ export const useTaskMutations = (taskDate: string) => {
   const toggleTask = useMutation({
     mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
       if (!user?.id) throw new Error('User not authenticated');
-      if (toggleInProgress.current) throw new Error('Please wait...');
-      toggleInProgress.current = true;
 
-      try {
-        const { data: existingTask, error: existingError } = await supabase
-          .from('daily_tasks')
-          .select('completed_at')
-          .eq('id', taskId)
-          .eq('user_id', user.id)
-          .maybeSingle();
+      const { data: existingTask, error: existingError } = await supabase
+        .from('daily_tasks')
+        .select('completed_at')
+        .eq('id', taskId)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-        if (existingError) throw existingError;
+      if (existingError) throw existingError;
 
-        const wasAlreadyCompleted = existingTask?.completed_at !== null;
+      const wasAlreadyCompleted = existingTask?.completed_at !== null;
 
-        if (wasAlreadyCompleted && !completed) {
-          throw new Error('Cannot uncheck completed tasks');
-        }
-
-        if (!completed) {
-          const { error } = await supabase
-            .from('daily_tasks')
-            .update({ completed: false, completed_at: null })
-            .eq('id', taskId)
-            .eq('user_id', user.id);
-
-          if (error) throw error;
-          return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted };
-        }
-
-        const { bonusXP, toastReason } = await calculateGuildBonus(user.id, xpReward);
-        const totalXP = xpReward + bonusXP;
-
-        const { data: updateResult, error: updateError } = await supabase
-          .from('daily_tasks')
-          .update({ completed: true, completed_at: new Date().toISOString() })
-          .eq('id', taskId)
-          .eq('user_id', user.id)
-          .eq('completed', false)
-          .select();
-
-        if (updateError) throw updateError;
-        if (!updateResult || updateResult.length === 0) {
-          throw new Error('Task was already completed');
-        }
-
-        await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
-
-        return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted };
-      } finally {
-        toggleInProgress.current = false;
+      if (wasAlreadyCompleted && !completed) {
+        throw new Error('Cannot uncheck completed tasks');
       }
+
+      if (!completed) {
+        const { error } = await supabase
+          .from('daily_tasks')
+          .update({ completed: false, completed_at: null })
+          .eq('id', taskId)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted };
+      }
+
+      const { bonusXP, toastReason } = await calculateGuildBonus(user.id, xpReward);
+      const totalXP = xpReward + bonusXP;
+
+      const { data: updateResult, error: updateError } = await supabase
+        .from('daily_tasks')
+        .update({ completed: true, completed_at: new Date().toISOString() })
+        .eq('id', taskId)
+        .eq('user_id', user.id)
+        .eq('completed', false)
+        .select();
+
+      if (updateError) throw updateError;
+      if (!updateResult || updateResult.length === 0) {
+        throw new Error('Task was already completed');
+      }
+
+      await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
+
+      return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted };
     },
     onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
