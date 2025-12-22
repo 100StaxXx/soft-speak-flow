@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Swords, Sparkles, Info, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { BattleCard, AIDifficulty } from '@/types/cardBattle';
 import { transformToBattleCard, validateDeck, calculateDeckPower, suggestDeckComposition } from '@/lib/cardBattleUtils';
 import { useBattleMoves } from '@/hooks/useBattleMoves';
