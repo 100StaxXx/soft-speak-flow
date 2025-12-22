@@ -371,46 +371,46 @@ const Stars = memo(() => {
 });
 Stars.displayName = 'Stars';
 
-// UI Overlay for score/lives - fullscreen positioning
+// UI Overlay for score/lives - fullscreen positioning, compact
 const GameUI = memo(({ score, lives, combo, hasShield, distance }: { 
   score: number; lives: number; combo: number; hasShield: boolean; distance: number;
 }) => (
-  <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none z-10 safe-area-inset-top">
-    <div className="flex flex-col gap-2">
-      <div className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2">
-        <span className="text-yellow-400 font-bold text-xl">{score}</span>
-        <span className="text-sm text-muted-foreground ml-1">pts</span>
+  <div className="absolute top-2 left-2 right-2 flex justify-between items-start pointer-events-none z-10 safe-area-inset-top">
+    <div className="flex flex-col gap-1">
+      <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
+        <span className="text-yellow-400 font-bold text-base">{score}</span>
+        <span className="text-[10px] text-muted-foreground ml-0.5">pts</span>
       </div>
-      <div className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2">
-        <span className="text-cyan-400 font-bold text-xl">{Math.round(distance)}</span>
-        <span className="text-sm text-muted-foreground ml-1">m</span>
+      <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
+        <span className="text-cyan-400 font-bold text-base">{Math.round(distance)}</span>
+        <span className="text-[10px] text-muted-foreground ml-0.5">m</span>
       </div>
       {combo > 1 && (
         <motion.div 
-          className="bg-purple-500/60 backdrop-blur-sm rounded-xl px-4 py-2"
+          className="bg-purple-500/60 backdrop-blur-sm rounded-lg px-2 py-1"
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
         >
-          <span className="text-white font-bold text-xl">{combo}x</span>
-          <span className="text-sm text-purple-200 ml-1">combo</span>
+          <span className="text-white font-bold text-base">{combo}x</span>
+          <span className="text-[10px] text-purple-200 ml-0.5">combo</span>
         </motion.div>
       )}
     </div>
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-1.5">
       {hasShield && (
         <motion.div 
-          className="bg-cyan-500/60 backdrop-blur-sm rounded-xl px-3 py-2"
+          className="bg-cyan-500/60 backdrop-blur-sm rounded-lg px-2 py-1"
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
         >
-          <span className="text-2xl">🛡️</span>
+          <span className="text-lg">🛡️</span>
         </motion.div>
       )}
-      <div className="flex gap-1.5 bg-black/60 backdrop-blur-sm rounded-xl px-3 py-2">
+      <div className="flex gap-1 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
         {Array.from({ length: 3 }).map((_, i) => (
           <motion.span 
             key={i} 
-            className={`text-2xl ${i < lives ? '' : 'grayscale opacity-30'}`}
+            className={`text-lg ${i < lives ? '' : 'grayscale opacity-30'}`}
             animate={i < lives ? { scale: [1, 1.1, 1] } : {}}
             transition={{ duration: 0.3 }}
           >
@@ -423,20 +423,20 @@ const GameUI = memo(({ score, lives, combo, hasShield, distance }: {
 ));
 GameUI.displayName = 'GameUI';
 
-// Lane controls - fullscreen positioning
+// Lane controls - fullscreen positioning, compact
 const LaneControls = memo(({ onLeft, onRight }: { onLeft: () => void; onRight: () => void }) => (
-  <div className="absolute bottom-8 left-4 right-4 flex justify-between z-10 safe-area-inset-bottom">
+  <div className="absolute bottom-4 left-3 right-3 flex justify-between z-10 safe-area-inset-bottom">
     <button
-      className="w-24 h-24 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center active:bg-white/30 transition-colors border border-white/20"
+      className="w-20 h-20 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center active:bg-white/30 transition-colors border border-white/20"
       onPointerDown={onLeft}
     >
-      <span className="text-4xl text-white">◀</span>
+      <span className="text-3xl text-white">◀</span>
     </button>
     <button
-      className="w-24 h-24 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center active:bg-white/30 transition-colors border border-white/20"
+      className="w-20 h-20 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center active:bg-white/30 transition-colors border border-white/20"
       onPointerDown={onRight}
     >
-      <span className="text-4xl text-white">▶</span>
+      <span className="text-3xl text-white">▶</span>
     </button>
   </div>
 ));

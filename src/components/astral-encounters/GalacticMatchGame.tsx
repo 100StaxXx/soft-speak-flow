@@ -465,23 +465,23 @@ export const GalacticMatchGame = ({
   }), [config.cols, config.rows]);
 
   return (
-    <div className="flex flex-col items-center gap-3 p-4 select-none touch-none">
-      {/* Header with level, lives, and score */}
-      <div className="w-full flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Level</span>
+    <div className="flex flex-col items-center gap-2 p-3 select-none touch-none">
+      {/* Header with level, lives, and score - compact */}
+      <div className="w-full flex items-center justify-between text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground text-[10px]">Level</span>
           <motion.span 
             key={level}
             initial={{ scale: 1.5, color: 'hsl(var(--primary))' }}
             animate={{ scale: 1, color: 'hsl(var(--foreground))' }}
-            className="font-bold text-lg"
+            className="font-bold text-base"
           >
             {level}
           </motion.span>
         </div>
 
-        {/* Lives */}
-        <div className="flex items-center gap-1">
+        {/* Lives - compact */}
+        <div className="flex items-center gap-0.5">
           {[...Array(maxLives)].map((_, i) => (
             <motion.div
               key={i}
@@ -493,7 +493,7 @@ export const GalacticMatchGame = ({
               transition={{ type: 'spring', stiffness: 300 }}
             >
               <Heart 
-                className={`w-5 h-5 ${i < lives ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`}
+                className={`w-4 h-4 ${i < lives ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`}
               />
             </motion.div>
           ))}
@@ -512,23 +512,23 @@ export const GalacticMatchGame = ({
         </div>
       </div>
 
-      {/* Combo indicator */}
+      {/* Combo indicator - compact */}
       <AnimatePresence>
         {combo > 1 && phase === 'playing' && (
           <motion.div
             initial={{ scale: 0, y: -10 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="px-3 py-1 bg-yellow-500/20 rounded-full text-yellow-400 text-sm font-bold"
+            className="px-2 py-0.5 bg-yellow-500/20 rounded-full text-yellow-400 text-xs font-bold"
           >
             🔥 {combo}x COMBO!
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Pairs progress */}
-      <div className="w-full flex items-center gap-2">
-        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+      {/* Pairs progress - compact */}
+      <div className="w-full flex items-center gap-1.5">
+        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-cyan-500 to-purple-500"
             initial={{ width: 0 }}
@@ -536,7 +536,7 @@ export const GalacticMatchGame = ({
             transition={{ duration: 0.3 }}
           />
         </div>
-        <span className="text-xs text-muted-foreground">{matchedPairs}/{config.pairs}</span>
+        <span className="text-[10px] text-muted-foreground">{matchedPairs}/{config.pairs}</span>
       </div>
 
       {/* Card grid */}

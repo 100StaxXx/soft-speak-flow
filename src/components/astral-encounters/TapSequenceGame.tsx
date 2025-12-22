@@ -220,9 +220,9 @@ const ConnectionLines = memo(({ orbs, highlightIndex }: { orbs: Orb[]; highlight
 });
 ConnectionLines.displayName = 'ConnectionLines';
 
-// Lives display component
+// Lives display component - compact sizing
 const LivesDisplay = memo(({ lives, maxLives = 3 }: { lives: number; maxLives?: number }) => (
-  <div className="flex items-center gap-1">
+  <div className="flex items-center gap-0.5">
     {Array.from({ length: maxLives }).map((_, i) => (
       <motion.div
         key={i}
@@ -234,7 +234,7 @@ const LivesDisplay = memo(({ lives, maxLives = 3 }: { lives: number; maxLives?: 
         transition={{ type: 'spring', stiffness: 400 }}
       >
         <Heart 
-          className={`w-5 h-5 ${i < lives ? 'fill-red-500 text-red-500' : 'fill-gray-600 text-gray-600'}`}
+          className={`w-4 h-4 ${i < lives ? 'fill-red-500 text-red-500' : 'fill-gray-600 text-gray-600'}`}
         />
       </motion.div>
     ))}
@@ -478,22 +478,22 @@ export const TapSequenceGame = ({
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
       />
 
-      {/* Lives and Level display */}
-      <div className="w-full max-w-xs mb-3 flex items-center justify-between">
+      {/* Lives and Level display - compact */}
+      <div className="w-full max-w-xs mb-2 flex items-center justify-between">
         <LivesDisplay lives={lives} />
         <motion.div 
           key={level}
           initial={{ scale: 1.2, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="px-3 py-1 bg-primary/20 rounded-full border border-primary/40"
+          className="px-2 py-0.5 bg-primary/20 rounded-full border border-primary/40"
         >
-          <span className="text-sm font-bold text-primary">Level {level}</span>
+          <span className="text-xs font-bold text-primary">Level {level}</span>
         </motion.div>
       </div>
 
-      {/* Difficulty indicator */}
-      <div className="mb-2 flex items-center gap-2">
-        <span className={`text-xs px-2 py-0.5 rounded-full ${
+      {/* Difficulty indicator - compact */}
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
           difficulty === 'beginner' ? 'bg-blue-500/20 text-blue-400' :
           difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
           difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
@@ -502,7 +502,7 @@ export const TapSequenceGame = ({
         }`}>
           {difficulty.toUpperCase()}
         </span>
-        <span className="text-xs text-muted-foreground">{orbCount} orbs</span>
+        <span className="text-[10px] text-muted-foreground">{orbCount} orbs</span>
       </div>
 
       {/* Game area */}
@@ -600,9 +600,9 @@ export const TapSequenceGame = ({
         </AnimatePresence>
       </div>
       
-      {/* Instructions */}
+      {/* Instructions - compact */}
       <motion.p 
-        className="mt-4 text-sm text-muted-foreground text-center"
+        className="mt-2 text-xs text-muted-foreground text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -613,10 +613,10 @@ export const TapSequenceGame = ({
             : ''}
       </motion.p>
 
-      {/* Game info */}
-      <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-        <span>{diffConfig.startLives} lives • Endless levels</span>
-        <span className="text-primary">No time limit!</span>
+      {/* Game info - compact */}
+      <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+        <span>{diffConfig.startLives} lives • Endless</span>
+        <span className="text-primary">No time limit</span>
       </div>
 
       {/* CSS animations */}

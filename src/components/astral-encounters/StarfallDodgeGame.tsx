@@ -280,11 +280,11 @@ const TiltPermissionOverlay = memo(({ onRequest, onSkip }: { onRequest: () => vo
 ));
 TiltPermissionOverlay.displayName = 'TiltPermissionOverlay';
 
-// Lives display
+// Lives display - compact
 const LivesDisplay = memo(({ lives, maxLives = 3 }: { lives: number; maxLives?: number }) => (
-  <div className="flex gap-1">
+  <div className="flex gap-0.5">
     {Array.from({ length: maxLives }).map((_, i) => (
-      <span key={i} className={`text-xl ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
+      <span key={i} className={`text-lg ${i < lives ? 'opacity-100' : 'opacity-30'}`}>
         ❤️
       </span>
     ))}
@@ -292,7 +292,7 @@ const LivesDisplay = memo(({ lives, maxLives = 3 }: { lives: number; maxLives?: 
 ));
 LivesDisplay.displayName = 'LivesDisplay';
 
-// Active power-ups display
+// Active power-ups display - compact
 const ActivePowerupsDisplay = memo(({ 
   hasShield, 
   hasMagnet, 
@@ -306,22 +306,22 @@ const ActivePowerupsDisplay = memo(({
   magnetTimeLeft: number;
   slowMoTimeLeft: number;
 }) => (
-  <div className="flex gap-2">
+  <div className="flex gap-1">
     {hasShield && (
-      <div className="bg-emerald-500/30 backdrop-blur-sm rounded-full px-2 py-0.5">
-        <span className="text-emerald-300 text-sm">🛡️</span>
+      <div className="bg-emerald-500/30 backdrop-blur-sm rounded-full px-1.5 py-0.5">
+        <span className="text-emerald-300 text-xs">🛡️</span>
       </div>
     )}
     {hasMagnet && (
-      <div className="bg-amber-500/30 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
-        <span className="text-amber-300 text-sm">🧲</span>
-        <span className="text-amber-300 text-xs">{Math.ceil(magnetTimeLeft / 1000)}s</span>
+      <div className="bg-amber-500/30 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5">
+        <span className="text-amber-300 text-xs">🧲</span>
+        <span className="text-amber-300 text-[10px]">{Math.ceil(magnetTimeLeft / 1000)}s</span>
       </div>
     )}
     {hasSlowMo && (
-      <div className="bg-purple-500/30 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
-        <span className="text-purple-300 text-sm">⏳</span>
-        <span className="text-purple-300 text-xs">{Math.ceil(slowMoTimeLeft / 1000)}s</span>
+      <div className="bg-purple-500/30 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5">
+        <span className="text-purple-300 text-xs">⏳</span>
+        <span className="text-purple-300 text-[10px]">{Math.ceil(slowMoTimeLeft / 1000)}s</span>
       </div>
     )}
   </div>
