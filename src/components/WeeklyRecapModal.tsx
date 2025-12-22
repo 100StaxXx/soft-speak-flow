@@ -203,7 +203,7 @@ export const WeeklyRecapModal = () => {
 
             {/* Story Content */}
             <ScrollArea className="relative flex-1 min-h-0">
-              <div ref={cardRef} className="px-6 pb-6 space-y-6">
+              <div ref={cardRef} className="px-4 pb-6 space-y-6">
                 {/* Trend Badge */}
                 <div className="flex items-center justify-center pt-2">
                   <TrendBadge trend={selectedRecap.mood_data.trend} />
