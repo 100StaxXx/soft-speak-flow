@@ -14,6 +14,8 @@ import { AudioGenerator } from "@/components/AudioGenerator";
 import { AdminPayouts } from "@/components/AdminPayouts";
 import { AdminReferralCodes } from "@/components/AdminReferralCodes";
 import { AdminReferralTesting } from "@/components/AdminReferralTesting";
+import { AdminReferralConfig } from "@/components/AdminReferralConfig";
+import { AdminReferralAnalytics } from "@/components/AdminReferralAnalytics";
 import { EvolutionCardFlip } from "@/components/EvolutionCardFlip";
 import { AdminCompanionImageTester } from "@/components/AdminCompanionImageTester";
 import { Capacitor } from '@capacitor/core';
@@ -1392,8 +1394,10 @@ const Admin = () => {
           </Card>
         )}
 
-        {/* Referral Codes Management */}
+        {/* Referral Program Management */}
         <div className="space-y-6 mb-8">
+          <AdminReferralAnalytics />
+          <AdminReferralConfig />
           <AdminReferralCodes />
           <AdminPayouts />
           <AdminReferralTesting />
