@@ -101,7 +101,7 @@ export const WeeklyRecapModal = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-20"
           onClick={handleClose}
         >
           {/* Backdrop with animated gradient */}
@@ -137,7 +137,7 @@ export const WeeklyRecapModal = () => {
             exit={{ scale: 0.9, opacity: 0, y: 40 }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-3xl overflow-hidden"
+            className="relative w-full max-w-lg max-h-[75dvh] flex flex-col rounded-3xl overflow-hidden"
           >
             {/* Glass card background */}
             <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/90 to-background/95 backdrop-blur-xl border border-white/10 rounded-3xl" />
@@ -286,7 +286,7 @@ export const WeeklyRecapModal = () => {
             </ScrollArea>
 
             {/* Footer */}
-            <div className="relative px-6 py-5 border-t border-white/5">
+            <div className="relative px-6 py-5 pb-6 border-t border-white/5">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
