@@ -49,34 +49,34 @@ const DIFFICULTY_CONFIG = {
     initialSpawnRate: 1000,
     debrisRatio: 0.35,
     baseSpeed: 1.5,
-    speedIncrease: 0.12,     // 2x faster ramp (was 0.06)
+    speedIncrease: 0.20,     // 67% faster (was 0.12)
     spawnRateDecrease: 8,
     minSpawnRate: 350,
-    maxSpeed: 7.0,           // Slightly higher cap (was 6.0)
+    maxSpeed: 7.0,
   },
   easy: { 
     initialSpawnRate: 800, 
     debrisRatio: 0.45, 
     baseSpeed: 2.0,
-    speedIncrease: 0.18,     // 1.8x faster ramp (was 0.10)
+    speedIncrease: 0.30,     // 67% faster (was 0.18)
     spawnRateDecrease: 14,
     minSpawnRate: 250,
-    maxSpeed: 9.5,           // Slightly higher cap (was 8.5)
+    maxSpeed: 9.5,
   },
   medium: { 
     initialSpawnRate: 650, 
     debrisRatio: 0.55, 
     baseSpeed: 2.8,
-    speedIncrease: 0.25,     // 1.8x faster ramp (was 0.14)
+    speedIncrease: 0.40,     // 60% faster (was 0.25)
     spawnRateDecrease: 18,
     minSpawnRate: 200,
-    maxSpeed: 11.0,          // Slightly higher cap (was 10.0)
+    maxSpeed: 11.0,
   },
   hard: { 
     initialSpawnRate: 500, 
     debrisRatio: 0.65, 
     baseSpeed: 3.5,
-    speedIncrease: 0.16,
+    speedIncrease: 0.28,     // 75% faster (was 0.16)
     spawnRateDecrease: 22,
     minSpawnRate: 150,
     maxSpeed: 12.0,
@@ -85,7 +85,7 @@ const DIFFICULTY_CONFIG = {
     initialSpawnRate: 400,
     debrisRatio: 0.75,
     baseSpeed: 4.5,
-    speedIncrease: 0.20,
+    speedIncrease: 0.35,     // 75% faster (was 0.20)
     spawnRateDecrease: 28,
     minSpawnRate: 120,
     maxSpeed: 14.0,
