@@ -58,9 +58,16 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const isValid = mood.length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true}>
-      <DrawerContent className="max-h-[90vh]">
-        <div className="mx-auto w-full max-w-lg px-4 pb-8 overflow-y-auto" data-vaul-no-drag>
+    <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
+      <DrawerContent className="max-h-[85dvh]">
+        <div 
+          className="mx-auto w-full max-w-lg px-4 pb-8 overflow-y-auto overscroll-contain"
+          style={{ 
+            WebkitOverflowScrolling: 'touch',
+            maxHeight: 'calc(85dvh - 80px)'
+          }}
+          data-vaul-no-drag
+        >
           <DrawerHeader className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Moon className="h-6 w-6 text-purple-400" />
