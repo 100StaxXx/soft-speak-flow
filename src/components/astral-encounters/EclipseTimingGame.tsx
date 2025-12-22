@@ -136,6 +136,7 @@ const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) =>
         top: `${note.y}%`,
         transform: 'translateY(-50%) translateZ(0)',
         willChange: 'transform',
+        zIndex: 15,
       }}
     >
       <div
