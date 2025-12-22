@@ -1,3 +1,4 @@
+import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Brain, Zap, Heart } from "lucide-react";
@@ -42,10 +43,33 @@ export const PlanetaryCard = ({ planet, sign, description, delay = 0 }: Planetar
   const config = planetConfig[planet];
   const Icon = config.icon;
   const navigate = useNavigate();
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const MOVE_THRESHOLD = 10;
 
   const handleClick = () => {
     navigate(`/cosmic/${planet}/${sign.toLowerCase()}`);
   };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // Only navigate if finger moved less than threshold (tap, not scroll)
+    if (deltaX < MOVE_THRESHOLD && deltaY < MOVE_THRESHOLD) {
+      e.preventDefault();
+      handleClick();
+    }
+    
+    touchStartRef.current = null;
+  }, []);
 
   return (
     <motion.div
@@ -53,7 +77,10 @@ export const PlanetaryCard = ({ planet, sign, description, delay = 0 }: Planetar
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay }}
       onClick={handleClick}
-      className="cursor-pointer"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="cursor-pointer select-none"
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'pan-y' }}
     >
       <Card className="bg-obsidian/60 border-royal-purple/30 hover:border-royal-purple/50 transition-all hover:shadow-lg hover:shadow-accent-purple/10 hover:scale-[1.02]">
         <CardContent className="p-6">

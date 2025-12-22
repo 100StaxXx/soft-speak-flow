@@ -45,6 +45,7 @@ const Horoscope = () => {
   const [energyForecast, setEnergyForecast] = useState<EnergyForecast | null>(null);
   const [placementInsights, setPlacementInsights] = useState<PlacementInsights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [showWelcomeTooltip, setShowWelcomeTooltip] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -119,6 +120,7 @@ const Horoscope = () => {
       setCosmiqTip(data.cosmiqTip || null);
       setEnergyForecast(data.energyForecast || null);
       setPlacementInsights(data.placementInsights || null);
+      setGeneratedAt(data.generatedAt || null);
     } catch (err) {
       console.error('Error generating horoscope:', err);
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -414,6 +416,11 @@ const Horoscope = () => {
             </h1>
             <p className="text-gray-400 text-sm mt-1">
               {date ? formatDate(date) : 'Loading...'}
+              {generatedAt && (
+                <span className="ml-2 text-xs text-purple-400/70">
+                  • Cached
+                </span>
+              )}
             </p>
           </motion.div>
         </div>

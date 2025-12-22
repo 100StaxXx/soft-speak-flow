@@ -103,7 +103,8 @@ serve(async (req) => {
             date: existingHoroscope.for_date,
             cosmiqTip: existingHoroscope.cosmic_tip,
             energyForecast: existingHoroscope.energy_forecast || null,
-            placementInsights: existingHoroscope.placement_insights || null
+            placementInsights: existingHoroscope.placement_insights || null,
+            generatedAt: existingHoroscope.for_date, // Indicates this was cached
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -352,7 +353,8 @@ Respond with JSON:
         date: today,
         cosmiqTip,
         energyForecast,
-        placementInsights
+        placementInsights,
+        generatedAt: null, // Fresh generation, not cached
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
