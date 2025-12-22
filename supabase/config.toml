@@ -212,3 +212,6 @@ verify_jwt = false
 
 [functions.paypal-webhook]
 verify_jwt = false
+
+[functions.retry-failed-payouts]
+verify_jwt = false
