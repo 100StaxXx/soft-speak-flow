@@ -434,13 +434,13 @@ const WaveTransition = memo(({ wave }: { wave: number }) => (
 ));
 WaveTransition.displayName = 'WaveTransition';
 
-// Lives display
+// Lives display - compact
 const LivesDisplay = memo(({ lives }: { lives: number }) => (
-  <div className="flex items-center gap-1">
+  <div className="flex items-center gap-0.5">
     {Array.from({ length: 3 }).map((_, i) => (
       <Heart
         key={i}
-        className={`w-5 h-5 ${i < lives ? 'text-red-500 fill-red-500' : 'text-slate-600'}`}
+        className={`w-4 h-4 ${i < lives ? 'text-red-500 fill-red-500' : 'text-slate-600'}`}
       />
     ))}
   </div>

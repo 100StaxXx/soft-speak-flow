@@ -120,7 +120,7 @@ const StaticStarBackground = memo(({ stars }: { stars: ReturnType<typeof useStat
 ));
 StaticStarBackground.displayName = 'StaticStarBackground';
 
-// OPTIMIZED: Simplified note orb - no trail, no approach ring, simple shadow
+// OPTIMIZED: Simplified note orb - compact sizing
 // FIX: Use percentage instead of vh for proper positioning within container
 const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) => {
   const config = LANE_CONFIG[note.lane];
@@ -130,9 +130,9 @@ const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) =>
     <div
       className="absolute flex items-center justify-center"
       style={{
-        width: '64px',
-        height: '64px',
-        left: `calc(${(laneIndex + 0.5) * 33.33}% - 32px)`,
+        width: '52px',
+        height: '52px',
+        left: `calc(${(laneIndex + 0.5) * 33.33}% - 26px)`,
         top: `${note.y}%`,
         transform: 'translateY(-50%) translateZ(0)',
         willChange: 'transform',
@@ -142,11 +142,11 @@ const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) =>
         className="w-full h-full rounded-full flex items-center justify-center"
         style={{
           background: `radial-gradient(circle at 30% 30%, ${config.color}, ${config.color}88)`,
-          boxShadow: `0 0 15px ${config.color}80`,
+          boxShadow: `0 0 12px ${config.color}80`,
           border: `2px solid ${config.color}`,
         }}
       >
-        <Icon className="w-8 h-8 text-white" />
+        <Icon className="w-6 h-6 text-white" />
       </div>
     </div>
   );
@@ -232,20 +232,20 @@ const LaneButton = memo(({
       }}
     >
       <div
-        className="w-20 h-20 rounded-full flex items-center justify-center transition-transform duration-75"
+        className="w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-75"
         style={{
           background: isPressed 
             ? `radial-gradient(circle, ${config.color}, ${config.color}80)`
             : `radial-gradient(circle, ${config.color}40, ${config.color}15)`,
-          border: `4px solid ${config.color}${isPressed ? '' : '80'}`,
+          border: `3px solid ${config.color}${isPressed ? '' : '80'}`,
           boxShadow: isPressed 
-            ? `0 0 30px ${config.color}` 
-            : `0 0 10px ${config.color}30`,
+            ? `0 0 24px ${config.color}` 
+            : `0 0 8px ${config.color}30`,
           transform: isPressed ? 'scale(0.9)' : 'scale(1)',
         }}
       >
         <Icon 
-          className="w-10 h-10 pointer-events-none" 
+          className="w-8 h-8 pointer-events-none" 
           style={{ color: isPressed ? 'white' : config.color }} 
         />
       </div>
@@ -289,14 +289,14 @@ const generateFallbackNotes = (difficulty: ArcadeDifficulty): Note[] => {
 };
 
 const TrackLoadingScreen = memo(({ isGenerating }: { isGenerating?: boolean }) => (
-  <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
+  <div className="flex flex-col items-center justify-center h-full min-h-[300px] gap-3">
     <div className="relative">
       <div className="animate-spin">
-        <Music className="w-16 h-16 text-primary" />
+        <Music className="w-12 h-12 text-primary" />
       </div>
-      <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-pulse" />
+      <Sparkles className="absolute -top-1 -right-1 w-5 h-5 text-yellow-400 animate-pulse" />
     </div>
-    <p className="text-lg font-medium text-foreground">
+    <p className="text-base font-medium text-foreground">
       {isGenerating ? 'Generating music...' : 'Loading music...'}
     </p>
   </div>

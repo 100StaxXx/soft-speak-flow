@@ -281,13 +281,13 @@ const LevelCompleteOverlay = memo(({
 });
 LevelCompleteOverlay.displayName = 'LevelCompleteOverlay';
 
-// Level Indicator Badge
+// Level Indicator Badge - compact
 const LevelIndicator = memo(({ level, progress, targetScore }: { level: number; progress: number; targetScore: number }) => (
-  <div className="absolute left-2 top-2 z-40">
-    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/60 rounded-full border border-purple-500/40 backdrop-blur-sm">
-      <span className="text-xs font-bold text-purple-400">LVL</span>
-      <span className="text-lg font-black text-white">{level}</span>
-      <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
+  <div className="absolute left-1 top-1 z-40">
+    <div className="flex items-center gap-1.5 px-2 py-1 bg-black/60 rounded-full border border-purple-500/40 backdrop-blur-sm">
+      <span className="text-[10px] font-bold text-purple-400">LVL</span>
+      <span className="text-base font-black text-white">{level}</span>
+      <div className="w-10 h-1 bg-white/10 rounded-full overflow-hidden">
         <div 
           className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-200"
           style={{ width: `${Math.min(100, progress * 100)}%` }}
