@@ -209,3 +209,6 @@ verify_jwt = true
 
 [functions.deal-boss-damage]
 verify_jwt = false
+
+[functions.paypal-webhook]
+verify_jwt = false

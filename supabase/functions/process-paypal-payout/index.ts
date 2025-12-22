@@ -4,18 +4,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 /**
  * Process PayPal Payout
  * 
- * Admin-triggered function to send approved referral payouts via PayPal.
- * Requires admin authentication and payout approval before processing.
- * 
- * Request body:
- * {
- *   payout_id: string - The referral_payouts.id to process
- * }
+ * Admin-triggered function to process approved referral payouts via PayPal.
+ * Uses PAYPAL_ENVIRONMENT secret to determine sandbox vs production mode.
  */
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Get PayPal environment - defaults to sandbox for safety
+const getPayPalEnvironment = (): "sandbox" | "production" => {
+  const env = Deno.env.get("PAYPAL_ENVIRONMENT") || "sandbox";
+  return env.toLowerCase() === "production" ? "production" : "sandbox";
+};
+
+const getPayPalApiUrl = (): string => {
+  return getPayPalEnvironment() === "production"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com";
 };
 
 serve(async (req) => {
@@ -28,6 +35,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+
+    const paypalEnv = getPayPalEnvironment();
+    const paypalBaseUrl = getPayPalApiUrl();
+    console.log(`Processing payout in ${paypalEnv} mode (${paypalBaseUrl})`);
 
     // Verify admin authentication
     const authHeader = req.headers.get("Authorization");
@@ -122,12 +133,6 @@ serve(async (req) => {
       });
     }
 
-    // Use sandbox URL for testing, production URL for live
-    const isProduction = Deno.env.get("PAYPAL_ENVIRONMENT") !== "sandbox";
-    const paypalBaseUrl = isProduction 
-      ? "https://api-m.paypal.com" 
-      : "https://api-m.sandbox.paypal.com";
-
     const basicAuth = btoa(`${clientId}:${clientSecret}`);
     const tokenResponse = await fetch(`${paypalBaseUrl}/v1/oauth2/token`, {
       method: "POST",
@@ -151,7 +156,7 @@ serve(async (req) => {
     // Create PayPal payout
     const payoutBatch = {
       sender_batch_header: {
-        sender_batch_id: `ref_payout_${payout.id}`,
+        sender_batch_id: `ref_payout_${payout.id}_${Date.now()}`,
         email_subject: "You've received a referral reward from Cosmiq!",
         email_message: "Thank you for referring friends to Cosmiq. Here's your reward!",
       },
@@ -159,7 +164,7 @@ serve(async (req) => {
         {
           recipient_type: "EMAIL",
           amount: {
-            value: payout.amount.toFixed(2),
+            value: Number(payout.amount).toFixed(2),
             currency: "USD",
           },
           receiver: paypalEmail,
@@ -168,6 +173,8 @@ serve(async (req) => {
         },
       ],
     };
+
+    console.log("Sending payout request:", JSON.stringify(payoutBatch, null, 2));
 
     const payoutResponse = await fetch(`${paypalBaseUrl}/v1/payments/payouts`, {
       method: "POST",
@@ -188,28 +195,32 @@ serve(async (req) => {
     }
 
     const payoutResult = await payoutResponse.json();
-    const payoutBatchId = payoutResult.batch_header.payout_batch_id;
-    const payoutItemId = payoutResult.items?.[0]?.payout_item_id;
+    const payoutBatchId = payoutResult.batch_header?.payout_batch_id;
+    const batchStatus = payoutResult.batch_header?.batch_status;
 
-    // Update payout status
+    console.log("PayPal payout response:", JSON.stringify(payoutResult, null, 2));
+
+    // Update payout status to "processing" - webhook will confirm final status
     await supabaseClient
       .from("referral_payouts")
       .update({
-        status: "paid",
-        paid_at: new Date().toISOString(),
+        status: batchStatus === "SUCCESS" ? "paid" : "processing",
+        paid_at: batchStatus === "SUCCESS" ? new Date().toISOString() : null,
         paypal_transaction_id: payoutBatchId,
-        paypal_payer_id: payoutItemId,
+        admin_notes: `PayPal batch ${payoutBatchId} - Status: ${batchStatus}`,
       })
       .eq("id", payout_id);
 
-    console.log(`Successfully processed payout ${payout_id} to ${paypalEmail}`);
+    console.log(`Successfully submitted payout ${payout_id} to PayPal (batch: ${payoutBatchId})`);
 
     return new Response(
       JSON.stringify({
         success: true,
         payout_batch_id: payoutBatchId,
+        batch_status: batchStatus,
         amount: payout.amount,
         recipient: paypalEmail,
+        environment: paypalEnv,
       }),
       {
         status: 200,
