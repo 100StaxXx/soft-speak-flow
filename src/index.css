@@ -394,6 +394,18 @@ All colors MUST be HSL.
       @apply bg-background text-foreground;
       font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       transition: background-color 0.3s ease, color 0.3s ease;
+      
+      /* Prevent text selection app-wide for mobile game experience */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Allow text selection in input fields */
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text;
+      user-select: text;
     }
 
     html.walkthrough-scroll-locked,
