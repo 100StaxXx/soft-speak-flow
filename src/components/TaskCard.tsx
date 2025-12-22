@@ -27,6 +27,7 @@ interface TaskCardProps {
   isMainQuest?: boolean;
   isTutorialQuest?: boolean;
   streakMultiplier?: number;
+  isToggling?: boolean;
 }
 
 export const TaskCard = ({
@@ -39,6 +40,7 @@ export const TaskCard = ({
   isMainQuest,
   isTutorialQuest,
   streakMultiplier = 1,
+  isToggling = false,
 }: TaskCardProps) => {
   const [showXP, setShowXP] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
@@ -241,13 +243,20 @@ export const TaskCard = ({
           )}
           <button
             onClick={() => {
+              if (isToggling) return;
               haptics.success();
               onToggle();
             }}
-            className="flex-shrink-0 touch-manipulation active:scale-95 transition-transform relative z-10"
+            disabled={isToggling}
+            className={cn(
+              "flex-shrink-0 touch-manipulation active:scale-95 transition-transform relative z-10",
+              isToggling && "opacity-50 cursor-not-allowed"
+            )}
             aria-label={task.completed ? "Mark task as incomplete" : "Mark task as complete"}
           >
-            {task.completed ? (
+            {isToggling ? (
+              <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            ) : task.completed ? (
               <CheckCircle2 className={cn(
                 "h-6 w-6 transition-all",
                 isMainQuest ? "text-[hsl(45,100%,60%)]" : "text-green-500"

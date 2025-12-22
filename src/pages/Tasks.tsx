@@ -102,6 +102,7 @@ export default function Tasks() {
     deleteTask,
     setMainQuest,
     isAdding,
+    isToggling,
     completedCount,
     totalCount 
   } = useDailyTasks(selectedDate);
@@ -538,6 +539,7 @@ export default function Tasks() {
                 onSetMainQuest={setMainQuest}
                 onAddQuest={() => openAddSheet()}
                 tutorialQuestId={tutorialQuestId}
+                isToggling={isToggling}
               />
             </Card>
 

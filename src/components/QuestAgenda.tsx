@@ -25,6 +25,7 @@ interface QuestAgendaProps {
   onAddQuest?: () => void;
   onQuickAdd?: (preset: { text: string; difficulty: "easy" | "medium" | "hard" }) => void;
   tutorialQuestId?: string;
+  isToggling?: boolean;
 }
 
 // Thematic section headers
@@ -56,6 +57,7 @@ export function QuestAgenda({
   onAddQuest,
   onQuickAdd,
   tutorialQuestId,
+  isToggling = false,
 }: QuestAgendaProps) {
   const { currentStreak, multiplier } = useStreakMultiplier();
   const completedCount = tasks.filter(t => t.completed).length;
@@ -132,6 +134,7 @@ export function QuestAgenda({
       isMainQuest={isMainQuest}
       isTutorialQuest={task.id === tutorialQuestId}
       streakMultiplier={multiplier}
+      isToggling={isToggling}
     />
   );
 
