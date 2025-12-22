@@ -46,11 +46,21 @@ interface TrailParticle {
 type Direction = 'up' | 'down' | 'left' | 'right';
 
 const GRID_SIZE = 10;
-const CELL_SIZE = 32;
+const DEFAULT_CELL_SIZE = 28; // Default cell size
+const CELL_SIZE = DEFAULT_CELL_SIZE; // Used by sub-components
 const TRAIL_LIFETIME = 600;
 const MAX_TRAIL_PARTICLES = 30;
 const MIN_SWIPE_DISTANCE = 30;
 const INTERPOLATION_STEPS = 8; // Smoothness - higher = smoother movement
+
+// Dynamic cell size based on viewport height
+const getCellSize = () => {
+  if (typeof window === 'undefined') return 28;
+  const vh = window.innerHeight;
+  if (vh < 600) return 24;
+  if (vh < 700) return 26;
+  return 28;
+};
 
 // D-Pad button component
 const DPadButton = memo(({ 
@@ -79,7 +89,7 @@ const DPadButton = memo(({
   
   return (
     <button
-      className={`absolute ${positions[direction]} w-16 h-16 rounded-xl 
+      className={`absolute ${positions[direction]} w-12 h-12 rounded-lg 
         bg-primary/20 border border-primary/40 backdrop-blur-sm
         active:bg-primary/40 active:scale-95 transition-all
         flex items-center justify-center touch-manipulation
@@ -93,7 +103,7 @@ const DPadButton = memo(({
       }}
       disabled={disabled}
     >
-      <Icon className="w-8 h-8 text-primary" />
+      <Icon className="w-6 h-6 text-primary" />
     </button>
   );
 });
@@ -477,6 +487,9 @@ export const SoulSerpentGame = ({
   const animationFrameRef = useRef<number | null>(null);
   const lastMoveTimeRef = useRef<number>(0);
 
+  // Dynamic cell size based on viewport
+  const cellSize = useMemo(() => getCellSize(), []);
+  
   // Speed based on difficulty (slower for smoother feel)
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const adjustedSpeed = diffConfig.baseSpeed * (1 - questIntervalScale * 0.1);
@@ -810,8 +823,8 @@ export const SoulSerpentGame = ({
     const clickY = e.clientY - rect.top;
     
     const head = snake[0];
-    const headPixelX = head.x * CELL_SIZE + CELL_SIZE / 2;
-    const headPixelY = head.y * CELL_SIZE + CELL_SIZE / 2;
+    const headPixelX = head.x * cellSize + cellSize / 2;
+    const headPixelY = head.y * cellSize + cellSize / 2;
     
     const deltaX = clickX - headPixelX;
     const deltaY = clickY - headPixelY;
@@ -821,7 +834,7 @@ export const SoulSerpentGame = ({
     } else {
       changeDirection(deltaY > 0 ? 'down' : 'up');
     }
-  }, [gameState, snake, changeDirection]);
+  }, [gameState, snake, changeDirection, cellSize]);
 
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
@@ -838,7 +851,7 @@ export const SoulSerpentGame = ({
     };
   }, []);
 
-  const gridPixelSize = GRID_SIZE * CELL_SIZE;
+  const gridPixelSize = GRID_SIZE * cellSize;
 
   return (
     <GameStyleWrapper>
@@ -867,19 +880,6 @@ export const SoulSerpentGame = ({
           onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
         />
 
-        {/* Score display */}
-        <div className="flex items-center gap-4 mb-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500/30">
-            <span className="text-yellow-400">✨</span>
-            <span className="text-sm font-bold text-yellow-400">{score}</span>
-          </div>
-          {highScore > 0 && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/30">
-              <span className="text-[10px] text-muted-foreground">Best:</span>
-              <span className="text-xs font-semibold text-foreground">{highScore}</span>
-            </div>
-          )}
-        </div>
 
         {/* Game Grid */}
         <motion.div
@@ -924,7 +924,7 @@ export const SoulSerpentGame = ({
                 linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
                 linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px)
               `,
-              backgroundSize: `${CELL_SIZE}px ${CELL_SIZE}px`,
+              backgroundSize: `${cellSize}px ${cellSize}px`,
             }}
           />
 
@@ -957,10 +957,10 @@ export const SoulSerpentGame = ({
           </AnimatePresence>
         </motion.div>
 
-        {/* D-Pad Controls */}
+        {/* D-Pad Controls - Compact */}
         <div 
-          className="relative mt-4"
-          style={{ width: 192, height: 192 }}
+          className="relative mt-2"
+          style={{ width: 140, height: 140 }}
         >
           <DPadButton direction="up" onPress={changeDirection} disabled={gameState !== 'playing'} />
           <DPadButton direction="down" onPress={changeDirection} disabled={gameState !== 'playing'} />
@@ -968,12 +968,12 @@ export const SoulSerpentGame = ({
           <DPadButton direction="right" onPress={changeDirection} disabled={gameState !== 'playing'} />
           
           {/* Center indicator */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-lg bg-muted/30 border border-border/30" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-md bg-muted/30 border border-border/30" />
         </div>
 
         {/* Control hint */}
-        <p className="mt-3 text-xs text-muted-foreground text-center">
-          Use D-Pad or swipe on grid • Walls wrap around!
+        <p className="mt-2 text-xs text-muted-foreground text-center">
+          Swipe or D-Pad • Walls wrap!
         </p>
 
         {/* CSS animations */}
