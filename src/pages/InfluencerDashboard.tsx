@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Share } from "@capacitor/share";
@@ -136,8 +137,31 @@ const InfluencerDashboard = () => {
     activeSubscribers: conversions?.filter(c => c.subscription_status === "active").length || 0,
     totalEarnings: payouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
     pendingEarnings: payouts?.filter(p => p.status === "pending").reduce((sum, p) => sum + Number(p.amount), 0) || 0,
+    requestedEarnings: payouts?.filter(p => p.status === "requested").reduce((sum, p) => sum + Number(p.amount), 0) || 0,
     paidEarnings: payouts?.filter(p => p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0) || 0,
   };
+
+  const queryClient = useQueryClient();
+
+  // Request payout mutation
+  const requestPayoutMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("request-referral-payout", {
+        body: { referral_code: verifiedCode },
+      });
+      
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || "Payout request submitted!");
+      queryClient.invalidateQueries({ queryKey: ["influencer-payouts"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to request payout");
+    },
+  });
 
   const handleVerifyCode = () => {
     if (!codeInput.trim()) {
@@ -440,12 +464,38 @@ const InfluencerDashboard = () => {
 
             {stats.pendingEarnings >= 50 && (
               <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <p className="text-sm font-medium text-green-600">
-                  🎉 You've reached the $50 payout threshold!
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-green-600">
+                      🎉 You've reached the $50 payout threshold!
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Request your payout to be sent to {referralCode.payout_identifier}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => requestPayoutMutation.mutate()}
+                    disabled={requestPayoutMutation.isPending}
+                    className="shrink-0"
+                  >
+                    {requestPayoutMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Banknote className="h-4 w-4 mr-2" />
+                    )}
+                    Request Payout
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {stats.requestedEarnings > 0 && (
+              <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-sm font-medium text-blue-600">
+                  ⏳ Payout of ${stats.requestedEarnings.toFixed(2)} is pending review
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Your payout will be processed once approved by our team and sent to{" "}
-                  {referralCode.payout_identifier}
+                  Our team will process your payout request shortly.
                 </p>
               </div>
             )}

@@ -28,7 +28,7 @@ export function useBattleHistory() {
       
       const { data, error } = await supabase
         .from('battle_history')
-        .insert({
+        .insert([{
           user_id: user.id,
           opponent_type: params.opponentType,
           opponent_id: params.opponentId || null,
@@ -38,10 +38,10 @@ export function useBattleHistory() {
           damage_dealt: params.damageDealt,
           damage_received: params.damageReceived,
           xp_earned: params.xpEarned,
-          rewards_claimed: params.rewards,
-          battle_log: params.battleLog,
+          rewards_claimed: JSON.parse(JSON.stringify(params.rewards)),
+          battle_log: JSON.parse(JSON.stringify(params.battleLog)),
           completed_at: new Date().toISOString(),
-        })
+        }])
         .select()
         .single();
       
