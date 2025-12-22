@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
 import { Card, CardContent } from "@/components/ui/card";
@@ -120,13 +120,36 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
   const habitLimit = getHabitLimitForTier(template.difficulty_tier);
   const displayedHabits = template.habits.slice(0, habitLimit);
 
+  // Track touch start position to differentiate tap from scroll
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const moveThreshold = 10; // pixels
+
   const handleSelect = useCallback(() => {
     onSelect(template);
   }, [onSelect, template]);
 
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  }, []);
+
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    handleSelect();
+    if (!touchStartRef.current) return;
+
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = Math.abs(endX - touchStartRef.current.x);
+    const deltaY = Math.abs(endY - touchStartRef.current.y);
+
+    // Only trigger selection if finger didn't move much (it was a tap, not a scroll)
+    if (deltaX < moveThreshold && deltaY < moveThreshold) {
+      e.preventDefault();
+      handleSelect();
+    }
+
+    touchStartRef.current = null;
   }, [handleSelect]);
 
   return (
@@ -137,6 +160,7 @@ const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
         featured && "ring-2 ring-primary/50"
       )}
       onClick={handleSelect}
+      onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       role="button"
       tabIndex={0}
