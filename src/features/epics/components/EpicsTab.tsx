@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Target, Trophy, Users, Castle, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,6 +15,8 @@ import { useEpics } from "@/hooks/useEpics";
 import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
+const MAX_EPICS = 2;
+
 export function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
   const [createEpicDialogOpen, setCreateEpicDialogOpen] = useState(false);
@@ -21,6 +24,8 @@ export function EpicsTab() {
   const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('epics');
+  
+  const hasReachedLimit = activeEpics.length >= MAX_EPICS;
 
   const handleSelectTemplate = (template: EpicTemplate) => {
     setSelectedTemplate(template);
@@ -35,7 +40,13 @@ export function EpicsTab() {
         <div className="flex gap-2 w-full overflow-hidden">
           <Button
             onClick={() => setTemplatesDialogOpen(true)}
-            className="flex-1 min-w-0 bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02] text-xs font-bold"
+            disabled={hasReachedLimit}
+            className={cn(
+              "flex-1 min-w-0 text-xs font-bold",
+              hasReachedLimit 
+                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                : "bg-gradient-to-r from-primary via-purple-600 to-primary hover:from-primary/90 hover:via-purple-600/90 hover:to-primary/90 shadow-lg shadow-primary/50 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300 hover:scale-[1.02]"
+            )}
           >
             <Star className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
             Star Paths
@@ -43,6 +54,7 @@ export function EpicsTab() {
           <Button
             onClick={() => setCreateEpicDialogOpen(true)}
             variant="outline"
+            disabled={hasReachedLimit}
             className="flex-1 min-w-0 h-auto py-3 text-xs font-medium"
           >
             <Castle className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
@@ -56,6 +68,11 @@ export function EpicsTab() {
             <Users className="w-3.5 h-3.5" />
           </Button>
         </div>
+        {hasReachedLimit && (
+          <p className="text-xs text-amber-500 text-center mt-3">
+            You can only have {MAX_EPICS} active Star Paths at a time. Complete or abandon one to start a new journey.
+          </p>
+        )}
       </Card>
 
       {/* Active Epics */}
