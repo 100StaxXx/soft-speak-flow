@@ -77,7 +77,7 @@ class AmbientMusicManager {
         // Global mute turned off - restore ambient music if not locally muted
         if (!this.isMuted && this.isPlaying) {
           // Restore volume immediately (muted property already set above)
-          this.audio.volume = this.isDucked ? this.volume * 0.05 : this.volume;
+          this.audio.volume = this.isDucked ? this.volume * 0.02 : this.volume;
         } else if (!this.isMuted && !this.isPlaying) {
           this.play();
         }
@@ -302,7 +302,7 @@ class AmbientMusicManager {
     // Apply volume immediately if not muted
     if (this.audio && !this.shouldMute()) {
       // If ducked, apply ducked ratio, otherwise full volume
-      this.audio.volume = this.isDucked ? this.volume * 0.05 : this.volume;
+      this.audio.volume = this.isDucked ? this.volume * 0.02 : this.volume;
     }
   }
 
@@ -365,7 +365,7 @@ class AmbientMusicManager {
         setTimeout(() => { this.isMuting = false; }, 2000);
       } else {
         // Set to ducked volume
-        this.audio.volume = this.volume * 0.05;
+        this.audio.volume = this.volume * 0.02;
         this.isMuting = false;
       }
     } else {
@@ -557,7 +557,7 @@ class AmbientMusicManager {
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
     // Use ducked volume if currently ducked, otherwise use normal volume
-    const targetVolume = this.isDucked ? this.volume * 0.05 : this.volume;
+    const targetVolume = this.isDucked ? this.volume * 0.02 : this.volume;
     const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
     const stepDuration = duration / steps;
     const volumeIncrement = targetVolume / steps;
@@ -624,7 +624,7 @@ class AmbientMusicManager {
     
     this.isDucking = true;
     this.isDucked = true;
-    const duckedVolume = this.volume * 0.05; // Reduce to 5% of original for clearer pep talk audio
+    const duckedVolume = this.volume * 0.02; // Reduce to 2% of original for clearer pep talk audio
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
     
