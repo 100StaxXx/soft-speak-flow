@@ -453,6 +453,65 @@ export type Database = {
           },
         ]
       }
+      battle_history: {
+        Row: {
+          battle_log: Json | null
+          cards_used: string[]
+          completed_at: string | null
+          damage_dealt: number | null
+          damage_received: number | null
+          id: string
+          opponent_id: string | null
+          opponent_type: string
+          result: string
+          rewards_claimed: Json | null
+          started_at: string
+          turns_taken: number | null
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          battle_log?: Json | null
+          cards_used: string[]
+          completed_at?: string | null
+          damage_dealt?: number | null
+          damage_received?: number | null
+          id?: string
+          opponent_id?: string | null
+          opponent_type: string
+          result: string
+          rewards_claimed?: Json | null
+          started_at?: string
+          turns_taken?: number | null
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          battle_log?: Json | null
+          cards_used?: string[]
+          completed_at?: string | null
+          damage_dealt?: number | null
+          damage_received?: number | null
+          id?: string
+          opponent_id?: string | null
+          opponent_type?: string
+          result?: string
+          rewards_claimed?: Json | null
+          started_at?: string
+          turns_taken?: number | null
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       battle_matches: {
         Row: {
           completed_at: string | null
@@ -620,6 +679,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      card_move_assignments: {
+        Row: {
+          card_id: string
+          id: string
+          move_id: string
+          slot_number: number
+          unlocked_at: string
+        }
+        Insert: {
+          card_id: string
+          id?: string
+          move_id: string
+          slot_number?: number
+          unlocked_at?: string
+        }
+        Update: {
+          card_id?: string
+          id?: string
+          move_id?: string
+          slot_number?: number
+          unlocked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_move_assignments_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "companion_evolution_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_move_assignments_move_id_fkey"
+            columns: ["move_id"]
+            isOneToOne: false
+            referencedRelation: "card_moves"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_moves: {
+        Row: {
+          accuracy: number
+          base_power: number
+          cooldown_turns: number | null
+          created_at: string
+          description: string | null
+          element: string
+          energy_cost: number
+          id: string
+          move_type: string
+          name: string
+          status_chance: number | null
+          status_effect: string | null
+        }
+        Insert: {
+          accuracy?: number
+          base_power?: number
+          cooldown_turns?: number | null
+          created_at?: string
+          description?: string | null
+          element: string
+          energy_cost?: number
+          id?: string
+          move_type?: string
+          name: string
+          status_chance?: number | null
+          status_effect?: string | null
+        }
+        Update: {
+          accuracy?: number
+          base_power?: number
+          cooldown_turns?: number | null
+          created_at?: string
+          description?: string | null
+          element?: string
+          energy_cost?: number
+          id?: string
+          move_type?: string
+          name?: string
+          status_chance?: number | null
+          status_effect?: string | null
+        }
+        Relationships: []
       }
       challenge_progress: {
         Row: {
