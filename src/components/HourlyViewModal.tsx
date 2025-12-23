@@ -15,6 +15,7 @@ interface HourlyViewModalProps {
   tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
+  onTaskLongPress?: (taskId: string) => void;
 }
 
 export function HourlyViewModal({
@@ -25,6 +26,7 @@ export function HourlyViewModal({
   tasks,
   onTaskDrop,
   onTimeSlotLongPress,
+  onTaskLongPress,
 }: HourlyViewModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isToday = isSameDay(selectedDate, new Date());
@@ -101,6 +103,7 @@ export function HourlyViewModal({
             tasks={tasks}
             onTaskDrop={onTaskDrop}
             onTimeSlotLongPress={onTimeSlotLongPress}
+            onTaskLongPress={onTaskLongPress}
             fullDayMode
             hideHeader
           />

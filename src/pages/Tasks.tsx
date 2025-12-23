@@ -604,8 +604,16 @@ export default function Tasks() {
           queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
         }}
         onTimeSlotLongPress={(date, time) => {
+          // Keep modal open - AddQuestSheet will appear over it
+          openAddSheet(time);
+        }}
+        onTaskLongPress={(taskId) => {
+          // Close modal and open edit dialog for the task
           setShowHourlyModal(false);
-          setTimeout(() => openAddSheet(time), 150);
+          const task = allCalendarTasks.find(t => t.id === taskId);
+          if (task) {
+            setEditingTask(task as typeof tasks[0]);
+          }
         }}
       />
 
