@@ -25,6 +25,8 @@ interface AskMentorChatProps {
   mentorId?: string;
   hasActiveHabits?: boolean;
   hasActiveChallenges?: boolean;
+  briefingContext?: string;
+  comprehensiveMode?: boolean;
 }
 
 const getSmartPrompts = (
@@ -68,7 +70,9 @@ export const AskMentorChat = ({
   mentorTone,
   mentorId,
   hasActiveHabits = false,
-  hasActiveChallenges = false
+  hasActiveChallenges = false,
+  briefingContext,
+  comprehensiveMode = false
 }: AskMentorChatProps) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -119,7 +123,9 @@ export const AskMentorChat = ({
           message: text,
           mentorName,
           mentorTone,
-          conversationHistory: currentMessages.slice(-10)
+          conversationHistory: currentMessages.slice(-10),
+          comprehensiveMode,
+          briefingContext,
         },
       });
 
@@ -188,7 +194,7 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline, comprehensiveMode, briefingContext]);
 
   useEffect(() => {
     // Check today's message count on mount only
