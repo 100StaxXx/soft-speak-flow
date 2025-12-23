@@ -17,9 +17,9 @@ export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRout
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Redirect to auth if not logged in
+    // Redirect to welcome page if not logged in (for App Store compliance)
     if (!authLoading && !user) {
-      navigate("/auth");
+      navigate("/welcome");
     }
   }, [user, authLoading, navigate]);
 

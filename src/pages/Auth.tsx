@@ -781,7 +781,7 @@ const Auth = () => {
             )}
 
 
-            <div className="text-center">
+            <div className="text-center space-y-3">
               <Button
                 variant="link"
                 onClick={() => {
@@ -799,6 +799,17 @@ const Auth = () => {
                   ? "Back to Sign In" 
                   : isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
               </Button>
+              
+              {/* Continue as Guest - for App Store compliance */}
+              <div className="pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate("/preview")}
+                  className="text-muted-foreground hover:text-foreground text-sm"
+                >
+                  Continue as Guest
+                </Button>
+              </div>
             </div>
           </div>
         </div>
