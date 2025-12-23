@@ -104,20 +104,11 @@ export const StellarFlowGame = ({
     return () => clearInterval(interval);
   }, [startTime, isComplete]);
   
-  // Check if puzzle is solved
+  // Check if puzzle is solved - only requires all pairs to be connected
   const checkSolution = useCallback(() => {
     if (!puzzle) return false;
     
-    // Check all cells are filled
-    for (const row of grid) {
-      for (const cell of row) {
-        if (!cell.isEndpoint && cell.pathColor === null) {
-          return false;
-        }
-      }
-    }
-    
-    // Check all pairs are connected
+    // Check all pairs are connected (no need for 100% grid fill)
     for (const pair of puzzle.pairs) {
       const pathForColor = paths.get(pair.color);
       if (!pathForColor || pathForColor.length < 2) {
@@ -128,20 +119,20 @@ export const StellarFlowGame = ({
       const first = pathForColor[0];
       const last = pathForColor[pathForColor.length - 1];
       
-      const startsCorrect = 
+      const connectsStart = 
         (first.row === pair.start.row && first.col === pair.start.col) ||
-        (first.row === pair.end.row && first.col === pair.end.col);
-      const endsCorrect = 
-        (last.row === pair.start.row && last.col === pair.start.col) ||
+        (last.row === pair.start.row && last.col === pair.start.col);
+      const connectsEnd = 
+        (first.row === pair.end.row && first.col === pair.end.col) ||
         (last.row === pair.end.row && last.col === pair.end.col);
       
-      if (!startsCorrect || !endsCorrect) {
+      if (!connectsStart || !connectsEnd) {
         return false;
       }
     }
     
     return true;
-  }, [puzzle, grid, paths]);
+  }, [puzzle, paths]);
   
   // Handle victory
   useEffect(() => {
