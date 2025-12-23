@@ -551,6 +551,7 @@ export default function AstralArcade() {
         case 'soul_serpent': return SoulSerpentGame;
         case 'orb_match': return OrbMatchGame;
         case 'galactic_match': return GalacticMatchGame;
+        case 'cosmiq_grid': return CosmiqGridGame;
         default: return null;
       }
     })();
