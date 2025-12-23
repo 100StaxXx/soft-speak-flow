@@ -14,7 +14,7 @@ import {
   Loader2, 
   Brain,
   TrendingUp,
-  RefreshCw
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +38,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   } = useMorningBriefing();
   
   const [showFull, setShowFull] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Mark as viewed when component mounts with a briefing
   useEffect(() => {
@@ -47,10 +47,10 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
     }
   }, [briefing?.id]);
 
-  // Check if already dismissed
+  // Start collapsed if already dismissed
   useEffect(() => {
     if (briefing?.dismissed_at) {
-      setIsDismissed(true);
+      setIsCollapsed(true);
     }
   }, [briefing?.dismissed_at]);
 
@@ -70,7 +70,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   const handleDismiss = async () => {
     if (!briefing) return;
     
-    setIsDismissed(true);
+    setIsCollapsed(true);
     try {
       await dismissBriefing.mutateAsync(briefing.id);
     } catch (error) {
@@ -97,22 +97,39 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
     });
   };
 
-  // Already dismissed state - show minimal card
-  if (isDismissed && briefing) {
+  // Collapsed state - show minimized preview that can be expanded
+  if (isCollapsed && briefing) {
     return (
-      <Card className={cn("p-4 bg-muted/30 border-border/50", className)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Check className="h-4 w-4 text-primary" />
-            <span className="text-sm">Morning briefing reviewed</span>
+      <Card 
+        className={cn(
+          "p-4 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors",
+          className
+        )}
+        onClick={() => setIsCollapsed(false)}
+      >
+        <div className="flex items-center gap-3">
+          {personality && (
+            <MentorAvatar
+              mentorSlug={(personality.slug || '').toLowerCase()}
+              mentorName={personality.name}
+              primaryColor={personality.primary_color || '#000'}
+              avatarUrl={personality.avatar_url || undefined}
+              size="sm"
+              showBorder={true}
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm">Morning Briefing</h3>
+              <Check className="h-4 w-4 text-primary" />
+            </div>
+            {briefing.todays_focus && (
+              <p className="text-xs text-muted-foreground truncate">
+                Focus: {briefing.todays_focus}
+              </p>
+            )}
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setIsDismissed(false)}
-          >
-            View again
-          </Button>
+          <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
         </div>
       </Card>
     );
