@@ -458,7 +458,7 @@ export const EclipseTimingGame = ({
         for (let i = 0; i < notes.length; i++) {
           const note = notes[i];
           if (!note.hit && !note.missed && note.y >= -15 && note.y <= 105) {
-            visible.push(note);
+            visible.push({ ...note });
           }
         }
         setVisibleNotes(visible);
