@@ -140,6 +140,19 @@ const RESULT_CONFIG = {
   },
 };
 
+// Game-specific title overrides for different result types
+const GAME_TITLE_OVERRIDES: Partial<Record<MiniGameType, Partial<Record<'perfect' | 'good' | 'fail' | 'practice', string>>>> = {
+  // Puzzle completion games - "Cleared!" instead of "Perfect!"
+  cosmiq_grid: { perfect: 'Cleared!', good: 'Cleared!' },
+  stellar_flow: { perfect: 'Cleared!', good: 'Cleared!' },
+  
+  // Endless/survival games - "Good Run!" instead of "Perfect!"
+  starfall_dodge: { perfect: 'Good Run!', good: 'Nice Try!' },
+  astral_frequency: { perfect: 'Good Run!', good: 'Nice Try!' },
+  soul_serpent: { perfect: 'Good Run!', good: 'Nice Try!' },
+  energy_beam: { perfect: 'Good Run!', good: 'Nice Try!' },
+};
+
 export function GameSummaryModal({
   isOpen,
   gameType,
@@ -157,6 +170,9 @@ export function GameSummaryModal({
   const gameConfig = GAME_STAT_CONFIG[gameType];
   const ResultIcon = resultConfig.icon;
   const showCelebration = effectiveResult !== 'fail';
+  
+  // Get game-specific title override if it exists
+  const displayTitle = GAME_TITLE_OVERRIDES[gameType]?.[effectiveResult] || resultConfig.title;
 
   // Get stats to display
   const statsToShow = Object.entries(gameConfig?.statLabels || {}).filter(
@@ -231,7 +247,7 @@ export function GameSummaryModal({
               transition={{ delay: 0.15 }}
               className={`text-3xl font-bold text-center ${resultConfig.color} mb-1`}
             >
-              {resultConfig.title}
+              {displayTitle}
             </motion.h2>
 
             {/* Game Name */}
