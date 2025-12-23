@@ -100,18 +100,33 @@ Deno.serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    const { data: mentor } = await supabase
-      .from('mentors')
-      .select('id, name, tone_description, personality_traits')
-      .eq('id', profile?.selected_mentor_id)
-      .single();
-
-    if (!mentor) {
-      return new Response(
-        JSON.stringify({ error: "No mentor selected" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let mentor = null;
+    if (profile?.selected_mentor_id) {
+      const { data: mentorData } = await supabase
+        .from('mentors')
+        .select('id, name, tone_description, personality_traits')
+        .eq('id', profile.selected_mentor_id)
+        .single();
+      mentor = mentorData;
     }
+
+    // If no mentor selected, get a default mentor
+    if (!mentor) {
+      const { data: defaultMentor } = await supabase
+        .from('mentors')
+        .select('id, name, tone_description, personality_traits')
+        .limit(1)
+        .single();
+      mentor = defaultMentor;
+    }
+
+    // If still no mentor (empty table), use a fallback
+    const mentorInfo = mentor || {
+      id: null,
+      name: "Your Coach",
+      tone_description: "Supportive, encouraging, and insightful personal coach",
+      personality_traits: ["supportive", "motivating", "empathetic"]
+    };
 
     // Gather comprehensive user activity data
     const sevenDaysAgo = new Date();
@@ -260,9 +275,9 @@ const challenges: ChallengeData[] = (challengesResult.data || []).map(c => ({
     };
 
     // Build the system prompt
-    const systemPrompt = `You are ${mentor.name}, a personal life coach and mentor with the following personality: ${mentor.tone_description}
+    const systemPrompt = `You are ${mentorInfo.name}, a personal life coach and mentor with the following personality: ${mentorInfo.tone_description}
 
-Your traits: ${JSON.stringify(mentor.personality_traits || [])}
+Your traits: ${JSON.stringify(mentorInfo.personality_traits || [])}
 
 You have COMPLETE access to this user's activity data. Your job is to:
 1. ANALYZE their patterns deeply to infer what major life goals they're working toward
@@ -387,7 +402,7 @@ Based on this data, generate a personalized morning briefing. Infer their life g
       .insert({
         user_id: user.id,
         briefing_date: today,
-        mentor_id: mentor.id,
+        mentor_id: mentorInfo.id,
         content: parsedResponse.briefing,
         inferred_goals: parsedResponse.inferredGoals || [],
         todays_focus: parsedResponse.todaysFocus,
@@ -402,7 +417,7 @@ Based on this data, generate a personalized morning briefing. Infer their life g
       // Still return the briefing even if save fails
     }
 
-    console.log(`Generated morning briefing for user ${user.id} with mentor ${mentor.name}`);
+    console.log(`Generated morning briefing for user ${user.id} with mentor ${mentorInfo.name}`);
 
     return new Response(
       JSON.stringify({ 
