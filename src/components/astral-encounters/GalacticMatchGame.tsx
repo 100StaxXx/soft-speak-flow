@@ -65,9 +65,34 @@ const COSMIC_SYMBOLS = [
 
 const MAX_XP = 150;
 
-// Get level configuration - starts at startPairs, adds 1 per level
-const getLevelConfig = (level: number, startPairs: number = 2, revealTimeMultiplier: number = 1.0) => {
-  const pairs = Math.min(level + startPairs - 1, 15); // Level 1 = startPairs, caps at 15
+// Get level configuration
+// Before 3 pairs: 1 puzzle each
+// At 3+ pairs: 2 puzzles each (round 1 and round 2)
+const getLevelConfig = (level: number, round: number = 1, startPairs: number = 2, revealTimeMultiplier: number = 1.0) => {
+  // Calculate pairs based on level progression:
+  // Level 1 = startPairs (e.g., 2)
+  // Level 2 = startPairs + 1 (e.g., 3) - this is where 2 rounds start if startPairs < 3
+  // After reaching 3 pairs, each pair count has 2 rounds
+  
+  let pairs: number;
+  if (startPairs >= 3) {
+    // Hard/Master: starts at 3+ pairs, so always 2 rounds per pair count
+    // Level 1 = startPairs, Level 2 = startPairs (round 2), Level 3 = startPairs+1, etc.
+    pairs = startPairs + Math.floor((level - 1) / 2);
+  } else {
+    // Beginner/Easy/Medium: starts at 2 pairs
+    // Level 1 = 2 pairs (single round)
+    // Level 2-3 = 3 pairs (2 rounds)
+    // Level 4-5 = 4 pairs (2 rounds), etc.
+    if (level === 1) {
+      pairs = startPairs; // 2 pairs, single round
+    } else {
+      // For level 2+, calculate based on 2 rounds per pair count starting at 3 pairs
+      pairs = 3 + Math.floor((level - 2) / 2);
+    }
+  }
+  
+  pairs = Math.min(pairs, 15); // Cap at 15 pairs
   const totalCards = pairs * 2;
   
   // Calculate optimal grid layout
@@ -181,6 +206,7 @@ export const GalacticMatchGame = ({
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const maxLives = MAX_LIVES_BY_DIFFICULTY[difficulty];
   const [level, setLevel] = useState(1);
+  const [round, setRound] = useState(1); // Track round within pair count (1 or 2)
   const [lives, setLives] = useState(diffConfig.startLives);
   const [phase, setPhase] = useState<GamePhase>('countdown');
   const [cards, setCards] = useState<Card[]>([]);
@@ -195,7 +221,7 @@ export const GalacticMatchGame = ({
   const [revealCountdown, setRevealCountdown] = useState(0);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
   
-  const config = useMemo(() => getLevelConfig(level, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, diffConfig]);
+  const config = useMemo(() => getLevelConfig(level, round, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, round, diffConfig]);
 
   // Initialize/shuffle cards for current level
   const initializeCards = useCallback((startFlipped: boolean = false) => {
@@ -281,7 +307,7 @@ export const GalacticMatchGame = ({
       const levelBonus = 15 * level;
       setScore(prev => prev + levelBonus);
       
-      // Move to next level after delay
+      // Move to next level/round after delay
       setTimeout(() => {
         // In practice mode, end after completing 2 levels
         if (isPractice && level >= 2) {
@@ -299,8 +325,25 @@ export const GalacticMatchGame = ({
           return;
         }
         
-        const nextLevel = level + 1;
-        const nextConfig = getLevelConfig(nextLevel, diffConfig.startPairs, diffConfig.revealTimeMultiplier);
+        // Determine if we should repeat this pair count or advance
+        const currentPairs = config.pairs;
+        const shouldRepeat = currentPairs >= 3 && round === 1;
+        
+        let nextLevel: number;
+        let nextRound: number;
+        let nextConfig;
+        
+        if (shouldRepeat) {
+          // Same pair count, round 2
+          nextLevel = level + 1;
+          nextRound = 2;
+          nextConfig = getLevelConfig(nextLevel, nextRound, diffConfig.startPairs, diffConfig.revealTimeMultiplier);
+        } else {
+          // Move to next pair count, round 1
+          nextLevel = level + 1;
+          nextRound = 1;
+          nextConfig = getLevelConfig(nextLevel, nextRound, diffConfig.startPairs, diffConfig.revealTimeMultiplier);
+        }
         
         // Generate new shuffled cards for next level, starting flipped for memorization
         const symbolIndices = Array.from({ length: nextConfig.pairs }, (_, i) => i % COSMIC_SYMBOLS.length);
@@ -322,11 +365,12 @@ export const GalacticMatchGame = ({
         setCombo(0);
         
         setLevel(nextLevel);
+        setRound(nextRound);
         setPhase('revealing');
         setRevealCountdown(Math.ceil(nextConfig.revealTime));
       }, 1500);
     }
-  }, [matchedPairs, config.pairs, phase, level, isPractice, onComplete, mistakesThisLevel, onDamage]);
+  }, [matchedPairs, config.pairs, phase, level, round, isPractice, onComplete, mistakesThisLevel, onDamage, diffConfig]);
 
   // Handle game over
   useEffect(() => {
@@ -473,13 +517,19 @@ export const GalacticMatchGame = ({
         <div className="flex items-center gap-1">
           {!compact && <span className="text-muted-foreground text-[10px]">Level</span>}
           <motion.span 
-            key={level}
+            key={`${level}-${round}`}
             initial={{ scale: 1.5, color: 'hsl(var(--primary))' }}
             animate={{ scale: 1, color: 'hsl(var(--foreground))' }}
             className={`font-bold ${compact ? 'text-sm' : 'text-base'}`}
           >
             {compact ? `Lv${level}` : level}
           </motion.span>
+          {/* Show round indicator when there are 2 rounds per pair count (3+ pairs) */}
+          {config.pairs >= 3 && (
+            <span className="text-muted-foreground text-[10px] ml-0.5">
+              ({round}/2)
+            </span>
+          )}
         </div>
 
         {/* Lives - compact */}
