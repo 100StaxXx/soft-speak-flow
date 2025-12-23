@@ -150,7 +150,7 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
   },
   stellar_flow: {
     icon: Target,
-    title: "Stellar Flow",
+    title: "Pathfinder",
     goal: "Connect matching orbs with flowing paths!",
     howToPlay: [
       "Drag from one orb to its matching pair",

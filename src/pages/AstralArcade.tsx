@@ -69,7 +69,7 @@ const GAMES = [
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
   { type: 'orb_match' as MiniGameType, label: 'Starburst', icon: Grid3X3, stat: 'mind' as const },
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
-  { type: 'stellar_flow' as MiniGameType, label: 'Stellar Flow', icon: GitBranch, stat: 'soul' as const },
+  { type: 'stellar_flow' as MiniGameType, label: 'Pathfinder', icon: GitBranch, stat: 'soul' as const },
 ];
 
 type Difficulty = ArcadeDifficulty;

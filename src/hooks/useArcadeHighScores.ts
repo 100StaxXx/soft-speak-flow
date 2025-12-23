@@ -7,6 +7,7 @@ export const GAME_METRICS: Record<MiniGameType, {
   label: string; 
   format: (value: number) => string;
   icon: string;
+  lowerIsBetter?: boolean; // For time-based games where faster = better
 }> = {
   astral_frequency: { label: 'Distance', format: v => `${Math.round(v)}m`, icon: '🚀' },
   galactic_match: { label: 'Level', format: v => `Lvl ${Math.round(v)}`, icon: '🧠' },
@@ -16,8 +17,8 @@ export const GAME_METRICS: Record<MiniGameType, {
   tap_sequence: { label: 'Level', format: v => `Lvl ${Math.round(v)}`, icon: '🔢' },
   starfall_dodge: { label: 'Time', format: v => `${Math.round(v)}s`, icon: '⭐' },
   orb_match: { label: 'Score', format: v => Math.round(v).toLocaleString(), icon: '💎' },
-  cosmiq_grid: { label: 'Best Time', format: v => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}`, icon: '🧩' },
-  stellar_flow: { label: 'Best Time', format: v => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}`, icon: '🔗' },
+  cosmiq_grid: { label: 'Best Time', format: v => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}`, icon: '🧩', lowerIsBetter: true },
+  stellar_flow: { label: 'Best Time', format: v => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}`, icon: '🔗', lowerIsBetter: true },
 };
 
 interface HighScoreEntry {
@@ -103,9 +104,13 @@ export const useArcadeHighScores = () => {
       const key = getStorageKey(gameType, difficulty);
       const existing = highScores[key];
       
-      // Only update if this is a new high score
-      if (existing && existing.value >= value) {
-        return false;
+      // For time-based games, lower is better; for others, higher is better
+      const isLowerBetter = metric.lowerIsBetter === true;
+      if (existing) {
+        const isBetter = isLowerBetter ? value < existing.value : value > existing.value;
+        if (!isBetter) {
+          return false;
+        }
       }
 
       const newScore: HighScoreEntry = {
