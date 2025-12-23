@@ -3475,18 +3475,21 @@ export type Database = {
           email: string
           id: string
           ip_address: string
+          request_type: string | null
         }
         Insert: {
           created_at?: string | null
           email: string
           id?: string
           ip_address: string
+          request_type?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string
           id?: string
           ip_address?: string
+          request_type?: string | null
         }
         Relationships: []
       }

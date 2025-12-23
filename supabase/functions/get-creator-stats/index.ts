@@ -123,7 +123,7 @@ serve(async (req) => {
       .eq('is_active', true);
 
     if (email) {
-      query = query.eq('email', email.toLowerCase());
+      query = query.eq('influencer_email', email.toLowerCase());
     } else if (referral_code) {
       query = query.ilike('code', referral_code);
     }
@@ -144,7 +144,7 @@ serve(async (req) => {
     // Fetch payout history for this referral code
     const { data: payouts, error: payoutsError } = await supabaseClient
       .from('referral_payouts')
-      .select('amount, status, created_at, paid_at, plan')
+      .select('amount, status, created_at, paid_at, payout_type')
       .eq('referral_code_id', codeData.id)
       .order('created_at', { ascending: false })
       .limit(20);
@@ -172,8 +172,8 @@ serve(async (req) => {
     // Build response
     const response = {
       code: codeData.code,
-      name: codeData.name || null,
-      handle: codeData.handle || null,
+      name: codeData.influencer_name || null,
+      handle: codeData.influencer_handle || null,
       tier: codeData.tier || 'bronze',
       created_at: codeData.created_at,
       stats: {
@@ -187,7 +187,7 @@ serve(async (req) => {
       payout_history: payoutsList.slice(0, 10).map(p => ({
         amount: p.amount,
         status: p.status,
-        plan: p.plan,
+        payout_type: p.payout_type,
         created_at: p.created_at,
         paid_at: p.paid_at
       }))
