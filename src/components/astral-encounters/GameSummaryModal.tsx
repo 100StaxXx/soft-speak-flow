@@ -109,44 +109,57 @@ const RESULT_CONFIG = {
   perfect: {
     icon: Trophy,
     title: 'Perfect!',
-    color: 'text-yellow-400',
-    bgColor: 'from-yellow-500/20 to-amber-500/20',
-    borderColor: 'border-yellow-500/50',
-    glowColor: 'shadow-yellow-500/30',
+    iconBg: 'bg-gradient-to-br from-yellow-400/30 via-amber-500/20 to-orange-500/30',
+    iconColor: 'text-yellow-300',
+    titleColor: 'text-yellow-300',
+    accentColor: 'from-yellow-400 to-amber-500',
+    cardBorder: 'border-yellow-500/40',
+    cardGlow: 'shadow-[0_0_60px_-12px_rgba(250,204,21,0.4)]',
+    statBg: 'bg-yellow-500/10 border-yellow-500/20',
+    buttonGradient: 'from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400',
   },
   good: {
     icon: Star,
     title: 'Good!',
-    color: 'text-purple-400',
-    bgColor: 'from-purple-500/20 to-pink-500/20',
-    borderColor: 'border-purple-500/50',
-    glowColor: 'shadow-purple-500/30',
+    iconBg: 'bg-gradient-to-br from-purple-400/30 via-violet-500/20 to-pink-500/30',
+    iconColor: 'text-purple-300',
+    titleColor: 'text-purple-300',
+    accentColor: 'from-purple-400 to-pink-500',
+    cardBorder: 'border-purple-500/40',
+    cardGlow: 'shadow-[0_0_60px_-12px_rgba(168,85,247,0.4)]',
+    statBg: 'bg-purple-500/10 border-purple-500/20',
+    buttonGradient: 'from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400',
   },
   fail: {
     icon: X,
     title: 'Try Again',
-    color: 'text-red-400',
-    bgColor: 'from-red-500/20 to-orange-500/20',
-    borderColor: 'border-red-500/50',
-    glowColor: 'shadow-red-500/30',
+    iconBg: 'bg-gradient-to-br from-slate-400/30 via-slate-500/20 to-slate-600/30',
+    iconColor: 'text-slate-300',
+    titleColor: 'text-slate-300',
+    accentColor: 'from-slate-400 to-slate-500',
+    cardBorder: 'border-slate-500/40',
+    cardGlow: 'shadow-[0_0_40px_-12px_rgba(100,116,139,0.3)]',
+    statBg: 'bg-slate-500/10 border-slate-500/20',
+    buttonGradient: 'from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400',
   },
   practice: {
     icon: Target,
     title: 'Practice Complete!',
-    color: 'text-cyan-400',
-    bgColor: 'from-cyan-500/20 to-blue-500/20',
-    borderColor: 'border-cyan-500/50',
-    glowColor: 'shadow-cyan-500/30',
+    iconBg: 'bg-gradient-to-br from-cyan-400/30 via-blue-500/20 to-indigo-500/30',
+    iconColor: 'text-cyan-300',
+    titleColor: 'text-cyan-300',
+    accentColor: 'from-cyan-400 to-blue-500',
+    cardBorder: 'border-cyan-500/40',
+    cardGlow: 'shadow-[0_0_60px_-12px_rgba(34,211,238,0.4)]',
+    statBg: 'bg-cyan-500/10 border-cyan-500/20',
+    buttonGradient: 'from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400',
   },
 };
 
 // Game-specific title overrides for different result types
 const GAME_TITLE_OVERRIDES: Partial<Record<MiniGameType, Partial<Record<'perfect' | 'good' | 'fail' | 'practice', string>>>> = {
-  // Puzzle completion games - "Cleared!" instead of "Perfect!"
   cosmiq_grid: { perfect: 'Cleared!', good: 'Cleared!' },
   stellar_flow: { perfect: 'Cleared!', good: 'Cleared!' },
-  
-  // Endless/survival games - "Good Run!" instead of "Perfect!"
   starfall_dodge: { perfect: 'Good Run!', good: 'Nice Try!' },
   astral_frequency: { perfect: 'Good Run!', good: 'Nice Try!' },
   soul_serpent: { perfect: 'Good Run!', good: 'Nice Try!' },
@@ -159,22 +172,16 @@ export function GameSummaryModal({
   gameLabel,
   result,
   isNewHighScore = false,
-  previousHighScore,
   isPracticeMode = false,
   onPlayAgain,
   onExit,
 }: GameSummaryModalProps) {
-  // In practice mode, use encouraging "practice" config instead of "fail"
   const effectiveResult = isPracticeMode && result.result === 'fail' ? 'practice' : result.result;
-  const resultConfig = RESULT_CONFIG[effectiveResult];
+  const config = RESULT_CONFIG[effectiveResult];
   const gameConfig = GAME_STAT_CONFIG[gameType];
-  const ResultIcon = resultConfig.icon;
-  const showCelebration = effectiveResult !== 'fail';
-  
-  // Get game-specific title override if it exists
-  const displayTitle = GAME_TITLE_OVERRIDES[gameType]?.[effectiveResult] || resultConfig.title;
+  const ResultIcon = config.icon;
+  const displayTitle = GAME_TITLE_OVERRIDES[gameType]?.[effectiveResult] || config.title;
 
-  // Get stats to display
   const statsToShow = Object.entries(gameConfig?.statLabels || {}).filter(
     ([key]) => result.gameStats?.[key as keyof typeof result.gameStats] !== undefined
   );
@@ -186,180 +193,117 @@ export function GameSummaryModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
         >
-          {/* Celebration particles for success */}
-          {showCelebration && (
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              {[...Array(20)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-2 h-2 rounded-full"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    backgroundColor: effectiveResult === 'perfect' 
-                      ? `hsl(${45 + Math.random() * 20}, 100%, ${50 + Math.random() * 30}%)` 
-                      : effectiveResult === 'practice'
-                      ? `hsl(${190 + Math.random() * 20}, 80%, ${50 + Math.random() * 30}%)`
-                      : `hsl(${270 + Math.random() * 30}, 70%, ${50 + Math.random() * 30}%)`,
-                  }}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ 
-                    scale: [0, 1, 0],
-                    opacity: [0, 1, 0],
-                    y: [0, -100 - Math.random() * 100],
-                  }}
-                  transition={{ 
-                    duration: 2 + Math.random(), 
-                    delay: Math.random() * 0.5,
-                    repeat: Infinity,
-                    repeatDelay: Math.random() * 2,
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          {/* Premium backdrop with layered blur */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50" />
 
+          {/* Main card */}
           <motion.div
-            initial={{ scale: 0.8, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.8, y: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className={`relative w-full max-w-sm rounded-2xl border-2 ${resultConfig.borderColor} bg-gradient-to-br ${resultConfig.bgColor} p-6 shadow-xl ${resultConfig.glowColor}`}
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className={`relative w-full max-w-sm overflow-hidden rounded-3xl border ${config.cardBorder} ${config.cardGlow}`}
           >
-            {/* Result Icon */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', delay: 0.1 }}
-              className="flex justify-center mb-4"
-            >
-              <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${resultConfig.bgColor} border-2 ${resultConfig.borderColor} flex items-center justify-center`}>
-                <ResultIcon className={`w-10 h-10 ${resultConfig.color}`} />
-              </div>
-            </motion.div>
+            {/* Glass card background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-white/[0.08] to-white/[0.02] backdrop-blur-2xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent" />
+            
+            {/* Top accent line */}
+            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-32 h-[2px] bg-gradient-to-r ${config.accentColor} rounded-full opacity-80`} />
 
-            {/* Result Title */}
-            <motion.h2
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.15 }}
-              className={`text-3xl font-bold text-center ${resultConfig.color} mb-1`}
-            >
-              {displayTitle}
-            </motion.h2>
-
-            {/* Game Name */}
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-center text-muted-foreground text-sm mb-4"
-            >
-              {gameLabel}
-            </motion.p>
-
-            {/* New High Score Badge */}
-            {isNewHighScore && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.25 }}
-                className="flex justify-center mb-4"
-              >
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 border border-yellow-500/50">
-                  <Award className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm font-bold text-yellow-400">New High Score!</span>
+            {/* Content */}
+            <div className="relative p-8">
+              {/* Icon with premium ring */}
+              <div className="flex justify-center mb-6">
+                <div className={`relative w-24 h-24 rounded-full ${config.iconBg} border border-white/10 flex items-center justify-center`}>
+                  <div className="absolute inset-1 rounded-full border border-white/5" />
+                  <ResultIcon className={`w-11 h-11 ${config.iconColor} drop-shadow-lg`} strokeWidth={1.5} />
                 </div>
-              </motion.div>
-            )}
+              </div>
 
-            {/* Stats Grid */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="grid grid-cols-2 gap-3 mb-4"
-            >
-              {statsToShow.map(([key, config]) => {
-                const value = result.gameStats?.[key as keyof typeof result.gameStats];
-                if (value === undefined) return null;
-                const Icon = config.icon;
-                const displayValue = config.format ? config.format(value as number) : value;
-                
-                return (
-                  <div 
-                    key={key}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10"
-                  >
-                    <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground truncate">{config.label}</p>
-                      <p className="text-sm font-bold text-foreground">{displayValue}</p>
-                    </div>
+              {/* Title */}
+              <h2 className={`text-3xl font-bold text-center ${config.titleColor} tracking-tight mb-1`}>
+                {displayTitle}
+              </h2>
+
+              {/* Game label */}
+              <p className="text-center text-white/50 text-sm font-medium tracking-wide uppercase mb-6">
+                {gameLabel}
+              </p>
+
+              {/* High score badge */}
+              {isNewHighScore && (
+                <div className="flex justify-center mb-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/15 border border-yellow-500/30">
+                    <Award className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm font-semibold text-yellow-400 tracking-wide">New High Score!</span>
                   </div>
-                );
-              })}
-            </motion.div>
+                </div>
+              )}
 
-            {/* Accuracy Bar */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.35 }}
-              className="mb-6"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">Accuracy</span>
-                <span className={`text-sm font-bold ${resultConfig.color}`}>{result.accuracy}%</span>
+              {/* Stats grid */}
+              <div className="grid grid-cols-2 gap-2.5 mb-6">
+                {statsToShow.map(([key, statConfig]) => {
+                  const value = result.gameStats?.[key as keyof typeof result.gameStats];
+                  if (value === undefined) return null;
+                  const Icon = statConfig.icon;
+                  const displayValue = statConfig.format ? statConfig.format(value as number) : value;
+                  
+                  return (
+                    <div 
+                      key={key}
+                      className={`flex items-center gap-3 p-3 rounded-xl ${config.statBg} border`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-white/60" strokeWidth={1.5} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-white/40 font-medium uppercase tracking-wider truncate">{statConfig.label}</p>
+                        <p className="text-base font-bold text-white/90 tabular-nums">{displayValue}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${result.accuracy}%` }}
-                  transition={{ delay: 0.4, duration: 0.5, ease: 'easeOut' }}
-                  className={`h-full rounded-full ${
-                    effectiveResult === 'perfect' ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
-                    effectiveResult === 'good' ? 'bg-gradient-to-r from-purple-400 to-pink-500' :
-                    effectiveResult === 'practice' ? 'bg-gradient-to-r from-cyan-400 to-blue-500' :
-                    'bg-gradient-to-r from-red-400 to-orange-500'
-                  }`}
-                />
-              </div>
-            </motion.div>
 
-            {/* Action Buttons */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.45 }}
-              className="flex gap-3"
-            >
-              <Button
-                variant="outline"
-                onClick={onExit}
-                className="flex-1 border-white/20 hover:bg-white/10"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Exit
-              </Button>
-              <Button
-                onClick={onPlayAgain}
-                className={`flex-1 ${
-                  effectiveResult === 'perfect' 
-                    ? 'bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600' 
-                    : effectiveResult === 'good'
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
-                    : effectiveResult === 'practice'
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
-                    : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
-                }`}
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Play Again
-              </Button>
-            </motion.div>
+              {/* Accuracy section */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-white/40 font-medium uppercase tracking-wider">Accuracy</span>
+                  <span className={`text-lg font-bold ${config.titleColor} tabular-nums`}>{result.accuracy}%</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-white/5 border border-white/10 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${result.accuracy}%` }}
+                    transition={{ delay: 0.2, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className={`h-full rounded-full bg-gradient-to-r ${config.accentColor}`}
+                  />
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={onExit}
+                  className="flex-1 h-12 border-white/10 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium rounded-xl transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" strokeWidth={1.5} />
+                  Exit
+                </Button>
+                <Button
+                  onClick={onPlayAgain}
+                  className={`flex-1 h-12 bg-gradient-to-r ${config.buttonGradient} text-white font-semibold rounded-xl shadow-lg transition-all`}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" strokeWidth={1.5} />
+                  Play Again
+                </Button>
+              </div>
+            </div>
           </motion.div>
         </motion.div>
       )}
