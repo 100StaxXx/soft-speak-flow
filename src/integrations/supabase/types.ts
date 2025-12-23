@@ -6127,6 +6127,14 @@ export type Database = {
         Args: { current_stage: number }
         Returns: number
       }
+      get_user_display_info: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          display_name: string
+          faction: string
+          user_id: string
+        }[]
+      }
       get_user_id: { Args: never; Returns: string }
       has_role: {
         Args: {

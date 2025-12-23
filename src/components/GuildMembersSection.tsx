@@ -14,17 +14,15 @@ import { FactionBadge } from "./FactionBadge";
 import { Trophy, Medal, Flame, Swords, Megaphone, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShoutType } from "@/data/shoutMessages";
-import { getUserDisplayName, getInitials } from "@/utils/getUserDisplayName";
 import { logger } from "@/utils/logger";
 
 interface LeaderboardMember {
   user_id: string;
   total_contribution: number;
   joined_at: string;
-  profile?: {
-    email: string | null;
-    onboarding_data?: unknown;
-    faction?: string | null;
+  displayInfo?: {
+    display_name: string;
+    faction: string | null;
   };
   companion?: {
     current_image_url: string | null;
@@ -64,24 +62,26 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
       // Extract all user IDs for batch queries (avoid N+1 problem)
       const userIds = membersData.map(m => m.user_id);
 
-      // Batch fetch profiles and companions in parallel
-      const [profilesRes, companionsRes] = await Promise.all([
-        supabase.from("profiles").select("id, email, onboarding_data, faction").in("id", userIds),
+      // Batch fetch display info using secure function and companions in parallel
+      const [displayInfoRes, companionsRes] = await Promise.all([
+        supabase.rpc("get_user_display_info", { p_user_ids: userIds }),
         supabase.from("user_companion").select("user_id, current_image_url, spirit_animal").in("user_id", userIds),
       ]);
 
       // Create lookup maps for O(1) access
-      const profilesMap = new Map(
-        (profilesRes.data || []).map(p => [p.id, { email: p.email, onboarding_data: p.onboarding_data, faction: p.faction }])
+      const displayInfoMap = new Map(
+        (displayInfoRes.data || []).map((p: { user_id: string; display_name: string; faction: string | null }) => 
+          [p.user_id, { display_name: p.display_name, faction: p.faction }]
+        )
       );
       const companionsMap = new Map(
         (companionsRes.data || []).map(c => [c.user_id, { current_image_url: c.current_image_url, spirit_animal: c.spirit_animal }])
       );
 
-      // Enrich members with profile and companion data
+      // Enrich members with display info and companion data
       const enrichedMembers = membersData.map(member => ({
         ...member,
-        profile: profilesMap.get(member.user_id),
+        displayInfo: displayInfoMap.get(member.user_id),
         companion: companionsMap.get(member.user_id),
       }));
 
@@ -118,7 +118,7 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
   };
 
   const getDisplayName = (member: LeaderboardMember) => {
-    return getUserDisplayName(member.profile);
+    return member.displayInfo?.display_name || "Adventurer";
   };
 
   const handleOpenShoutDrawer = (member: LeaderboardMember) => {
@@ -220,8 +220,8 @@ export const GuildMembersSection = ({ epicId }: GuildMembersSectionProps) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium truncate">{displayName}</span>
-                    {member.profile?.faction && (
-                      <FactionBadge faction={member.profile.faction} variant="icon-only" className="h-6 w-6" />
+                    {member.displayInfo?.faction && (
+                      <FactionBadge faction={member.displayInfo.faction} variant="icon-only" className="h-6 w-6" />
                     )}
                     {isCurrentUser && (
                       <Badge variant="secondary" className="text-xs">You</Badge>
