@@ -95,6 +95,14 @@ const GAME_STAT_CONFIG: Record<MiniGameType, {
       hintsUsed: { label: 'Hints Used', icon: Sparkles },
     },
   },
+  stellar_flow: {
+    primaryStat: 'time',
+    statLabels: {
+      time: { label: 'Solve Time', icon: Clock, format: (v) => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}` },
+      pathsConnected: { label: 'Paths', icon: TrendingUp },
+      cellsFilled: { label: 'Cells Filled', icon: Target },
+    },
+  },
 };
 
 const RESULT_CONFIG = {
