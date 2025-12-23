@@ -694,14 +694,14 @@ export default function AstralArcade() {
               <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
             )}
 
-            <div className="flex-1 flex items-center justify-center p-4">
-              <div className="w-full max-w-md h-[500px]">
+            <div className={`flex-1 flex ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'items-start pt-2' : 'items-center justify-center'} p-4`}>
+              <div className={`w-full max-w-md ${arcadeMode === 'battle' && gamePhase === 'playing' ? '' : 'h-[500px]'}`}>
                 {gamePhase !== 'result' && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleExitGame}
-                    className="mb-4 text-muted-foreground hover:text-white"
+                    className={`${arcadeMode === 'battle' && gamePhase === 'playing' ? 'mb-1' : 'mb-4'} text-muted-foreground hover:text-white`}
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Exit Game
