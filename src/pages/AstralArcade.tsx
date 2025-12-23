@@ -697,7 +697,7 @@ export default function AstralArcade() {
             )}
 
             <div className={`flex-1 flex ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'items-start pt-2' : 'items-center justify-center'} p-4`}>
-              <div className={`w-full max-w-md ${arcadeMode === 'battle' && gamePhase === 'playing' ? '' : 'h-[500px]'}`}>
+              <div className={`w-full max-w-md ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'h-[calc(100vh-180px)]' : 'h-[500px]'}`}>
                 {gamePhase !== 'result' && (
                   <Button
                     variant="ghost"
@@ -768,7 +768,7 @@ export default function AstralArcade() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto"
+                      className="h-full overflow-hidden"
                     >
                       {renderGame()}
                     </motion.div>
