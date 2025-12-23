@@ -56,22 +56,62 @@ const Auth = () => {
   const { session: authSession } = useAuth();
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
+    const startTime = Date.now();
+    logger.info(`[Auth ${source}] handlePostAuthNavigation START`, { 
+      hasSession: !!session, 
+      hasRedirected: hasRedirected.current,
+      userId: session?.user?.id?.substring(0, 8) 
+    });
+
     // Synchronous guard - check and set IMMEDIATELY before any async work
-    if (!session || hasRedirected.current) return;
+    if (!session || hasRedirected.current) {
+      logger.info(`[Auth ${source}] Skipping - session: ${!!session}, hasRedirected: ${hasRedirected.current}`);
+      return;
+    }
     hasRedirected.current = true;
 
+    // Timeout protection - force navigation after 5 seconds to prevent hanging
+    const NAVIGATION_TIMEOUT = 5000;
+    let navigationCompleted = false;
+    
+    const timeoutId = setTimeout(() => {
+      if (!navigationCompleted) {
+        logger.warn(`[Auth ${source}] TIMEOUT after ${NAVIGATION_TIMEOUT}ms - forcing navigation to /onboarding`);
+        toast({
+          title: "Taking longer than expected",
+          description: "Redirecting you now...",
+        });
+        safeNavigate(navigate, '/onboarding');
+      }
+    }, NAVIGATION_TIMEOUT);
+
     try {
+      logger.info(`[Auth ${source}] Calling ensureProfile...`);
+      const profileStartTime = Date.now();
       await ensureProfile(session.user.id, session.user.email);
+      logger.info(`[Auth ${source}] ensureProfile completed in ${Date.now() - profileStartTime}ms`);
+      
+      logger.info(`[Auth ${source}] Calling getAuthRedirectPath...`);
+      const redirectStartTime = Date.now();
       const path = await getAuthRedirectPath(session.user.id);
-      logger.info(`[Auth ${source}] Navigating to ${path}`);
+      logger.info(`[Auth ${source}] getAuthRedirectPath returned "${path}" in ${Date.now() - redirectStartTime}ms`);
+      
+      navigationCompleted = true;
+      clearTimeout(timeoutId);
+      
+      logger.info(`[Auth ${source}] Navigating to ${path} (total time: ${Date.now() - startTime}ms)`);
       safeNavigate(navigate, path);
+      logger.info(`[Auth ${source}] safeNavigate called successfully`);
     } catch (error) {
+      navigationCompleted = true;
+      clearTimeout(timeoutId);
+      
       // Reset on error so user can retry
       hasRedirected.current = false;
-      logger.error(`[Auth ${source}] Navigation error`, { error });
+      logger.error(`[Auth ${source}] Navigation error after ${Date.now() - startTime}ms`, { error });
       safeNavigate(navigate, '/onboarding');
     }
-  }, [navigate]);
+  }, [navigate, toast]);
   
   // Refs to track OAuth fallback timeouts (for cleanup)
   const googleFallbackTimeout = useRef<NodeJS.Timeout | null>(null);
