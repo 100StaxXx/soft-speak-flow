@@ -31,41 +31,34 @@ export function HourlyViewModal({
 
   // Auto-scroll to show previous hour at top when modal opens
   useEffect(() => {
-    if (open && scrollRef.current) {
+    if (open) {
       const currentHour = new Date().getHours();
       const previousHour = Math.max(0, currentHour - 1);
-      // Each hour = 2 slots × 60px = 120px per hour
-      const targetScroll = previousHour * 120;
       
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 10;
       
       const attemptScroll = () => {
-        if (!scrollRef.current) return;
+        // Find the time slot element by data-hour attribute
+        const targetElement = scrollRef.current?.querySelector(`[data-hour="${previousHour}"]`);
         
-        const scrollableHeight = scrollRef.current.scrollHeight;
-        const containerHeight = scrollRef.current.clientHeight;
-        
-        // Check if content is fully rendered (48 slots × 60px = 2880px min)
-        if (scrollableHeight > 2000 && scrollableHeight > containerHeight) {
-          // Use direct scrollTop assignment (more reliable on iOS)
-          scrollRef.current.scrollTop = targetScroll;
+        if (targetElement) {
+          // Use scrollIntoView with block: 'start' to put the element at the top
+          targetElement.scrollIntoView({ block: 'start', behavior: 'instant' });
           
-          // Verify it worked, retry if not
-          requestAnimationFrame(() => {
-            if (scrollRef.current && Math.abs(scrollRef.current.scrollTop - targetScroll) > 50) {
-              scrollRef.current.scrollTop = targetScroll;
-            }
-          });
+          // Add a small offset to not have it flush against the top
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = Math.max(0, scrollRef.current.scrollTop - 8);
+          }
         } else if (attempts < maxAttempts) {
-          // Content not ready yet, retry
+          // Element not found yet, content still rendering
           attempts++;
-          setTimeout(attemptScroll, 150);
+          setTimeout(attemptScroll, 100);
         }
       };
       
       // Initial delay for dialog animation to complete
-      const timer = setTimeout(attemptScroll, 400);
+      const timer = setTimeout(attemptScroll, 300);
       
       return () => clearTimeout(timer);
     }
