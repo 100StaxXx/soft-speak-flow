@@ -12,7 +12,8 @@ import {
   Grid3X3,
   Target,
   Layers,
-  Smartphone
+  Smartphone,
+  LayoutGrid
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -130,6 +131,19 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
       "Cards hide - match pairs from memory",
       "Wrong match = lose a life (3 total)",
       "Clear level → more cards next level!"
+    ],
+    statBonus: 'mind',
+    statIcon: Brain,
+  },
+  cosmiq_grid: {
+    icon: LayoutGrid,
+    title: "Cosmiq Grid",
+    goal: "Fill the grid with numbers 1-4!",
+    howToPlay: [
+      "Each row must have 1, 2, 3, 4",
+      "Each column must have 1, 2, 3, 4",
+      "Each 2×2 box must have 1, 2, 3, 4",
+      "Tap a cell, then tap a number to place"
     ],
     statBonus: 'mind',
     statIcon: Brain,

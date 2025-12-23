@@ -53,6 +53,7 @@ const StarfallDodgeGame = lazy(() => import('@/components/astral-encounters/Star
 const SoulSerpentGame = lazy(() => import('@/components/astral-encounters/SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
 const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
+const CosmiqGridGame = lazy(() => import('@/components/astral-encounters/CosmiqGridGame').then(m => ({ default: m.CosmiqGridGame })));
 
 // Track which games user has practiced in this arcade session
 const arcadePracticedGames = new Set<MiniGameType>();
@@ -60,7 +61,7 @@ const arcadePracticedGames = new Set<MiniGameType>();
 const GAMES = [
   { type: 'energy_beam' as MiniGameType, label: 'Star Defender', icon: Zap, stat: 'body' as const },
   { type: 'tap_sequence' as MiniGameType, label: 'Tap Sequence', icon: Target, stat: 'mind' as const },
-  { type: 'astral_frequency' as MiniGameType, label: 'Cosmiq Dash', icon: Radio, stat: 'soul' as const },
+  { type: 'cosmiq_grid' as MiniGameType, label: 'Cosmiq Grid', icon: Grid3X3, stat: 'mind' as const },
   { type: 'eclipse_timing' as MiniGameType, label: 'Stellar Beats', icon: Clock, stat: 'soul' as const },
   { type: 'starfall_dodge' as MiniGameType, label: 'Starfall Dodge', icon: Shield, stat: 'body' as const },
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },

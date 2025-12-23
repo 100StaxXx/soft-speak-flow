@@ -23,7 +23,8 @@ export type MiniGameType =
   | 'starfall_dodge'
   | 'soul_serpent'
   | 'orb_match'
-  | 'galactic_match';
+  | 'galactic_match'
+  | 'cosmiq_grid';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -56,6 +57,8 @@ export interface GameStats {
   goodHits?: number;
   misses?: number;
   notesHit?: number;
+  puzzlesSolved?: number;
+  hintsUsed?: number;
 }
 
 export interface Adversary {
