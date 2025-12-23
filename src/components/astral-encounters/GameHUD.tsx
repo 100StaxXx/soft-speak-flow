@@ -196,6 +196,26 @@ export const GameHUD = memo(({
             />
           </motion.div>
         )}
+
+        {/* Pause button in compact mode - moved to stats row */}
+        {compact && onPauseToggle && (
+          <motion.button
+            onClick={onPauseToggle}
+            className="p-1.5 rounded-full transition-all flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+              border: '1px solid rgba(255,255,255,0.12)',
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            {isPaused ? (
+              <Play className="w-3 h-3 text-white" />
+            ) : (
+              <Pause className="w-3 h-3 text-white" />
+            )}
+          </motion.button>
+        )}
       </div>
 
       {/* Premium timer progress bar with animated glow */}
