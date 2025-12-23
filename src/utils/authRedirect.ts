@@ -1,41 +1,81 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getResolvedMentorId } from "./mentor";
+import { logger } from "./logger";
+
+/**
+ * Helper to wrap a promise with a timeout
+ */
+const withTimeout = <T>(promiseFn: () => PromiseLike<T>, timeoutMs: number, operation: string): Promise<T> => {
+  return Promise.race([
+    Promise.resolve(promiseFn()),
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+};
 
 /**
  * Centralized auth redirect logic
  * Determines where to send users based on their auth and profile state
  */
 export const getAuthRedirectPath = async (userId: string): Promise<string> => {
+  const QUERY_TIMEOUT = 3000; // 3 second timeout for each query
+  
   try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("selected_mentor_id, onboarding_completed, onboarding_data")
-      .eq("id", userId)
-      .maybeSingle();
+    logger.debug('[getAuthRedirectPath] Fetching profile...', { userId: userId.substring(0, 8) });
+    
+    const { data: profile, error } = await withTimeout(
+      () => supabase
+        .from("profiles")
+        .select("selected_mentor_id, onboarding_completed, onboarding_data")
+        .eq("id", userId)
+        .maybeSingle(),
+      QUERY_TIMEOUT, 
+      'Profile fetch'
+    );
+    
+    if (error) {
+      logger.warn('[getAuthRedirectPath] Profile fetch error, defaulting to onboarding', { error: error.message });
+      return "/onboarding";
+    }
 
     const resolvedMentorId = getResolvedMentorId(profile);
+    logger.debug('[getAuthRedirectPath] Profile fetched', { 
+      hasProfile: !!profile, 
+      onboardingCompleted: profile?.onboarding_completed,
+      hasMentor: !!profile?.selected_mentor_id,
+      resolvedMentorId: resolvedMentorId?.substring(0, 8)
+    });
 
     if (profile?.onboarding_completed && !profile.selected_mentor_id && resolvedMentorId) {
-      await supabase
-        .from("profiles")
-        .update({ selected_mentor_id: resolvedMentorId })
-        .eq("id", userId);
+      // Fire and forget - don't wait for this update
+      Promise.resolve(
+        supabase
+          .from("profiles")
+          .update({ selected_mentor_id: resolvedMentorId })
+          .eq("id", userId)
+      )
+        .then(() => logger.debug('[getAuthRedirectPath] Mentor ID updated'))
+        .catch((err: Error) => logger.warn('[getAuthRedirectPath] Failed to update mentor ID', { error: err }));
     }
 
     // If onboarding is completed, always go to tasks
     if (profile?.onboarding_completed) {
+      logger.debug('[getAuthRedirectPath] Onboarding complete, redirecting to /tasks');
       return "/tasks";
     }
 
     // No profile or no mentor selected -> onboarding
     if (!profile || !resolvedMentorId) {
+      logger.debug('[getAuthRedirectPath] No profile or mentor, redirecting to /onboarding');
       return "/onboarding";
     }
 
     // Has mentor -> quests page
+    logger.debug('[getAuthRedirectPath] Has mentor, redirecting to /tasks');
     return "/tasks";
   } catch (error) {
-    console.error("Error checking profile:", error);
+    logger.error("[getAuthRedirectPath] Error", { error });
     return "/onboarding";
   }
 };
@@ -45,32 +85,65 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
  * Also updates timezone to match user's current device
  */
 export const ensureProfile = async (userId: string, email: string | null): Promise<void> => {
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("id, timezone")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-  if (!existing) {
-    // Create new profile with user's timezone
-    const { error } = await supabase.from("profiles").upsert({
-      id: userId,
-      email: email ?? null,
-      timezone: userTimezone,
-    }, {
-      onConflict: 'id'
-    });
+  const QUERY_TIMEOUT = 3000; // 3 second timeout for each query
+  
+  logger.debug('[ensureProfile] Starting...', { userId: userId.substring(0, 8), email: email?.substring(0, 5) });
+  
+  try {
+    const { data: existing, error: fetchError } = await withTimeout(
+      () => supabase
+        .from("profiles")
+        .select("id, timezone")
+        .eq("id", userId)
+        .maybeSingle(),
+      QUERY_TIMEOUT, 
+      'Profile check'
+    );
     
-    if (error && !error.message.includes('duplicate')) {
-      console.error('Error creating profile:', error);
-      throw error;
+    if (fetchError) {
+      logger.warn('[ensureProfile] Fetch error, continuing anyway', { error: fetchError.message });
+      return; // Don't block navigation for this
     }
-  } else if (existing.timezone !== userTimezone) {
-    // Update timezone if it's different
-    await supabase.from("profiles").update({
-      timezone: userTimezone
-    }).eq("id", userId);
+
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    logger.debug('[ensureProfile] Profile check result', { exists: !!existing, userTimezone });
+
+    if (!existing) {
+      // Create new profile with user's timezone
+      logger.debug('[ensureProfile] Creating new profile...');
+      const { error } = await withTimeout(
+        () => supabase.from("profiles").upsert({
+          id: userId,
+          email: email ?? null,
+          timezone: userTimezone,
+        }, {
+          onConflict: 'id'
+        }),
+        QUERY_TIMEOUT, 
+        'Profile create'
+      );
+      
+      if (error && !error.message.includes('duplicate')) {
+        logger.warn('[ensureProfile] Create error, continuing anyway', { error: error.message });
+        // Don't throw - allow navigation to continue
+      } else {
+        logger.debug('[ensureProfile] Profile created successfully');
+      }
+    } else if (existing.timezone !== userTimezone) {
+      // Update timezone if it's different - fire and forget
+      logger.debug('[ensureProfile] Updating timezone...');
+      Promise.resolve(
+        supabase.from("profiles").update({
+          timezone: userTimezone
+        }).eq("id", userId)
+      )
+        .then(() => logger.debug('[ensureProfile] Timezone updated'))
+        .catch((err: Error) => logger.warn('[ensureProfile] Timezone update failed', { error: err }));
+    } else {
+      logger.debug('[ensureProfile] Profile exists, no update needed');
+    }
+  } catch (error) {
+    // Log but don't throw - allow navigation to continue even if profile operations fail
+    logger.warn('[ensureProfile] Error (non-blocking)', { error });
   }
 };
