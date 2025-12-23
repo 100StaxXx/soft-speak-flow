@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Volume2, VolumeX, Music, Sparkles, Swords } from "lucide-react";
 import { soundManager } from "@/utils/soundEffects";
 import { globalAudio } from "@/utils/globalAudio";
+import { ambientMusic } from "@/utils/ambientMusic";
 
 export const SoundSettings = () => {
   const [volume, setVolume] = useState(0.5);
@@ -67,6 +68,8 @@ export const SoundSettings = () => {
     const newVolume = values[0];
     setBgMusicVolume(newVolume);
     safeLocalStorage.setItem('bg_music_volume', newVolume.toString());
+    // Call singleton directly for reliable volume change
+    ambientMusic.setVolume(newVolume);
     window.dispatchEvent(new CustomEvent('bg-music-volume-change', { detail: newVolume }));
   };
 
@@ -74,6 +77,12 @@ export const SoundSettings = () => {
     const newMuted = !bgMusicMuted;
     setBgMusicMuted(newMuted);
     safeLocalStorage.setItem('bg_music_muted', newMuted.toString());
+    // Call singleton directly for reliable mute toggle
+    if (newMuted) {
+      ambientMusic.mute();
+    } else {
+      ambientMusic.unmute();
+    }
     window.dispatchEvent(new CustomEvent('bg-music-mute-change', { detail: newMuted }));
   };
 

@@ -628,54 +628,28 @@ class AmbientMusicManager {
     console.log('[AmbientMusic] duck() called - isPlaying:', this.isPlaying, 'shouldMute:', this.shouldMute());
     
     // FIXED: Always track duck state, even if muted or not playing
-    // This ensures when we unmute/resume, we apply ducked volume
     this.isDucked = true;
     this.isDucking = true;
     
-    // Only do actual volume fade if not muted and playing
-    if (this.shouldMute() || !this.isPlaying) {
-      console.log('[AmbientMusic] duck() - state tracked but no fade (muted or not playing)');
-      this.isDucking = false;
-      return;
-    }
-    
     const duckedVolume = this.volume * 0.02; // Reduce to 2% of original for clearer pep talk audio
     
-    if (this.fadeInterval) clearInterval(this.fadeInterval);
-    
-    const startVolume = this.audio.volume;
-    // If audio volume is very low or zero, skip fade and set directly
-    if (startVolume <= duckedVolume) {
+    // FIXED: Always apply ducked volume immediately to audio element
+    // This ensures correct volume regardless of play state
+    if (!this.shouldMute() && this.audio) {
       this.audio.volume = duckedVolume;
+      console.log('[AmbientMusic] duck() - applied ducked volume immediately:', duckedVolume);
+    }
+    
+    // If not playing or muted, we're done (state is set, volume applied)
+    if (this.shouldMute() || !this.isPlaying) {
+      console.log('[AmbientMusic] duck() - state tracked, volume set (muted or not playing)');
       this.isDucking = false;
-      console.log('[AmbientMusic] duck() - volume already low, set to:', duckedVolume);
       return;
     }
     
-    const duration = 300;
-    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
-    const stepDuration = duration / steps;
-    const volumeDecrement = (startVolume - duckedVolume) / steps;
-    let currentStep = 0;
-
-    this.fadeInterval = setInterval(() => {
-      if (!this.audio || !this.isPlaying || this.isStopped) {
-        if (this.fadeInterval) clearInterval(this.fadeInterval);
-        this.fadeInterval = null;
-        this.isDucking = false;
-        return;
-      }
-      
-      currentStep++;
-      this.audio.volume = Math.max(startVolume - (volumeDecrement * currentStep), duckedVolume);
-      
-      if (currentStep >= steps) {
-        if (this.fadeInterval) clearInterval(this.fadeInterval);
-        this.fadeInterval = null;
-        this.isDucking = false;
-        console.log('[AmbientMusic] duck() fade complete, volume:', this.audio.volume);
-      }
-    }, stepDuration);
+    // Already applied the volume above, just mark as done
+    this.isDucking = false;
+    console.log('[AmbientMusic] duck() complete, volume:', this.audio.volume);
   }
 
   // Restore volume after ducking
@@ -689,51 +663,26 @@ class AmbientMusicManager {
     this.wasDuckedBeforeMute = false;
     this.isDucking = true;
     
-    // Only do actual volume fade if not muted and playing
-    if (this.shouldMute() || !this.isPlaying) {
-      console.log('[AmbientMusic] unduck() - state cleared but no fade (muted or not playing)');
-      this.isDucking = false;
-      return;
-    }
-    
     // Use current this.volume in case user changed it while ducked
     const targetVolume = this.volume;
     
-    if (this.fadeInterval) clearInterval(this.fadeInterval);
-    
-    const startVolume = this.audio.volume;
-    // If already at or above target, set directly
-    if (startVolume >= targetVolume) {
+    // FIXED: Always apply target volume immediately to audio element
+    // This ensures correct volume regardless of play state
+    if (!this.shouldMute() && this.audio) {
       this.audio.volume = targetVolume;
+      console.log('[AmbientMusic] unduck() - applied target volume immediately:', targetVolume);
+    }
+    
+    // If not playing or muted, we're done (state is cleared, volume applied)
+    if (this.shouldMute() || !this.isPlaying) {
+      console.log('[AmbientMusic] unduck() - state cleared, volume set (muted or not playing)');
       this.isDucking = false;
-      console.log('[AmbientMusic] unduck() - already at target, set to:', targetVolume);
       return;
     }
     
-    const duration = 500;
-    const steps = Math.max(10, Math.min(20, Math.floor(duration / 50))); // Adaptive steps
-    const stepDuration = duration / steps;
-    const volumeIncrement = (targetVolume - startVolume) / steps;
-    let currentStep = 0;
-
-    this.fadeInterval = setInterval(() => {
-      if (!this.audio || !this.isPlaying || this.isStopped) {
-        if (this.fadeInterval) clearInterval(this.fadeInterval);
-        this.fadeInterval = null;
-        this.isDucking = false;
-        return;
-      }
-      
-      currentStep++;
-      this.audio.volume = Math.min(startVolume + (volumeIncrement * currentStep), targetVolume);
-      
-      if (currentStep >= steps) {
-        if (this.fadeInterval) clearInterval(this.fadeInterval);
-        this.fadeInterval = null;
-        this.isDucking = false;
-        console.log('[AmbientMusic] unduck() fade complete, volume:', this.audio.volume);
-      }
-    }, stepDuration);
+    // Already applied the volume above, just mark as done
+    this.isDucking = false;
+    console.log('[AmbientMusic] unduck() complete, volume:', this.audio.volume);
   }
 
   // Get current state
