@@ -18,6 +18,7 @@ interface EclipseTimingGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 type LaneType = 'moon' | 'star' | 'sun';
@@ -313,6 +314,7 @@ export const EclipseTimingGame = ({
   questIntervalScale = 0,
   maxTimer,
   isPractice = false,
+  compact = false,
 }: EclipseTimingGameProps) => {
   const [gameState, setGameState] = useState<'loading' | 'countdown' | 'playing' | 'paused' | 'rating' | 'complete'>('loading');
   const [songsPlayed, setSongsPlayed] = useState(0);
@@ -704,6 +706,7 @@ export const EclipseTimingGame = ({
         primaryStat={{ value: notesMissed, label: `Misses (max ${maxMisses})`, color: notesMissed >= maxMisses - 2 ? 'hsl(0, 84%, 60%)' : 'hsl(45, 100%, 60%)' }}
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
+        compact={compact}
       />
       
       {/* OPTIMIZED: CSS-only warning */}

@@ -17,6 +17,7 @@ interface TapSequenceGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // Difficulty config for orb adjustment and show time
@@ -249,6 +250,7 @@ export const TapSequenceGame = ({
   tierAttackDamage = 15,
   difficulty = 'medium',
   isPractice = false,
+  compact = false,
 }: TapSequenceGameProps) => {
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const [gameState, setGameState] = useState<'countdown' | 'showing' | 'playing' | 'paused' | 'complete' | 'reshowing'>('countdown');
@@ -476,6 +478,7 @@ export const TapSequenceGame = ({
         totalPhases={10}
         isPaused={gameState === 'paused'}
         onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
+        compact={compact}
       />
 
       {/* Lives and Level display - compact */}
