@@ -95,7 +95,7 @@ const Community = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 relative overflow-hidden">
+    <div className="min-h-screen bg-background pb-nav-safe relative overflow-hidden">
       {/* Ambient background particles */}
       <div className="fixed inset-0 pointer-events-none opacity-30">
         <GuildParticles effect="stars" intensity="low" />
@@ -319,7 +319,7 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving, memberCoun
       />
 
       {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 mt-6 space-y-6 pb-28">
+      <div className="max-w-2xl mx-auto px-4 mt-6 space-y-6 pb-nav-safe">
         {/* Online Presence Banner */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

@@ -385,7 +385,7 @@ export default function Tasks() {
   // Error state
   if (companionError) {
     return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
         <div className="text-center space-y-4 p-6">
           <Target className="h-16 w-16 mx-auto text-destructive" />
           <h2 className="text-2xl font-bold">Error Loading Data</h2>
@@ -411,7 +411,7 @@ export default function Tasks() {
   // No companion - redirect to onboarding
   if (!companion) {
     return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
         <div className="text-center space-y-4 p-6">
           <Target className="h-16 w-16 mx-auto text-primary" />
           <h2 className="text-2xl font-bold">No Companion Found</h2>
@@ -430,7 +430,7 @@ export default function Tasks() {
   }
 
   return (
-    <div className="min-h-screen pb-20 relative">
+    <div className="min-h-screen pb-nav-safe relative">
       <StarfieldBackground />
       
       <QuestsTutorialModal open={showTutorial} onClose={handleTutorialClose} />

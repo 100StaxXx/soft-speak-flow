@@ -89,7 +89,7 @@ const Companion = () => {
   if (error) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+      <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
           <div className="text-center space-y-4 p-6">
             <Sparkles className="h-16 w-16 mx-auto text-destructive" />
             <h2 className="text-2xl font-bold">Error Loading Companion</h2>
@@ -113,7 +113,7 @@ const Companion = () => {
   if (isLoading) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
           <div className="text-center space-y-4">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
             <p className="text-muted-foreground">Loading your companion...</p>
@@ -128,7 +128,7 @@ const Companion = () => {
   if (!companion) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
+        <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
           <div className="text-center space-y-4 p-6">
             <Sparkles className="h-16 w-16 mx-auto text-primary" />
             <h2 className="text-2xl font-bold">No Companion Found</h2>
@@ -151,7 +151,7 @@ const Companion = () => {
   return (
     <PageTransition>
       <CompanionErrorBoundary>
-        <div className="min-h-screen pb-20 relative">
+        <div className="min-h-screen pb-nav-safe relative">
           <StarfieldBackground />
           
           <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
