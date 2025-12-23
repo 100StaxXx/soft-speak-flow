@@ -257,7 +257,7 @@ const Profile = () => {
     return (
       <PageTransition>
         <StarfieldBackground />
-        <div className="min-h-screen pb-24 flex items-center justify-center relative z-10">
+        <div className="min-h-screen pb-nav-safe flex items-center justify-center relative z-10">
           <div className="text-center">
             <h2 className="text-3xl font-bold mb-4">Sign in to view your profile</h2>
             <Button onClick={() => navigate("/auth")}>Sign In</Button>
@@ -272,7 +272,7 @@ const Profile = () => {
     <PageTransition>
       <StarfieldBackground />
       
-      <div className="min-h-screen pb-24 relative">
+      <div className="min-h-screen pb-nav-safe relative">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-4">
