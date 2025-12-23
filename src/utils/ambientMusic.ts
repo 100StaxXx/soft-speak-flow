@@ -299,10 +299,12 @@ class AmbientMusicManager {
       this.fadeInterval = null;
     }
     
-    // Apply volume immediately if not muted
-    if (this.audio && !this.shouldMute()) {
-      // If ducked, apply ducked ratio, otherwise full volume
-      this.audio.volume = this.isDucked ? this.volume * 0.02 : this.volume;
+    // FIXED: Always apply volume to audio element if it exists
+    // The muted property handles actual muting, not volume level
+    if (this.audio) {
+      const newVolume = this.isDucked ? this.volume * 0.02 : this.volume;
+      this.audio.volume = newVolume;
+      console.log('[AmbientMusic] setVolume applied:', newVolume, 'base:', this.volume, 'ducked:', this.isDucked);
     }
   }
 
@@ -620,10 +622,23 @@ class AmbientMusicManager {
 
   // Duck volume for other audio (e.g., pep talks)
   duck() {
-    if (!this.audio || this.isDucked || this.isDucking || this.shouldMute() || !this.isPlaying) return;
+    // Only need audio element and not already ducked/ducking
+    if (!this.audio || this.isDucked || this.isDucking) return;
     
-    this.isDucking = true;
+    console.log('[AmbientMusic] duck() called - isPlaying:', this.isPlaying, 'shouldMute:', this.shouldMute());
+    
+    // FIXED: Always track duck state, even if muted or not playing
+    // This ensures when we unmute/resume, we apply ducked volume
     this.isDucked = true;
+    this.isDucking = true;
+    
+    // Only do actual volume fade if not muted and playing
+    if (this.shouldMute() || !this.isPlaying) {
+      console.log('[AmbientMusic] duck() - state tracked but no fade (muted or not playing)');
+      this.isDucking = false;
+      return;
+    }
+    
     const duckedVolume = this.volume * 0.02; // Reduce to 2% of original for clearer pep talk audio
     
     if (this.fadeInterval) clearInterval(this.fadeInterval);
@@ -633,6 +648,7 @@ class AmbientMusicManager {
     if (startVolume <= duckedVolume) {
       this.audio.volume = duckedVolume;
       this.isDucking = false;
+      console.log('[AmbientMusic] duck() - volume already low, set to:', duckedVolume);
       return;
     }
     
@@ -657,6 +673,7 @@ class AmbientMusicManager {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
         this.isDucking = false;
+        console.log('[AmbientMusic] duck() fade complete, volume:', this.audio.volume);
       }
     }, stepDuration);
   }
@@ -665,16 +682,20 @@ class AmbientMusicManager {
   unduck() {
     if (!this.audio || !this.isDucked || this.isDucking) return;
     
-    // If muted, clear duck state without audio changes
-    // Also clear the saved duck state so unmute() won't restore it
-    if (this.isMuted) {
-      this.isDucked = false;
-      this.wasDuckedBeforeMute = false;
+    console.log('[AmbientMusic] unduck() called - shouldMute:', this.shouldMute(), 'isPlaying:', this.isPlaying);
+    
+    // FIXED: Always clear duck state first
+    this.isDucked = false;
+    this.wasDuckedBeforeMute = false;
+    this.isDucking = true;
+    
+    // Only do actual volume fade if not muted and playing
+    if (this.shouldMute() || !this.isPlaying) {
+      console.log('[AmbientMusic] unduck() - state cleared but no fade (muted or not playing)');
+      this.isDucking = false;
       return;
     }
     
-    this.isDucking = true;
-    this.isDucked = false;
     // Use current this.volume in case user changed it while ducked
     const targetVolume = this.volume;
     
@@ -685,6 +706,7 @@ class AmbientMusicManager {
     if (startVolume >= targetVolume) {
       this.audio.volume = targetVolume;
       this.isDucking = false;
+      console.log('[AmbientMusic] unduck() - already at target, set to:', targetVolume);
       return;
     }
     
@@ -709,6 +731,7 @@ class AmbientMusicManager {
         if (this.fadeInterval) clearInterval(this.fadeInterval);
         this.fadeInterval = null;
         this.isDucking = false;
+        console.log('[AmbientMusic] unduck() fade complete, volume:', this.audio.volume);
       }
     }, stepDuration);
   }
