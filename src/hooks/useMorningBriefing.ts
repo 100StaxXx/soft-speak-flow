@@ -41,9 +41,23 @@ export const useMorningBriefing = () => {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Generate a new briefing
+  // Generate a new briefing (only if none exists for today)
   const generateBriefing = useMutation({
     mutationFn: async () => {
+      // Double-check we don't already have one (prevents race conditions)
+      const { data: existing } = await supabase
+        .from('morning_briefings')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('briefing_date', today)
+        .maybeSingle();
+      
+      if (existing) {
+        // Refetch to get full data
+        await refetch();
+        return null;
+      }
+      
       const { data, error } = await supabase.functions.invoke('generate-morning-briefing');
       
       if (error) throw error;
