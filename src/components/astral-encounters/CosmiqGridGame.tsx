@@ -2,14 +2,18 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult, EncounterResult } from '@/types/astralEncounters';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
+import { DamageEvent } from '@/types/battleSystem';
 import { triggerHaptic } from './gameUtils';
 import { Undo2, Lightbulb, RotateCcw } from 'lucide-react';
 
-interface CosmiqGridGameProps {
+export interface CosmiqGridGameProps {
   onComplete: (result: MiniGameResult) => void;
-  onDamage?: (event: { target: 'player' | 'adversary'; damage: number; isCritical?: boolean }) => void;
+  onDamage?: (event: DamageEvent) => void;
   difficulty?: ArcadeDifficulty;
   isPractice?: boolean;
+  compact?: boolean;
+  companionStats?: { mind: number; body: number; soul: number };
+  tierAttackDamage?: number;
 }
 
 type CellValue = 0 | 1 | 2 | 3 | 4;
@@ -275,7 +279,7 @@ export const CosmiqGridGame = ({
     if (num !== 0 && getConflicts(newGrid, row, col).length > 0) {
       triggerHaptic('error');
       if (onDamage) {
-        onDamage({ target: 'player', damage: 5 });
+        onDamage({ target: 'player', amount: 5, source: 'conflict' });
       }
     }
   }, [selectedCell, grid, given, gameComplete, onDamage]);
