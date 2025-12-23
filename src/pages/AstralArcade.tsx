@@ -702,8 +702,8 @@ export default function AstralArcade() {
               <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
             )}
 
-            <div className={`flex-1 flex ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'items-start pt-2' : 'items-center justify-center'} p-4`}>
-              <div className={`w-full max-w-md ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'h-[calc(100vh-180px)]' : 'h-[500px]'}`}>
+            <div className={`flex-1 flex ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'items-start pt-2' : 'items-center justify-center'} p-4 overflow-y-auto`}>
+              <div className={`w-full max-w-md ${arcadeMode === 'battle' && gamePhase === 'playing' ? 'min-h-0 max-h-[calc(100dvh-180px)]' : 'min-h-0 max-h-[calc(100dvh-120px)]'}`}>
                 {gamePhase !== 'result' && (
                   <Button
                     variant="ghost"

@@ -482,7 +482,7 @@ export const TapSequenceGame = ({
       />
 
       {/* Lives and Level display - compact */}
-      <div className="w-full max-w-xs mb-2 flex items-center justify-between">
+      <div className="w-full max-w-[280px] mb-1 flex items-center justify-between">
         <LivesDisplay lives={lives} />
         <motion.div 
           key={level}
@@ -495,7 +495,7 @@ export const TapSequenceGame = ({
       </div>
 
       {/* Difficulty indicator - compact */}
-      <div className="mb-1 flex items-center gap-1.5">
+      <div className="mb-0.5 flex items-center gap-1.5">
         <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
           difficulty === 'beginner' ? 'bg-blue-500/20 text-blue-400' :
           difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
@@ -510,7 +510,7 @@ export const TapSequenceGame = ({
 
       {/* Game area */}
       <div 
-        className="relative w-full aspect-square max-w-xs rounded-2xl overflow-hidden"
+        className="relative w-full aspect-square max-w-[280px] rounded-2xl overflow-hidden"
         style={{
           background: 'linear-gradient(145deg, rgba(0,0,0,0.85) 0%, rgba(15,15,35,0.95) 50%, rgba(25,15,45,0.9) 100%)',
           border: '1px solid rgba(255,255,255,0.08)',
