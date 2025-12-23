@@ -325,6 +325,7 @@ export const EclipseTimingGame = ({
   const [gameResult, setGameResult] = useState<MiniGameResult | null>(null);
   const [showMissWarning, setShowMissWarning] = useState(false);
   const [showComboMultiplier, setShowComboMultiplier] = useState(false);
+  const [beatPulse, setBeatPulse] = useState(false);
   
   const maxMisses = MAX_MISSES_BY_DIFFICULTY[difficulty];
   
@@ -640,6 +641,20 @@ export const EclipseTimingGame = ({
     }
   }, [gameState]);
 
+  // BPM-synced beat pulse effect
+  useEffect(() => {
+    if (gameState !== 'playing' || !currentTrackRef.current) return;
+    const bpm = currentTrackRef.current.bpm || 120;
+    const beatInterval = 60000 / bpm;
+    
+    const interval = setInterval(() => {
+      setBeatPulse(true);
+      setTimeout(() => setBeatPulse(false), 100);
+    }, beatInterval);
+    
+    return () => clearInterval(interval);
+  }, [gameState]);
+
   const approachingLanes = useMemo(() => {
     const approaching: Record<LaneType, boolean> = { moon: false, star: false, sun: false };
     for (const note of visibleNotes) {
@@ -747,7 +762,7 @@ export const EclipseTimingGame = ({
           ))}
         </div>
         
-        {/* Lane glow trails */}
+        {/* Lane glow trails - enhanced visibility */}
         <div className="absolute inset-0 flex pointer-events-none">
           {LANES.map((lane) => {
             const laneConfig = LANE_CONFIG[lane];
@@ -755,31 +770,78 @@ export const EclipseTimingGame = ({
             return (
               <div
                 key={lane}
-                className="flex-1"
+                className="flex-1 transition-all duration-150"
                 style={{
-                  background: `linear-gradient(to bottom, transparent 0%, ${laneConfig.color}${hasApproaching ? '15' : '08'} 40%, ${laneConfig.color}${hasApproaching ? '25' : '12'} 70%, ${laneConfig.color}${hasApproaching ? '35' : '18'} 100%)`,
+                  background: `linear-gradient(to bottom, 
+                    transparent 0%, 
+                    ${laneConfig.color}${hasApproaching ? '20' : '10'} 30%, 
+                    ${laneConfig.color}${hasApproaching ? '35' : '18'} 60%, 
+                    ${laneConfig.color}${hasApproaching ? '50' : '25'} 100%)`,
                 }}
               />
             );
           })}
         </div>
 
-        {/* Hit zone line */}
+        {/* Hit zone glow band - ambient glow around hit line */}
+        <div
+          className="absolute left-0 right-0 pointer-events-none z-8"
+          style={{
+            top: `${HIT_ZONE_Y - 3}%`,
+            height: '7%',
+            background: `linear-gradient(to bottom, transparent, hsl(45, 100%, 60% / ${beatPulse ? 0.25 : 0.12}), transparent)`,
+            transition: 'background 0.1s ease-out',
+          }}
+        />
+
+        {/* Beat indicator - central burst that pulses with BPM */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-6 transition-all duration-75"
+          style={{
+            top: `${HIT_ZONE_Y}%`,
+            transform: 'translate(-50%, -50%)',
+            width: beatPulse ? '140px' : '100px',
+            height: beatPulse ? '140px' : '100px',
+            borderRadius: '50%',
+            background: `radial-gradient(circle, hsl(45, 100%, 80% / ${beatPulse ? 0.35 : 0.08}), transparent 70%)`,
+            boxShadow: beatPulse ? '0 0 60px hsl(45, 100%, 60% / 0.5)' : 'none',
+          }}
+        />
+
+        {/* Hit zone line - thicker and more prominent */}
         <div
           className="absolute left-0 right-0 pointer-events-none z-10"
           style={{
             top: `${HIT_ZONE_Y}%`,
-            height: '3px',
+            height: '5px',
             background: 'linear-gradient(90deg, hsl(271, 91%, 65%), hsl(45, 100%, 60%), hsl(25, 95%, 55%))',
-            boxShadow: '0 0 15px hsl(45, 100%, 60% / 0.5)',
+            boxShadow: `0 0 20px hsl(45, 100%, 60% / 0.7), 0 0 40px hsl(45, 100%, 60% / ${beatPulse ? 0.5 : 0.3})`,
+            transition: 'box-shadow 0.1s ease-out',
           }}
         />
         
-        {/* Hit zone targets */}
+        {/* Hit zone targets - enhanced with glow and pulse on approach */}
         <div className="absolute left-0 right-0 flex justify-around pointer-events-none z-5" style={{ top: `${HIT_ZONE_Y}%`, transform: 'translateY(-50%)' }}>
-          {LANES.map(lane => (
-            <div key={lane} className="w-20 h-20 rounded-full border-2" style={{ borderColor: `${LANE_CONFIG[lane].color}40` }} />
-          ))}
+          {LANES.map(lane => {
+            const laneConfig = LANE_CONFIG[lane];
+            const hasApproaching = approachingLanes[lane];
+            return (
+              <div 
+                key={lane} 
+                className="w-20 h-20 rounded-full transition-all duration-150"
+                style={{ 
+                  borderWidth: '3px',
+                  borderStyle: 'solid',
+                  borderColor: hasApproaching ? laneConfig.color : `${laneConfig.color}50`,
+                  opacity: hasApproaching ? 0.9 : 0.5,
+                  boxShadow: hasApproaching 
+                    ? `0 0 20px ${laneConfig.color}, inset 0 0 15px ${laneConfig.color}40` 
+                    : `0 0 10px ${laneConfig.color}30`,
+                  transform: hasApproaching ? 'scale(1.05)' : 'scale(1)',
+                }} 
+              />
+            );
+          })}
         </div>
 
         {/* Lane icons */}
