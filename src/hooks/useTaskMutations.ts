@@ -78,7 +78,7 @@ export const useTaskMutations = (taskDate: string) => {
         const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
         const detectedCategory = detectCategory(params.taskText, params.category);
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('daily_tasks')
           .insert({
             user_id: user.id,
@@ -96,7 +96,9 @@ export const useTaskMutations = (taskDate: string) => {
             reminder_minutes_before: params.reminderMinutesBefore ?? 15,
             category: detectedCategory,
             is_bonus: false
-          });
+          })
+          .select()
+          .single();
 
         if (error) {
           if (error.message?.includes('MAX_TASKS_REACHED') || error.message?.includes('Maximum quest limit')) {
@@ -104,17 +106,73 @@ export const useTaskMutations = (taskDate: string) => {
           }
           throw error;
         }
+        return data;
       } finally {
         addInProgress.current = false;
       }
     },
-    onSuccess: () => {
+    onMutate: async (params: AddTaskParams) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
+
+      // Snapshot previous values
+      const previousDailyTasks = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
+      const previousCalendarTasks = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
+
+      // Create optimistic task
+      const optimisticTask = {
+        id: `temp-${Date.now()}`,
+        user_id: user?.id,
+        task_text: params.taskText,
+        difficulty: params.difficulty,
+        task_date: params.taskDate || taskDate,
+        completed: false,
+        completed_at: null,
+        is_main_quest: params.isMainQuest ?? false,
+        scheduled_time: params.scheduledTime || null,
+        estimated_duration: params.estimatedDuration || null,
+        xp_reward: getEffectiveQuestXP(params.difficulty, 1),
+        created_at: new Date().toISOString(),
+        category: detectCategory(params.taskText, params.category),
+      };
+
+      // Update all matching daily-tasks queries
+      queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return [optimisticTask, ...old];
+      });
+
+      // Update all matching calendar-tasks queries
+      queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return [optimisticTask, ...old];
+      });
+
+      return { previousDailyTasks, previousCalendarTasks };
+    },
+    onError: (error: Error, _params, context) => {
+      // Rollback on error
+      if (context?.previousDailyTasks) {
+        context.previousDailyTasks.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousCalendarTasks) {
+        context.previousCalendarTasks.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast({ title: "Failed to add task", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    },
+    onSuccess: () => {
       toast({ title: "Task added successfully!" });
       window.dispatchEvent(new CustomEvent('task-added'));
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to add task", description: error.message, variant: "destructive" });
     },
   });
 
@@ -170,6 +228,7 @@ export const useTaskMutations = (taskDate: string) => {
     },
     onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       if (completed && !wasAlreadyCompleted) {
         if (xpAwarded > 0) {
           showXPToast(xpAwarded, toastReason || 'Task Complete!');
@@ -211,6 +270,7 @@ export const useTaskMutations = (taskDate: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       toast({ title: "Task deleted successfully!" });
     },
     onError: (error: Error) => {
@@ -249,6 +309,7 @@ export const useTaskMutations = (taskDate: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       toast({ title: "Main quest updated!" });
     },
     onError: (error: Error) => {
