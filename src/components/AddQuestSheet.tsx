@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Plus, Zap, Flame, Mountain, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,23 @@ export function AddQuestSheet({
     if (prefilledTime) setScheduledTime(prefilledTime);
   });
 
+  // Swipe-up gesture tracking
+  const touchStartY = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEnd = e.changedTouches[0].clientY;
+    const swipeDistance = touchStartY.current - touchEnd;
+    
+    // Swipe up detected (minimum 50px threshold)
+    if (swipeDistance > 50 && !showAdvanced) {
+      setShowAdvanced(true);
+    }
+  };
+
   const resetForm = () => {
     setTaskText("");
     setDifficulty("medium");
@@ -104,7 +121,12 @@ export function AddQuestSheet({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="px-4 pb-4 space-y-4 overflow-y-auto" data-vaul-no-drag>
+        <div 
+          className="px-4 pb-4 space-y-4 overflow-y-auto" 
+          data-vaul-no-drag
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           <div data-vaul-no-drag>
             <Input
               placeholder="What's your quest?"
