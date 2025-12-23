@@ -8,6 +8,7 @@ interface ShoutNotificationPayload {
   senderId: string;
   recipientId?: string;
   epicId?: string;
+  communityId?: string;
   senderName?: string;
   shoutType?: string;
   messageText?: string;
@@ -68,7 +69,7 @@ serve(async (req) => {
 
     const { data: shout, error: shoutError } = await supabase
       .from('guild_shouts')
-      .select('sender_id, recipient_id, epic_id, shout_type, message_key')
+      .select('sender_id, recipient_id, epic_id, community_id, shout_type, message_key')
       .eq('id', payload.shoutId)
       .single();
 
@@ -85,28 +86,42 @@ serve(async (req) => {
 
     const recipientId = shout.recipient_id;
     const epicId = shout.epic_id;
+    const communityId = shout.community_id;
     const shoutType = shout.shout_type;
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('display_name, username, email')
+      .select('email, onboarding_data')
       .eq('id', user.id)
       .maybeSingle();
 
-    const senderName = profile?.display_name || profile?.username || profile?.email || 'Cosmiq player';
+    // Get display name from onboarding_data or email
+    const onboardingData = profile?.onboarding_data as Record<string, unknown> | null;
+    const userName = onboardingData?.userName as string | undefined;
+    const senderName = userName || (profile?.email ? profile.email.split('@')[0] : 'A guild member');
+    
     const shoutMessage = getShoutByKey(shout.message_key);
     const messageText = shoutMessage?.text || payload.messageText || 'Someone sent you a shout!';
     const messageEmoji = shoutMessage?.emoji || '📢';
 
-    console.log(`Processing shout notification from ${user.id} to ${recipientId}`);
+    console.log(`Processing shout notification from ${user.id} to ${recipientId} (epic: ${epicId}, community: ${communityId})`);
 
-    const { data: muteCheck } = await supabase
+    // Check if recipient has muted the sender
+    let muteQuery = supabase
       .from('muted_guild_users')
       .select('id')
       .eq('user_id', recipientId)
       .eq('muted_user_id', user.id)
-      .or(`epic_id.eq.${epicId},epic_id.is.null`)
       .limit(1);
+
+    // Filter by context (epic or community)
+    if (epicId) {
+      muteQuery = muteQuery.or(`epic_id.eq.${epicId},epic_id.is.null`);
+    } else if (communityId) {
+      muteQuery = muteQuery.or(`community_id.eq.${communityId},community_id.is.null`);
+    }
+
+    const { data: muteCheck } = await muteQuery;
 
     if (muteCheck && muteCheck.length > 0) {
       console.log(`Recipient ${recipientId} has muted sender ${user.id}, skipping notification`);
@@ -116,31 +131,40 @@ serve(async (req) => {
       );
     }
 
+    // Rate limit: 1 push per sender per recipient per context per day
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const { data: recentPush } = await supabase
+    let rateLimitQuery = supabase
       .from('shout_push_log')
       .select('id')
       .eq('sender_id', user.id)
       .eq('recipient_id', recipientId)
-      .eq('epic_id', epicId)
       .gte('sent_at', today.toISOString())
       .limit(1);
 
+    // Filter by context
+    if (epicId) {
+      rateLimitQuery = rateLimitQuery.eq('epic_id', epicId);
+    } else if (communityId) {
+      rateLimitQuery = rateLimitQuery.eq('community_id', communityId);
+    }
+
+    const { data: recentPush } = await rateLimitQuery;
+
     if (recentPush && recentPush.length > 0) {
-      console.log(`Rate limit: Already sent push from ${user.id} to ${recipientId} today`);
+      console.log(`Rate limit: Already sent push from ${user.id} to ${recipientId} today for this context`);
       return new Response(
         JSON.stringify({ success: true, skipped: true, reason: 'rate_limited' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Get recipient's device tokens
     const { data: deviceTokens } = await supabase
       .from('push_device_tokens')
-      .select('device_token')
-      .eq('user_id', recipientId)
-      .eq('platform', 'ios');
+      .select('device_token, platform')
+      .eq('user_id', recipientId);
 
     if (!deviceTokens || deviceTokens.length === 0) {
       console.log(`No device tokens found for recipient ${recipientId}`);
@@ -150,10 +174,17 @@ serve(async (req) => {
       );
     }
 
-    const results: Array<{ token: string; success: boolean; error?: string }> = [];
+    const results: Array<{ token: string; platform: string; success: boolean; error?: string }> = [];
 
-    for (const { device_token } of deviceTokens) {
+    for (const { device_token, platform } of deviceTokens) {
       try {
+        // Currently only iOS is supported via APNs
+        if (platform !== 'ios') {
+          console.log(`Skipping unsupported platform: ${platform}`);
+          results.push({ token: device_token, platform, success: false, error: 'unsupported_platform' });
+          continue;
+        }
+
         const { error } = await supabase.functions.invoke('send-apns-notification', {
           body: {
             deviceToken: device_token,
@@ -161,7 +192,8 @@ serve(async (req) => {
             body: messageText,
             data: {
               type: 'guild_shout',
-              epicId,
+              epicId: epicId || null,
+              communityId: communityId || null,
               shoutType,
             },
           },
@@ -172,25 +204,34 @@ serve(async (req) => {
 
         if (error) {
           console.error(`Failed to send push to token ${device_token}:`, error);
-          results.push({ token: device_token, success: false, error: error.message });
+          results.push({ token: device_token, platform, success: false, error: error.message });
         } else {
-          results.push({ token: device_token, success: true });
+          results.push({ token: device_token, platform, success: true });
         }
       } catch (err) {
         console.error(`Error sending push to token ${device_token}:`, err);
-        results.push({ token: device_token, success: false, error: String(err) });
+        results.push({ token: device_token, platform, success: false, error: String(err) });
       }
     }
 
+    // Log successful push for rate limiting
     const anySuccess = results.some(r => r.success);
     if (anySuccess) {
+      const logData: Record<string, unknown> = {
+        sender_id: user.id,
+        recipient_id: recipientId,
+      };
+      
+      if (epicId) {
+        logData.epic_id = epicId;
+      }
+      if (communityId) {
+        logData.community_id = communityId;
+      }
+
       await supabase
         .from('shout_push_log')
-        .insert({
-          sender_id: user.id,
-          recipient_id: recipientId,
-          epic_id: epicId,
-        });
+        .insert(logData);
     }
 
     console.log(`Shout notification results:`, results);
