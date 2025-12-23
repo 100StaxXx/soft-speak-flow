@@ -87,6 +87,14 @@ const GAME_STAT_CONFIG: Record<MiniGameType, {
       livesRemaining: { label: 'Lives Left', icon: Heart },
     },
   },
+  cosmiq_grid: {
+    primaryStat: 'time',
+    statLabels: {
+      time: { label: 'Solve Time', icon: Clock, format: (v) => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}` },
+      puzzlesSolved: { label: 'Solved', icon: Trophy },
+      hintsUsed: { label: 'Hints Used', icon: Sparkles },
+    },
+  },
 };
 
 const RESULT_CONFIG = {

@@ -16,6 +16,7 @@ export const GAME_METRICS: Record<MiniGameType, {
   tap_sequence: { label: 'Level', format: v => `Lvl ${Math.round(v)}`, icon: '🔢' },
   starfall_dodge: { label: 'Time', format: v => `${Math.round(v)}s`, icon: '⭐' },
   orb_match: { label: 'Score', format: v => Math.round(v).toLocaleString(), icon: '💎' },
+  cosmiq_grid: { label: 'Best Time', format: v => `${Math.floor(v / 60)}:${(v % 60).toString().padStart(2, '0')}`, icon: '🧩' },
 };
 
 interface HighScoreEntry {
