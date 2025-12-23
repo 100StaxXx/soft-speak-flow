@@ -18,6 +18,7 @@ interface AstralFrequencyGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // Difficulty configuration - NO TIMER, endless until lives = 0
@@ -371,46 +372,46 @@ const Stars = memo(() => {
 });
 Stars.displayName = 'Stars';
 
-// UI Overlay for score/lives - fullscreen positioning, compact
-const GameUI = memo(({ score, lives, combo, hasShield, distance }: { 
-  score: number; lives: number; combo: number; hasShield: boolean; distance: number;
+// UI Overlay for score/lives - fullscreen positioning, compact mode support
+const GameUI = memo(({ score, lives, combo, hasShield, distance, compact = false }: { 
+  score: number; lives: number; combo: number; hasShield: boolean; distance: number; compact?: boolean;
 }) => (
-  <div className="absolute top-2 left-2 right-2 flex justify-between items-start pointer-events-none z-10 safe-area-inset-top">
+  <div className={`absolute ${compact ? 'top-1 left-1 right-1' : 'top-2 left-2 right-2'} flex justify-between items-start pointer-events-none z-10 safe-area-inset-top`}>
     <div className="flex flex-col gap-1">
-      <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
-        <span className="text-yellow-400 font-bold text-base">{score}</span>
-        <span className="text-[10px] text-muted-foreground ml-0.5">pts</span>
+      <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-0.5">
+        <span className={`text-yellow-400 font-bold ${compact ? 'text-sm' : 'text-base'}`}>{score}</span>
+        {!compact && <span className="text-[10px] text-muted-foreground ml-0.5">pts</span>}
       </div>
-      <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
-        <span className="text-cyan-400 font-bold text-base">{Math.round(distance)}</span>
-        <span className="text-[10px] text-muted-foreground ml-0.5">m</span>
+      <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-0.5">
+        <span className={`text-cyan-400 font-bold ${compact ? 'text-sm' : 'text-base'}`}>{Math.round(distance)}</span>
+        {!compact && <span className="text-[10px] text-muted-foreground ml-0.5">m</span>}
       </div>
       {combo > 1 && (
         <motion.div 
-          className="bg-purple-500/60 backdrop-blur-sm rounded-lg px-2 py-1"
+          className="bg-purple-500/60 backdrop-blur-sm rounded-lg px-2 py-0.5"
           initial={{ scale: 0.8 }}
           animate={{ scale: 1 }}
         >
-          <span className="text-white font-bold text-base">{combo}x</span>
-          <span className="text-[10px] text-purple-200 ml-0.5">combo</span>
+          <span className={`text-white font-bold ${compact ? 'text-sm' : 'text-base'}`}>{combo}x</span>
+          {!compact && <span className="text-[10px] text-purple-200 ml-0.5">combo</span>}
         </motion.div>
       )}
     </div>
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {hasShield && (
         <motion.div 
-          className="bg-cyan-500/60 backdrop-blur-sm rounded-lg px-2 py-1"
+          className="bg-cyan-500/60 backdrop-blur-sm rounded-lg px-1.5 py-0.5"
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
         >
-          <span className="text-lg">🛡️</span>
+          <span className={compact ? 'text-sm' : 'text-lg'}>🛡️</span>
         </motion.div>
       )}
-      <div className="flex gap-1 bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1">
+      <div className="flex gap-0.5 bg-black/60 backdrop-blur-sm rounded-lg px-1.5 py-0.5">
         {Array.from({ length: 3 }).map((_, i) => (
           <motion.span 
             key={i} 
-            className={`text-lg ${i < lives ? '' : 'grayscale opacity-30'}`}
+            className={`${compact ? 'text-sm' : 'text-lg'} ${i < lives ? '' : 'grayscale opacity-30'}`}
             animate={i < lives ? { scale: [1, 1.1, 1] } : {}}
             transition={{ duration: 0.3 }}
           >
@@ -450,6 +451,7 @@ export const AstralFrequencyGame = ({
   tierAttackDamage = 15,
   difficulty = 'medium',
   isPractice = false,
+  compact = false,
 }: AstralFrequencyGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
   
@@ -681,7 +683,7 @@ export const AstralFrequencyGame = ({
       </Canvas>
       
       {/* HUD overlay */}
-      <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} distance={distance} />
+      <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} distance={distance} compact={compact} />
       
       {/* Controls - positioned at bottom */}
       <LaneControls 

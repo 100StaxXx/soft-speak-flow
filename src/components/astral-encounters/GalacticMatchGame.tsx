@@ -24,6 +24,7 @@ interface GalacticMatchGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // Difficulty config for lives and reveal time
@@ -175,6 +176,7 @@ export const GalacticMatchGame = ({
   questIntervalScale = 0,
   maxTimer,
   isPractice = false,
+  compact = false,
 }: GalacticMatchGameProps) => {
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const maxLives = MAX_LIVES_BY_DIFFICULTY[difficulty];
@@ -465,18 +467,18 @@ export const GalacticMatchGame = ({
   }), [config.cols, config.rows]);
 
   return (
-    <div className="flex flex-col items-center gap-2 p-3 select-none touch-none">
-      {/* Header with level, lives, and score - compact */}
+    <div className={`flex flex-col items-center ${compact ? 'gap-1 p-2' : 'gap-2 p-3'} select-none touch-none`}>
+      {/* Header with level, lives, and score - compact mode support */}
       <div className="w-full flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground text-[10px]">Level</span>
+        <div className="flex items-center gap-1">
+          {!compact && <span className="text-muted-foreground text-[10px]">Level</span>}
           <motion.span 
             key={level}
             initial={{ scale: 1.5, color: 'hsl(var(--primary))' }}
             animate={{ scale: 1, color: 'hsl(var(--foreground))' }}
-            className="font-bold text-base"
+            className={`font-bold ${compact ? 'text-sm' : 'text-base'}`}
           >
-            {level}
+            {compact ? `Lv${level}` : level}
           </motion.span>
         </div>
 

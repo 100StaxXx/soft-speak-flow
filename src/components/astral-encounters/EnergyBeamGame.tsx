@@ -17,6 +17,7 @@ interface EnergyBeamGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // ENDLESS mode config - no timer, no wave cap
@@ -600,6 +601,7 @@ export function EnergyBeamGame({
   difficulty = 'medium',
   questIntervalScale = 1,
   isPractice = false,
+  compact = false,
 }: EnergyBeamGameProps) {
   const config = DIFFICULTY_CONFIG[difficulty];
   
@@ -1217,47 +1219,49 @@ export function EnergyBeamGame({
     <div className="relative w-full h-full min-h-[500px] flex flex-col items-center overflow-hidden select-none">
       <StarfieldBackground />
       
-      {/* HUD - No timer, show wave without max */}
-      <div className="absolute top-0 left-0 right-0 z-30 p-3">
+      {/* HUD - No timer, show wave without max - compact mode support */}
+      <div className={`absolute top-0 left-0 right-0 z-30 ${compact ? 'p-2' : 'p-3'}`}>
         <div className="flex justify-between items-start">
           <div>
-            <div className="text-2xl font-black text-white" style={{ textShadow: '0 0 10px rgba(59,130,246,0.5)' }}>
+            <div className={`font-black text-white ${compact ? 'text-lg' : 'text-2xl'}`} style={{ textShadow: '0 0 10px rgba(59,130,246,0.5)' }}>
               {score.toLocaleString()}
             </div>
-            <div className="text-xs text-muted-foreground">SCORE</div>
+            {!compact && <div className="text-xs text-muted-foreground">SCORE</div>}
           </div>
           
           <div className="text-center">
-            <div className="text-lg font-bold text-cyan-400">WAVE {wave}</div>
-            <div className="text-xs text-muted-foreground">Endless Mode</div>
+            <div className={`font-bold text-cyan-400 ${compact ? 'text-sm' : 'text-lg'}`}>WAVE {wave}</div>
+            {!compact && <div className="text-xs text-muted-foreground">Endless Mode</div>}
           </div>
           
           <LivesDisplay lives={lives} />
         </div>
         
-        {/* Power-up indicators */}
-        <div className="flex gap-2 mt-2">
-          {hasShield && (
-            <div className="px-2 py-1 bg-blue-500/30 rounded text-xs text-blue-400 flex items-center gap-1">
-              <Shield className="w-3 h-3" /> SHIELD
-            </div>
-          )}
-          {rapidFire && (
-            <div className="px-2 py-1 bg-amber-500/30 rounded text-xs text-amber-400 flex items-center gap-1">
-              <Zap className="w-3 h-3" /> RAPID
-            </div>
-          )}
-          {isSlowMo && (
-            <div className="px-2 py-1 bg-purple-500/30 rounded text-xs text-purple-400 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> SLOW-MO
-            </div>
-          )}
-          {spreadShot && (
-            <div className="px-2 py-1 bg-pink-500/30 rounded text-xs text-pink-400 flex items-center gap-1">
-              <Crosshair className="w-3 h-3" /> SPREAD
-            </div>
-          )}
-        </div>
+        {/* Power-up indicators - hidden in compact mode */}
+        {!compact && (
+          <div className="flex gap-2 mt-2">
+            {hasShield && (
+              <div className="px-2 py-1 bg-blue-500/30 rounded text-xs text-blue-400 flex items-center gap-1">
+                <Shield className="w-3 h-3" /> SHIELD
+              </div>
+            )}
+            {rapidFire && (
+              <div className="px-2 py-1 bg-amber-500/30 rounded text-xs text-amber-400 flex items-center gap-1">
+                <Zap className="w-3 h-3" /> RAPID
+              </div>
+            )}
+            {isSlowMo && (
+              <div className="px-2 py-1 bg-purple-500/30 rounded text-xs text-purple-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" /> SLOW-MO
+              </div>
+            )}
+            {spreadShot && (
+              <div className="px-2 py-1 bg-pink-500/30 rounded text-xs text-pink-400 flex items-center gap-1">
+                <Crosshair className="w-3 h-3" /> SPREAD
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Slow-mo visual overlay */}
