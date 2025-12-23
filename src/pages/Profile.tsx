@@ -28,6 +28,7 @@ import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { AstrologySettings } from "@/components/AstrologySettings";
+import { DisplayNameSetting } from "@/components/DisplayNameSetting";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -356,6 +357,9 @@ const Profile = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Display Name Setting */}
+              <DisplayNameSetting />
 
               <SubscriptionManagement />
 
