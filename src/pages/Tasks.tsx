@@ -259,15 +259,22 @@ export default function Tasks() {
     safeLocalStorage.setItem(`tutorial_dismissed_${user.id}`, 'true');
     setShowTutorial(false);
     
-    if (profile) {
-      const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
-      const updatedData = { ...onboardingData, quests_tutorial_seen: true };
-      await supabase
-        .from('profiles')
-        .update({ onboarding_data: updatedData })
-        .eq('id', user.id);
-      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
-    }
+    // Fetch fresh profile data to avoid overwriting recent onboarding data (like userName)
+    const { data: freshProfile } = await supabase
+      .from('profiles')
+      .select('onboarding_data')
+      .eq('id', user.id)
+      .maybeSingle();
+    
+    const onboardingData = (freshProfile?.onboarding_data as Record<string, unknown>) || {};
+    const updatedData = { ...onboardingData, quests_tutorial_seen: true };
+    
+    await supabase
+      .from('profiles')
+      .update({ onboarding_data: updatedData })
+      .eq('id', user.id);
+    
+    queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
   };
 
   const handleAddQuest = async (data: AddQuestData) => {

@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Crown, Shield, Trophy, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 interface CommunityMembersSectionProps {
   communityId: string;
@@ -84,7 +83,7 @@ const MemberRow = ({ member, rank, isCurrentUser }: MemberRowProps) => {
     }
   };
 
-  const displayName = getUserDisplayName(member.profile);
+  const displayName = member.display_name;
   const companionImage = member.companion?.current_image_url;
 
   return (
