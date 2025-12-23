@@ -103,38 +103,44 @@ const sanitizeId = (id: string): string => {
 };
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
-  const colorConfig = Object.entries(config).filter(([_, config]) => config.theme || config.color);
+  const colorConfig = Object.entries(config).filter(([_, cfg]) => cfg.theme || cfg.color);
+  
+  // Sanitize the ID to prevent CSS selector injection
+  const safeId = sanitizeId(id);
+
+  // Build CSS custom properties safely using React's style injection
+  // This avoids dangerouslySetInnerHTML entirely
+  const styleRef = React.useRef<HTMLStyleElement | null>(null);
+  
+  React.useLayoutEffect(() => {
+    if (!colorConfig.length || !styleRef.current) return;
+    
+    // Build CSS text safely by validating all inputs
+    const cssRules = Object.entries(THEMES)
+      .map(([theme, prefix]) => {
+        const properties = colorConfig
+          .map(([key, itemConfig]) => {
+            const rawColor = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+            const safeKey = sanitizeKey(key);
+            const safeColor = rawColor ? sanitizeColor(rawColor) : null;
+            return safeColor ? `  --color-${safeKey}: ${safeColor};` : null;
+          })
+          .filter(Boolean)
+          .join("\n");
+        
+        return properties ? `${prefix} [data-chart=${safeId}] {\n${properties}\n}` : null;
+      })
+      .filter(Boolean)
+      .join("\n");
+    
+    styleRef.current.textContent = cssRules;
+  }, [colorConfig, safeId]);
 
   if (!colorConfig.length) {
     return null;
   }
 
-  // Sanitize the ID to prevent CSS selector injection
-  const safeId = sanitizeId(id);
-
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${safeId}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const rawColor = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    const safeKey = sanitizeKey(key);
-    const safeColor = rawColor ? sanitizeColor(rawColor) : null;
-    return safeColor ? `  --color-${safeKey}: ${safeColor};` : null;
-  })
-  .filter(Boolean)
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
-      }}
-    />
-  );
+  return <style ref={styleRef} />;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
