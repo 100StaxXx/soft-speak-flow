@@ -1169,14 +1169,11 @@ export function EnergyBeamGame({
     }, 2000);
   }, [enemies.length, wave, config, gameState, isPractice, onDamage]);
   
-  // Determine result based on performance
-  const getResult = useCallback((wavesCleared: number, hasLives: boolean): 'perfect' | 'good' | 'fail' => {
-    if (!hasLives) {
-      if (wavesCleared >= 4) return 'perfect';
-      if (wavesCleared >= 2) return 'good';
-      return 'fail';
-    }
-    return 'perfect';
+  // Determine result based on accuracy
+  const getResult = useCallback((accuracy: number): 'perfect' | 'good' | 'fail' => {
+    if (accuracy >= 90) return 'perfect';
+    if (accuracy >= 50) return 'good';
+    return 'fail';
   }, []);
   
   // Complete game - calculate result based on waves cleared
@@ -1186,7 +1183,7 @@ export function EnergyBeamGame({
     const stats = statsRef.current;
     const wavesCleared = stats.wavesCompleted;
     
-    // Accuracy based on waves cleared
+    // Accuracy based on waves cleared relative to difficulty threshold
     const waveThresholds: Record<ArcadeDifficulty, number> = { 
       beginner: 5, 
       easy: 4, 
@@ -1197,7 +1194,8 @@ export function EnergyBeamGame({
     const threshold = waveThresholds[difficulty];
     const accuracy = Math.min(100, Math.round((wavesCleared / threshold) * 100));
     
-    const result = getResult(wavesCleared, lives > 0);
+    // Determine result based on accuracy for consistency
+    const result = getResult(accuracy);
     
     const timer = setTimeout(() => {
       onComplete({
