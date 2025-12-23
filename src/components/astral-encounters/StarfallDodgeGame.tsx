@@ -520,7 +520,6 @@ export const StarfallDodgeGame = ({
 
   // Game loop - ENDLESS with progressive difficulty
   useGameLoop((deltaTime, time) => {
-    if (gameStateRef.current !== 'playing') return;
 
     const currentTime = Date.now();
     
@@ -767,7 +766,7 @@ export const StarfallDodgeGame = ({
                 magnetTimeLeft={magnetTimeLeft}
                 slowMoTimeLeft={slowMoTimeLeft}
               />
-              <LivesDisplay lives={lives} maxLives={5} />
+              <LivesDisplay lives={lives} maxLives={3} />
             </div>
           </div>
         </div>
