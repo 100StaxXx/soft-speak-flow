@@ -12,6 +12,7 @@ import { MentorQuickChat } from "@/components/MentorQuickChat";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { TodaysPepTalk } from "@/components/TodaysPepTalk";
 import { MorningCheckIn } from "@/components/MorningCheckIn";
+import { MorningBriefing } from "@/components/MorningBriefing";
 import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
 import { IndexPageSkeleton } from "@/components/skeletons";
@@ -301,6 +302,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             
             <ErrorBoundary>
               <MorningCheckIn />
+            </ErrorBoundary>
+
+            <ErrorBoundary>
+              <MorningBriefing className="animate-scale-in" />
             </ErrorBoundary>
 
             <ErrorBoundary>
