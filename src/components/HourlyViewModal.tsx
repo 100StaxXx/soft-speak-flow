@@ -32,34 +32,41 @@ export function HourlyViewModal({
   // Auto-scroll to show previous hour at top when modal opens
   useEffect(() => {
     if (open && scrollRef.current) {
-      const scrollToCurrentTime = () => {
-        const currentHour = new Date().getHours();
-        const previousHour = Math.max(0, currentHour - 1);
+      const currentHour = new Date().getHours();
+      const previousHour = Math.max(0, currentHour - 1);
+      // Each hour = 2 slots × 60px = 120px per hour
+      const targetScroll = previousHour * 120;
+      
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const attemptScroll = () => {
+        if (!scrollRef.current) return;
         
-        // Each hour = 2 slots × 60px = 120px per hour
-        const targetScroll = previousHour * 120;
+        const scrollableHeight = scrollRef.current.scrollHeight;
+        const containerHeight = scrollRef.current.clientHeight;
         
-        if (scrollRef.current) {
-          try {
-            scrollRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
-          } catch {
-            scrollRef.current.scrollTop = targetScroll;
-          }
+        // Check if content is fully rendered (48 slots × 60px = 2880px min)
+        if (scrollableHeight > 2000 && scrollableHeight > containerHeight) {
+          // Use direct scrollTop assignment (more reliable on iOS)
+          scrollRef.current.scrollTop = targetScroll;
           
-          // iOS fallback - verify scroll worked
+          // Verify it worked, retry if not
           requestAnimationFrame(() => {
-            if (scrollRef.current && scrollRef.current.scrollTop === 0 && targetScroll > 0) {
+            if (scrollRef.current && Math.abs(scrollRef.current.scrollTop - targetScroll) > 50) {
               scrollRef.current.scrollTop = targetScroll;
             }
           });
+        } else if (attempts < maxAttempts) {
+          // Content not ready yet, retry
+          attempts++;
+          setTimeout(attemptScroll, 150);
         }
       };
-
-      // Wait for dialog animation + render
-      const timer = setTimeout(() => {
-        requestAnimationFrame(scrollToCurrentTime);
-      }, 350);
-
+      
+      // Initial delay for dialog animation to complete
+      const timer = setTimeout(attemptScroll, 400);
+      
       return () => clearTimeout(timer);
     }
   }, [open]);
