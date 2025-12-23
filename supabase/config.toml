@@ -218,3 +218,6 @@ verify_jwt = false
 
 [functions.get-creator-stats]
 verify_jwt = false
+
+[functions.generate-morning-briefing]
+verify_jwt = true

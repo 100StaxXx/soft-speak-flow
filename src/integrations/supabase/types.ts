@@ -3843,6 +3843,66 @@ export type Database = {
         }
         Relationships: []
       }
+      morning_briefings: {
+        Row: {
+          action_prompt: string | null
+          briefing_date: string
+          content: string
+          created_at: string
+          data_snapshot: Json | null
+          dismissed_at: string | null
+          id: string
+          inferred_goals: Json | null
+          mentor_id: string | null
+          todays_focus: string | null
+          user_id: string
+          viewed_at: string | null
+        }
+        Insert: {
+          action_prompt?: string | null
+          briefing_date?: string
+          content: string
+          created_at?: string
+          data_snapshot?: Json | null
+          dismissed_at?: string | null
+          id?: string
+          inferred_goals?: Json | null
+          mentor_id?: string | null
+          todays_focus?: string | null
+          user_id: string
+          viewed_at?: string | null
+        }
+        Update: {
+          action_prompt?: string | null
+          briefing_date?: string
+          content?: string
+          created_at?: string
+          data_snapshot?: Json | null
+          dismissed_at?: string | null
+          id?: string
+          inferred_goals?: Json | null
+          mentor_id?: string | null
+          todays_focus?: string | null
+          user_id?: string
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "morning_briefings_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "morning_briefings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       muted_guild_users: {
         Row: {
           epic_id: string | null

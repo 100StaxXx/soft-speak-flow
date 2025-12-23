@@ -12,7 +12,9 @@ const ChatSchema = z.object({
     content: z.string().max(2000)
   })).max(20).optional(),
   mentorName: z.string().min(1).max(50),
-  mentorTone: z.string().min(1).max(200)
+  mentorTone: z.string().min(1).max(200),
+  comprehensiveMode: z.boolean().optional(),
+  briefingContext: z.string().max(5000).optional(),
 });
 
 const DAILY_MESSAGE_LIMIT = 20;
@@ -63,8 +65,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { message, conversationHistory, mentorName, mentorTone } = validation.data;
+    const { message, conversationHistory, mentorName, mentorTone, comprehensiveMode, briefingContext } = validation.data;
 
+    // Build additional context for comprehensive mode
+    let additionalContext = '';
+    if (briefingContext) {
+      additionalContext += `\n\nTODAY'S MORNING BRIEFING (you gave the user this earlier):\n${briefingContext}\n`;
+    }
+    if (comprehensiveMode) {
+      additionalContext += '\nThe user wants comprehensive, data-aware guidance. Reference their activities and goals.';
+    }
     // Check rate limit using shared rateLimiter
     const rateLimitCheck = await checkRateLimit(
       supabase,
@@ -118,18 +128,20 @@ Deno.serve(async (req) => {
       ? `Recent conversation context:\n${conversationHistory.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n')}`
       : '';
 
-    const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
+    const { systemPrompt: baseSystemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'mentor_chat',
       userId: user.id,
       variables: {
         mentorName,
         mentorTone,
         userMessage: message,
-        contextualInfo,
+        contextualInfo: contextualInfo + additionalContext,
         personalityAdjustments: '',
         maxSentences: 4
       }
     });
+
+    const systemPrompt = baseSystemPrompt;
 
     const messages = [
       { role: "system", content: systemPrompt },
