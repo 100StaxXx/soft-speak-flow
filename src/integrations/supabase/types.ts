@@ -4911,27 +4911,37 @@ export type Database = {
       }
       shout_push_log: {
         Row: {
-          epic_id: string
+          community_id: string | null
+          epic_id: string | null
           id: string
           recipient_id: string
           sender_id: string
           sent_at: string
         }
         Insert: {
-          epic_id: string
+          community_id?: string | null
+          epic_id?: string | null
           id?: string
           recipient_id: string
           sender_id: string
           sent_at?: string
         }
         Update: {
-          epic_id?: string
+          community_id?: string | null
+          epic_id?: string | null
           id?: string
           recipient_id?: string
           sender_id?: string
           sent_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shout_push_log_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shout_push_log_epic_id_fkey"
             columns: ["epic_id"]
