@@ -263,27 +263,31 @@ const generateFallbackPuzzle = (size: number, numPairs: number): Puzzle => {
   return { size, pairs, grid };
 };
 
-// Check if the puzzle is solved (all paths complete and grid filled)
+// Check if the puzzle is solved (all pairs connected - no need for 100% grid fill)
 export const isPuzzleSolved = (
   grid: Cell[][],
-  originalPairs: ColorPair[]
+  originalPairs: ColorPair[],
+  paths: Map<ColorId, { row: number; col: number }[]>
 ): boolean => {
-  // Check if all cells are filled
-  for (const row of grid) {
-    for (const cell of row) {
-      if (!cell.isEndpoint && cell.pathColor === null) {
-        return false;
-      }
-    }
-  }
-  
-  // Check if all pairs are connected
+  // Check if all pairs are connected via their paths
   for (const pair of originalPairs) {
-    const startCell = grid[pair.start.row][pair.start.col];
-    const endCell = grid[pair.end.row][pair.end.col];
+    const pathForColor = paths.get(pair.color);
+    if (!pathForColor || pathForColor.length < 2) {
+      return false;
+    }
     
-    // Both endpoints should have the path color set or be endpoints
-    if (!startCell.isEndpoint || !endCell.isEndpoint) {
+    // Check path connects both endpoints
+    const first = pathForColor[0];
+    const last = pathForColor[pathForColor.length - 1];
+    
+    const connectsStart = 
+      (first.row === pair.start.row && first.col === pair.start.col) ||
+      (last.row === pair.start.row && last.col === pair.start.col);
+    const connectsEnd = 
+      (first.row === pair.end.row && first.col === pair.end.col) ||
+      (last.row === pair.end.row && last.col === pair.end.col);
+    
+    if (!connectsStart || !connectsEnd) {
       return false;
     }
   }
