@@ -120,7 +120,7 @@ export const useTaskMutations = (taskDate: string) => {
       const previousDailyTasks = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
       const previousCalendarTasks = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
 
-      // Create optimistic task
+      // Create optimistic task with all required fields
       const optimisticTask = {
         id: `temp-${Date.now()}`,
         user_id: user?.id,
@@ -135,6 +135,14 @@ export const useTaskMutations = (taskDate: string) => {
         xp_reward: getEffectiveQuestXP(params.difficulty, 1),
         created_at: new Date().toISOString(),
         category: detectCategory(params.taskText, params.category),
+        is_bonus: false,
+        is_recurring: !!params.recurrencePattern,
+        recurrence_pattern: params.recurrencePattern || null,
+        recurrence_days: params.recurrenceDays || null,
+        reminder_enabled: params.reminderEnabled ?? false,
+        reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+        reminder_sent: false,
+        parent_template_id: null,
       };
 
       // Update all matching daily-tasks queries
