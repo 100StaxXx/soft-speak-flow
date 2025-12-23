@@ -53,7 +53,7 @@ export const BattleOverlay = memo(function BattleOverlay({
           paddingRight: 'env(safe-area-inset-right, 0px)',
         }}
       >
-        <div className="px-3 pt-1 pb-2">
+        <div className="px-2 pt-0.5 pb-1">
           {/* Large Widescreen Adversary Image */}
           <BossPortraitWidescreen
             imageUrl={adversaryImageUrl}
@@ -62,18 +62,18 @@ export const BattleOverlay = memo(function BattleOverlay({
             isDefeated={battleState.isAdversaryDefeated}
           />
           
-          {/* Adversary Name - Prominent & Centered */}
+          {/* Adversary Name - Compact */}
           <motion.div 
-            className="flex items-center justify-center gap-2 mt-2 mb-1.5"
+            className="flex items-center justify-center gap-1.5 mt-1 mb-0.5"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <span className="text-purple-400 text-sm">⚔️</span>
-            <h2 className="text-base font-bold text-purple-300 tracking-wide uppercase truncate max-w-[200px]">
+            <span className="text-purple-400 text-xs">⚔️</span>
+            <h2 className="text-sm font-bold text-purple-300 tracking-wide uppercase truncate max-w-[200px]">
               {adversaryName}
             </h2>
-            <span className="text-purple-400 text-sm">⚔️</span>
+            <span className="text-purple-400 text-xs">⚔️</span>
           </motion.div>
           
           {/* Full-Width Adversary HP Bar */}

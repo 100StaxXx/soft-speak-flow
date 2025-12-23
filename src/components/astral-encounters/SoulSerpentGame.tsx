@@ -18,6 +18,7 @@ interface SoulSerpentGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // Difficulty config for speed adjustments
@@ -461,6 +462,7 @@ export const SoulSerpentGame = ({
   questIntervalScale = 0,
   maxTimer,
   isPractice = false,
+  compact = false,
 }: SoulSerpentGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
   const [snake, setSnake] = useState<Position[]>([{ x: 5, y: 5 }]);
@@ -878,6 +880,7 @@ export const SoulSerpentGame = ({
           primaryStat={{ value: snake.length, label: 'Length', color: 'hsl(var(--primary))' }}
           isPaused={gameState === 'paused'}
           onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
+          compact={compact}
         />
 
 

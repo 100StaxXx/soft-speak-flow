@@ -16,6 +16,7 @@ interface OrbMatchGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // Difficulty multipliers for level scaling - balanced for higher base targets
@@ -541,7 +542,7 @@ OrbComponent.displayName = 'OrbComponent';
 
 // Main Game Component
 export const OrbMatchGame = ({
-  companionStats, onComplete, onDamage, tierAttackDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false,
+  companionStats, onComplete, onDamage, tierAttackDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false, compact = false,
 }: OrbMatchGameProps) => {
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'levelComplete' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -1251,6 +1252,7 @@ export const OrbMatchGame = ({
         primaryStat={{ value: score, label: `${score}/${levelConfig.targetScore}`, color: score >= levelConfig.targetScore ? '#22c55e' : '#a855f7' }}
         secondaryStat={{ value: levelsCompleted, label: `${levelsCompleted} cleared`, color: '#22d3ee' }}
         isPaused={gameState === 'paused'} onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}
+        compact={compact}
       />
 
       <div className="relative w-full max-w-xs mb-2">

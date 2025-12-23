@@ -17,6 +17,7 @@ interface GameHUDProps {
   subtitle?: string;
   primaryStat?: { value: number; label: string; color: string };
   secondaryStat?: { value: number; label: string; color: string };
+  compact?: boolean;
 }
 
 // Memoized stat badge for performance
@@ -26,7 +27,8 @@ const StatBadge = memo(({
   value, 
   maxValue, 
   color,
-  animate = false
+  animate = false,
+  compact = false
 }: {
   icon: React.ReactNode;
   label: string;
@@ -34,21 +36,22 @@ const StatBadge = memo(({
   maxValue?: number;
   color: string;
   animate?: boolean;
+  compact?: boolean;
 }) => (
   <motion.div 
-    className="flex items-center gap-2 px-3 py-1.5 rounded-xl stat-pill"
+    className={`flex items-center gap-1.5 rounded-xl stat-pill ${compact ? 'px-2 py-1' : 'px-3 py-1.5'}`}
     animate={animate ? { scale: [1, 1.08, 1] } : {}}
     transition={{ duration: 0.25 }}
   >
     <div 
-      className="p-1.5 rounded-lg"
+      className={compact ? "p-1 rounded-md" : "p-1.5 rounded-lg"}
       style={{ backgroundColor: `${color}20` }}
     >
       {icon}
     </div>
     <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-wider text-white/50 font-medium">{label}</span>
-      <span className="text-sm font-bold" style={{ color }}>
+      {!compact && <span className="text-[10px] uppercase tracking-wider text-white/50 font-medium">{label}</span>}
+      <span className={`font-bold ${compact ? 'text-xs' : 'text-sm'}`} style={{ color }}>
         {value}
         {maxValue !== undefined && (
           <span className="text-white/40 font-normal">/{maxValue}</span>
@@ -74,6 +77,7 @@ export const GameHUD = memo(({
   subtitle,
   primaryStat,
   secondaryStat,
+  compact = false,
 }: GameHUDProps) => {
   const [prevScore, setPrevScore] = useState(score);
   const [scoreAnimation, setScoreAnimation] = useState(false);
@@ -90,49 +94,52 @@ export const GameHUD = memo(({
   const isTimeLow = timeLeft !== undefined && timeLeft <= 3;
 
   return (
-    <div className="w-full px-3 py-2 mb-2">
-      {/* Title row with premium glass effect */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex-1">
-          <h3 className="text-base font-bold text-white tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="text-[10px] text-white/60 font-medium tracking-wide">{subtitle}</p>
+    <div className={`w-full ${compact ? 'px-2 py-1 mb-1' : 'px-3 py-2 mb-2'}`}>
+      {/* Title row - hidden in compact mode */}
+      {!compact && (
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1">
+            <h3 className="text-base font-bold text-white tracking-tight" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+              {title}
+            </h3>
+            {subtitle && (
+              <p className="text-[10px] text-white/60 font-medium tracking-wide">{subtitle}</p>
+            )}
+          </div>
+          
+          {onPauseToggle && (
+            <motion.button
+              onClick={onPauseToggle}
+              className="p-2.5 rounded-full transition-all"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+            >
+              {isPaused ? (
+                <Play className="w-4 h-4 text-white" />
+              ) : (
+                <Pause className="w-4 h-4 text-white" />
+              )}
+            </motion.button>
           )}
         </div>
-        
-        {onPauseToggle && (
-          <motion.button
-            onClick={onPauseToggle}
-            className="p-2.5 rounded-full transition-all"
-            style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: '0 4px 15px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.92 }}
-          >
-            {isPaused ? (
-              <Play className="w-4 h-4 text-white" />
-            ) : (
-              <Pause className="w-4 h-4 text-white" />
-            )}
-          </motion.button>
-        )}
-      </div>
+      )}
 
       {/* Stats row with badges */}
-      <div className="flex items-center justify-between gap-2 mb-2 overflow-x-auto scrollbar-hide">
+      <div className={`flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-hide ${compact ? 'mb-1' : 'mb-2'}`}>
         {score !== undefined && (
           <StatBadge
-            icon={<Star className="w-3.5 h-3.5 text-purple-400" />}
+            icon={<Star className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-purple-400`} />}
             label="Score"
             value={score}
             maxValue={maxScore}
             color="#a855f7"
             animate={scoreAnimation}
+            compact={compact}
           />
         )}
 
@@ -144,11 +151,12 @@ export const GameHUD = memo(({
               exit={{ scale: 0, opacity: 0 }}
             >
               <StatBadge
-                icon={<Zap className="w-3.5 h-3.5 text-yellow-400" />}
+                icon={<Zap className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-yellow-400`} />}
                 label="Combo"
                 value={`×${combo}`}
                 color="#fbbf24"
                 animate={true}
+                compact={compact}
               />
             </motion.div>
           )}
@@ -156,19 +164,21 @@ export const GameHUD = memo(({
 
         {primaryStat && (
           <StatBadge
-            icon={<div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: primaryStat.color }} />}
+            icon={<div className={`${compact ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full`} style={{ backgroundColor: primaryStat.color }} />}
             label={primaryStat.label}
             value={primaryStat.value}
             color={primaryStat.color}
+            compact={compact}
           />
         )}
 
         {secondaryStat && (
           <StatBadge
-            icon={<div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: secondaryStat.color }} />}
+            icon={<div className={`${compact ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full`} style={{ backgroundColor: secondaryStat.color }} />}
             label={secondaryStat.label}
             value={secondaryStat.value}
             color={secondaryStat.color}
+            compact={compact}
           />
         )}
 
@@ -178,10 +188,11 @@ export const GameHUD = memo(({
             transition={{ duration: 0.4, repeat: isTimeLow ? Infinity : 0 }}
           >
             <StatBadge
-              icon={<Timer className={`w-3.5 h-3.5 ${isTimeLow ? 'text-red-400' : 'text-white/60'}`} />}
+              icon={<Timer className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} ${isTimeLow ? 'text-red-400' : 'text-white/60'}`} />}
               label="Time"
               value={`${timeLeft}s`}
               color={isTimeLow ? '#ef4444' : '#94a3b8'}
+              compact={compact}
             />
           </motion.div>
         )}
@@ -190,7 +201,7 @@ export const GameHUD = memo(({
       {/* Premium timer progress bar with animated glow */}
       {totalTime !== undefined && timeLeft !== undefined && (
         <div 
-          className="h-2.5 rounded-full overflow-hidden"
+          className={`${compact ? 'h-1.5' : 'h-2.5'} rounded-full overflow-hidden`}
           style={{
             background: 'linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.06))',
             border: '1px solid rgba(255,255,255,0.08)',
@@ -220,8 +231,8 @@ export const GameHUD = memo(({
         </div>
       )}
 
-      {/* Phase dots */}
-      {phase !== undefined && totalPhases !== undefined && totalPhases > 1 && (
+      {/* Phase dots - hidden in compact mode */}
+      {!compact && phase !== undefined && totalPhases !== undefined && totalPhases > 1 && (
         <div className="flex justify-center gap-1.5 mt-3">
           {Array.from({ length: totalPhases }).map((_, i) => (
             <motion.div

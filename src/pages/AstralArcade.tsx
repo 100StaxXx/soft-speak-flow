@@ -528,11 +528,13 @@ export default function AstralArcade() {
   const renderGame = () => {
     if (!activeGame) return null;
 
+    const isBattleMode = arcadeMode === 'battle';
     const gameProps = {
       companionStats,
       difficulty,
       onComplete: handleGameComplete,
-      ...(arcadeMode === 'battle' && {
+      compact: isBattleMode,
+      ...(isBattleMode && {
         onDamage: handleDamage,
         tierAttackDamage,
       }),
@@ -701,10 +703,10 @@ export default function AstralArcade() {
                     variant="ghost"
                     size="sm"
                     onClick={handleExitGame}
-                    className={`${arcadeMode === 'battle' && gamePhase === 'playing' ? 'mb-1' : 'mb-4'} text-muted-foreground hover:text-white`}
+                    className={`${arcadeMode === 'battle' && gamePhase === 'playing' ? 'mb-1 p-2' : 'mb-4'} text-muted-foreground hover:text-white`}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Exit Game
+                    <ArrowLeft className="w-4 h-4" />
+                    {!(arcadeMode === 'battle' && gamePhase === 'playing') && <span className="ml-2">Exit Game</span>}
                   </Button>
                 )}
                 
