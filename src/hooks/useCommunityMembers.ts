@@ -11,8 +11,11 @@ export interface CommunityMember {
   total_contribution: number;
   joined_at: string;
   last_activity_at: string;
-  display_name: string;
-  faction?: string;
+  profile?: {
+    id: string;
+    email: string | null;
+    onboarding_data?: unknown;
+  };
   companion?: {
     id: string;
     current_xp: number;
@@ -45,9 +48,11 @@ export const useCommunityMembers = (communityId?: string) => {
       // Get user IDs to fetch profiles and companions
       const userIds = membersData.map(m => m.user_id);
 
-      // Use get_user_display_info RPC (SECURITY DEFINER bypasses RLS)
-      const { data: displayInfoData } = await supabase
-        .rpc("get_user_display_info", { p_user_ids: userIds });
+      // Fetch profiles for these users (including onboarding_data for display name)
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, email, onboarding_data")
+        .in("id", userIds);
 
       // Fetch companions for these users
       const { data: companions } = await supabase
@@ -57,14 +62,17 @@ export const useCommunityMembers = (communityId?: string) => {
 
       // Map data together
       return membersData.map(member => {
-        const displayInfo = displayInfoData?.find((d: { user_id: string }) => d.user_id === member.user_id);
+        const profile = profiles?.find(p => p.id === member.user_id);
         const companion = companions?.find(c => c.user_id === member.user_id);
         
         return {
           ...member,
           role: member.role as 'owner' | 'admin' | 'member',
-          display_name: displayInfo?.display_name || 'Adventurer',
-          faction: displayInfo?.faction,
+          profile: profile ? {
+            id: profile.id,
+            email: profile.email,
+            onboarding_data: profile.onboarding_data,
+          } : undefined,
           companion: companion ? {
             id: companion.id,
             current_xp: companion.current_xp,
