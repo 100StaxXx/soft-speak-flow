@@ -148,6 +148,19 @@ const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
     statBonus: 'mind',
     statIcon: Brain,
   },
+  stellar_flow: {
+    icon: Target,
+    title: "Stellar Flow",
+    goal: "Connect matching orbs with flowing paths!",
+    howToPlay: [
+      "Drag from one orb to its matching pair",
+      "Paths cannot cross each other",
+      "Fill every cell to complete the puzzle",
+      "Faster times = higher scores!"
+    ],
+    statBonus: 'soul',
+    statIcon: Sparkles,
+  },
 };
 
 const STAT_COLORS = {

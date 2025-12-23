@@ -24,7 +24,8 @@ export type MiniGameType =
   | 'soul_serpent'
   | 'orb_match'
   | 'galactic_match'
-  | 'cosmiq_grid';
+  | 'cosmiq_grid'
+  | 'stellar_flow';
 
 export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
 
@@ -59,6 +60,8 @@ export interface GameStats {
   notesHit?: number;
   puzzlesSolved?: number;
   hintsUsed?: number;
+  pathsConnected?: number;
+  cellsFilled?: number;
 }
 
 export interface Adversary {

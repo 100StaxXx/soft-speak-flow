@@ -42,6 +42,7 @@ import {
   Star,
   Crown,
   Flame,
+  GitBranch,
 } from 'lucide-react';
 
 // Lazy load mini-games for bundle optimization
@@ -54,6 +55,7 @@ const SoulSerpentGame = lazy(() => import('@/components/astral-encounters/SoulSe
 const OrbMatchGame = lazy(() => import('@/components/astral-encounters/OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
 const GalacticMatchGame = lazy(() => import('@/components/astral-encounters/GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
 const CosmiqGridGame = lazy(() => import('@/components/astral-encounters/CosmiqGridGame').then(m => ({ default: m.CosmiqGridGame })));
+const StellarFlowGame = lazy(() => import('@/components/astral-encounters/StellarFlowGame').then(m => ({ default: m.StellarFlowGame })));
 
 // Track which games user has practiced in this arcade session
 const arcadePracticedGames = new Set<MiniGameType>();
@@ -67,6 +69,7 @@ const GAMES = [
   { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
   { type: 'orb_match' as MiniGameType, label: 'Starburst', icon: Grid3X3, stat: 'mind' as const },
   { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
+  { type: 'stellar_flow' as MiniGameType, label: 'Stellar Flow', icon: GitBranch, stat: 'soul' as const },
 ];
 
 type Difficulty = ArcadeDifficulty;
@@ -552,6 +555,7 @@ export default function AstralArcade() {
         case 'orb_match': return OrbMatchGame;
         case 'galactic_match': return GalacticMatchGame;
         case 'cosmiq_grid': return CosmiqGridGame;
+        case 'stellar_flow': return StellarFlowGame;
         default: return null;
       }
     })();
