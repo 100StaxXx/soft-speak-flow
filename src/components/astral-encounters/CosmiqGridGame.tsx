@@ -4,7 +4,7 @@ import { MiniGameResult, EncounterResult } from '@/types/astralEncounters';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 import { DamageEvent } from '@/types/battleSystem';
 import { triggerHaptic } from './gameUtils';
-import { Undo2, Lightbulb, RotateCcw } from 'lucide-react';
+import { Undo2, Lightbulb, RotateCcw, Clock } from 'lucide-react';
 
 export interface CosmiqGridGameProps {
   onComplete: (result: MiniGameResult) => void;
@@ -25,13 +25,21 @@ interface MoveHistory {
   prevValue: CellValue;
 }
 
-// Difficulty configs: how many cells to remove (empty cells)
-const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { emptyCells: number; name: string }> = {
-  beginner: { emptyCells: 3, name: 'Beginner' },
-  easy: { emptyCells: 5, name: 'Easy' },
-  medium: { emptyCells: 7, name: 'Medium' },
-  hard: { emptyCells: 9, name: 'Hard' },
-  master: { emptyCells: 11, name: 'Master' },
+interface PuzzleData {
+  solution: Grid;
+  puzzle: Grid;
+  given: boolean[][];
+}
+
+const TOTAL_GRIDS = 3;
+
+// Difficulty configs: empty cells + time limit for all 3 grids
+const DIFFICULTY_CONFIG: Record<ArcadeDifficulty, { emptyCells: number; name: string; timeLimit: number }> = {
+  beginner: { emptyCells: 3, name: 'Beginner', timeLimit: 300 },  // 5 min
+  easy: { emptyCells: 5, name: 'Easy', timeLimit: 240 },          // 4 min
+  medium: { emptyCells: 7, name: 'Medium', timeLimit: 180 },      // 3 min
+  hard: { emptyCells: 9, name: 'Hard', timeLimit: 150 },          // 2.5 min
+  master: { emptyCells: 11, name: 'Master', timeLimit: 120 },     // 2 min
 };
 
 // Seeded random number generator
@@ -178,31 +186,112 @@ export const CosmiqGridGame = ({
     return parseInt(`${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`);
   }, []);
   
-  const { solution, puzzle: initialPuzzle, given } = useMemo(() => {
-    // Combine daily seed with difficulty for unique puzzles per difficulty
-    const combinedSeed = dailySeed + Object.keys(DIFFICULTY_CONFIG).indexOf(difficulty) * 1000;
-    const sol = generateSolution(combinedSeed);
-    const { puzzle, given } = createPuzzle(sol, config.emptyCells, combinedSeed);
-    return { solution: sol, puzzle, given };
+  // Generate 3 unique puzzles
+  const puzzles = useMemo((): PuzzleData[] => {
+    return [0, 1, 2].map(gridIndex => {
+      const combinedSeed = dailySeed + Object.keys(DIFFICULTY_CONFIG).indexOf(difficulty) * 1000 + gridIndex * 100;
+      const solution = generateSolution(combinedSeed);
+      const { puzzle, given } = createPuzzle(solution, config.emptyCells, combinedSeed);
+      return { solution, puzzle, given };
+    });
   }, [dailySeed, difficulty, config.emptyCells]);
   
-  const [grid, setGrid] = useState<Grid>(initialPuzzle);
+  // Multi-grid state
+  const [currentGridIndex, setCurrentGridIndex] = useState(0);
+  const [gridsCompleted, setGridsCompleted] = useState(0);
+  const [showRoundTransition, setShowRoundTransition] = useState(false);
+  
+  // Current puzzle state
+  const [grid, setGrid] = useState<Grid>(puzzles[0].puzzle.map(row => [...row]));
+  const [currentGiven, setCurrentGiven] = useState<boolean[][]>(puzzles[0].given);
+  const [currentSolution, setCurrentSolution] = useState<Grid>(puzzles[0].solution);
+  
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
   const [conflictCells, setConflictCells] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<MoveHistory[]>([]);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(config.timeLimit);
   const [gameComplete, setGameComplete] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [gameResult, setGameResult] = useState<'victory' | 'defeat' | null>(null);
   
-  // Timer
+  // Load puzzle for current grid index
+  const loadPuzzle = useCallback((index: number) => {
+    const puzzle = puzzles[index];
+    setGrid(puzzle.puzzle.map(row => [...row]));
+    setCurrentGiven(puzzle.given);
+    setCurrentSolution(puzzle.solution);
+    setHistory([]);
+    setSelectedCell(null);
+  }, [puzzles]);
+  
+  // Countdown timer
   useEffect(() => {
     if (gameComplete) return;
+    
     const interval = setInterval(() => {
-      setElapsedTime(t => t + 1);
+      setTimeRemaining(t => {
+        if (t <= 1) {
+          // TIME'S UP - DEFEAT!
+          clearInterval(interval);
+          handleDefeat();
+          return 0;
+        }
+        return t - 1;
+      });
     }, 1000);
+    
     return () => clearInterval(interval);
   }, [gameComplete]);
+  
+  const handleDefeat = useCallback(() => {
+    setGameComplete(true);
+    setGameResult('defeat');
+    triggerHaptic('error');
+    
+    setTimeout(() => {
+      const result: MiniGameResult = {
+        success: false,
+        accuracy: Math.round((gridsCompleted / TOTAL_GRIDS) * 100),
+        result: 'fail' as EncounterResult,
+        highScoreValue: gridsCompleted,
+        gameStats: {
+          time: config.timeLimit,
+          puzzlesSolved: gridsCompleted,
+          hintsUsed,
+        },
+      };
+      onComplete(result);
+    }, 2000);
+  }, [gridsCompleted, config.timeLimit, hintsUsed, onComplete]);
+  
+  const handleVictory = useCallback(() => {
+    setGameComplete(true);
+    setGameResult('victory');
+    setShowCelebration(true);
+    triggerHaptic('success');
+    
+    const timeUsed = config.timeLimit - timeRemaining;
+    const difficultyIndex = Object.keys(DIFFICULTY_CONFIG).indexOf(difficulty);
+    const baseXP = [15, 25, 35, 45, 60][difficultyIndex] * TOTAL_GRIDS;
+    const timeBonus = Math.round((timeRemaining / config.timeLimit) * 30);
+    const hintPenalty = hintsUsed * 3;
+    
+    setTimeout(() => {
+      const result: MiniGameResult = {
+        success: true,
+        accuracy: 100,
+        result: hintsUsed === 0 ? 'perfect' : 'good' as EncounterResult,
+        highScoreValue: timeUsed, // Lower is better
+        gameStats: {
+          time: timeUsed,
+          puzzlesSolved: TOTAL_GRIDS,
+          hintsUsed,
+        },
+      };
+      onComplete(result);
+    }, 2500);
+  }, [timeRemaining, config.timeLimit, hintsUsed, difficulty, onComplete]);
   
   // Update conflicts whenever grid changes
   useEffect(() => {
@@ -221,45 +310,41 @@ export const CosmiqGridGame = ({
     setConflictCells(newConflicts);
   }, [grid]);
   
-  // Check for completion
+  // Check for grid completion
   useEffect(() => {
-    if (!gameComplete && isPuzzleComplete(grid)) {
-      setGameComplete(true);
-      setShowCelebration(true);
+    if (gameComplete || showRoundTransition) return;
+    
+    if (isPuzzleComplete(grid)) {
+      const newCompleted = gridsCompleted + 1;
+      setGridsCompleted(newCompleted);
       triggerHaptic('success');
       
-      // Calculate result
-      const baseXP = [15, 25, 35, 45, 60][Object.keys(DIFFICULTY_CONFIG).indexOf(difficulty)];
-      const timeBonus = Math.max(0, 120 - elapsedTime) / 4; // Up to 30 bonus XP for speed
-      const hintPenalty = hintsUsed * 5;
-      
-      setTimeout(() => {
-        const result: MiniGameResult = {
-          success: true,
-          accuracy: 100,
-          result: hintsUsed === 0 ? 'perfect' : 'good' as EncounterResult,
-          highScoreValue: elapsedTime, // Lower is better for time-based
-          gameStats: {
-            time: elapsedTime,
-            puzzlesSolved: 1,
-            hintsUsed,
-          },
-        };
-        onComplete(result);
-      }, 2000);
+      if (newCompleted >= TOTAL_GRIDS) {
+        // ALL 3 GRIDS SOLVED - VICTORY!
+        handleVictory();
+      } else {
+        // Transition to next grid
+        setShowRoundTransition(true);
+        setTimeout(() => {
+          const nextIndex = currentGridIndex + 1;
+          setCurrentGridIndex(nextIndex);
+          loadPuzzle(nextIndex);
+          setShowRoundTransition(false);
+        }, 1500);
+      }
     }
-  }, [grid, gameComplete, elapsedTime, hintsUsed, difficulty, onComplete]);
+  }, [grid, gameComplete, gridsCompleted, currentGridIndex, showRoundTransition, loadPuzzle, handleVictory]);
   
   const handleCellTap = useCallback((row: number, col: number) => {
-    if (given[row][col] || gameComplete) return;
+    if (currentGiven[row][col] || gameComplete || showRoundTransition) return;
     setSelectedCell([row, col]);
     triggerHaptic('light');
-  }, [given, gameComplete]);
+  }, [currentGiven, gameComplete, showRoundTransition]);
   
   const handleNumberTap = useCallback((num: CellValue) => {
-    if (!selectedCell || gameComplete) return;
+    if (!selectedCell || gameComplete || showRoundTransition) return;
     const [row, col] = selectedCell;
-    if (given[row][col]) return;
+    if (currentGiven[row][col]) return;
     
     // Save to history
     setHistory(h => [...h.slice(-9), { row, col, prevValue: grid[row][col] }]);
@@ -282,10 +367,10 @@ export const CosmiqGridGame = ({
         onDamage({ target: 'player', amount: 5, source: 'conflict' });
       }
     }
-  }, [selectedCell, grid, given, gameComplete, onDamage]);
+  }, [selectedCell, grid, currentGiven, gameComplete, showRoundTransition, onDamage]);
   
   const handleUndo = useCallback(() => {
-    if (history.length === 0 || gameComplete) return;
+    if (history.length === 0 || gameComplete || showRoundTransition) return;
     const last = history[history.length - 1];
     setHistory(h => h.slice(0, -1));
     setGrid(g => {
@@ -294,18 +379,18 @@ export const CosmiqGridGame = ({
       return newGrid;
     });
     triggerHaptic('light');
-  }, [history, gameComplete]);
+  }, [history, gameComplete, showRoundTransition]);
   
   const handleHint = useCallback(() => {
-    if (gameComplete) return;
+    if (gameComplete || showRoundTransition) return;
     
     // Find first empty or wrong cell
     for (let r = 0; r < 4; r++) {
       for (let c = 0; c < 4; c++) {
-        if (!given[r][c] && grid[r][c] !== solution[r][c]) {
+        if (!currentGiven[r][c] && grid[r][c] !== currentSolution[r][c]) {
           setGrid(g => {
             const newGrid = g.map(row => [...row]);
-            newGrid[r][c] = solution[r][c];
+            newGrid[r][c] = currentSolution[r][c];
             return newGrid;
           });
           setHintsUsed(h => h + 1);
@@ -315,19 +400,30 @@ export const CosmiqGridGame = ({
         }
       }
     }
-  }, [grid, solution, given, gameComplete]);
+  }, [grid, currentSolution, currentGiven, gameComplete, showRoundTransition]);
   
   const handleReset = useCallback(() => {
-    setGrid(initialPuzzle);
-    setHistory([]);
-    setSelectedCell(null);
+    if (gameComplete || showRoundTransition) return;
+    loadPuzzle(currentGridIndex);
     triggerHaptic('medium');
-  }, [initialPuzzle]);
+  }, [currentGridIndex, loadPuzzle, gameComplete, showRoundTransition]);
   
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  const getTimerColor = () => {
+    if (timeRemaining <= 30) return 'text-red-400 animate-pulse';
+    if (timeRemaining <= 60) return 'text-amber-400';
+    return 'text-cyan-400';
+  };
+  
+  const getTimerBgColor = () => {
+    if (timeRemaining <= 30) return 'bg-red-500/30 border-red-500/50';
+    if (timeRemaining <= 60) return 'bg-amber-500/20 border-amber-500/30';
+    return 'bg-white/10 border-white/10';
   };
   
   return (
@@ -360,14 +456,41 @@ export const CosmiqGridGame = ({
       
       {/* Header */}
       <div className="relative z-10 flex items-center justify-between w-full max-w-xs mb-4">
-        <div className="text-sm font-medium text-muted-foreground">
-          {config.name}
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/10">
-          <span className="text-lg font-mono font-bold text-cyan-400">
-            {formatTime(elapsedTime)}
+        {/* Grid progress indicator */}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map(i => (
+              <motion.div 
+                key={i}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  i < gridsCompleted ? 'bg-green-400 shadow-[0_0_8px_hsl(142,69%,58%/0.5)]' :
+                  i === currentGridIndex ? 'bg-cyan-400 shadow-[0_0_8px_hsl(190,90%,50%/0.5)]' :
+                  'bg-white/20'
+                }`}
+                animate={i === currentGridIndex && !gameComplete ? {
+                  scale: [1, 1.2, 1],
+                } : {}}
+                transition={{ duration: 1, repeat: Infinity }}
+              />
+            ))}
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {gridsCompleted}/{TOTAL_GRIDS}
           </span>
         </div>
+        
+        {/* Countdown timer */}
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm border ${getTimerBgColor()}`}>
+          <Clock className={`w-4 h-4 ${getTimerColor()}`} />
+          <span className={`text-lg font-mono font-bold ${getTimerColor()}`}>
+            {formatTime(timeRemaining)}
+          </span>
+        </div>
+      </div>
+      
+      {/* Difficulty label */}
+      <div className="relative z-10 text-xs font-medium text-muted-foreground mb-2">
+        {config.name} • Grid {currentGridIndex + 1} of {TOTAL_GRIDS}
       </div>
       
       {/* Grid */}
@@ -375,6 +498,7 @@ export const CosmiqGridGame = ({
         className="relative z-10 grid grid-cols-4 gap-0.5 p-1 rounded-xl bg-white/5 backdrop-blur-xl border border-white/20"
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
+        key={currentGridIndex} // Re-animate on grid change
         style={{
           boxShadow: '0 0 40px hsl(270, 50%, 30% / 0.3)',
         }}
@@ -382,7 +506,7 @@ export const CosmiqGridGame = ({
         {grid.map((row, r) => (
           row.map((cell, c) => {
             const isSelected = selectedCell?.[0] === r && selectedCell?.[1] === c;
-            const isGiven = given[r][c];
+            const isGiven = currentGiven[r][c];
             const hasConflict = conflictCells.has(`${r}-${c}`);
             const isBoxBorderRight = c === 1;
             const isBoxBorderBottom = r === 1;
@@ -391,7 +515,7 @@ export const CosmiqGridGame = ({
               <motion.button
                 key={`${r}-${c}`}
                 onClick={() => handleCellTap(r, c)}
-                disabled={isGiven}
+                disabled={isGiven || showRoundTransition}
                 className={`
                   relative w-16 h-16 flex items-center justify-center text-2xl font-bold
                   transition-all duration-200
@@ -451,7 +575,7 @@ export const CosmiqGridGame = ({
           <motion.button
             key={num}
             onClick={() => handleNumberTap(num)}
-            disabled={!selectedCell || gameComplete}
+            disabled={!selectedCell || gameComplete || showRoundTransition}
             className={`
               w-14 h-14 rounded-xl text-xl font-bold
               bg-gradient-to-br from-cyan-500/20 to-purple-500/20
@@ -470,7 +594,7 @@ export const CosmiqGridGame = ({
         {/* Clear button */}
         <motion.button
           onClick={() => handleNumberTap(0)}
-          disabled={!selectedCell || gameComplete}
+          disabled={!selectedCell || gameComplete || showRoundTransition}
           className={`
             w-14 h-14 rounded-xl text-xl font-bold
             bg-gradient-to-br from-red-500/20 to-orange-500/20
@@ -495,7 +619,7 @@ export const CosmiqGridGame = ({
       >
         <button
           onClick={handleUndo}
-          disabled={history.length === 0 || gameComplete}
+          disabled={history.length === 0 || gameComplete || showRoundTransition}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-sm text-muted-foreground hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           <Undo2 className="w-4 h-4" />
@@ -504,7 +628,7 @@ export const CosmiqGridGame = ({
         
         <button
           onClick={handleHint}
-          disabled={gameComplete}
+          disabled={gameComplete || showRoundTransition}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-sm text-amber-300 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           <Lightbulb className="w-4 h-4" />
@@ -513,7 +637,7 @@ export const CosmiqGridGame = ({
         
         <button
           onClick={handleReset}
-          disabled={gameComplete}
+          disabled={gameComplete || showRoundTransition}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-sm text-muted-foreground hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           <RotateCcw className="w-4 h-4" />
@@ -521,9 +645,46 @@ export const CosmiqGridGame = ({
         </button>
       </motion.div>
       
-      {/* Celebration overlay */}
+      {/* Round transition overlay */}
       <AnimatePresence>
-        {showCelebration && (
+        {showRoundTransition && (
+          <motion.div
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="text-center"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              exit={{ scale: 0, rotate: 180 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            >
+              <motion.div
+                className="text-5xl mb-4"
+                animate={{ 
+                  scale: [1, 1.3, 1],
+                  rotate: [0, 360],
+                }}
+                transition={{ duration: 0.8 }}
+              >
+                🌟
+              </motion.div>
+              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
+                Grid {gridsCompleted} Complete!
+              </h3>
+              <p className="text-muted-foreground mt-2">
+                {TOTAL_GRIDS - gridsCompleted} remaining
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Victory celebration overlay */}
+      <AnimatePresence>
+        {showCelebration && gameResult === 'victory' && (
           <motion.div
             className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
             initial={{ opacity: 0 }}
@@ -536,6 +697,19 @@ export const CosmiqGridGame = ({
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 15 }}
             >
+              {/* Grid completion indicators */}
+              <div className="flex gap-3 justify-center mb-6">
+                {[0, 1, 2].map(i => (
+                  <motion.div 
+                    key={i}
+                    className="w-5 h-5 rounded-full bg-green-400 shadow-[0_0_15px_hsl(142,69%,58%/0.6)]"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: i * 0.2, type: 'spring' }}
+                  />
+                ))}
+              </div>
+              
               <motion.div
                 className="text-6xl mb-4"
                 animate={{
@@ -547,10 +721,62 @@ export const CosmiqGridGame = ({
                 ✨
               </motion.div>
               <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
-                Solved!
+                All Grids Solved!
               </h2>
               <p className="text-muted-foreground mt-2">
-                {formatTime(elapsedTime)} {hintsUsed === 0 ? '• No hints!' : `• ${hintsUsed} hint${hintsUsed > 1 ? 's' : ''}`}
+                {formatTime(timeRemaining)} remaining {hintsUsed === 0 ? '• No hints!' : `• ${hintsUsed} hint${hintsUsed > 1 ? 's' : ''}`}
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Defeat overlay */}
+      <AnimatePresence>
+        {gameResult === 'defeat' && (
+          <motion.div
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="text-center"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            >
+              {/* Partial progress */}
+              <div className="flex gap-3 justify-center mb-6">
+                {[0, 1, 2].map(i => (
+                  <motion.div 
+                    key={i}
+                    className={`w-5 h-5 rounded-full ${
+                      i < gridsCompleted 
+                        ? 'bg-green-400 shadow-[0_0_15px_hsl(142,69%,58%/0.6)]' 
+                        : 'bg-red-500/30 border border-red-500/50'
+                    }`}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                  />
+                ))}
+              </div>
+              
+              <motion.div
+                className="text-6xl mb-4"
+                animate={{
+                  opacity: [1, 0.5, 1],
+                }}
+                transition={{ duration: 1, repeat: 2 }}
+              >
+                ⏱️
+              </motion.div>
+              <h2 className="text-3xl font-bold text-red-400">
+                Time's Up!
+              </h2>
+              <p className="text-muted-foreground mt-2">
+                Completed {gridsCompleted} of {TOTAL_GRIDS} grids
               </p>
             </motion.div>
           </motion.div>
