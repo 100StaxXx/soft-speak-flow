@@ -20,6 +20,7 @@ interface StarfallDodgeGameProps {
   questIntervalScale?: number;
   maxTimer?: number;
   isPractice?: boolean;
+  compact?: boolean;
 }
 
 // Extended object types with new power-ups and obstacles
@@ -336,6 +337,7 @@ export const StarfallDodgeGame = ({
   difficulty = 'medium',
   questIntervalScale = 0,
   isPractice = false,
+  compact = false,
 }: StarfallDodgeGameProps) => {
   const [gameState, setGameState] = useState<'rotate' | 'permission' | 'countdown' | 'playing' | 'paused' | 'complete'>('rotate');
   const [useTilt, setUseTilt] = useState(false);
@@ -744,20 +746,20 @@ export const StarfallDodgeGame = ({
     >
       <StarBackground stars={stars} />
       
-      {/* Game HUD - Landscape optimized */}
+      {/* Game HUD - Landscape optimized, compact mode support */}
       {gameState !== 'rotate' && gameState !== 'permission' && (
-        <div className="absolute top-2 left-0 right-0 z-20 px-4">
+        <div className={`absolute top-1 left-0 right-0 z-20 ${compact ? 'px-2' : 'px-4'}`}>
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <div className="text-sm font-bold text-white/80">Starfall Dodge</div>
+            <div className="flex items-center gap-2">
+              {!compact && <div className="text-sm font-bold text-white/80">Starfall Dodge</div>}
               <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
-                <span className="text-cyan-400 text-sm">💎 {crystalsCollected}</span>
+                <span className={`text-cyan-400 ${compact ? 'text-xs' : 'text-sm'}`}>💎 {crystalsCollected}</span>
               </div>
               <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
-                <span className="text-yellow-400 text-sm">⏱️ {Math.floor(survivalTime)}s</span>
+                <span className={`text-yellow-400 ${compact ? 'text-xs' : 'text-sm'}`}>⏱️ {Math.floor(survivalTime)}s</span>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <ActivePowerupsDisplay 
                 hasShield={hasShield}
                 hasMagnet={hasMagnet}
@@ -772,7 +774,7 @@ export const StarfallDodgeGame = ({
       )}
       
       {/* Tilt indicator + Speed indicator - landscape position */}
-      {gameState === 'playing' && (
+      {gameState === 'playing' && !compact && (
         <div className="absolute top-10 left-1/2 -translate-x-1/2 flex gap-2">
           {useTilt && (
             <div className="bg-cyan-500/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-cyan-300">
