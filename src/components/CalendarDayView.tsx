@@ -16,6 +16,7 @@ interface CalendarDayViewProps {
   tasks: CalendarTask[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
+  onTaskLongPress?: (taskId: string) => void;
   fullDayMode?: boolean;
   hideHeader?: boolean;
 }
@@ -26,6 +27,7 @@ export const CalendarDayView = ({
   tasks,
   onTaskDrop,
   onTimeSlotLongPress,
+  onTaskLongPress,
   fullDayMode = false,
   hideHeader = false
 }: CalendarDayViewProps) => {
@@ -115,7 +117,7 @@ export const CalendarDayView = ({
       playSound('pop');
       const time24 = formatTime24(hour, minute);
       onTimeSlotLongPress?.(selectedDate, time24);
-    }, 500); // 500ms long press
+    }, 800); // 800ms long press - increased to prevent accidental triggers
     setLongPressTimer(timer);
   };
 
@@ -303,8 +305,8 @@ export const CalendarDayView = ({
         </Card>
       )}
 
-      {/* Unscheduled Tasks */}
-      {unscheduledTasks.length > 0 && (
+      {/* Unscheduled Tasks - Full section in normal mode */}
+      {!fullDayMode && unscheduledTasks.length > 0 && (
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -346,6 +348,15 @@ export const CalendarDayView = ({
               Show less
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Floating unscheduled count in fullDayMode */}
+      {fullDayMode && unscheduledTasks.length > 0 && (
+        <div className="flex justify-center">
+          <div className="rounded-full bg-muted/90 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-muted-foreground shadow-sm border border-border/50">
+            You have {unscheduledTasks.length} unscheduled quest{unscheduledTasks.length !== 1 ? 's' : ''}
+          </div>
         </div>
       )}
 
@@ -423,6 +434,7 @@ export const CalendarDayView = ({
                                 setDraggedTask(task.id);
                                 playSound('pop');
                               }}
+                              onLongPress={() => onTaskLongPress?.(task.id)}
                               showTime
                             />
                           </div>

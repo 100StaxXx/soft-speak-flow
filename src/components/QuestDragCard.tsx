@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Clock, Zap, Flame, Mountain, Star, Sparkles, Brain, Dumbbell, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ interface QuestDragCardProps {
   task: DragTask;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  onLongPress?: () => void;
   compact?: boolean;
   showTime?: boolean;
 }
@@ -59,8 +60,31 @@ const difficultyConfig = {
   },
 };
 
-export const QuestDragCard = ({ task, isDragging, onDragStart, compact = false, showTime = true }: QuestDragCardProps) => {
+export const QuestDragCard = ({ task, isDragging, onDragStart, onLongPress, compact = false, showTime = true }: QuestDragCardProps) => {
   const [isHovering, setIsHovering] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTriggered = useRef(false);
+
+  const handleTouchStart = () => {
+    if (!onLongPress) return;
+    longPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      onLongPress();
+    }, 600);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleTouchMove = () => {
+    // Cancel long press if user moves finger
+    handleTouchEnd();
+  };
 
   const difficulty = task.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
   const config = difficulty ? difficultyConfig[difficulty] : null;
@@ -103,6 +127,9 @@ export const QuestDragCard = ({ task, isDragging, onDragStart, compact = false, 
         )}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
       >
         {/* Main Quest Gold Shimmer */}
         {task.is_main_quest && !task.completed && (
