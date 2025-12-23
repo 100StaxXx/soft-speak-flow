@@ -5,7 +5,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { AskMentorChat } from "@/components/AskMentorChat";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { motion } from "framer-motion";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -21,9 +21,14 @@ export default function MentorChat() {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const haptics = useHapticFeedback();
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('mentor');
+
+  // Get briefing context from navigation state
+  const briefingContext = location.state?.briefingContext;
+  const comprehensiveMode = location.state?.comprehensiveMode || false;
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
     queryKey: ['mentor', profile?.selected_mentor_id],
@@ -134,6 +139,8 @@ export default function MentorChat() {
             mentorName={mentor.name}
             mentorTone={mentor.tone_description}
             mentorId={mentor.id}
+            briefingContext={briefingContext}
+            comprehensiveMode={comprehensiveMode}
           />
         </div>
         <BottomNav />

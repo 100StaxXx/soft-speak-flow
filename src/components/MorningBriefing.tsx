@@ -88,7 +88,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
     }
     
     // Otherwise navigate to Ask Mentor with context
-    navigate('/ask-mentor', {
+    navigate('/mentor-chat', {
       state: {
         initialMessage: briefing.action_prompt || "Let's discuss my morning briefing",
         briefingContext: briefing.content,
