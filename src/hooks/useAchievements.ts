@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { playAchievementUnlock } from "@/utils/soundEffects";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { AdversaryTheme } from "@/types/astralEncounters";
 
 interface AchievementData {
@@ -21,24 +21,22 @@ interface AchievementData {
 
 export const useAchievements = () => {
   const { user } = useAuth();
+  
+  // Track achievements already notified this session to prevent duplicate toasts
+  const notifiedAchievements = useRef<Set<string>>(new Set());
 
   const awardAchievement = useCallback(async (achievement: AchievementData) => {
     if (!user) return;
 
+    // Skip if already notified this session
+    if (notifiedAchievements.current.has(achievement.type)) return;
+    notifiedAchievements.current.add(achievement.type);
+
     try {
-      // Check if already earned
-      const { data: existing } = await supabase
+      // Use upsert with ignoreDuplicates to handle race conditions
+      const { data, error } = await supabase
         .from("achievements")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("achievement_type", achievement.type)
-        .maybeSingle();
-
-      if (existing) return; // Already earned
-
-      const { error } = await supabase
-        .from("achievements")
-        .insert({
+        .upsert({
           user_id: user.id,
           achievement_type: achievement.type,
           title: achievement.title,
@@ -46,9 +44,15 @@ export const useAchievements = () => {
           icon: achievement.icon,
           tier: achievement.tier,
           metadata: achievement.metadata || {},
-        });
+        }, {
+          onConflict: 'user_id,achievement_type',
+          ignoreDuplicates: true
+        })
+        .select('id')
+        .maybeSingle();
 
-      if (!error) {
+      // Only show toast if this was a new insert (data returned means it was inserted)
+      if (data && !error) {
         toast.success("🏆 Achievement Unlocked!", {
           description: achievement.title,
         });

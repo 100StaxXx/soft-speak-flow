@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageTransition } from '@/components/PageTransition';
@@ -513,8 +513,15 @@ export default function AstralArcade() {
     }
   }, [adversary, resetBattle]);
 
+  // Track if discovery achievement has been triggered this mount
+  const hasTriggeredDiscovery = useRef(false);
+
   useEffect(() => {
-    checkArcadeDiscovery();
+    // Only call discovery once per component mount
+    if (!hasTriggeredDiscovery.current) {
+      hasTriggeredDiscovery.current = true;
+      checkArcadeDiscovery();
+    }
     pauseAmbientForEvent();
     playEncounterTrigger();
     
@@ -527,7 +534,8 @@ export default function AstralArcade() {
       stopEncounterMusic();
       resumeAmbientAfterEvent();
     };
-  }, [checkArcadeDiscovery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const renderGame = () => {
     if (!activeGame) return null;
