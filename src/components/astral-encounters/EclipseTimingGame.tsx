@@ -26,7 +26,8 @@ type LaneType = 'moon' | 'star' | 'sun';
 interface Note {
   id: number;
   lane: LaneType;
-  spawnTime: number;
+  spawnTime: number; // ms since game start when note should spawn
+  expectedHitTime: number; // ms since game start when note should be hit
   y: number;
   hit: boolean;
   missed: boolean;
@@ -36,23 +37,35 @@ type HitResult = 'perfect' | 'great' | 'good' | 'miss';
 
 const LANE_INDICES: Record<LaneType, number> = { moon: 0, star: 1, sun: 2 };
 
+// Travel time for notes to go from top to hit zone (ms)
+const NOTE_TRAVEL_TIME_MS = 1500;
+
 const DIFFICULTY_CONFIG = {
-  beginner: { notesPerBeat: 0.25, scrollSpeed: 0.025, patterns: ['single'] as const },
-  easy: { notesPerBeat: 0.5, scrollSpeed: 0.035, patterns: ['single'] as const },
-  medium: { notesPerBeat: 1, scrollSpeed: 0.045, patterns: ['single', 'double'] as const },
-  hard: { notesPerBeat: 2, scrollSpeed: 0.055, patterns: ['single', 'double', 'triple'] as const },
-  master: { notesPerBeat: 3, scrollSpeed: 0.07, patterns: ['single', 'double', 'triple'] as const },
+  beginner: { notesPerBeat: 0.25, patterns: ['single'] as const },
+  easy: { notesPerBeat: 0.5, patterns: ['single'] as const },
+  medium: { notesPerBeat: 1, patterns: ['single', 'double'] as const },
+  hard: { notesPerBeat: 2, patterns: ['single', 'double', 'triple'] as const },
+  master: { notesPerBeat: 3, patterns: ['single', 'double', 'triple'] as const },
 };
 
-const TIMING_WINDOWS = { perfect: 5, great: 9, good: 14 };
+// TIME-BASED timing windows (ms) - much more reliable than position
+const TIMING_WINDOWS_MS = { 
+  perfect: 60,   // ±60ms window
+  great: 120,    // ±120ms window  
+  good: 180      // ±180ms window
+};
+
+// Audio latency compensation - adjust if taps feel early/late
+const AUDIO_LATENCY_OFFSET_MS = 30;
 
 const MAX_MISSES_BY_DIFFICULTY: Record<ArcadeDifficulty, number> = {
   beginner: 12, easy: 10, medium: 8, hard: 5, master: 3,
 };
 
-const HIT_ZONE_Y = 80;
-const MAX_HIT_EFFECTS = 4; // Reduced from 8
-const RENDER_THROTTLE_MS = 20; // Increased from 16 (~50fps is sufficient)
+// Hit zone at 85% - closer to the tap buttons for better visual-tactile connection
+const HIT_ZONE_Y = 85;
+const MAX_HIT_EFFECTS = 4;
+const RENDER_THROTTLE_MS = 16; // 60fps for smooth highway effect
 
 const HIT_RESULTS: Record<HitResult, { label: string; points: number; color: string }> = {
   perfect: { label: 'PERFECT!', points: 100, color: 'hsl(45, 100%, 60%)' },
@@ -61,10 +74,10 @@ const HIT_RESULTS: Record<HitResult, { label: string; points: number; color: str
   miss: { label: 'MISS', points: 0, color: 'hsl(0, 84%, 60%)' },
 };
 
-const LANE_CONFIG: Record<LaneType, { icon: typeof Moon; color: string }> = {
-  moon: { icon: Moon, color: 'hsl(271, 91%, 65%)' },
-  star: { icon: Star, color: 'hsl(45, 100%, 60%)' },
-  sun: { icon: Sun, color: 'hsl(25, 95%, 55%)' },
+const LANE_CONFIG: Record<LaneType, { icon: typeof Moon; color: string; glowColor: string }> = {
+  moon: { icon: Moon, color: 'hsl(271, 91%, 65%)', glowColor: 'hsl(271, 91%, 75%)' },
+  star: { icon: Star, color: 'hsl(45, 100%, 60%)', glowColor: 'hsl(45, 100%, 70%)' },
+  sun: { icon: Sun, color: 'hsl(25, 95%, 55%)', glowColor: 'hsl(25, 95%, 65%)' },
 };
 
 const LANES: LaneType[] = ['moon', 'star', 'sun'];
@@ -90,7 +103,7 @@ const initialGameStats: GameStats = {
   score: 0, combo: 0, maxCombo: 0, notesHit: 0, notesMissed: 0,
 };
 
-// OPTIMIZED: Static star background - no beat pulse, fewer elements
+// Static star background - highway style
 const StaticStarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
     {stars.map((star, i) => (
@@ -106,74 +119,118 @@ const StaticStarBackground = memo(({ stars }: { stars: ReturnType<typeof useStat
             ? 'hsl(45, 100%, 80%)'
             : 'hsl(210, 100%, 90%)',
           boxShadow: `0 0 ${2 + (i % 3)}px rgba(255,255,255,0.4)`,
-          opacity: 0.5 + (i % 4) * 0.1,
+          opacity: 0.4 + (i % 4) * 0.08,
         }}
       />
     ))}
-    {/* Simple nebula - no animation */}
+    {/* Cosmic nebula backdrop */}
     <div 
-      className="absolute inset-0 opacity-20"
+      className="absolute inset-0 opacity-25"
       style={{
-        background: 'radial-gradient(ellipse at 20% 30%, hsl(271, 50%, 30%) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, hsl(45, 50%, 20%) 0%, transparent 50%)',
+        background: 'radial-gradient(ellipse at 20% 20%, hsl(271, 50%, 25%) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, hsl(45, 50%, 15%) 0%, transparent 50%)',
       }}
     />
   </div>
 ));
 StaticStarBackground.displayName = 'StaticStarBackground';
 
-// OPTIMIZED: Simplified note orb - compact sizing
-// FIX: Use percentage instead of vh for proper positioning within container
-const NoteOrb = memo(({ note, laneIndex }: { note: Note; laneIndex: number }) => {
+// Guitar Hero style BAR NOTE with glowing trail
+const NoteBar = memo(({ note, laneIndex, gameTimeMs }: { note: Note; laneIndex: number; gameTimeMs: number }) => {
   const config = LANE_CONFIG[note.lane];
-  const Icon = config.icon;
+  
+  // Calculate how close to hit zone (for glow intensity)
+  const timeToHit = note.expectedHitTime - gameTimeMs;
+  const proximityFactor = Math.max(0, Math.min(1, 1 - (timeToHit / NOTE_TRAVEL_TIME_MS)));
+  const glowIntensity = 0.4 + proximityFactor * 0.6;
+  
+  // Trail length based on proximity - longer as it approaches
+  const trailLength = 30 + proximityFactor * 50;
   
   return (
     <div
-      className="absolute flex items-center justify-center"
+      className="absolute pointer-events-none"
       style={{
-        width: '52px',
-        height: '52px',
-        left: `calc(${(laneIndex + 0.5) * 33.33}% - 26px)`,
+        left: `calc(${(laneIndex + 0.5) * 33.33}% - 45px)`,
         top: `${note.y}%`,
         transform: 'translateY(-50%) translateZ(0)',
         willChange: 'transform',
         zIndex: 15,
       }}
     >
+      {/* Glowing trail effect */}
       <div
-        className="w-full h-full rounded-full flex items-center justify-center"
+        className="absolute left-1/2 -translate-x-1/2"
         style={{
-          background: `radial-gradient(circle at 30% 30%, ${config.color}, ${config.color}88)`,
-          boxShadow: `0 0 12px ${config.color}80`,
-          border: `2px solid ${config.color}`,
+          width: '60px',
+          height: `${trailLength}px`,
+          bottom: '100%',
+          background: `linear-gradient(to bottom, transparent 0%, ${config.color}40 50%, ${config.color}80 100%)`,
+          filter: `blur(${4 + proximityFactor * 4}px)`,
+          opacity: glowIntensity * 0.7,
+        }}
+      />
+      
+      {/* Main bar note - horizontal rectangle */}
+      <div
+        style={{
+          width: '90px',
+          height: '18px',
+          borderRadius: '9px',
+          background: `linear-gradient(180deg, ${config.glowColor} 0%, ${config.color} 50%, ${config.color}cc 100%)`,
+          boxShadow: `
+            0 0 ${10 + proximityFactor * 15}px ${config.color}${Math.round(glowIntensity * 99).toString(16).padStart(2, '0')},
+            0 0 ${20 + proximityFactor * 20}px ${config.color}60,
+            inset 0 2px 4px rgba(255,255,255,0.4),
+            inset 0 -2px 4px rgba(0,0,0,0.3)
+          `,
+          border: `2px solid ${config.glowColor}`,
+          transform: `scaleY(${1 + proximityFactor * 0.2})`,
+          transition: 'transform 0.05s ease-out',
         }}
       >
-        <Icon className="w-6 h-6 text-white" />
+        {/* Inner highlight */}
+        <div
+          className="absolute top-1 left-2 right-2 h-1 rounded-full"
+          style={{ background: 'rgba(255,255,255,0.5)' }}
+        />
       </div>
     </div>
   );
 });
-NoteOrb.displayName = 'NoteOrb';
+NoteBar.displayName = 'NoteBar';
 
-// OPTIMIZED: CSS-only hit effect - no particles, just text animation
+// Hit effect with flash animation
 const HitEffect = memo(({ lane, result }: { lane: LaneType; result: HitResult }) => {
   const laneIndex = LANE_INDICES[lane];
   const config = HIT_RESULTS[result];
+  const laneConfig = LANE_CONFIG[lane];
   
   return (
     <div
-      className="absolute flex items-center justify-center pointer-events-none animate-stellar-hit-text"
+      className="absolute flex flex-col items-center justify-center pointer-events-none"
       style={{
         left: `calc(${(laneIndex + 0.5) * 33.33}%)`,
         top: `${HIT_ZONE_Y}%`,
         transform: 'translate(-50%, -50%)',
       }}
     >
+      {/* Flash ring */}
+      <div
+        className="absolute animate-ping"
+        style={{
+          width: '80px',
+          height: '80px',
+          borderRadius: '50%',
+          border: `3px solid ${result === 'perfect' ? config.color : laneConfig.color}`,
+          opacity: 0.6,
+        }}
+      />
+      {/* Result text */}
       <span
-        className="text-xl font-black whitespace-nowrap"
+        className="text-xl font-black whitespace-nowrap animate-stellar-hit-text"
         style={{ 
           color: config.color, 
-          textShadow: `0 0 10px ${config.color}`,
+          textShadow: `0 0 15px ${config.color}, 0 0 30px ${config.color}80`,
         }}
       >
         {config.label}
@@ -183,7 +240,7 @@ const HitEffect = memo(({ lane, result }: { lane: LaneType; result: HitResult })
 });
 HitEffect.displayName = 'HitEffect';
 
-// Simplified lane button
+// Enhanced lane button with better touch handling
 const LaneButton = memo(({ 
   lane, 
   laneIndex, 
@@ -193,57 +250,77 @@ const LaneButton = memo(({
 }: { 
   lane: LaneType; 
   laneIndex: number; 
-  onTap: () => void;
+  onTap: (timestamp: number) => void;
   isPressed: boolean;
   hasApproachingNote: boolean;
 }) => {
   const config = LANE_CONFIG[lane];
   const Icon = config.icon;
-  const touchIdRef = useRef<number | null>(null);
+  const touchActiveRef = useRef<boolean>(false);
   
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+  // Use touchstart for faster mobile response
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (touchIdRef.current !== null) return;
-    touchIdRef.current = e.pointerId;
+    if (touchActiveRef.current) return;
+    touchActiveRef.current = true;
+    
+    // Get high-precision timestamp
+    const tapTime = performance.now();
     triggerHaptic('light');
-    onTap();
+    onTap(tapTime);
   }, [onTap]);
   
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (e.pointerId === touchIdRef.current) touchIdRef.current = null;
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    touchActiveRef.current = false;
   }, []);
   
-  const handlePointerCancel = useCallback(() => { touchIdRef.current = null; }, []);
+  // Fallback pointer events for desktop
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return; // Let touch events handle it
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const tapTime = performance.now();
+    triggerHaptic('light');
+    onTap(tapTime);
+  }, [onTap]);
   
   return (
     <button
       className="flex-1 h-full flex items-center justify-center relative overflow-hidden select-none"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         background: isPressed 
-          ? `linear-gradient(to top, ${config.color}70, ${config.color}20)` 
+          ? `linear-gradient(to top, ${config.color}80, ${config.color}30)` 
           : hasApproachingNote
-            ? `linear-gradient(to top, ${config.color}30, transparent)`
+            ? `linear-gradient(to top, ${config.color}40, transparent)`
             : 'transparent',
         touchAction: 'none',
         WebkitTapHighlightColor: 'transparent',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
       }}
     >
+      {/* Hit zone target circle */}
       <div
-        className="w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-75"
+        className="w-20 h-20 rounded-full flex items-center justify-center transition-all duration-50"
         style={{
           background: isPressed 
-            ? `radial-gradient(circle, ${config.color}, ${config.color}80)`
-            : `radial-gradient(circle, ${config.color}40, ${config.color}15)`,
-          border: `3px solid ${config.color}${isPressed ? '' : '80'}`,
+            ? `radial-gradient(circle, ${config.color}, ${config.color}90)`
+            : `radial-gradient(circle, ${config.color}50, ${config.color}20)`,
+          border: `4px solid ${config.color}${isPressed ? '' : '90'}`,
           boxShadow: isPressed 
-            ? `0 0 24px ${config.color}` 
-            : `0 0 8px ${config.color}30`,
-          transform: isPressed ? 'scale(0.9)' : 'scale(1)',
+            ? `0 0 30px ${config.color}, 0 0 60px ${config.color}60` 
+            : hasApproachingNote
+              ? `0 0 20px ${config.color}60`
+              : `0 0 10px ${config.color}40`,
+          transform: isPressed ? 'scale(0.85)' : 'scale(1)',
         }}
       >
         <Icon 
@@ -256,32 +333,35 @@ const LaneButton = memo(({
 });
 LaneButton.displayName = 'LaneButton';
 
+// Generate notes with time-based positioning
 const generateSyncedNotes = (bpm: number, durationSeconds: number, difficulty: ArcadeDifficulty): Note[] => {
   const config = DIFFICULTY_CONFIG[difficulty];
   const beatInterval = 60000 / bpm;
   const noteInterval = beatInterval / config.notesPerBeat;
   const notes: Note[] = [];
   
-  let time = 2000;
+  // First note hits at 2 seconds (spawn earlier based on travel time)
+  let hitTime = 2000;
   const endTime = (durationSeconds - 2) * 1000;
   
-  while (time < endTime) {
+  while (hitTime < endTime) {
     const patternType = config.patterns[Math.floor(Math.random() * config.patterns.length)];
+    const spawnTime = hitTime - NOTE_TRAVEL_TIME_MS;
     
     if (patternType === 'single') {
       const lane = LANES[Math.floor(Math.random() * 3)];
-      notes.push({ id: notes.length, lane, spawnTime: time, y: -10, hit: false, missed: false });
+      notes.push({ id: notes.length, lane, spawnTime, expectedHitTime: hitTime, y: -10, hit: false, missed: false });
     } else if (patternType === 'double') {
       const lanes = [...LANES].sort(() => Math.random() - 0.5).slice(0, 2);
       lanes.forEach(lane => {
-        notes.push({ id: notes.length, lane, spawnTime: time, y: -10, hit: false, missed: false });
+        notes.push({ id: notes.length, lane, spawnTime, expectedHitTime: hitTime, y: -10, hit: false, missed: false });
       });
     } else if (patternType === 'triple') {
       LANES.forEach(lane => {
-        notes.push({ id: notes.length, lane, spawnTime: time, y: -10, hit: false, missed: false });
+        notes.push({ id: notes.length, lane, spawnTime, expectedHitTime: hitTime, y: -10, hit: false, missed: false });
       });
     }
-    time += noteInterval;
+    hitTime += noteInterval;
   }
   return notes;
 };
@@ -326,6 +406,7 @@ export const EclipseTimingGame = ({
   const [showMissWarning, setShowMissWarning] = useState(false);
   const [showComboMultiplier, setShowComboMultiplier] = useState(false);
   const [beatPulse, setBeatPulse] = useState(false);
+  const [gameTimeMs, setGameTimeMs] = useState(0);
   
   const maxMisses = MAX_MISSES_BY_DIFFICULTY[difficulty];
   
@@ -338,7 +419,7 @@ export const EclipseTimingGame = ({
   const currentTrackRef = useRef<RhythmTrack | null>(null);
   const loadingStartRef = useRef<number>(0);
   
-  const stars = useStaticStars(15); // Reduced from 30
+  const stars = useStaticStars(20);
   const config = DIFFICULTY_CONFIG[difficulty];
   
   const { track, isLoading, isGenerating, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
@@ -391,7 +472,6 @@ export const EclipseTimingGame = ({
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch((e) => {
-        // Audio play can fail due to autoplay policy - this is expected
         if (e.name !== 'NotAllowedError') {
           console.warn('Audio play failed:', e.message);
         }
@@ -399,29 +479,31 @@ export const EclipseTimingGame = ({
     }
   }, []);
 
-  // OPTIMIZED: High-performance game loop with for-loop mutation
+  // High-performance game loop with time-based positioning
   useEffect(() => {
     if (gameState !== 'playing') return;
     
-    const scrollSpeed = config.scrollSpeed;
-    const missThreshold = HIT_ZONE_Y + TIMING_WINDOWS.good + 5;
+    const missThresholdMs = TIMING_WINDOWS_MS.good + 50; // Miss if 50ms past good window
     
     const gameLoop = (currentTime: number) => {
       const gameTime = currentTime - gameStartTimeRef.current;
       const notes = notesRef.current;
       let missCount = 0;
       
-      // OPTIMIZED: For loop with in-place mutation
+      // Update note positions based on time
       for (let i = 0; i < notes.length; i++) {
         const note = notes[i];
         if (note.hit || note.missed) continue;
         
-        const timeSinceSpawn = gameTime - note.spawnTime;
-        if (timeSinceSpawn < 0) continue;
+        // Calculate Y position based on time to hit
+        const timeToHit = note.expectedHitTime - gameTime;
+        const progress = 1 - (timeToHit / NOTE_TRAVEL_TIME_MS);
         
-        note.y = timeSinceSpawn * scrollSpeed;
+        // Note Y position: -10% at spawn, HIT_ZONE_Y% at hit time
+        note.y = -10 + (progress * (HIT_ZONE_Y + 10));
         
-        if (note.y > missThreshold) {
+        // Check if note was missed (past the hit window)
+        if (gameTime > note.expectedHitTime + missThresholdMs) {
           note.missed = true;
           missCount++;
         }
@@ -451,19 +533,20 @@ export const EclipseTimingGame = ({
         }
       }
       
-      // OPTIMIZED: Throttled render sync
+      // Throttled render sync
       if (currentTime - lastRenderTimeRef.current >= RENDER_THROTTLE_MS) {
         lastRenderTimeRef.current = currentTime;
         
         const visible: Note[] = [];
         for (let i = 0; i < notes.length; i++) {
           const note = notes[i];
-          if (!note.hit && !note.missed && note.y >= -15 && note.y <= 105) {
+          if (!note.hit && !note.missed && note.y >= -15 && note.y <= 100) {
             visible.push({ ...note });
           }
         }
         setVisibleNotes(visible);
         setGameStats({ ...gameStatsRef.current });
+        setGameTimeMs(gameTime);
         
         // Update warning/multiplier visibility
         const stats = gameStatsRef.current;
@@ -507,35 +590,40 @@ export const EclipseTimingGame = ({
     
     animationFrameRef.current = requestAnimationFrame(gameLoop);
     return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); };
-  }, [gameState, config.scrollSpeed, isPractice, onDamage, maxMisses]);
+  }, [gameState, isPractice, onDamage, maxMisses]);
 
-  const handleLaneTap = useCallback((lane: LaneType) => {
+  // TIME-BASED hit detection
+  const handleLaneTap = useCallback((lane: LaneType, tapTimestamp: number) => {
     if (gameState !== 'playing') return;
     
+    // Visual feedback
     setPressedLanes(prev => ({ ...prev, [lane]: true }));
-    setTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 100);
+    setTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 80);
     
+    const gameTime = tapTimestamp - gameStartTimeRef.current + AUDIO_LATENCY_OFFSET_MS;
     const notes = notesRef.current;
     let closestNote: Note | null = null;
-    let closestDist = Infinity;
+    let closestTimeDiff = Infinity;
     
+    // Find closest unhit note in this lane by TIME
     for (let i = 0; i < notes.length; i++) {
       const note = notes[i];
       if (note.lane !== lane || note.hit || note.missed) continue;
-      const dist = Math.abs(note.y - HIT_ZONE_Y);
-      if (dist < closestDist) {
-        closestDist = dist;
+      
+      const timeDiff = Math.abs(gameTime - note.expectedHitTime);
+      if (timeDiff < closestTimeDiff && timeDiff <= TIMING_WINDOWS_MS.good) {
+        closestTimeDiff = timeDiff;
         closestNote = note;
       }
     }
     
     if (!closestNote) return;
     
+    // Determine hit quality based on TIME difference
     let result: HitResult;
-    if (closestDist <= TIMING_WINDOWS.perfect) result = 'perfect';
-    else if (closestDist <= TIMING_WINDOWS.great) result = 'great';
-    else if (closestDist <= TIMING_WINDOWS.good) result = 'good';
-    else return;
+    if (closestTimeDiff <= TIMING_WINDOWS_MS.perfect) result = 'perfect';
+    else if (closestTimeDiff <= TIMING_WINDOWS_MS.great) result = 'great';
+    else result = 'good';
     
     closestNote.hit = true;
     
@@ -553,7 +641,7 @@ export const EclipseTimingGame = ({
     };
     setGameStats({ ...gameStatsRef.current });
     
-    // OPTIMIZED: Fewer effects, shorter timeout
+    // Hit effect
     const effectId = Date.now();
     setHitEffects(prev => [...prev.slice(-(MAX_HIT_EFFECTS - 1)), { id: effectId, lane, result }]);
     setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== effectId)), 400);
@@ -565,9 +653,10 @@ export const EclipseTimingGame = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (gameState !== 'playing') return;
-      if (e.key === 'a' || e.key === 'ArrowLeft') handleLaneTap('moon');
-      else if (e.key === 's' || e.key === 'ArrowDown') handleLaneTap('star');
-      else if (e.key === 'd' || e.key === 'ArrowRight') handleLaneTap('sun');
+      const timestamp = performance.now();
+      if (e.key === 'a' || e.key === 'ArrowLeft') handleLaneTap('moon', timestamp);
+      else if (e.key === 's' || e.key === 'ArrowDown') handleLaneTap('star', timestamp);
+      else if (e.key === 'd' || e.key === 'ArrowRight') handleLaneTap('sun', timestamp);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -632,7 +721,6 @@ export const EclipseTimingGame = ({
       if (gameState === 'paused') audioRef.current.pause();
       else if (gameState === 'playing') {
         audioRef.current.play().catch((e) => {
-          // Audio play can fail due to autoplay policy - expected behavior
           if (e.name !== 'NotAllowedError') {
             console.warn('Audio play failed:', e.message);
           }
@@ -649,7 +737,7 @@ export const EclipseTimingGame = ({
     
     const interval = setInterval(() => {
       setBeatPulse(true);
-      setTimeout(() => setBeatPulse(false), 100);
+      setTimeout(() => setBeatPulse(false), 80);
     }, beatInterval);
     
     return () => clearInterval(interval);
@@ -658,7 +746,7 @@ export const EclipseTimingGame = ({
   const approachingLanes = useMemo(() => {
     const approaching: Record<LaneType, boolean> = { moon: false, star: false, sun: false };
     for (const note of visibleNotes) {
-      if (note.y > HIT_ZONE_Y - 25 && note.y < HIT_ZONE_Y + 10) {
+      if (note.y > HIT_ZONE_Y - 20 && note.y < HIT_ZONE_Y + 5) {
         approaching[note.lane] = true;
       }
     }
@@ -724,7 +812,7 @@ export const EclipseTimingGame = ({
         compact={compact}
       />
       
-      {/* OPTIMIZED: CSS-only warning */}
+      {/* Miss warning */}
       {showMissWarning && gameState === 'playing' && (
         <div
           className="absolute top-20 right-4 z-30 px-3 py-1 rounded-full text-sm font-bold animate-pulse"
@@ -734,7 +822,7 @@ export const EclipseTimingGame = ({
         </div>
       )}
       
-      {/* OPTIMIZED: CSS-only combo multiplier */}
+      {/* Combo multiplier */}
       {showComboMultiplier && (
         <div
           className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full text-base font-bold"
@@ -744,83 +832,110 @@ export const EclipseTimingGame = ({
         </div>
       )}
 
+      {/* HIGHWAY CONTAINER with 3D perspective */}
       <div 
         className="relative w-full rounded-xl overflow-hidden"
         style={{
-          background: 'linear-gradient(to bottom, hsl(240, 30%, 6%), hsl(260, 35%, 10%), hsl(270, 40%, 12%))',
+          background: 'linear-gradient(to bottom, hsl(240, 35%, 5%), hsl(260, 40%, 8%), hsl(270, 45%, 10%))',
           height: 'calc(100% - 100px)',
           minHeight: '350px',
           touchAction: 'none',
+          perspective: '800px',
+          perspectiveOrigin: 'center 30%',
         }}
       >
         <StaticStarBackground stars={stars} />
         
-        {/* Lane dividers */}
-        <div className="absolute inset-0 flex pointer-events-none">
-          {LANES.map((lane) => (
-            <div key={lane} className="flex-1 border-r last:border-r-0" style={{ borderColor: 'hsl(var(--border) / 0.35)' }} />
-          ))}
-        </div>
-        
-        {/* Lane glow trails - enhanced visibility */}
-        <div className="absolute inset-0 flex pointer-events-none">
-          {LANES.map((lane) => {
-            const laneConfig = LANE_CONFIG[lane];
-            const hasApproaching = approachingLanes[lane];
-            return (
-              <div
-                key={lane}
-                className="flex-1 transition-all duration-150"
-                style={{
-                  background: `linear-gradient(to bottom, 
-                    transparent 0%, 
-                    ${laneConfig.color}${hasApproaching ? '20' : '10'} 30%, 
-                    ${laneConfig.color}${hasApproaching ? '35' : '18'} 60%, 
-                    ${laneConfig.color}${hasApproaching ? '50' : '25'} 100%)`,
+        {/* Highway track with 3D transform */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: 'rotateX(35deg)',
+            transformOrigin: 'center bottom',
+          }}
+        >
+          {/* Lane dividers - converging lines for highway effect */}
+          <div className="absolute inset-0 flex pointer-events-none">
+            {LANES.map((lane, index) => (
+              <div 
+                key={lane} 
+                className="flex-1 relative"
+                style={{ 
+                  borderRight: index < 2 ? `2px solid hsl(var(--border) / 0.4)` : 'none',
                 }}
-              />
-            );
-          })}
+              >
+                {/* Center lane glow line */}
+                <div
+                  className="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2"
+                  style={{
+                    background: `linear-gradient(to bottom, ${LANE_CONFIG[lane].color}10 0%, ${LANE_CONFIG[lane].color}30 50%, ${LANE_CONFIG[lane].color}50 100%)`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Lane glow trails */}
+          <div className="absolute inset-0 flex pointer-events-none">
+            {LANES.map((lane) => {
+              const laneConfig = LANE_CONFIG[lane];
+              const hasApproaching = approachingLanes[lane];
+              return (
+                <div
+                  key={lane}
+                  className="flex-1 transition-all duration-100"
+                  style={{
+                    background: `linear-gradient(to bottom, 
+                      transparent 0%, 
+                      ${laneConfig.color}${hasApproaching ? '18' : '08'} 40%, 
+                      ${laneConfig.color}${hasApproaching ? '40' : '20'} 70%, 
+                      ${laneConfig.color}${hasApproaching ? '60' : '30'} 100%)`,
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
 
-        {/* Hit zone glow band - ambient glow around hit line */}
+        {/* Hit zone glow band */}
         <div
           className="absolute left-0 right-0 pointer-events-none z-8"
           style={{
-            top: `${HIT_ZONE_Y - 3}%`,
-            height: '7%',
-            background: `linear-gradient(to bottom, transparent, hsl(45, 100%, 60% / ${beatPulse ? 0.25 : 0.12}), transparent)`,
-            transition: 'background 0.1s ease-out',
+            top: `${HIT_ZONE_Y - 4}%`,
+            height: '10%',
+            background: `linear-gradient(to bottom, transparent, hsl(45, 100%, 60% / ${beatPulse ? 0.3 : 0.15}), transparent)`,
+            transition: 'background 0.08s ease-out',
           }}
         />
 
-        {/* Beat indicator - central burst that pulses with BPM */}
+        {/* Beat pulse center burst */}
         <div
-          className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-6 transition-all duration-75"
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-6 transition-all duration-60"
           style={{
             top: `${HIT_ZONE_Y}%`,
             transform: 'translate(-50%, -50%)',
-            width: beatPulse ? '140px' : '100px',
-            height: beatPulse ? '140px' : '100px',
+            width: beatPulse ? '180px' : '120px',
+            height: beatPulse ? '180px' : '120px',
             borderRadius: '50%',
-            background: `radial-gradient(circle, hsl(45, 100%, 80% / ${beatPulse ? 0.35 : 0.08}), transparent 70%)`,
-            boxShadow: beatPulse ? '0 0 60px hsl(45, 100%, 60% / 0.5)' : 'none',
+            background: `radial-gradient(circle, hsl(45, 100%, 80% / ${beatPulse ? 0.4 : 0.1}), transparent 70%)`,
+            boxShadow: beatPulse ? '0 0 80px hsl(45, 100%, 60% / 0.6)' : 'none',
           }}
         />
 
-        {/* Hit zone line - thicker and more prominent */}
+        {/* Hit zone line - prominent bar */}
         <div
           className="absolute left-0 right-0 pointer-events-none z-10"
           style={{
             top: `${HIT_ZONE_Y}%`,
-            height: '5px',
+            height: '6px',
             background: 'linear-gradient(90deg, hsl(271, 91%, 65%), hsl(45, 100%, 60%), hsl(25, 95%, 55%))',
-            boxShadow: `0 0 20px hsl(45, 100%, 60% / 0.7), 0 0 40px hsl(45, 100%, 60% / ${beatPulse ? 0.5 : 0.3})`,
-            transition: 'box-shadow 0.1s ease-out',
+            boxShadow: `0 0 25px hsl(45, 100%, 60% / 0.8), 0 0 50px hsl(45, 100%, 60% / ${beatPulse ? 0.6 : 0.4})`,
+            transition: 'box-shadow 0.08s ease-out',
           }}
         />
         
-        {/* Hit zone targets - enhanced with glow and pulse on approach */}
+        {/* Hit zone targets */}
         <div className="absolute left-0 right-0 flex justify-around pointer-events-none z-5" style={{ top: `${HIT_ZONE_Y}%`, transform: 'translateY(-50%)' }}>
           {LANES.map(lane => {
             const laneConfig = LANE_CONFIG[lane];
@@ -828,38 +943,38 @@ export const EclipseTimingGame = ({
             return (
               <div 
                 key={lane} 
-                className="w-20 h-20 rounded-full transition-all duration-150"
+                className="w-24 h-6 rounded-full transition-all duration-100"
                 style={{ 
-                  borderWidth: '3px',
-                  borderStyle: 'solid',
-                  borderColor: hasApproaching ? laneConfig.color : `${laneConfig.color}50`,
-                  opacity: hasApproaching ? 0.9 : 0.5,
+                  background: hasApproaching 
+                    ? `linear-gradient(180deg, ${laneConfig.color}60, ${laneConfig.color}30)`
+                    : `linear-gradient(180deg, ${laneConfig.color}30, ${laneConfig.color}10)`,
+                  border: `3px solid ${hasApproaching ? laneConfig.color : `${laneConfig.color}60`}`,
                   boxShadow: hasApproaching 
-                    ? `0 0 20px ${laneConfig.color}, inset 0 0 15px ${laneConfig.color}40` 
-                    : `0 0 10px ${laneConfig.color}30`,
-                  transform: hasApproaching ? 'scale(1.05)' : 'scale(1)',
+                    ? `0 0 25px ${laneConfig.color}, inset 0 0 10px ${laneConfig.color}40` 
+                    : `0 0 12px ${laneConfig.color}40`,
+                  transform: hasApproaching ? 'scaleX(1.1)' : 'scaleX(1)',
                 }} 
               />
             );
           })}
         </div>
 
-        {/* Lane icons */}
+        {/* Lane icons at top */}
         <div className="absolute top-4 left-0 right-0 flex justify-around pointer-events-none z-20">
           {LANES.map(lane => {
             const laneConfig = LANE_CONFIG[lane];
             const Icon = laneConfig.icon;
             return (
-              <div key={lane} className="p-2 rounded-full" style={{ background: `${laneConfig.color}20` }}>
-                <Icon className="w-6 h-6" style={{ color: laneConfig.color, opacity: 0.8 }} />
+              <div key={lane} className="p-2 rounded-full" style={{ background: `${laneConfig.color}25` }}>
+                <Icon className="w-6 h-6" style={{ color: laneConfig.color, opacity: 0.9 }} />
               </div>
             );
           })}
         </div>
 
-        {/* Notes */}
+        {/* BAR NOTES with trails */}
         {visibleNotes.map(note => (
-          <NoteOrb key={note.id} note={note} laneIndex={LANE_INDICES[note.lane]} />
+          <NoteBar key={note.id} note={note} laneIndex={LANE_INDICES[note.lane]} gameTimeMs={gameTimeMs} />
         ))}
 
         {/* Hit effects */}
@@ -868,13 +983,13 @@ export const EclipseTimingGame = ({
         ))}
 
         {/* Lane buttons */}
-        <div className="absolute bottom-0 left-0 right-0 flex" style={{ height: '18%' }}>
+        <div className="absolute bottom-0 left-0 right-0 flex" style={{ height: '14%' }}>
           {LANES.map((lane, i) => (
             <LaneButton
               key={lane}
               lane={lane}
               laneIndex={i}
-              onTap={() => handleLaneTap(lane)}
+              onTap={(timestamp) => handleLaneTap(lane, timestamp)}
               isPressed={pressedLanes[lane]}
               hasApproachingNote={approachingLanes[lane]}
             />
@@ -884,7 +999,7 @@ export const EclipseTimingGame = ({
 
       {gameState === 'playing' && (
         <div className="text-center py-2 text-xs text-muted-foreground">
-          Tap lanes when notes reach the line • Keys: A/S/D or ←/↓/→
+          Tap lanes when bars reach the line • Keys: A/S/D or ←/↓/→
         </div>
       )}
     </div>
