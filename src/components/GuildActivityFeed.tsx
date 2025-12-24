@@ -13,7 +13,8 @@ import {
   Flame, 
   Sparkles,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  type LucideIcon
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,7 @@ interface GuildActivityFeedProps {
 }
 
 const ACTIVITY_CONFIG: Record<string, { 
-  icon: React.ElementType; 
+  icon: LucideIcon; 
   color: string; 
   format: (data: Record<string, any>) => string;
 }> = {
