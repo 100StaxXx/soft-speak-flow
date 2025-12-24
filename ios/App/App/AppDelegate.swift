@@ -47,6 +47,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // MARK: - Push Notification Delegates
+    
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Forward device token to Capacitor Push Notifications plugin
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+        
+        // Log for debugging
+        let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
+        let token = tokenParts.joined()
+        print("[APNs] Successfully registered for remote notifications with token: \(token)")
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Forward error to Capacitor Push Notifications plugin
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+        
+        // Log for debugging
+        print("[APNs] Failed to register for remote notifications: \(error.localizedDescription)")
+    }
+
 }
 
 private extension AppDelegate {

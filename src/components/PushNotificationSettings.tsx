@@ -2,19 +2,23 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, AlertCircle, MapPin } from "lucide-react";
+import { Bell, AlertCircle, MapPin, Bug, CheckCircle, XCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationPreview } from "@/components/NotificationPreview";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   isNativePushSupported, 
   initializeNativePush, 
   unregisterNativePush,
-  hasActiveNativePushSubscription 
+  hasActiveNativePushSubscription,
+  debugTestRegistration,
+  getPermissionStatus
 } from "@/utils/nativePushNotifications";
 
 const timeOptions = [
@@ -365,7 +369,173 @@ export const PushNotificationSettings = () => {
             <NotificationPreview />
           </div>
         )}
+
+        {/* Debug Panel */}
+        <PushDebugPanel userId={user?.id} />
       </div>
     </Card>
+  );
+};
+
+// Push Debug Panel Component
+const PushDebugPanel = ({ userId }: { userId?: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{
+    platform: string;
+    isNative: boolean;
+    isSupported: boolean;
+    permissionStatus: string;
+    hasToken: boolean;
+    error?: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const { toast } = useToast();
+
+  const loadDebugInfo = async () => {
+    setIsLoading(true);
+    try {
+      const info = await debugTestRegistration(userId || '');
+      const hasToken = userId ? await hasActiveNativePushSubscription(userId) : false;
+      setDebugInfo({ ...info, hasToken });
+    } catch (error) {
+      console.error('Debug info error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestRegistration = async () => {
+    if (!userId) {
+      toast({ title: "Error", description: "No user ID available", variant: "destructive" });
+      return;
+    }
+    
+    setIsRegistering(true);
+    try {
+      await initializeNativePush(userId);
+      toast({ title: "Registration Initiated", description: "Check Xcode console for detailed logs" });
+      // Reload debug info after a short delay
+      setTimeout(loadDebugInfo, 2000);
+    } catch (error) {
+      toast({ 
+        title: "Registration Failed", 
+        description: error instanceof Error ? error.message : "Unknown error", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && !debugInfo) {
+      loadDebugInfo();
+    }
+  }, [isOpen]);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="pt-4 border-t border-border">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+          <div className="flex items-center gap-2">
+            <Bug className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Debug Push Notifications</span>
+          </div>
+          {isOpen ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4 space-y-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : debugInfo ? (
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Platform:</span>
+                <span className="font-mono text-foreground">{debugInfo.platform}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {debugInfo.isNative ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-muted-foreground">Native:</span>
+                <span className="text-foreground">{debugInfo.isNative ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {debugInfo.isSupported ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-muted-foreground">Supported:</span>
+                <span className="text-foreground">{debugInfo.isSupported ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {debugInfo.permissionStatus === 'granted' ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-yellow-500" />
+                )}
+                <span className="text-muted-foreground">Permission:</span>
+                <span className="text-foreground">{debugInfo.permissionStatus}</span>
+              </div>
+              <div className="flex items-center gap-2 col-span-2">
+                {debugInfo.hasToken ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                )}
+                <span className="text-muted-foreground">Token in DB:</span>
+                <span className="text-foreground">{debugInfo.hasToken ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+            
+            {debugInfo.error && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">{debugInfo.error}</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="flex gap-2 pt-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={loadDebugInfo}
+                disabled={isLoading}
+              >
+                Refresh
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleTestRegistration}
+                disabled={isRegistering || !debugInfo.isSupported}
+              >
+                {isRegistering ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Registering...
+                  </>
+                ) : (
+                  'Test Registration'
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Failed to load debug info</p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
