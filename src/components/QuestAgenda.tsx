@@ -245,25 +245,19 @@ export function QuestAgenda({
         )}
       </div>
 
-      {/* XP Preview for next quest */}
+      {/* XP Preview for next quest - informational only */}
       {tasks.length > 0 && (
-        <div className={cn(
-          "flex items-center justify-between p-3 rounded-lg border",
-          tasks.length >= 3 ? "bg-amber-500/5 border-amber-500/20" : "bg-primary/5 border-primary/20"
-        )}>
+        <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/20">
           <div className="flex items-center gap-2">
-            <Zap className={cn("h-4 w-4", tasks.length >= 3 ? "text-amber-500" : "text-primary")} />
-            <span className="text-sm font-medium">Next Quest ({tasks.length + 1})</span>
+            <Zap className="h-3.5 w-3.5 text-muted-foreground/60" />
+            <span className="text-xs text-muted-foreground">Next Quest ({tasks.length + 1})</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "text-xs font-semibold px-2 py-1 rounded-full",
-              tasks.length >= 3 ? "text-amber-600 bg-amber-500/10" : "text-primary bg-primary/10"
-            )}>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground/80">
               {Math.round(getQuestXPMultiplier(tasks.length + 1) * 100)}% XP
             </span>
-            <span className="text-sm text-muted-foreground">
-              {getEffectiveQuestXP("medium", tasks.length + 1)} XP
+            <span className="text-xs text-muted-foreground/60">
+              · {getEffectiveQuestXP("medium", tasks.length + 1)} XP
             </span>
           </div>
         </div>
