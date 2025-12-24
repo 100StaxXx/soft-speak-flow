@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 // Complete creature list from edge function, organized by category
 const CREATURE_OPTIONS = {
   "Canines": ["Wolf", "Fox", "Arctic Fox", "Fennec Fox", "Dog", "Hyena", "Tanuki"],
-  "Mythical Canines": ["Fenrir", "Cerberus"],
+  "Mythical Canines": ["Fenrir"],
   "Felines": ["Cat", "Lion", "Tiger", "Panther", "Snow Leopard", "Cheetah", "Jaguar", "Lynx", "Puma / Cougar"],
   "Mythical Felines": ["Sphinx", "Kitsune"],
   "Dragons & Reptiles": ["Dragon", "Wyvern", "Hydra", "Basilisk", "T-Rex", "Velociraptor", "Crocodile", "Snake", "Sea Turtle"],
