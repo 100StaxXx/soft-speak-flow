@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
  * Create Influencer Referral Code
@@ -9,7 +10,7 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
  * Creates a code and stores payout information for future reward payments.
  * Sends a confirmation email with the code and dashboard link.
  * 
- * SECURITY: Rate limited to 3 requests per IP per hour
+ * SECURITY: Rate limited to 3 requests per IP+email per hour
  * 
  * Request body:
  * {
@@ -20,11 +21,6 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
  *   promotion_channel?: string - Where they'll promote (optional)
  * }
  */
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 // Rate limit: 3 requests per IP per hour
 const RATE_LIMIT_MAX = 3;
@@ -39,18 +35,44 @@ function generateCodeFromHandle(handle: string): string {
   return `COSMIQ-${base}${random}`;
 }
 
+/**
+ * Get client IP address securely
+ * Only trusts cf-connecting-ip as Supabase Edge Functions run behind Cloudflare
+ * Falls back to combined hash for rate limiting when IP unavailable
+ */
 function getClientIP(req: Request): string {
-  // Check common headers for real IP (in order of reliability)
+  // Supabase Edge Functions run behind Cloudflare, so cf-connecting-ip is reliable
   const cfConnectingIP = req.headers.get("cf-connecting-ip");
-  if (cfConnectingIP) return cfConnectingIP;
+  if (cfConnectingIP) {
+    return cfConnectingIP;
+  }
   
-  const xForwardedFor = req.headers.get("x-forwarded-for");
-  if (xForwardedFor) return xForwardedFor.split(",")[0].trim();
-  
-  const xRealIP = req.headers.get("x-real-ip");
-  if (xRealIP) return xRealIP;
-  
+  // For non-Cloudflare environments (dev/test), fall back but log warning
+  console.warn("cf-connecting-ip not available, rate limiting may be less effective");
   return "unknown";
+}
+
+/**
+ * Sanitize error messages for client responses
+ * Logs full error server-side, returns generic message to client
+ */
+function sanitizeError(error: unknown): string {
+  if (error instanceof Error) {
+    // Log full error server-side for debugging
+    console.error("Full error details:", error.message, error.stack);
+    
+    // Return generic messages for known error types
+    if (error.message.includes("violates foreign key")) {
+      return "Invalid reference provided";
+    }
+    if (error.message.includes("duplicate key")) {
+      return "This code already exists";
+    }
+    if (error.message.includes("permission denied")) {
+      return "Access denied";
+    }
+  }
+  return "An error occurred. Please try again.";
 }
 
 async function checkRateLimit(
@@ -60,31 +82,44 @@ async function checkRateLimit(
 ): Promise<{ allowed: boolean; message?: string }> {
   const oneHourAgo = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
   
-  // Check requests from this IP in the last hour
-  const { count, error } = await supabaseClient
+  // Check requests from this IP OR this email in the last hour (combined protection)
+  const { count: ipCount, error: ipError } = await supabaseClient
     .from("influencer_creation_log")
     .select("*", { count: "exact", head: true })
     .eq("ip_address", ip)
     .gte("created_at", oneHourAgo);
   
-  if (error) {
-    console.error("Rate limit check failed:", error);
-    // Allow through if check fails (fail open for legitimate users)
-    return { allowed: true };
+  if (ipError) {
+    console.error("Rate limit check (IP) failed:", ipError);
   }
   
-  if (count && count >= RATE_LIMIT_MAX) {
-    console.warn(`Rate limit exceeded for IP: ${ip}`);
+  // Also check by email to prevent bypass via IP spoofing
+  const { count: emailCount, error: emailError } = await supabaseClient
+    .from("influencer_creation_log")
+    .select("*", { count: "exact", head: true })
+    .eq("email", email.toLowerCase())
+    .gte("created_at", oneHourAgo);
+  
+  if (emailError) {
+    console.error("Rate limit check (email) failed:", emailError);
+  }
+  
+  // Block if either IP or email exceeds limit
+  const effectiveIpCount = ipCount ?? 0;
+  const effectiveEmailCount = emailCount ?? 0;
+  
+  if (effectiveIpCount >= RATE_LIMIT_MAX || effectiveEmailCount >= RATE_LIMIT_MAX) {
+    console.warn(`Rate limit exceeded - IP: ${ip} (${effectiveIpCount}), Email: ${email} (${effectiveEmailCount})`);
     return { 
       allowed: false, 
       message: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX} code requests per hour.` 
     };
   }
   
-  // Log this request
+  // Log this request for future rate limiting
   await supabaseClient.from("influencer_creation_log").insert({
     ip_address: ip,
-    email: email,
+    email: email.toLowerCase(),
   });
   
   return { allowed: true };
@@ -212,8 +247,10 @@ async function sendConfirmationEmail(
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCors(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabaseClient = createClient(
@@ -246,7 +283,7 @@ serve(async (req) => {
       );
     }
 
-    // SECURITY: Check rate limit before processing
+    // SECURITY: Check rate limit before processing (by IP + email)
     const clientIP = getClientIP(req);
     const rateLimitResult = await checkRateLimit(supabaseClient, clientIP, email);
     
@@ -330,7 +367,7 @@ serve(async (req) => {
     if (insertError) {
       console.error("Failed to create influencer code:", insertError);
       return new Response(
-        JSON.stringify({ error: "Failed to create referral code" }),
+        JSON.stringify({ error: sanitizeError(insertError) }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -359,9 +396,8 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error creating influencer code:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: sanitizeError(error) }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

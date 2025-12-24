@@ -1,7 +1,38 @@
-// Edge function for account deletion - v2.0
+// Edge function for account deletion - v2.1
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+
+/**
+ * Sanitize error messages for client responses
+ * Logs full error server-side, returns generic message to client
+ */
+function sanitizeError(error: unknown): { message: string; status: number } {
+  // Log full error details server-side for debugging
+  console.error("Full error details:", error);
+  
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    
+    // Authorization errors - safe to indicate
+    if (msg.includes("unauthorized") || msg.includes("invalid token") || msg.includes("jwt")) {
+      return { message: "Unauthorized", status: 401 };
+    }
+    
+    // Permission errors
+    if (msg.includes("permission denied") || msg.includes("access denied")) {
+      return { message: "Access denied", status: 403 };
+    }
+    
+    // Not found
+    if (msg.includes("not found") || msg.includes("no rows")) {
+      return { message: "User not found", status: 404 };
+    }
+  }
+  
+  // Generic error for everything else - don't leak internal details
+  return { message: "An error occurred during account deletion. Please try again.", status: 500 };
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function cleanupReferralArtifacts(supabase: any, userId: string) {
@@ -42,7 +73,8 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error("Missing Supabase environment variables");
+      console.error("Missing Supabase environment variables");
+      throw new Error("Server configuration error");
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -101,27 +133,9 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("delete-user edge function error", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    const status = message.toLowerCase().includes("unauthorized") ? 401 : 500;
+    const { message, status } = sanitizeError(error);
 
-    const errorPayload: Record<string, unknown> = {
-      success: false,
-      error: message,
-    };
-
-    if (typeof error === "object" && error !== null) {
-      const maybeCode = (error as { code?: unknown }).code;
-      if (typeof maybeCode === "string" && maybeCode.length > 0) {
-        errorPayload.code = maybeCode;
-      }
-
-      const maybeDetails = (error as { details?: unknown }).details;
-      if (typeof maybeDetails === "string" && maybeDetails.length > 0) {
-        errorPayload.details = maybeDetails;
-      }
-    }
-
-    return new Response(JSON.stringify(errorPayload), {
+    return new Response(JSON.stringify({ success: false, error: message }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -19,6 +19,32 @@ const ChatSchema = z.object({
 
 const DAILY_MESSAGE_LIMIT = 20;
 
+/**
+ * Sanitize error messages for client responses
+ * Logs full error server-side, returns generic message to client
+ */
+function sanitizeError(error: unknown): string {
+  // Log full error details server-side for debugging
+  console.error("Full error details:", error);
+  
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    
+    // Configuration errors - generic message
+    if (msg.includes("api_key") || msg.includes("not configured")) {
+      return "Service temporarily unavailable";
+    }
+    
+    // Auth errors - safe to indicate
+    if (msg.includes("unauthorized") || msg.includes("invalid token")) {
+      return "Unauthorized";
+    }
+  }
+  
+  // Generic error for everything else
+  return "An error occurred. Please try again.";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -58,8 +84,7 @@ Deno.serve(async (req) => {
     if (!validation.success) {
       return new Response(
         JSON.stringify({ 
-          error: "Invalid input", 
-          details: validation.error.errors 
+          error: "Invalid input"
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -219,7 +244,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error in mentor-chat function:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: sanitizeError(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
