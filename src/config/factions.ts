@@ -1,4 +1,4 @@
-import { Flame, Moon, Sparkles } from "lucide-react";
+import { Flame, Moon, Sparkles, type LucideIcon } from "lucide-react";
 import starfallImg from "@/assets/faction-starfall.png";
 import voidImg from "@/assets/faction-void.png";
 import stellarImg from "@/assets/faction-stellar.png";
@@ -18,7 +18,7 @@ export interface Faction {
   color: string;
   fontClass: string;
   nameStyle: React.CSSProperties;
-  icon: React.ElementType;
+  icon: LucideIcon;
 }
 
 export const factions: Faction[] = [

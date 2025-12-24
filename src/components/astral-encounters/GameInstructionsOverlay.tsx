@@ -13,7 +13,8 @@ import {
   Target,
   Layers,
   Smartphone,
-  LayoutGrid
+  LayoutGrid,
+  type LucideIcon
 } from "lucide-react";
 import { MiniGameType } from "@/types/astralEncounters";
 
@@ -23,12 +24,12 @@ interface GameInstructionsOverlayProps {
 }
 
 interface GameInstruction {
-  icon: React.ElementType;
+  icon: LucideIcon;
   title: string;
   goal: string;
   howToPlay: string[];
   statBonus: 'mind' | 'body' | 'soul';
-  statIcon: React.ElementType;
+  statIcon: LucideIcon;
 }
 
 const GAME_INSTRUCTIONS: Record<MiniGameType, GameInstruction> = {
