@@ -127,16 +127,9 @@ export function handleCors(req: Request): Response {
   });
 }
 
-/**
- * Legacy CORS headers for gradual migration
- * Use getCorsHeaders(req) for new code
- * 
- * @deprecated Use getCorsHeaders(req) instead for origin validation
- */
-export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// NOTE: Legacy corsHeaders export has been removed for security.
+// All edge functions should use getCorsHeaders(req) for proper origin validation.
+// See getCorsHeaders() function above for the secure implementation.
 
 /**
  * Create a JSON response with proper CORS headers
