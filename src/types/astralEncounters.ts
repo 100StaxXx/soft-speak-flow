@@ -138,6 +138,9 @@ export interface EncounterPhase {
   accuracy: number;
 }
 
+// Games disabled from encounters (still available in Arcade for testing)
+export const DISABLED_ENCOUNTER_GAMES: MiniGameType[] = ['eclipse_timing', 'stellar_flow'];
+
 // Theme to mini-game mapping (rebalanced for variety)
 export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   distraction: 'tap_sequence',      // Focus challenge - pattern recognition
@@ -148,8 +151,8 @@ export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   overthinking: 'astral_frequency', // Quieting mental noise - find clarity
   doubt: 'starfall_dodge',          // Facing fears - courage under fire
   fear: 'starfall_dodge',           // Overcoming fear - dodge the darkness
-  confusion: 'eclipse_timing',      // Finding patterns - timing precision
-  vulnerability: 'eclipse_timing',  // Precise timing - trust your instincts
+  confusion: 'astral_frequency',    // DISABLED eclipse_timing - remapped to astral_frequency
+  vulnerability: 'astral_frequency', // DISABLED eclipse_timing - remapped to astral_frequency
   imbalance: 'energy_beam',         // Controlled release - find balance
 };
 
