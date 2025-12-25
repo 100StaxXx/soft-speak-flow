@@ -190,7 +190,7 @@ export const AstralEncounterModal = ({
     const themeGameMap: Record<string, MiniGameType[]> = {
       mind: ['tap_sequence', 'galactic_match'],
       body: ['energy_beam', 'starfall_dodge'],
-      soul: ['astral_frequency', 'eclipse_timing'],
+      soul: ['astral_frequency'], // eclipse_timing disabled for now
     };
     
     const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
