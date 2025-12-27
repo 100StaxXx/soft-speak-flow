@@ -7,24 +7,32 @@ export interface DailyTask {
   id: string;
   user_id: string;
   task_text: string;
-  difficulty: string;
+  difficulty: string | null;
   xp_reward: number;
   task_date: string;
-  completed: boolean;
+  completed: boolean | null;
   completed_at: string | null;
-  is_main_quest: boolean;
+  is_main_quest: boolean | null;
   scheduled_time: string | null;
   estimated_duration: number | null;
   recurrence_pattern: string | null;
   recurrence_days: number[] | null;
-  is_recurring: boolean;
-  reminder_enabled: boolean;
+  is_recurring: boolean | null;
+  reminder_enabled: boolean | null;
   reminder_minutes_before: number | null;
   reminder_sent: boolean | null;
   parent_template_id: string | null;
   category: string | null;
-  is_bonus: boolean;
-  created_at: string;
+  is_bonus: boolean | null;
+  created_at: string | null;
+  // Enhanced task features
+  priority: string | null;
+  energy_level: string | null;
+  is_top_three: boolean | null;
+  actual_time_spent: number | null;
+  ai_generated: boolean | null;
+  context_id: string | null;
+  source: string | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {
