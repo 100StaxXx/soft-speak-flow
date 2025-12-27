@@ -2,11 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction, type ToastActionElement } from "@/components/ui/toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
-import { useRef } from "react";
+import React, { useRef, createElement } from "react";
 import { getEffectiveQuestXP } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
 
@@ -185,12 +186,22 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const toggleTask = useMutation({
-    mutationFn: async ({ taskId, completed, xpReward }: { taskId: string; completed: boolean; xpReward: number }) => {
+    mutationFn: async ({ 
+      taskId, 
+      completed, 
+      xpReward, 
+      forceUndo = false 
+    }: { 
+      taskId: string; 
+      completed: boolean; 
+      xpReward: number; 
+      forceUndo?: boolean;
+    }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
       const { data: existingTask, error: existingError } = await supabase
         .from('daily_tasks')
-        .select('completed_at')
+        .select('completed_at, task_text')
         .eq('id', taskId)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -198,9 +209,29 @@ export const useTaskMutations = (taskDate: string) => {
       if (existingError) throw existingError;
 
       const wasAlreadyCompleted = existingTask?.completed_at !== null;
+      const taskText = existingTask?.task_text || 'Task';
 
-      if (wasAlreadyCompleted && !completed) {
+      // Allow undo if forceUndo is true, otherwise block unchecking
+      if (wasAlreadyCompleted && !completed && !forceUndo) {
         throw new Error('Cannot uncheck completed tasks');
+      }
+
+      // Handle undo case - revert task and deduct XP
+      if (!completed && forceUndo) {
+        const { error } = await supabase
+          .from('daily_tasks')
+          .update({ completed: false, completed_at: null })
+          .eq('id', taskId)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        // Deduct the XP that was awarded
+        if (xpReward > 0) {
+          await awardCustomXP(-xpReward, 'task_undo', 'Quest undone', { task_id: taskId });
+        }
+
+        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted: true, isUndo: true, taskText };
       }
 
       if (!completed) {
@@ -211,7 +242,7 @@ export const useTaskMutations = (taskDate: string) => {
           .eq('user_id', user.id);
 
         if (error) throw error;
-        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted };
+        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted, isUndo: false, taskText };
       }
 
       const { bonusXP, toastReason } = await calculateGuildBonus(user.id, xpReward);
@@ -232,11 +263,21 @@ export const useTaskMutations = (taskDate: string) => {
 
       await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
 
-      return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted };
+      return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted, isUndo: false, taskText };
     },
-    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted }) => {
+    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      // Handle undo success
+      if (isUndo) {
+        toast({ 
+          title: "Quest undone", 
+          description: "XP has been adjusted",
+        });
+        return;
+      }
+
       if (completed && !wasAlreadyCompleted) {
         if (xpAwarded > 0) {
           showXPToast(xpAwarded, toastReason || 'Task Complete!');
@@ -245,9 +286,29 @@ export const useTaskMutations = (taskDate: string) => {
           updateBodyFromActivity(companion.id).catch(console.error);
         }
         window.dispatchEvent(new CustomEvent('mission-completed'));
-        
-        // Dispatch event for Astral Encounter trigger check
         window.dispatchEvent(new CustomEvent('quest-completed'));
+
+        // Show undo toast with 5-second window
+        toast({
+          title: "Quest completed! ✨",
+          description: taskText.length > 40 ? taskText.substring(0, 40) + '...' : taskText,
+          duration: 5000,
+          action: createElement(
+            ToastAction,
+            {
+              altText: "Undo completion",
+              onClick: () => {
+                toggleTask.mutate({ 
+                  taskId, 
+                  completed: false, 
+                  xpReward: xpAwarded,
+                  forceUndo: true 
+                });
+              }
+            },
+            "Undo"
+          ) as unknown as ToastActionElement,
+        });
       }
     },
     onError: (error: Error) => {
