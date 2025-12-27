@@ -8,6 +8,7 @@ import {
   Play,
   Star,
   MoreHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import { PriorityBadge } from './PriorityBadge';
 import { EnergyBadge } from './EnergyLevelPicker';
 import { BlockedBadge } from './BlockedBadge';
 import { ProgressRing } from './ProgressRing';
+import { DecomposeTaskDialog } from './DecomposeTaskDialog';
 import { useSubtasks } from '../hooks/useSubtasks';
 import { useTaskDependencies } from '../hooks/useTaskDependencies';
 import { Priority, EnergyLevel } from '../hooks/usePriorityTasks';
@@ -66,6 +68,7 @@ export function EnhancedTaskCard({
   compact = false,
 }: EnhancedTaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDecomposeDialog, setShowDecomposeDialog] = useState(false);
   const { subtasks, progressPercent } = useSubtasks(task.id);
   const { blockers, isBlocked, incompleteBlockers } = useTaskDependencies(task.id);
 
@@ -201,6 +204,10 @@ export function EnhancedTaskCard({
                     {task.is_top_three ? 'Remove from Top 3' : 'Add to Top 3'}
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={() => setShowDecomposeDialog(true)}>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Break down with AI
+                </DropdownMenuItem>
                 {onEdit && (
                   <DropdownMenuItem onClick={() => onEdit(task.id)}>
                     Edit task
@@ -251,6 +258,14 @@ export function EnhancedTaskCard({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Decompose Task Dialog */}
+      <DecomposeTaskDialog
+        open={showDecomposeDialog}
+        onOpenChange={setShowDecomposeDialog}
+        taskId={task.id}
+        taskTitle={task.task_text}
+      />
     </motion.div>
   );
 }
