@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { format, addDays, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, parse } from 'date-fns';
+import { format, addDays, addWeeks, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, setMonth, setDate, getYear } from 'date-fns';
 
 export interface ParsedTask {
   text: string;
@@ -14,6 +14,119 @@ export interface ParsedTask {
   isTopThree: boolean;
 }
 
+// Month name to number mapping
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11,
+};
+
+// Smart time inference: "at 4" without am/pm
+// Hours 1-6 default to PM (more likely afternoon meetings/calls)
+// Hours 7-11 default to AM (more likely morning activities)
+// Hour 12 defaults to PM (noon)
+function inferAmPm(hour: number): 'am' | 'pm' {
+  if (hour >= 1 && hour <= 6) return 'pm';
+  if (hour >= 7 && hour <= 11) return 'am';
+  if (hour === 12) return 'pm';
+  return 'am'; // midnight edge case
+}
+
+function parseTimeMatch(match: RegExpMatchArray): string {
+  let hours = parseInt(match[1]);
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  let period = match[3]?.toLowerCase() as 'am' | 'pm' | undefined;
+
+  // Smart inference when no am/pm specified
+  if (!period && hours >= 1 && hours <= 12) {
+    period = inferAmPm(hours);
+  }
+
+  if (period === 'pm' && hours < 12) hours += 12;
+  if (period === 'am' && hours === 12) hours = 0;
+
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
+// Parse "Dec 28" or "December 28th"
+function parseMonthDay(match: RegExpMatchArray): string {
+  const monthStr = match[1].toLowerCase();
+  const day = parseInt(match[2]);
+  const month = MONTH_MAP[monthStr];
+  
+  if (month === undefined || day < 1 || day > 31) {
+    return format(new Date(), 'yyyy-MM-dd');
+  }
+  
+  let date = setMonth(new Date(), month);
+  date = setDate(date, day);
+  
+  // If the date is in the past, assume next year
+  if (date < new Date()) {
+    date = setMonth(new Date(getYear(new Date()) + 1, 0, 1), month);
+    date = setDate(date, day);
+  }
+  
+  return format(date, 'yyyy-MM-dd');
+}
+
+// Parse "28th Dec" or "28 December"
+function parseDayMonth(match: RegExpMatchArray): string {
+  const day = parseInt(match[1]);
+  const monthStr = match[2].toLowerCase();
+  const month = MONTH_MAP[monthStr];
+  
+  if (month === undefined || day < 1 || day > 31) {
+    return format(new Date(), 'yyyy-MM-dd');
+  }
+  
+  let date = setMonth(new Date(), month);
+  date = setDate(date, day);
+  
+  // If the date is in the past, assume next year
+  if (date < new Date()) {
+    date = setMonth(new Date(getYear(new Date()) + 1, 0, 1), month);
+    date = setDate(date, day);
+  }
+  
+  return format(date, 'yyyy-MM-dd');
+}
+
+// Parse "12/28" or "12-28" (MM/DD format)
+function parseNumericDate(match: RegExpMatchArray): string {
+  const first = parseInt(match[1]);
+  const second = parseInt(match[2]);
+  
+  // Assume MM/DD format (US standard)
+  let month = first - 1; // 0-indexed
+  let day = second;
+  
+  // Basic validation
+  if (month < 0 || month > 11 || day < 1 || day > 31) {
+    return format(new Date(), 'yyyy-MM-dd');
+  }
+  
+  let date = setMonth(new Date(), month);
+  date = setDate(date, day);
+  
+  // If the date is in the past, assume next year
+  if (date < new Date()) {
+    date = setMonth(new Date(getYear(new Date()) + 1, 0, 1), month);
+    date = setDate(date, day);
+  }
+  
+  return format(date, 'yyyy-MM-dd');
+}
+
 const TIME_PATTERNS = [
   { regex: /\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i, handler: parseTimeMatch },
   { regex: /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i, handler: parseTimeMatch },
@@ -26,8 +139,23 @@ const TIME_PATTERNS = [
 ];
 
 const DATE_PATTERNS = [
+  // Relative dates - "in X days/weeks"
+  { regex: /\bin\s+(\d+)\s*days?\b/i, handler: (m: RegExpMatchArray) => format(addDays(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
+  { regex: /\bin\s+(\d+)\s*weeks?\b/i, handler: (m: RegExpMatchArray) => format(addWeeks(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
+  { regex: /\bnext\s+week\b/i, handler: () => format(addWeeks(new Date(), 1), 'yyyy-MM-dd') },
+  
+  // Standard relative dates
   { regex: /\btoday\b/i, handler: () => format(new Date(), 'yyyy-MM-dd') },
   { regex: /\btomorrow\b/i, handler: () => format(addDays(new Date(), 1), 'yyyy-MM-dd') },
+  
+  // Specific dates - "Dec 28", "December 28th"
+  { regex: /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i, handler: parseMonthDay },
+  // "28th Dec", "28 December"
+  { regex: /\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i, handler: parseDayMonth },
+  // Numeric dates - "12/28", "12-28"
+  { regex: /\b(\d{1,2})[\/\-](\d{1,2})\b/, handler: parseNumericDate },
+  
+  // Day names
   { regex: /\bnext\s+monday\b/i, handler: () => format(nextMonday(new Date()), 'yyyy-MM-dd') },
   { regex: /\bnext\s+tuesday\b/i, handler: () => format(nextTuesday(new Date()), 'yyyy-MM-dd') },
   { regex: /\bnext\s+wednesday\b/i, handler: () => format(nextWednesday(new Date()), 'yyyy-MM-dd') },
@@ -66,11 +194,16 @@ const DIFFICULTY_PATTERNS = [
 ];
 
 const PRIORITY_PATTERNS = [
+  // Todoist-style shortcuts
+  { regex: /!{3,}/, priority: 'urgent-important' },
+  { regex: /!high\b/i, priority: 'important' },
+  { regex: /!low\b/i, priority: 'low' },
+  { regex: /!med(?:ium)?\b/i, priority: 'medium' },
+  // Natural language
   { regex: /\bURGENT\b/i, priority: 'urgent' },
   { regex: /\bASAP\b/i, priority: 'urgent' },
   { regex: /\bimportant\b/i, priority: 'important' },
   { regex: /\bcritical\b/i, priority: 'urgent-important' },
-  { regex: /\b!{2,}\b/, priority: 'urgent-important' },
   { regex: /\btop\s*3\b/i, isTopThree: true },
   { regex: /\b#1\b/, isTopThree: true },
 ];
@@ -101,17 +234,6 @@ const ENERGY_PATTERNS = [
   { regex: /\btired\b/i, result: 'low' as const },
   { regex: /\bfocused\b/i, result: 'high' as const },
 ];
-
-function parseTimeMatch(match: RegExpMatchArray): string {
-  let hours = parseInt(match[1]);
-  const minutes = match[2] ? parseInt(match[2]) : 0;
-  const period = match[3]?.toLowerCase();
-
-  if (period === 'pm' && hours < 12) hours += 12;
-  if (period === 'am' && hours === 12) hours = 0;
-
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-}
 
 function cleanTaskText(text: string): string {
   let cleaned = text;
@@ -166,7 +288,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of DATE_PATTERNS) {
     const match = input.match(pattern.regex);
     if (match) {
-      scheduledDate = pattern.handler();
+      scheduledDate = pattern.handler(match);
       break;
     }
   }
@@ -191,6 +313,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   // Parse priority
   let hasUrgent = false;
   let hasImportant = false;
+  let hasLow = false;
   for (const pattern of PRIORITY_PATTERNS) {
     if (pattern.regex.test(input)) {
       if ('isTopThree' in pattern) {
@@ -202,6 +325,8 @@ export function parseNaturalLanguage(input: string): ParsedTask {
       } else if (pattern.priority === 'urgent-important') {
         hasUrgent = true;
         hasImportant = true;
+      } else if (pattern.priority === 'low') {
+        hasLow = true;
       }
     }
   }
@@ -209,6 +334,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   if (hasUrgent && hasImportant) priority = 'urgent-important';
   else if (hasUrgent) priority = 'urgent-not-important';
   else if (hasImportant) priority = 'not-urgent-important';
+  else if (hasLow) priority = 'not-urgent-not-important';
 
   // Parse recurrence
   for (const pattern of RECURRENCE_PATTERNS) {
