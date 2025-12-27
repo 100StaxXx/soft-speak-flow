@@ -5,3 +5,5 @@ export { SubtaskList } from './SubtaskList';
 export { ProgressRing } from './ProgressRing';
 export { DependencyPicker } from './DependencyPicker';
 export { BlockedBadge } from './BlockedBadge';
+export { FocusTimer } from './FocusTimer';
+export { FocusStats } from './FocusStats';

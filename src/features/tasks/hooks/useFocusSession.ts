@@ -1,0 +1,353 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+
+export interface FocusSession {
+  id: string;
+  user_id: string;
+  task_id: string | null;
+  duration_type: 'pomodoro' | 'short_break' | 'long_break' | 'custom';
+  planned_duration: number; // minutes
+  actual_duration: number | null;
+  started_at: string;
+  completed_at: string | null;
+  paused_at: string | null;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  distractions_count: number;
+  xp_earned: number | null;
+  notes: string | null;
+}
+
+export interface FocusTimerState {
+  isRunning: boolean;
+  isPaused: boolean;
+  timeRemaining: number; // seconds
+  totalTime: number; // seconds
+  sessionType: 'pomodoro' | 'short_break' | 'long_break' | 'custom';
+  currentSessionId: string | null;
+  distractionsCount: number;
+}
+
+const DURATION_PRESETS = {
+  pomodoro: 25,
+  short_break: 5,
+  long_break: 15,
+  custom: 30,
+};
+
+export function useFocusSession() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [timerState, setTimerState] = useState<FocusTimerState>({
+    isRunning: false,
+    isPaused: false,
+    timeRemaining: DURATION_PRESETS.pomodoro * 60,
+    totalTime: DURATION_PRESETS.pomodoro * 60,
+    sessionType: 'pomodoro',
+    currentSessionId: null,
+    distractionsCount: 0,
+  });
+
+  // Fetch today's sessions
+  const { data: todaySessions = [], isLoading } = useQuery({
+    queryKey: ['focus-sessions', user?.id, 'today'],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('focus_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('started_at', `${today}T00:00:00`)
+        .order('started_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as FocusSession[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Start session mutation
+  const startSessionMutation = useMutation({
+    mutationFn: async ({ 
+      taskId, 
+      durationType, 
+      customDuration 
+    }: { 
+      taskId?: string; 
+      durationType: FocusTimerState['sessionType'];
+      customDuration?: number;
+    }) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      const duration = customDuration || DURATION_PRESETS[durationType];
+      
+      const { data, error } = await supabase
+        .from('focus_sessions')
+        .insert({
+          user_id: user.id,
+          task_id: taskId || null,
+          duration_type: durationType,
+          planned_duration: duration,
+          started_at: new Date().toISOString(),
+          status: 'active',
+          distractions_count: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FocusSession;
+    },
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
+      setTimerState(prev => ({
+        ...prev,
+        isRunning: true,
+        isPaused: false,
+        timeRemaining: session.planned_duration * 60,
+        totalTime: session.planned_duration * 60,
+        sessionType: session.duration_type as FocusTimerState['sessionType'],
+        currentSessionId: session.id,
+        distractionsCount: 0,
+      }));
+    },
+    onError: (error) => {
+      console.error('Failed to start session:', error);
+      toast({
+        title: "Failed to start focus session",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Complete session mutation
+  const completeSessionMutation = useMutation({
+    mutationFn: async ({ 
+      sessionId, 
+      actualDuration,
+      distractionsCount,
+    }: { 
+      sessionId: string; 
+      actualDuration: number;
+      distractionsCount: number;
+    }) => {
+      // Calculate XP based on completion
+      const baseXP = 15;
+      const bonusXP = distractionsCount === 0 ? 10 : 0;
+      const totalXP = baseXP + bonusXP;
+
+      const { data, error } = await supabase
+        .from('focus_sessions')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          actual_duration: actualDuration,
+          distractions_count: distractionsCount,
+          xp_earned: totalXP,
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FocusSession;
+    },
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
+      toast({
+        title: "Focus session complete! 🎯",
+        description: `+${session.xp_earned} XP earned`,
+      });
+      resetTimer();
+    },
+  });
+
+  // Pause session mutation
+  const pauseSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data, error } = await supabase
+        .from('focus_sessions')
+        .update({
+          status: 'paused',
+          paused_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FocusSession;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
+    },
+  });
+
+  // Resume session mutation
+  const resumeSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data, error } = await supabase
+        .from('focus_sessions')
+        .update({
+          status: 'active',
+          paused_at: null,
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FocusSession;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
+    },
+  });
+
+  // Cancel session mutation
+  const cancelSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { data, error } = await supabase
+        .from('focus_sessions')
+        .update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as FocusSession;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
+      resetTimer();
+    },
+  });
+
+  // Log distraction
+  const logDistraction = useCallback(() => {
+    setTimerState(prev => ({
+      ...prev,
+      distractionsCount: prev.distractionsCount + 1,
+    }));
+  }, []);
+
+  // Timer tick effect
+  useEffect(() => {
+    if (timerState.isRunning && !timerState.isPaused) {
+      intervalRef.current = setInterval(() => {
+        setTimerState(prev => {
+          if (prev.timeRemaining <= 1) {
+            // Timer complete
+            if (prev.currentSessionId) {
+              const actualMinutes = Math.round((prev.totalTime - prev.timeRemaining) / 60);
+              completeSessionMutation.mutate({
+                sessionId: prev.currentSessionId,
+                actualDuration: actualMinutes,
+                distractionsCount: prev.distractionsCount,
+              });
+            }
+            return { ...prev, isRunning: false, timeRemaining: 0 };
+          }
+          return { ...prev, timeRemaining: prev.timeRemaining - 1 };
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [timerState.isRunning, timerState.isPaused]);
+
+  const startSession = useCallback((
+    taskId?: string,
+    durationType: FocusTimerState['sessionType'] = 'pomodoro',
+    customDuration?: number
+  ) => {
+    startSessionMutation.mutate({ taskId, durationType, customDuration });
+  }, []);
+
+  const pauseSession = useCallback(() => {
+    if (timerState.currentSessionId) {
+      pauseSessionMutation.mutate(timerState.currentSessionId);
+      setTimerState(prev => ({ ...prev, isPaused: true }));
+    }
+  }, [timerState.currentSessionId]);
+
+  const resumeSession = useCallback(() => {
+    if (timerState.currentSessionId) {
+      resumeSessionMutation.mutate(timerState.currentSessionId);
+      setTimerState(prev => ({ ...prev, isPaused: false }));
+    }
+  }, [timerState.currentSessionId]);
+
+  const cancelSession = useCallback(() => {
+    if (timerState.currentSessionId) {
+      cancelSessionMutation.mutate(timerState.currentSessionId);
+    }
+  }, [timerState.currentSessionId]);
+
+  const resetTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    setTimerState({
+      isRunning: false,
+      isPaused: false,
+      timeRemaining: DURATION_PRESETS.pomodoro * 60,
+      totalTime: DURATION_PRESETS.pomodoro * 60,
+      sessionType: 'pomodoro',
+      currentSessionId: null,
+      distractionsCount: 0,
+    });
+  }, []);
+
+  const setSessionType = useCallback((type: FocusTimerState['sessionType'], customMinutes?: number) => {
+    const duration = customMinutes || DURATION_PRESETS[type];
+    setTimerState(prev => ({
+      ...prev,
+      sessionType: type,
+      timeRemaining: duration * 60,
+      totalTime: duration * 60,
+    }));
+  }, []);
+
+  // Stats calculations
+  const completedToday = todaySessions.filter(s => s.status === 'completed').length;
+  const totalFocusMinutes = todaySessions
+    .filter(s => s.status === 'completed' && s.duration_type === 'pomodoro')
+    .reduce((acc, s) => acc + (s.actual_duration || 0), 0);
+  const totalXPToday = todaySessions
+    .filter(s => s.status === 'completed')
+    .reduce((acc, s) => acc + (s.xp_earned || 0), 0);
+
+  return {
+    timerState,
+    todaySessions,
+    isLoading,
+    startSession,
+    pauseSession,
+    resumeSession,
+    cancelSession,
+    resetTimer,
+    setSessionType,
+    logDistraction,
+    stats: {
+      completedToday,
+      totalFocusMinutes,
+      totalXPToday,
+    },
+    DURATION_PRESETS,
+  };
+}
