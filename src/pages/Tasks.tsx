@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Target, Swords, Trophy, Star, Plus, ArrowDown, Clock } from "lucide-react";
+import { Target, Swords, Trophy, Star, ArrowDown, Clock } from "lucide-react";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
