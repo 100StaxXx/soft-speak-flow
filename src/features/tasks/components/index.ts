@@ -12,3 +12,5 @@ export { EnergyLevelPicker, EnergyBadge } from './EnergyLevelPicker';
 export { PriorityBadge, PriorityPicker } from './PriorityBadge';
 export { WeeklyProgress } from './WeeklyProgress';
 export { ProductivityDashboard } from './ProductivityDashboard';
+export { EnhancedTaskCard, type TaskCardTask } from './EnhancedTaskCard';
+export { TaskManagerPanel } from './TaskManagerPanel';
