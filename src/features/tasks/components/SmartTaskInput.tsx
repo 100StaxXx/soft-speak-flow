@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { 
-  Sparkles, 
+  Sparkles,
   Clock, 
   Calendar, 
   Zap, 
@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -46,6 +47,8 @@ export function SmartTaskInput({
   const [isFocused, setIsFocused] = useState(false);
   const [interimText, setInterimText] = useState('');
 
+  const { medium, success } = useHapticFeedback();
+  
   const { isRecording, isSupported, toggleRecording } = useVoiceInput({
     onInterimResult: (text) => {
       setInterimText(text);
@@ -58,6 +61,16 @@ export function SmartTaskInput({
       toast.error(error);
     },
   });
+
+  // Voice toggle with haptic feedback
+  const handleVoiceToggle = useCallback(() => {
+    if (isRecording) {
+      success(); // Satisfying completion haptic
+    } else {
+      medium(); // Action initiated haptic
+    }
+    toggleRecording();
+  }, [isRecording, success, medium, toggleRecording]);
 
   // Display text combines typed input with interim voice results
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
@@ -138,7 +151,7 @@ export function SmartTaskInput({
               type="button"
               variant={isRecording ? "destructive" : "ghost"}
               size="sm"
-              onClick={toggleRecording}
+              onClick={handleVoiceToggle}
               disabled={disabled}
               className={cn(
                 "h-7 px-2",
