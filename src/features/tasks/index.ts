@@ -14,6 +14,8 @@ export {
   EnergyBadge,
   PriorityBadge,
   PriorityPicker,
+  WeeklyProgress,
+  ProductivityDashboard,
 } from './components';
 
 // Hooks
@@ -25,6 +27,7 @@ export {
   useTaskDependencies,
   useFocusSession,
   usePriorityTasks,
+  useProductivityStats,
   type ParsedTask,
   type InboxItem,
   type Subtask,
@@ -33,4 +36,7 @@ export {
   type FocusTimerState,
   type Priority,
   type EnergyLevel,
+  type DailyStats,
+  type WeeklyStats,
+  type ProductivityInsights,
 } from './hooks';
