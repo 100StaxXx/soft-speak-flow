@@ -8,9 +8,10 @@ import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { FactionBadge } from "@/components/FactionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Compass, Package, Sparkles } from "lucide-react";
+import { TrendingUp, Compass, Package, Sparkles, Timer } from "lucide-react";
 import { JourneyTab } from "@/components/companion/JourneyTab";
 import { CollectionTab } from "@/components/companion/CollectionTab";
+import { FocusTab } from "@/components/companion/FocusTab";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
@@ -141,10 +142,14 @@ const Companion = () => {
           </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="focus" className="flex items-center gap-2">
+                <Timer className="h-4 w-4" />
+                <span className="hidden sm:inline">Focus</span>
               </TabsTrigger>
               <TabsTrigger value="journey" className="flex items-center gap-2 relative">
                 <Compass className="h-4 w-4" />
@@ -169,6 +174,10 @@ const Companion = () => {
                   progressToNext={progressToNext} 
                 />
               )}
+            </TabsContent>
+
+            <TabsContent value="focus">
+              {activeTab === "focus" && <FocusTab />}
             </TabsContent>
 
             <TabsContent value="journey">
