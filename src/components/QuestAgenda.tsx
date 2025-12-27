@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { format, isSameDay } from "date-fns";
 import { Target, Zap, Plus } from "lucide-react";
-import { TaskCard } from "@/components/TaskCard";
+import { EnhancedTaskCard, TaskCardTask } from "@/features/tasks/components/EnhancedTaskCard";
 import { InteractiveEmptyState } from "@/components/InteractiveEmptyState";
 import { GamifiedProgress } from "@/components/GamifiedProgress";
 import { StreakIndicator } from "@/components/StreakIndicator";
@@ -118,23 +118,34 @@ export function QuestAgenda({
     return { morning, afternoon, evening, unscheduled, completed };
   }, [sideQuests]);
 
+  // Map DailyTask to TaskCardTask interface
+  const mapToTaskCardTask = (task: DailyTask): TaskCardTask => ({
+    id: task.id,
+    task_text: task.task_text,
+    completed: task.completed || false,
+    priority: task.priority as TaskCardTask['priority'],
+    energy_level: task.energy_level as TaskCardTask['energy_level'],
+    is_top_three: task.is_top_three,
+    estimated_duration: task.estimated_duration,
+    scheduled_time: task.scheduled_time,
+    category: task.category,
+  });
+
   const renderTaskCard = (task: DailyTask, isMainQuest = false) => (
-    <TaskCard
+    <EnhancedTaskCard
       key={task.id}
-      task={isMainQuest ? { ...task, xp_reward: task.xp_reward * MAIN_QUEST_MULTIPLIER } : task}
-      onToggle={() => onToggle(
-        task.id, 
-        !task.completed, 
+      task={mapToTaskCardTask(task)}
+      onToggleComplete={(taskId, completed) => onToggle(
+        taskId, 
+        completed, 
         isMainQuest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward
       )}
-      onDelete={() => onDelete(task.id)}
-      onEdit={() => onEdit(task)}
-      onSetMainQuest={!isMainQuest && !mainQuest ? () => onSetMainQuest(task.id) : undefined}
-      showPromoteButton={!isMainQuest && !mainQuest}
-      isMainQuest={isMainQuest}
-      isTutorialQuest={task.id === tutorialQuestId}
-      streakMultiplier={multiplier}
-      isToggling={isToggling}
+      onDelete={(taskId) => onDelete(taskId)}
+      onEdit={(taskId) => {
+        const fullTask = tasks.find(t => t.id === taskId);
+        if (fullTask) onEdit(fullTask);
+      }}
+      showSubtasks={true}
     />
   );
 
