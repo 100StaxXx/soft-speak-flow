@@ -7,3 +7,6 @@ export { DependencyPicker } from './DependencyPicker';
 export { BlockedBadge } from './BlockedBadge';
 export { FocusTimer } from './FocusTimer';
 export { FocusStats } from './FocusStats';
+export { TopThreeTasks } from './TopThreeTasks';
+export { EnergyLevelPicker, EnergyBadge } from './EnergyLevelPicker';
+export { PriorityBadge, PriorityPicker } from './PriorityBadge';
