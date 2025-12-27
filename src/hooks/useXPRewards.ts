@@ -6,6 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
+import {
+  FOCUS_XP_REWARDS,
+  SUBTASK_XP_REWARDS,
+  PRIORITY_XP_REWARDS,
+  INBOX_XP_REWARDS,
+  PRODUCTIVITY_XP_REWARDS,
+  SCHEDULING_XP_REWARDS,
+} from "@/config/xpRewards";
 
 // Helper to mark user as active (resets companion decay)
 const markUserActive = async (userId: string) => {
@@ -238,6 +246,212 @@ export const useXPRewards = () => {
     });
   };
 
+  // ============================================
+  // NEW: Focus Session XP Rewards
+  // ============================================
+  
+  const awardFocusSessionComplete = (durationType: 'quick' | 'standard' | 'deep_work', isPerfect: boolean = false) => {
+    if (!companion || awardXP.isPending) return;
+
+    let baseReward: number = FOCUS_XP_REWARDS.STANDARD;
+    let label = "Focus Session Complete!";
+
+    switch (durationType) {
+      case 'quick':
+        baseReward = FOCUS_XP_REWARDS.QUICK;
+        label = "Quick Focus Done!";
+        break;
+      case 'deep_work':
+        baseReward = FOCUS_XP_REWARDS.DEEP_WORK;
+        label = "Deep Work Complete!";
+        break;
+    }
+
+    // Add perfect focus bonus if no distractions
+    if (isPerfect) {
+      baseReward += FOCUS_XP_REWARDS.PERFECT_FOCUS_BONUS;
+      label = "Perfect Focus! 🎯";
+    }
+
+    const reward = applyStreakMultiplier(baseReward);
+    showXPToast(reward, label);
+    awardXP.mutate({
+      eventType: "focus_session",
+      xpAmount: reward,
+      metadata: { durationType, isPerfect },
+    });
+  };
+
+  const awardFocusComboBonus = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(FOCUS_XP_REWARDS.COMBO_BONUS);
+    showXPToast(reward, "4x Focus Combo! 🔥");
+    awardXP.mutate({
+      eventType: "focus_combo",
+      xpAmount: reward,
+    });
+  };
+
+  // ============================================
+  // NEW: Subtask XP Rewards
+  // ============================================
+
+  const awardSubtaskComplete = () => {
+    if (!companion) return;
+    const reward = SUBTASK_XP_REWARDS.SUBTASK_COMPLETE;
+    showXPToast(reward, "Subtask Done!");
+    awardXP.mutate({
+      eventType: "subtask_complete",
+      xpAmount: reward,
+    });
+  };
+
+  const awardAllSubtasksComplete = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(SUBTASK_XP_REWARDS.ALL_SUBTASKS_BONUS);
+    showXPToast(reward, "All Subtasks Complete! 🎉");
+    awardXP.mutate({
+      eventType: "all_subtasks_complete",
+      xpAmount: reward,
+    });
+  };
+
+  // ============================================
+  // NEW: Priority System XP Rewards
+  // ============================================
+
+  const awardTopThreeComplete = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRIORITY_XP_REWARDS.TOP_THREE_COMPLETE);
+    showXPToast(reward, "Top 3 Task Done! 🎯");
+    awardXP.mutate({
+      eventType: "top_three_complete",
+      xpAmount: reward,
+    });
+  };
+
+  const awardAllTopThreeComplete = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRIORITY_XP_REWARDS.ALL_TOP_THREE_BONUS);
+    showXPToast(reward, "All Top 3 Complete! 🏆");
+    awardXP.mutate({
+      eventType: "all_top_three_complete",
+      xpAmount: reward,
+    });
+  };
+
+  const awardUrgentTaskComplete = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRIORITY_XP_REWARDS.URGENT_IMPORTANT);
+    showXPToast(reward, "Urgent Task Done!");
+    awardXP.mutate({
+      eventType: "urgent_task_complete",
+      xpAmount: reward,
+    });
+  };
+
+  // ============================================
+  // NEW: Inbox XP Rewards
+  // ============================================
+
+  const awardInboxProcessed = () => {
+    if (!companion) return;
+    const reward = INBOX_XP_REWARDS.PROCESS_INBOX;
+    // Silent - no toast for small XP
+    awardXP.mutate({
+      eventType: "inbox_processed",
+      xpAmount: reward,
+    });
+  };
+
+  const awardInboxZero = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(INBOX_XP_REWARDS.INBOX_ZERO);
+    showXPToast(reward, "Inbox Zero! 📭");
+    awardXP.mutate({
+      eventType: "inbox_zero",
+      xpAmount: reward,
+    });
+  };
+
+  const awardVoiceCapture = () => {
+    if (!companion) return;
+    const reward = INBOX_XP_REWARDS.VOICE_CAPTURE;
+    // Silent - no toast for small XP
+    awardXP.mutate({
+      eventType: "voice_capture",
+      xpAmount: reward,
+    });
+  };
+
+  // ============================================
+  // NEW: Productivity XP Rewards
+  // ============================================
+
+  const awardWeeklyReview = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.WEEKLY_REVIEW);
+    showXPToast(reward, "Weekly Review Complete! 📊");
+    awardXP.mutate({
+      eventType: "weekly_review",
+      xpAmount: reward,
+    });
+  };
+
+  const awardDailyReview = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.DAILY_REVIEW);
+    showXPToast(reward, "Daily Review Done!");
+    awardXP.mutate({
+      eventType: "daily_review",
+      xpAmount: reward,
+    });
+  };
+
+  const awardHighProductivityDay = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.HIGH_PRODUCTIVITY_DAY);
+    showXPToast(reward, "Productive Day! 📈");
+    awardXP.mutate({
+      eventType: "high_productivity_day",
+      xpAmount: reward,
+    });
+  };
+
+  const awardPerfectDay = () => {
+    if (!companion) return;
+    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.PERFECT_DAY);
+    showXPToast(reward, "Perfect Day! ⭐");
+    awardXP.mutate({
+      eventType: "perfect_day",
+      xpAmount: reward,
+    });
+  };
+
+  // ============================================
+  // NEW: Scheduling XP Rewards
+  // ============================================
+
+  const awardOnTimeCompletion = () => {
+    if (!companion) return;
+    const reward = SCHEDULING_XP_REWARDS.ON_TIME_COMPLETION;
+    // Silent - no toast for small XP
+    awardXP.mutate({
+      eventType: "on_time_completion",
+      xpAmount: reward,
+    });
+  };
+
+  const awardContextMatch = () => {
+    if (!companion) return;
+    const reward = SCHEDULING_XP_REWARDS.CONTEXT_MATCH;
+    // Silent - no toast for small XP
+    awardXP.mutate({
+      eventType: "context_match",
+      xpAmount: reward,
+    });
+  };
+
   const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
     // Guard: Don't attempt XP award if companion not loaded or mutation in progress
     if (!companion) {
@@ -278,6 +492,34 @@ export const useXPRewards = () => {
     awardQuoteShared,
     awardCustomXP,
     
+    // NEW: Focus Session rewards
+    awardFocusSessionComplete,
+    awardFocusComboBonus,
+    
+    // NEW: Subtask rewards
+    awardSubtaskComplete,
+    awardAllSubtasksComplete,
+    
+    // NEW: Priority rewards
+    awardTopThreeComplete,
+    awardAllTopThreeComplete,
+    awardUrgentTaskComplete,
+    
+    // NEW: Inbox rewards
+    awardInboxProcessed,
+    awardInboxZero,
+    awardVoiceCapture,
+    
+    // NEW: Productivity rewards
+    awardWeeklyReview,
+    awardDailyReview,
+    awardHighProductivityDay,
+    awardPerfectDay,
+    
+    // NEW: Scheduling rewards
+    awardOnTimeCompletion,
+    awardContextMatch,
+    
     // Legacy aliases (for backward compatibility)
     awardCheckIn: awardCheckInComplete,
     awardChallengeComplete: awardChallengeCompletion,
@@ -286,5 +528,11 @@ export const useXPRewards = () => {
     
     // XP constants for display
     XP_REWARDS,
+    FOCUS_XP_REWARDS,
+    SUBTASK_XP_REWARDS,
+    PRIORITY_XP_REWARDS,
+    INBOX_XP_REWARDS,
+    PRODUCTIVITY_XP_REWARDS,
+    SCHEDULING_XP_REWARDS,
   };
 };
