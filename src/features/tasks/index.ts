@@ -16,6 +16,9 @@ export {
   PriorityPicker,
   WeeklyProgress,
   ProductivityDashboard,
+  EnhancedTaskCard,
+  TaskManagerPanel,
+  type TaskCardTask,
 } from './components';
 
 // Hooks
