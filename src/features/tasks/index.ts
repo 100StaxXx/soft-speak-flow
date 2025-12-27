@@ -7,6 +7,8 @@ export {
   ProgressRing,
   DependencyPicker,
   BlockedBadge,
+  FocusTimer,
+  FocusStats,
 } from './components';
 
 // Hooks
@@ -16,8 +18,11 @@ export {
   useTaskInbox,
   useSubtasks,
   useTaskDependencies,
+  useFocusSession,
   type ParsedTask,
   type InboxItem,
   type Subtask,
   type TaskDependency,
+  type FocusSession,
+  type FocusTimerState,
 } from './hooks';
