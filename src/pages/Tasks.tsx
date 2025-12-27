@@ -523,7 +523,7 @@ export default function Tasks() {
                   actuallyAddTask(false, taskData);
                 }
               }}
-              showQuickCapture={false}
+              
               placeholder="Add quest... try 'Call mom tomorrow at 3pm'"
             />
             {tutorialQuestPending && (

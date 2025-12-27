@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { 
   Sparkles, 
   Clock, 
@@ -14,7 +14,8 @@ import {
   Battery,
   BatteryLow,
   BatteryFull,
-  Inbox,
+  Mic,
+  MicOff,
   Send,
   X
 } from 'lucide-react';
@@ -23,39 +24,54 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface SmartTaskInputProps {
   onSubmit: (parsed: ParsedTask) => void;
-  onQuickCapture?: (text: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
   disabled?: boolean;
-  showQuickCapture?: boolean;
 }
 
 export function SmartTaskInput({
   onSubmit,
-  onQuickCapture,
   placeholder = "Add a quest... try 'Call mom tomorrow at 3pm @phone'",
   autoFocus = false,
   disabled = false,
-  showQuickCapture = true,
 }: SmartTaskInputProps) {
   const { input, setInput, parsed, reset } = useNaturalLanguageParser();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [interimText, setInterimText] = useState('');
+
+  const { isRecording, isSupported, toggleRecording } = useVoiceInput({
+    onInterimResult: (text) => {
+      setInterimText(text);
+    },
+    onFinalResult: (text) => {
+      setInput((prev) => (prev + ' ' + text).trim());
+      setInterimText('');
+    },
+    onError: (error) => {
+      toast.error(error);
+    },
+  });
+
+  // Display text combines typed input with interim voice results
+  const displayText = interimText ? `${input} ${interimText}`.trim() : input;
 
   const handleSubmit = () => {
     if (!parsed || !parsed.text.trim()) return;
     onSubmit(parsed);
     reset();
+    setInterimText('');
   };
 
-  const handleQuickCapture = () => {
-    if (!input.trim() || !onQuickCapture) return;
-    onQuickCapture(input);
+  const handleClear = () => {
     reset();
+    setInterimText('');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -95,49 +111,63 @@ export function SmartTaskInput({
         <div className="absolute left-3 top-1/2 -translate-y-1/2">
           <Sparkles className={cn(
             "h-4 w-4 transition-colors",
-            isFocused ? "text-primary" : "text-muted-foreground"
+            isRecording ? "text-destructive animate-pulse" : isFocused ? "text-primary" : "text-muted-foreground"
           )} />
         </div>
         
         <Input
           ref={inputRef}
-          value={input}
+          value={displayText}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-          placeholder={placeholder}
+          placeholder={isRecording ? "Listening..." : placeholder}
           autoFocus={autoFocus}
           disabled={disabled}
-          className="pl-10 pr-24"
+          className={cn(
+            "pl-10 pr-28",
+            isRecording && "border-destructive/50 ring-1 ring-destructive/20"
+          )}
         />
 
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {showQuickCapture && onQuickCapture && input.trim() && (
+          {/* Voice Input Button */}
+          {isSupported && (
             <Button
               type="button"
-              variant="ghost"
+              variant={isRecording ? "destructive" : "ghost"}
               size="sm"
-              onClick={handleQuickCapture}
-              className="h-7 px-2 text-muted-foreground hover:text-foreground"
-              title="Quick capture to inbox"
+              onClick={toggleRecording}
+              disabled={disabled}
+              className={cn(
+                "h-7 px-2",
+                isRecording && "animate-pulse"
+              )}
+              title={isRecording ? "Stop recording" : "Start voice input"}
             >
-              <Inbox className="h-4 w-4" />
+              {isRecording ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
             </Button>
           )}
           
-          {input.trim() && (
+          {/* Clear Button */}
+          {(input.trim() || interimText) && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={reset}
+              onClick={handleClear}
               className="h-7 px-2 text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </Button>
           )}
           
+          {/* Submit Button */}
           <Button
             type="button"
             size="sm"
@@ -247,9 +277,16 @@ export function SmartTaskInput({
       )}
 
       {/* Hint text */}
-      {isFocused && !input && (
+      {isFocused && !input && !isRecording && (
         <p className="text-xs text-muted-foreground px-1 animate-in fade-in duration-300">
-          Try: "Meeting with John tomorrow at 2pm for 1h @work" or "Buy groceries today quick @errands"
+          Try: "Meeting with John tomorrow at 2pm for 1h @work" or tap 🎤 to speak
+        </p>
+      )}
+
+      {/* Recording indicator */}
+      {isRecording && (
+        <p className="text-xs text-destructive px-1 animate-pulse">
+          🎤 Listening... tap mic to stop
         </p>
       )}
     </div>
