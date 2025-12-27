@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Target, Swords, Trophy, Star, Plus, ArrowDown, Clock } from "lucide-react";
+import { Target, Swords, Trophy, Star, Plus, ArrowDown, Clock, Timer } from "lucide-react";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { ScheduleCelebration } from "@/components/ScheduleCelebration";
 import { QuestsTutorialModal } from "@/components/QuestsTutorialModal";
@@ -46,6 +46,7 @@ import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { QuestAgenda } from "@/components/QuestAgenda";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { CalendarTask } from "@/types/quest";
+import { TaskManagerPanel } from "@/features/tasks/components";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
@@ -482,10 +483,14 @@ export default function Tasks() {
 
       <div className="max-w-2xl mx-auto p-6 pb-24 space-y-4 relative z-10">
         <Tabs defaultValue="quests" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="quests" className="gap-2" data-tour="tasks-tab">
               <Swords className="h-4 w-4" />
-              Daily Quests
+              <span className="hidden sm:inline">Daily</span> Quests
+            </TabsTrigger>
+            <TabsTrigger value="focus" className="gap-2">
+              <Timer className="h-4 w-4" />
+              <span className="hidden sm:inline">Focus</span>
             </TabsTrigger>
             <TabsTrigger value="epics" className="gap-2" data-tour="epics-tab">
               <Trophy className="h-4 w-4" />
@@ -563,6 +568,39 @@ export default function Tasks() {
                 </span>
               )}
             </button>
+          </TabsContent>
+
+          <TabsContent value="focus" className="space-y-4 mt-4">
+            <TaskManagerPanel
+              tasks={tasks.map(t => ({
+                id: t.id,
+                task_text: t.task_text,
+                completed: t.completed ?? false,
+                priority: t.difficulty === 'hard' ? 'high' : t.difficulty === 'medium' ? 'medium' : 'low',
+                is_top_three: t.is_main_quest ?? false,
+              }))}
+              onToggleComplete={(taskId, completed) => {
+                const task = tasks.find(t => t.id === taskId);
+                if (task) {
+                  if (completed) recordCompletion();
+                  toggleTask({ taskId, completed, xpReward: task.xp_reward });
+                }
+              }}
+              onAddTask={(taskText, metadata) => {
+                addTask({
+                  taskText,
+                  difficulty: 'medium',
+                  taskDate: format(selectedDate, 'yyyy-MM-dd'),
+                  isMainQuest: metadata?.isTopThree ?? false,
+                  scheduledTime: metadata?.scheduledTime ?? null,
+                  estimatedDuration: metadata?.estimatedDuration ?? null,
+                  recurrencePattern: metadata?.recurrencePattern ?? null,
+                  recurrenceDays: [],
+                  reminderEnabled: false,
+                  reminderMinutesBefore: 15,
+                });
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="epics" className="space-y-4 mt-6">
