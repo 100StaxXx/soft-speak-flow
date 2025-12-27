@@ -125,6 +125,96 @@ export const CALENDAR_BONUS_XP = {
 } as const;
 
 /**
+ * Focus Session XP Rewards
+ * 
+ * Rewards based on session duration and completion.
+ */
+export const FOCUS_XP_REWARDS = {
+  /** Quick focus session (15 minutes) */
+  QUICK: 15,
+  /** Standard Pomodoro session (25 minutes) */
+  STANDARD: 25,
+  /** Deep work session (50 minutes) */
+  DEEP_WORK: 50,
+  /** Combo bonus for 4 consecutive sessions */
+  COMBO_BONUS: 20,
+  /** Perfect focus (no distractions) bonus */
+  PERFECT_FOCUS_BONUS: 10,
+  /** Early quit penalty (negative) */
+  EARLY_QUIT_PENALTY: -5,
+} as const;
+
+/**
+ * Subtask XP Rewards
+ * 
+ * Rewards for subtask completion and parent task progress.
+ */
+export const SUBTASK_XP_REWARDS = {
+  /** Completing a single subtask */
+  SUBTASK_COMPLETE: 3,
+  /** Bonus when all subtasks of a task are completed */
+  ALL_SUBTASKS_BONUS: 10,
+} as const;
+
+/**
+ * Priority System XP Rewards
+ * 
+ * Bonuses for completing prioritized tasks.
+ */
+export const PRIORITY_XP_REWARDS = {
+  /** Completing a Top 3 daily task */
+  TOP_THREE_COMPLETE: 15,
+  /** Completing all 3 Top 3 tasks in a day */
+  ALL_TOP_THREE_BONUS: 30,
+  /** Completing an urgent-important (Quadrant 1) task */
+  URGENT_IMPORTANT: 10,
+  /** Completing a not-urgent-important (Quadrant 2) task */
+  NOT_URGENT_IMPORTANT: 12,
+} as const;
+
+/**
+ * Inbox & Capture XP Rewards
+ * 
+ * Rewards for using quick capture and processing inbox.
+ */
+export const INBOX_XP_REWARDS = {
+  /** Processing an inbox item into a task */
+  PROCESS_INBOX: 2,
+  /** Achieving inbox zero */
+  INBOX_ZERO: 10,
+  /** Using voice capture */
+  VOICE_CAPTURE: 3,
+} as const;
+
+/**
+ * Productivity & Analytics XP Rewards
+ * 
+ * Rewards for maintaining productivity and completing reviews.
+ */
+export const PRODUCTIVITY_XP_REWARDS = {
+  /** Completing weekly review ritual */
+  WEEKLY_REVIEW: 25,
+  /** Completing end-of-day review */
+  DAILY_REVIEW: 8,
+  /** Achieving productivity score > 80 */
+  HIGH_PRODUCTIVITY_DAY: 20,
+  /** Perfect day (all planned tasks completed) */
+  PERFECT_DAY: 35,
+} as const;
+
+/**
+ * Context & Scheduling XP Rewards
+ * 
+ * Bonuses for smart scheduling behaviors.
+ */
+export const SCHEDULING_XP_REWARDS = {
+  /** Completing task in its scheduled time block */
+  ON_TIME_COMPLETION: 5,
+  /** Completing task in its context location */
+  CONTEXT_MATCH: 3,
+} as const;
+
+/**
  * Type-safe difficulty type
  */
 export type Difficulty = 'easy' | 'medium' | 'hard';

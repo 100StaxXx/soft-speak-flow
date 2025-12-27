@@ -1683,75 +1683,103 @@ export type Database = {
       }
       daily_tasks: {
         Row: {
+          actual_time_spent: number | null
+          ai_generated: boolean | null
           category: string | null
           completed: boolean | null
           completed_at: string | null
+          context_id: string | null
           created_at: string | null
           difficulty: string | null
+          energy_level: string | null
           estimated_duration: number | null
           id: string
           is_bonus: boolean | null
           is_main_quest: boolean | null
           is_recurring: boolean | null
+          is_top_three: boolean | null
           parent_template_id: string | null
+          priority: string | null
           recurrence_days: number[] | null
           recurrence_pattern: string | null
           reminder_enabled: boolean | null
           reminder_minutes_before: number | null
           reminder_sent: boolean | null
           scheduled_time: string | null
+          source: string | null
           task_date: string
           task_text: string
           user_id: string
           xp_reward: number
         }
         Insert: {
+          actual_time_spent?: number | null
+          ai_generated?: boolean | null
           category?: string | null
           completed?: boolean | null
           completed_at?: string | null
+          context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
+          energy_level?: string | null
           estimated_duration?: number | null
           id?: string
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_recurring?: boolean | null
+          is_top_three?: boolean | null
           parent_template_id?: string | null
+          priority?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
           reminder_enabled?: boolean | null
           reminder_minutes_before?: number | null
           reminder_sent?: boolean | null
           scheduled_time?: string | null
+          source?: string | null
           task_date?: string
           task_text: string
           user_id: string
           xp_reward?: number
         }
         Update: {
+          actual_time_spent?: number | null
+          ai_generated?: boolean | null
           category?: string | null
           completed?: boolean | null
           completed_at?: string | null
+          context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
+          energy_level?: string | null
           estimated_duration?: number | null
           id?: string
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_recurring?: boolean | null
+          is_top_three?: boolean | null
           parent_template_id?: string | null
+          priority?: string | null
           recurrence_days?: number[] | null
           recurrence_pattern?: string | null
           reminder_enabled?: boolean | null
           reminder_minutes_before?: number | null
           reminder_sent?: boolean | null
           scheduled_time?: string | null
+          source?: string | null
           task_date?: string
           task_text?: string
           user_id?: string
           xp_reward?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "daily_tasks_context_id_fkey"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "task_contexts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "daily_tasks_parent_template_id_fkey"
             columns: ["parent_template_id"]
@@ -2334,6 +2362,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      focus_sessions: {
+        Row: {
+          actual_duration: number | null
+          completed_at: string | null
+          created_at: string
+          distractions_count: number | null
+          duration_type: string
+          id: string
+          notes: string | null
+          paused_at: string | null
+          planned_duration: number
+          started_at: string
+          status: string | null
+          task_id: string | null
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          actual_duration?: number | null
+          completed_at?: string | null
+          created_at?: string
+          distractions_count?: number | null
+          duration_type: string
+          id?: string
+          notes?: string | null
+          paused_at?: string | null
+          planned_duration: number
+          started_at?: string
+          status?: string | null
+          task_id?: string | null
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          actual_duration?: number | null
+          completed_at?: string | null
+          created_at?: string
+          distractions_count?: number | null
+          duration_type?: string
+          id?: string
+          notes?: string | null
+          paused_at?: string | null
+          planned_duration?: number
+          started_at?: string
+          status?: string | null
+          task_id?: string | null
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       guild_artifact_unlocks: {
         Row: {
@@ -4179,6 +4266,68 @@ export type Database = {
           },
         ]
       }
+      productivity_stats: {
+        Row: {
+          created_at: string
+          focus_sessions_completed: number | null
+          id: string
+          most_productive_context: string | null
+          peak_hour: number | null
+          productivity_score: number | null
+          stat_date: string
+          streak_maintained: boolean | null
+          subtasks_completed: number | null
+          tasks_completed: number | null
+          tasks_created: number | null
+          top_three_completed: number | null
+          total_focus_minutes: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          focus_sessions_completed?: number | null
+          id?: string
+          most_productive_context?: string | null
+          peak_hour?: number | null
+          productivity_score?: number | null
+          stat_date?: string
+          streak_maintained?: boolean | null
+          subtasks_completed?: number | null
+          tasks_completed?: number | null
+          tasks_created?: number | null
+          top_three_completed?: number | null
+          total_focus_minutes?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          focus_sessions_completed?: number | null
+          id?: string
+          most_productive_context?: string | null
+          peak_hour?: number | null
+          productivity_score?: number | null
+          stat_date?: string
+          streak_maintained?: boolean | null
+          subtasks_completed?: number | null
+          tasks_completed?: number | null
+          tasks_created?: number | null
+          top_three_completed?: number | null
+          total_focus_minutes?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productivity_stats_most_productive_context_fkey"
+            columns: ["most_productive_context"]
+            isOneToOne: false
+            referencedRelation: "task_contexts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           astral_encounters_enabled: boolean | null
@@ -5150,6 +5299,160 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subtasks: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          sort_order: number | null
+          task_id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          sort_order?: number | null
+          task_id: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          sort_order?: number | null
+          task_id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_contexts: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      task_dependencies: {
+        Row: {
+          created_at: string
+          depends_on_task_id: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          depends_on_task_id: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          depends_on_task_id?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_dependencies_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_inbox: {
+        Row: {
+          created_at: string
+          created_task_id: string | null
+          id: string
+          parsed_data: Json | null
+          processed: boolean | null
+          processed_at: string | null
+          raw_text: string
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_task_id?: string | null
+          id?: string
+          parsed_data?: Json | null
+          processed?: boolean | null
+          processed_at?: string | null
+          raw_text: string
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_task_id?: string | null
+          id?: string
+          parsed_data?: Json | null
+          processed?: boolean | null
+          processed_at?: string | null
+          raw_text?: string
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_inbox_created_task_id_fkey"
+            columns: ["created_task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_reminders_log: {
         Row: {
