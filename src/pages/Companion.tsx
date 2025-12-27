@@ -4,16 +4,13 @@ import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
-import { BadgesCollectionPanel } from "@/components/BadgesCollectionPanel";
-import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
-import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
 import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { FactionBadge } from "@/components/FactionBadge";
-import { RewardInventory } from "@/components/RewardInventory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Award, TrendingUp, BookOpen, Sparkles, MapPin, Gift } from "lucide-react";
-import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
+import { TrendingUp, Compass, Package, Sparkles } from "lucide-react";
+import { JourneyTab } from "@/components/companion/JourneyTab";
+import { CollectionTab } from "@/components/companion/CollectionTab";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
@@ -43,39 +40,6 @@ const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: {
   </div>
 ));
 OverviewTab.displayName = 'OverviewTab';
-
-const BadgesTab = memo(() => (
-  <BadgesCollectionPanel />
-));
-BadgesTab.displayName = 'BadgesTab';
-
-const StoryTab = memo(() => (
-  <div className="space-y-6 mt-6">
-    <CompanionStoryJournal />
-  </div>
-));
-StoryTab.displayName = 'StoryTab';
-
-const CardsTab = memo(() => (
-  <div className="space-y-6 mt-6">
-    <EvolutionCardGallery />
-  </div>
-));
-CardsTab.displayName = 'CardsTab';
-
-const PostcardsTab = memo(() => (
-  <div className="space-y-6 mt-6">
-    <CompanionPostcards />
-  </div>
-));
-PostcardsTab.displayName = 'PostcardsTab';
-
-const LootTab = memo(() => (
-  <div className="space-y-6 mt-6">
-    <RewardInventory />
-  </div>
-));
-LootTab.displayName = 'LootTab';
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
@@ -177,35 +141,23 @@ const Companion = () => {
           </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="overview" className="text-xs px-1">
-                <TrendingUp className="h-4 w-4 sm:mr-1" />
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
               </TabsTrigger>
-              <TabsTrigger value="badges" className="text-xs px-1">
-                <Award className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Badges</span>
-              </TabsTrigger>
-              <TabsTrigger value="story" className="text-xs px-1 relative">
-                <BookOpen className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Story</span>
+              <TabsTrigger value="journey" className="flex items-center gap-2 relative">
+                <Compass className="h-4 w-4" />
+                <span className="hidden sm:inline">Journey</span>
                 {unreadStoryCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
                     {unreadStoryCount > 9 ? '9+' : unreadStoryCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="cards" className="text-xs px-1">
-                <Sparkles className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Cards</span>
-              </TabsTrigger>
-              <TabsTrigger value="postcards" className="text-xs px-1">
-                <MapPin className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Postcards</span>
-              </TabsTrigger>
-              <TabsTrigger value="loot" className="text-xs px-1">
-                <Gift className="h-4 w-4 sm:mr-1" />
-                <span className="hidden sm:inline">Loot</span>
+              <TabsTrigger value="collection" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Collection</span>
               </TabsTrigger>
             </TabsList>
 
@@ -219,24 +171,12 @@ const Companion = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="badges">
-              {activeTab === "badges" && <BadgesTab />}
+            <TabsContent value="journey">
+              {activeTab === "journey" && <JourneyTab unreadStoryCount={unreadStoryCount} />}
             </TabsContent>
 
-            <TabsContent value="story">
-              {activeTab === "story" && <StoryTab />}
-            </TabsContent>
-
-            <TabsContent value="cards">
-              {activeTab === "cards" && <CardsTab />}
-            </TabsContent>
-
-            <TabsContent value="postcards">
-              {activeTab === "postcards" && <PostcardsTab />}
-            </TabsContent>
-
-            <TabsContent value="loot">
-              {activeTab === "loot" && <LootTab />}
+            <TabsContent value="collection">
+              {activeTab === "collection" && <CollectionTab />}
             </TabsContent>
           </Tabs>
         </div>
