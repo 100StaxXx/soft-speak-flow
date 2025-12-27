@@ -5410,50 +5410,6 @@ export type Database = {
           },
         ]
       }
-      task_inbox: {
-        Row: {
-          created_at: string
-          created_task_id: string | null
-          id: string
-          parsed_data: Json | null
-          processed: boolean | null
-          processed_at: string | null
-          raw_text: string
-          source: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_task_id?: string | null
-          id?: string
-          parsed_data?: Json | null
-          processed?: boolean | null
-          processed_at?: string | null
-          raw_text: string
-          source?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          created_task_id?: string | null
-          id?: string
-          parsed_data?: Json | null
-          processed?: boolean | null
-          processed_at?: string | null
-          raw_text?: string
-          source?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "task_inbox_created_task_id_fkey"
-            columns: ["created_task_id"]
-            isOneToOne: false
-            referencedRelation: "daily_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       task_reminders_log: {
         Row: {
           created_at: string | null

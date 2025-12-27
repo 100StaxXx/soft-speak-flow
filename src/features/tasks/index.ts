@@ -1,8 +1,6 @@
 // Components
 export { 
   SmartTaskInput, 
-  InboxDrawer, 
-  QuickCaptureButton,
   SubtaskList,
   ProgressRing,
   DependencyPicker,
@@ -25,14 +23,12 @@ export {
 export { 
   useNaturalLanguageParser, 
   parseNaturalLanguage, 
-  useTaskInbox,
   useSubtasks,
   useTaskDependencies,
   useFocusSession,
   usePriorityTasks,
   useProductivityStats,
   type ParsedTask,
-  type InboxItem,
   type Subtask,
   type TaskDependency,
   type FocusSession,
