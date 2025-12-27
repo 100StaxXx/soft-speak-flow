@@ -97,6 +97,50 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
   });
 
+  const updateSubtask = useMutation({
+    mutationFn: async ({ subtaskId, title }: { subtaskId: string; title: string }) => {
+      const { error } = await supabase
+        .from('subtasks')
+        .update({ title })
+        .eq('id', subtaskId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+    },
+    onError: () => {
+      toast.error('Failed to update subtask');
+    },
+  });
+
+  const bulkAddSubtasks = useMutation({
+    mutationFn: async (titles: string[]) => {
+      if (!user?.id || !parentTaskId) throw new Error('Missing required data');
+      
+      const maxOrder = subtasks.length > 0 
+        ? Math.max(...subtasks.map(s => s.sort_order)) + 1 
+        : 0;
+
+      const subtasksToInsert = titles.map((title, index) => ({
+        task_id: parentTaskId,
+        user_id: user.id,
+        title,
+        sort_order: maxOrder + index,
+      }));
+
+      const { error } = await supabase.from('subtasks').insert(subtasksToInsert);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+      toast.success('Subtasks added!');
+    },
+    onError: () => {
+      toast.error('Failed to add subtasks');
+    },
+  });
+
   const completedCount = subtasks.filter(s => s.completed).length;
   const totalCount = subtasks.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -107,7 +151,10 @@ export const useSubtasks = (parentTaskId: string | null) => {
     addSubtask: addSubtask.mutate,
     toggleSubtask: toggleSubtask.mutate,
     deleteSubtask: deleteSubtask.mutate,
+    updateSubtask: updateSubtask.mutate,
+    bulkAddSubtasks: bulkAddSubtasks.mutateAsync,
     isAdding: addSubtask.isPending,
+    isBulkAdding: bulkAddSubtasks.isPending,
     completedCount,
     totalCount,
     progressPercent,

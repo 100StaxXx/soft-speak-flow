@@ -221,3 +221,6 @@ verify_jwt = false
 
 [functions.generate-morning-briefing]
 verify_jwt = true
+
+[functions.decompose-task]
+verify_jwt = true

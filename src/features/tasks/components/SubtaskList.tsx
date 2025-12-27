@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Check, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Check, Trash2, ChevronDown, ChevronRight, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useSubtasks } from '../hooks/useSubtasks';
+import { useSubtasks, Subtask } from '../hooks/useSubtasks';
 import { ProgressRing } from './ProgressRing';
 import { cn } from '@/lib/utils';
 
@@ -21,16 +21,44 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
 }) => {
   const [newSubtask, setNewSubtask] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const {
     subtasks,
     isLoading,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
+    updateSubtask,
     progressPercent,
     completedCount,
     totalCount,
   } = useSubtasks(parentTaskId);
+
+  const startEdit = (subtask: Subtask) => {
+    setEditingId(subtask.id);
+    setEditText(subtask.title);
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !editText.trim()) return;
+    updateSubtask({ subtaskId: editingId, title: editText.trim() });
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      saveEdit();
+    } else if (e.key === 'Escape') {
+      cancelEdit();
+    }
+  };
 
   const handleAddSubtask = () => {
     if (!newSubtask.trim()) return;
@@ -105,12 +133,55 @@ export const SubtaskList: React.FC<SubtaskListProps> = ({
                 }
                 className="h-4 w-4"
               />
-              <span className={cn(
-                "flex-1 text-sm",
-                subtask.completed && "line-through text-muted-foreground"
-              )}>
-                {subtask.title}
-              </span>
+              
+              {editingId === subtask.id ? (
+                <div className="flex-1 flex items-center gap-1">
+                  <Input
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
+                    className="h-6 text-sm"
+                    autoFocus
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={saveEdit}
+                  >
+                    <Check className="h-3 w-3 text-green-500" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={cancelEdit}
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <span 
+                    className={cn(
+                      "flex-1 text-sm cursor-pointer",
+                      subtask.completed && "line-through text-muted-foreground"
+                    )}
+                    onDoubleClick={() => startEdit(subtask)}
+                  >
+                    {subtask.title}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                    onClick={() => startEdit(subtask)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+              
               <Button
                 variant="ghost"
                 size="sm"
