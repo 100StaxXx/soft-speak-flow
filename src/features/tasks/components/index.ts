@@ -1,3 +1,7 @@
 export { SmartTaskInput } from './SmartTaskInput';
 export { InboxDrawer } from './InboxDrawer';
 export { QuickCaptureButton } from './QuickCaptureButton';
+export { SubtaskList } from './SubtaskList';
+export { ProgressRing } from './ProgressRing';
+export { DependencyPicker } from './DependencyPicker';
+export { BlockedBadge } from './BlockedBadge';
