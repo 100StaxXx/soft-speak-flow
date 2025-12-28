@@ -137,11 +137,11 @@ export function SmartTaskInput({
 
   return (
     <div className="space-y-2">
-      <div className="relative">
+      <div className="relative group">
         <div className="absolute left-3 top-1/2 -translate-y-1/2">
           <Sparkles className={cn(
-            "h-4 w-4 transition-colors",
-            isRecording ? "text-destructive animate-pulse" : isFocused ? "text-primary" : "text-muted-foreground"
+            "h-4 w-4 transition-all duration-300",
+            isRecording ? "text-destructive scale-110" : isFocused ? "text-primary" : "text-muted-foreground"
           )} />
         </div>
         
@@ -156,8 +156,9 @@ export function SmartTaskInput({
           autoFocus={autoFocus}
           disabled={disabled}
           className={cn(
-            "pl-10 pr-28",
-            isRecording && "border-destructive/50 ring-1 ring-destructive/20"
+            "pl-10 pr-28 transition-all duration-300",
+            isRecording && "border-destructive/50 ring-2 ring-destructive/20 bg-destructive/5",
+            isFocused && !isRecording && "ring-2 ring-primary/20"
           )}
         />
 
@@ -171,13 +172,16 @@ export function SmartTaskInput({
               onClick={handleVoiceToggle}
               disabled={disabled}
               className={cn(
-                "h-7 px-2",
-                isRecording && "animate-pulse"
+                "h-7 px-2 transition-all duration-200",
+                isRecording && "shadow-lg shadow-destructive/30"
               )}
               title={isRecording ? "Stop recording" : "Start voice input"}
             >
               {isRecording ? (
-                <MicOff className="h-4 w-4" />
+                <span className="relative">
+                  <MicOff className="h-4 w-4" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-white rounded-full animate-ping" />
+                </span>
               ) : (
                 <Mic className="h-4 w-4" />
               )}
@@ -191,7 +195,7 @@ export function SmartTaskInput({
               variant="ghost"
               size="sm"
               onClick={handleClear}
-              className="h-7 px-2 text-muted-foreground hover:text-foreground"
+              className="h-7 px-2 text-muted-foreground hover:text-foreground animate-in fade-in zoom-in-95 duration-150"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -203,7 +207,10 @@ export function SmartTaskInput({
             size="sm"
             onClick={handleSubmit}
             disabled={disabled || !parsed?.text.trim()}
-            className="h-7 px-3"
+            className={cn(
+              "h-7 px-3 transition-all duration-200",
+              parsed?.text.trim() && "shadow-md hover:shadow-lg hover:scale-105"
+            )}
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -308,16 +315,31 @@ export function SmartTaskInput({
 
       {/* Hint text */}
       {isFocused && !input && !isRecording && (
-        <p className="text-xs text-muted-foreground px-1 animate-in fade-in duration-300">
+        <p className="text-xs text-muted-foreground px-1 animate-in fade-in slide-in-from-bottom-1 duration-300">
           Try: "Meeting with John tomorrow at 2pm for 1h @work" or tap 🎤 to speak
         </p>
       )}
 
-      {/* Recording indicator */}
+      {/* Recording indicator with waveform effect */}
       {isRecording && (
-        <p className="text-xs text-destructive px-1 animate-pulse">
-          🎤 Listening... tap mic to stop
-        </p>
+        <div className="flex items-center gap-2 px-1 animate-in fade-in slide-in-from-bottom-1 duration-200">
+          <div className="flex items-center gap-0.5">
+            {[...Array(5)].map((_, i) => (
+              <span
+                key={i}
+                className="w-0.5 bg-destructive rounded-full animate-pulse"
+                style={{
+                  height: `${8 + Math.random() * 8}px`,
+                  animationDelay: `${i * 0.1}s`,
+                  animationDuration: '0.5s',
+                }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-destructive">
+            Listening... will stop when you pause
+          </p>
+        </div>
       )}
 
       {/* Permission Request Dialog */}
