@@ -36,6 +36,12 @@ export interface EpicDetails {
   suggestedTargetDays?: number;
 }
 
+export interface CapacityWarnings {
+  atEpicLimit: boolean;
+  overloaded: boolean;
+  suggestedWorkload: 'light' | 'normal' | 'heavy';
+}
+
 export interface IntentClassification {
   type: 'quest' | 'epic' | 'habit' | 'brain-dump';
   confidence: number;
@@ -53,19 +59,24 @@ export interface IntentClassification {
   epicClarifyingQuestions?: ClarifyingQuestion[];
   epicContext?: string;
   epicDetails?: EpicDetails;
+  // Capacity warnings from orchestrator
+  capacityWarnings?: CapacityWarnings;
+  warning?: string;
 }
 
 interface UseIntentClassifierOptions {
   debounceMs?: number;
   minInputLength?: number;
+  useOrchestrator?: boolean;
 }
 
 export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
-  const { debounceMs = 500, minInputLength = 10 } = options;
+  const { debounceMs = 500, minInputLength = 10, useOrchestrator = false } = options;
   
   const [classification, setClassification] = useState<IntentClassification | null>(null);
   const [isClassifying, setIsClassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [capacityWarnings, setCapacityWarnings] = useState<CapacityWarnings | null>(null);
   
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const lastInputRef = useRef<string>('');
@@ -86,9 +97,13 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     setError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('classify-task-intent', {
-        body: { input },
-      });
+      // Use orchestrator if enabled, otherwise direct call
+      const endpoint = useOrchestrator ? 'ai-orchestrator' : 'classify-task-intent';
+      const body = useOrchestrator 
+        ? { input, interactionType: 'classify' }
+        : { input };
+
+      const { data, error: fnError } = await supabase.functions.invoke(endpoint, { body });
 
       if (fnError) {
         throw new Error(fnError.message);
@@ -100,6 +115,12 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
 
       const result = data as IntentClassification;
       setClassification(result);
+      
+      // Extract capacity warnings if using orchestrator
+      if (useOrchestrator && data?.capacityWarnings) {
+        setCapacityWarnings(data.capacityWarnings);
+      }
+      
       return result;
     } catch (err) {
       console.error('Intent classification error:', err);
@@ -109,7 +130,7 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     } finally {
       setIsClassifying(false);
     }
-  }, [classification, minInputLength]);
+  }, [classification, minInputLength, useOrchestrator]);
 
   // Clarify function for brain-dump follow-up questions
   const clarify = useCallback(async (
@@ -257,5 +278,10 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     epicClarifyingQuestions: classification?.epicClarifyingQuestions ?? [],
     epicContext: classification?.epicContext,
     epicDetails: classification?.epicDetails,
+    // Capacity warnings (from orchestrator)
+    capacityWarnings,
+    capacityWarning: classification?.warning ?? null,
+    isAtEpicLimit: capacityWarnings?.atEpicLimit ?? false,
+    isOverloaded: capacityWarnings?.overloaded ?? false,
   };
 }
