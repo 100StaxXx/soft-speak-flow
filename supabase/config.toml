@@ -236,3 +236,6 @@ verify_jwt = false
 
 [functions.apply-epic-adjustments]
 verify_jwt = true
+
+[functions.enrich-user-context]
+verify_jwt = true
