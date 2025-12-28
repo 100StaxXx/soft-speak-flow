@@ -242,3 +242,6 @@ verify_jwt = true
 
 [functions.ai-orchestrator]
 verify_jwt = true
+
+[functions.detect-promotion-opportunities]
+verify_jwt = true
