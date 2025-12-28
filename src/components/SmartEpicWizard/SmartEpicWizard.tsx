@@ -34,6 +34,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion, type ClarificationAnswers } from '@/hooks/useEpicSuggestions';
 import { useEpicTemplates, EpicTemplate } from '@/hooks/useEpicTemplates';
+import { useUserAIContext } from '@/hooks/useUserAIContext';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { SuggestionCard } from './SuggestionCard';
 import { StoryStep, themeColors } from './StoryStep';
@@ -92,7 +93,10 @@ export function SmartEpicWizard({
   const [goalMode, setGoalMode] = useState<'custom' | 'template'>(showTemplatesFirst ? 'template' : 'custom');
   const [goalInput, setGoalInput] = useState(initialGoal);
   
-  // Calculate target days from clarification answers (exam_date or target_date) or use initial value
+  // Get learned preferences from AI context
+  const { preferences, isAtEpicLimit, capacityWarning } = useUserAIContext();
+  
+  // Calculate target days from clarification answers (exam_date or target_date), learned preferences, or defaults
   const calculatedTargetDays = useMemo(() => {
     if (initialTargetDays) return initialTargetDays;
     
@@ -104,11 +108,13 @@ export function SmartEpicWizard({
         // Ensure at least 7 days and at most 365
         return Math.max(7, Math.min(365, daysUntil));
       } catch {
-        return 30;
+        // Fall through to learned preference
       }
     }
-    return 30;
-  }, [initialTargetDays, clarificationAnswers]);
+    
+    // Use learned preference if available
+    return preferences.epicDuration || 30;
+  }, [initialTargetDays, clarificationAnswers, preferences.epicDuration]);
   
   const [targetDays, setTargetDays] = useState(calculatedTargetDays);
   const [epicTitle, setEpicTitle] = useState('');
@@ -118,6 +124,7 @@ export function SmartEpicWizard({
   const [themeColor, setThemeColor] = useState(themeColors[0].value);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(template || null);
   const { medium, success, light, tap } = useHapticFeedback();
+  
   const { templates, featuredTemplates, isLoading: templatesLoading, incrementPopularity } = useEpicTemplates();
   const {
     suggestions,
