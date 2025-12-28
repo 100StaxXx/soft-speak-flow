@@ -2045,9 +2045,13 @@ export type Database = {
           description: string | null
           epic_id: string
           id: string
+          is_postcard_milestone: boolean | null
           is_surfaced: boolean | null
           milestone_percent: number
+          phase_name: string | null
+          phase_order: number | null
           surfaced_at: string | null
+          target_date: string | null
           task_id: string | null
           title: string
           updated_at: string | null
@@ -2060,9 +2064,13 @@ export type Database = {
           description?: string | null
           epic_id: string
           id?: string
+          is_postcard_milestone?: boolean | null
           is_surfaced?: boolean | null
           milestone_percent: number
+          phase_name?: string | null
+          phase_order?: number | null
           surfaced_at?: string | null
+          target_date?: string | null
           task_id?: string | null
           title: string
           updated_at?: string | null
@@ -2075,9 +2083,13 @@ export type Database = {
           description?: string | null
           epic_id?: string
           id?: string
+          is_postcard_milestone?: boolean | null
           is_surfaced?: boolean | null
           milestone_percent?: number
+          phase_name?: string | null
+          phase_order?: number | null
           surfaced_at?: string | null
+          target_date?: string | null
           task_id?: string | null
           title?: string
           updated_at?: string | null
@@ -3718,6 +3730,56 @@ export type Database = {
           request_type?: string | null
         }
         Relationships: []
+      }
+      journey_phases: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string
+          epic_id: string
+          id: string
+          is_active: boolean | null
+          name: string
+          phase_order: number
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date: string
+          epic_id: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phase_order?: number
+          start_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          epic_id?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phase_order?: number
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_phases_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lesson_mentors: {
         Row: {
