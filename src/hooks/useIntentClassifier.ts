@@ -113,14 +113,49 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
         throw new Error(data.error);
       }
 
-      const result = data as IntentClassification;
-      setClassification(result);
+      // When using orchestrator, the classification is embedded in the response
+      // The orchestrator returns: { ...classificationData, enrichedContext, capacityWarnings, sessionId, responseTimeMs }
+      // Extract the classification fields properly
+      let result: IntentClassification;
       
-      // Extract capacity warnings if using orchestrator
-      if (useOrchestrator && data?.capacityWarnings) {
-        setCapacityWarnings(data.capacityWarnings);
+      if (useOrchestrator) {
+        // Extract classification data from orchestrator response
+        // The orchestrator embeds classification fields directly in the response
+        result = {
+          type: data.type || 'quest',
+          confidence: data.confidence || 0,
+          reasoning: data.reasoning || '',
+          suggestedDeadline: data.suggestedDeadline,
+          suggestedDuration: data.suggestedDuration,
+          needsClarification: data.needsClarification,
+          clarifyingQuestion: data.clarifyingQuestion,
+          clarificationContext: data.clarificationContext,
+          extractedTasks: data.extractedTasks,
+          suggestedTasks: data.suggestedTasks,
+          detectedContext: data.detectedContext,
+          epicClarifyingQuestions: data.epicClarifyingQuestions,
+          epicContext: data.epicContext,
+          epicDetails: data.epicDetails,
+          capacityWarnings: data.capacityWarnings,
+          warning: data.warning,
+        };
+        
+        // Extract capacity warnings from orchestrator
+        if (data.capacityWarnings) {
+          setCapacityWarnings(data.capacityWarnings);
+        } else if (data.enrichedContext) {
+          // Fallback to enrichedContext if capacityWarnings not present directly
+          setCapacityWarnings({
+            atEpicLimit: data.enrichedContext.atEpicLimit ?? false,
+            overloaded: data.enrichedContext.overloaded ?? false,
+            suggestedWorkload: data.enrichedContext.suggestedWorkload ?? 'normal',
+          });
+        }
+      } else {
+        result = data as IntentClassification;
       }
       
+      setClassification(result);
       return result;
     } catch (err) {
       console.error('Intent classification error:', err);
