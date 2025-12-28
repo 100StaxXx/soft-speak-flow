@@ -48,6 +48,8 @@ interface UseVoiceInputOptions {
   onError?: (error: string) => void;
   onPermissionNeeded?: () => void;
   language?: string;
+  autoStopOnSilence?: boolean;
+  silenceTimeoutMs?: number;
 }
 
 interface UseVoiceInputReturn {
@@ -66,14 +68,33 @@ export function useVoiceInput({
   onError,
   onPermissionNeeded,
   language = 'en-US',
+  autoStopOnSilence = true,
+  silenceTimeoutMs = 1500,
 }: UseVoiceInputOptions = {}): UseVoiceInputReturn {
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { status: permissionStatus, requestPermission, checkPermission } = useMicrophonePermission();
   
   // Check for Web Speech API support
   const isSupported = typeof window !== 'undefined' && 
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const clearSilenceTimeout = useCallback(() => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    clearSilenceTimeout();
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setIsRecording(false);
+    }
+  }, [clearSilenceTimeout]);
 
   const createRecognition = useCallback((): SpeechRecognitionInstance | null => {
     if (!isSupported) return null;
@@ -107,10 +128,19 @@ export function useVoiceInput({
       if (interimTranscript && onInterimResult) {
         onInterimResult(interimTranscript);
       }
+
+      // Auto-stop on silence: reset timer whenever we get speech
+      if (autoStopOnSilence && (interimTranscript || finalTranscript)) {
+        clearSilenceTimeout();
+        silenceTimeoutRef.current = setTimeout(() => {
+          stopRecording();
+        }, silenceTimeoutMs);
+      }
     };
     
     recognition.onerror = (event: SpeechRecognitionErrorEventType) => {
       console.error('Speech recognition error:', event.error);
+      clearSilenceTimeout();
       setIsRecording(false);
       
       if (onError) {
@@ -125,11 +155,12 @@ export function useVoiceInput({
     };
     
     recognition.onend = () => {
+      clearSilenceTimeout();
       setIsRecording(false);
     };
     
     return recognition;
-  }, [isSupported, language, onInterimResult, onFinalResult, onError]);
+  }, [isSupported, language, onInterimResult, onFinalResult, onError, autoStopOnSilence, silenceTimeoutMs, clearSilenceTimeout, stopRecording]);
 
   const startRecording = useCallback(async () => {
     if (!isSupported) {
@@ -166,13 +197,6 @@ export function useVoiceInput({
     }
   }, [isSupported, createRecognition, onError, checkPermission, requestPermission, onPermissionNeeded]);
 
-  const stopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-      setIsRecording(false);
-    }
-  }, []);
 
   const toggleRecording = useCallback(() => {
     if (isRecording) {
