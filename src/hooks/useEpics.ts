@@ -83,6 +83,20 @@ export const useEpics = () => {
         reminder_enabled?: boolean;
         reminder_minutes_before?: number;
       }>;
+      milestones?: Array<{
+        title: string;
+        description?: string;
+        target_date: string;
+        milestone_percent: number;
+        is_postcard_milestone: boolean;
+      }>;
+      phases?: Array<{
+        name: string;
+        description: string;
+        start_date: string;
+        end_date: string;
+        phase_order: number;
+      }>;
     }) => {
       if (!user) throw new Error("Not authenticated");
 
@@ -182,6 +196,51 @@ export const useEpics = () => {
             .delete()
             .in("id", createdHabits.map(h => h.id));
           throw new Error(`Failed to link habits: ${linkError.message}`);
+        }
+
+        // Create journey phases if provided
+        if (epicData.phases && epicData.phases.length > 0) {
+          const { error: phasesError } = await supabase
+            .from("journey_phases")
+            .insert(
+              epicData.phases.map(phase => ({
+                epic_id: epic.id,
+                user_id: user.id,
+                name: phase.name,
+                description: phase.description,
+                start_date: phase.start_date,
+                end_date: phase.end_date,
+                phase_order: phase.phase_order,
+              }))
+            );
+
+          if (phasesError) {
+            console.error("Failed to create journey phases:", phasesError);
+            // Non-blocking - epic still created successfully
+          }
+        }
+
+        // Create milestones with dates if provided
+        if (epicData.milestones && epicData.milestones.length > 0) {
+          const { error: milestonesError } = await supabase
+            .from("epic_milestones")
+            .insert(
+              epicData.milestones.map((milestone, index) => ({
+                epic_id: epic.id,
+                user_id: user.id,
+                title: milestone.title,
+                description: milestone.description,
+                target_date: milestone.target_date,
+                milestone_percent: milestone.milestone_percent,
+                is_postcard_milestone: milestone.is_postcard_milestone,
+                phase_order: index + 1,
+              }))
+            );
+
+          if (milestonesError) {
+            console.error("Failed to create milestones:", milestonesError);
+            // Non-blocking - epic still created successfully
+          }
         }
 
         // Trigger narrative seed generation in background if story type selected
