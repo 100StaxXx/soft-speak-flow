@@ -1,0 +1,179 @@
+import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface JourneyPhase {
+  id: string;
+  name: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  phaseOrder: number;
+}
+
+export interface JourneyMilestone {
+  id: string;
+  title: string;
+  description: string;
+  targetDate: string;
+  phaseOrder: number;
+  phaseName: string;
+  isPostcardMilestone: boolean;
+  milestonePercent: number;
+}
+
+export interface JourneyRitual {
+  id: string;
+  title: string;
+  description: string;
+  frequency: 'daily' | 'weekly' | 'custom';
+  difficulty: 'easy' | 'medium' | 'hard';
+  estimatedMinutes?: number;
+}
+
+export interface FeasibilityAssessment {
+  daysAvailable: number;
+  typicalDays: number;
+  feasibility: 'comfortable' | 'achievable' | 'aggressive' | 'very_aggressive';
+  message: string;
+}
+
+export interface JourneySchedule {
+  feasibilityAssessment: FeasibilityAssessment;
+  phases: JourneyPhase[];
+  milestones: JourneyMilestone[];
+  rituals: JourneyRitual[];
+  weeklyHoursEstimate: number;
+}
+
+interface GenerateScheduleParams {
+  goal: string;
+  deadline: string;
+  clarificationAnswers?: Record<string, string | number | undefined>;
+  epicContext?: string;
+}
+
+interface AdjustScheduleParams {
+  goal: string;
+  deadline: string;
+  adjustmentRequest: string;
+  previousSchedule: {
+    phases: JourneyPhase[];
+    milestones: JourneyMilestone[];
+    rituals: JourneyRitual[];
+  };
+}
+
+export function useJourneySchedule() {
+  const [schedule, setSchedule] = useState<JourneySchedule | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generateSchedule = useCallback(async (params: GenerateScheduleParams): Promise<JourneySchedule | null> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('generate-journey-schedule', {
+        body: params,
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      const generatedSchedule = data as JourneySchedule;
+      setSchedule(generatedSchedule);
+      return generatedSchedule;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate schedule';
+      setError(message);
+      console.error('Failed to generate schedule:', err);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const adjustSchedule = useCallback(async (params: AdjustScheduleParams): Promise<JourneySchedule | null> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('generate-journey-schedule', {
+        body: params,
+      });
+
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+
+      const adjustedSchedule = data as JourneySchedule;
+      setSchedule(adjustedSchedule);
+      return adjustedSchedule;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to adjust schedule';
+      setError(message);
+      console.error('Failed to adjust schedule:', err);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const toggleMilestone = useCallback((milestoneId: string) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        milestones: prev.milestones.map(m => 
+          m.id === milestoneId 
+            ? { ...m, isPostcardMilestone: !m.isPostcardMilestone }
+            : m
+        ),
+      };
+    });
+  }, []);
+
+  const toggleRitual = useCallback((ritualId: string) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      const ritual = prev.rituals.find(r => r.id === ritualId);
+      if (!ritual) return prev;
+      
+      // Toggle by removing or adding back
+      const isCurrentlySelected = prev.rituals.some(r => r.id === ritualId);
+      // For simplicity, we'll track selection separately or use a 'selected' field
+      return prev;
+    });
+  }, []);
+
+  const updateMilestoneDate = useCallback((milestoneId: string, newDate: string) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        milestones: prev.milestones.map(m => 
+          m.id === milestoneId 
+            ? { ...m, targetDate: newDate }
+            : m
+        ),
+      };
+    });
+  }, []);
+
+  const reset = useCallback(() => {
+    setSchedule(null);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
+  return {
+    schedule,
+    isLoading,
+    error,
+    generateSchedule,
+    adjustSchedule,
+    toggleMilestone,
+    toggleRitual,
+    updateMilestoneDate,
+    reset,
+  };
+}

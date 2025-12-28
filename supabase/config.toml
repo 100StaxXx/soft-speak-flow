@@ -3,6 +3,9 @@ project_id = "tffrgsaawvletgiztfry"
 [functions.validate-companion-image]
 verify_jwt = false
 
+[functions.generate-journey-schedule]
+verify_jwt = false
+
 [functions.generate-adversary-image]
 verify_jwt = false
 
