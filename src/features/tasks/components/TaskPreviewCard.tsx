@@ -47,24 +47,67 @@ interface TaskPreviewCardProps {
 }
 
 // Detection logic for "big goals" that could benefit from breakdown
-function looksLikeBigGoal(text: string, estimatedDuration?: number): boolean {
+function looksLikeBigGoal(
+  text: string, 
+  estimatedDuration?: number,
+  scheduledDate?: string | null
+): boolean {
   if (!text) return false;
   
   const cleanText = text.toLowerCase().trim();
   
-  // Big goal keywords
-  const bigGoalKeywords = [
+  // 1. Action verbs
+  const actionKeywords = [
     'launch', 'build', 'create', 'develop', 'design', 'implement',
-    'plan', 'organize', 'set up', 'setup', 'prepare', 'finish',
-    'complete', 'start', 'begin', 'make', 'write', 'research'
+    'plan', 'organize', 'set up', 'setup', 'finish', 'complete', 
+    'start', 'begin', 'make', 'write', 'research', 'learn', 'master',
+    'study', 'pass', 'get', 'achieve', 'earn', 'become'
   ];
   
-  const hasKeyword = bigGoalKeywords.some(kw => cleanText.includes(kw));
+  // 2. Preparation phrases (strongest signal)
+  const preparationPhrases = [
+    'prepare for', 'get ready for', 'study for', 'practice for',
+    'train for', 'prep for', 'preparing for', 'ready for',
+    'work toward', 'working toward', 'aim for', 'aiming for',
+    'for the'  // catches "For the bar exam"
+  ];
+  
+  // 3. Goal subjects
+  const goalSubjects = [
+    'exam', 'certification', 'degree', 'license', 'marathon', 
+    'wedding', 'business', 'company', 'app', 'website', 'project',
+    'move', 'house', 'career', 'job', 'promotion', 'interview',
+    'presentation', 'launch', 'renovation', 'trip', 'vacation'
+  ];
+  
+  // 4. Future date pattern (by Month Year / by Year / next year / this year)
+  const hasFutureDatePhrase = /\bby\s+(january|february|march|april|may|june|july|august|september|october|november|december|\d{4})/i.test(cleanText)
+    || /\b(this year|next year|end of year|by end of|by the end)\b/i.test(cleanText);
+  
+  // 5. Check if scheduled date is >14 days out (far future = likely needs breakdown)
+  const isFarOut = scheduledDate 
+    ? (new Date(scheduledDate).getTime() - Date.now()) > 14 * 24 * 60 * 60 * 1000
+    : false;
+    
+  const hasActionKeyword = actionKeywords.some(kw => cleanText.includes(kw));
+  const hasPreparationPhrase = preparationPhrases.some(p => cleanText.includes(p));
+  const hasGoalSubject = goalSubjects.some(s => cleanText.includes(s));
   const isLongText = cleanText.length > 35;
   const hasNoDuration = !estimatedDuration;
   
-  // Has big goal keyword AND (long text OR no duration specified)
-  return hasKeyword && (isLongText || hasNoDuration);
+  // Trigger breakdown suggestion if ANY of these conditions are met:
+  return (
+    // Has preparation phrase (strongest signal)
+    hasPreparationPhrase ||
+    // Goal subject + (future date OR far out OR long text)
+    (hasGoalSubject && (hasFutureDatePhrase || isFarOut || isLongText)) ||
+    // Action keyword + (no duration OR long text)
+    (hasActionKeyword && (hasNoDuration || isLongText)) ||
+    // Far out date (>2 weeks) + no specific duration
+    (isFarOut && hasNoDuration) ||
+    // Future date phrase + no duration
+    (hasFutureDatePhrase && hasNoDuration)
+  );
 }
 
 export function TaskPreviewCard({
@@ -108,7 +151,7 @@ export function TaskPreviewCard({
   const showBreakdownPrompt = onBreakdown && 
     !suggestedSubtasks?.length && 
     !isBreakingDown &&
-    looksLikeBigGoal(parsed.text || rawInput, parsed.estimatedDuration);
+    looksLikeBigGoal(parsed.text || rawInput, parsed.estimatedDuration, parsed.scheduledDate);
 
   const hasSubtasks = suggestedSubtasks && suggestedSubtasks.length > 0;
   const selectedSubtasks = suggestedSubtasks?.filter(s => s.selected) || [];
