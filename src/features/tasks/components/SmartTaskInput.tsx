@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles,
   Clock, 
@@ -17,7 +18,8 @@ import {
   Mic,
   MicOff,
   Send,
-  X
+  X,
+  Check
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,7 @@ import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguag
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
+import { VoiceWaveform } from '@/components/VoiceWaveform';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -50,9 +53,9 @@ export function SmartTaskInput({
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
-  const { medium, success } = useHapticFeedback();
+  const { medium, success, light } = useHapticFeedback();
   
-  const { isRecording, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
+  const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
       setInterimText(text);
     },
@@ -65,6 +68,9 @@ export function SmartTaskInput({
     },
     onPermissionNeeded: () => {
       setShowPermissionDialog(true);
+    },
+    onAutoStopping: () => {
+      light(); // Subtle haptic when auto-stopping
     },
   });
 
@@ -321,26 +327,34 @@ export function SmartTaskInput({
       )}
 
       {/* Recording indicator with waveform effect */}
-      {isRecording && (
-        <div className="flex items-center gap-2 px-1 animate-in fade-in slide-in-from-bottom-1 duration-200">
-          <div className="flex items-center gap-0.5">
-            {[...Array(5)].map((_, i) => (
-              <span
-                key={i}
-                className="w-0.5 bg-destructive rounded-full animate-pulse"
-                style={{
-                  height: `${8 + Math.random() * 8}px`,
-                  animationDelay: `${i * 0.1}s`,
-                  animationDuration: '0.5s',
-                }}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-destructive">
-            Listening... will stop when you pause
-          </p>
-        </div>
-      )}
+      <AnimatePresence>
+        {isRecording && (
+          <motion.div 
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="flex items-center gap-3 px-1"
+          >
+            <VoiceWaveform isActive={isRecording && !isAutoStopping} barCount={7} />
+            <motion.p 
+              className={cn(
+                "text-xs transition-colors",
+                isAutoStopping ? "text-green-500" : "text-destructive"
+              )}
+              animate={isAutoStopping ? { scale: [1, 1.05, 1] } : {}}
+            >
+              {isAutoStopping ? (
+                <span className="flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  Finishing...
+                </span>
+              ) : (
+                "Listening... will stop when you pause"
+              )}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Permission Request Dialog */}
       <PermissionRequestDialog
