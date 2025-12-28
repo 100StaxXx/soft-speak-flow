@@ -38,8 +38,10 @@ import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { ParsedBadge } from './ParsedBadge';
 import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
 import { useEpics } from '@/hooks/useEpics';
+import { useHabits } from '@/features/habits';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { Leaf } from 'lucide-react';
 
 interface SmartTaskInputProps {
   onSubmit: (parsed: ParsedTask) => void;
@@ -67,6 +69,7 @@ export function SmartTaskInput({
 
   const { medium, success, light, tap } = useHapticFeedback();
   const { createEpic, isCreating: isCreatingEpic } = useEpics();
+  const { addHabit, isAddingHabit, habits } = useHabits();
   
   // Intent classification for detecting epics/habits
   const { 
@@ -75,6 +78,7 @@ export function SmartTaskInput({
     classifyDebounced, 
     reset: resetClassification,
     isEpicDetected,
+    isHabitDetected,
   } = useIntentClassifier({ debounceMs: 600, minInputLength: 15 });
 
   // Trigger classification when input changes
@@ -175,6 +179,21 @@ export function SmartTaskInput({
   const handleCreateAsEpic = () => {
     medium();
     setShowEpicWizard(true);
+  };
+
+  const handleCreateAsHabit = () => {
+    if (!parsed?.text.trim()) return;
+    medium();
+    
+    // Quick-create habit with detected text and medium difficulty
+    addHabit({
+      title: parsed.text.trim(),
+      difficulty: parsed.difficulty || 'medium',
+      selectedDays: [0, 1, 2, 3, 4, 5, 6], // Daily by default
+    });
+    
+    reset();
+    resetClassification();
   };
 
   const handleEpicCreated = async (data: Parameters<typeof createEpic>[0]) => {
@@ -568,6 +587,40 @@ export function SmartTaskInput({
               className="h-7 text-xs text-primary hover:text-primary"
             >
               Create as Epic →
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Habit Detection Badge */}
+      <AnimatePresence>
+        {isHabitDetected && !isEpicDetected && !isRecording && input.trim() && habits.length < 2 && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="flex items-center gap-2 px-1"
+          >
+            <Badge 
+              variant="outline" 
+              className="bg-green-500/10 border-green-500/30 text-green-600 gap-1.5 cursor-pointer hover:bg-green-500/20 transition-colors"
+              onClick={handleCreateAsHabit}
+            >
+              {isClassifying ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Leaf className="w-3 h-3" />
+              )}
+              Habit detected
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleCreateAsHabit}
+              disabled={isAddingHabit}
+              className="h-7 text-xs text-green-600 hover:text-green-600"
+            >
+              {isAddingHabit ? 'Creating...' : 'Create as Habit →'}
             </Button>
           </motion.div>
         )}
