@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Users, Sparkles, User, Swords } from "lucide-react";
+import { Users, Sparkles, User, Compass } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
@@ -144,9 +144,9 @@ export const BottomNav = memo(() => {
         >
           {({ isActive }) => (
             <>
-              <Swords className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Quests
+                Journeys
               </span>
             </>
           )}

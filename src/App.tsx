@@ -56,6 +56,7 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 const Epics = lazy(() => import("./pages/Epics"));
+const Journeys = lazy(() => import("./pages/Journeys"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
@@ -219,8 +220,9 @@ const AppContent = memo(() => {
                 <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
                 <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-                <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+                <Route path="/tasks" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
                 <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
+                <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
                 <Route path="/join/:code" element={<JoinEpic />} />
                 <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                 <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} />
