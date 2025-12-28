@@ -55,6 +55,7 @@ export function SmartTaskInput({
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [voicePreview, setVoicePreview] = useState<string | null>(null);
   const prevParsedRef = useRef<ParsedTask | null>(null);
 
   const { medium, success, light, tap } = useHapticFeedback();
@@ -64,7 +65,8 @@ export function SmartTaskInput({
       setInterimText(text);
     },
     onFinalResult: (text) => {
-      setInput((prev) => (prev + ' ' + text).trim());
+      // Store in preview instead of directly adding to input
+      setVoicePreview((prev) => (prev ? prev + ' ' + text : text).trim());
       setInterimText('');
       success(); // Haptic on voice result
     },
@@ -142,6 +144,21 @@ export function SmartTaskInput({
     light();
     reset();
     setInterimText('');
+    setVoicePreview(null);
+  };
+
+  const confirmVoicePreview = () => {
+    if (voicePreview) {
+      setInput((prev) => (prev ? prev + ' ' + voicePreview : voicePreview).trim());
+      setVoicePreview(null);
+      success();
+      inputRef.current?.focus();
+    }
+  };
+
+  const discardVoicePreview = () => {
+    setVoicePreview(null);
+    light();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -547,9 +564,39 @@ export function SmartTaskInput({
                   Finishing...
                 </span>
               ) : (
-                "Listening... will stop when you pause"
+                "Listening..."
               )}
             </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Voice Preview Confirmation */}
+      <AnimatePresence>
+        {voicePreview && !isRecording && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg mx-1"
+          >
+            <Mic className="w-4 h-4 text-primary shrink-0" />
+            <span className="flex-1 text-sm text-foreground">{voicePreview}</span>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={discardVoicePreview}
+              className="h-7 px-2 text-muted-foreground hover:text-destructive"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={confirmVoicePreview}
+              className="h-7 px-3"
+            >
+              <Check className="w-4 h-4" />
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
