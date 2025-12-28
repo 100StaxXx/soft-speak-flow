@@ -42,6 +42,13 @@ export interface CapacityWarnings {
   suggestedWorkload: 'light' | 'normal' | 'heavy';
 }
 
+export interface TimelineAnalysis {
+  statedDays: number;
+  typicalDays: number;
+  feasibility: 'realistic' | 'aggressive' | 'very_aggressive';
+  adjustmentFactors: string[];
+}
+
 export interface IntentClassification {
   type: 'quest' | 'epic' | 'habit' | 'brain-dump';
   confidence: number;
@@ -59,6 +66,8 @@ export interface IntentClassification {
   epicClarifyingQuestions?: ClarifyingQuestion[];
   epicContext?: string;
   epicDetails?: EpicDetails;
+  // Timeline intelligence
+  timelineAnalysis?: TimelineAnalysis;
   // Capacity warnings from orchestrator
   capacityWarnings?: CapacityWarnings;
   warning?: string;
@@ -136,6 +145,7 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
           epicClarifyingQuestions: data.epicClarifyingQuestions,
           epicContext: data.epicContext,
           epicDetails: data.epicDetails,
+          timelineAnalysis: data.timelineAnalysis,
           capacityWarnings: data.capacityWarnings,
           warning: data.warning,
         };
@@ -313,6 +323,8 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     epicClarifyingQuestions: classification?.epicClarifyingQuestions ?? [],
     epicContext: classification?.epicContext,
     epicDetails: classification?.epicDetails,
+    // Timeline intelligence
+    timelineAnalysis: classification?.timelineAnalysis ?? null,
     // Capacity warnings (from orchestrator)
     capacityWarnings,
     capacityWarning: classification?.warning ?? null,

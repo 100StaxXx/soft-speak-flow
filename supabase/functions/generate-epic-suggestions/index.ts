@@ -23,9 +23,18 @@ interface ClarificationAnswers {
   target_date?: string;
   hours_per_day?: number;
   days_per_week?: number;
+  daily_hours?: number;
   current_status?: string;
   current_level?: string;
+  timeline_context?: string; // NEW: User's context for aggressive timelines
   [key: string]: string | number | undefined;
+}
+
+interface TimelineAnalysis {
+  statedDays: number;
+  typicalDays: number;
+  feasibility: 'realistic' | 'aggressive' | 'very_aggressive';
+  adjustmentFactors: string[];
 }
 
 interface GenerateRequest {
@@ -34,6 +43,7 @@ interface GenerateRequest {
   targetDays?: number;
   clarificationAnswers?: ClarificationAnswers;
   epicContext?: string;
+  timelineAnalysis?: TimelineAnalysis; // NEW: Timeline intelligence data
 }
 
 serve(async (req) => {
@@ -42,7 +52,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, deadline, targetDays, clarificationAnswers, epicContext } = await req.json() as GenerateRequest;
+    const { goal, deadline, targetDays, clarificationAnswers, epicContext, timelineAnalysis } = await req.json() as GenerateRequest;
 
     if (!goal || goal.trim().length < 3) {
       return new Response(
@@ -79,10 +89,51 @@ ${Object.entries(clarificationAnswers)
 
 Use this context to personalize the suggestions. For example:
 - If subjects are specified, create subject-specific study habits
-- If hours_per_day is specified, ensure habits fit within that time
+- If hours_per_day or daily_hours is specified, ensure habits fit within that time
 - If current_status indicates "just starting", include foundational habits
 - If exam_date is provided, work backwards to create realistic milestones
+- If timeline_context indicates prior preparation, adapt the intensity accordingly
 `;
+    }
+
+    // Build timeline-aware instructions
+    let timelineInstructions = '';
+    if (timelineAnalysis) {
+      const { statedDays, typicalDays, feasibility, adjustmentFactors } = timelineAnalysis;
+      const timelineContextAnswer = clarificationAnswers?.timeline_context;
+      
+      if (feasibility === 'very_aggressive') {
+        timelineInstructions = `
+IMPORTANT - AGGRESSIVE TIMELINE DETECTED:
+- User has ${statedDays} days but typical preparation takes ${typicalDays} days
+- This is ${Math.round((statedDays / typicalDays) * 100)}% of the typical timeline
+- User's context: "${timelineContextAnswer || 'Not specified'}"
+
+ADAPT YOUR PLAN:
+${timelineContextAnswer?.toLowerCase().includes('retake') || timelineContextAnswer?.toLowerCase().includes('already') 
+  ? `- User has prior experience/foundation - focus on REVIEW and PRACTICE, not learning from scratch
+- Skip introductory content, emphasize weak areas and practice tests
+- Create intensive but focused review schedule`
+  : timelineContextAnswer?.toLowerCase().includes('full-time') || timelineContextAnswer?.toLowerCase().includes('dedicate')
+  ? `- User can commit significant time - create intensive daily schedule
+- Maximize productive hours with strategic breaks
+- Focus on high-impact activities`
+  : `- Be realistic about what can be achieved in ${statedDays} days
+- Prioritize the MOST critical skills/knowledge
+- Set achievable milestones for this compressed timeline
+- Include habits that maximize retention (active recall, spaced repetition)`}
+
+DO NOT refuse to help. Create the best possible plan for their situation.
+`;
+      } else if (feasibility === 'aggressive') {
+        timelineInstructions = `
+TIMELINE NOTE:
+- User has ${statedDays} days (${Math.round((statedDays / typicalDays) * 100)}% of typical ${typicalDays} day timeline)
+- This is achievable but requires focused effort
+- User's context: "${timelineContextAnswer || 'Not specified'}"
+- Create an intensive but sustainable plan
+`;
+      }
     }
 
     // Add epic-type specific instructions
@@ -119,6 +170,8 @@ This is a learning goal. Generate:
     const systemPrompt = `You are an expert habit coach and goal planner. Your job is to break down goals into actionable habits (recurring daily/weekly actions) and milestones (one-time achievements).
 
 ${epicTypeInstructions}
+
+${timelineInstructions}
 
 Rules:
 1. Generate 3-6 habits (recurring actions that build toward the goal)
@@ -166,7 +219,7 @@ ${clarificationContext}
 
 Generate practical, specific suggestions that will help achieve this goal. Make sure habits are realistic and milestones are properly spaced.`;
 
-    console.log('Generating suggestions for goal:', goal, 'context:', epicContext, 'answers:', clarificationAnswers);
+    console.log('Generating suggestions for goal:', goal, 'context:', epicContext, 'answers:', clarificationAnswers, 'timeline:', timelineAnalysis);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

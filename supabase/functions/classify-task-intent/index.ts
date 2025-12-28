@@ -26,6 +26,13 @@ interface ClarifyingQuestion {
   required: boolean;
 }
 
+interface TimelineAnalysis {
+  statedDays: number;
+  typicalDays: number;
+  feasibility: 'realistic' | 'aggressive' | 'very_aggressive';
+  adjustmentFactors: string[];
+}
+
 interface IntentClassification {
   type: 'quest' | 'epic' | 'habit' | 'brain-dump';
   confidence: number;
@@ -53,6 +60,8 @@ interface IntentClassification {
     currentStatus?: string;
     suggestedTargetDays?: number;
   };
+  // Timeline intelligence
+  timelineAnalysis?: TimelineAnalysis;
 }
 
 serve(async (req) => {
@@ -93,6 +102,49 @@ serve(async (req) => {
    - Examples: "Tomorrow is Sunday, I need to vacuum, do dishes, laundry, and take out trash"
    - Key indicators: lists of activities, commas/and separating tasks, day/context mentioned, 2+ distinct tasks
 
+**FOR EPIC TYPE - TIMELINE INTELLIGENCE:**
+
+When detecting an epic with a timeline, ALWAYS analyze the feasibility:
+
+TYPICAL TIMELINES (use these as benchmarks):
+- Bar exam: 8-12 weeks typical prep, minimum 4 weeks for retakers
+- Marathon: 12-16 weeks for beginners, 8-10 weeks for experienced runners
+- Language learning (conversational): 3-6 months
+- CPA exam: 3-4 months per section
+- MCAT: 3-6 months
+- Real estate license: 4-8 weeks
+- Lose 20 pounds: 10-20 weeks (1-2 lbs/week healthy rate)
+- Learn coding basics: 2-3 months
+- Write a book: 3-12 months
+
+TIMELINE ANALYSIS RULES:
+1. Calculate stated days vs typical days for the goal type
+2. Set feasibility:
+   - "realistic": stated >= 70% of typical
+   - "aggressive": stated = 30-70% of typical
+   - "very_aggressive": stated < 30% of typical
+
+3. For aggressive/very_aggressive timelines, ALWAYS ask a "timeline_context" question first to understand WHY:
+   - Frame it positively: "That's an intensive timeline!" not "That's impossible"
+   - Ask about prior preparation, experience level, or special circumstances
+   - This context helps create a realistic plan
+
+**TIMELINE-AWARE CLARIFICATION QUESTIONS:**
+
+For aggressive timelines, ADD this question at the start:
+{
+  "id": "timeline_context",
+  "question": "That's an intensive timeline! What's your current situation?",
+  "type": "select",
+  "options": ["Just starting fresh", "Already have some foundation", "This is a retake/restart", "I can dedicate full-time to this"],
+  "required": true
+}
+
+Customize options based on goal type:
+- For exams: ["Just starting", "Some study done (1-2 months)", "Extensive prep completed", "This is a retake"]
+- For fitness: ["Beginner", "Already active/can run 5K+", "Previously trained for this", "Former athlete"]
+- For learning: ["Complete beginner", "Some basics learned", "Intermediate returning", "Refresher/relearning"]
+
 **FOR EPIC TYPE - CLARIFICATION LOGIC:**
 
 When detecting an epic, decide if you need clarifying questions:
@@ -102,12 +154,14 @@ ASK CLARIFICATION IF the goal is:
 - A fitness goal (run marathon, lose weight) - Ask about current level, target date, available time
 - Learning a skill (learn Spanish, learn coding) - Ask about current level, target proficiency, study time
 - A major project (write a book, launch business) - Ask about scope, deadline, available hours
+- Timeline seems aggressive (< 50% of typical time needed)
 
 DO NOT ASK IF:
-- User already provided specific details ("study 2 hours daily for bar exam until July")
+- User already provided specific details AND timeline context ("I'm a retaker studying 2 hours daily for bar exam until July")
 - Goal is simple enough to break down without context ("read more books")
 
-When asking epic clarification, generate 2-4 questions appropriate to the goal type:
+When asking epic clarification, generate 2-5 questions appropriate to the goal type:
+- For aggressive timelines: ALWAYS include timeline_context question first
 - Use "date" type for target dates/deadlines
 - Use "number" type for hours per day, days per week
 - Use "select" type for predefined options (subjects, current level, etc.)
@@ -115,28 +169,53 @@ When asking epic clarification, generate 2-4 questions appropriate to the goal t
 
 **EPIC CLARIFICATION EXAMPLES:**
 
-For "prepare for the bar exam":
+For "pass bar exam in 2 weeks" (very aggressive timeline):
 {
   "type": "epic",
   "needsClarification": true,
   "epicContext": "exam_preparation",
+  "timelineAnalysis": {
+    "statedDays": 14,
+    "typicalDays": 60,
+    "feasibility": "very_aggressive",
+    "adjustmentFactors": ["prior_study", "full_time_availability", "retake", "specific_sections_only"]
+  },
   "epicClarifyingQuestions": [
-    { "id": "subjects", "question": "Which subjects do you need to focus on?", "type": "select", "options": ["All MBE subjects", "Essays & PT", "State-specific", "Full review"], "required": true },
-    { "id": "exam_date", "question": "When is your exam?", "type": "date", "placeholder": "Select exam date", "required": true },
-    { "id": "hours_per_day", "question": "How many hours per day can you study?", "type": "number", "placeholder": "e.g., 4", "required": true },
-    { "id": "current_status", "question": "Where are you in your preparation?", "type": "select", "options": ["Just starting", "Some progress made", "In review phase", "Final cramming"], "required": false }
+    { "id": "timeline_context", "question": "That's an intensive 2-week sprint! What's your preparation status?", "type": "select", "options": ["Just starting fresh", "Already studied 1-2 months", "Completed full prep course", "This is a retake"], "required": true },
+    { "id": "daily_hours", "question": "How many hours per day can you dedicate?", "type": "number", "placeholder": "e.g., 8-12 for intensive prep", "required": true },
+    { "id": "subjects", "question": "Which areas need the most focus?", "type": "select", "options": ["All MBE subjects evenly", "Weak subjects only", "Essays & Performance Test", "State-specific law"], "required": true },
+    { "id": "current_status", "question": "Where are you in your preparation?", "type": "select", "options": ["Need full review", "In review phase", "Just need practice tests", "Final polish"], "required": false }
   ]
 }
 
-For "run a marathon":
+For "run a marathon in 3 days" (very aggressive):
 {
   "type": "epic",
   "needsClarification": true,
   "epicContext": "fitness_goal",
+  "timelineAnalysis": {
+    "statedDays": 3,
+    "typicalDays": 112,
+    "feasibility": "very_aggressive",
+    "adjustmentFactors": ["current_fitness", "race_experience", "specific_race"]
+  },
   "epicClarifyingQuestions": [
-    { "id": "target_date", "question": "When is your target marathon?", "type": "date", "placeholder": "Select race date", "required": true },
-    { "id": "current_level", "question": "What's your current running level?", "type": "select", "options": ["Beginner (< 5 miles)", "Intermediate (5-10 miles)", "Advanced (10+ miles)"], "required": true },
-    { "id": "days_per_week", "question": "How many days per week can you train?", "type": "number", "placeholder": "e.g., 4", "required": true }
+    { "id": "timeline_context", "question": "That's a very short timeline! What's your current running ability?", "type": "select", "options": ["Can already run 15+ miles", "Run half-marathons regularly", "Have run marathons before", "Just curious about the distance"], "required": true },
+    { "id": "race_type", "question": "Is this for a specific race or personal goal?", "type": "select", "options": ["Signed up for a race", "Personal challenge", "Want to eventually run one"], "required": true }
+  ]
+}
+
+For "prepare for the bar exam" (no specific timeline - normal flow):
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "exam_preparation",
+  "timelineAnalysis": null,
+  "epicClarifyingQuestions": [
+    { "id": "exam_date", "question": "When is your exam?", "type": "date", "placeholder": "Select exam date", "required": true },
+    { "id": "subjects", "question": "Which subjects do you need to focus on?", "type": "select", "options": ["All MBE subjects", "Essays & PT", "State-specific", "Full review"], "required": true },
+    { "id": "hours_per_day", "question": "How many hours per day can you study?", "type": "number", "placeholder": "e.g., 4", "required": true },
+    { "id": "current_status", "question": "Where are you in your preparation?", "type": "select", "options": ["Just starting", "Some progress made", "In review phase", "Final cramming"], "required": false }
   ]
 }
 
@@ -179,7 +258,8 @@ Respond ONLY with valid JSON matching this schema:
   "detectedContext": { "dayOfWeek": string, "userSituation": string, "targetDate": string },
   "epicClarifyingQuestions": [{ "id": string, "question": string, "type": string, "options": array, "placeholder": string, "required": boolean }],
   "epicContext": "exam_preparation|fitness_goal|learning|project|other",
-  "epicDetails": { "subjects": array, "targetDate": string, "hoursPerDay": number, "currentStatus": string, "suggestedTargetDays": number }
+  "epicDetails": { "subjects": array, "targetDate": string, "hoursPerDay": number, "currentStatus": string, "suggestedTargetDays": number },
+  "timelineAnalysis": { "statedDays": number, "typicalDays": number, "feasibility": string, "adjustmentFactors": array } | null
 }`;
 
     // Build user message - include clarification if provided
