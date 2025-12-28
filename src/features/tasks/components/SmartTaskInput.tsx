@@ -21,7 +21,8 @@ import {
   X,
   Check,
   Target,
-  Loader2
+  Loader2,
+  List
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { useIntentClassifier } from '@/hooks/useIntentClassifier';
+import { useIntentClassifier, ExtractedTask } from '@/hooks/useIntentClassifier';
 import { useTaskDecomposition, SuggestedSubtask } from '@/hooks/useTaskDecomposition';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
 import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
@@ -38,6 +39,8 @@ import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
+import { ClarificationBubble } from './ClarificationBubble';
+import { TaskBatchPreview } from './TaskBatchPreview';
 import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
 import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
@@ -72,6 +75,12 @@ export function SmartTaskInput({
   const [showEpicWizard, setShowEpicWizard] = useState(false);
   const prevParsedRef = useRef<ParsedTask | null>(null);
   
+  // Brain dump state
+  const [showClarification, setShowClarification] = useState(false);
+  const [originalBrainDump, setOriginalBrainDump] = useState('');
+  const [showBatchPreview, setShowBatchPreview] = useState(false);
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false);
+  
   // Breakdown state
   const [suggestedSubtasks, setSuggestedSubtasks] = useState<SuggestedSubtask[]>([]);
   const { decompose, isLoading: isBreakingDown } = useTaskDecomposition();
@@ -80,14 +89,21 @@ export function SmartTaskInput({
   const { createEpic, isCreating: isCreatingEpic } = useEpics();
   const { addHabit, isAddingHabit, habits } = useHabits();
   
-  // Intent classification for detecting epics/habits
+  // Intent classification for detecting epics/habits/brain-dumps
   const { 
     classification, 
     isClassifying, 
     classifyDebounced, 
     reset: resetClassification,
+    clarify,
     isEpicDetected,
     isHabitDetected,
+    isBrainDumpDetected,
+    needsClarification,
+    clarifyingQuestion,
+    extractedTasks,
+    suggestedTasks,
+    detectedContext,
   } = useIntentClassifier({ debounceMs: 600, minInputLength: 15 });
 
   // Trigger classification when input changes
@@ -96,6 +112,17 @@ export function SmartTaskInput({
       classifyDebounced(input);
     }
   }, [input, classifyDebounced]);
+
+  // Handle brain dump with clarification
+  useEffect(() => {
+    if (isBrainDumpDetected && needsClarification && !showClarification) {
+      setOriginalBrainDump(input);
+      setShowClarification(true);
+    } else if (isBrainDumpDetected && !needsClarification && extractedTasks.length >= 2) {
+      // Ready to show preview
+      setShowClarification(false);
+    }
+  }, [isBrainDumpDetected, needsClarification, showClarification, input, extractedTasks.length]);
   
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -168,6 +195,12 @@ export function SmartTaskInput({
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
 
   const handleSubmit = () => {
+    // If brain dump detected, open batch preview instead
+    if (isBrainDumpDetected && extractedTasks.length >= 2) {
+      setShowBatchPreview(true);
+      return;
+    }
+    
     if (!parsed || !parsed.text.trim()) return;
     success(); // Haptic on submit
     setJustSubmitted(true);
@@ -185,6 +218,57 @@ export function SmartTaskInput({
     setVoicePreview(null);
     setShowPreviewCard(false);
     setSuggestedSubtasks([]);
+    setShowClarification(false);
+    setOriginalBrainDump('');
+  };
+
+  // Handle clarification answer
+  const handleClarificationAnswer = async (answer: string) => {
+    await clarify(originalBrainDump, answer);
+    setShowClarification(false);
+  };
+
+  // Handle skipping clarification
+  const handleSkipClarification = () => {
+    setShowClarification(false);
+    if (extractedTasks.length >= 2) {
+      setShowBatchPreview(true);
+    }
+  };
+
+  // Handle batch task creation
+  const handleBatchConfirm = async (tasks: ExtractedTask[]) => {
+    if (tasks.length === 0) return;
+    
+    setIsCreatingBatch(true);
+    try {
+      // Create tasks one by one with parsed data
+      for (const task of tasks) {
+        const parsedTask = parseNaturalLanguage(task.title);
+        // Apply detected context
+        if (detectedContext?.targetDate && !parsedTask.scheduledDate) {
+          parsedTask.scheduledDate = detectedContext.targetDate;
+        }
+        if (task.estimatedDuration && !parsedTask.estimatedDuration) {
+          parsedTask.estimatedDuration = task.estimatedDuration;
+        }
+        if (task.energyLevel && parsedTask.energyLevel === 'medium') {
+          parsedTask.energyLevel = task.energyLevel;
+        }
+        onSubmit(parsedTask);
+      }
+      
+      success();
+      toast.success(`Created ${tasks.length} tasks!`);
+      setShowBatchPreview(false);
+      reset();
+      resetClassification();
+      setOriginalBrainDump('');
+    } catch (error) {
+      toast.error('Failed to create tasks');
+    } finally {
+      setIsCreatingBatch(false);
+    }
   };
 
   // Handle breakdown request
@@ -621,9 +705,54 @@ export function SmartTaskInput({
         </div>
       </motion.div>
 
+      {/* Brain Dump Detection Badge */}
+      <AnimatePresence>
+        {isBrainDumpDetected && !isRecording && input.trim() && !showClarification && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="flex items-center gap-2 px-1"
+          >
+            <Badge 
+              variant="outline" 
+              className="bg-cyan-500/10 border-cyan-500/30 text-cyan-600 gap-1.5 cursor-pointer hover:bg-cyan-500/20 transition-colors"
+              onClick={() => setShowBatchPreview(true)}
+            >
+              {isClassifying ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <List className="w-3 h-3" />
+              )}
+              {extractedTasks.length} tasks detected
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowBatchPreview(true)}
+              className="h-7 text-xs text-cyan-600 hover:text-cyan-600"
+            >
+              Review & Create →
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Clarification Bubble */}
+      <AnimatePresence>
+        {showClarification && clarifyingQuestion && (
+          <ClarificationBubble
+            question={clarifyingQuestion}
+            onAnswer={handleClarificationAnswer}
+            onSkip={handleSkipClarification}
+            isLoading={isClassifying}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Epic Detection Badge */}
       <AnimatePresence>
-        {isEpicDetected && !isRecording && input.trim() && (
+        {isEpicDetected && !isBrainDumpDetected && !isRecording && input.trim() && (
           <motion.div
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
@@ -656,7 +785,7 @@ export function SmartTaskInput({
 
       {/* Habit Detection Badge */}
       <AnimatePresence>
-        {isHabitDetected && !isEpicDetected && !isRecording && input.trim() && habits.length < 2 && (
+        {isHabitDetected && !isEpicDetected && !isBrainDumpDetected && !isRecording && input.trim() && habits.length < 2 && (
           <motion.div
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
@@ -690,7 +819,7 @@ export function SmartTaskInput({
 
       {/* Quick Suggestion Chips */}
       <AnimatePresence>
-        {isFocused && !isRecording && !isEpicDetected && (
+        {isFocused && !isRecording && !isEpicDetected && !isBrainDumpDetected && (
           <QuickSuggestionChips 
             onSuggestionClick={handleSuggestionClick}
             currentInput={input}
@@ -701,7 +830,7 @@ export function SmartTaskInput({
 
       {/* Smart Preview with staggered badges */}
       <AnimatePresence>
-        {showPreview && badges.length > 0 && (
+        {showPreview && badges.length > 0 && !isBrainDumpDetected && (
           <motion.div 
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -799,6 +928,17 @@ export function SmartTaskInput({
         isCreating={isCreatingEpic}
         initialGoal={input}
         initialTargetDays={classification?.suggestedDuration}
+      />
+
+      {/* Task Batch Preview Modal */}
+      <TaskBatchPreview
+        open={showBatchPreview}
+        onOpenChange={setShowBatchPreview}
+        extractedTasks={extractedTasks}
+        suggestedTasks={suggestedTasks}
+        detectedContext={detectedContext}
+        onConfirm={handleBatchConfirm}
+        isCreating={isCreatingBatch}
       />
     </div>
   );
