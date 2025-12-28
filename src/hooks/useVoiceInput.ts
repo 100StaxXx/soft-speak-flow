@@ -209,11 +209,12 @@ export function useVoiceInput({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      clearSilenceTimeout();
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
     };
-  }, []);
+  }, [clearSilenceTimeout]);
 
   return {
     isRecording,
