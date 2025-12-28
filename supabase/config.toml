@@ -227,3 +227,6 @@ verify_jwt = true
 
 [functions.generate-epic-suggestions]
 verify_jwt = false
+
+[functions.classify-task-intent]
+verify_jwt = false

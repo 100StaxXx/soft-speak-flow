@@ -19,19 +19,25 @@ import {
   MicOff,
   Send,
   X,
-  Check
+  Check,
+  Target,
+  Loader2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { useIntentClassifier } from '@/hooks/useIntentClassifier';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
 import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
 import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { ParsedBadge } from './ParsedBadge';
+import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
+import { useEpics } from '@/hooks/useEpics';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -56,9 +62,27 @@ export function SmartTaskInput({
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [voicePreview, setVoicePreview] = useState<string | null>(null);
+  const [showEpicWizard, setShowEpicWizard] = useState(false);
   const prevParsedRef = useRef<ParsedTask | null>(null);
 
   const { medium, success, light, tap } = useHapticFeedback();
+  const { createEpic, isCreating: isCreatingEpic } = useEpics();
+  
+  // Intent classification for detecting epics/habits
+  const { 
+    classification, 
+    isClassifying, 
+    classifyDebounced, 
+    reset: resetClassification,
+    isEpicDetected,
+  } = useIntentClassifier({ debounceMs: 600, minInputLength: 15 });
+
+  // Trigger classification when input changes
+  useEffect(() => {
+    if (input.trim()) {
+      classifyDebounced(input);
+    }
+  }, [input, classifyDebounced]);
   
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -143,8 +167,27 @@ export function SmartTaskInput({
   const handleClear = () => {
     light();
     reset();
+    resetClassification();
     setInterimText('');
     setVoicePreview(null);
+  };
+
+  const handleCreateAsEpic = () => {
+    medium();
+    setShowEpicWizard(true);
+  };
+
+  const handleEpicCreated = async (data: Parameters<typeof createEpic>[0]) => {
+    try {
+      await createEpic(data);
+      setShowEpicWizard(false);
+      reset();
+      resetClassification();
+      toast.success('Epic created!');
+    } catch (error) {
+      console.error('Failed to create epic:', error);
+      toast.error('Failed to create epic');
+    }
   };
 
   const confirmVoicePreview = () => {
@@ -497,9 +540,42 @@ export function SmartTaskInput({
         </div>
       </motion.div>
 
+      {/* Epic Detection Badge */}
+      <AnimatePresence>
+        {isEpicDetected && !isRecording && input.trim() && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="flex items-center gap-2 px-1"
+          >
+            <Badge 
+              variant="outline" 
+              className="bg-primary/10 border-primary/30 text-primary gap-1.5 cursor-pointer hover:bg-primary/20 transition-colors"
+              onClick={handleCreateAsEpic}
+            >
+              {isClassifying ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Target className="w-3 h-3" />
+              )}
+              Goal detected
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleCreateAsEpic}
+              className="h-7 text-xs text-primary hover:text-primary"
+            >
+              Create as Epic →
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Quick Suggestion Chips */}
       <AnimatePresence>
-        {isFocused && !isRecording && (
+        {isFocused && !isRecording && !isEpicDetected && (
           <QuickSuggestionChips 
             onSuggestionClick={handleSuggestionClick}
             currentInput={input}
@@ -608,6 +684,16 @@ export function SmartTaskInput({
         onRequestPermission={handleRequestPermission}
         permissionStatus={permissionStatus}
         isRequesting={isRequestingPermission}
+      />
+
+      {/* Smart Epic Wizard */}
+      <SmartEpicWizard
+        open={showEpicWizard}
+        onOpenChange={setShowEpicWizard}
+        onCreateEpic={handleEpicCreated}
+        isCreating={isCreatingEpic}
+        initialGoal={input}
+        initialTargetDays={classification?.suggestedDuration}
       />
     </div>
   );
