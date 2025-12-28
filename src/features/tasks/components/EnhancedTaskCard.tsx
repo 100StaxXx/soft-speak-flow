@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, 
@@ -28,6 +28,7 @@ import { ProgressRing } from './ProgressRing';
 import { DecomposeTaskDialog } from './DecomposeTaskDialog';
 import { useSubtasks } from '../hooks/useSubtasks';
 import { useTaskDependencies } from '../hooks/useTaskDependencies';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { Priority, EnergyLevel } from '../hooks/usePriorityTasks';
 
 export interface TaskCardTask {
@@ -69,11 +70,24 @@ export function EnhancedTaskCard({
 }: EnhancedTaskCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDecomposeDialog, setShowDecomposeDialog] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
   const { subtasks, progressPercent } = useSubtasks(task.id);
   const { blockers, isBlocked, incompleteBlockers } = useTaskDependencies(task.id);
+  const { success, light } = useHapticFeedback();
 
   const hasSubtasks = subtasks.length > 0;
   const blockerNames = incompleteBlockers.map(b => b.daily_tasks?.task_text || 'Unknown task');
+
+  const handleToggleComplete = useCallback((checked: boolean) => {
+    if (checked) {
+      success(); // Satisfying completion haptic
+      setJustCompleted(true);
+      setTimeout(() => setJustCompleted(false), 600);
+    } else {
+      light();
+    }
+    onToggleComplete(task.id, checked);
+  }, [task.id, onToggleComplete, success, light]);
 
   return (
     <motion.div
@@ -82,12 +96,13 @@ export function EnhancedTaskCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       className={cn(
-        "group relative rounded-lg border transition-all",
+        "group relative rounded-xl border transition-all duration-300",
         task.completed 
           ? "bg-muted/30 border-border/50" 
-          : "bg-card border-border hover:border-primary/30",
-        task.is_top_three && !task.completed && "border-primary/50 bg-primary/5",
-        isBlocked && "opacity-60"
+          : "bg-card border-border hover:border-primary/30 hover:shadow-md",
+        task.is_top_three && !task.completed && "border-primary/50 bg-primary/5 shadow-sm",
+        isBlocked && "opacity-60",
+        justCompleted && "ring-2 ring-green-500/50"
       )}
     >
       <div className={cn("p-3", compact && "p-2")}>
@@ -119,10 +134,10 @@ export function EnhancedTaskCard({
           ) : (
             <Checkbox
               checked={task.completed}
-              onCheckedChange={(checked) => onToggleComplete(task.id, checked as boolean)}
+              onCheckedChange={(checked) => handleToggleComplete(checked as boolean)}
               disabled={isBlocked}
               className={cn(
-                "mt-0.5",
+                "mt-0.5 transition-transform hover:scale-110",
                 task.completed && "data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
               )}
             />

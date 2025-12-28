@@ -47,6 +47,7 @@ interface UseVoiceInputOptions {
   onFinalResult?: (text: string) => void;
   onError?: (error: string) => void;
   onPermissionNeeded?: () => void;
+  onAutoStopping?: () => void;
   language?: string;
   autoStopOnSilence?: boolean;
   silenceTimeoutMs?: number;
@@ -54,6 +55,7 @@ interface UseVoiceInputOptions {
 
 interface UseVoiceInputReturn {
   isRecording: boolean;
+  isAutoStopping: boolean;
   isSupported: boolean;
   permissionStatus: PermissionStatus;
   startRecording: () => void;
@@ -67,11 +69,13 @@ export function useVoiceInput({
   onFinalResult,
   onError,
   onPermissionNeeded,
+  onAutoStopping,
   language = 'en-US',
   autoStopOnSilence = true,
   silenceTimeoutMs = 1500,
 }: UseVoiceInputOptions = {}): UseVoiceInputReturn {
   const [isRecording, setIsRecording] = useState(false);
+  const [isAutoStopping, setIsAutoStopping] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const silenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { status: permissionStatus, requestPermission, checkPermission } = useMicrophonePermission();
@@ -85,10 +89,12 @@ export function useVoiceInput({
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
     }
+    setIsAutoStopping(false);
   }, []);
 
   const stopRecording = useCallback(() => {
     clearSilenceTimeout();
+    setIsAutoStopping(false);
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -133,7 +139,12 @@ export function useVoiceInput({
       if (autoStopOnSilence && (interimTranscript || finalTranscript)) {
         clearSilenceTimeout();
         silenceTimeoutRef.current = setTimeout(() => {
-          stopRecording();
+          setIsAutoStopping(true);
+          onAutoStopping?.();
+          // Give a brief moment for UI feedback before stopping
+          setTimeout(() => {
+            stopRecording();
+          }, 300);
         }, silenceTimeoutMs);
       }
     };
@@ -218,6 +229,7 @@ export function useVoiceInput({
 
   return {
     isRecording,
+    isAutoStopping,
     isSupported,
     permissionStatus,
     startRecording,
