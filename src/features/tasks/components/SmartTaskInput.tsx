@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -46,10 +47,12 @@ export function SmartTaskInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [interimText, setInterimText] = useState('');
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   const { medium, success } = useHapticFeedback();
   
-  const { isRecording, isSupported, toggleRecording } = useVoiceInput({
+  const { isRecording, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
       setInterimText(text);
     },
@@ -60,7 +63,21 @@ export function SmartTaskInput({
     onError: (error) => {
       toast.error(error);
     },
+    onPermissionNeeded: () => {
+      setShowPermissionDialog(true);
+    },
   });
+
+  const handleRequestPermission = async () => {
+    setIsRequestingPermission(true);
+    const status = await requestPermission();
+    setIsRequestingPermission(false);
+    
+    if (status === 'granted') {
+      setShowPermissionDialog(false);
+      toggleRecording();
+    }
+  };
 
   // Voice toggle with haptic feedback
   const handleVoiceToggle = useCallback(() => {
@@ -302,6 +319,15 @@ export function SmartTaskInput({
           🎤 Listening... tap mic to stop
         </p>
       )}
+
+      {/* Permission Request Dialog */}
+      <PermissionRequestDialog
+        isOpen={showPermissionDialog}
+        onClose={() => setShowPermissionDialog(false)}
+        onRequestPermission={handleRequestPermission}
+        permissionStatus={permissionStatus}
+        isRequesting={isRequestingPermission}
+      />
     </div>
   );
 }
