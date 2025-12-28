@@ -269,6 +269,59 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_interactions: {
+        Row: {
+          ai_response: Json | null
+          context_snapshot: Json | null
+          created_at: string
+          detected_intent: string | null
+          id: string
+          input_text: string | null
+          interaction_type: string
+          modifications: Json | null
+          response_time_ms: number | null
+          session_id: string | null
+          user_action: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_response?: Json | null
+          context_snapshot?: Json | null
+          created_at?: string
+          detected_intent?: string | null
+          id?: string
+          input_text?: string | null
+          interaction_type: string
+          modifications?: Json | null
+          response_time_ms?: number | null
+          session_id?: string | null
+          user_action?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_response?: Json | null
+          context_snapshot?: Json | null
+          created_at?: string
+          detected_intent?: string | null
+          id?: string
+          input_text?: string | null
+          interaction_type?: string
+          modifications?: Json | null
+          response_time_ms?: number | null
+          session_id?: string | null
+          user_action?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_interactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_output_validation_log: {
         Row: {
           created_at: string | null
@@ -5527,6 +5580,71 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_ai_learning: {
+        Row: {
+          acceptance_rate: number | null
+          common_contexts: string[] | null
+          created_at: string
+          failed_patterns: Json | null
+          id: string
+          interaction_count: number | null
+          last_interaction_at: string | null
+          modification_rate: number | null
+          peak_productivity_times: string[] | null
+          preference_weights: Json | null
+          preferred_epic_duration: number | null
+          preferred_habit_difficulty: string | null
+          preferred_habit_frequency: string | null
+          successful_patterns: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acceptance_rate?: number | null
+          common_contexts?: string[] | null
+          created_at?: string
+          failed_patterns?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_interaction_at?: string | null
+          modification_rate?: number | null
+          peak_productivity_times?: string[] | null
+          preference_weights?: Json | null
+          preferred_epic_duration?: number | null
+          preferred_habit_difficulty?: string | null
+          preferred_habit_frequency?: string | null
+          successful_patterns?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acceptance_rate?: number | null
+          common_contexts?: string[] | null
+          created_at?: string
+          failed_patterns?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_interaction_at?: string | null
+          modification_rate?: number | null
+          peak_productivity_times?: string[] | null
+          preference_weights?: Json | null
+          preferred_epic_duration?: number | null
+          preferred_habit_difficulty?: string | null
+          preferred_habit_frequency?: string | null
+          successful_patterns?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ai_learning_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
