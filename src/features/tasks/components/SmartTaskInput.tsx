@@ -36,13 +36,14 @@ import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
 import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { ParsedBadge } from './ParsedBadge';
+import { TaskPreviewCard } from './TaskPreviewCard';
 import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
 import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { Leaf } from 'lucide-react';
-
+import { parseNaturalLanguage } from '../hooks/useNaturalLanguageParser';
 interface SmartTaskInputProps {
   onSubmit: (parsed: ParsedTask) => void;
   placeholder?: string;
@@ -64,6 +65,8 @@ export function SmartTaskInput({
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [voicePreview, setVoicePreview] = useState<string | null>(null);
+  const [showPreviewCard, setShowPreviewCard] = useState(false);
+  const [previewSource, setPreviewSource] = useState<'voice' | 'typed'>('typed');
   const [showEpicWizard, setShowEpicWizard] = useState(false);
   const prevParsedRef = useRef<ParsedTask | null>(null);
 
@@ -174,6 +177,7 @@ export function SmartTaskInput({
     resetClassification();
     setInterimText('');
     setVoicePreview(null);
+    setShowPreviewCard(false);
   };
 
   const handleCreateAsEpic = () => {
@@ -209,19 +213,48 @@ export function SmartTaskInput({
     }
   };
 
-  const confirmVoicePreview = () => {
-    if (voicePreview) {
-      setInput((prev) => (prev ? prev + ' ' + voicePreview : voicePreview).trim());
-      setVoicePreview(null);
-      success();
-      inputRef.current?.focus();
-    }
+  // Handle confirming from preview card (creates task immediately)
+  const handlePreviewConfirm = () => {
+    const textToSubmit = voicePreview || input;
+    if (!textToSubmit.trim()) return;
+    
+    const parsedTask = parseNaturalLanguage(textToSubmit);
+    if (!parsedTask.text.trim()) return;
+    
+    success(); // Haptic on submit
+    setJustSubmitted(true);
+    setTimeout(() => setJustSubmitted(false), 300);
+    onSubmit(parsedTask);
+    reset();
+    setVoicePreview(null);
+    setShowPreviewCard(false);
+    resetClassification();
   };
 
-  const discardVoicePreview = () => {
+  // Handle editing from preview card
+  const handlePreviewEdit = () => {
+    if (voicePreview) {
+      setInput(voicePreview);
+      setVoicePreview(null);
+    }
+    setShowPreviewCard(false);
+    inputRef.current?.focus();
+  };
+
+  // Handle discarding preview
+  const handlePreviewDiscard = () => {
     setVoicePreview(null);
+    setShowPreviewCard(false);
     light();
   };
+
+  // Show preview card when recording stops with content
+  useEffect(() => {
+    if (!isRecording && voicePreview && !showPreviewCard) {
+      setPreviewSource('voice');
+      setShowPreviewCard(true);
+    }
+  }, [isRecording, voicePreview, showPreviewCard]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -702,48 +735,18 @@ export function SmartTaskInput({
         )}
       </AnimatePresence>
 
-      {/* Voice Preview Confirmation */}
+      {/* Task Preview Card - shown for voice input or when user wants to preview */}
       <AnimatePresence>
         {voicePreview && !isRecording && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg mx-1"
-          >
-            <Mic className="w-4 h-4 text-primary shrink-0" />
-            <input
-              type="text"
-              value={voicePreview}
-              onChange={(e) => setVoicePreview(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  confirmVoicePreview();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  discardVoicePreview();
-                }
-              }}
-              autoFocus
-              className="flex-1 text-sm text-foreground bg-transparent border-none outline-none focus:ring-0"
-            />
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={discardVoicePreview}
-              className="h-7 px-2 text-muted-foreground hover:text-destructive"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              onClick={confirmVoicePreview}
-              className="h-7 px-3"
-            >
-              <Check className="w-4 h-4" />
-            </Button>
-          </motion.div>
+          <TaskPreviewCard
+            parsed={parseNaturalLanguage(voicePreview)}
+            rawInput={voicePreview}
+            onConfirm={handlePreviewConfirm}
+            onEdit={handlePreviewEdit}
+            onDiscard={handlePreviewDiscard}
+            isVoiceInput={true}
+            className="mx-1"
+          />
         )}
       </AnimatePresence>
 
