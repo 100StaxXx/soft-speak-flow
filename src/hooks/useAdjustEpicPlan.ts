@@ -55,7 +55,11 @@ interface UseAdjustEpicPlanReturn {
   ) => Promise<void>;
   toggleSuggestion: (id: string) => void;
   getSelectedSuggestions: () => AdjustmentSuggestion[];
-  applyAdjustments: (epicId: string) => Promise<boolean>;
+  applyAdjustments: (
+    epicId: string,
+    adjustmentType?: AdjustmentType,
+    reason?: string
+  ) => Promise<boolean>;
   reset: () => void;
 }
 
@@ -133,7 +137,11 @@ export function useAdjustEpicPlan(): UseAdjustEpicPlanReturn {
     return suggestions.filter(s => s.selected);
   }, [suggestions]);
 
-  const applyAdjustments = useCallback(async (epicId: string): Promise<boolean> => {
+  const applyAdjustments = useCallback(async (
+    epicId: string,
+    adjustmentType?: AdjustmentType,
+    reason?: string
+  ): Promise<boolean> => {
     const selected = getSelectedSuggestions();
     
     if (selected.length === 0) {
@@ -141,15 +149,34 @@ export function useAdjustEpicPlan(): UseAdjustEpicPlanReturn {
       return false;
     }
 
+    setIsLoading(true);
+
     try {
-      // For now, we'll just show a success message
-      // In a full implementation, this would actually modify the epic
-      toast.success(`Applied ${selected.length} adjustment${selected.length > 1 ? 's' : ''} to your plan`);
+      const { data, error: fnError } = await supabase.functions.invoke('apply-epic-adjustments', {
+        body: {
+          epicId,
+          adjustments: selected,
+          adjustmentType,
+          reason,
+        },
+      });
+
+      if (fnError) {
+        throw fnError;
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success(data.message || `Applied ${selected.length} adjustment${selected.length > 1 ? 's' : ''} to your plan`);
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to apply adjustments';
       toast.error(message);
       return false;
+    } finally {
+      setIsLoading(false);
     }
   }, [getSelectedSuggestions]);
 
