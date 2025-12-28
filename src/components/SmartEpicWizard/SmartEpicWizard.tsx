@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Sparkles,
   Wand2,
@@ -27,9 +28,11 @@ import {
   Zap,
   Repeat,
   Flag,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion } from '@/hooks/useEpicSuggestions';
+import { useEpicTemplates, EpicTemplate } from '@/hooks/useEpicTemplates';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { SuggestionCard } from './SuggestionCard';
 import { StoryStep, themeColors } from './StoryStep';
@@ -59,6 +62,8 @@ interface SmartEpicWizardProps {
   isCreating: boolean;
   initialGoal?: string;
   initialTargetDays?: number;
+  template?: EpicTemplate | null;
+  showTemplatesFirst?: boolean;
 }
 
 export function SmartEpicWizard({
@@ -68,8 +73,11 @@ export function SmartEpicWizard({
   isCreating,
   initialGoal = '',
   initialTargetDays,
+  template,
+  showTemplatesFirst = false,
 }: SmartEpicWizardProps) {
   const [step, setStep] = useState<WizardStep>('goal');
+  const [goalMode, setGoalMode] = useState<'custom' | 'template'>(showTemplatesFirst ? 'template' : 'custom');
   const [goalInput, setGoalInput] = useState(initialGoal);
   const [targetDays, setTargetDays] = useState(initialTargetDays || 30);
   const [epicTitle, setEpicTitle] = useState('');
@@ -77,7 +85,9 @@ export function SmartEpicWizard({
   const [customHabits, setCustomHabits] = useState<EpicSuggestion[]>([]);
   const [storyType, setStoryType] = useState<StoryTypeSlug | null>(null);
   const [themeColor, setThemeColor] = useState(themeColors[0].value);
+  const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(template || null);
   const { medium, success, light, tap } = useHapticFeedback();
+  const { templates, featuredTemplates, isLoading: templatesLoading, incrementPopularity } = useEpicTemplates();
   const {
     suggestions,
     isLoading: isGenerating,
@@ -89,6 +99,36 @@ export function SmartEpicWizard({
     getSelectedSuggestions,
     reset: resetSuggestions,
   } = useEpicSuggestions();
+
+  // Apply template when selected
+  useEffect(() => {
+    if (selectedTemplate && open) {
+      setEpicTitle(selectedTemplate.name);
+      setEpicDescription(selectedTemplate.description);
+      setTargetDays(selectedTemplate.target_days);
+      setThemeColor(selectedTemplate.theme_color || themeColors[0].value);
+      
+      // Convert template habits to suggestions format
+      const templateSuggestions: EpicSuggestion[] = selectedTemplate.habits.map((h, idx) => ({
+        id: `template-${idx}`,
+        type: 'habit' as const,
+        title: h.title,
+        description: '',
+        difficulty: (h.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
+        frequency: (h.frequency === 'weekly' ? 'weekly' : h.frequency === 'custom' ? 'custom' : 'daily') as 'daily' | 'weekly' | 'custom',
+        isSelected: true,
+      }));
+      setCustomHabits(templateSuggestions);
+      setStep('story');
+    }
+  }, [selectedTemplate, open]);
+
+  // Apply initial template prop
+  useEffect(() => {
+    if (template && open) {
+      setSelectedTemplate(template);
+    }
+  }, [template, open]);
 
   const [interimText, setInterimText] = useState('');
   
@@ -176,6 +216,7 @@ export function SmartEpicWizard({
 
   const handleClose = useCallback(() => {
     setStep('goal');
+    setGoalMode(showTemplatesFirst ? 'template' : 'custom');
     setGoalInput(initialGoal);
     setTargetDays(initialTargetDays || 30);
     setEpicTitle('');
@@ -183,9 +224,16 @@ export function SmartEpicWizard({
     setCustomHabits([]);
     setStoryType(null);
     setThemeColor(themeColors[0].value);
+    setSelectedTemplate(null);
     resetSuggestions();
     onOpenChange(false);
-  }, [onOpenChange, resetSuggestions, initialGoal, initialTargetDays]);
+  }, [onOpenChange, resetSuggestions, initialGoal, initialTargetDays, showTemplatesFirst]);
+
+  const handleSelectTemplate = useCallback((template: EpicTemplate) => {
+    incrementPopularity.mutate(template.id);
+    setSelectedTemplate(template);
+    tap();
+  }, [incrementPopularity, tap]);
 
   const handleVoiceToggle = useCallback(() => {
     if (isRecording) {

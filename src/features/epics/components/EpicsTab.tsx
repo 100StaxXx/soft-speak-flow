@@ -3,34 +3,29 @@ import { Target, Trophy, Users, Castle, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EpicCard } from "@/components/EpicCard";
-import { CreateEpicDialog } from "@/components/CreateEpicDialog";
+import { SmartEpicWizard } from "@/components/SmartEpicWizard";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
-import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { EmptyState } from "@/components/EmptyState";
 import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { useEpics } from "@/hooks/useEpics";
-import { useEpicTemplates, EpicTemplate } from "@/hooks/useEpicTemplates";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 const MAX_EPICS = 2;
 
 export function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
-  const [createEpicDialogOpen, setCreateEpicDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [showTemplatesFirst, setShowTemplatesFirst] = useState(false);
   const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
-  const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('epics');
   
   const hasReachedLimit = activeEpics.length >= MAX_EPICS;
 
-  const handleSelectTemplate = (template: EpicTemplate) => {
-    setSelectedTemplate(template);
-    setTemplatesDialogOpen(false);
-    setCreateEpicDialogOpen(true);
+  const handleOpenWizard = (templatesFirst: boolean) => {
+    setShowTemplatesFirst(templatesFirst);
+    setWizardOpen(true);
   };
 
   return (
@@ -39,7 +34,7 @@ export function EpicsTab() {
       <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
         <div className="flex gap-2 w-full overflow-hidden">
           <Button
-            onClick={() => setTemplatesDialogOpen(true)}
+            onClick={() => handleOpenWizard(true)}
             disabled={hasReachedLimit}
             className={cn(
               "flex-1 min-w-0 text-xs font-bold",
@@ -52,7 +47,7 @@ export function EpicsTab() {
             Star Paths
           </Button>
           <Button
-            onClick={() => setCreateEpicDialogOpen(true)}
+            onClick={() => handleOpenWizard(false)}
             variant="outline"
             disabled={hasReachedLimit}
             className="flex-1 min-w-0 h-auto py-3 text-xs font-medium"
@@ -94,7 +89,7 @@ export function EpicsTab() {
             title="No Active Epics"
             description="Browse Star Paths to find the perfect epic quest and start your legendary journey!"
             actionLabel="Star Paths"
-            onAction={() => setTemplatesDialogOpen(true)}
+            onAction={() => handleOpenWizard(true)}
           />
         </div>
       ) : (
@@ -130,34 +125,17 @@ export function EpicsTab() {
         </div>
       )}
 
-      {/* Create Epic Dialog */}
-      <CreateEpicDialog
-        open={createEpicDialogOpen}
-        onOpenChange={(open) => {
-          setCreateEpicDialogOpen(open);
-          if (!open) setSelectedTemplate(null);
-        }}
+      {/* Smart Epic Wizard (consolidated) */}
+      <SmartEpicWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
         onCreateEpic={(data) => {
           createEpic(data);
-          setCreateEpicDialogOpen(false);
-          setSelectedTemplate(null);
+          setWizardOpen(false);
         }}
         isCreating={isCreating}
-        template={selectedTemplate}
+        showTemplatesFirst={showTemplatesFirst}
       />
-
-      {/* Star Paths Dialog */}
-      <Dialog open={templatesDialogOpen} onOpenChange={setTemplatesDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-primary" />
-              Star Paths
-            </DialogTitle>
-          </DialogHeader>
-          <StarPathsBrowser onSelectTemplate={handleSelectTemplate} />
-        </DialogContent>
-      </Dialog>
 
       {/* Join Epic Dialog */}
       <JoinEpicDialog
