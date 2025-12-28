@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EpicCard } from "@/components/EpicCard";
 import { CreateEpicDialog } from "@/components/CreateEpicDialog";
+import { SmartEpicWizard } from "@/components/SmartEpicWizard";
 import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
-import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight } from "lucide-react";
+import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight, Wand2 } from "lucide-react";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
@@ -24,6 +25,7 @@ import {
 
 const Epics = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [smartWizardOpen, setSmartWizardOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
   const [showPageInfo, setShowPageInfo] = useState(false);
@@ -114,29 +116,42 @@ const Epics = () => {
           </Button>
         </motion.div>
 
-        {/* Create Epic Button */}
+        {/* Create Epic Buttons */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.15 }}
-          className="mb-6"
+          className="mb-6 space-y-3"
         >
           {hasReachedLimit ? (
             <div className="w-full h-14 flex items-center justify-center bg-secondary/30 rounded-lg border border-border/50 text-muted-foreground text-sm">
               You can only have {MAX_EPICS} active epics at a time
             </div>
           ) : (
-            <Button
-              onClick={() => {
-                setSelectedTemplate(null);
-                setCreateDialogOpen(true);
-              }}
-              className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 h-14 text-lg"
-              size="lg"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Create Custom Epic
-            </Button>
+            <>
+              {/* Smart Epic Wizard - Primary CTA */}
+              <Button
+                onClick={() => setSmartWizardOpen(true)}
+                className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 h-14 text-lg"
+                size="lg"
+              >
+                <Wand2 className="w-5 h-5 mr-2" />
+                Create Smart Epic
+              </Button>
+              
+              {/* Manual create option */}
+              <Button
+                onClick={() => {
+                  setSelectedTemplate(null);
+                  setCreateDialogOpen(true);
+                }}
+                variant="outline"
+                className="w-full h-12"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Custom Epic
+              </Button>
+            </>
           )}
         </motion.div>
 
@@ -213,6 +228,17 @@ const Epics = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Smart Epic Wizard */}
+        <SmartEpicWizard
+          open={smartWizardOpen}
+          onOpenChange={setSmartWizardOpen}
+          onCreateEpic={(data) => {
+            createEpic(data);
+            setSmartWizardOpen(false);
+          }}
+          isCreating={isCreating}
+        />
 
         {/* Create Epic Dialog */}
         <CreateEpicDialog
