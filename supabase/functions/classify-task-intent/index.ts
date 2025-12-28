@@ -17,6 +17,15 @@ interface SuggestedTask extends ExtractedTask {
   reason: string;
 }
 
+interface ClarifyingQuestion {
+  id: string;
+  question: string;
+  type: 'text' | 'select' | 'date' | 'number';
+  options?: string[];
+  placeholder?: string;
+  required: boolean;
+}
+
 interface IntentClassification {
   type: 'quest' | 'epic' | 'habit' | 'brain-dump';
   confidence: number;
@@ -34,6 +43,16 @@ interface IntentClassification {
     userSituation?: string;
     targetDate?: string;
   };
+  // Epic-specific clarification fields
+  epicClarifyingQuestions?: ClarifyingQuestion[];
+  epicContext?: string;
+  epicDetails?: {
+    subjects?: string[];
+    targetDate?: string;
+    hoursPerDay?: number;
+    currentStatus?: string;
+    suggestedTargetDays?: number;
+  };
 }
 
 serve(async (req) => {
@@ -42,7 +61,7 @@ serve(async (req) => {
   }
 
   try {
-    const { input, clarification, previousContext } = await req.json();
+    const { input, clarification, previousContext, epicAnswers } = await req.json();
 
     if (!input || typeof input !== 'string') {
       return new Response(
@@ -62,8 +81,9 @@ serve(async (req) => {
    - Examples: "buy groceries", "call mom", "finish report", "clean room"
    
 2. **epic** - A long-term goal requiring multiple steps, habits, or milestones over days/weeks/months
-   - Examples: "get my real estate license", "run a marathon", "learn Spanish", "lose 20 pounds"
-   - Key indicators: timeframes like "by June", "in 3 months", certifications, learning goals, fitness transformations
+   - Examples: "get my real estate license", "run a marathon", "learn Spanish", "lose 20 pounds", "prepare for the bar exam", "study for MCAT"
+   - Key indicators: timeframes like "by June", "in 3 months", certifications, exams, learning goals, fitness transformations
+   - **COMPLEX EPICS that need clarification**: exams (bar, CPA, MCAT, etc.), certifications, multi-subject learning, fitness goals with specific targets
    
 3. **habit** - A recurring action to be done regularly
    - Examples: "meditate daily", "drink 8 glasses of water", "read for 30 minutes every day"
@@ -72,7 +92,53 @@ serve(async (req) => {
 4. **brain-dump** - Multiple tasks mentioned conversationally, often with context
    - Examples: "Tomorrow is Sunday, I need to vacuum, do dishes, laundry, and take out trash"
    - Key indicators: lists of activities, commas/and separating tasks, day/context mentioned, 2+ distinct tasks
-   - This includes vague multi-task descriptions like "I need to get organized" or "clean up my place"
+
+**FOR EPIC TYPE - CLARIFICATION LOGIC:**
+
+When detecting an epic, decide if you need clarifying questions:
+
+ASK CLARIFICATION IF the goal is:
+- An exam/certification (bar exam, CPA, MCAT, real estate license, etc.) - Ask about subjects, exam date, study hours
+- A fitness goal (run marathon, lose weight) - Ask about current level, target date, available time
+- Learning a skill (learn Spanish, learn coding) - Ask about current level, target proficiency, study time
+- A major project (write a book, launch business) - Ask about scope, deadline, available hours
+
+DO NOT ASK IF:
+- User already provided specific details ("study 2 hours daily for bar exam until July")
+- Goal is simple enough to break down without context ("read more books")
+
+When asking epic clarification, generate 2-4 questions appropriate to the goal type:
+- Use "date" type for target dates/deadlines
+- Use "number" type for hours per day, days per week
+- Use "select" type for predefined options (subjects, current level, etc.)
+- Use "text" type for open-ended answers
+
+**EPIC CLARIFICATION EXAMPLES:**
+
+For "prepare for the bar exam":
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "exam_preparation",
+  "epicClarifyingQuestions": [
+    { "id": "subjects", "question": "Which subjects do you need to focus on?", "type": "select", "options": ["All MBE subjects", "Essays & PT", "State-specific", "Full review"], "required": true },
+    { "id": "exam_date", "question": "When is your exam?", "type": "date", "placeholder": "Select exam date", "required": true },
+    { "id": "hours_per_day", "question": "How many hours per day can you study?", "type": "number", "placeholder": "e.g., 4", "required": true },
+    { "id": "current_status", "question": "Where are you in your preparation?", "type": "select", "options": ["Just starting", "Some progress made", "In review phase", "Final cramming"], "required": false }
+  ]
+}
+
+For "run a marathon":
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "fitness_goal",
+  "epicClarifyingQuestions": [
+    { "id": "target_date", "question": "When is your target marathon?", "type": "date", "placeholder": "Select race date", "required": true },
+    { "id": "current_level", "question": "What's your current running level?", "type": "select", "options": ["Beginner (< 5 miles)", "Intermediate (5-10 miles)", "Advanced (10+ miles)"], "required": true },
+    { "id": "days_per_week", "question": "How many days per week can you train?", "type": "number", "placeholder": "e.g., 4", "required": true }
+  ]
+}
 
 For brain-dump type:
 1. First decide if you need clarification:
@@ -105,12 +171,15 @@ Respond ONLY with valid JSON matching this schema:
   "reasoning": "brief explanation",
   "suggestedDeadline": "ISO date or null",
   "suggestedDuration": number or null,
-  "needsClarification": boolean (only for brain-dump),
-  "clarifyingQuestion": "question string or null",
-  "clarificationContext": "what info is needed, for follow-up",
+  "needsClarification": boolean,
+  "clarifyingQuestion": "question string or null (for brain-dump)",
+  "clarificationContext": "what info is needed (for brain-dump)",
   "extractedTasks": [{ "title": string, "estimatedDuration": number, "energyLevel": string, "suggestedTimeOfDay": string, "category": string }],
   "suggestedTasks": [{ "title": string, "reason": string, "estimatedDuration": number, "energyLevel": string }],
-  "detectedContext": { "dayOfWeek": string, "userSituation": string, "targetDate": string }
+  "detectedContext": { "dayOfWeek": string, "userSituation": string, "targetDate": string },
+  "epicClarifyingQuestions": [{ "id": string, "question": string, "type": string, "options": array, "placeholder": string, "required": boolean }],
+  "epicContext": "exam_preparation|fitness_goal|learning|project|other",
+  "epicDetails": { "subjects": array, "targetDate": string, "hoursPerDay": number, "currentStatus": string, "suggestedTargetDays": number }
 }`;
 
     // Build user message - include clarification if provided
@@ -121,6 +190,12 @@ Previous context needed: ${previousContext}
 User's clarification: "${clarification}"
 
 Now extract the tasks based on this additional context.`;
+    } else if (epicAnswers && Object.keys(epicAnswers).length > 0) {
+      userMessage = `Original goal: "${input}"
+User provided these details:
+${Object.entries(epicAnswers).map(([key, value]) => `- ${key}: ${value}`).join('\n')}
+
+Now provide epic details with suggestedTargetDays calculated from their answers. Set needsClarification to false.`;
     }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -130,12 +205,12 @@ Now extract the tasks based on this additional context.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        temperature: 0.1,
+        temperature: 0.2,
       }),
     });
 
@@ -196,7 +271,20 @@ Now extract the tasks based on this additional context.`;
       classification.needsClarification = classification.needsClarification ?? false;
     }
 
-    console.log('Classified intent:', { input, clarification: !!clarification, classification });
+    // For epic, ensure clarification fields exist
+    if (classification.type === 'epic') {
+      classification.needsClarification = classification.needsClarification ?? false;
+      classification.epicClarifyingQuestions = classification.epicClarifyingQuestions || [];
+    }
+
+    console.log('Classified intent:', { 
+      input, 
+      clarification: !!clarification, 
+      epicAnswers: !!epicAnswers,
+      type: classification.type,
+      needsClarification: classification.needsClarification,
+      epicQuestionsCount: classification.epicClarifyingQuestions?.length
+    });
 
     return new Response(
       JSON.stringify(classification),

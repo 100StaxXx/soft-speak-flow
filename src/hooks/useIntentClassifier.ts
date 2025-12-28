@@ -19,6 +19,23 @@ export interface DetectedContext {
   targetDate?: string;
 }
 
+export interface ClarifyingQuestion {
+  id: string;
+  question: string;
+  type: 'text' | 'select' | 'date' | 'number';
+  options?: string[];
+  placeholder?: string;
+  required: boolean;
+}
+
+export interface EpicDetails {
+  subjects?: string[];
+  targetDate?: string;
+  hoursPerDay?: number;
+  currentStatus?: string;
+  suggestedTargetDays?: number;
+}
+
 export interface IntentClassification {
   type: 'quest' | 'epic' | 'habit' | 'brain-dump';
   confidence: number;
@@ -32,6 +49,10 @@ export interface IntentClassification {
   extractedTasks?: ExtractedTask[];
   suggestedTasks?: SuggestedTask[];
   detectedContext?: DetectedContext;
+  // Epic-specific clarification fields
+  epicClarifyingQuestions?: ClarifyingQuestion[];
+  epicContext?: string;
+  epicDetails?: EpicDetails;
 }
 
 interface UseIntentClassifierOptions {
@@ -90,7 +111,7 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     }
   }, [classification, minInputLength]);
 
-  // Clarify function for follow-up questions
+  // Clarify function for brain-dump follow-up questions
   const clarify = useCallback(async (
     originalInput: string, 
     userResponse: string
@@ -131,6 +152,46 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     }
   }, [classification?.clarificationContext]);
 
+  // Clarify function for epic-specific questions
+  const clarifyEpic = useCallback(async (
+    originalInput: string,
+    answers: Record<string, string | number>
+  ): Promise<IntentClassification | null> => {
+    if (!originalInput || !answers || Object.keys(answers).length === 0) {
+      return null;
+    }
+
+    setIsClassifying(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('classify-task-intent', {
+        body: { 
+          input: originalInput,
+          epicAnswers: answers
+        },
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const result = data as IntentClassification;
+      setClassification(result);
+      return result;
+    } catch (err) {
+      console.error('Epic clarification error:', err);
+      setError(err instanceof Error ? err.message : 'Epic clarification failed');
+      return null;
+    } finally {
+      setIsClassifying(false);
+    }
+  }, []);
+
   const classifyDebounced = useCallback((input: string) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -170,6 +231,9 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
   const isBrainDumpDetected = classification?.type === 'brain-dump' && 
                               classification.confidence >= 0.7 &&
                               (classification.extractedTasks?.length ?? 0) >= 2;
+  const needsEpicClarification = isEpicDetected && 
+                                  classification?.needsClarification === true &&
+                                  (classification?.epicClarifyingQuestions?.length ?? 0) > 0;
 
   return {
     classification,
@@ -177,6 +241,7 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     error,
     classify,
     clarify,
+    clarifyEpic,
     classifyDebounced,
     reset,
     isEpicDetected,
@@ -187,5 +252,10 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     extractedTasks: classification?.extractedTasks ?? [],
     suggestedTasks: classification?.suggestedTasks ?? [],
     detectedContext: classification?.detectedContext,
+    // Epic-specific returns
+    needsEpicClarification,
+    epicClarifyingQuestions: classification?.epicClarifyingQuestions ?? [],
+    epicContext: classification?.epicContext,
+    epicDetails: classification?.epicDetails,
   };
 }

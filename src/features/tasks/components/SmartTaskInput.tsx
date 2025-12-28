@@ -41,6 +41,7 @@ import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
 import { ClarificationBubble } from './ClarificationBubble';
 import { TaskBatchPreview } from './TaskBatchPreview';
+import { EpicClarificationFlow } from './EpicClarificationFlow';
 import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
 import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
@@ -96,6 +97,7 @@ export function SmartTaskInput({
     classifyDebounced, 
     reset: resetClassification,
     clarify,
+    clarifyEpic,
     isEpicDetected,
     isHabitDetected,
     isBrainDumpDetected,
@@ -104,7 +106,15 @@ export function SmartTaskInput({
     extractedTasks,
     suggestedTasks,
     detectedContext,
+    needsEpicClarification,
+    epicClarifyingQuestions,
+    epicContext,
+    epicDetails,
   } = useIntentClassifier({ debounceMs: 600, minInputLength: 15 });
+  
+  // Epic clarification state
+  const [showEpicClarification, setShowEpicClarification] = useState(false);
+  const [epicClarificationAnswers, setEpicClarificationAnswers] = useState<Record<string, string | number> | null>(null);
 
   // Trigger classification when input changes
   useEffect(() => {
@@ -123,6 +133,27 @@ export function SmartTaskInput({
       setShowClarification(false);
     }
   }, [isBrainDumpDetected, needsClarification, showClarification, input, extractedTasks.length]);
+
+  // Handle epic clarification detection
+  useEffect(() => {
+    if (needsEpicClarification && !showEpicClarification && epicClarifyingQuestions.length > 0) {
+      setShowEpicClarification(true);
+    }
+  }, [needsEpicClarification, showEpicClarification, epicClarifyingQuestions.length]);
+
+  // Handle epic clarification submission
+  const handleEpicClarificationSubmit = async (answers: Record<string, string | number>) => {
+    setEpicClarificationAnswers(answers);
+    await clarifyEpic(input, answers);
+    setShowEpicClarification(false);
+    setShowEpicWizard(true);
+  };
+
+  // Handle skipping epic clarification  
+  const handleSkipEpicClarification = () => {
+    setShowEpicClarification(false);
+    setShowEpicWizard(true);
+  };
   
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -735,6 +766,19 @@ export function SmartTaskInput({
               Review & Create →
             </Button>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Epic Clarification Flow */}
+      <AnimatePresence>
+        {showEpicClarification && epicClarifyingQuestions.length > 0 && (
+          <EpicClarificationFlow
+            goal={input}
+            questions={epicClarifyingQuestions}
+            onSubmit={handleEpicClarificationSubmit}
+            onSkip={handleSkipEpicClarification}
+            isLoading={isClassifying}
+          />
         )}
       </AnimatePresence>
 
