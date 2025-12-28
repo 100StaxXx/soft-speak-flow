@@ -319,7 +319,25 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
             {/* Daily Coach Panel - AI-powered insights */}
             <ErrorBoundary>
-              <DailyCoachPanel maxInsights={3} />
+              <DailyCoachPanel 
+                maxInsights={3} 
+                onInsightAction={(insight) => {
+                  // Route actions to appropriate behavior based on actionType
+                  switch (insight.actionType) {
+                    case 'reschedule':
+                    case 'add_break':
+                    case 'simplify':
+                      navigate('/tasks');
+                      break;
+                    case 'celebrate':
+                      // Could show celebration modal, for now navigate to tasks
+                      navigate('/tasks');
+                      break;
+                    default:
+                      navigate('/tasks');
+                  }
+                }}
+              />
             </ErrorBoundary>
           
             <ErrorBoundary>
