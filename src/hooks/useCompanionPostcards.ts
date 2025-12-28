@@ -98,6 +98,7 @@ export const useCompanionPostcards = () => {
     },
   });
 
+  // Legacy check for percentage-based postcards (still used for epics without milestones)
   const checkAndGeneratePostcard = useCallback(
     async (
       epicId: string,
@@ -138,12 +139,68 @@ export const useCompanionPostcards = () => {
     [postcards, generatePostcard]
   );
 
+  // NEW: Check for milestone-based postcard generation
+  const checkMilestoneForPostcard = useCallback(
+    async (
+      milestoneId: string,
+      epicId: string,
+      companionId: string,
+      companionData: {
+        spirit_animal?: string;
+        favorite_color?: string;
+        core_element?: string;
+        eye_color?: string;
+        fur_color?: string;
+      }
+    ) => {
+      if (!user?.id) return;
+
+      // Fetch the milestone to check if it's a postcard milestone
+      const { data: milestone, error } = await supabase
+        .from("epic_milestones")
+        .select("id, title, milestone_percent, is_postcard_milestone")
+        .eq("id", milestoneId)
+        .single();
+
+      if (error || !milestone) {
+        console.error("Failed to fetch milestone:", error);
+        return;
+      }
+
+      // Only generate postcard for milestones marked as postcard milestones
+      if (!milestone.is_postcard_milestone) {
+        console.log("Milestone is not marked for postcard generation");
+        return;
+      }
+
+      // Check if postcard already exists for this milestone
+      const existingPostcard = postcards?.find(
+        p => p.epic_id === epicId && p.milestone_percent === milestone.milestone_percent
+      );
+
+      if (existingPostcard) {
+        console.log("Postcard already exists for this milestone");
+        return;
+      }
+
+      // Generate the postcard
+      generatePostcard.mutate({
+        companionId,
+        epicId,
+        milestonePercent: milestone.milestone_percent,
+        companionData,
+      });
+    },
+    [user?.id, postcards, generatePostcard]
+  );
+
   return {
     postcards: postcards || [],
     isLoading,
     error,
     generatePostcard,
     checkAndGeneratePostcard,
+    checkMilestoneForPostcard,
     isGenerating: generatePostcard.isPending,
   };
 };
