@@ -15,6 +15,7 @@ import { MorningCheckIn } from "@/components/MorningCheckIn";
 import { MorningBriefing } from "@/components/MorningBriefing";
 import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
+import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
 
 import { loadMentorImage } from "@/utils/mentorImageLoader";
@@ -314,6 +315,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
             <ErrorBoundary>
               <WeeklyRecapCard />
+            </ErrorBoundary>
+
+            {/* Daily Coach Panel - AI-powered insights */}
+            <ErrorBoundary>
+              <DailyCoachPanel maxInsights={3} />
             </ErrorBoundary>
           
             <ErrorBoundary>

@@ -43,8 +43,10 @@ import { ClarificationBubble } from './ClarificationBubble';
 import { TaskBatchPreview } from './TaskBatchPreview';
 import { EpicClarificationFlow } from './EpicClarificationFlow';
 import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
+import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
+import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { Leaf } from 'lucide-react';
@@ -91,6 +93,7 @@ export function SmartTaskInput({
   const { addHabit, isAddingHabit, habits } = useHabits();
   
   // Intent classification for detecting epics/habits/brain-dumps
+  // Enable orchestrator for centralized AI handling
   const { 
     classification, 
     isClassifying, 
@@ -110,7 +113,8 @@ export function SmartTaskInput({
     epicClarifyingQuestions,
     epicContext,
     epicDetails,
-  } = useIntentClassifier({ debounceMs: 600, minInputLength: 15 });
+    capacityWarnings,
+  } = useIntentClassifier({ debounceMs: 600, minInputLength: 15, useOrchestrator: true });
   
   // Epic clarification state
   const [showEpicClarification, setShowEpicClarification] = useState(false);

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
 // Type for habits created during epic creation
@@ -31,6 +32,7 @@ export const useEpics = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
+  const { trackEpicOutcome } = useAIInteractionTracker();
 
   // Fetch all epics for the user
   const { data: epics, isLoading, error: epicsError } = useQuery({
@@ -313,6 +315,13 @@ export const useEpics = () => {
     },
     onSuccess: async ({ epic, status, wasAlreadyCompleted }, variables) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
+      
+      // Track epic outcome for AI learning
+      if (status === "completed" || status === "abandoned") {
+        trackEpicOutcome(variables.epicId, status).catch(err => {
+          console.error('Failed to track epic outcome:', err);
+        });
+      }
       
       if (status === "completed" && !wasAlreadyCompleted) {
         // Only award XP if this is the FIRST time completing

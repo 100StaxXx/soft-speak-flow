@@ -9,6 +9,7 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
+import { PromotionOpportunitiesSection } from "@/components/PromotionOpportunitiesSection";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
@@ -29,7 +30,9 @@ export function EpicsTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* AI-detected Promotion Opportunities */}
+      <PromotionOpportunitiesSection maxVisible={2} compact />
       {/* Create Epic and Join Guild Buttons */}
       <Card className="p-4 bg-gradient-to-br from-primary/5 to-purple-500/5">
         <div className="flex gap-2 w-full overflow-hidden">
