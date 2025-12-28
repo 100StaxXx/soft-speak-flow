@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, 
   Clock, 
@@ -17,32 +18,71 @@ import {
   Pencil,
   Plus,
   X,
-  Mic
+  Mic,
+  ChevronDown,
+  Loader2,
+  Wand2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
+import { SuggestedSubtask } from '@/hooks/useTaskDecomposition';
+import { SubtaskPreviewList } from './SubtaskPreviewList';
 
 interface TaskPreviewCardProps {
   parsed: ParsedTask;
   rawInput: string;
   onConfirm: () => void;
+  onConfirmWithSubtasks?: (subtasks: SuggestedSubtask[]) => void;
   onEdit: () => void;
   onDiscard: () => void;
   isVoiceInput?: boolean;
+  // Breakdown-related props
+  onBreakdown?: () => void;
+  isBreakingDown?: boolean;
+  suggestedSubtasks?: SuggestedSubtask[];
+  onSubtasksChange?: (subtasks: SuggestedSubtask[]) => void;
   className?: string;
+}
+
+// Detection logic for "big goals" that could benefit from breakdown
+function looksLikeBigGoal(text: string, estimatedDuration?: number): boolean {
+  if (!text) return false;
+  
+  const cleanText = text.toLowerCase().trim();
+  
+  // Big goal keywords
+  const bigGoalKeywords = [
+    'launch', 'build', 'create', 'develop', 'design', 'implement',
+    'plan', 'organize', 'set up', 'setup', 'prepare', 'finish',
+    'complete', 'start', 'begin', 'make', 'write', 'research'
+  ];
+  
+  const hasKeyword = bigGoalKeywords.some(kw => cleanText.includes(kw));
+  const isLongText = cleanText.length > 35;
+  const hasNoDuration = !estimatedDuration;
+  
+  // Has big goal keyword AND (long text OR no duration specified)
+  return hasKeyword && (isLongText || hasNoDuration);
 }
 
 export function TaskPreviewCard({
   parsed,
   rawInput,
   onConfirm,
+  onConfirmWithSubtasks,
   onEdit,
   onDiscard,
   isVoiceInput = false,
+  onBreakdown,
+  isBreakingDown = false,
+  suggestedSubtasks,
+  onSubtasksChange,
   className
 }: TaskPreviewCardProps) {
+  const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
+  
   const difficultyConfig = {
     easy: { icon: Zap, label: 'Easy', color: 'text-green-500 bg-green-500/10' },
     medium: { icon: Flame, label: 'Medium', color: 'text-yellow-500 bg-yellow-500/10' },
@@ -64,6 +104,20 @@ export function TaskPreviewCard({
     parsed.recurrencePattern ||
     parsed.difficulty !== 'medium' ||
     parsed.energyLevel !== 'medium';
+
+  const showBreakdownPrompt = onBreakdown && 
+    !suggestedSubtasks?.length && 
+    !isBreakingDown &&
+    looksLikeBigGoal(parsed.text || rawInput, parsed.estimatedDuration);
+
+  const hasSubtasks = suggestedSubtasks && suggestedSubtasks.length > 0;
+  const selectedSubtasks = suggestedSubtasks?.filter(s => s.selected) || [];
+
+  const handleConfirmWithSteps = () => {
+    if (onConfirmWithSubtasks && selectedSubtasks.length > 0) {
+      onConfirmWithSubtasks(selectedSubtasks);
+    }
+  };
 
   return (
     <motion.div
@@ -182,6 +236,94 @@ export function TaskPreviewCard({
         </div>
       )}
 
+      {/* Breakdown Prompt */}
+      <AnimatePresence>
+        {showBreakdownPrompt && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-3"
+          >
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2">
+                <Wand2 className="w-4 h-4 text-primary" />
+                <span className="text-sm text-foreground">
+                  This looks like a big goal!
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onBreakdown}
+                className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10"
+              >
+                Break it down →
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Loading State */}
+      <AnimatePresence>
+        {isBreakingDown && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-3"
+          >
+            <div className="flex items-center justify-center gap-2 p-4 rounded-lg bg-muted/30">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Breaking down your goal...</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Subtasks Section */}
+      <AnimatePresence>
+        {hasSubtasks && !isBreakingDown && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-3"
+          >
+            {/* Collapsible header */}
+            <button
+              onClick={() => setIsSubtasksExpanded(!isSubtasksExpanded)}
+              className="flex items-center justify-between w-full mb-2 group"
+            >
+              <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                Suggested steps ({selectedSubtasks.length} selected)
+              </span>
+              <ChevronDown className={cn(
+                "w-4 h-4 text-muted-foreground transition-transform",
+                isSubtasksExpanded && "rotate-180"
+              )} />
+            </button>
+
+            {/* Subtask list */}
+            <AnimatePresence>
+              {isSubtasksExpanded && onSubtasksChange && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <SubtaskPreviewList
+                    subtasks={suggestedSubtasks!}
+                    onChange={onSubtasksChange}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Action buttons */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 bg-muted/30 border-t">
         <Button
@@ -193,14 +335,38 @@ export function TaskPreviewCard({
           <Pencil className="w-3.5 h-3.5" />
           Edit
         </Button>
-        <Button
-          size="sm"
-          onClick={onConfirm}
-          className="h-8 px-4 gap-1.5 shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Create Task
-        </Button>
+        
+        <div className="flex items-center gap-2">
+          {hasSubtasks && selectedSubtasks.length > 0 ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onConfirm}
+                className="h-8 px-3 text-muted-foreground"
+              >
+                Just the task
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmWithSteps}
+                className="h-8 px-4 gap-1.5 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create with {selectedSubtasks.length} steps
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              onClick={onConfirm}
+              className="h-8 px-4 gap-1.5 shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create Task
+            </Button>
+          )}
+        </div>
       </div>
     </motion.div>
   );

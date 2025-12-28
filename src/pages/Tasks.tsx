@@ -48,6 +48,8 @@ import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { CalendarTask } from "@/types/quest";
 import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { SuggestedSubtask } from "@/hooks/useTaskDecomposition";
+import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { ViewModeToggle } from "@/components/ViewModeToggle";
 import { FocusSchedulerView } from "@/components/scheduler/FocusSchedulerView";
@@ -136,7 +138,12 @@ export default function Tasks() {
   // Main quest prompt state
   const [showMainQuestPrompt, setShowMainQuestPrompt] = useState(false);
   const [pendingTaskData, setPendingTaskData] = useState<PendingTaskData | null>(null);
+  const [pendingSubtasks, setPendingSubtasks] = useState<SuggestedSubtask[]>([]);
   const drawerActionHandledRef = useRef(false);
+  
+  // Subtasks hook (will be used after task creation)
+  const [lastCreatedTaskId, setLastCreatedTaskId] = useState<string | null>(null);
+  const { bulkAddSubtasks } = useSubtasks(lastCreatedTaskId);
   
   // Edit quest state
   const [editingTask, setEditingTask] = useState<typeof tasks[0] | null>(null);
@@ -504,7 +511,7 @@ export default function Tasks() {
           <TabsContent value="quests" className="space-y-4 mt-4">
             {/* Smart Task Input */}
             <SmartTaskInput
-              onSubmit={(parsed: ParsedTask) => {
+              onSubmit={async (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => {
                 const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
                 const hasMainQuest = tasks.some(task => task.is_main_quest);
                 
@@ -521,12 +528,20 @@ export default function Tasks() {
                   moreInformation: null,
                 };
                 
+                // Store pending subtasks if any
+                if (subtasks && subtasks.length > 0) {
+                  setPendingSubtasks(subtasks);
+                }
+                
                 if (!hasMainQuest) {
                   setPendingTaskData(taskData);
                   drawerActionHandledRef.current = false;
                   setShowMainQuestPrompt(true);
                 } else {
-                  actuallyAddTask(false, taskData);
+                  await actuallyAddTask(false, taskData);
+                  // Note: Subtask creation will be handled in a follow-up enhancement
+                  // when we update actuallyAddTask to return the created task ID
+                  setPendingSubtasks([]);
                 }
               }}
               

@@ -31,6 +31,7 @@ import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguag
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useIntentClassifier } from '@/hooks/useIntentClassifier';
+import { useTaskDecomposition, SuggestedSubtask } from '@/hooks/useTaskDecomposition';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
 import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
 import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
@@ -44,8 +45,9 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { Leaf } from 'lucide-react';
 import { parseNaturalLanguage } from '../hooks/useNaturalLanguageParser';
+
 interface SmartTaskInputProps {
-  onSubmit: (parsed: ParsedTask) => void;
+  onSubmit: (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => void;
   placeholder?: string;
   autoFocus?: boolean;
   disabled?: boolean;
@@ -69,6 +71,10 @@ export function SmartTaskInput({
   const [previewSource, setPreviewSource] = useState<'voice' | 'typed'>('typed');
   const [showEpicWizard, setShowEpicWizard] = useState(false);
   const prevParsedRef = useRef<ParsedTask | null>(null);
+  
+  // Breakdown state
+  const [suggestedSubtasks, setSuggestedSubtasks] = useState<SuggestedSubtask[]>([]);
+  const { decompose, isLoading: isBreakingDown } = useTaskDecomposition();
 
   const { medium, success, light, tap } = useHapticFeedback();
   const { createEpic, isCreating: isCreatingEpic } = useEpics();
@@ -178,6 +184,20 @@ export function SmartTaskInput({
     setInterimText('');
     setVoicePreview(null);
     setShowPreviewCard(false);
+    setSuggestedSubtasks([]);
+  };
+
+  // Handle breakdown request
+  const handleBreakdown = async () => {
+    const textToBreakdown = voicePreview || (parsed?.text || input);
+    if (!textToBreakdown.trim()) return;
+    
+    try {
+      const subtasks = await decompose(textToBreakdown);
+      setSuggestedSubtasks(subtasks);
+    } catch (error) {
+      toast.error('Failed to break down task. Please try again.');
+    }
   };
 
   const handleCreateAsEpic = () => {
@@ -214,7 +234,7 @@ export function SmartTaskInput({
   };
 
   // Handle confirming from preview card (creates task immediately)
-  const handlePreviewConfirm = () => {
+  const handlePreviewConfirm = (subtasks?: SuggestedSubtask[]) => {
     const textToSubmit = voicePreview || input;
     if (!textToSubmit.trim()) return;
     
@@ -224,11 +244,17 @@ export function SmartTaskInput({
     success(); // Haptic on submit
     setJustSubmitted(true);
     setTimeout(() => setJustSubmitted(false), 300);
-    onSubmit(parsedTask);
+    onSubmit(parsedTask, subtasks);
     reset();
     setVoicePreview(null);
     setShowPreviewCard(false);
+    setSuggestedSubtasks([]);
     resetClassification();
+  };
+
+  // Handle confirm with subtasks
+  const handleConfirmWithSubtasks = (subtasks: SuggestedSubtask[]) => {
+    handlePreviewConfirm(subtasks);
   };
 
   // Handle editing from preview card
@@ -245,6 +271,7 @@ export function SmartTaskInput({
   const handlePreviewDiscard = () => {
     setVoicePreview(null);
     setShowPreviewCard(false);
+    setSuggestedSubtasks([]);
     light();
   };
 
@@ -741,10 +768,15 @@ export function SmartTaskInput({
           <TaskPreviewCard
             parsed={parseNaturalLanguage(voicePreview)}
             rawInput={voicePreview}
-            onConfirm={handlePreviewConfirm}
+            onConfirm={() => handlePreviewConfirm()}
+            onConfirmWithSubtasks={handleConfirmWithSubtasks}
             onEdit={handlePreviewEdit}
             onDiscard={handlePreviewDiscard}
             isVoiceInput={true}
+            onBreakdown={handleBreakdown}
+            isBreakingDown={isBreakingDown}
+            suggestedSubtasks={suggestedSubtasks}
+            onSubtasksChange={setSuggestedSubtasks}
             className="mx-1"
           />
         )}
