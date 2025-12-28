@@ -17,12 +17,16 @@ import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
 interface MilestoneProgressProps {
   epicId: string;
   epicTitle: string;
+  epicGoal?: string;
+  currentDeadline?: string;
   compact?: boolean;
 }
 
 export const MilestoneProgress = ({ 
   epicId, 
   epicTitle,
+  epicGoal,
+  currentDeadline,
   compact = false 
 }: MilestoneProgressProps) => {
   const {
@@ -110,7 +114,7 @@ export const MilestoneProgress = ({
         )}
 
         {/* View All Link */}
-        <JourneyDetailDrawer epicId={epicId} epicTitle={epicTitle}>
+        <JourneyDetailDrawer epicId={epicId} epicTitle={epicTitle} epicGoal={epicGoal} currentDeadline={currentDeadline}>
           <Button variant="ghost" size="sm" className="w-full text-xs h-7 text-muted-foreground">
             View all milestones
             <ChevronRight className="w-3 h-3 ml-1" />
@@ -205,7 +209,7 @@ export const MilestoneProgress = ({
       )}
 
       {/* View All Button */}
-      <JourneyDetailDrawer epicId={epicId} epicTitle={epicTitle}>
+      <JourneyDetailDrawer epicId={epicId} epicTitle={epicTitle} epicGoal={epicGoal} currentDeadline={currentDeadline}>
         <Button variant="outline" size="sm" className="w-full text-xs">
           View full timeline
           <ChevronRight className="w-3 h-3 ml-1" />
