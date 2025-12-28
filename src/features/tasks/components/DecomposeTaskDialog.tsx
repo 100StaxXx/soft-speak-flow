@@ -250,15 +250,23 @@ export function DecomposeTaskDialog({
                       </div>
                     ) : (
                       <>
-                        <span className="flex-1 text-sm">{subtask.title}</span>
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {/* Tap-to-edit title */}
+                        <span 
+                          className="flex-1 text-sm cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => startEdit(subtask)}
+                        >
+                          {subtask.title}
+                        </span>
+                        {/* Duration badge */}
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
                           <Clock className="w-3 h-3" />
                           {subtask.durationMinutes}m
                         </span>
+                        {/* Always-visible action buttons */}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
                           onClick={() => startEdit(subtask)}
                         >
                           <Pencil className="w-3 h-3" />
@@ -266,7 +274,7 @@ export function DecomposeTaskDialog({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
                           onClick={() => removeSubtask(subtask.id)}
                         >
                           <Trash2 className="w-3 h-3" />
