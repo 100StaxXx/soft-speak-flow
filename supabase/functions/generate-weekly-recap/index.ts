@@ -158,6 +158,19 @@ serve(async (req) => {
       habits: habits?.length || 0,
     };
 
+    // Don't create a recap if user has no activity this week
+    const totalActivity = stats.checkIns + stats.reflections + stats.quests + stats.habits;
+    if (totalActivity === 0) {
+      console.log(`Skipping recap for ${userId}: no activity this week`);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        skipped: true,
+        message: "No activity to recap" 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Generate mentor story
     let mentorInsight = null;
     let mentorStory = null;

@@ -149,11 +149,26 @@ export const useWeeklyRecap = () => {
     }
   }, [isSunday, currentRecap, isLoading, contextOpenRecap]);
 
-  // Auto-generate recap on Sunday if it doesn't exist
+  // Auto-generate recap on Sunday if it doesn't exist AND user has activity
   useEffect(() => {
-    if (isSunday && !currentRecap && !isLoading && user?.id && !generateMutation.isPending) {
-      generateMutation.mutate();
-    }
+    const checkAndGenerate = async () => {
+      if (!isSunday || currentRecap || isLoading || !user?.id || generateMutation.isPending) {
+        return;
+      }
+      
+      // Check if user has any prior check-ins before triggering generation
+      const { count } = await supabase
+        .from("daily_check_ins")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+      
+      // Only generate if user has at least 1 check-in ever
+      if (count && count > 0) {
+        generateMutation.mutate();
+      }
+    };
+    
+    checkAndGenerate();
   }, [isSunday, currentRecap, isLoading, user?.id, generateMutation.isPending]);
 
   const openRecap = (recap: WeeklyRecap) => {
