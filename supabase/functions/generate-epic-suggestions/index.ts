@@ -17,10 +17,23 @@ interface EpicSuggestion {
   category?: string;
 }
 
+interface ClarificationAnswers {
+  subjects?: string;
+  exam_date?: string;
+  target_date?: string;
+  hours_per_day?: number;
+  days_per_week?: number;
+  current_status?: string;
+  current_level?: string;
+  [key: string]: string | number | undefined;
+}
+
 interface GenerateRequest {
   goal: string;
   deadline?: string; // ISO date string
   targetDays?: number;
+  clarificationAnswers?: ClarificationAnswers;
+  epicContext?: string;
 }
 
 serve(async (req) => {
@@ -29,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, deadline, targetDays } = await req.json() as GenerateRequest;
+    const { goal, deadline, targetDays, clarificationAnswers, epicContext } = await req.json() as GenerateRequest;
 
     if (!goal || goal.trim().length < 3) {
       return new Response(
@@ -54,17 +67,69 @@ serve(async (req) => {
       durationContext = `The user has ${targetDays} days to complete this goal.`;
     }
 
+    // Build clarification context if provided
+    let clarificationContext = '';
+    if (clarificationAnswers && Object.keys(clarificationAnswers).length > 0) {
+      clarificationContext = `
+User's specific context and preferences:
+${Object.entries(clarificationAnswers)
+  .filter(([_, v]) => v !== undefined && v !== '')
+  .map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`)
+  .join('\n')}
+
+Use this context to personalize the suggestions. For example:
+- If subjects are specified, create subject-specific study habits
+- If hours_per_day is specified, ensure habits fit within that time
+- If current_status indicates "just starting", include foundational habits
+- If exam_date is provided, work backwards to create realistic milestones
+`;
+    }
+
+    // Add epic-type specific instructions
+    let epicTypeInstructions = '';
+    if (epicContext === 'exam_preparation') {
+      epicTypeInstructions = `
+This is exam preparation. Generate:
+1. Subject-specific study habits (rotate subjects if multiple)
+2. Practice test milestones at regular intervals
+3. Review/consolidation habits
+4. Self-care habits to prevent burnout (breaks, exercise)
+5. Progressive difficulty - start easier, build up to full practice exams
+`;
+    } else if (epicContext === 'fitness_goal') {
+      epicTypeInstructions = `
+This is a fitness goal. Generate:
+1. Progressive training habits (start small, build up)
+2. Rest and recovery habits
+3. Nutrition-related habits if relevant
+4. Milestones based on distance/time improvements
+5. Include cross-training and flexibility
+`;
+    } else if (epicContext === 'learning') {
+      epicTypeInstructions = `
+This is a learning goal. Generate:
+1. Daily practice habits appropriate to skill
+2. Review/spaced repetition habits
+3. Application/project milestones
+4. Community/immersion habits if applicable
+5. Progressive difficulty milestones
+`;
+    }
+
     const systemPrompt = `You are an expert habit coach and goal planner. Your job is to break down goals into actionable habits (recurring daily/weekly actions) and milestones (one-time achievements).
 
+${epicTypeInstructions}
+
 Rules:
-1. Generate 3-5 habits (recurring actions that build toward the goal)
-2. Generate 2-4 milestones (one-time checkpoints/achievements)
+1. Generate 3-6 habits (recurring actions that build toward the goal)
+2. Generate 3-5 milestones (one-time checkpoints/achievements) spread across the timeline
 3. Habits should be specific, measurable, and realistic
-4. Milestones should be spread across the timeline
-5. Each item needs a clear, actionable title and brief description
+4. Each habit should fit within the user's available time (if specified)
+5. Milestones should be progressive and motivating
 6. Assign appropriate difficulty (easy for quick daily tasks, medium for moderate effort, hard for challenging ones)
 7. For habits, suggest frequency (daily, weekly, or specific days)
 8. For milestones, suggest which week they should be completed by
+9. If user specified hours per day, ensure total habit time ≤ that amount
 
 Return a JSON object with this exact structure:
 {
@@ -94,10 +159,11 @@ Return a JSON object with this exact structure:
 
 Goal: "${goal}"
 ${durationContext}
+${clarificationContext}
 
-Generate practical, specific suggestions that will help achieve this goal.`;
+Generate practical, specific suggestions that will help achieve this goal. Make sure habits are realistic and milestones are properly spaced.`;
 
-    console.log('Generating suggestions for goal:', goal);
+    console.log('Generating suggestions for goal:', goal, 'context:', epicContext, 'answers:', clarificationAnswers);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

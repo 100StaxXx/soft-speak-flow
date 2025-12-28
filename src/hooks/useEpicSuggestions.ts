@@ -15,11 +15,30 @@ export interface EpicSuggestion {
   selected?: boolean;
 }
 
+export interface ClarificationAnswers {
+  subjects?: string;
+  exam_date?: string;
+  target_date?: string;
+  hours_per_day?: number;
+  days_per_week?: number;
+  current_status?: string;
+  current_level?: string;
+  [key: string]: string | number | undefined;
+}
+
 interface UseEpicSuggestionsReturn {
   suggestions: EpicSuggestion[];
   isLoading: boolean;
   error: string | null;
-  generateSuggestions: (goal: string, options?: { deadline?: string; targetDays?: number }) => Promise<void>;
+  generateSuggestions: (
+    goal: string, 
+    options?: { 
+      deadline?: string; 
+      targetDays?: number;
+      clarificationAnswers?: ClarificationAnswers;
+      epicContext?: string;
+    }
+  ) => Promise<void>;
   toggleSuggestion: (id: string) => void;
   selectAll: () => void;
   deselectAll: () => void;
@@ -34,7 +53,12 @@ export function useEpicSuggestions(): UseEpicSuggestionsReturn {
 
   const generateSuggestions = useCallback(async (
     goal: string, 
-    options?: { deadline?: string; targetDays?: number }
+    options?: { 
+      deadline?: string; 
+      targetDays?: number;
+      clarificationAnswers?: ClarificationAnswers;
+      epicContext?: string;
+    }
   ) => {
     if (!goal.trim()) {
       setError('Please enter a goal');
@@ -50,6 +74,8 @@ export function useEpicSuggestions(): UseEpicSuggestionsReturn {
           goal: goal.trim(),
           deadline: options?.deadline,
           targetDays: options?.targetDays,
+          clarificationAnswers: options?.clarificationAnswers,
+          epicContext: options?.epicContext,
         },
       });
 
