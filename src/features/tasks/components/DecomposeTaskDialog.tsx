@@ -178,12 +178,15 @@ export function DecomposeTaskDialog({
 
         <div className="py-4">
           {isDecomposing ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="flex flex-col items-center justify-center py-8 gap-3 animate-in fade-in duration-300">
+              <div className="relative">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <div className="absolute inset-0 w-8 h-8 rounded-full bg-primary/20 animate-ping" />
+              </div>
               <p className="text-sm text-muted-foreground">Generating subtasks...</p>
             </div>
           ) : error && suggestions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-3">
+            <div className="flex flex-col items-center justify-center py-8 gap-3 animate-in fade-in duration-300">
               <p className="text-sm text-destructive">{error}</p>
               <Button variant="outline" size="sm" onClick={handleRegenerate}>
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -199,31 +202,35 @@ export function DecomposeTaskDialog({
                   size="sm" 
                   onClick={handleRegenerate}
                   disabled={isDecomposing}
+                  className="transition-all hover:scale-105"
                 >
-                  <RefreshCw className={cn("w-4 h-4 mr-1", isDecomposing && "animate-spin")} />
+                  <RefreshCw className={cn("w-4 h-4 mr-1 transition-transform", isDecomposing && "animate-spin")} />
                   Regenerate
                 </Button>
               </div>
 
               {/* Suggestions list */}
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {suggestions.map((subtask) => (
+                {suggestions.map((subtask, index) => (
                   <div
                     key={subtask.id}
                     className={cn(
-                      "group flex items-center gap-2 p-2 rounded-md border transition-colors",
+                      "group flex items-center gap-2 p-2.5 rounded-lg border transition-all duration-200",
+                      "animate-in fade-in slide-in-from-left-2",
                       subtask.selected 
-                        ? "bg-primary/5 border-primary/30" 
-                        : "bg-muted/30 border-border"
+                        ? "bg-primary/5 border-primary/30 shadow-sm" 
+                        : "bg-muted/30 border-border hover:border-muted-foreground/30"
                     )}
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <Checkbox
                       checked={subtask.selected}
                       onCheckedChange={() => toggleSelection(subtask.id)}
+                      className="transition-transform hover:scale-110"
                     />
 
                     {editingId === subtask.id ? (
-                      <div className="flex-1 flex items-center gap-1">
+                      <div className="flex-1 flex items-center gap-1 animate-in fade-in duration-150">
                         <Input
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
@@ -234,7 +241,7 @@ export function DecomposeTaskDialog({
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7"
+                          className="h-7 w-7 hover:bg-green-500/10"
                           onClick={saveEdit}
                         >
                           <Check className="w-3.5 h-3.5 text-green-500" />
@@ -252,13 +259,13 @@ export function DecomposeTaskDialog({
                       <>
                         {/* Tap-to-edit title */}
                         <span 
-                          className="flex-1 text-sm cursor-pointer hover:text-primary transition-colors"
+                          className="flex-1 text-sm cursor-pointer hover:text-primary transition-colors duration-150"
                           onClick={() => startEdit(subtask)}
                         >
                           {subtask.title}
                         </span>
                         {/* Duration badge */}
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full transition-colors hover:bg-muted">
                           <Clock className="w-3 h-3" />
                           {subtask.durationMinutes}m
                         </span>
@@ -266,7 +273,7 @@ export function DecomposeTaskDialog({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all hover:scale-110"
                           onClick={() => startEdit(subtask)}
                         >
                           <Pencil className="w-3 h-3" />
@@ -274,7 +281,7 @@ export function DecomposeTaskDialog({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all hover:scale-110"
                           onClick={() => removeSubtask(subtask.id)}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -333,13 +340,17 @@ export function DecomposeTaskDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="transition-all hover:scale-105">
             Cancel
           </Button>
           <Button 
             onClick={handleAddSelected}
             disabled={selectedCount === 0 || isBulkAdding || isDecomposing}
+            className={cn(
+              "transition-all duration-200",
+              selectedCount > 0 && "shadow-md hover:shadow-lg hover:scale-105"
+            )}
           >
             {isBulkAdding ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
