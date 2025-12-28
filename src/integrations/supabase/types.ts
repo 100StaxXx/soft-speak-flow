@@ -1692,10 +1692,13 @@ export type Database = {
           created_at: string | null
           difficulty: string | null
           energy_level: string | null
+          epic_id: string | null
           estimated_duration: number | null
+          habit_source_id: string | null
           id: string
           is_bonus: boolean | null
           is_main_quest: boolean | null
+          is_milestone: boolean | null
           is_recurring: boolean | null
           is_top_three: boolean | null
           parent_template_id: string | null
@@ -1722,10 +1725,13 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           energy_level?: string | null
+          epic_id?: string | null
           estimated_duration?: number | null
+          habit_source_id?: string | null
           id?: string
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
+          is_milestone?: boolean | null
           is_recurring?: boolean | null
           is_top_three?: boolean | null
           parent_template_id?: string | null
@@ -1752,10 +1758,13 @@ export type Database = {
           created_at?: string | null
           difficulty?: string | null
           energy_level?: string | null
+          epic_id?: string | null
           estimated_duration?: number | null
+          habit_source_id?: string | null
           id?: string
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
+          is_milestone?: boolean | null
           is_recurring?: boolean | null
           is_top_three?: boolean | null
           parent_template_id?: string | null
@@ -1778,6 +1787,20 @@ export type Database = {
             columns: ["context_id"]
             isOneToOne: false
             referencedRelation: "task_contexts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_tasks_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_tasks_habit_source_id_fkey"
+            columns: ["habit_source_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
             referencedColumns: ["id"]
           },
           {
@@ -1957,6 +1980,69 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epic_milestones: {
+        Row: {
+          chapter_number: number | null
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          epic_id: string
+          id: string
+          is_surfaced: boolean | null
+          milestone_percent: number
+          surfaced_at: string | null
+          task_id: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chapter_number?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          epic_id: string
+          id?: string
+          is_surfaced?: boolean | null
+          milestone_percent: number
+          surfaced_at?: string | null
+          task_id?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chapter_number?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          epic_id?: string
+          id?: string
+          is_surfaced?: boolean | null
+          milestone_percent?: number
+          surfaced_at?: string | null
+          task_id?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_milestones_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "epic_milestones_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
             referencedColumns: ["id"]
           },
         ]
