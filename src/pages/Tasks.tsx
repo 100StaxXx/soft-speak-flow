@@ -48,6 +48,10 @@ import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { CalendarTask } from "@/types/quest";
 import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import { useViewMode } from "@/contexts/ViewModeContext";
+import { ViewModeToggle } from "@/components/ViewModeToggle";
+import { FocusSchedulerView } from "@/components/scheduler/FocusSchedulerView";
+import { QuestSchedulerView } from "@/components/scheduler/QuestSchedulerView";
 
 const MAIN_QUEST_MULTIPLIER = 1.5;
 
@@ -75,6 +79,7 @@ export default function Tasks() {
   // Streak freeze prompt state
   const { needsStreakDecision, currentStreak, freezesAvailable, useFreeze, resetStreak, isResolving } = useStreakAtRisk();
   const { currentStreak: streakCount } = useStreakMultiplier();
+  const { viewMode } = useViewMode();
   
   // Combo and celebration state
   const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
@@ -476,6 +481,7 @@ export default function Tasks() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <ViewModeToggle />
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </div>
@@ -564,22 +570,36 @@ export default function Tasks() {
               tasksPerDay={tasksPerDay}
             />
 
-            {/* Quest Agenda */}
+            {/* Scheduler View - Mode-aware */}
             <Card className="p-4">
-              <QuestAgenda
-                tasks={tasks}
-                selectedDate={selectedDate}
-                onToggle={(taskId, completed, xpReward) => {
-                  if (completed) recordCompletion();
-                  toggleTask({ taskId, completed, xpReward });
-                }}
-                onDelete={deleteTask}
-                onEdit={(task) => setEditingTask(task)}
-                onSetMainQuest={setMainQuest}
-                onAddQuest={() => openAddSheet()}
-                tutorialQuestId={tutorialQuestId}
-                isToggling={isToggling}
-              />
+              {viewMode === "focus" ? (
+                <FocusSchedulerView
+                  tasks={tasks as any}
+                  selectedDate={selectedDate}
+                  onToggle={(taskId, completed, xpReward) => {
+                    if (completed) recordCompletion();
+                    toggleTask({ taskId, completed, xpReward });
+                  }}
+                  onEdit={(task: any) => setEditingTask(task)}
+                  onAddQuest={() => openAddSheet()}
+                  completedCount={completedCount}
+                  totalCount={totalCount}
+                />
+              ) : (
+                <QuestSchedulerView
+                  tasks={tasks as any}
+                  selectedDate={selectedDate}
+                  onToggle={(taskId, completed, xpReward) => {
+                    if (completed) recordCompletion();
+                    toggleTask({ taskId, completed, xpReward });
+                  }}
+                  onEdit={(task: any) => setEditingTask(task)}
+                  onAddQuest={() => openAddSheet()}
+                  completedCount={completedCount}
+                  totalCount={totalCount}
+                  currentStreak={streakCount}
+                />
+              )}
             </Card>
 
             {/* Hourly View Trigger - Enhanced */}
