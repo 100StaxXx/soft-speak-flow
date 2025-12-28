@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords, Settings2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -19,6 +19,7 @@ import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
 import { EpicRewardReveal } from "./EpicRewardReveal";
+import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -87,6 +88,7 @@ interface EpicCardProps {
 export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
+  const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   const [showBossBattle, setShowBossBattle] = useState(false);
   const [showRewardReveal, setShowRewardReveal] = useState(false);
   const [rewardRevealData, setRewardRevealData] = useState<RewardRevealData | null>(null);
@@ -467,6 +469,19 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
         )}
 
+        {/* Adjust Plan Button */}
+        {isActive && epic.progress_percentage < 100 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdjustDialog(true)}
+            className="w-full mb-4"
+          >
+            <Settings2 className="h-4 w-4 mr-2" />
+            Adjust My Plan
+          </Button>
+        )}
+
         {/* Action Buttons */}
         {isActive && epic.progress_percentage >= 100 && (
           <div className="mt-4 space-y-2">
@@ -532,6 +547,14 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             description: 'Rewards claimed! Check your collection.',
           });
         }}
+      />
+
+      {/* Adjust Epic Plan Dialog */}
+      <AdjustEpicPlanDialog
+        open={showAdjustDialog}
+        onOpenChange={setShowAdjustDialog}
+        epicId={epic.id}
+        epicTitle={epic.title}
       />
     </motion.div>
   );

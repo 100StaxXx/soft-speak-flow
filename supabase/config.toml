@@ -230,3 +230,6 @@ verify_jwt = false
 
 [functions.classify-task-intent]
 verify_jwt = false
+
+[functions.adjust-epic-plan]
+verify_jwt = false
