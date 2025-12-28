@@ -1,12 +1,37 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface ExtractedTask {
+  title: string;
+  estimatedDuration?: number;
+  energyLevel?: 'low' | 'medium' | 'high';
+  suggestedTimeOfDay?: 'morning' | 'afternoon' | 'evening';
+  category?: string;
+}
+
+export interface SuggestedTask extends ExtractedTask {
+  reason: string;
+}
+
+export interface DetectedContext {
+  dayOfWeek?: string;
+  userSituation?: string;
+  targetDate?: string;
+}
+
 export interface IntentClassification {
-  type: 'quest' | 'epic' | 'habit';
+  type: 'quest' | 'epic' | 'habit' | 'brain-dump';
   confidence: number;
   reasoning: string;
   suggestedDeadline?: string;
   suggestedDuration?: number;
+  // Brain-dump specific fields
+  needsClarification?: boolean;
+  clarifyingQuestion?: string;
+  clarificationContext?: string;
+  extractedTasks?: ExtractedTask[];
+  suggestedTasks?: SuggestedTask[];
+  detectedContext?: DetectedContext;
 }
 
 interface UseIntentClassifierOptions {
@@ -65,6 +90,47 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
     }
   }, [classification, minInputLength]);
 
+  // Clarify function for follow-up questions
+  const clarify = useCallback(async (
+    originalInput: string, 
+    userResponse: string
+  ): Promise<IntentClassification | null> => {
+    if (!originalInput || !userResponse) {
+      return null;
+    }
+
+    setIsClassifying(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('classify-task-intent', {
+        body: { 
+          input: originalInput,
+          clarification: userResponse,
+          previousContext: classification?.clarificationContext
+        },
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const result = data as IntentClassification;
+      setClassification(result);
+      return result;
+    } catch (err) {
+      console.error('Intent clarification error:', err);
+      setError(err instanceof Error ? err.message : 'Clarification failed');
+      return null;
+    } finally {
+      setIsClassifying(false);
+    }
+  }, [classification?.clarificationContext]);
+
   const classifyDebounced = useCallback((input: string) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -101,15 +167,25 @@ export function useIntentClassifier(options: UseIntentClassifierOptions = {}) {
 
   const isEpicDetected = classification?.type === 'epic' && classification.confidence >= 0.6;
   const isHabitDetected = classification?.type === 'habit' && classification.confidence >= 0.6;
+  const isBrainDumpDetected = classification?.type === 'brain-dump' && 
+                              classification.confidence >= 0.7 &&
+                              (classification.extractedTasks?.length ?? 0) >= 2;
 
   return {
     classification,
     isClassifying,
     error,
     classify,
+    clarify,
     classifyDebounced,
     reset,
     isEpicDetected,
     isHabitDetected,
+    isBrainDumpDetected,
+    needsClarification: classification?.needsClarification ?? false,
+    clarifyingQuestion: classification?.clarifyingQuestion,
+    extractedTasks: classification?.extractedTasks ?? [],
+    suggestedTasks: classification?.suggestedTasks ?? [],
+    detectedContext: classification?.detectedContext,
   };
 }
