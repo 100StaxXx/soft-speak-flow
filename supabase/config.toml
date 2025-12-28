@@ -233,3 +233,6 @@ verify_jwt = false
 
 [functions.adjust-epic-plan]
 verify_jwt = false
+
+[functions.apply-epic-adjustments]
+verify_jwt = true

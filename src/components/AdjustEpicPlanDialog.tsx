@@ -82,7 +82,7 @@ export function AdjustEpicPlanDialog({ open, onOpenChange, epicId, epicTitle }: 
   };
 
   const handleApply = async () => {
-    const success = await applyAdjustments(epicId);
+    const success = await applyAdjustments(epicId, selectedType || undefined, reason || undefined);
     if (success) {
       handleClose();
     }
