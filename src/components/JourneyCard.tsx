@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
+import { MilestoneProgress } from "./MilestoneProgress";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -228,6 +229,15 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
               <div className="text-xs font-bold">{journey.xp_reward}</div>
             </div>
           </div>
+        </div>
+
+        {/* Milestone Progress Section */}
+        <div className="mb-3">
+          <MilestoneProgress 
+            epicId={journey.id} 
+            epicTitle={journey.title}
+            compact 
+          />
         </div>
 
         {/* Check In Button & Rituals */}
