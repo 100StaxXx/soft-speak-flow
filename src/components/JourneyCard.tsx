@@ -236,6 +236,8 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           <MilestoneProgress 
             epicId={journey.id} 
             epicTitle={journey.title}
+            epicGoal={journey.description}
+            currentDeadline={journey.end_date}
             compact 
           />
         </div>

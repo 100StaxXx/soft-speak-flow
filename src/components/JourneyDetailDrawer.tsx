@@ -18,23 +18,29 @@ import {
   Star, 
   AlertCircle,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Wand2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+import { RescheduleDrawer } from "./RescheduleDrawer";
 
 interface JourneyDetailDrawerProps {
   epicId: string;
   epicTitle: string;
+  epicGoal?: string;
+  currentDeadline?: string;
   children?: React.ReactNode;
 }
 
 export const JourneyDetailDrawer = ({ 
   epicId, 
   epicTitle,
+  epicGoal,
+  currentDeadline,
   children 
 }: JourneyDetailDrawerProps) => {
   const [open, setOpen] = useState(false);
@@ -93,14 +99,29 @@ export const JourneyDetailDrawer = ({
             <Map className="w-5 h-5 text-primary" />
             {epicTitle}
           </DrawerTitle>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="secondary" className="text-xs">
-              {completedCount} / {totalCount} milestones
-            </Badge>
-            {currentPhase && (
-              <Badge variant="outline" className="text-xs">
-                Current: {currentPhase}
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                {completedCount} / {totalCount} milestones
               </Badge>
+              {currentPhase && (
+                <Badge variant="outline" className="text-xs">
+                  Current: {currentPhase}
+                </Badge>
+              )}
+            </div>
+            {currentDeadline && (
+              <RescheduleDrawer
+                epicId={epicId}
+                epicTitle={epicTitle}
+                epicGoal={epicGoal}
+                currentDeadline={currentDeadline}
+              >
+                <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7">
+                  <Wand2 className="w-3.5 h-3.5" />
+                  Reschedule
+                </Button>
+              </RescheduleDrawer>
             )}
           </div>
         </DrawerHeader>
