@@ -245,3 +245,6 @@ verify_jwt = true
 
 [functions.detect-promotion-opportunities]
 verify_jwt = true
+
+[functions.optimize-daily-plan]
+verify_jwt = true
