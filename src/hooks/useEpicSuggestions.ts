@@ -21,9 +21,18 @@ export interface ClarificationAnswers {
   target_date?: string;
   hours_per_day?: number;
   days_per_week?: number;
+  daily_hours?: number;
   current_status?: string;
   current_level?: string;
+  timeline_context?: string;
   [key: string]: string | number | undefined;
+}
+
+export interface TimelineAnalysis {
+  statedDays: number;
+  typicalDays: number;
+  feasibility: 'realistic' | 'aggressive' | 'very_aggressive';
+  adjustmentFactors: string[];
 }
 
 interface UseEpicSuggestionsReturn {
@@ -37,6 +46,7 @@ interface UseEpicSuggestionsReturn {
       targetDays?: number;
       clarificationAnswers?: ClarificationAnswers;
       epicContext?: string;
+      timelineAnalysis?: TimelineAnalysis;
     }
   ) => Promise<void>;
   toggleSuggestion: (id: string) => void;
@@ -58,6 +68,7 @@ export function useEpicSuggestions(): UseEpicSuggestionsReturn {
       targetDays?: number;
       clarificationAnswers?: ClarificationAnswers;
       epicContext?: string;
+      timelineAnalysis?: TimelineAnalysis;
     }
   ) => {
     if (!goal.trim()) {
@@ -76,6 +87,7 @@ export function useEpicSuggestions(): UseEpicSuggestionsReturn {
           targetDays: options?.targetDays,
           clarificationAnswers: options?.clarificationAnswers,
           epicContext: options?.epicContext,
+          timelineAnalysis: options?.timelineAnalysis,
         },
       });
 
