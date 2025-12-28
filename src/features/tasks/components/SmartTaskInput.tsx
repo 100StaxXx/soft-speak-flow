@@ -710,7 +710,22 @@ export function SmartTaskInput({
             className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg mx-1"
           >
             <Mic className="w-4 h-4 text-primary shrink-0" />
-            <span className="flex-1 text-sm text-foreground">{voicePreview}</span>
+            <input
+              type="text"
+              value={voicePreview}
+              onChange={(e) => setVoicePreview(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  confirmVoicePreview();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  discardVoicePreview();
+                }
+              }}
+              autoFocus
+              className="flex-1 text-sm text-foreground bg-transparent border-none outline-none focus:ring-0"
+            />
             <Button 
               size="sm" 
               variant="ghost" 
