@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useMicrophonePermission, PermissionStatus } from './useMicrophonePermission';
 
 // Web Speech API types (not globally available in all TS configs)
 interface SpeechRecognitionResult {
@@ -45,25 +46,30 @@ interface UseVoiceInputOptions {
   onInterimResult?: (text: string) => void;
   onFinalResult?: (text: string) => void;
   onError?: (error: string) => void;
+  onPermissionNeeded?: () => void;
   language?: string;
 }
 
 interface UseVoiceInputReturn {
   isRecording: boolean;
   isSupported: boolean;
+  permissionStatus: PermissionStatus;
   startRecording: () => void;
   stopRecording: () => void;
   toggleRecording: () => void;
+  requestPermission: () => Promise<PermissionStatus>;
 }
 
 export function useVoiceInput({
   onInterimResult,
   onFinalResult,
   onError,
+  onPermissionNeeded,
   language = 'en-US',
 }: UseVoiceInputOptions = {}): UseVoiceInputReturn {
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const { status: permissionStatus, requestPermission, checkPermission } = useMicrophonePermission();
   
   // Check for Web Speech API support
   const isSupported = typeof window !== 'undefined' && 
@@ -125,10 +131,27 @@ export function useVoiceInput({
     return recognition;
   }, [isSupported, language, onInterimResult, onFinalResult, onError]);
 
-  const startRecording = useCallback(() => {
+  const startRecording = useCallback(async () => {
     if (!isSupported) {
       onError?.('Speech recognition is not supported in this browser.');
       return;
+    }
+
+    // Check permission status first
+    const currentStatus = await checkPermission();
+    
+    if (currentStatus === 'denied' || currentStatus === 'unsupported') {
+      onPermissionNeeded?.();
+      return;
+    }
+
+    if (currentStatus === 'prompt') {
+      // Request permission first
+      const newStatus = await requestPermission();
+      if (newStatus !== 'granted') {
+        onPermissionNeeded?.();
+        return;
+      }
     }
     
     recognitionRef.current = createRecognition();
@@ -141,7 +164,7 @@ export function useVoiceInput({
         onError?.('Failed to start recording. Please try again.');
       }
     }
-  }, [isSupported, createRecognition, onError]);
+  }, [isSupported, createRecognition, onError, checkPermission, requestPermission, onPermissionNeeded]);
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
@@ -171,8 +194,10 @@ export function useVoiceInput({
   return {
     isRecording,
     isSupported,
+    permissionStatus,
     startRecording,
     stopRecording,
     toggleRecording,
+    requestPermission,
   };
 }
