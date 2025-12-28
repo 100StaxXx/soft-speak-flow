@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { parseISO, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -295,7 +296,7 @@ export const GlobalSearch = ({
                             <div className="flex-1">
                               <h4 className="font-semibold mb-1">{task.task_text}</h4>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>{new Date(task.task_date).toLocaleDateString()}</span>
+                                <span>{format(parseISO(task.task_date), 'MMM d, yyyy')}</span>
                                 {task.scheduled_time && (
                                   <>
                                     <span>•</span>
@@ -443,7 +444,7 @@ export const GlobalSearch = ({
                     <div className="flex-1">
                       <h4 className="font-semibold mb-1">{task.task_text}</h4>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{new Date(task.task_date).toLocaleDateString()}</span>
+                        <span>{format(parseISO(task.task_date), 'MMM d, yyyy')}</span>
                         {task.scheduled_time && (
                           <>
                             <span>•</span>
