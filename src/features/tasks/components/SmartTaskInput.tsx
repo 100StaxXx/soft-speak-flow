@@ -39,7 +39,7 @@ import { ParsedBadge } from './ParsedBadge';
 import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
 import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { Leaf } from 'lucide-react';
 
@@ -339,10 +339,12 @@ export function SmartTaskInput({
   }> = [];
 
   if (parsed?.scheduledDate) {
+    // Use parseISO to avoid timezone issues with date-only strings
+    const dateForDisplay = parseISO(parsed.scheduledDate);
     badges.push({
       key: 'date',
       icon: Calendar,
-      label: format(new Date(parsed.scheduledDate), 'MMM d'),
+      label: format(dateForDisplay, 'MMM d'),
       color: 'text-blue-500 bg-blue-500/10 border-blue-500/30',
       onRemove: clearDate,
     });
