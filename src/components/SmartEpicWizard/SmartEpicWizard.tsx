@@ -35,8 +35,10 @@ import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion, type ClarificationAnswers } from '@/hooks/useEpicSuggestions';
 import { useEpicTemplates, EpicTemplate } from '@/hooks/useEpicTemplates';
 import { useUserAIContext } from '@/hooks/useUserAIContext';
+import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { SuggestionCard } from './SuggestionCard';
+import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { StoryStep, themeColors } from './StoryStep';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
@@ -95,6 +97,9 @@ export function SmartEpicWizard({
   
   // Get learned preferences from AI context
   const { preferences, isAtEpicLimit, capacityWarning } = useUserAIContext();
+  
+  // AI interaction tracking for learning from user actions
+  const { trackInteraction } = useAIInteractionTracker();
   
   // Calculate target days from clarification answers (exam_date or target_date), learned preferences, or defaults
   const calculatedTargetDays = useMemo(() => {
@@ -265,6 +270,20 @@ export function SmartEpicWizard({
       custom_days: h.customDays || [],
     }));
 
+    // Track AI interaction - user accepted epic suggestions
+    trackInteraction({
+      interactionType: 'epic-creation',
+      inputText: goalInput,
+      aiResponse: { 
+        totalSuggestions: suggestions?.length || 0,
+        selectedHabits: selectedHabits.length,
+        targetDays,
+        storyType,
+      },
+      userAction: 'accepted',
+      detectedIntent: 'epic',
+    });
+
     onCreateEpic({
       title: epicTitle || goalInput,
       description: epicDescription || undefined,
@@ -276,7 +295,7 @@ export function SmartEpicWizard({
     });
 
     success();
-  }, [selectedHabits, epicTitle, goalInput, epicDescription, targetDays, storyType, themeColor, onCreateEpic, success]);
+  }, [selectedHabits, epicTitle, goalInput, epicDescription, targetDays, storyType, themeColor, onCreateEpic, success, trackInteraction, suggestions]);
 
   const handleBack = useCallback(() => {
     light();
@@ -286,6 +305,21 @@ export function SmartEpicWizard({
   }, [step, light]);
 
   const handleClose = useCallback(() => {
+    // Track AI interaction - user rejected/cancelled without creating
+    if (step !== 'goal' && suggestions && suggestions.length > 0) {
+      trackInteraction({
+        interactionType: 'epic-creation',
+        inputText: goalInput,
+        aiResponse: { 
+          totalSuggestions: suggestions.length,
+          cancelled: true,
+          step,
+        },
+        userAction: 'rejected',
+        detectedIntent: 'epic',
+      });
+    }
+    
     setStep('goal');
     setGoalMode(showTemplatesFirst ? 'template' : 'custom');
     setGoalInput(initialGoal);
@@ -298,7 +332,7 @@ export function SmartEpicWizard({
     setSelectedTemplate(null);
     resetSuggestions();
     onOpenChange(false);
-  }, [onOpenChange, resetSuggestions, initialGoal, calculatedTargetDays, showTemplatesFirst]);
+  }, [onOpenChange, resetSuggestions, initialGoal, calculatedTargetDays, showTemplatesFirst, trackInteraction, goalInput, suggestions, step]);
 
   const handleSelectTemplate = useCallback((template: EpicTemplate) => {
     incrementPopularity.mutate(template.id);
@@ -330,6 +364,16 @@ export function SmartEpicWizard({
             {step === 'review' && 'Review and customize your epic before creating'}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Capacity Warning Banner */}
+        {isAtEpicLimit && (
+          <div className="px-6 pb-2">
+            <CapacityWarningBanner
+              isAtEpicLimit={isAtEpicLimit}
+              isLoading={false}
+            />
+          </div>
+        )}
 
         {/* Progress indicator */}
         <div className="px-6 pb-4">

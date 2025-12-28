@@ -159,6 +159,9 @@ export function SmartTaskInput({
     setShowEpicWizard(true);
   };
   
+  // AI interaction tracking for learning from user actions
+  const { trackInteraction } = useAIInteractionTracker();
+  
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
       setInterimText(text);
@@ -293,6 +296,15 @@ export function SmartTaskInput({
         onSubmit(parsedTask);
       }
       
+      // Track AI interaction - user accepted brain-dump suggestions
+      trackInteraction({
+        interactionType: 'brain-dump',
+        inputText: originalBrainDump,
+        aiResponse: { extractedTasks: tasks },
+        userAction: 'accepted',
+        detectedIntent: 'brain-dump',
+      });
+      
       success();
       toast.success(`Created ${tasks.length} tasks!`);
       setShowBatchPreview(false);
@@ -321,12 +333,29 @@ export function SmartTaskInput({
 
   const handleCreateAsEpic = () => {
     medium();
+    // Track AI interaction - user accepted epic suggestion
+    trackInteraction({
+      interactionType: 'classify',
+      inputText: input,
+      aiResponse: classification ? { ...classification } : undefined,
+      userAction: 'accepted',
+      detectedIntent: 'epic',
+    });
     setShowEpicWizard(true);
   };
 
   const handleCreateAsHabit = () => {
     if (!parsed?.text.trim()) return;
     medium();
+    
+    // Track AI interaction - user accepted habit suggestion
+    trackInteraction({
+      interactionType: 'classify',
+      inputText: input,
+      aiResponse: classification ? { ...classification } : undefined,
+      userAction: 'accepted',
+      detectedIntent: 'habit',
+    });
     
     // Quick-create habit with detected text and medium difficulty
     addHabit({
@@ -388,6 +417,16 @@ export function SmartTaskInput({
 
   // Handle discarding preview
   const handlePreviewDiscard = () => {
+    // Track AI interaction - user rejected/discarded suggestion
+    if (classification) {
+      trackInteraction({
+        interactionType: 'classify',
+        inputText: voicePreview || input,
+        aiResponse: { ...classification },
+        userAction: 'rejected',
+        detectedIntent: classification.type,
+      });
+    }
     setVoicePreview(null);
     setShowPreviewCard(false);
     setSuggestedSubtasks([]);
@@ -615,6 +654,14 @@ export function SmartTaskInput({
 
   return (
     <div className="space-y-2">
+      {/* Capacity Warning Banner */}
+      <CapacityWarningBanner
+        isAtEpicLimit={capacityWarnings?.atEpicLimit}
+        isOverloaded={capacityWarnings?.overloaded}
+        suggestedWorkload={capacityWarnings?.suggestedWorkload}
+        isLoading={isClassifying}
+      />
+      
       {/* Input container with glow effect on focus */}
       <motion.div 
         className="relative group"

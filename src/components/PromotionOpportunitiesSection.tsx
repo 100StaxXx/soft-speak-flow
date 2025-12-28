@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { PromotionOpportunityCard } from './PromotionOpportunityCard';
 import { SmartEpicWizard } from './SmartEpicWizard/SmartEpicWizard';
 import { useEpics } from '@/hooks/useEpics';
 import { toast } from 'sonner';
+
+const DISMISSED_OPPORTUNITIES_KEY = 'dismissed_promotion_opportunities';
 
 interface PromotionOpportunitiesSectionProps {
   maxVisible?: number;
@@ -20,9 +22,26 @@ export const PromotionOpportunitiesSection = memo(function PromotionOpportunitie
   const { opportunities, isLoading, hasOpportunities, refetch } = usePromotionOpportunities();
   const { createEpic, isCreating } = useEpics();
   const [showAll, setShowAll] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    // Load dismissed IDs from localStorage on mount
+    try {
+      const stored = localStorage.getItem(DISMISSED_OPPORTUNITIES_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [selectedOpportunity, setSelectedOpportunity] = useState<PromotionOpportunity | null>(null);
   const [showWizard, setShowWizard] = useState(false);
+
+  // Persist dismissed IDs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(DISMISSED_OPPORTUNITIES_KEY, JSON.stringify([...dismissedIds]));
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [dismissedIds]);
 
   // Filter out dismissed opportunities
   const visibleOpportunities = opportunities.filter(
