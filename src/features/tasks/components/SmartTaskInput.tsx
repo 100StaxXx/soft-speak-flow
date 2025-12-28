@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles,
@@ -23,13 +23,15 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
-import { VoiceWaveform } from '@/components/VoiceWaveform';
+import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
+import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
+import { QuickSuggestionChips } from './QuickSuggestionChips';
+import { ParsedBadge } from './ParsedBadge';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -42,7 +44,7 @@ interface SmartTaskInputProps {
 
 export function SmartTaskInput({
   onSubmit,
-  placeholder = "Add a quest... try 'Call mom tomorrow at 3pm @phone'",
+  placeholder = "Add a quest...",
   autoFocus = false,
   disabled = false,
 }: SmartTaskInputProps) {
@@ -52,8 +54,10 @@ export function SmartTaskInput({
   const [interimText, setInterimText] = useState('');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
+  const prevParsedRef = useRef<ParsedTask | null>(null);
 
-  const { medium, success, light } = useHapticFeedback();
+  const { medium, success, light, tap } = useHapticFeedback();
   
   const { isRecording, isAutoStopping, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -62,6 +66,7 @@ export function SmartTaskInput({
     onFinalResult: (text) => {
       setInput((prev) => (prev + ' ' + text).trim());
       setInterimText('');
+      success(); // Haptic on voice result
     },
     onError: (error) => {
       toast.error(error);
@@ -70,9 +75,36 @@ export function SmartTaskInput({
       setShowPermissionDialog(true);
     },
     onAutoStopping: () => {
-      light(); // Subtle haptic when auto-stopping
+      light();
     },
   });
+
+  // Haptic feedback when new elements are parsed
+  useEffect(() => {
+    if (!parsed || !prevParsedRef.current) {
+      prevParsedRef.current = parsed;
+      return;
+    }
+    
+    const prev = prevParsedRef.current;
+    let hasNewElement = false;
+    
+    if (parsed.scheduledDate && !prev.scheduledDate) hasNewElement = true;
+    if (parsed.scheduledTime && !prev.scheduledTime) hasNewElement = true;
+    if (parsed.estimatedDuration && !prev.estimatedDuration) hasNewElement = true;
+    if (parsed.context && !prev.context) hasNewElement = true;
+    if (parsed.priority && !prev.priority) hasNewElement = true;
+    if (parsed.isTopThree && !prev.isTopThree) hasNewElement = true;
+    if (parsed.recurrencePattern && !prev.recurrencePattern) hasNewElement = true;
+    if (parsed.difficulty !== 'medium' && prev.difficulty === 'medium') hasNewElement = true;
+    if (parsed.energyLevel !== 'medium' && prev.energyLevel === 'medium') hasNewElement = true;
+    
+    if (hasNewElement) {
+      tap(); // Subtle haptic when element is parsed
+    }
+    
+    prevParsedRef.current = parsed;
+  }, [parsed, tap]);
 
   const handleRequestPermission = async () => {
     setIsRequestingPermission(true);
@@ -85,27 +117,29 @@ export function SmartTaskInput({
     }
   };
 
-  // Voice toggle with haptic feedback
   const handleVoiceToggle = useCallback(() => {
     if (isRecording) {
-      success(); // Satisfying completion haptic
+      success();
     } else {
-      medium(); // Action initiated haptic
+      medium();
     }
     toggleRecording();
   }, [isRecording, success, medium, toggleRecording]);
 
-  // Display text combines typed input with interim voice results
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
 
   const handleSubmit = () => {
     if (!parsed || !parsed.text.trim()) return;
+    success(); // Haptic on submit
+    setJustSubmitted(true);
+    setTimeout(() => setJustSubmitted(false), 300);
     onSubmit(parsed);
     reset();
     setInterimText('');
   };
 
   const handleClear = () => {
+    light();
     reset();
     setInterimText('');
   };
@@ -115,6 +149,81 @@ export function SmartTaskInput({
       e.preventDefault();
       handleSubmit();
     }
+    if (e.key === 'Escape') {
+      handleClear();
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    tap();
+    setInput(prev => `${prev} ${suggestion}`.trim());
+    inputRef.current?.focus();
+  };
+
+  // Badge removal handlers
+  const clearDate = () => {
+    tap();
+    // Remove date-related words from input
+    const datePatterns = [
+      /\b(today|tomorrow|yesterday)\b/gi,
+      /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
+      /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d+\b/gi,
+      /\b\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/g,
+    ];
+    let newInput = input;
+    datePatterns.forEach(p => newInput = newInput.replace(p, ''));
+    setInput(newInput.replace(/\s+/g, ' ').trim());
+  };
+
+  const clearTime = () => {
+    tap();
+    const timePatterns = [
+      /\b(at\s+)?\d{1,2}(:\d{2})?\s*(am|pm)?\b/gi,
+      /\b(at\s+)?\d{1,2}:\d{2}\b/gi,
+    ];
+    let newInput = input;
+    timePatterns.forEach(p => newInput = newInput.replace(p, ''));
+    setInput(newInput.replace(/\s+/g, ' ').trim());
+  };
+
+  const clearDuration = () => {
+    tap();
+    const durationPatterns = [
+      /\b(for\s+)?\d+\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)\b/gi,
+      /\b\d+h\d*m?\b/gi,
+    ];
+    let newInput = input;
+    durationPatterns.forEach(p => newInput = newInput.replace(p, ''));
+    setInput(newInput.replace(/\s+/g, ' ').trim());
+  };
+
+  const clearContext = () => {
+    tap();
+    setInput(input.replace(/@\w+/gi, '').replace(/\s+/g, ' ').trim());
+  };
+
+  const clearPriority = () => {
+    tap();
+    const priorityPatterns = [/!+\s*(urgent|important)?/gi, /\b(urgent|important)\b/gi];
+    let newInput = input;
+    priorityPatterns.forEach(p => newInput = newInput.replace(p, ''));
+    setInput(newInput.replace(/\s+/g, ' ').trim());
+  };
+
+  const clearTopThree = () => {
+    tap();
+    setInput(input.replace(/#top\s*3|#top3/gi, '').replace(/\s+/g, ' ').trim());
+  };
+
+  const clearRecurrence = () => {
+    tap();
+    const recurrencePatterns = [
+      /\bevery\s+(day|week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
+      /\b(daily|weekly|monthly)\b/gi,
+    ];
+    let newInput = input;
+    recurrencePatterns.forEach(p => newInput = newInput.replace(p, ''));
+    setInput(newInput.replace(/\s+/g, ' ').trim());
   };
 
   const showPreview = isFocused && parsed && (
@@ -136,37 +245,172 @@ export function SmartTaskInput({
   };
 
   const energyConfig = {
-    low: { icon: BatteryLow, label: 'Low Energy', color: 'text-blue-400' },
-    medium: { icon: Battery, label: 'Medium Energy', color: 'text-blue-500' },
-    high: { icon: BatteryFull, label: 'High Energy', color: 'text-blue-600' },
+    low: { icon: BatteryLow, label: 'Low Energy', color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' },
+    medium: { icon: Battery, label: 'Medium Energy', color: 'text-blue-500 bg-blue-500/10 border-blue-500/30' },
+    high: { icon: BatteryFull, label: 'High Energy', color: 'text-blue-600 bg-blue-600/10 border-blue-600/30' },
   };
+
+  // Build badges array for staggered animation
+  const badges: Array<{
+    key: string;
+    icon: typeof Calendar;
+    label: string;
+    color: string;
+    onRemove?: () => void;
+  }> = [];
+
+  if (parsed?.scheduledDate) {
+    badges.push({
+      key: 'date',
+      icon: Calendar,
+      label: format(new Date(parsed.scheduledDate), 'MMM d'),
+      color: 'text-blue-500 bg-blue-500/10 border-blue-500/30',
+      onRemove: clearDate,
+    });
+  }
+
+  if (parsed?.scheduledTime) {
+    badges.push({
+      key: 'time',
+      icon: Clock,
+      label: parsed.scheduledTime,
+      color: 'text-purple-500 bg-purple-500/10 border-purple-500/30',
+      onRemove: clearTime,
+    });
+  }
+
+  if (parsed?.estimatedDuration) {
+    badges.push({
+      key: 'duration',
+      icon: Timer,
+      label: parsed.estimatedDuration >= 60 
+        ? `${Math.floor(parsed.estimatedDuration / 60)}h${parsed.estimatedDuration % 60 ? ` ${parsed.estimatedDuration % 60}m` : ''}`
+        : `${parsed.estimatedDuration}m`,
+      color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/30',
+      onRemove: clearDuration,
+    });
+  }
+
+  if (parsed?.difficulty && parsed.difficulty !== 'medium') {
+    badges.push({
+      key: 'difficulty',
+      icon: difficultyConfig[parsed.difficulty].icon,
+      label: difficultyConfig[parsed.difficulty].label,
+      color: difficultyConfig[parsed.difficulty].color,
+    });
+  }
+
+  if (parsed?.priority) {
+    badges.push({
+      key: 'priority',
+      icon: AlertTriangle,
+      label: parsed.priority === 'urgent-important' ? 'Urgent & Important' :
+             parsed.priority === 'urgent-not-important' ? 'Urgent' :
+             parsed.priority === 'not-urgent-important' ? 'Important' : '',
+      color: 'text-orange-500 bg-orange-500/10 border-orange-500/30',
+      onRemove: clearPriority,
+    });
+  }
+
+  if (parsed?.isTopThree) {
+    badges.push({
+      key: 'top3',
+      icon: Star,
+      label: 'Top 3',
+      color: 'text-stardust-gold bg-stardust-gold/20 border-stardust-gold/40',
+      onRemove: clearTopThree,
+    });
+  }
+
+  if (parsed?.context) {
+    badges.push({
+      key: 'context',
+      icon: MapPin,
+      label: `@${parsed.context}`,
+      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30',
+      onRemove: clearContext,
+    });
+  }
+
+  if (parsed?.recurrencePattern) {
+    badges.push({
+      key: 'recurrence',
+      icon: Repeat,
+      label: parsed.recurrencePattern,
+      color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/30',
+      onRemove: clearRecurrence,
+    });
+  }
+
+  if (parsed?.energyLevel && parsed.energyLevel !== 'medium') {
+    badges.push({
+      key: 'energy',
+      icon: energyConfig[parsed.energyLevel].icon,
+      label: energyConfig[parsed.energyLevel].label,
+      color: energyConfig[parsed.energyLevel].color,
+    });
+  }
+
+  const showTypewriter = isFocused && !input && !isRecording;
 
   return (
     <div className="space-y-2">
-      <div className="relative group">
+      {/* Input container with glow effect on focus */}
+      <motion.div 
+        className="relative group"
+        animate={justSubmitted ? { scale: [1, 0.98, 1] } : {}}
+        transition={{ duration: 0.2 }}
+      >
+        {/* Glow effect */}
+        <AnimatePresence>
+          {isFocused && !isRecording && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg blur-sm -z-10"
+            />
+          )}
+        </AnimatePresence>
+        
         <div className="absolute left-3 top-1/2 -translate-y-1/2">
-          <Sparkles className={cn(
-            "h-4 w-4 transition-all duration-300",
-            isRecording ? "text-destructive scale-110" : isFocused ? "text-primary" : "text-muted-foreground"
-          )} />
+          <motion.div
+            animate={isFocused ? { rotate: [0, 15, -15, 0] } : {}}
+            transition={{ duration: 0.5 }}
+          >
+            <Sparkles className={cn(
+              "h-4 w-4 transition-all duration-300",
+              isRecording ? "text-destructive scale-110" : isFocused ? "text-primary" : "text-muted-foreground"
+            )} />
+          </motion.div>
         </div>
         
-        <Input
-          ref={inputRef}
-          value={displayText}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-          placeholder={isRecording ? "Listening..." : placeholder}
-          autoFocus={autoFocus}
-          disabled={disabled}
-          className={cn(
-            "pl-10 pr-28 transition-all duration-300",
-            isRecording && "border-destructive/50 ring-2 ring-destructive/20 bg-destructive/5",
-            isFocused && !isRecording && "ring-2 ring-primary/20"
+        {/* Custom input with typewriter placeholder */}
+        <div className="relative">
+          <Input
+            ref={inputRef}
+            value={displayText}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+            placeholder={isRecording ? "Listening..." : (showTypewriter ? '' : placeholder)}
+            autoFocus={autoFocus}
+            disabled={disabled}
+            className={cn(
+              "pl-10 pr-28 transition-all duration-300",
+              isRecording && "border-destructive/50 ring-2 ring-destructive/20 bg-destructive/5",
+              isFocused && !isRecording && "ring-2 ring-primary/20"
+            )}
+          />
+          
+          {/* Typewriter placeholder overlay */}
+          {showTypewriter && (
+            <div className="absolute left-10 top-1/2 -translate-y-1/2 pointer-events-none text-sm">
+              <TypewriterPlaceholder isActive={showTypewriter} />
+            </div>
           )}
-        />
+        </div>
 
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {/* Voice Input Button */}
@@ -195,138 +439,92 @@ export function SmartTaskInput({
           )}
           
           {/* Clear Button */}
-          {(input.trim() || interimText) && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              className="h-7 px-2 text-muted-foreground hover:text-foreground animate-in fade-in zoom-in-95 duration-150"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+          <AnimatePresence>
+            {(input.trim() || interimText) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClear}
+                  className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           {/* Submit Button */}
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSubmit}
-            disabled={disabled || !parsed?.text.trim()}
-            className={cn(
-              "h-7 px-3 transition-all duration-200",
-              parsed?.text.trim() && "shadow-md hover:shadow-lg hover:scale-105"
-            )}
+          <motion.div
+            animate={parsed?.text.trim() ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <Send className="h-4 w-4" />
-          </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSubmit}
+              disabled={disabled || !parsed?.text.trim()}
+              className={cn(
+                "h-7 px-3 transition-all duration-200",
+                parsed?.text.trim() && "shadow-md hover:shadow-lg hover:scale-105"
+              )}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Smart Preview */}
-      {showPreview && (
-        <div className="flex flex-wrap gap-1.5 px-1 animate-in fade-in slide-in-from-top-1 duration-200">
-          {/* Cleaned text preview */}
-          {parsed.text !== input && (
-            <Badge variant="outline" className="text-xs gap-1 bg-primary/5 border-primary/20">
-              <Sparkles className="h-3 w-3 text-primary" />
-              {parsed.text.length > 30 ? parsed.text.slice(0, 30) + '...' : parsed.text}
-            </Badge>
-          )}
+      {/* Quick Suggestion Chips */}
+      <AnimatePresence>
+        {isFocused && !isRecording && (
+          <QuickSuggestionChips 
+            onSuggestionClick={handleSuggestionClick}
+            currentInput={input}
+            className="px-1"
+          />
+        )}
+      </AnimatePresence>
 
-          {/* Date */}
-          {parsed.scheduledDate && (
-            <Badge variant="outline" className="text-xs gap-1 bg-blue-500/10 border-blue-500/30 text-blue-500">
-              <Calendar className="h-3 w-3" />
-              {format(new Date(parsed.scheduledDate), 'MMM d')}
-            </Badge>
-          )}
+      {/* Smart Preview with staggered badges */}
+      <AnimatePresence>
+        {showPreview && badges.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-wrap gap-1.5 px-1 overflow-hidden"
+          >
+            {/* Cleaned text preview */}
+            {parsed.text !== input && parsed.text.length > 0 && (
+              <ParsedBadge
+                index={0}
+                icon={Sparkles}
+                label={parsed.text.length > 30 ? parsed.text.slice(0, 30) + '...' : parsed.text}
+                colorClass="text-primary bg-primary/5 border-primary/20"
+              />
+            )}
+            
+            {badges.map((badge, index) => (
+              <ParsedBadge
+                key={badge.key}
+                index={index + (parsed.text !== input ? 1 : 0)}
+                icon={badge.icon}
+                label={badge.label}
+                colorClass={badge.color}
+                onRemove={badge.onRemove}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Time */}
-          {parsed.scheduledTime && (
-            <Badge variant="outline" className="text-xs gap-1 bg-purple-500/10 border-purple-500/30 text-purple-500">
-              <Clock className="h-3 w-3" />
-              {parsed.scheduledTime}
-            </Badge>
-          )}
-
-          {/* Duration */}
-          {parsed.estimatedDuration && (
-            <Badge variant="outline" className="text-xs gap-1 bg-cyan-500/10 border-cyan-500/30 text-cyan-500">
-              <Timer className="h-3 w-3" />
-              {parsed.estimatedDuration >= 60 
-                ? `${Math.floor(parsed.estimatedDuration / 60)}h${parsed.estimatedDuration % 60 ? ` ${parsed.estimatedDuration % 60}m` : ''}`
-                : `${parsed.estimatedDuration}m`
-              }
-            </Badge>
-          )}
-
-          {/* Difficulty (only if not medium) */}
-          {parsed.difficulty !== 'medium' && (
-            <Badge variant="outline" className={cn("text-xs gap-1 border", difficultyConfig[parsed.difficulty].color)}>
-              {(() => {
-                const Icon = difficultyConfig[parsed.difficulty].icon;
-                return <Icon className="h-3 w-3" />;
-              })()}
-              {difficultyConfig[parsed.difficulty].label}
-            </Badge>
-          )}
-
-          {/* Priority */}
-          {parsed.priority && (
-            <Badge variant="outline" className="text-xs gap-1 bg-orange-500/10 border-orange-500/30 text-orange-500">
-              <AlertTriangle className="h-3 w-3" />
-              {parsed.priority === 'urgent-important' ? 'Urgent & Important' :
-               parsed.priority === 'urgent-not-important' ? 'Urgent' :
-               parsed.priority === 'not-urgent-important' ? 'Important' : ''}
-            </Badge>
-          )}
-
-          {/* Top 3 */}
-          {parsed.isTopThree && (
-            <Badge variant="outline" className="text-xs gap-1 bg-stardust-gold/20 border-stardust-gold/40 text-stardust-gold">
-              <Star className="h-3 w-3 fill-current" />
-              Top 3
-            </Badge>
-          )}
-
-          {/* Context */}
-          {parsed.context && (
-            <Badge variant="outline" className="text-xs gap-1 bg-emerald-500/10 border-emerald-500/30 text-emerald-500">
-              <MapPin className="h-3 w-3" />
-              @{parsed.context}
-            </Badge>
-          )}
-
-          {/* Recurrence */}
-          {parsed.recurrencePattern && (
-            <Badge variant="outline" className="text-xs gap-1 bg-indigo-500/10 border-indigo-500/30 text-indigo-500">
-              <Repeat className="h-3 w-3" />
-              {parsed.recurrencePattern}
-            </Badge>
-          )}
-
-          {/* Energy (only if not medium) */}
-          {parsed.energyLevel !== 'medium' && (
-            <Badge variant="outline" className={cn("text-xs gap-1 bg-background border-border", energyConfig[parsed.energyLevel].color)}>
-              {(() => {
-                const Icon = energyConfig[parsed.energyLevel].icon;
-                return <Icon className="h-3 w-3" />;
-              })()}
-              {energyConfig[parsed.energyLevel].label}
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Hint text */}
-      {isFocused && !input && !isRecording && (
-        <p className="text-xs text-muted-foreground px-1 animate-in fade-in slide-in-from-bottom-1 duration-300">
-          Try: "Meeting with John tomorrow at 2pm for 1h @work" or tap 🎤 to speak
-        </p>
-      )}
-
-      {/* Recording indicator with waveform effect */}
+      {/* Recording indicator with real audio waveform */}
       <AnimatePresence>
         {isRecording && (
           <motion.div 
@@ -335,7 +533,7 @@ export function SmartTaskInput({
             exit={{ opacity: 0, y: -5 }}
             className="flex items-center gap-3 px-1"
           >
-            <VoiceWaveform isActive={isRecording && !isAutoStopping} barCount={7} />
+            <AudioReactiveWaveform isActive={isRecording && !isAutoStopping} barCount={7} />
             <motion.p 
               className={cn(
                 "text-xs transition-colors",
