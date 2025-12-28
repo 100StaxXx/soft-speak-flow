@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Calendar, 
@@ -21,7 +21,8 @@ import {
   Mic,
   ChevronDown,
   Loader2,
-  Wand2
+  Wand2,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ import { format, parseISO } from 'date-fns';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { SuggestedSubtask } from '@/hooks/useTaskDecomposition';
 import { SubtaskPreviewList } from './SubtaskPreviewList';
+import { useIntentClassifier } from '@/hooks/useIntentClassifier';
 
 interface TaskPreviewCardProps {
   parsed: ParsedTask;
@@ -43,6 +45,8 @@ interface TaskPreviewCardProps {
   isBreakingDown?: boolean;
   suggestedSubtasks?: SuggestedSubtask[];
   onSubtasksChange?: (subtasks: SuggestedSubtask[]) => void;
+  // Epic flow props
+  onCreateAsEpic?: (answers?: Record<string, string | number>) => void;
   className?: string;
 }
 
@@ -122,9 +126,45 @@ export function TaskPreviewCard({
   isBreakingDown = false,
   suggestedSubtasks,
   onSubtasksChange,
+  onCreateAsEpic,
   className
 }: TaskPreviewCardProps) {
   const [isSubtasksExpanded, setIsSubtasksExpanded] = useState(true);
+  
+  // Epic detection for big goals
+  const {
+    classify,
+    isClassifying: isCheckingEpic,
+    needsEpicClarification,
+    epicClarifyingQuestions,
+    isEpicDetected,
+    reset: resetClassification
+  } = useIntentClassifier({ debounceMs: 0, minInputLength: 10 });
+  
+  const [hasCheckedEpic, setHasCheckedEpic] = useState(false);
+  const [showEpicPrompt, setShowEpicPrompt] = useState(false);
+  
+  // Check for epic on mount
+  useEffect(() => {
+    const textToCheck = parsed.text || rawInput;
+    if (textToCheck && !hasCheckedEpic && looksLikeBigGoal(textToCheck, parsed.estimatedDuration, parsed.scheduledDate)) {
+      classify(textToCheck);
+      setHasCheckedEpic(true);
+    }
+  }, [parsed.text, rawInput, hasCheckedEpic, classify, parsed.estimatedDuration, parsed.scheduledDate]);
+  
+  // Show epic prompt when detection completes
+  useEffect(() => {
+    if (hasCheckedEpic && !isCheckingEpic && (isEpicDetected || needsEpicClarification)) {
+      setShowEpicPrompt(true);
+    }
+  }, [hasCheckedEpic, isCheckingEpic, isEpicDetected, needsEpicClarification]);
+  
+  const handleCreateAsEpic = () => {
+    if (onCreateAsEpic) {
+      onCreateAsEpic();
+    }
+  };
   
   const difficultyConfig = {
     easy: { icon: Zap, label: 'Easy', color: 'text-green-500 bg-green-500/10' },
@@ -279,9 +319,51 @@ export function TaskPreviewCard({
         </div>
       )}
 
-      {/* Breakdown Prompt */}
+      {/* Epic Detection Prompt */}
       <AnimatePresence>
-        {showBreakdownPrompt && (
+        {showEpicPrompt && onCreateAsEpic && !hasSubtasks && !isBreakingDown && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-3"
+          >
+            <div className="flex flex-col gap-2 p-3 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-foreground">
+                  This looks like a bigger goal!
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground pl-6">
+                Create as an Epic to track progress with habits and milestones
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Button
+                  size="sm"
+                  onClick={handleCreateAsEpic}
+                  className="h-7 text-xs gap-1.5"
+                >
+                  <Target className="w-3 h-3" />
+                  Create as Epic
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowEpicPrompt(false)}
+                  className="h-7 text-xs text-muted-foreground"
+                >
+                  Just a task
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Breakdown Prompt - Only show if not showing epic prompt */}
+      <AnimatePresence>
+        {showBreakdownPrompt && !showEpicPrompt && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -292,7 +374,7 @@ export function TaskPreviewCard({
               <div className="flex items-center gap-2">
                 <Wand2 className="w-4 h-4 text-primary" />
                 <span className="text-sm text-foreground">
-                  This looks like a big goal!
+                  Break into steps?
                 </span>
               </div>
               <Button

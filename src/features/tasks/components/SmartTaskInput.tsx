@@ -950,6 +950,12 @@ export function SmartTaskInput({
             isBreakingDown={isBreakingDown}
             suggestedSubtasks={suggestedSubtasks}
             onSubtasksChange={setSuggestedSubtasks}
+            onCreateAsEpic={() => {
+              setShowPreviewCard(false);
+              setInput(voicePreview);
+              setVoicePreview(null);
+              setShowEpicWizard(true);
+            }}
             className="mx-1"
           />
         )}
