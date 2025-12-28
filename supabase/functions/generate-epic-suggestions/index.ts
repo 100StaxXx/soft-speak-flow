@@ -130,6 +130,9 @@ Rules:
 7. For habits, suggest frequency (daily, weekly, or specific days)
 8. For milestones, suggest which week they should be completed by
 9. If user specified hours per day, ensure total habit time ≤ that amount
+10. IMPORTANT: Even if the timeline seems aggressive, ALWAYS provide helpful suggestions. Adapt the plan to what CAN be accomplished in the given timeframe. Never refuse to provide suggestions.
+
+CRITICAL: You MUST ALWAYS respond with valid JSON. Never refuse or explain - just provide the best possible plan for the given constraints.
 
 Return a JSON object with this exact structure:
 {
@@ -233,7 +236,56 @@ Generate practical, specific suggestions that will help achieve this goal. Make 
       }));
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, content);
-      throw new Error('Failed to parse AI suggestions');
+      
+      // If AI refused or returned non-JSON, provide fallback suggestions
+      console.log('Providing fallback suggestions due to parse failure');
+      suggestions = [
+        {
+          id: `habit-${Date.now()}-1`,
+          title: 'Daily research & planning',
+          type: 'habit',
+          description: 'Spend time researching requirements and planning next steps',
+          frequency: 'daily',
+          difficulty: 'easy',
+          category: 'planning',
+        },
+        {
+          id: `habit-${Date.now()}-2`,
+          title: 'Take action on one task',
+          type: 'habit',
+          description: 'Complete at least one concrete action toward your goal',
+          frequency: 'daily',
+          difficulty: 'medium',
+          category: 'action',
+        },
+        {
+          id: `milestone-${Date.now()}-1`,
+          title: 'Complete initial research',
+          type: 'milestone',
+          description: 'Understand all requirements and create a detailed plan',
+          difficulty: 'easy',
+          suggestedWeek: 1,
+          category: 'planning',
+        },
+        {
+          id: `milestone-${Date.now()}-2`,
+          title: 'Reach halfway point',
+          type: 'milestone',
+          description: 'Complete 50% of the major tasks for this goal',
+          difficulty: 'medium',
+          suggestedWeek: Math.ceil((targetDays || 30) / 14),
+          category: 'progress',
+        },
+        {
+          id: `milestone-${Date.now()}-3`,
+          title: 'Final preparation',
+          type: 'milestone',
+          description: 'Complete final steps and prepare for goal completion',
+          difficulty: 'hard',
+          suggestedWeek: Math.ceil((targetDays || 30) / 7),
+          category: 'completion',
+        },
+      ] as EpicSuggestion[];
     }
 
     console.log(`Generated ${suggestions.length} suggestions for goal: ${goal}`);
