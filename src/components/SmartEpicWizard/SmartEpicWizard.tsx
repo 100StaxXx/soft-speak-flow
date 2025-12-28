@@ -32,11 +32,12 @@ import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion } from '@/hooks/useEpicSuggestions';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { SuggestionCard } from './SuggestionCard';
+import { StoryStep, themeColors } from './StoryStep';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
-type WizardStep = 'goal' | 'suggestions' | 'review';
+type WizardStep = 'goal' | 'suggestions' | 'story' | 'review';
 
 interface SmartEpicWizardProps {
   open: boolean;
@@ -53,8 +54,11 @@ interface SmartEpicWizardProps {
     }>;
     is_public?: boolean;
     story_type_slug?: StoryTypeSlug;
+    theme_color?: string;
   }) => void;
   isCreating: boolean;
+  initialGoal?: string;
+  initialTargetDays?: number;
 }
 
 export function SmartEpicWizard({
@@ -62,14 +66,17 @@ export function SmartEpicWizard({
   onOpenChange,
   onCreateEpic,
   isCreating,
+  initialGoal = '',
+  initialTargetDays,
 }: SmartEpicWizardProps) {
   const [step, setStep] = useState<WizardStep>('goal');
-  const [goalInput, setGoalInput] = useState('');
-  const [targetDays, setTargetDays] = useState(30);
+  const [goalInput, setGoalInput] = useState(initialGoal);
+  const [targetDays, setTargetDays] = useState(initialTargetDays || 30);
   const [epicTitle, setEpicTitle] = useState('');
   const [epicDescription, setEpicDescription] = useState('');
   const [customHabits, setCustomHabits] = useState<EpicSuggestion[]>([]);
-
+  const [storyType, setStoryType] = useState<StoryTypeSlug | null>(null);
+  const [themeColor, setThemeColor] = useState(themeColors[0].value);
   const { medium, success, light, tap } = useHapticFeedback();
   const {
     suggestions,
@@ -121,15 +128,21 @@ export function SmartEpicWizard({
     success();
   }, [goalInput, targetDays, generateSuggestions, tap, success]);
 
-  const handleProceedToReview = useCallback(() => {
+  const handleProceedToStory = useCallback(() => {
     if (selectedSuggestions.length === 0) return;
     // Auto-fill epic title from goal if not set
     if (!epicTitle) {
       setEpicTitle(goalInput);
     }
-    setStep('review');
+    setStep('story');
     medium();
   }, [selectedSuggestions.length, epicTitle, goalInput, medium]);
+
+  const handleProceedToReview = useCallback(() => {
+    if (!storyType) return;
+    setStep('review');
+    medium();
+  }, [storyType, medium]);
 
   const handleCreateEpic = useCallback(() => {
     if (selectedHabits.length === 0) return;
@@ -147,27 +160,32 @@ export function SmartEpicWizard({
       target_days: targetDays,
       habits,
       is_public: true,
+      story_type_slug: storyType || undefined,
+      theme_color: themeColor,
     });
 
     success();
-  }, [selectedHabits, epicTitle, goalInput, epicDescription, targetDays, onCreateEpic, success]);
+  }, [selectedHabits, epicTitle, goalInput, epicDescription, targetDays, storyType, themeColor, onCreateEpic, success]);
 
   const handleBack = useCallback(() => {
     light();
     if (step === 'suggestions') setStep('goal');
-    else if (step === 'review') setStep('suggestions');
+    else if (step === 'story') setStep('suggestions');
+    else if (step === 'review') setStep('story');
   }, [step, light]);
 
   const handleClose = useCallback(() => {
     setStep('goal');
-    setGoalInput('');
-    setTargetDays(30);
+    setGoalInput(initialGoal);
+    setTargetDays(initialTargetDays || 30);
     setEpicTitle('');
     setEpicDescription('');
     setCustomHabits([]);
+    setStoryType(null);
+    setThemeColor(themeColors[0].value);
     resetSuggestions();
     onOpenChange(false);
-  }, [onOpenChange, resetSuggestions]);
+  }, [onOpenChange, resetSuggestions, initialGoal, initialTargetDays]);
 
   const handleVoiceToggle = useCallback(() => {
     if (isRecording) {
@@ -189,6 +207,7 @@ export function SmartEpicWizard({
           <DialogDescription>
             {step === 'goal' && 'Tell us your goal and we\'ll help you build the perfect epic'}
             {step === 'suggestions' && 'Select the habits and milestones that work for you'}
+            {step === 'story' && 'Choose your narrative adventure style'}
             {step === 'review' && 'Review and customize your epic before creating'}
           </DialogDescription>
         </DialogHeader>
@@ -196,8 +215,8 @@ export function SmartEpicWizard({
         {/* Progress indicator */}
         <div className="px-6 pb-4">
           <div className="flex items-center gap-2">
-            {(['goal', 'suggestions', 'review'] as const).map((s, i) => {
-              const steps: readonly WizardStep[] = ['goal', 'suggestions', 'review'];
+            {(['goal', 'suggestions', 'story', 'review'] as const).map((s, i) => {
+              const steps: readonly WizardStep[] = ['goal', 'suggestions', 'story', 'review'];
               const currentIndex = steps.indexOf(step);
               return (
                 <div key={s} className="flex items-center">
@@ -217,10 +236,10 @@ export function SmartEpicWizard({
                       i + 1
                     )}
                   </div>
-                  {i < 2 && (
+                  {i < 3 && (
                     <div
                       className={cn(
-                        'w-8 h-0.5 mx-1',
+                        'w-6 h-0.5 mx-1',
                         currentIndex > i
                           ? 'bg-primary'
                           : 'bg-muted'
@@ -406,7 +425,7 @@ export function SmartEpicWizard({
                 {/* Actions */}
                 <div className="p-6 pt-4 border-t bg-background space-y-3">
                   <Button
-                    onClick={handleProceedToReview}
+                    onClick={handleProceedToStory}
                     disabled={selectedSuggestions.length === 0}
                     className="w-full"
                   >
@@ -421,7 +440,20 @@ export function SmartEpicWizard({
               </motion.div>
             )}
 
-            {/* Step 3: Review */}
+            {/* Step 3: Story & Theme */}
+            {step === 'story' && (
+              <StoryStep
+                storyType={storyType}
+                themeColor={themeColor}
+                targetDays={targetDays}
+                onStoryTypeChange={setStoryType}
+                onThemeColorChange={setThemeColor}
+                onContinue={handleProceedToReview}
+                onBack={handleBack}
+              />
+            )}
+
+            {/* Step 4: Review */}
             {step === 'review' && (
               <motion.div
                 key="review"
@@ -543,7 +575,7 @@ export function SmartEpicWizard({
                   </Button>
                   <Button variant="ghost" onClick={handleBack} className="w-full">
                     <ChevronLeft className="w-4 h-4 mr-1" />
-                    Back to Suggestions
+                    Back to Story
                   </Button>
                 </div>
               </motion.div>
