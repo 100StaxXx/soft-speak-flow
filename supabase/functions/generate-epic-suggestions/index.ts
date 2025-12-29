@@ -5,6 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Normalize difficulty values to valid database enum values
+function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
+  if (typeof value !== 'string') return 'medium';
+  const lower = value.toLowerCase().trim();
+  if (['easy', 'simple', 'beginner', 'low', '1'].includes(lower)) return 'easy';
+  if (['hard', 'difficult', 'advanced', 'high', 'challenging', '3'].includes(lower)) return 'hard';
+  return 'medium';
+}
+
 interface EpicSuggestion {
   id: string;
   title: string;
@@ -283,7 +292,7 @@ Generate practical, specific suggestions that will help achieve this goal. Make 
         description: s.description || '',
         frequency: s.frequency || 'daily',
         customDays: s.customDays,
-        difficulty: s.difficulty || 'medium',
+        difficulty: normalizeDifficulty(s.difficulty),
         suggestedWeek: s.suggestedWeek,
         category: s.category,
       }));
