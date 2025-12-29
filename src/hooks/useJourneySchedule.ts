@@ -50,10 +50,7 @@ interface GenerateScheduleParams {
   deadline: string;
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
-  timelineContext?: {
-    accelerators?: string[];
-    constraints?: string[];
-  };
+  timelineContext?: string;
 }
 
 interface AdjustScheduleParams {
