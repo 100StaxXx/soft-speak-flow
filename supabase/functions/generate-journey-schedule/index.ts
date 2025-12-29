@@ -5,6 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Normalize difficulty values to valid database enum values
+function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
+  if (typeof value !== 'string') return 'medium';
+  const lower = value.toLowerCase().trim();
+  if (['easy', 'simple', 'beginner', 'low', '1'].includes(lower)) return 'easy';
+  if (['hard', 'difficult', 'advanced', 'high', 'challenging', '3'].includes(lower)) return 'hard';
+  return 'medium';
+}
+
 interface JourneyPhase {
   id: string;
   name: string;
@@ -300,7 +309,7 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
         ...r,
         id: r.id || `ritual-${Date.now()}-${i}`,
         frequency: r.frequency || 'daily',
-        difficulty: r.difficulty || 'medium',
+        difficulty: normalizeDifficulty(r.difficulty),
       }));
       
       // Ensure suggestedChapterCount matches actual postcard milestone count
