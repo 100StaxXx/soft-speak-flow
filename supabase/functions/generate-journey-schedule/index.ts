@@ -40,6 +40,7 @@ interface ScheduleRequest {
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
   timelineContext?: string;
+  totalChapters?: number; // Number of postcard milestones to create (matches story chapters)
   adjustmentRequest?: string; // For negotiation - e.g., "make it less aggressive"
   previousSchedule?: {
     phases: JourneyPhase[];
@@ -67,7 +68,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, deadline, clarificationAnswers, epicContext, timelineContext, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
+    const { goal, deadline, clarificationAnswers, epicContext, timelineContext, totalChapters, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
 
     if (!goal || goal.trim().length < 3) {
       return new Response(
@@ -145,14 +146,25 @@ Adjust the plan based on the user's feedback while keeping the same deadline.
 `;
     }
 
+    // Default to 5 chapters if not specified
+    const chaptersToCreate = totalChapters || 5;
+    
+    // Calculate milestone percentages for even distribution
+    const milestonePercentages = Array.from({ length: chaptersToCreate }, (_, i) => 
+      Math.round(((i + 1) / chaptersToCreate) * 100)
+    );
+    
     const systemPrompt = `You are an expert goal planner who creates detailed, deadline-driven schedules. You work backwards from deadlines to create realistic phased plans.
 
 Your job is to:
 1. Assess the feasibility of the goal given the deadline
 2. Create 3-5 PHASES with specific date ranges
-3. Create 3-6 MILESTONES with target dates (mark 3-5 as "postcard milestones" for celebrations)
-4. Create 3-6 RITUALS (recurring habits)
-5. Estimate weekly time commitment
+3. Create EXACTLY ${chaptersToCreate} POSTCARD MILESTONES with target dates at these progress percentages: ${milestonePercentages.join('%, ')}%
+4. You may also create 1-3 additional non-postcard milestones as intermediate goals
+5. Create 3-6 RITUALS (recurring habits)
+6. Estimate weekly time commitment
+
+IMPORTANT: The postcard milestones represent story chapters, so you must create exactly ${chaptersToCreate} of them.
 
 For each phase, work backwards from the deadline:
 - Final Phase: Polish and prepare (last 10-15% of time)
@@ -160,7 +172,6 @@ For each phase, work backwards from the deadline:
 - First Phase: Foundation and setup (first 15-20% of time)
 
 Milestones should have actual dates, not just weeks. Spread them across phases.
-Mark key milestones (typically at 25%, 50%, 75%, and end) as postcard milestones.
 
 CRITICAL: Return ONLY valid JSON with this exact structure:
 {
@@ -220,12 +231,12 @@ ${adjustmentContext}
 Generate a phased schedule working backwards from the deadline. Make sure:
 1. All dates are between ${today} and ${deadline}
 2. Phases connect without gaps
-3. Milestones are spread across phases with real dates
-4. Mark 3-5 key milestones as postcard milestones (typically at 25%, 50%, 75%, 100% progress)
+3. Create EXACTLY ${chaptersToCreate} postcard milestones at approximately ${milestonePercentages.join('%, ')}% progress
+4. Spread milestones across phases with real dates
 5. Rituals are realistic for the available time
 ${timelineContext ? '6. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
-    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
+    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'chapters:', chaptersToCreate, 'context:', timelineContext);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -291,10 +302,39 @@ ${timelineContext ? '6. Adjust the schedule based on the user\'s context (existi
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, content);
       
-      // Provide fallback schedule
+      // Provide fallback schedule with correct number of chapters
       const phaseLength = Math.floor(daysAvailable / 3);
       const phase1End = new Date(now.getTime() + phaseLength * 24 * 60 * 60 * 1000);
       const phase2End = new Date(now.getTime() + phaseLength * 2 * 24 * 60 * 60 * 1000);
+      
+      // Generate milestones based on chaptersToCreate
+      const fallbackMilestones: JourneyMilestone[] = [];
+      for (let i = 0; i < chaptersToCreate; i++) {
+        const percent = Math.round(((i + 1) / chaptersToCreate) * 100);
+        const dayOffset = Math.floor((daysAvailable * percent) / 100);
+        const targetDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+        
+        let phaseOrder = 1;
+        let phaseName = 'Foundation';
+        if (percent > 66) {
+          phaseOrder = 3;
+          phaseName = 'Final Push';
+        } else if (percent > 33) {
+          phaseOrder = 2;
+          phaseName = 'Core Work';
+        }
+        
+        fallbackMilestones.push({
+          id: `milestone-${Date.now()}-${i}`,
+          title: i === chaptersToCreate - 1 ? 'Goal achieved!' : `Chapter ${i + 1} milestone`,
+          description: i === chaptersToCreate - 1 ? 'Successfully complete your goal' : `Complete ${percent}% of your journey`,
+          targetDate: targetDate.toISOString().split('T')[0],
+          phaseOrder,
+          phaseName,
+          isPostcardMilestone: true,
+          milestonePercent: percent,
+        });
+      }
       
       schedule = {
         feasibilityAssessment: {
@@ -329,38 +369,7 @@ ${timelineContext ? '6. Adjust the schedule based on the user\'s context (existi
             phaseOrder: 3,
           },
         ],
-        milestones: [
-          {
-            id: `milestone-${Date.now()}-1`,
-            title: 'Complete foundation',
-            description: 'Finish initial setup and planning',
-            targetDate: phase1End.toISOString().split('T')[0],
-            phaseOrder: 1,
-            phaseName: 'Foundation',
-            isPostcardMilestone: true,
-            milestonePercent: 25,
-          },
-          {
-            id: `milestone-${Date.now()}-2`,
-            title: 'Reach halfway point',
-            description: 'Complete 50% of main work',
-            targetDate: phase2End.toISOString().split('T')[0],
-            phaseOrder: 2,
-            phaseName: 'Core Work',
-            isPostcardMilestone: true,
-            milestonePercent: 50,
-          },
-          {
-            id: `milestone-${Date.now()}-3`,
-            title: 'Goal achieved!',
-            description: 'Successfully complete your goal',
-            targetDate: deadline,
-            phaseOrder: 3,
-            phaseName: 'Final Push',
-            isPostcardMilestone: true,
-            milestonePercent: 100,
-          },
-        ],
+        milestones: fallbackMilestones,
         rituals: [
           {
             id: `ritual-${Date.now()}-1`,

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, Palette } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Palette, Loader2, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StoryTypeSelector, storyTypes } from '@/components/narrative/StoryTypeSelector';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
@@ -26,6 +26,7 @@ interface StoryStepProps {
   onThemeColorChange: (color: string) => void;
   onContinue: () => void;
   onBack: () => void;
+  isLoading?: boolean;
 }
 
 export function StoryStep({
@@ -36,6 +37,7 @@ export function StoryStep({
   onThemeColorChange,
   onContinue,
   onBack,
+  isLoading = false,
 }: StoryStepProps) {
   const selectedTheme = themeColors.find(t => t.value === themeColor) || themeColors[0];
 
@@ -102,15 +104,24 @@ export function StoryStep({
       <div className="p-6 pt-4 border-t bg-background space-y-3">
         <Button
           onClick={onContinue}
-          disabled={!storyType}
+          disabled={!storyType || isLoading}
           className="w-full"
         >
-          Continue to Review
-          <ChevronRight className="w-4 h-4 ml-1" />
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Creating your plan...
+            </>
+          ) : (
+            <>
+              <Wand2 className="w-4 h-4 mr-2" />
+              Generate Smart Timeline
+            </>
+          )}
         </Button>
-        <Button variant="ghost" onClick={onBack} className="w-full">
+        <Button variant="ghost" onClick={onBack} className="w-full" disabled={isLoading}>
           <ChevronLeft className="w-4 h-4 mr-1" />
-          Back to Suggestions
+          Back
         </Button>
       </div>
     </motion.div>

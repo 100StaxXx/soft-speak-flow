@@ -39,6 +39,7 @@ import { RitualEditor } from './RitualEditor';
 import { PostcardPreview } from './PostcardPreview';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { StoryStep, themeColors } from './StoryStep';
+import { storyTypes } from '@/components/narrative/StoryTypeSelector';
 import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
 import { TimelineView } from '@/components/JourneyWizard/TimelineView';
 import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
@@ -46,7 +47,7 @@ import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
-type WizardStep = 'goal' | 'timeline' | 'suggestions' | 'story' | 'review';
+type WizardStep = 'goal' | 'story' | 'timeline' | 'suggestions' | 'review';
 
 interface PathfinderProps {
   open: boolean;
@@ -230,10 +231,25 @@ export function Pathfinder({
 
   const calculateXP = useMemo(() => targetDays * EPIC_XP_REWARDS.XP_PER_DAY, [targetDays]);
 
+  // Calculate total chapters based on story type and duration
+  const calculateTotalChapters = useCallback((storyTypeSlug: StoryTypeSlug | null) => {
+    if (!storyTypeSlug) return 5; // Default
+    const story = storyTypes.find(s => s.slug === storyTypeSlug);
+    if (!story) return 5;
+    
+    const baseChapters = story.baseChapters;
+    // Adjust based on duration
+    if (targetDays <= 14) return Math.max(3, baseChapters - 2);
+    if (targetDays <= 30) return baseChapters;
+    if (targetDays <= 60) return baseChapters + 1;
+    return baseChapters + 2;
+  }, [targetDays]);
+
   const handleGenerateTimeline = useCallback(async () => {
-    if (!goalInput.trim() || !deadline) return;
+    if (!goalInput.trim() || !deadline || !storyType) return;
     tap();
     
+    const totalChapters = calculateTotalChapters(storyType);
     const deadlineStr = format(deadline, 'yyyy-MM-dd');
     const result = await generateSchedule({
       goal: goalInput,
@@ -241,6 +257,7 @@ export function Pathfinder({
       clarificationAnswers,
       epicContext,
       timelineContext: timelineContext.trim() || undefined,
+      totalChapters,
     });
     
     // Store original rituals for reset functionality
@@ -250,7 +267,7 @@ export function Pathfinder({
     
     setStep('timeline');
     success();
-  }, [goalInput, deadline, clarificationAnswers, epicContext, timelineContext, generateSchedule, tap, success]);
+  }, [goalInput, deadline, storyType, clarificationAnswers, epicContext, timelineContext, calculateTotalChapters, generateSchedule, tap, success]);
 
   const handleAdjustSchedule = useCallback(async (feedback: string) => {
     if (!schedule || !deadline) return;
@@ -273,13 +290,15 @@ export function Pathfinder({
     medium();
   }, [schedule, medium]);
 
+  // After goal step, go to story selection
   const handleProceedToStory = useCallback(() => {
+    if (!goalInput.trim() || !deadline) return;
     if (!epicTitle) {
       setEpicTitle(goalInput);
     }
     setStep('story');
     medium();
-  }, [epicTitle, goalInput, medium]);
+  }, [goalInput, deadline, epicTitle, medium]);
 
   const handleProceedToReview = useCallback(() => {
     if (!storyType) return;
@@ -346,10 +365,11 @@ export function Pathfinder({
 
   const handleBack = useCallback(() => {
     light();
-    if (step === 'timeline') setStep('goal');
+    // New order: goal -> story -> timeline -> suggestions -> review
+    if (step === 'story') setStep('goal');
+    else if (step === 'timeline') setStep('story');
     else if (step === 'suggestions') setStep('timeline');
-    else if (step === 'story') setStep('suggestions');
-    else if (step === 'review') setStep('story');
+    else if (step === 'review') setStep('suggestions');
   }, [step, light]);
 
   const handleClose = useCallback(() => {
@@ -377,7 +397,7 @@ export function Pathfinder({
     tap();
   }, [isRecording, startRecording, stopRecording, tap]);
 
-  const steps: WizardStep[] = ['goal', 'timeline', 'suggestions', 'story', 'review'];
+  const steps: WizardStep[] = ['goal', 'story', 'timeline', 'suggestions', 'review'];
   const currentStepIndex = steps.indexOf(step);
 
   return (
@@ -390,9 +410,9 @@ export function Pathfinder({
           </DialogTitle>
           <DialogDescription>
             {step === 'goal' && 'Set your goal and deadline'}
+            {step === 'story' && 'Choose your narrative adventure style'}
             {step === 'timeline' && 'Review your personalized timeline'}
             {step === 'suggestions' && 'Confirm your rituals and milestones'}
-            {step === 'story' && 'Choose your narrative adventure style'}
             {step === 'review' && 'Review and create your campaign'}
           </DialogDescription>
         </DialogHeader>
@@ -493,24 +513,15 @@ export function Pathfinder({
                   <DeadlinePicker value={deadline} onChange={setDeadline} />
                 </div>
 
-                {/* Generate button */}
+                {/* Continue button */}
                 <Button
-                  onClick={handleGenerateTimeline}
-                  disabled={!goalInput.trim() || !deadline || isScheduleLoading}
+                  onClick={handleProceedToStory}
+                  disabled={!goalInput.trim() || !deadline}
                   className="w-full h-12 text-base"
                   size="lg"
                 >
-                  {isScheduleLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Creating your plan...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-5 h-5 mr-2" />
-                      Generate Smart Timeline
-                    </>
-                  )}
+                  <ChevronRight className="w-5 h-5 mr-2" />
+                  Choose Your Story Type
                 </Button>
 
                 {error && (
@@ -623,7 +634,7 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 4: Story & Theme */}
+            {/* Step 2: Story & Theme */}
             {step === 'story' && (
               <StoryStep
                 storyType={storyType}
@@ -631,8 +642,9 @@ export function Pathfinder({
                 targetDays={targetDays}
                 onStoryTypeChange={setStoryType}
                 onThemeColorChange={setThemeColor}
-                onContinue={handleProceedToReview}
+                onContinue={handleGenerateTimeline}
                 onBack={handleBack}
+                isLoading={isScheduleLoading}
               />
             )}
 
