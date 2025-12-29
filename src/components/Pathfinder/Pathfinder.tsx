@@ -416,7 +416,7 @@ export function Pathfinder({
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
           <AnimatePresence mode="wait">
             {/* Step 1: Goal & Deadline */}
             {step === 'goal' && (
@@ -499,7 +499,7 @@ export function Pathfinder({
                 exit={{ opacity: 0, x: -20 }}
                 className="flex flex-col h-full min-h-0"
               >
-                <div className="flex-1 overflow-y-auto px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="flex-1 overflow-y-auto px-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                   <div className="space-y-4 pb-4">
                     <TimelineView
                       feasibilityAssessment={schedule.feasibilityAssessment}
@@ -541,7 +541,7 @@ export function Pathfinder({
                 exit={{ opacity: 0, x: -20 }}
                 className="flex flex-col h-full min-h-0"
               >
-                <div className="flex-1 overflow-y-auto px-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                   <div className="space-y-4 pb-4">
                     {/* Editable Rituals */}
                     {schedule?.rituals && (
@@ -615,7 +615,7 @@ export function Pathfinder({
                 exit={{ opacity: 0, x: -20 }}
                 className="flex flex-col h-full min-h-0"
               >
-                <div className="flex-1 overflow-y-auto px-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                   <div className="space-y-4 pb-4">
                     <div className="space-y-2">
                       <Label htmlFor="epic-title">Campaign Name</Label>
