@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { 
   ChevronRight, 
@@ -6,6 +7,9 @@ import {
   Calendar,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone } from '@/hooks/useJourneySchedule';
 
@@ -15,6 +19,7 @@ interface PhaseCardProps {
   isFirst?: boolean;
   isLast?: boolean;
   onMilestoneToggle?: (milestoneId: string) => void;
+  onMilestoneDateChange?: (milestoneId: string, newDate: string) => void;
 }
 
 export function PhaseCard({ 
@@ -23,7 +28,9 @@ export function PhaseCard({
   isFirst, 
   isLast,
   onMilestoneToggle,
+  onMilestoneDateChange,
 }: PhaseCardProps) {
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const startDate = parseISO(phase.startDate);
   const endDate = parseISO(phase.endDate);
   const durationDays = differenceInDays(endDate, startDate) + 1;
@@ -80,9 +87,8 @@ export function PhaseCard({
               Milestones
             </p>
             {milestones.map(milestone => (
-              <button
+              <div
                 key={milestone.id}
-                onClick={() => onMilestoneToggle?.(milestone.id)}
                 className={cn(
                   'w-full p-2.5 rounded-lg text-left transition-all',
                   'bg-background/50 hover:bg-background/80',
@@ -94,21 +100,48 @@ export function PhaseCard({
                   {milestone.isPostcardMilestone && (
                     <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
                   )}
-                  <div className="flex-1 min-w-0">
+                  <button
+                    onClick={() => onMilestoneToggle?.(milestone.id)}
+                    className="flex-1 min-w-0 text-left"
+                  >
                     <p className="text-sm font-medium truncate">{milestone.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="w-3 h-3" />
-                      <span>{format(parseISO(milestone.targetDate), 'MMM d')}</span>
-                      {milestone.isPostcardMilestone && (
-                        <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
-                          Postcard
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  </button>
+                  <Popover 
+                    open={openPopoverId === milestone.id} 
+                    onOpenChange={(open) => setOpenPopoverId(open ? milestone.id : null)}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {format(parseISO(milestone.targetDate), 'MMM d')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <CalendarComponent
+                        mode="single"
+                        selected={parseISO(milestone.targetDate)}
+                        onSelect={(date) => {
+                          if (date) {
+                            onMilestoneDateChange?.(milestone.id, format(date, 'yyyy-MM-dd'));
+                            setOpenPopoverId(null);
+                          }
+                        }}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {milestone.isPostcardMilestone && (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 flex-shrink-0">
+                      Postcard
+                    </Badge>
+                  )}
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}

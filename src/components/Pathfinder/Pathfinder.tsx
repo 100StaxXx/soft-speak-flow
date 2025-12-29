@@ -109,7 +109,7 @@ export function Pathfinder({
   
   const { preferences, isAtEpicLimit } = useUserAIContext();
   const { trackInteraction } = useAIInteractionTracker();
-  const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, reset: resetSchedule, setRituals } = useJourneySchedule();
+  const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals } = useJourneySchedule();
   const [originalRituals, setOriginalRituals] = useState<typeof schedule.rituals>([]);
   
   const targetDays = useMemo(() => {
@@ -509,6 +509,7 @@ export function Pathfinder({
                       weeklyHoursEstimate={schedule.weeklyHoursEstimate}
                       deadline={format(deadline!, 'yyyy-MM-dd')}
                       onMilestoneToggle={toggleMilestone}
+                      onMilestoneDateChange={updateMilestoneDate}
                     />
 
                     {/* Adjustment input */}
