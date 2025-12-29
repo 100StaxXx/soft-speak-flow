@@ -11,16 +11,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { MilestoneProgress } from "./MilestoneProgress";
+import { PhaseProgressCard } from "./journey/PhaseProgressCard";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useMilestones } from "@/hooks/useMilestones";
 
 import type { StorySeed, NarrativeCheckpoint } from "@/types/narrativeTypes";
 
@@ -82,6 +84,12 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
+  const { 
+    milestonesByPhase, 
+    getCurrentPhase, 
+    getProgressToNextPostcard,
+    getJourneyHealth,
+  } = useMilestones(journey.id);
   
   const daysRemaining = Math.ceil(
     (new Date(journey.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -91,6 +99,10 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const theme = (journey.theme_color || 'heroic') as JourneyTheme;
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
+  
+  const currentPhase = getCurrentPhase();
+  const postcardProgress = getProgressToNextPostcard();
+  const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
 
   // Generate narrative checkpoints from story_seed
   const narrativeCheckpoints = useMemo((): NarrativeCheckpoint[] | undefined => {
@@ -202,6 +214,16 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           narrativeCheckpoints={narrativeCheckpoints}
         />
 
+        {/* Phase Progress (compact) */}
+        {milestonesByPhase.length > 0 && isActive && (
+          <PhaseProgressCard
+            milestonesByPhase={milestonesByPhase}
+            currentPhaseName={currentPhase}
+            compact
+            className="mb-3"
+          />
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
@@ -223,13 +245,55 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           </div>
           
           <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
-            <Zap className="w-3.5 h-3.5 text-yellow-500" />
-            <div>
-              <div className="text-[10px] text-muted-foreground">XP</div>
-              <div className="text-xs font-bold">{journey.xp_reward}</div>
-            </div>
+            {journeyHealth ? (
+              <>
+                <div className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                  journeyHealth.score === 'A' && "bg-green-500/20 text-green-500",
+                  journeyHealth.score === 'B' && "bg-blue-500/20 text-blue-500",
+                  journeyHealth.score === 'C' && "bg-amber-500/20 text-amber-500",
+                  journeyHealth.score === 'D' && "bg-orange-500/20 text-orange-500",
+                  journeyHealth.score === 'F' && "bg-red-500/20 text-red-500",
+                )}>
+                  {journeyHealth.score}
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Health</div>
+                  <div className="text-xs font-bold">
+                    {journeyHealth.progressDelta > 0 ? '+' : ''}{Math.round(journeyHealth.progressDelta)}%
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 text-yellow-500" />
+                <div>
+                  <div className="text-[10px] text-muted-foreground">XP</div>
+                  <div className="text-xs font-bold">{journey.xp_reward}</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Next Postcard Preview */}
+        {postcardProgress && postcardProgress.remaining <= 15 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-3 p-2.5 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <div className="flex-1">
+                <div className="text-xs font-medium">Next Chapter Unlocks Soon!</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {Math.round(postcardProgress.remaining)}% until "{postcardProgress.milestone.title}"
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Milestone Progress Section */}
         <div className="mb-3">
