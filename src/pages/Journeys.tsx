@@ -202,14 +202,20 @@ const Journeys = () => {
               Active Campaigns
             </h2>
             {!hasReachedLimit && (
-              <Button
-                onClick={() => setSmartWizardOpen(true)}
-                size="sm"
-                className="bg-gradient-to-r from-primary to-purple-600"
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="relative"
               >
-                <Wand2 className="w-4 h-4 mr-1" />
-                New
-              </Button>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-500 rounded-lg blur opacity-40 animate-pulse" />
+                <Button
+                  onClick={() => setSmartWizardOpen(true)}
+                  className="relative bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+                >
+                  <Wand2 className="w-4 h-4 mr-1.5" />
+                  Start Campaign
+                </Button>
+              </motion.div>
             )}
           </div>
           
@@ -221,20 +227,45 @@ const Journeys = () => {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center py-8 bg-secondary/20 rounded-xl border-2 border-dashed border-primary/20"
+              className="text-center py-12 bg-gradient-to-br from-primary/10 via-purple-500/10 to-primary/5 rounded-2xl border-2 border-primary/30 relative overflow-hidden"
             >
-              <Wand2 className="w-12 h-12 text-primary mx-auto mb-3 opacity-60" />
-              <h3 className="text-base font-semibold mb-1">No Active Campaigns</h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
-                Use Pathfinder to create a personalized campaign with daily rituals
-              </p>
-              <Button
-                onClick={() => setSmartWizardOpen(true)}
-                className="bg-gradient-to-r from-primary to-purple-600"
+              {/* Animated sparkles background */}
+              <div className="absolute inset-0 pointer-events-none">
+                <Sparkles className="absolute top-4 left-8 w-4 h-4 text-primary/40 animate-pulse" />
+                <Sparkles className="absolute top-8 right-12 w-3 h-3 text-purple-400/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                <Sparkles className="absolute bottom-6 left-16 w-3 h-3 text-primary/30 animate-pulse" style={{ animationDelay: '1s' }} />
+                <Sparkles className="absolute bottom-10 right-8 w-4 h-4 text-purple-400/30 animate-pulse" style={{ animationDelay: '0.3s' }} />
+              </div>
+              
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               >
-                <Wand2 className="w-4 h-4 mr-2" />
-                Start a Campaign
-              </Button>
+                <Wand2 className="w-16 h-16 text-primary mx-auto mb-4" />
+              </motion.div>
+              <h3 className="text-xl font-bold mb-2">Begin Your Journey</h3>
+              <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
+                Create an AI-powered campaign with personalized rituals and milestones
+              </p>
+              
+              {/* Hero CTA Button */}
+              <motion.div
+                animate={{ scale: [1, 1.02, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="relative inline-block"
+              >
+                {/* Glow effect */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-xl blur-lg opacity-50 animate-pulse" />
+                <Button
+                  onClick={() => setSmartWizardOpen(true)}
+                  size="lg"
+                  className="relative h-14 px-8 text-lg font-semibold bg-gradient-to-r from-primary via-purple-500 to-primary bg-[length:200%_100%] hover:bg-[length:100%_100%] transition-all duration-500 shadow-lg hover:shadow-primary/25"
+                >
+                  <Wand2 className="w-5 h-5 mr-2" />
+                  Start a Campaign
+                  <Sparkles className="w-4 h-4 ml-2" />
+                </Button>
+              </motion.div>
             </motion.div>
           ) : (
             <div className="space-y-4">
