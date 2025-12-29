@@ -13,7 +13,7 @@ interface CosmiqProfileSectionProps {
   };
 }
 
-// AI-generated descriptions (can be enhanced with actual generation later)
+// Auto-generated descriptions (can be enhanced with actual generation later)
 const getDescription = (planet: string, sign: string) => {
   const descriptions: Record<string, string> = {
     sun: `Your ${sign} Sun radiates your core essence - the authentic self you're growing into through every quest and challenge.`,

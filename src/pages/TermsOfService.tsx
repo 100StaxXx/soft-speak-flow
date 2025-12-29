@@ -91,10 +91,10 @@ export default function TermsOfService() {
 
             <section className="scroll-mt-20 space-y-3">
               <h2 className="text-lg sm:text-xl font-semibold text-foreground leading-snug">
-                7. AI-Generated Content
+                7. Personalized Content
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Our service uses artificial intelligence to generate personalized content, mentor responses, and companion interactions. AI-generated content is provided for informational and motivational purposes only. While we strive for accuracy and helpfulness, AI responses may not always be perfect or applicable to your specific situation.
+                Our service creates personalized content, mentor responses, and companion interactions tailored to your journey. This content is provided for informational and motivational purposes only. While we strive for accuracy and helpfulness, generated content may not always be perfect or applicable to your specific situation.
               </p>
             </section>
 

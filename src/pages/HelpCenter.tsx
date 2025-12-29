@@ -285,7 +285,7 @@ const HelpCenter = () => {
         },
         {
           title: "Placement Deep Dives",
-          content: "Tap any placement on your Horoscope page to explore its meaning in depth. Learn how each sign influences that area of your life. AI-generated insights explain what each placement means for you personally."
+          content: "Tap any placement on your Horoscope page to explore its meaning in depth. Learn how each sign influences that area of your life. Personalized insights explain what each placement means for you."
         },
         {
           title: "Daily Horoscope",
