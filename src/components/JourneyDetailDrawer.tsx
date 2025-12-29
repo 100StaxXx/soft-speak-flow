@@ -26,6 +26,7 @@ import { format, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+import { useCompanion } from "@/hooks/useCompanion";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 
 interface JourneyDetailDrawerProps {
@@ -59,6 +60,7 @@ export const JourneyDetailDrawer = ({
   } = useMilestones(epicId);
 
   const { checkMilestoneForPostcard } = useCompanionPostcards();
+  const { companion } = useCompanion();
 
   const currentPhase = getCurrentPhase();
 
@@ -70,8 +72,13 @@ export const JourneyDetailDrawer = ({
         milestoneId: milestone.id,
         epicId,
         onPostcardTrigger: (completedMilestone) => {
-          // Trigger postcard generation for postcard milestones
-          checkMilestoneForPostcard(completedMilestone.id, epicId, "", {});
+          checkMilestoneForPostcard(completedMilestone.id, epicId, companion?.id || "", {
+            spirit_animal: companion?.spirit_animal,
+            favorite_color: companion?.favorite_color,
+            core_element: companion?.core_element,
+            eye_color: companion?.eye_color,
+            fur_color: companion?.fur_color,
+          });
         },
       });
     }
