@@ -23,7 +23,8 @@ import {
   Loader2,
   Sparkles,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Brain
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -34,6 +35,7 @@ import { useMilestones } from "@/hooks/useMilestones";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { SmartRescheduleAdvisor } from "@/components/journey/SmartRescheduleAdvisor";
 
 interface RescheduleDrawerProps {
   epicId: string;
@@ -43,6 +45,7 @@ interface RescheduleDrawerProps {
   children?: React.ReactNode;
 }
 
+// Legacy quick adjustments kept as fallback
 const QUICK_ADJUSTMENTS = [
   { label: "I'm falling behind", value: "I'm falling behind schedule and need more time for each milestone" },
   { label: "Ahead of schedule", value: "I'm ahead of schedule, please compress the timeline" },
@@ -64,10 +67,12 @@ export const RescheduleDrawer = ({
     currentDeadline ? new Date(currentDeadline) : undefined
   );
   const [step, setStep] = useState<"input" | "preview" | "saving">("input");
+  const [showSmartAdvisor, setShowSmartAdvisor] = useState(true);
   
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { milestones, milestonesByPhase } = useMilestones(epicId);
+  const { milestones, milestonesByPhase, getJourneyHealth } = useMilestones(epicId);
+  const journeyHealth = getJourneyHealth();
   const { 
     schedule, 
     adjustSchedule, 
@@ -100,7 +105,13 @@ export const RescheduleDrawer = ({
   };
 
   const handleQuickAdjustment = (value: string) => {
-    setAdjustmentText(prev => prev ? `${prev}\n${value}` : value);
+    setAdjustmentText(value);
+    setShowSmartAdvisor(false);
+  };
+
+  const handleSmartAdjustment = (adjustmentText: string) => {
+    setAdjustmentText(adjustmentText);
+    setShowSmartAdvisor(false);
   };
 
   const handleGenerateNewSchedule = async () => {
@@ -186,6 +197,7 @@ export const RescheduleDrawer = ({
   const resetState = () => {
     setStep("input");
     setAdjustmentText("");
+    setShowSmartAdvisor(true);
     resetSchedule();
   };
 
@@ -208,12 +220,29 @@ export const RescheduleDrawer = ({
       </DrawerTrigger>
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader className="pb-2">
-          <DrawerTitle className="flex items-center gap-2">
-            <Wand2 className="w-5 h-5 text-primary" />
-            AI Reschedule
-          </DrawerTitle>
+          <div className="flex items-center justify-between">
+            <DrawerTitle className="flex items-center gap-2">
+              <Wand2 className="w-5 h-5 text-primary" />
+              AI Reschedule
+            </DrawerTitle>
+            {journeyHealth && (
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs",
+                  journeyHealth.score === 'A' && "border-green-500/50 text-green-500",
+                  journeyHealth.score === 'B' && "border-blue-500/50 text-blue-500",
+                  journeyHealth.score === 'C' && "border-amber-500/50 text-amber-500",
+                  (journeyHealth.score === 'D' || journeyHealth.score === 'F') && "border-red-500/50 text-red-500",
+                )}
+              >
+                <Brain className="w-3 h-3 mr-1" />
+                Health: {journeyHealth.score}
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            {step === "input" && "Tell AI how you'd like to adjust your journey"}
+            {step === "input" && "AI-powered suggestions to optimize your journey"}
             {step === "preview" && "Review and apply the new schedule"}
             {step === "saving" && "Applying changes..."}
           </p>
@@ -229,24 +258,36 @@ export const RescheduleDrawer = ({
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4 pb-4"
               >
-                {/* Quick Adjustments */}
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">
-                    Quick adjustments
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {QUICK_ADJUSTMENTS.map((adj) => (
-                      <Badge
-                        key={adj.label}
-                        variant="outline"
-                        className="cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-colors"
-                        onClick={() => handleQuickAdjustment(adj.value)}
-                      >
-                        {adj.label}
-                      </Badge>
-                    ))}
+                {/* Smart Reschedule Advisor */}
+                {showSmartAdvisor && (
+                  <SmartRescheduleAdvisor
+                    epicId={epicId}
+                    onSelectAdjustment={handleSmartAdjustment}
+                    onDismiss={() => setShowSmartAdvisor(false)}
+                    variant="inline"
+                  />
+                )}
+
+                {/* Legacy Quick Adjustments (shown when advisor is dismissed) */}
+                {!showSmartAdvisor && (
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                      Quick adjustments
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK_ADJUSTMENTS.map((adj) => (
+                        <Badge
+                          key={adj.label}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-colors"
+                          onClick={() => handleQuickAdjustment(adj.value)}
+                        >
+                          {adj.label}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Custom Adjustment Text */}
                 <div>
