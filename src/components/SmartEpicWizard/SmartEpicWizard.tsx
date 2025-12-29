@@ -490,34 +490,38 @@ export function SmartEpicWizard({
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col h-full min-h-0 max-h-[calc(90vh-220px)]"
+                className="flex flex-col h-full min-h-0"
               >
-                <TimelineView
-                  feasibilityAssessment={schedule.feasibilityAssessment}
-                  phases={schedule.phases}
-                  milestones={schedule.milestones}
-                  rituals={schedule.rituals}
-                  weeklyHoursEstimate={schedule.weeklyHoursEstimate}
-                  deadline={format(deadline!, 'yyyy-MM-dd')}
-                  onMilestoneToggle={toggleMilestone}
-                />
+                <ScrollArea className="flex-1 px-4">
+                  <div className="space-y-4 pb-4">
+                    <TimelineView
+                      feasibilityAssessment={schedule.feasibilityAssessment}
+                      phases={schedule.phases}
+                      milestones={schedule.milestones}
+                      rituals={schedule.rituals}
+                      weeklyHoursEstimate={schedule.weeklyHoursEstimate}
+                      deadline={format(deadline!, 'yyyy-MM-dd')}
+                      onMilestoneToggle={toggleMilestone}
+                    />
 
-                {/* Adjustment input */}
-                <div className="p-4 border-t">
-                  <AdjustmentInput onSubmit={handleAdjustSchedule} isLoading={isScheduleLoading} />
-                </div>
+                    {/* Adjustment input */}
+                    <div className="pt-4 border-t">
+                      <AdjustmentInput onSubmit={handleAdjustSchedule} isLoading={isScheduleLoading} />
+                    </div>
 
-                {/* Actions */}
-                <div className="p-6 pt-0 space-y-3">
-                  <Button onClick={handleProceedToSuggestions} className="w-full">
-                    Continue with this plan
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                  <Button variant="ghost" onClick={handleBack} className="w-full">
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Change goal or deadline
-                  </Button>
-                </div>
+                    {/* Actions */}
+                    <div className="space-y-3 pt-2">
+                      <Button onClick={handleProceedToSuggestions} className="w-full">
+                        Continue with this plan
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                      <Button variant="ghost" onClick={handleBack} className="w-full">
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Change goal or deadline
+                      </Button>
+                    </div>
+                  </div>
+                </ScrollArea>
               </motion.div>
             )}
 
