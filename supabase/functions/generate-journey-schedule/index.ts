@@ -39,6 +39,10 @@ interface ScheduleRequest {
   deadline: string; // ISO date string
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
+  timelineContext?: {
+    accelerators?: string[];
+    constraints?: string[];
+  };
   adjustmentRequest?: string; // For negotiation - e.g., "make it less aggressive"
   previousSchedule?: {
     phases: JourneyPhase[];
@@ -66,7 +70,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, deadline, clarificationAnswers, epicContext, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
+    const { goal, deadline, clarificationAnswers, epicContext, timelineContext, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
 
     if (!goal || goal.trim().length < 3) {
       return new Response(
@@ -109,6 +113,25 @@ ${Object.entries(clarificationAnswers)
   .map(([key, value]) => `- ${key.replace(/_/g, ' ')}: ${value}`)
   .join('\n')}
 `;
+    }
+
+    // Build timeline context for accelerators and constraints
+    let timelineContextPrompt = '';
+    if (timelineContext?.accelerators?.length || timelineContext?.constraints?.length) {
+      if (timelineContext.accelerators?.length) {
+        timelineContextPrompt += `
+EXISTING ADVANTAGES (user can progress faster):
+${timelineContext.accelerators.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+Consider skipping or shortening foundational phases. The user may be ready for intermediate/advanced work sooner.
+`;
+      }
+      if (timelineContext.constraints?.length) {
+        timelineContextPrompt += `
+CONSTRAINTS (must work around these):
+${timelineContext.constraints.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+Adjust phase timing, milestone dates, and ritual intensity to accommodate these limitations.
+`;
+      }
     }
 
     // Build adjustment context for negotiation
@@ -196,6 +219,7 @@ Today's date: ${today}
 Deadline: ${deadline} (${daysAvailable} days from now)
 ${clarificationContext}
 ${epicContext ? `Context type: ${epicContext}` : ''}
+${timelineContextPrompt}
 ${adjustmentContext}
 
 Generate a phased schedule working backwards from the deadline. Make sure:
@@ -203,9 +227,11 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 2. Phases connect without gaps
 3. Milestones are spread across phases with real dates
 4. Mark 3-5 key milestones as postcard milestones (typically at 25%, 50%, 75%, 100% progress)
-5. Rituals are realistic for the available time`;
+5. Rituals are realistic for the available time
+${timelineContext?.accelerators?.length ? '6. Consider the user\'s existing advantages when pacing the schedule - they may be able to skip basics' : ''}
+${timelineContext?.constraints?.length ? '7. Respect the user\'s constraints when scheduling phases and milestones' : ''}`;
 
-    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable);
+    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
