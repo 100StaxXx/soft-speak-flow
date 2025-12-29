@@ -6,6 +6,24 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
+// Helper to normalize difficulty values to valid database enum
+const normalizeDifficulty = (value: string): 'easy' | 'medium' | 'hard' => {
+  const lower = value?.toLowerCase()?.trim() || 'medium';
+  if (['easy', 'simple', 'beginner', 'low'].includes(lower)) return 'easy';
+  if (['hard', 'difficult', 'advanced', 'high', 'challenging'].includes(lower)) return 'hard';
+  return 'medium';
+};
+
+// Helper to normalize frequency values to valid database enum
+const normalizeFrequency = (value: string): 'daily' | '5x_week' | '3x_week' | 'custom' => {
+  const lower = value?.toLowerCase()?.trim()?.replace(/\s+/g, '_') || 'daily';
+  if (['daily', 'everyday', 'every_day', '7x_week', '7x'].includes(lower)) return 'daily';
+  if (['5x_week', '5x', 'weekdays', 'five_times', '5_times'].includes(lower)) return '5x_week';
+  if (['3x_week', '3x', 'three_times', '3_times', 'thrice'].includes(lower)) return '3x_week';
+  if (['weekly', 'biweekly', 'twice', '2x', '2x_week', 'once', '1x', 'custom', 'twice_daily'].includes(lower)) return 'custom';
+  return 'daily';
+};
+
 // Type for habits created during epic creation
 interface CreatedHabit {
   id: string;
@@ -100,6 +118,12 @@ export const useEpics = () => {
     }) => {
       if (!user) throw new Error("Not authenticated");
 
+      // Verify session is still valid before proceeding
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session || session.user.id !== user.id) {
+        throw new Error("Session expired. Please refresh and try again.");
+      }
+
       if (!epicData.habits || epicData.habits.length === 0) {
         throw new Error("Epic must have at least one habit");
       }
@@ -113,15 +137,15 @@ export const useEpics = () => {
       let createdEpic: CreatedEpic | null = null;
 
       try {
-        // Create habits first
+        // Create habits first with normalized values
         const { data: habits, error: habitError } = await supabase
           .from("habits")
           .insert(
             epicData.habits.map(habit => ({
               user_id: user.id,
               title: habit.title,
-              difficulty: habit.difficulty,
-              frequency: habit.frequency,
+              difficulty: normalizeDifficulty(habit.difficulty),
+              frequency: normalizeFrequency(habit.frequency),
               custom_days: habit.custom_days.length > 0 ? habit.custom_days : null,
               preferred_time: habit.preferred_time || null,
               reminder_enabled: habit.reminder_enabled || false,

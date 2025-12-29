@@ -29,8 +29,10 @@ export function useAIInteractionTracker() {
 
   /**
    * Log a completed AI interaction with user's action
+   * NOTE: This is non-blocking and should never throw errors that affect calling code
    */
   const trackInteraction = useCallback(async (options: TrackInteractionOptions) => {
+    // Silently skip if not authenticated - don't block calling code
     if (!user) return;
 
     const {
@@ -43,6 +45,13 @@ export function useAIInteractionTracker() {
     } = options;
 
     try {
+      // Verify session before attempting insert
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || session.user.id !== user.id) {
+        // Session mismatch - skip silently, don't block epic creation
+        return;
+      }
+
       // Insert interaction record
       const { error } = await supabase
         .from('ai_interactions')
@@ -57,13 +66,16 @@ export function useAIInteractionTracker() {
         });
 
       if (error) {
-        console.error('Failed to track interaction:', error);
+        // Log but don't throw - this is analytics, not critical path
+        console.warn('Failed to track interaction (non-blocking):', error.message);
+        return;
       }
 
-      // Update learning profile based on action
+      // Update learning profile based on action (also non-blocking)
       await updateLearningFromAction(user.id, userAction);
     } catch (err) {
-      console.error('Error tracking interaction:', err);
+      // Catch all errors - never let tracking block the main flow
+      console.warn('Error tracking interaction (non-blocking):', err);
     }
   }, [user]);
 
