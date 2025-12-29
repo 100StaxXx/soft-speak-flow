@@ -124,10 +124,10 @@ const Journeys = () => {
             <span className="text-sm font-medium">Your Path</span>
           </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-            Journeys
+            Quests & Campaigns
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Quests for today. Rituals for life. All in one place.
+            Daily quests. Epic campaigns. All in one place.
           </p>
         </motion.div>
 
@@ -199,7 +199,7 @@ const Journeys = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Target className="w-5 h-5 text-primary" />
-              Active Journeys
+              Active Campaigns
             </h2>
             {!hasReachedLimit && (
               <Button
@@ -224,16 +224,16 @@ const Journeys = () => {
               className="text-center py-8 bg-secondary/20 rounded-xl border-2 border-dashed border-primary/20"
             >
               <Wand2 className="w-12 h-12 text-primary mx-auto mb-3 opacity-60" />
-              <h3 className="text-base font-semibold mb-1">No Active Journeys</h3>
+              <h3 className="text-base font-semibold mb-1">No Active Campaigns</h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-xs mx-auto">
-                Use the Smart Journey Wizard to create a personalized path with daily rituals
+                Use Pathfinder to create a personalized campaign with daily rituals
               </p>
               <Button
                 onClick={() => setSmartWizardOpen(true)}
                 className="bg-gradient-to-r from-primary to-purple-600"
               >
                 <Wand2 className="w-4 h-4 mr-2" />
-                Start Smart Wizard
+                Start a Campaign
               </Button>
             </motion.div>
           ) : (
@@ -255,7 +255,7 @@ const Journeys = () => {
           
           {hasReachedLimit && (
             <p className="text-xs text-amber-500 text-center">
-              Max {MAX_JOURNEYS} active journeys. Complete one to start another.
+              Max {MAX_JOURNEYS} active campaigns. Complete one to start another.
             </p>
           )}
         </motion.div>
@@ -270,7 +270,7 @@ const Journeys = () => {
           >
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <Trophy className="w-5 h-5 text-yellow-500" />
-              Legendary Journeys
+              Legendary Campaigns
             </h2>
             <div className="space-y-4">
               {completedJourneys.map((journey) => (
@@ -302,17 +302,17 @@ const Journeys = () => {
         <PageInfoModal
           open={showPageInfo}
           onClose={() => setShowPageInfo(false)}
-          title="About Journeys"
+          title="About Quests & Campaigns"
           icon={Compass}
-          description="Journeys unite your daily quests and recurring rituals into one powerful view."
+          description="Quests and Campaigns unite your daily tasks and recurring rituals into one powerful view."
           features={[
             "Complete daily quests to earn XP",
             "Rituals repeat automatically to build habits",
-            "Link rituals to journeys for bonus progress",
+            "Link rituals to campaigns for bonus progress",
             "Track your streak and maintain momentum",
-            "Join guilds to journey with others"
+            "Join guilds to campaign with others"
           ]}
-          tip="Start with a Destiny Path template to get rituals pre-configured for your goal!"
+          tip="Use Pathfinder to create a campaign with rituals pre-configured for your goal!"
         />
       </div>
 
