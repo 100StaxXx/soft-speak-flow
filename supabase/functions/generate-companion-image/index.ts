@@ -25,7 +25,8 @@ const CATEGORY_DEFAULTS: Record<string, CategoryDefaults> = {
   "mammal": { limbCount: 4, hasWings: false, hasTail: true, bodyType: "quadruped", prohibitedBase: ["wings", "scales"] },
   "primate": { limbCount: 4, hasWings: false, hasTail: false, bodyType: "quadruped-knuckle", prohibitedBase: ["wings", "tail"] },
   "invertebrate": { limbCount: 8, hasWings: false, hasTail: false, bodyType: "aquatic-tentacle", prohibitedBase: ["skeleton", "fur"] },
-  "mythical": { limbCount: 4, hasWings: false, hasTail: true, bodyType: "quadruped", prohibitedBase: [] }
+  "mythical": { limbCount: 4, hasWings: false, hasTail: true, bodyType: "quadruped", prohibitedBase: [] },
+  "insect": { limbCount: 6, hasWings: true, hasTail: false, bodyType: "insect-winged", prohibitedBase: ["4 legs", "tail", "fur", "vertebrate skeleton"] }
 };
 
 // ============================================================================
@@ -111,6 +112,9 @@ const CREATURE_DATA: Record<string, { cat: string; baby: string; adult: string; 
   "Orca": { cat: "aquatic", baby: "small calf with black and white pattern, orange tint to white patches", adult: "black and white pattern, tall dorsal fin, horizontal tail flukes, white eye patch", notes: "NO LEGS - flippers only, distinctive black/white pattern, TALL dorsal fin", ref: "killer whale" },
   "Blue Whale": { cat: "aquatic", baby: "relatively small calf (still huge), mottled blue-grey, horizontal flukes", adult: "ENORMOUS blue-grey body, mottled pattern, tiny dorsal fin, horizontal flukes", notes: "LARGEST ANIMAL EVER, NO LEGS, blue-grey mottled, baleen plates not teeth", prohibited: "legs, teeth, large dorsal fin", ref: "blue whale" },
   "Jellyfish": { cat: "invertebrate", baby: "tiny translucent bell, developing tentacles, gentle pulsing", adult: "translucent bell-shaped body, flowing tentacles beneath, bioluminescent glow", notes: "NO skeleton, translucent bell body, trailing tentacles, no brain, pulses to move", prohibited: "legs, skeleton, eyes, solid body", limbs: 0, body: "aquatic-bell", ref: "moon jellyfish" },
+  
+  // === INSECTS ===
+  "Butterfly": { cat: "insect", baby: "tiny caterpillar or chrysalis, fuzzy body, bright patterns forming", adult: "delicate wings with intricate patterns, slender body, large compound eyes, curled proboscis", notes: "6 LEGS (3 pairs), 2 large patterned wings, NO tail, antennae on head, graceful flight", prohibited: "4 legs, tail, fur, teeth, vertebrate features", limbs: 6, wings: true, tail: false, body: "insect-winged", ref: "monarch butterfly" },
   "Octopus": { cat: "invertebrate", baby: "tiny translucent octopus, oversized head, 8 tiny tentacles", adult: "bulbous head, 8 suckered tentacles, color-changing skin, highly intelligent eyes", notes: "EXACTLY 8 tentacles with suckers, bulbous head/mantle, beak in center, very intelligent", prohibited: "legs, more or fewer than 8 tentacles, 10 limbs (that's squid)", ref: "giant Pacific octopus" },
   "Manta Ray": { cat: "aquatic", baby: "small ray with developing wing-like fins, long thin tail", adult: "MASSIVE flat diamond body, wing-like pectoral fins, cephalic fins near mouth", notes: "Flat diamond shape, NO LEGS, wing-like fins, horn-like cephalic fins, filter feeder", prohibited: "legs, thick body, stinger", body: "aquatic-flat", ref: "giant manta ray" },
   
