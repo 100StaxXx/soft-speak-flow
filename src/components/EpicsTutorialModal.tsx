@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Trophy, CheckCircle2, Star, Users } from "lucide-react";
+import { Compass, Milestone, Users, Sparkles } from "lucide-react";
 
 interface EpicsTutorialModalProps {
   open: boolean;
@@ -18,53 +18,53 @@ export function EpicsTutorialModal({ open, onClose }: EpicsTutorialModalProps) {
     <Dialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) return;
     }}>
-      <DialogContent className="max-w-md" hideCloseButton>
+      <DialogContent className="max-w-md bg-gradient-to-br from-background to-primary/5" hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
-            <Trophy className="h-6 w-6 text-primary" />
-            Welcome to Campaigns
+            <Compass className="h-6 w-6 text-primary" />
+            Your Adventure Awaits
           </DialogTitle>
           <DialogDescription className="space-y-4 pt-4 text-base">
             <p className="text-foreground">
-              Campaigns are long-term goals with linked rituals. Complete daily rituals 
-              to progress your Campaign and achieve legendary milestones!
+              Every great journey begins with a single step. Campaigns turn your big goals 
+              into daily adventures—complete rituals, track your progress, and watch your story unfold.
             </p>
             
             <div className="bg-accent/20 rounded-lg p-4 space-y-3">
               <div className="flex items-start gap-3">
-                <Star className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Use Pathfinder to create curated campaigns
+                  Build your own adventure with custom rituals
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <Milestone className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Create custom campaigns with your own rituals
+                  Track progress with milestones along the way
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <Users className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Join shared Campaigns with guilds
+                  Join guilds to adventure alongside others
                 </p>
               </div>
               <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Earn bonus XP completing guild quests
+                  Celebrate victories and earn bonus XP
                 </p>
               </div>
             </div>
 
             <p className="text-sm text-muted-foreground italic">
-              Use Pathfinder to create your first campaign!
+              Your first adventure is just a tap away!
             </p>
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-end">
           <Button onClick={onClose} size="lg">
-            Got it, let's go!
+            Let's Begin
           </Button>
         </div>
       </DialogContent>
