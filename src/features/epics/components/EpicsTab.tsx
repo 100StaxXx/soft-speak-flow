@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EpicCard } from "@/components/EpicCard";
-import { SmartEpicWizard } from "@/components/SmartEpicWizard";
+import { Pathfinder } from "@/components/Pathfinder";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EpicSectionTooltip } from "@/components/EpicSectionTooltip";
@@ -128,8 +128,8 @@ export function EpicsTab() {
         </div>
       )}
 
-      {/* Smart Epic Wizard (consolidated) */}
-      <SmartEpicWizard
+      {/* Pathfinder */}
+      <Pathfinder
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         onCreateEpic={(data) => {

@@ -4,7 +4,7 @@ import { Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePromotionOpportunities, PromotionOpportunity } from '@/hooks/usePromotionOpportunities';
 import { PromotionOpportunityCard } from './PromotionOpportunityCard';
-import { SmartEpicWizard } from './SmartEpicWizard/SmartEpicWizard';
+import { Pathfinder } from './Pathfinder/Pathfinder';
 import { useEpics } from '@/hooks/useEpics';
 import { toast } from 'sonner';
 
@@ -125,9 +125,9 @@ export const PromotionOpportunitiesSection = memo(function PromotionOpportunitie
         </AnimatePresence>
       </div>
 
-      {/* SmartEpicWizard Modal */}
+      {/* Pathfinder Modal */}
       {selectedOpportunity && (
-        <SmartEpicWizard
+        <Pathfinder
           open={showWizard}
           onOpenChange={handleWizardClose}
           onCreateEpic={handleEpicCreated}
