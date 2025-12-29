@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, addYears, differenceInDays } from 'date-fns';
 import { Calendar as CalendarIcon, Clock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -15,9 +15,9 @@ interface DeadlinePickerProps {
 const quickOptions = [
   { label: '2 weeks', getValue: () => addWeeks(new Date(), 2) },
   { label: '1 month', getValue: () => addMonths(new Date(), 1) },
-  { label: '2 months', getValue: () => addMonths(new Date(), 2) },
   { label: '3 months', getValue: () => addMonths(new Date(), 3) },
   { label: '6 months', getValue: () => addMonths(new Date(), 6) },
+  { label: '1 year', getValue: () => addYears(new Date(), 1) },
 ];
 
 export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps) {
