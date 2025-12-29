@@ -122,7 +122,7 @@ const Journeys = () => {
             variant="ghost"
             size="icon"
             onClick={() => setShowHourlyModal(true)}
-            className="absolute left-0 top-0 h-10 w-10 text-primary hover:text-primary hover:bg-primary/10"
+            className="absolute left-0 top-0 h-10 w-10 text-sky-400 hover:text-sky-300 hover:bg-sky-400/10"
             aria-label="Open day view"
           >
             <Clock className="h-6 w-6" />
