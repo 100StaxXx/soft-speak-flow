@@ -13,6 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 import {
   Sparkles,
@@ -26,6 +31,10 @@ import {
   Calendar,
   Zap,
   Flag,
+  Plus,
+  X,
+  Rocket,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEpicSuggestions, type EpicSuggestion, type ClarificationAnswers } from '@/hooks/useEpicSuggestions';
@@ -106,6 +115,12 @@ export function Pathfinder({
   const [step, setStep] = useState<WizardStep>('goal');
   const [goalInput, setGoalInput] = useState(initialGoal);
   const [deadline, setDeadline] = useState<Date | undefined>(undefined);
+  
+  // Timeline context state
+  const [accelerators, setAccelerators] = useState<string[]>([]);
+  const [constraints, setConstraints] = useState<string[]>([]);
+  const [contextInput, setContextInput] = useState('');
+  const [contextOpen, setContextOpen] = useState(false);
   
   const { preferences, isAtEpicLimit } = useUserAIContext();
   const { trackInteraction } = useAIInteractionTracker();
@@ -229,6 +244,10 @@ export function Pathfinder({
       deadline: deadlineStr,
       clarificationAnswers,
       epicContext,
+      timelineContext: (accelerators.length > 0 || constraints.length > 0) ? {
+        accelerators: accelerators.length > 0 ? accelerators : undefined,
+        constraints: constraints.length > 0 ? constraints : undefined,
+      } : undefined,
     });
     
     // Store original rituals for reset functionality
@@ -238,7 +257,7 @@ export function Pathfinder({
     
     setStep('timeline');
     success();
-  }, [goalInput, deadline, clarificationAnswers, epicContext, generateSchedule, tap, success]);
+  }, [goalInput, deadline, clarificationAnswers, epicContext, accelerators, constraints, generateSchedule, tap, success]);
 
   const handleAdjustSchedule = useCallback(async (feedback: string) => {
     if (!schedule || !deadline) return;
@@ -344,6 +363,10 @@ export function Pathfinder({
     setStep('goal');
     setGoalInput(initialGoal);
     setDeadline(undefined);
+    setAccelerators([]);
+    setConstraints([]);
+    setContextInput('');
+    setContextOpen(false);
     setEpicTitle('');
     setEpicDescription('');
     setCustomHabits([]);
@@ -463,6 +486,172 @@ export function Pathfinder({
                   </Label>
                   <DeadlinePicker value={deadline} onChange={setDeadline} />
                 </div>
+
+                {/* Timeline Context Section */}
+                <Collapsible open={contextOpen} onOpenChange={setContextOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between h-auto py-2 px-3 text-muted-foreground hover:text-foreground">
+                      <span className="flex items-center gap-2 text-sm">
+                        <Plus className={cn("w-4 h-4 transition-transform", contextOpen && "rotate-45")} />
+                        Customize timeline (optional)
+                      </span>
+                      {(accelerators.length > 0 || constraints.length > 0) && (
+                        <Badge variant="secondary" className="ml-2">
+                          {accelerators.length + constraints.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-3">
+                    {/* Accelerators */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                        <Rocket className="w-3.5 h-3.5" />
+                        I already have...
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['Prior experience', 'Equipment ready', 'Related skills', 'Dedicated time daily'].map((item) => (
+                          <Button
+                            key={item}
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-7 text-xs",
+                              accelerators.includes(item) && "bg-emerald-500/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
+                            )}
+                            onClick={() => {
+                              if (accelerators.includes(item)) {
+                                setAccelerators(prev => prev.filter(a => a !== item));
+                              } else {
+                                setAccelerators(prev => [...prev, item]);
+                              }
+                            }}
+                          >
+                            {item}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Constraints */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                        <Clock className="w-3.5 h-3.5" />
+                        I need to work around...
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['Can\'t start until later', 'Limited availability', 'Waiting on something', 'Fixed commitments'].map((item) => (
+                          <Button
+                            key={item}
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-7 text-xs",
+                              constraints.includes(item) && "bg-amber-500/10 border-amber-500/50 text-amber-700 dark:text-amber-300"
+                            )}
+                            onClick={() => {
+                              if (constraints.includes(item)) {
+                                setConstraints(prev => prev.filter(c => c !== item));
+                              } else {
+                                setConstraints(prev => [...prev, item]);
+                              }
+                            }}
+                          >
+                            {item}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom input */}
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Add custom context</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="e.g., I've run a 5K before, or I can't practice weekends"
+                          value={contextInput}
+                          onChange={(e) => setContextInput(e.target.value)}
+                          className="text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && contextInput.trim()) {
+                              e.preventDefault();
+                              // Detect if it sounds like an advantage or constraint
+                              const lower = contextInput.toLowerCase();
+                              const isAccelerator = lower.includes('already') || lower.includes('have') || lower.includes('know') || lower.includes('experience') || lower.includes('can ');
+                              if (isAccelerator) {
+                                setAccelerators(prev => [...prev, contextInput.trim()]);
+                              } else {
+                                setConstraints(prev => [...prev, contextInput.trim()]);
+                              }
+                              setContextInput('');
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={!contextInput.trim()}
+                          onClick={() => {
+                            if (contextInput.trim()) {
+                              const lower = contextInput.toLowerCase();
+                              const isAccelerator = lower.includes('already') || lower.includes('have') || lower.includes('know') || lower.includes('experience') || lower.includes('can ');
+                              if (isAccelerator) {
+                                setAccelerators(prev => [...prev, contextInput.trim()]);
+                              } else {
+                                setConstraints(prev => [...prev, contextInput.trim()]);
+                              }
+                              setContextInput('');
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Added items display */}
+                    {(accelerators.length > 0 || constraints.length > 0) && (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t">
+                        {accelerators.map((item, i) => (
+                          <Badge
+                            key={`acc-${i}`}
+                            variant="secondary"
+                            className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 gap-1 pr-1"
+                          >
+                            <Rocket className="w-3 h-3" />
+                            {item}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 p-0 hover:bg-emerald-500/20"
+                              onClick={() => setAccelerators(prev => prev.filter((_, idx) => idx !== i))}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                        {constraints.map((item, i) => (
+                          <Badge
+                            key={`con-${i}`}
+                            variant="secondary"
+                            className="bg-amber-500/10 text-amber-700 dark:text-amber-300 gap-1 pr-1"
+                          >
+                            <Clock className="w-3 h-3" />
+                            {item}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 p-0 hover:bg-amber-500/20"
+                              onClick={() => setConstraints(prev => prev.filter((_, idx) => idx !== i))}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
                 {/* Generate button */}
                 <Button
