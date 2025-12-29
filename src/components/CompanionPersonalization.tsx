@@ -12,7 +12,7 @@ import {
 
 
 const ANIMALS = [
-  "Arctic Fox", "Basilisk", "Bear", "Blue Whale", "Butterfly",
+  "Arctic Fox", "Basilisk", "Bear", "Blue Whale", "Buttercat",
   "Cat", "Cheetah", "Crocodile", "Dog",
   "Dolphin", "Dragon", "Eagle", "Elephant", "Falcon",
   "Fennec Fox", "Fenrir", "Fox", "Gorilla", "Gryphon",
