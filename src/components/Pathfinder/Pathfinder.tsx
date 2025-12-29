@@ -468,7 +468,7 @@ export function Pathfinder({
                   </Label>
                   <Textarea
                     id="context-input"
-                    placeholder="e.g., I already know basic Spanish, I can only practice on weekends, I need to wait until my equipment arrives in February"
+                    placeholder="e.g., I already know basic Spanish"
                     value={timelineContext}
                     onChange={(e) => setTimelineContext(e.target.value)}
                     rows={2}
