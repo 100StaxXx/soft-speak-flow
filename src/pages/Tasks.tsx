@@ -488,6 +488,15 @@ export default function Tasks() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowHourlyModal(true)}
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                aria-label="Open day view"
+              >
+                <Clock className="h-5 w-5" />
+              </Button>
               <ViewModeToggle />
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
