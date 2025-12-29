@@ -54,13 +54,13 @@ export function QuestsTutorialModal({ open, onClose }: QuestsTutorialModalProps)
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Create Epics for long-term goals
+                  Create Campaigns for long-term goals
                 </p>
               </div>
               <div className="flex items-start gap-3">
                 <Sparkles className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-foreground">
-                  Browse Star Paths for curated habit journeys
+                  Use Pathfinder to create curated campaigns
                 </p>
               </div>
             </div>
