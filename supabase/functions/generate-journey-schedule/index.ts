@@ -14,6 +14,19 @@ function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
   return 'medium';
 }
 
+// Normalize frequency values to valid database enum values
+function normalizeFrequency(value: unknown): 'daily' | '5x_week' | '3x_week' | 'custom' {
+  if (typeof value !== 'string') return 'daily';
+  const lower = value.toLowerCase().trim().replace(/\s+/g, '_');
+  
+  if (['daily', 'everyday', 'every_day', '7x_week', '7x'].includes(lower)) return 'daily';
+  if (['5x_week', '5x', 'weekdays', 'five_times', '5_times'].includes(lower)) return '5x_week';
+  if (['3x_week', '3x', 'three_times', '3_times', 'thrice'].includes(lower)) return '3x_week';
+  if (['weekly', 'biweekly', 'twice', '2x', '2x_week', 'once', '1x', 'custom', 'twice_daily'].includes(lower)) return 'custom';
+  
+  return 'daily';
+}
+
 interface JourneyPhase {
   id: string;
   name: string;
@@ -38,7 +51,7 @@ interface JourneyRitual {
   id: string;
   title: string;
   description: string;
-  frequency: 'daily' | 'weekly' | 'custom';
+  frequency: 'daily' | '5x_week' | '3x_week' | 'custom';
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedMinutes?: number;
 }
@@ -308,7 +321,7 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
       schedule.rituals = schedule.rituals.map((r, i) => ({
         ...r,
         id: r.id || `ritual-${Date.now()}-${i}`,
-        frequency: r.frequency || 'daily',
+        frequency: normalizeFrequency(r.frequency),
         difficulty: normalizeDifficulty(r.difficulty),
       }));
       
@@ -407,7 +420,7 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
             id: `ritual-${Date.now()}-2`,
             title: 'Weekly review',
             description: 'Review progress and plan the next week',
-            frequency: 'weekly',
+            frequency: 'custom',
             difficulty: 'easy',
             estimatedMinutes: 20,
           },

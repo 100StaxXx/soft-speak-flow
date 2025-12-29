@@ -14,12 +14,25 @@ function normalizeDifficulty(value: unknown): 'easy' | 'medium' | 'hard' {
   return 'medium';
 }
 
+// Normalize frequency values to valid database enum values
+function normalizeFrequency(value: unknown): 'daily' | '5x_week' | '3x_week' | 'custom' {
+  if (typeof value !== 'string') return 'daily';
+  const lower = value.toLowerCase().trim().replace(/\s+/g, '_');
+  
+  if (['daily', 'everyday', 'every_day', '7x_week', '7x'].includes(lower)) return 'daily';
+  if (['5x_week', '5x', 'weekdays', 'five_times', '5_times'].includes(lower)) return '5x_week';
+  if (['3x_week', '3x', 'three_times', '3_times', 'thrice'].includes(lower)) return '3x_week';
+  if (['weekly', 'biweekly', 'twice', '2x', '2x_week', 'once', '1x', 'custom', 'twice_daily'].includes(lower)) return 'custom';
+  
+  return 'daily';
+}
+
 interface EpicSuggestion {
   id: string;
   title: string;
   type: 'habit' | 'milestone';
   description: string;
-  frequency?: 'daily' | 'weekly' | 'custom';
+  frequency?: 'daily' | '5x_week' | '3x_week' | 'custom';
   customDays?: number[];
   difficulty: 'easy' | 'medium' | 'hard';
   suggestedWeek?: number; // For milestones - which week to target
@@ -290,7 +303,7 @@ Generate practical, specific suggestions that will help achieve this goal. Make 
         title: s.title,
         type: s.type || 'habit',
         description: s.description || '',
-        frequency: s.frequency || 'daily',
+        frequency: normalizeFrequency(s.frequency),
         customDays: s.customDays,
         difficulty: normalizeDifficulty(s.difficulty),
         suggestedWeek: s.suggestedWeek,
