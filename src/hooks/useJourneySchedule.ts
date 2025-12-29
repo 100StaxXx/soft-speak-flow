@@ -51,6 +51,7 @@ interface GenerateScheduleParams {
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
   timelineContext?: string;
+  totalChapters?: number;
 }
 
 interface AdjustScheduleParams {
