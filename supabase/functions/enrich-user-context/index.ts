@@ -120,7 +120,7 @@ serve(async (req) => {
       // Active habits with streaks
       supabase
         .from('habits')
-        .select('id, title, current_streak, difficulty, frequency, category')
+        .select('id, title, current_streak, difficulty, frequency')
         .eq('user_id', userId)
         .eq('is_active', true),
       
@@ -186,7 +186,7 @@ serve(async (req) => {
       currentStreak: habit.current_streak || 0,
       difficulty: habit.difficulty || 'medium',
       frequency: habit.frequency || 'daily',
-      category: habit.category
+      category: habit.difficulty || 'medium' // Use difficulty as category fallback
     }));
 
     // Calculate streaks
