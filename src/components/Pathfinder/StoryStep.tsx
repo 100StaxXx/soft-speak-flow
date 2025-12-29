@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronRight, ChevronLeft, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StoryTypeSelector, storyTypes } from '@/components/narrative/StoryTypeSelector';
@@ -48,7 +47,7 @@ export function StoryStep({
       exit={{ opacity: 0, x: -20 }}
       className="flex flex-col h-full min-h-0"
     >
-      <ScrollArea className="flex-1 px-6">
+      <div className="flex-1 overflow-y-auto px-6" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="space-y-6 pb-4">
           {/* Story Type Selection */}
           <div className="space-y-2">
@@ -97,7 +96,7 @@ export function StoryStep({
             </p>
           </div>
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Actions */}
       <div className="p-6 pt-4 border-t bg-background space-y-3">
