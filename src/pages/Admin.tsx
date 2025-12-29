@@ -617,7 +617,7 @@ const Admin = () => {
         {/* Sample Card Generator */}
         <Card className="p-6 mb-8 rounded-3xl shadow-soft">
           <h2 className="font-heading text-2xl font-semibold mb-4">🃏 Sample Card Generator</h2>
-          <p className="text-muted-foreground mb-6">Generate complete trading cards with AI-generated images, names, traits, and lore</p>
+          <p className="text-muted-foreground mb-6">Generate complete trading cards with images, names, traits, and lore</p>
           
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -780,7 +780,7 @@ const Admin = () => {
             </div>
 
             <div>
-              <Label htmlFor="cardCustomName">Custom Name (Optional - leave blank for AI-generated)</Label>
+              <Label htmlFor="cardCustomName">Custom Name (Optional - leave blank for auto-generated)</Label>
               <Input
                 type="text"
                 id="cardCustomName"

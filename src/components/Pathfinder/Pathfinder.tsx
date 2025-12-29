@@ -377,7 +377,7 @@ export function Pathfinder({
           </DialogTitle>
           <DialogDescription>
             {step === 'goal' && 'Set your goal and deadline'}
-            {step === 'timeline' && 'Review your AI-generated timeline'}
+            {step === 'timeline' && 'Review your personalized timeline'}
             {step === 'suggestions' && 'Confirm your rituals and milestones'}
             {step === 'story' && 'Choose your narrative adventure style'}
             {step === 'review' && 'Review and create your campaign'}

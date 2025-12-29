@@ -315,7 +315,7 @@ export function SmartRescheduleAdvisor({
             </div>
             <div>
               <h3 className="text-sm font-semibold">Smart Reschedule</h3>
-              <p className="text-[10px] text-muted-foreground">AI-powered suggestions</p>
+              <p className="text-[10px] text-muted-foreground">Personalized suggestions</p>
             </div>
           </div>
           <Button

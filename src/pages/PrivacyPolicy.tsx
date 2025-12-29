@@ -114,10 +114,10 @@ export default function PrivacyPolicy() {
 
             <section className="scroll-mt-20 space-y-3">
               <h2 className="text-lg sm:text-xl font-semibold text-foreground leading-snug">
-                4. AI and Data Processing
+                4. Personalization and Data Processing
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                We use artificial intelligence to provide personalized mentorship, generate companion evolutions, and create motivational content. Your interaction data may be processed by AI systems to improve personalization. We implement measures to protect your privacy during AI processing, including data anonymization where appropriate.
+                We use advanced personalization to provide tailored mentorship, generate companion evolutions, and create motivational content. Your interaction data may be processed to improve personalization. We implement measures to protect your privacy during this processing, including data anonymization where appropriate.
               </p>
             </section>
 
@@ -142,7 +142,7 @@ export default function PrivacyPolicy() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>
-                      <span>AI services (content generation)</span>
+                      <span>Content generation services</span>
                     </li>
                   </ul>
                 </div>

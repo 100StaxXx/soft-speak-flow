@@ -18,7 +18,7 @@ export const StoryJournalInfoTooltip = () => {
           <p className="font-semibold">Story Journal</p>
           <ul className="space-y-1 text-muted-foreground">
             <li>• Each evolution stage unlocks a new chapter</li>
-            <li>• AI-generated stories unique to your journey</li>
+            <li>• Stories unique to your journey</li>
             <li>• Learn life lessons through your companion's tale</li>
             <li>• Prologue + 20 chapters to unlock</li>
             <li>• Guild Chronicles feature companions from your guild</li>
