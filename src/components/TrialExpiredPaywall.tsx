@@ -1,17 +1,35 @@
 import { useMemo, useState } from "react";
-import { Crown, Sparkles, Moon, MessageCircle, Lock, RefreshCw } from "lucide-react";
+import { Crown, Sparkles, Moon, MessageCircle, Lock, RefreshCw, LogOut, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 
 type PlanType = "monthly" | "yearly";
 
 export const TrialExpiredPaywall = () => {
-
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  
   const { 
     handlePurchase, 
     handleRestore, 
@@ -24,6 +42,8 @@ export const TrialExpiredPaywall = () => {
     hasLoadedProducts,
   } = useAppleSubscription();
   const { toast } = useToast();
+  const { signOut, session } = useAuth();
+  const navigate = useNavigate();
 
   const productMap = useMemo(() => {
     return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
@@ -52,6 +72,68 @@ export const TrialExpiredPaywall = () => {
       ? IAP_PRODUCTS.YEARLY 
       : IAP_PRODUCTS.MONTHLY;
     await handlePurchase(productId);
+  };
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      navigate("/auth");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE") {
+      toast({
+        title: "Confirmation required",
+        description: "Please type DELETE to confirm account deletion.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession?.access_token) {
+        throw new Error("No active session");
+      }
+
+      const { error } = await supabase.functions.invoke("delete-user", {
+        headers: {
+          Authorization: `Bearer ${currentSession.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      await signOut();
+      navigate("/auth");
+      toast({
+        title: "Account deleted",
+        description: "Your account has been permanently deleted.",
+      });
+    } catch (error) {
+      console.error("Delete account error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setDeleteConfirmText("");
+    }
   };
 
   const plans = {
@@ -213,7 +295,82 @@ export const TrialExpiredPaywall = () => {
           <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>
           <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
         </div>
+
+        {/* Sign Out & Delete Account Options */}
+        <div className="relative flex items-center py-2">
+          <div className="flex-grow border-t border-muted" />
+          <span className="px-3 text-xs text-muted-foreground">or</span>
+          <div className="flex-grow border-t border-muted" />
+        </div>
+
+        <div className="flex justify-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {isSigningOut ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-1.5" />
+            ) : (
+              <LogOut className="h-4 w-4 mr-1.5" />
+            )}
+            Sign Out
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Delete Account
+          </Button>
+        </div>
       </div>
+
+      {/* Delete Account Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This action is permanent and cannot be undone. All your data, 
+                including your companion, progress, and achievements will be 
+                permanently deleted.
+              </p>
+              <p className="font-medium text-foreground">
+                Type <span className="font-bold text-destructive">DELETE</span> to confirm:
+              </p>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE"
+                className="mt-2"
+              />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={isDeleting || deleteConfirmText !== "DELETE"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Account"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
