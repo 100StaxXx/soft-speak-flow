@@ -21,7 +21,6 @@ const themeColors = [
 interface StoryStepProps {
   storyType: StoryTypeSlug | null;
   themeColor: string;
-  targetDays: number;
   onStoryTypeChange: (type: StoryTypeSlug) => void;
   onThemeColorChange: (color: string) => void;
   onContinue: () => void;
@@ -32,7 +31,6 @@ interface StoryStepProps {
 export function StoryStep({
   storyType,
   themeColor,
-  targetDays,
   onStoryTypeChange,
   onThemeColorChange,
   onContinue,

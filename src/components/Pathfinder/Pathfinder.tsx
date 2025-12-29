@@ -623,7 +623,6 @@ export function Pathfinder({
               <StoryStep
                 storyType={storyType}
                 themeColor={themeColor}
-                targetDays={targetDays}
                 onStoryTypeChange={setStoryType}
                 onThemeColorChange={setThemeColor}
                 onContinue={handleGenerateTimeline}
