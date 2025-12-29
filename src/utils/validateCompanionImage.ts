@@ -19,6 +19,7 @@ export async function generateWithValidation(
     stage: number;
     eyeColor?: string;
     furColor?: string;
+    storyTone?: string;
   },
   options: {
     maxRetries?: number;
