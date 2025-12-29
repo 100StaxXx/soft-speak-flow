@@ -60,7 +60,6 @@ export function StoryStep({
             <StoryTypeSelector
               selectedType={storyType}
               onSelect={onStoryTypeChange}
-              targetDays={targetDays}
             />
           </div>
 

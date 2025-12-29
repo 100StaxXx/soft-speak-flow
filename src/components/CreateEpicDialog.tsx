@@ -273,7 +273,6 @@ export const CreateEpicDialog = ({
             <StoryTypeSelector
               selectedType={storyType}
               onSelect={setStoryType}
-              targetDays={targetDays}
             />
 
             {/* Duration Preview */}
