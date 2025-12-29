@@ -76,19 +76,10 @@ const storyTypes: StoryType[] = [
 interface StoryTypeSelectorProps {
   selectedType: StoryTypeSlug | null;
   onSelect: (type: StoryTypeSlug) => void;
-  targetDays: number;
 }
 
-export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryTypeSelectorProps) => {
+export const StoryTypeSelector = ({ selectedType, onSelect }: StoryTypeSelectorProps) => {
   const [expandedType, setExpandedType] = useState<StoryTypeSlug | null>(null);
-
-  // Calculate chapters based on duration
-  const calculateChapters = (baseChapters: number) => {
-    if (targetDays <= 14) return Math.max(3, baseChapters - 2);
-    if (targetDays <= 30) return baseChapters;
-    if (targetDays <= 60) return baseChapters + 1;
-    return baseChapters + 2;
-  };
 
   const handleCardClick = (slug: StoryTypeSlug) => {
     if (expandedType === slug) {
@@ -109,7 +100,6 @@ export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryT
       <div className="grid grid-cols-2 gap-3">
         {storyTypes.map((type, index) => {
           const Icon = type.icon;
-          const chapters = calculateChapters(type.baseChapters);
           const isSelected = selectedType === type.slug;
           const isExpanded = expandedType === type.slug;
           
@@ -177,11 +167,6 @@ export const StoryTypeSelector = ({ selectedType, onSelect, targetDays }: StoryT
                       )}
                     </AnimatePresence>
                     
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {chapters} Chapters
-                      </Badge>
-                    </div>
                   </div>
                 </div>
               </Card>
