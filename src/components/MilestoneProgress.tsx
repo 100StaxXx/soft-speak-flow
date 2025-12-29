@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+import { useCompanion } from "@/hooks/useCompanion";
 import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
 
 interface MilestoneProgressProps {
@@ -41,6 +42,7 @@ export const MilestoneProgress = ({
   } = useMilestones(epicId);
 
   const { checkMilestoneForPostcard } = useCompanionPostcards();
+  const { companion } = useCompanion();
 
   const handleQuickComplete = async (milestone: Milestone, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -48,7 +50,13 @@ export const MilestoneProgress = ({
       milestoneId: milestone.id,
       epicId,
       onPostcardTrigger: (completedMilestone) => {
-        checkMilestoneForPostcard(completedMilestone.id, epicId, "", {});
+        checkMilestoneForPostcard(completedMilestone.id, epicId, companion?.id || "", {
+          spirit_animal: companion?.spirit_animal,
+          favorite_color: companion?.favorite_color,
+          core_element: companion?.core_element,
+          eye_color: companion?.eye_color,
+          fur_color: companion?.fur_color,
+        });
       },
     });
   };
