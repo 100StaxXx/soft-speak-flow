@@ -201,22 +201,6 @@ const Journeys = () => {
               <Target className="w-5 h-5 text-primary" />
               Active Campaigns
             </h2>
-            {!hasReachedLimit && (
-              <motion.div
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="relative"
-              >
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-500 rounded-lg blur opacity-40 animate-pulse" />
-                <Button
-                  onClick={() => setSmartWizardOpen(true)}
-                  className="relative bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
-                >
-                  <Wand2 className="w-4 h-4 mr-1.5" />
-                  Start Campaign
-                </Button>
-              </motion.div>
-            )}
           </div>
           
           {journeysLoading ? (
@@ -245,7 +229,7 @@ const Journeys = () => {
               </motion.div>
               <h3 className="text-xl font-bold mb-2">Begin Your Journey</h3>
               <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
-                Create an AI-powered campaign with personalized rituals and milestones
+                Create a campaign with personalized rituals and milestones
               </p>
               
               {/* Hero CTA Button */}
@@ -281,6 +265,20 @@ const Journeys = () => {
                   }
                 />
               ))}
+              
+              {/* Subtle add campaign button */}
+              {!hasReachedLimit && (
+                <div className="flex justify-center pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSmartWizardOpen(true)}
+                    className="h-7 w-7 rounded-full opacity-30 hover:opacity-60 text-muted-foreground p-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           
@@ -343,28 +341,10 @@ const Journeys = () => {
             "Track your streak and maintain momentum",
             "Join guilds to campaign with others"
           ]}
-          tip="Use Pathfinder to create a campaign with rituals pre-configured for your goal!"
+          tip="Create campaigns to link your daily rituals to bigger goals!"
         />
       </div>
 
-      {/* Floating Add Button */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ delay: 0.3, type: "spring" }}
-        className="fixed bottom-24 right-4 z-40"
-      >
-        <Button
-          onClick={() => setShowAddSheet(true)}
-          size="lg"
-          className={cn(
-            "h-14 w-14 rounded-full shadow-lg",
-            "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
-          )}
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
-      </motion.div>
 
       <BottomNav />
     </PageTransition>
