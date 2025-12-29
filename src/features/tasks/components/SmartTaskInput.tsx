@@ -42,7 +42,7 @@ import { TaskPreviewCard } from './TaskPreviewCard';
 import { ClarificationBubble } from './ClarificationBubble';
 import { TaskBatchPreview } from './TaskBatchPreview';
 import { EpicClarificationFlow } from './EpicClarificationFlow';
-import { SmartEpicWizard } from '@/components/SmartEpicWizard/SmartEpicWizard';
+import { Pathfinder } from '@/components/Pathfinder/Pathfinder';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { useEpics } from '@/hooks/useEpics';
 import { useHabits } from '@/features/habits';
@@ -1021,8 +1021,8 @@ export function SmartTaskInput({
         isRequesting={isRequestingPermission}
       />
 
-      {/* Smart Epic Wizard */}
-      <SmartEpicWizard
+      {/* Pathfinder */}
+      <Pathfinder
         open={showEpicWizard}
         onOpenChange={setShowEpicWizard}
         onCreateEpic={handleEpicCreated}

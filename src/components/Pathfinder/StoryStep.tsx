@@ -46,7 +46,7 @@ export function StoryStep({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col h-full"
+      className="flex flex-col h-full min-h-0"
     >
       <ScrollArea className="flex-1 px-6">
         <div className="space-y-6 pb-4">

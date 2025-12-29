@@ -16,7 +16,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { JourneyCard } from "@/components/JourneyCard";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
-import { SmartEpicWizard } from "@/components/SmartEpicWizard";
+import { Pathfinder } from "@/components/Pathfinder";
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -280,8 +280,8 @@ const Journeys = () => {
           </motion.div>
         )}
 
-        {/* Smart Journey Wizard */}
-        <SmartEpicWizard
+        {/* Pathfinder */}
+        <Pathfinder
           open={smartWizardOpen}
           onOpenChange={setSmartWizardOpen}
           onCreateEpic={handleCreateJourney}

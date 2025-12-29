@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EpicCard } from "@/components/EpicCard";
 import { CreateEpicDialog } from "@/components/CreateEpicDialog";
-import { SmartEpicWizard } from "@/components/SmartEpicWizard";
+import { Pathfinder } from "@/components/Pathfinder";
 import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
 import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight, Wand2 } from "lucide-react";
@@ -229,8 +229,8 @@ const Epics = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Smart Epic Wizard */}
-        <SmartEpicWizard
+        {/* Pathfinder */}
+        <Pathfinder
           open={smartWizardOpen}
           onOpenChange={setSmartWizardOpen}
           onCreateEpic={(data) => {
