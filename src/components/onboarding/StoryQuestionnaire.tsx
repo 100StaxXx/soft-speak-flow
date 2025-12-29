@@ -205,7 +205,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
             <ChevronLeft className="h-4 w-4" />
             Back
           </Button>
-          <span className="flex-1 text-center text-sm font-semibold">Your Path Unfolds</span>
+          <span className="flex-1" />
           <span className="text-sm font-medium tabular-nums min-w-[72px] text-right">
             {currentIndex + 1} of {questions.length}
           </span>
