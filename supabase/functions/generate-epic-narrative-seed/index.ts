@@ -56,14 +56,16 @@ serve(async (req) => {
       storyTypeSlug,
       companionData,
       mentorData,
-      userGoal 
+      userGoal,
+      totalChapters: passedTotalChapters, // Explicit chapter count from milestones
+      milestoneData, // Array of { chapterNumber, title, targetDate, milestonePercent }
     } = await req.json();
 
     if (!userId || !epicId || !storyTypeSlug) {
       throw new Error("Missing required fields");
     }
 
-    console.log(`[Narrative Seed] Generating for epic ${epicId}, story type: ${storyTypeSlug}`);
+    console.log(`[Narrative Seed] Generating for epic ${epicId}, story type: ${storyTypeSlug}, chapters: ${passedTotalChapters}`);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -75,7 +77,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch story type details
+    // Fetch story type details (for theme/flavor, not chapter count)
     const { data: storyType, error: storyTypeError } = await supabase
       .from('epic_story_types')
       .select('*')
@@ -86,9 +88,8 @@ serve(async (req) => {
       throw new Error(`Story type not found: ${storyTypeSlug}`);
     }
 
-    // Calculate total chapters
-    const durationBonus = targetDays >= 30 ? 1 : 0;
-    const totalChapters = storyType.base_chapters + durationBonus;
+    // Use passed chapter count from milestones, fallback to story type base if not provided
+    const totalChapters = passedTotalChapters || (storyType.base_chapters + (targetDays >= 30 ? 1 : 0));
 
     // Select 2-3 character archetypes for this story
     const archetypeKeys = Object.keys(ARCHETYPE_TEMPLATES);
@@ -104,6 +105,21 @@ serve(async (req) => {
     const mentorSlug = mentorData?.slug || 'eli';
     const mentorProfile = getMentorNarrativeProfile(mentorSlug) || mentorNarrativeProfiles.eli;
 
+    // Build milestone schedule for the prompt
+    let milestoneSchedule = '';
+    if (milestoneData && Array.isArray(milestoneData) && milestoneData.length > 0) {
+      milestoneSchedule = `
+═══════════════════════════════════════════════════════════════════
+                     CHAPTER MILESTONE SCHEDULE
+═══════════════════════════════════════════════════════════════════
+Each chapter corresponds to a real-world milestone the user will achieve:
+${milestoneData.map(m => `Chapter ${m.chapterNumber}: "${m.title}" - Target Date: ${m.targetDate} (${m.milestonePercent}% progress)`).join('\n')}
+
+IMPORTANT: Each chapter_blueprint must align with these milestone dates and titles.
+The narrative should reflect the progress and achievement at each checkpoint.
+`;
+    }
+
     // Build the master prompt with rich mentor context
     const prompt = `You are COSMIC STORYTELLER — a master narrative architect creating an interconnected epic journey.
 
@@ -113,6 +129,7 @@ TOTAL CHAPTERS: ${totalChapters}
 EPIC TITLE: ${epicTitle}
 EPIC DESCRIPTION: ${epicDescription || 'A personal journey of growth'}
 USER'S REAL-LIFE GOAL: ${userGoal || 'Self-improvement and personal growth'}
+${milestoneSchedule}
 
 ═══════════════════════════════════════════════════════════════════
                          THE COMPANION
@@ -210,6 +227,9 @@ Return ONLY valid JSON (no markdown):
     {
       "chapter": 1,
       "title": "Evocative chapter title",
+      "milestone_title": "The real-world milestone title this chapter unlocks at",
+      "target_date": "YYYY-MM-DD from the milestone schedule",
+      "milestone_percent": 25,
       "narrative_purpose": "What this chapter accomplishes",
       "opening_hook": "The attention-grabbing first scene",
       "featured_characters": ["Names of characters who appear"],

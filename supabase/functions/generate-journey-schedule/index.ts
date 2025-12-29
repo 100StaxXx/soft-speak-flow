@@ -40,7 +40,6 @@ interface ScheduleRequest {
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
   timelineContext?: string;
-  totalChapters?: number; // Number of postcard milestones to create (matches story chapters)
   adjustmentRequest?: string; // For negotiation - e.g., "make it less aggressive"
   previousSchedule?: {
     phases: JourneyPhase[];
@@ -60,6 +59,7 @@ interface ScheduleResponse {
   milestones: JourneyMilestone[];
   rituals: JourneyRitual[];
   weeklyHoursEstimate: number;
+  suggestedChapterCount: number; // AI-determined optimal number of chapters/postcards
 }
 
 serve(async (req) => {
@@ -68,7 +68,7 @@ serve(async (req) => {
   }
 
   try {
-    const { goal, deadline, clarificationAnswers, epicContext, timelineContext, totalChapters, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
+    const { goal, deadline, clarificationAnswers, epicContext, timelineContext, adjustmentRequest, previousSchedule } = await req.json() as ScheduleRequest;
 
     if (!goal || goal.trim().length < 3) {
       return new Response(
@@ -139,32 +139,33 @@ User's feedback: "${adjustmentRequest}"
 
 Previous plan had:
 - ${previousSchedule.phases.length} phases
-- ${previousSchedule.milestones.length} milestones
+- ${previousSchedule.milestones.length} milestones (${previousSchedule.milestones.filter(m => m.isPostcardMilestone).length} postcard/chapter milestones)
 - ${previousSchedule.rituals.length} rituals
 
 Adjust the plan based on the user's feedback while keeping the same deadline.
+Keep the same number of postcard milestones unless the feedback specifically asks to change this.
 `;
     }
 
-    // Default to 5 chapters if not specified
-    const chaptersToCreate = totalChapters || 5;
-    
-    // Calculate milestone percentages for even distribution
-    const milestonePercentages = Array.from({ length: chaptersToCreate }, (_, i) => 
-      Math.round(((i + 1) / chaptersToCreate) * 100)
-    );
-    
     const systemPrompt = `You are an expert goal planner who creates detailed, deadline-driven schedules. You work backwards from deadlines to create realistic phased plans.
 
 Your job is to:
 1. Assess the feasibility of the goal given the deadline
 2. Create 3-5 PHASES with specific date ranges
-3. Create EXACTLY ${chaptersToCreate} POSTCARD MILESTONES with target dates at these progress percentages: ${milestonePercentages.join('%, ')}%
-4. You may also create 1-3 additional non-postcard milestones as intermediate goals
-5. Create 3-6 RITUALS (recurring habits)
-6. Estimate weekly time commitment
+3. DETERMINE THE OPTIMAL NUMBER OF CHAPTERS/POSTCARDS based on:
+   - Goal complexity (simple goals = fewer chapters, complex multi-step goals = more)
+   - Timeline length (7-14 days: 3-4 chapters, 15-30 days: 4-5, 31-60 days: 5-6, 60+ days: 6-7)
+   - Natural breaking points in the journey
+4. Create postcard milestones with specific target dates - one per chapter, evenly distributed
+5. You may also create 1-3 additional non-postcard milestones as intermediate goals
+6. Create 3-6 RITUALS (recurring habits)
+7. Estimate weekly time commitment
 
-IMPORTANT: The postcard milestones represent story chapters, so you must create exactly ${chaptersToCreate} of them.
+POSTCARD MILESTONE GUIDELINES:
+- Each postcard milestone represents a story chapter - a major progress point
+- Distribute them evenly across the timeline
+- Minimum 3 chapters (for short/simple goals), maximum 7 (for long/complex goals)
+- Each should have isPostcardMilestone: true and a unique milestonePercent
 
 For each phase, work backwards from the deadline:
 - Final Phase: Polish and prepare (last 10-15% of time)
@@ -213,7 +214,8 @@ CRITICAL: Return ONLY valid JSON with this exact structure:
       "estimatedMinutes": 30
     }
   ],
-  "weeklyHoursEstimate": <number>
+  "weeklyHoursEstimate": <number>,
+  "suggestedChapterCount": <number between 3-7 - must match the count of postcard milestones>
 }`;
 
     const today = new Date().toISOString().split('T')[0];
@@ -231,12 +233,14 @@ ${adjustmentContext}
 Generate a phased schedule working backwards from the deadline. Make sure:
 1. All dates are between ${today} and ${deadline}
 2. Phases connect without gaps
-3. Create EXACTLY ${chaptersToCreate} postcard milestones at approximately ${milestonePercentages.join('%, ')}% progress
-4. Spread milestones across phases with real dates
-5. Rituals are realistic for the available time
-${timelineContext ? '6. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
+3. Determine the optimal number of postcard milestones (3-7) based on goal complexity and timeline length
+4. Each postcard milestone has a specific target date and represents a story chapter
+5. Spread milestones across phases with real dates
+6. Rituals are realistic for the available time
+7. suggestedChapterCount matches the exact count of milestones with isPostcardMilestone: true
+${timelineContext ? '8. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
-    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'chapters:', chaptersToCreate, 'context:', timelineContext);
+    console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -299,18 +303,29 @@ ${timelineContext ? '6. Adjust the schedule based on the user\'s context (existi
         difficulty: r.difficulty || 'medium',
       }));
       
+      // Ensure suggestedChapterCount matches actual postcard milestone count
+      const postcardCount = schedule.milestones.filter(m => m.isPostcardMilestone).length;
+      schedule.suggestedChapterCount = postcardCount > 0 ? postcardCount : (schedule.suggestedChapterCount || 5);
+      
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, content);
+      
+      // Calculate fallback chapter count based on timeline
+      let fallbackChapterCount = 5;
+      if (daysAvailable <= 14) fallbackChapterCount = 3;
+      else if (daysAvailable <= 30) fallbackChapterCount = 4;
+      else if (daysAvailable <= 60) fallbackChapterCount = 5;
+      else fallbackChapterCount = 6;
       
       // Provide fallback schedule with correct number of chapters
       const phaseLength = Math.floor(daysAvailable / 3);
       const phase1End = new Date(now.getTime() + phaseLength * 24 * 60 * 60 * 1000);
       const phase2End = new Date(now.getTime() + phaseLength * 2 * 24 * 60 * 60 * 1000);
       
-      // Generate milestones based on chaptersToCreate
+      // Generate milestones based on fallback chapter count
       const fallbackMilestones: JourneyMilestone[] = [];
-      for (let i = 0; i < chaptersToCreate; i++) {
-        const percent = Math.round(((i + 1) / chaptersToCreate) * 100);
+      for (let i = 0; i < fallbackChapterCount; i++) {
+        const percent = Math.round(((i + 1) / fallbackChapterCount) * 100);
         const dayOffset = Math.floor((daysAvailable * percent) / 100);
         const targetDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
         
@@ -326,8 +341,8 @@ ${timelineContext ? '6. Adjust the schedule based on the user\'s context (existi
         
         fallbackMilestones.push({
           id: `milestone-${Date.now()}-${i}`,
-          title: i === chaptersToCreate - 1 ? 'Goal achieved!' : `Chapter ${i + 1} milestone`,
-          description: i === chaptersToCreate - 1 ? 'Successfully complete your goal' : `Complete ${percent}% of your journey`,
+          title: i === fallbackChapterCount - 1 ? 'Goal achieved!' : `Chapter ${i + 1} milestone`,
+          description: i === fallbackChapterCount - 1 ? 'Successfully complete your goal' : `Complete ${percent}% of your journey`,
           targetDate: targetDate.toISOString().split('T')[0],
           phaseOrder,
           phaseName,
@@ -389,10 +404,11 @@ ${timelineContext ? '6. Adjust the schedule based on the user\'s context (existi
           },
         ],
         weeklyHoursEstimate: 5,
+        suggestedChapterCount: fallbackChapterCount,
       };
     }
 
-    console.log(`Generated schedule with ${schedule.phases.length} phases, ${schedule.milestones.length} milestones, ${schedule.rituals.length} rituals`);
+    console.log(`Generated schedule with ${schedule.phases.length} phases, ${schedule.milestones.length} milestones (${schedule.suggestedChapterCount} chapters), ${schedule.rituals.length} rituals`);
 
     return new Response(
       JSON.stringify(schedule),

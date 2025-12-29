@@ -43,6 +43,7 @@ export interface JourneySchedule {
   milestones: JourneyMilestone[];
   rituals: JourneyRitual[];
   weeklyHoursEstimate: number;
+  suggestedChapterCount: number; // AI-determined optimal number of chapters/postcards
 }
 
 interface GenerateScheduleParams {
@@ -51,7 +52,6 @@ interface GenerateScheduleParams {
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
   timelineContext?: string;
-  totalChapters?: number;
 }
 
 interface AdjustScheduleParams {

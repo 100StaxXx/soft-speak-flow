@@ -231,25 +231,10 @@ export function Pathfinder({
 
   const calculateXP = useMemo(() => targetDays * EPIC_XP_REWARDS.XP_PER_DAY, [targetDays]);
 
-  // Calculate total chapters based on story type and duration
-  const calculateTotalChapters = useCallback((storyTypeSlug: StoryTypeSlug | null) => {
-    if (!storyTypeSlug) return 5; // Default
-    const story = storyTypes.find(s => s.slug === storyTypeSlug);
-    if (!story) return 5;
-    
-    const baseChapters = story.baseChapters;
-    // Adjust based on duration
-    if (targetDays <= 14) return Math.max(3, baseChapters - 2);
-    if (targetDays <= 30) return baseChapters;
-    if (targetDays <= 60) return baseChapters + 1;
-    return baseChapters + 2;
-  }, [targetDays]);
-
   const handleGenerateTimeline = useCallback(async () => {
-    if (!goalInput.trim() || !deadline || !storyType) return;
+    if (!goalInput.trim() || !deadline) return;
     tap();
     
-    const totalChapters = calculateTotalChapters(storyType);
     const deadlineStr = format(deadline, 'yyyy-MM-dd');
     const result = await generateSchedule({
       goal: goalInput,
@@ -257,7 +242,6 @@ export function Pathfinder({
       clarificationAnswers,
       epicContext,
       timelineContext: timelineContext.trim() || undefined,
-      totalChapters,
     });
     
     // Store original rituals for reset functionality
@@ -267,7 +251,7 @@ export function Pathfinder({
     
     setStep('timeline');
     success();
-  }, [goalInput, deadline, storyType, clarificationAnswers, epicContext, timelineContext, calculateTotalChapters, generateSchedule, tap, success]);
+  }, [goalInput, deadline, clarificationAnswers, epicContext, timelineContext, generateSchedule, tap, success]);
 
   const handleAdjustSchedule = useCallback(async (feedback: string) => {
     if (!schedule || !deadline) return;
