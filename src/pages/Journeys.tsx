@@ -118,18 +118,19 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 text-center relative"
         >
-          <div className="absolute right-0 top-0 flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowHourlyModal(true)}
-              className="h-9 w-9 text-muted-foreground hover:text-foreground"
-              aria-label="Open day view"
-            >
-              <Clock className="h-5 w-5" />
-            </Button>
-            <PageInfoButton onClick={() => setShowPageInfo(true)} />
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowHourlyModal(true)}
+            className="absolute left-0 top-0 h-10 w-10 text-primary hover:text-primary hover:bg-primary/10"
+            aria-label="Open day view"
+          >
+            <Clock className="h-6 w-6" />
+          </Button>
+          <PageInfoButton 
+            onClick={() => setShowPageInfo(true)} 
+            className="absolute right-0 top-0"
+          />
           <div className="inline-flex items-center gap-2 mb-3 bg-gradient-to-r from-primary/20 to-purple-500/20 px-4 py-2 rounded-full">
             <Compass className="w-5 h-5 text-primary" />
             <span className="text-sm font-medium">Your Path</span>
