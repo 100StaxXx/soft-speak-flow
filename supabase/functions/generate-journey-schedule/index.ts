@@ -39,10 +39,7 @@ interface ScheduleRequest {
   deadline: string; // ISO date string
   clarificationAnswers?: Record<string, string | number | undefined>;
   epicContext?: string;
-  timelineContext?: {
-    accelerators?: string[];
-    constraints?: string[];
-  };
+  timelineContext?: string;
   adjustmentRequest?: string; // For negotiation - e.g., "make it less aggressive"
   previousSchedule?: {
     phases: JourneyPhase[];
@@ -115,23 +112,21 @@ ${Object.entries(clarificationAnswers)
 `;
     }
 
-    // Build timeline context for accelerators and constraints
+    // Build timeline context prompt
     let timelineContextPrompt = '';
-    if (timelineContext?.accelerators?.length || timelineContext?.constraints?.length) {
-      if (timelineContext.accelerators?.length) {
-        timelineContextPrompt += `
-EXISTING ADVANTAGES (user can progress faster):
-${timelineContext.accelerators.map((a, i) => `${i + 1}. ${a}`).join('\n')}
-Consider skipping or shortening foundational phases. The user may be ready for intermediate/advanced work sooner.
+    if (timelineContext && timelineContext.trim()) {
+      timelineContextPrompt = `
+IMPORTANT CONTEXT from the user about their situation:
+"${timelineContext}"
+
+Consider this when planning - it may include:
+- Existing skills or experience (could allow skipping or shortening early phases)
+- Time constraints or availability limitations (adjust pacing accordingly)
+- Dependencies or prerequisites they're waiting on
+- Equipment or resources they have or need
+
+Adjust the timeline based on this context.
 `;
-      }
-      if (timelineContext.constraints?.length) {
-        timelineContextPrompt += `
-CONSTRAINTS (must work around these):
-${timelineContext.constraints.map((c, i) => `${i + 1}. ${c}`).join('\n')}
-Adjust phase timing, milestone dates, and ritual intensity to accommodate these limitations.
-`;
-      }
     }
 
     // Build adjustment context for negotiation
@@ -228,8 +223,7 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 3. Milestones are spread across phases with real dates
 4. Mark 3-5 key milestones as postcard milestones (typically at 25%, 50%, 75%, 100% progress)
 5. Rituals are realistic for the available time
-${timelineContext?.accelerators?.length ? '6. Consider the user\'s existing advantages when pacing the schedule - they may be able to skip basics' : ''}
-${timelineContext?.constraints?.length ? '7. Respect the user\'s constraints when scheduling phases and milestones' : ''}`;
+${timelineContext ? '6. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
     console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
