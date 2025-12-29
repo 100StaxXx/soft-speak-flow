@@ -514,7 +514,20 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 2: Timeline Review */}
+            {/* Step 2: Story & Theme */}
+            {step === 'story' && (
+              <StoryStep
+                storyType={storyType}
+                themeColor={themeColor}
+                onStoryTypeChange={setStoryType}
+                onThemeColorChange={setThemeColor}
+                onContinue={handleGenerateTimeline}
+                onBack={handleBack}
+                isLoading={isScheduleLoading}
+              />
+            )}
+
+            {/* Step 3: Timeline Review */}
             {step === 'timeline' && schedule && (
               <motion.div
                 key="timeline"
@@ -557,7 +570,7 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 3: Suggestions confirmation */}
+            {/* Step 4: Suggestions Confirmation */}
             {step === 'suggestions' && (
               <motion.div
                 key="suggestions"
@@ -616,19 +629,6 @@ export function Pathfinder({
                   </Button>
                 </div>
               </motion.div>
-            )}
-
-            {/* Step 2: Story & Theme */}
-            {step === 'story' && (
-              <StoryStep
-                storyType={storyType}
-                themeColor={themeColor}
-                onStoryTypeChange={setStoryType}
-                onThemeColorChange={setThemeColor}
-                onContinue={handleGenerateTimeline}
-                onBack={handleBack}
-                isLoading={isScheduleLoading}
-              />
             )}
 
             {/* Step 5: Review */}
