@@ -273,6 +273,16 @@ export const useEpics = () => {
             }
           }
 
+          // Build milestone data for narrative generation - use the actual postcard milestones
+          const postcardMilestones = epicData.milestones?.filter(m => m.is_postcard_milestone) || [];
+          const totalChapters = postcardMilestones.length || 5;
+          const milestoneData = postcardMilestones.map((m, idx) => ({
+            chapterNumber: idx + 1,
+            title: m.title,
+            targetDate: m.target_date,
+            milestonePercent: m.milestone_percent,
+          }));
+
           supabase.functions.invoke('generate-epic-narrative-seed', {
             body: {
               userId: user.id,
@@ -284,6 +294,8 @@ export const useEpics = () => {
               companionData: companionResult.data || undefined,
               mentorData,
               userGoal: epicData.description,
+              totalChapters, // Explicitly pass the count from milestones
+              milestoneData, // Pass the milestone dates for chapter alignment
             },
           }).catch(err => {
             console.error('Narrative seed generation failed:', err);
