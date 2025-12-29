@@ -10,7 +10,7 @@ import {
   Star,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { cn } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone, JourneyRitual, FeasibilityAssessment } from '@/hooks/useJourneySchedule';
 import { PhaseCard } from './PhaseCard';
@@ -60,9 +60,9 @@ export function TimelineView({
   const postcardMilestones = milestones.filter(m => m.isPostcardMilestone);
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="space-y-4">
       {/* Feasibility Assessment Header */}
-      <div className={cn('mx-4 mb-4 p-4 rounded-xl border', colors.bg, colors.border)}>
+      <div className={cn('p-4 rounded-xl border', colors.bg, colors.border)}>
         <div className="flex items-start gap-3">
           <div className={cn('p-2 rounded-lg', colors.bg)}>
             <Calendar className={cn('w-5 h-5', colors.text)} />
@@ -84,7 +84,7 @@ export function TimelineView({
       </div>
 
       {/* Time Commitment */}
-      <div className="mx-4 mb-4 flex items-center gap-4 text-sm text-muted-foreground">
+      <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <div className="flex items-center gap-1.5">
           <Clock className="w-4 h-4" />
           <span>~{weeklyHoursEstimate} hrs/week</span>
@@ -95,51 +95,49 @@ export function TimelineView({
         </div>
       </div>
 
-      {/* Timeline */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-        <div className="space-y-4 pb-4">
-          {sortedPhases.map((phase, index) => (
-            <motion.div
-              key={phase.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <PhaseCard
-                phase={phase}
-                milestones={milestonesPerPhase.get(phase.phaseOrder) || []}
-                isFirst={index === 0}
-                isLast={index === sortedPhases.length - 1}
-                onMilestoneToggle={onMilestoneToggle}
-              />
-            </motion.div>
-          ))}
-
-          {/* Deadline marker */}
+      {/* Timeline Phases */}
+      <div className="space-y-4">
+        {sortedPhases.map((phase, index) => (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: sortedPhases.length * 0.1 }}
-            className="p-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl border border-primary/30"
+            key={phase.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
           >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-primary/20">
-                <Flag className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold">Goal Complete!</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(parseISO(deadline), 'EEEE, MMMM d, yyyy')}
-                </p>
-              </div>
-              <Sparkles className="w-5 h-5 text-primary ml-auto animate-pulse" />
-            </div>
+            <PhaseCard
+              phase={phase}
+              milestones={milestonesPerPhase.get(phase.phaseOrder) || []}
+              isFirst={index === 0}
+              isLast={index === sortedPhases.length - 1}
+              onMilestoneToggle={onMilestoneToggle}
+            />
           </motion.div>
-        </div>
+        ))}
+
+        {/* Deadline marker */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: sortedPhases.length * 0.1 }}
+          className="p-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl border border-primary/30"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-primary/20">
+              <Flag className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold">Goal Complete!</p>
+              <p className="text-sm text-muted-foreground">
+                {format(parseISO(deadline), 'EEEE, MMMM d, yyyy')}
+              </p>
+            </div>
+            <Sparkles className="w-5 h-5 text-primary ml-auto animate-pulse" />
+          </div>
+        </motion.div>
       </div>
 
       {/* Rituals Summary */}
-      <div className="p-4 border-t bg-muted/30">
+      <div className="p-4 rounded-lg bg-muted/30 border">
         <p className="text-xs font-medium text-muted-foreground mb-2">
           Daily & Weekly Rituals ({rituals.length})
         </p>
