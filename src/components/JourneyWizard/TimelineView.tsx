@@ -96,7 +96,7 @@ export function TimelineView({
       </div>
 
       {/* Timeline */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
         <div className="space-y-4 pb-4">
           {sortedPhases.map((phase, index) => (
             <motion.div
