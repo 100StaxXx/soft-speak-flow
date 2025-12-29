@@ -36,6 +36,8 @@ import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useJourneySchedule } from '@/hooks/useJourneySchedule';
 import { SuggestionCard } from './SuggestionCard';
+import { RitualEditor } from './RitualEditor';
+import { PostcardPreview } from './PostcardPreview';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { StoryStep, themeColors } from './StoryStep';
 import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
@@ -108,7 +110,8 @@ export function Pathfinder({
   
   const { preferences, isAtEpicLimit } = useUserAIContext();
   const { trackInteraction } = useAIInteractionTracker();
-  const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, reset: resetSchedule } = useJourneySchedule();
+  const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, reset: resetSchedule, setRituals } = useJourneySchedule();
+  const [originalRituals, setOriginalRituals] = useState<typeof schedule.rituals>([]);
   
   const targetDays = useMemo(() => {
     if (deadline) {
@@ -222,12 +225,17 @@ export function Pathfinder({
     tap();
     
     const deadlineStr = format(deadline, 'yyyy-MM-dd');
-    await generateSchedule({
+    const result = await generateSchedule({
       goal: goalInput,
       deadline: deadlineStr,
       clarificationAnswers,
       epicContext,
     });
+    
+    // Store original rituals for reset functionality
+    if (result?.rituals) {
+      setOriginalRituals([...result.rituals]);
+    }
     
     setStep('timeline');
     success();
@@ -536,24 +544,14 @@ export function Pathfinder({
               >
                 <div className="flex-1 overflow-y-auto px-6" style={{ WebkitOverflowScrolling: 'touch' }}>
                   <div className="space-y-4 pb-4">
-                    {/* Rituals */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Repeat className="w-4 h-4" />
-                        Daily & Weekly Rituals ({selectedHabits.length})
-                      </div>
-                      {selectedHabits.map((h) => (
-                        <div key={h.id} className="p-3 bg-secondary/50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{h.title}</span>
-                            <Badge variant="outline">{h.frequency}</Badge>
-                          </div>
-                          {h.description && (
-                            <p className="text-sm text-muted-foreground mt-1">{h.description}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    {/* Editable Rituals */}
+                    {schedule?.rituals && (
+                      <RitualEditor
+                        rituals={schedule.rituals}
+                        originalRituals={originalRituals}
+                        onRitualsChange={setRituals}
+                      />
+                    )}
 
                     {/* Milestones */}
                     <div className="space-y-2">
@@ -572,6 +570,14 @@ export function Pathfinder({
                         </div>
                       ))}
                     </div>
+
+                    {/* Postcard Preview */}
+                    {schedule?.milestones && (
+                      <PostcardPreview 
+                        milestones={schedule.milestones} 
+                        storyType={storyType}
+                      />
+                    )}
                   </div>
                 </div>
 

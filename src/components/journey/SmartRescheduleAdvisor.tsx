@@ -17,7 +17,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useRescheduleIntelligence, RescheduleInsight } from '@/hooks/useRescheduleIntelligence';
-import { format } from 'date-fns';
+
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { format, subDays } from 'date-fns';
 
 interface SmartRescheduleAdvisorProps {
   epicId: string;
@@ -44,8 +48,78 @@ export function SmartRescheduleAdvisor({
 }: SmartRescheduleAdvisorProps) {
   const [dismissed, setDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const { user } = useAuth();
   
-  const intelligence = useRescheduleIntelligence(epicId);
+  // Fetch epic details for date range
+  const { data: epicData } = useQuery({
+    queryKey: ['epic-details', epicId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('epics')
+        .select('start_date, end_date, epic_habits(habit_id)')
+        .eq('id', epicId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!epicId,
+  });
+  
+  // Fetch habit completions for this epic's habits
+  const { data: habitCompletions } = useQuery({
+    queryKey: ['epic-habit-completions', epicId, user?.id],
+    queryFn: async () => {
+      if (!user?.id || !epicData?.epic_habits?.length) return [];
+      
+      const habitIds = epicData.epic_habits.map((eh: any) => eh.habit_id);
+      const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('habit_completions')
+        .select('habit_id, date, habits(title)')
+        .eq('user_id', user.id)
+        .in('habit_id', habitIds)
+        .gte('date', thirtyDaysAgo);
+        
+      if (error) throw error;
+      
+      return (data || []).map((hc: any) => ({
+        habit_id: hc.habit_id,
+        completed_at: hc.date,
+        habit: hc.habits,
+      }));
+    },
+    enabled: !!user?.id && !!epicData?.epic_habits?.length,
+  });
+  
+  // Get last check-in date
+  const { data: lastCheckIn } = useQuery({
+    queryKey: ['last-epic-activity', epicId, user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('epic_progress_log')
+        .select('date')
+        .eq('epic_id', epicId)
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') throw error;
+      return data?.date ? new Date(data.date) : undefined;
+    },
+    enabled: !!user?.id && !!epicId,
+  });
+  
+  const intelligence = useRescheduleIntelligence(
+    epicId,
+    habitCompletions,
+    lastCheckIn,
+    epicData?.start_date,
+    epicData?.end_date
+  );
   
   const handleDismiss = () => {
     setDismissed(true);
