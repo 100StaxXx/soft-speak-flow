@@ -606,8 +606,8 @@ export function Pathfinder({
                 </div>
 
                 <div className="p-6 pt-4 border-t bg-background space-y-3">
-                  <Button onClick={handleProceedToStory} className="w-full">
-                    Continue to story selection
+                  <Button onClick={handleProceedToReview} className="w-full">
+                    Continue to Review
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                   <Button variant="ghost" onClick={handleBack} className="w-full">
