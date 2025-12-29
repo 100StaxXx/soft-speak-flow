@@ -24,6 +24,31 @@ const normalizeFrequency = (value: string): 'daily' | '5x_week' | '3x_week' | 'c
   return 'daily';
 };
 
+// Helper to normalize theme color to valid database constraint values
+const normalizeThemeColor = (value: string | undefined): 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar' => {
+  if (!value) return 'heroic';
+  const lower = value.toLowerCase().trim();
+  
+  // Direct matches for valid values
+  if (['heroic', 'warrior', 'mystic', 'nature', 'solar'].includes(lower)) {
+    return lower as 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
+  }
+  
+  // Map hex values to ids (backward compatibility)
+  const hexMap: Record<string, 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar'> = {
+    '#f59e0b': 'heroic',
+    '#ef4444': 'warrior',
+    '#10b981': 'nature',
+    '#ec4899': 'mystic',
+    '#f97316': 'solar',
+    '#8b5cf6': 'mystic',  // cosmic -> mystic
+    '#3b82f6': 'heroic',  // ocean -> heroic
+    '#475569': 'warrior', // shadow -> warrior
+  };
+  
+  return hexMap[lower] || 'heroic';
+};
+
 // Type for habits created during epic creation
 interface CreatedHabit {
   id: string;
@@ -179,7 +204,7 @@ export const useEpics = () => {
             is_public: true,
             xp_reward: Math.floor(epicData.target_days * 10),
             invite_code: inviteCode,
-            theme_color: epicData.theme_color || 'heroic',
+            theme_color: normalizeThemeColor(epicData.theme_color),
             story_type_slug: epicData.story_type_slug || null,
           })
           .select()

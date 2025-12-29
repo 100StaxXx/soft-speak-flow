@@ -7,15 +7,13 @@ import { StoryTypeSelector, storyTypes } from '@/components/narrative/StoryTypeS
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
 // Theme colors available for epics
+// Theme colors matching database constraint: heroic, warrior, mystic, nature, solar
 const themeColors = [
   { id: 'heroic', label: 'Heroic Gold', color: 'from-amber-500 to-yellow-600', value: '#f59e0b' },
   { id: 'warrior', label: 'Warrior Red', color: 'from-red-500 to-rose-600', value: '#ef4444' },
   { id: 'nature', label: 'Nature Green', color: 'from-emerald-500 to-green-600', value: '#10b981' },
-  { id: 'cosmic', label: 'Cosmic Purple', color: 'from-purple-500 to-violet-600', value: '#8b5cf6' },
-  { id: 'ocean', label: 'Ocean Blue', color: 'from-blue-500 to-cyan-600', value: '#3b82f6' },
-  { id: 'sunset', label: 'Sunset Orange', color: 'from-orange-500 to-amber-600', value: '#f97316' },
   { id: 'mystic', label: 'Mystic Pink', color: 'from-pink-500 to-rose-600', value: '#ec4899' },
-  { id: 'shadow', label: 'Shadow Gray', color: 'from-slate-600 to-zinc-700', value: '#475569' },
+  { id: 'solar', label: 'Solar Orange', color: 'from-orange-500 to-yellow-500', value: '#f97316' },
 ];
 
 interface StoryStepProps {
@@ -37,7 +35,7 @@ export function StoryStep({
   onBack,
   isLoading = false,
 }: StoryStepProps) {
-  const selectedTheme = themeColors.find(t => t.value === themeColor) || themeColors[0];
+  const selectedTheme = themeColors.find(t => t.id === themeColor) || themeColors[0];
 
   return (
     <motion.div
@@ -71,18 +69,18 @@ export function StoryStep({
               {themeColors.map((theme) => (
                 <button
                   key={theme.id}
-                  onClick={() => onThemeColorChange(theme.value)}
+                  onClick={() => onThemeColorChange(theme.id)}
                   className={cn(
                     "relative h-12 rounded-lg transition-all",
                     "bg-gradient-to-br",
                     theme.color,
-                    themeColor === theme.value
+                    themeColor === theme.id
                       ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-105"
                       : "hover:scale-105"
                   )}
                   title={theme.label}
                 >
-                  {themeColor === theme.value && (
+                  {themeColor === theme.id && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="w-3 h-3 bg-white rounded-full shadow-lg" />
                     </div>
