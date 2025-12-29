@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Map, 
   Calendar, 
@@ -19,7 +20,9 @@ import {
   AlertCircle,
   ChevronRight,
   Sparkles,
-  Wand2
+  Wand2,
+  LayoutList,
+  GitBranch,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, differenceInDays } from "date-fns";
@@ -28,6 +31,8 @@ import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { RescheduleDrawer } from "./RescheduleDrawer";
+import { PhaseProgressTimeline } from "./journey/PhaseProgressTimeline";
+import { PhaseProgressCard } from "./journey/PhaseProgressCard";
 
 interface JourneyDetailDrawerProps {
   epicId: string;
@@ -45,6 +50,7 @@ export const JourneyDetailDrawer = ({
   children 
 }: JourneyDetailDrawerProps) => {
   const [open, setOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
   
   const {
     milestonesByPhase,
@@ -54,6 +60,7 @@ export const JourneyDetailDrawer = ({
     completeMilestone,
     uncompleteMilestone,
     getCurrentPhase,
+    getPhaseStats,
     isMilestoneOverdue,
     getDaysUntilMilestone,
     isCompleting,
@@ -63,6 +70,7 @@ export const JourneyDetailDrawer = ({
   const { companion } = useCompanion();
 
   const currentPhase = getCurrentPhase();
+  const phaseStats = getPhaseStats();
 
   const handleMilestoneToggle = async (milestone: Milestone) => {
     if (milestone.completed_at) {
@@ -133,7 +141,23 @@ export const JourneyDetailDrawer = ({
           </div>
         </DrawerHeader>
 
-        <ScrollArea className="flex-1 px-4 pb-6 max-h-[65vh]">
+        {/* View Mode Tabs */}
+        <div className="px-4 pb-3">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'timeline' | 'list')}>
+            <TabsList className="grid w-full grid-cols-2 h-8">
+              <TabsTrigger value="timeline" className="text-xs gap-1.5">
+                <GitBranch className="w-3.5 h-3.5" />
+                Timeline
+              </TabsTrigger>
+              <TabsTrigger value="list" className="text-xs gap-1.5">
+                <LayoutList className="w-3.5 h-3.5" />
+                List
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        <ScrollArea className="flex-1 px-4 pb-6 max-h-[60vh]">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
@@ -142,6 +166,22 @@ export const JourneyDetailDrawer = ({
             <div className="text-center py-8 text-muted-foreground">
               <Map className="w-10 h-10 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No milestones yet</p>
+            </div>
+          ) : viewMode === 'timeline' ? (
+            <div className="space-y-4">
+              {/* Phase Progress Card */}
+              <PhaseProgressCard
+                milestonesByPhase={milestonesByPhase}
+                currentPhaseName={currentPhase}
+              />
+              
+              {/* Visual Timeline */}
+              <PhaseProgressTimeline
+                milestonesByPhase={milestonesByPhase}
+                currentPhaseName={currentPhase}
+                deadline={currentDeadline}
+                variant="vertical"
+              />
             </div>
           ) : (
             <div className="space-y-6">

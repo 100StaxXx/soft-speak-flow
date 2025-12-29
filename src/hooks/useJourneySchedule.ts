@@ -132,16 +132,45 @@ export function useJourneySchedule() {
     });
   }, []);
 
-  const toggleRitual = useCallback((ritualId: string) => {
+  const updateRitual = useCallback((updatedRitual: JourneyRitual) => {
     setSchedule(prev => {
       if (!prev) return prev;
-      const ritual = prev.rituals.find(r => r.id === ritualId);
-      if (!ritual) return prev;
-      
-      // Toggle by removing or adding back
-      const isCurrentlySelected = prev.rituals.some(r => r.id === ritualId);
-      // For simplicity, we'll track selection separately or use a 'selected' field
-      return prev;
+      return {
+        ...prev,
+        rituals: prev.rituals.map(r => 
+          r.id === updatedRitual.id ? updatedRitual : r
+        ),
+      };
+    });
+  }, []);
+
+  const addRitual = useCallback((ritual: JourneyRitual) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        rituals: [...prev.rituals, ritual],
+      };
+    });
+  }, []);
+
+  const removeRitual = useCallback((ritualId: string) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        rituals: prev.rituals.filter(r => r.id !== ritualId),
+      };
+    });
+  }, []);
+
+  const setRituals = useCallback((rituals: JourneyRitual[]) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        rituals,
+      };
     });
   }, []);
 
@@ -172,7 +201,10 @@ export function useJourneySchedule() {
     generateSchedule,
     adjustSchedule,
     toggleMilestone,
-    toggleRitual,
+    updateRitual,
+    addRitual,
+    removeRitual,
+    setRituals,
     updateMilestoneDate,
     reset,
   };
