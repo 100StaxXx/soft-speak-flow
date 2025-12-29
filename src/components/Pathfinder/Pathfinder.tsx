@@ -34,11 +34,13 @@ import { useUserAIContext } from '@/hooks/useUserAIContext';
 import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useJourneySchedule } from '@/hooks/useJourneySchedule';
+import { useIntentClassifier } from '@/hooks/useIntentClassifier';
 import { SuggestionCard } from './SuggestionCard';
 import { RitualEditor } from './RitualEditor';
 import { PostcardPreview } from './PostcardPreview';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { StoryStep, themeColors } from './StoryStep';
+import { EpicClarificationFlow } from '@/features/tasks/components/EpicClarificationFlow';
 import { storyTypes } from '@/components/narrative/StoryTypeSelector';
 import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
 import { TimelineView } from '@/components/JourneyWizard/TimelineView';
@@ -116,6 +118,18 @@ export function Pathfinder({
   const { trackInteraction } = useAIInteractionTracker();
   const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals } = useJourneySchedule();
   const [originalRituals, setOriginalRituals] = useState<typeof schedule.rituals>([]);
+  
+  // AI Clarification state
+  const {
+    classify,
+    isClassifying,
+    classification,
+    clarifyEpic,
+    reset: resetClassification,
+  } = useIntentClassifier({ useOrchestrator: false });
+  const [showClarification, setShowClarification] = useState(false);
+  const [localClarificationAnswers, setLocalClarificationAnswers] = useState<Record<string, string | number>>({});
+  const [localEpicContext, setLocalEpicContext] = useState<string | undefined>(undefined);
   
   const targetDays = useMemo(() => {
     if (deadline) {
@@ -236,11 +250,17 @@ export function Pathfinder({
     tap();
     
     const deadlineStr = format(deadline, 'yyyy-MM-dd');
+    // Use local clarification answers if available, otherwise fall back to props
+    const answersToUse = Object.keys(localClarificationAnswers).length > 0 
+      ? localClarificationAnswers 
+      : clarificationAnswers;
+    const contextToUse = localEpicContext || epicContext;
+    
     const result = await generateSchedule({
       goal: goalInput,
       deadline: deadlineStr,
-      clarificationAnswers,
-      epicContext,
+      clarificationAnswers: answersToUse,
+      epicContext: contextToUse,
       timelineContext: timelineContext.trim() || undefined,
     });
     
@@ -251,7 +271,7 @@ export function Pathfinder({
     
     setStep('timeline');
     success();
-  }, [goalInput, deadline, clarificationAnswers, epicContext, timelineContext, generateSchedule, tap, success]);
+  }, [goalInput, deadline, clarificationAnswers, epicContext, localClarificationAnswers, localEpicContext, timelineContext, generateSchedule, tap, success]);
 
   const handleAdjustSchedule = useCallback(async (feedback: string) => {
     if (!schedule || !deadline) return;
@@ -274,15 +294,48 @@ export function Pathfinder({
     medium();
   }, [schedule, medium]);
 
-  // After goal step, go to story selection
-  const handleProceedToStory = useCallback(() => {
+  // After goal step, classify and potentially show clarification
+  const handleProceedToStory = useCallback(async () => {
     if (!goalInput.trim() || !deadline) return;
-    if (!epicTitle) {
-      setEpicTitle(goalInput);
+    tap();
+    
+    // Classify the goal to check if clarification is needed
+    const result = await classify(goalInput);
+    
+    if (result?.type === 'epic' && result.needsClarification && result.epicClarifyingQuestions?.length) {
+      // Show clarification UI
+      setShowClarification(true);
+    } else {
+      // No clarification needed, proceed to story
+      if (!epicTitle) setEpicTitle(goalInput);
+      setStep('story');
+      medium();
     }
+  }, [goalInput, deadline, epicTitle, classify, tap, medium]);
+
+  // Handle clarification submission
+  const handleClarificationSubmit = useCallback(async (answers: Record<string, string | number>) => {
+    setLocalClarificationAnswers(answers);
+    setShowClarification(false);
+    
+    // Re-classify with answers to get refined epic details
+    const result = await clarifyEpic(goalInput, answers);
+    if (result?.epicContext) {
+      setLocalEpicContext(result.epicContext);
+    }
+    
+    if (!epicTitle) setEpicTitle(goalInput);
     setStep('story');
     medium();
-  }, [goalInput, deadline, epicTitle, medium]);
+  }, [goalInput, clarifyEpic, epicTitle, medium]);
+
+  // Skip clarification
+  const handleSkipClarification = useCallback(() => {
+    setShowClarification(false);
+    if (!epicTitle) setEpicTitle(goalInput);
+    setStep('story');
+    medium();
+  }, [goalInput, epicTitle, medium]);
 
   const handleProceedToReview = useCallback(() => {
     if (!storyType) return;
@@ -365,12 +418,16 @@ export function Pathfinder({
     setEpicWhy('');
     setCustomHabits([]);
     setStoryType(null);
-    setThemeColor(themeColors[0].value);
+    setThemeColor(themeColors[0].id);
     setSelectedTemplate(null);
+    setShowClarification(false);
+    setLocalClarificationAnswers({});
+    setLocalEpicContext(undefined);
     resetSuggestions();
     resetSchedule();
+    resetClassification();
     onOpenChange(false);
-  }, [onOpenChange, resetSuggestions, resetSchedule, initialGoal]);
+  }, [onOpenChange, resetSuggestions, resetSchedule, resetClassification, initialGoal]);
 
   const handleVoiceToggle = useCallback(() => {
     if (isRecording) {
@@ -497,16 +554,40 @@ export function Pathfinder({
                   <DeadlinePicker value={deadline} onChange={setDeadline} />
                 </div>
 
-                {/* Continue button */}
-                <Button
-                  onClick={handleProceedToStory}
-                  disabled={!goalInput.trim() || !deadline}
-                  className="w-full h-12 text-base"
-                  size="lg"
-                >
-                  <ChevronRight className="w-5 h-5 mr-2" />
-                  Choose Your Story Type
-                </Button>
+                {/* AI Clarification Flow */}
+                <AnimatePresence>
+                  {showClarification && classification?.epicClarifyingQuestions && classification.epicClarifyingQuestions.length > 0 && (
+                    <EpicClarificationFlow
+                      goal={goalInput}
+                      questions={classification.epicClarifyingQuestions}
+                      onSubmit={handleClarificationSubmit}
+                      onSkip={handleSkipClarification}
+                      isLoading={isClassifying}
+                    />
+                  )}
+                </AnimatePresence>
+
+                {/* Continue button - hide when showing clarification */}
+                {!showClarification && (
+                  <Button
+                    onClick={handleProceedToStory}
+                    disabled={!goalInput.trim() || !deadline || isClassifying}
+                    className="w-full h-12 text-base"
+                    size="lg"
+                  >
+                    {isClassifying ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Analyzing your goal...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronRight className="w-5 h-5 mr-2" />
+                        Choose Your Story Type
+                      </>
+                    )}
+                  </Button>
+                )}
 
                 {error && (
                   <p className="text-sm text-destructive text-center">{error}</p>
