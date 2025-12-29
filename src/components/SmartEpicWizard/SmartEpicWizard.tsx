@@ -409,7 +409,7 @@ export function SmartEpicWizard({
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <AnimatePresence mode="wait">
             {/* Step 1: Goal & Deadline */}
             {step === 'goal' && (
@@ -490,7 +490,7 @@ export function SmartEpicWizard({
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col h-full"
+                className="flex flex-col h-full min-h-0 max-h-[calc(90vh-220px)]"
               >
                 <TimelineView
                   feasibilityAssessment={schedule.feasibilityAssessment}

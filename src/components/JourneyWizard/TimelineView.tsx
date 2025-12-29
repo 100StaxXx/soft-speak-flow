@@ -60,7 +60,7 @@ export function TimelineView({
   const postcardMilestones = milestones.filter(m => m.isPostcardMilestone);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Feasibility Assessment Header */}
       <div className={cn('mx-4 mb-4 p-4 rounded-xl border', colors.bg, colors.border)}>
         <div className="flex items-start gap-3">
@@ -96,7 +96,7 @@ export function TimelineView({
       </div>
 
       {/* Timeline */}
-      <ScrollArea className="flex-1 px-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="space-y-4 pb-4">
           {sortedPhases.map((phase, index) => (
             <motion.div
@@ -136,7 +136,7 @@ export function TimelineView({
             </div>
           </motion.div>
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Rituals Summary */}
       <div className="p-4 border-t bg-muted/30">
