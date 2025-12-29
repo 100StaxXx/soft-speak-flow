@@ -9,8 +9,10 @@ import {
   Wand2,
   Target,
   Mic,
-  Send
+  Send,
+  Clock
 } from "lucide-react";
+import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { PageTransition } from "@/components/PageTransition";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,7 @@ const Journeys = () => {
   const [smartWizardOpen, setSmartWizardOpen] = useState(false);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showHourlyModal, setShowHourlyModal] = useState(false);
   
   const { currentStreak } = useStreakMultiplier();
   
@@ -115,10 +118,18 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 text-center relative"
         >
-          <PageInfoButton 
-            onClick={() => setShowPageInfo(true)} 
-            className="absolute right-0 top-0"
-          />
+          <div className="absolute right-0 top-0 flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHourlyModal(true)}
+              className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              aria-label="Open day view"
+            >
+              <Clock className="h-5 w-5" />
+            </Button>
+            <PageInfoButton onClick={() => setShowPageInfo(true)} />
+          </div>
           <div className="inline-flex items-center gap-2 mb-3 bg-gradient-to-r from-primary/20 to-purple-500/20 px-4 py-2 rounded-full">
             <Compass className="w-5 h-5 text-primary" />
             <span className="text-sm font-medium">Your Path</span>
@@ -342,6 +353,25 @@ const Journeys = () => {
             "Join guilds to campaign with others"
           ]}
           tip="Create campaigns to link your daily rituals to bigger goals!"
+        />
+
+        <HourlyViewModal
+          open={showHourlyModal}
+          onOpenChange={setShowHourlyModal}
+          selectedDate={selectedDate}
+          onDateSelect={setSelectedDate}
+          tasks={dailyTasks.map(task => ({
+            id: task.id,
+            task_text: task.task_text,
+            completed: task.completed || false,
+            scheduled_time: task.scheduled_time,
+            estimated_duration: task.estimated_duration,
+            task_date: task.task_date,
+            difficulty: task.difficulty,
+            xp_reward: task.xp_reward,
+            is_main_quest: task.is_main_quest || false,
+          }))}
+          onTaskDrop={() => {}}
         />
       </div>
 
