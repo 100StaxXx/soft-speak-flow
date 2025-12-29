@@ -129,7 +129,7 @@ export function Pathfinder({
   const [epicWhy, setEpicWhy] = useState('');
   const [customHabits, setCustomHabits] = useState<EpicSuggestion[]>([]);
   const [storyType, setStoryType] = useState<StoryTypeSlug | null>(null);
-  const [themeColor, setThemeColor] = useState(themeColors[0].value);
+  const [themeColor, setThemeColor] = useState(themeColors[0].id);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(template || null);
   const { medium, success, light, tap } = useHapticFeedback();
   
