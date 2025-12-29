@@ -106,6 +106,7 @@ export const useCompanion = () => {
             stage: 0,
             eyeColor,
             furColor,
+            storyTone: data.storyTone,
           },
           {
             maxRetries: 2,

@@ -285,6 +285,30 @@ const STORY_TONES: Record<string, { lighting: string; atmosphere: string; palett
   "playful": { lighting: "bright and cheerful daylight", atmosphere: "fun, energetic, silly", palette: "bright primary colors, candy hues", expression: "mischievous, happy, laughing" }
 };
 
+// Map UI story tone values to internal values
+function normalizeStoryTone(tone?: string): string | undefined {
+  if (!tone) return undefined;
+  
+  const mapping: Record<string, string> = {
+    // UI values -> edge function values
+    'soft_gentle': 'cozy',
+    'epic_adventure': 'epic',
+    'emotional_heartfelt': 'melancholic',
+    'dark_intense': 'mysterious',
+    'whimsical_playful': 'whimsical',
+    // Direct matches (if already normalized)
+    'whimsical': 'whimsical',
+    'epic': 'epic',
+    'cozy': 'cozy',
+    'mysterious': 'mysterious',
+    'triumphant': 'triumphant',
+    'melancholic': 'melancholic',
+    'playful': 'playful',
+  };
+  
+  return mapping[tone.toLowerCase()] || tone;
+}
+
 function getStoryToneModifiers(tone?: string): string {
   if (!tone || !STORY_TONES[tone]) return "";
   const t = STORY_TONES[tone];
@@ -589,7 +613,7 @@ serve(async (req) => {
 
     const characterDNA = generateCharacterDNA(spiritAnimal, element, favoriteColor, eyeColor, furColor, stage);
     const negativePrompts = getNegativePrompts(stage, spiritAnimal);
-    const storyToneStyle = getStoryToneModifiers(storyTone);
+    const storyToneStyle = getStoryToneModifiers(normalizeStoryTone(storyTone));
     const elementOverlay = getElementOverlay(element);
     const stagePrompt = generateStagePrompt(stage, spiritAnimal, element, favoriteColor);
 
