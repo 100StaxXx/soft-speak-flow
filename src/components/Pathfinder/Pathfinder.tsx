@@ -126,7 +126,7 @@ export function Pathfinder({
   }, [deadline, initialTargetDays, preferences.epicDuration]);
   
   const [epicTitle, setEpicTitle] = useState('');
-  const [epicDescription, setEpicDescription] = useState('');
+  const [epicWhy, setEpicWhy] = useState('');
   const [customHabits, setCustomHabits] = useState<EpicSuggestion[]>([]);
   const [storyType, setStoryType] = useState<StoryTypeSlug | null>(null);
   const [themeColor, setThemeColor] = useState(themeColors[0].value);
@@ -168,7 +168,7 @@ export function Pathfinder({
   useEffect(() => {
     if (selectedTemplate && open) {
       setEpicTitle(selectedTemplate.name);
-      setEpicDescription(selectedTemplate.description);
+      setEpicWhy(selectedTemplate.description);
       setDeadline(addDays(new Date(), selectedTemplate.target_days));
       setThemeColor(selectedTemplate.theme_color || themeColors[0].value);
       
@@ -334,7 +334,7 @@ export function Pathfinder({
 
     onCreateEpic({
       title: epicTitle || goalInput,
-      description: epicDescription || undefined,
+      description: epicWhy || undefined,
       target_days: targetDays,
       habits,
       milestones,
@@ -345,7 +345,7 @@ export function Pathfinder({
     });
 
     success();
-  }, [selectedHabits, epicTitle, goalInput, epicDescription, targetDays, storyType, themeColor, schedule, onCreateEpic, success, trackInteraction, suggestions]);
+  }, [selectedHabits, epicTitle, goalInput, epicWhy, targetDays, storyType, themeColor, schedule, onCreateEpic, success, trackInteraction, suggestions]);
 
   const handleBack = useCallback(() => {
     light();
@@ -362,7 +362,7 @@ export function Pathfinder({
     setDeadline(undefined);
     setTimelineContext('');
     setEpicTitle('');
-    setEpicDescription('');
+    setEpicWhy('');
     setCustomHabits([]);
     setStoryType(null);
     setThemeColor(themeColors[0].value);
@@ -643,25 +643,34 @@ export function Pathfinder({
                 <div className="flex-1 overflow-y-auto px-6 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
                   <div className="space-y-4 pb-4">
                     <div className="space-y-2">
-                      <Label htmlFor="epic-title">Campaign Name</Label>
-                      <Input
-                        id="epic-title"
-                        value={epicTitle}
-                        onChange={(e) => setEpicTitle(e.target.value)}
-                        placeholder="Name your campaign"
+                      <Label htmlFor="epic-why">Your Why</Label>
+                      <Textarea
+                        id="epic-why"
+                        value={epicWhy}
+                        onChange={(e) => setEpicWhy(e.target.value)}
+                        placeholder="Why are you embarking on this campaign? What's your purpose?"
+                        rows={3}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Define your purpose - this will fuel your motivation
+                      </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="epic-desc">Description (optional)</Label>
-                      <Textarea
-                        id="epic-desc"
-                        value={epicDescription}
-                        onChange={(e) => setEpicDescription(e.target.value)}
-                        placeholder="Add more details"
-                        rows={2}
-                      />
-                    </div>
+                    {epicWhy.trim().length > 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-2"
+                      >
+                        <Label htmlFor="epic-title">Campaign Name</Label>
+                        <Input
+                          id="epic-title"
+                          value={epicTitle}
+                          onChange={(e) => setEpicTitle(e.target.value)}
+                          placeholder="Name your campaign"
+                        />
+                      </motion.div>
+                    )}
 
                     <div className="p-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-xl border border-primary/20">
                       <div className="flex items-center justify-between">
