@@ -23,6 +23,7 @@ interface TimelineViewProps {
   weeklyHoursEstimate: number;
   deadline: string;
   onMilestoneToggle?: (milestoneId: string) => void;
+  onMilestoneDateChange?: (milestoneId: string, newDate: string) => void;
 }
 
 export function TimelineView({
@@ -33,6 +34,7 @@ export function TimelineView({
   weeklyHoursEstimate,
   deadline,
   onMilestoneToggle,
+  onMilestoneDateChange,
 }: TimelineViewProps) {
   const sortedPhases = useMemo(() => 
     [...phases].sort((a, b) => a.phaseOrder - b.phaseOrder),
@@ -110,6 +112,7 @@ export function TimelineView({
               isFirst={index === 0}
               isLast={index === sortedPhases.length - 1}
               onMilestoneToggle={onMilestoneToggle}
+              onMilestoneDateChange={onMilestoneDateChange}
             />
           </motion.div>
         ))}
