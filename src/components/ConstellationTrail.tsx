@@ -1,10 +1,10 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { HelpCircle, MapPin, Sparkles, Lock, Star } from "lucide-react";
+import { HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -379,6 +379,397 @@ const MysteryMilestonePopover = ({
   );
 };
 
+// Milestone Reveal Animation Component
+const MilestoneRevealAnimation = ({ 
+  isRevealing,
+  isPostcard,
+  onComplete
+}: { 
+  isRevealing: boolean;
+  isPostcard: boolean;
+  onComplete: () => void;
+}) => {
+  useEffect(() => {
+    if (isRevealing) {
+      // Trigger haptic feedback for milestone unlock
+      const triggerHaptic = async () => {
+        try {
+          await Haptics.notification({ type: NotificationType.Success });
+        } catch {
+          // Haptics not available
+        }
+      };
+      triggerHaptic();
+      
+      // Auto-complete animation after duration
+      const timer = setTimeout(onComplete, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isRevealing, onComplete]);
+
+  return (
+    <AnimatePresence>
+      {isRevealing && (
+        <>
+          {/* Expanding ring burst */}
+          <motion.div
+            className={cn(
+              "absolute inset-0 rounded-full border-2",
+              isPostcard ? "border-amber-400" : "border-purple-400"
+            )}
+            initial={{ scale: 0.5, opacity: 1 }}
+            animate={{ scale: 4, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            style={{ 
+              width: 20, 
+              height: 20,
+              marginLeft: -10,
+              marginTop: -10,
+            }}
+          />
+          
+          {/* Second ring with delay */}
+          <motion.div
+            className={cn(
+              "absolute inset-0 rounded-full border",
+              isPostcard ? "border-amber-400/50" : "border-purple-400/50"
+            )}
+            initial={{ scale: 0.5, opacity: 1 }}
+            animate={{ scale: 5, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1, ease: "easeOut", delay: 0.1 }}
+            style={{ 
+              width: 20, 
+              height: 20,
+              marginLeft: -10,
+              marginTop: -10,
+            }}
+          />
+          
+          {/* Central glow burst */}
+          <motion.div
+            className={cn(
+              "absolute rounded-full",
+              isPostcard ? "bg-amber-400" : "bg-purple-400"
+            )}
+            initial={{ scale: 0, opacity: 0.8 }}
+            animate={{ scale: [0, 2.5, 0], opacity: [0.8, 0.4, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            style={{ 
+              width: 24, 
+              height: 24,
+              marginLeft: -12,
+              marginTop: -12,
+              filter: "blur(6px)",
+            }}
+          />
+          
+          {/* Particle explosions */}
+          {Array.from({ length: 8 }).map((_, i) => {
+            const angle = (i / 8) * Math.PI * 2;
+            const distance = 30 + Math.random() * 20;
+            return (
+              <motion.div
+                key={`particle-${i}`}
+                className={cn(
+                  "absolute w-1.5 h-1.5 rounded-full",
+                  isPostcard ? "bg-amber-400" : "bg-purple-400"
+                )}
+                initial={{ 
+                  x: 0, 
+                  y: 0, 
+                  scale: 1, 
+                  opacity: 1 
+                }}
+                animate={{ 
+                  x: Math.cos(angle) * distance,
+                  y: Math.sin(angle) * distance,
+                  scale: 0,
+                  opacity: 0,
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ 
+                  duration: 0.6 + Math.random() * 0.3,
+                  ease: "easeOut",
+                  delay: Math.random() * 0.1
+                }}
+                style={{
+                  marginLeft: -3,
+                  marginTop: -3,
+                }}
+              />
+            );
+          })}
+          
+          {/* Sparkle icon burst */}
+          <motion.div
+            className={cn(
+              "absolute",
+              isPostcard ? "text-amber-400" : "text-purple-400"
+            )}
+            initial={{ scale: 0, rotate: 0, opacity: 1 }}
+            animate={{ 
+              scale: [0, 1.5, 0],
+              rotate: 180,
+              opacity: [1, 1, 0]
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            style={{
+              marginLeft: -8,
+              marginTop: -30,
+            }}
+          >
+            <Sparkles className="w-4 h-4" />
+          </motion.div>
+          
+          {/* Star burst */}
+          <motion.div
+            className={cn(
+              "absolute",
+              isPostcard ? "text-yellow-300" : "text-purple-300"
+            )}
+            initial={{ scale: 0, rotate: 0, opacity: 1 }}
+            animate={{ 
+              scale: [0, 1.2, 0],
+              rotate: -90,
+              opacity: [1, 1, 0]
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
+            style={{
+              marginLeft: 15,
+              marginTop: -20,
+            }}
+          >
+            <Star className="w-3 h-3" />
+          </motion.div>
+          
+          {/* Zap icon for energy */}
+          <motion.div
+            className={cn(
+              "absolute",
+              isPostcard ? "text-amber-300" : "text-purple-300"
+            )}
+            initial={{ scale: 0, y: 0, opacity: 1 }}
+            animate={{ 
+              scale: [0, 1, 0],
+              y: -25,
+              opacity: [1, 1, 0]
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut", delay: 0.15 }}
+            style={{
+              marginLeft: -20,
+              marginTop: -15,
+            }}
+          >
+            <Zap className="w-3 h-3" />
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Milestone Star Component with reveal tracking
+const MilestoneStar = ({
+  milestone,
+  pos,
+  index,
+  progress,
+  sortedMilestones,
+}: {
+  milestone: TrailMilestone;
+  pos: { x: number; y: number; size: number };
+  index: number;
+  progress: number;
+  sortedMilestones: TrailMilestone[];
+}) => {
+  const milestonePercent = milestone.milestone_percent;
+  const isCompleted = progress >= milestonePercent || !!milestone.completed_at;
+  const nextMilestonePercent = index < sortedMilestones.length - 1 ? sortedMilestones[index + 1].milestone_percent : 101;
+  const isCurrent = progress >= milestonePercent && progress < nextMilestonePercent;
+  const isPostcard = milestone.is_postcard_milestone;
+  const isFinale = milestonePercent === 100 || index === sortedMilestones.length - 1;
+  const isStart = index === 0;
+  
+  const starSize = isPostcard ? pos.size * 1.3 : pos.size;
+  
+  // Track previous completion state for reveal animation
+  const prevCompletedRef = useRef(isCompleted);
+  const [isRevealing, setIsRevealing] = useState(false);
+  
+  useEffect(() => {
+    // Detect transition from incomplete to complete
+    if (isCompleted && !prevCompletedRef.current && !isStart) {
+      setIsRevealing(true);
+    }
+    prevCompletedRef.current = isCompleted;
+  }, [isCompleted, isStart]);
+  
+  const handleRevealComplete = () => {
+    setIsRevealing(false);
+  };
+  
+  return (
+    <motion.div
+      className="absolute transform -translate-x-1/2 -translate-y-1/2"
+      style={{
+        left: `${pos.x}%`,
+        top: `${pos.y}%`,
+      }}
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: index * 0.1, duration: 0.5 }}
+    >
+      {/* Reveal Animation */}
+      <MilestoneRevealAnimation
+        isRevealing={isRevealing}
+        isPostcard={!!isPostcard}
+        onComplete={handleRevealComplete}
+      />
+      
+      {/* Completed glow effect */}
+      <AnimatePresence>
+        {isCompleted && (
+          <motion.div
+            className={cn(
+              "absolute inset-0 rounded-full",
+              isPostcard 
+                ? (isCurrent ? "bg-yellow-400" : "bg-yellow-400/50")
+                : (isCurrent ? "bg-primary" : "bg-primary/50")
+            )}
+            style={{
+              width: starSize * 3,
+              height: starSize * 3,
+              marginLeft: -starSize,
+              marginTop: -starSize,
+              filter: "blur(8px)",
+            }}
+            initial={isRevealing ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 0.5 }}
+            animate={isCurrent ? {
+              scale: [1, 1.3, 1],
+              opacity: [0.5, 0.8, 0.5],
+            } : { scale: 1, opacity: 0.5 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={isRevealing ? {
+              scale: { duration: 0.5, ease: "easeOut" },
+              opacity: { duration: 0.5, ease: "easeOut" },
+            } : {
+              duration: 2,
+              repeat: isCurrent ? Infinity : 0,
+              ease: "easeInOut",
+            }}
+          />
+        )}
+      </AnimatePresence>
+      
+      {/* Star orb */}
+      <motion.div
+        className={cn(
+          "rounded-full relative z-10",
+          isCompleted 
+            ? isPostcard
+              ? "bg-gradient-to-br from-yellow-400 via-amber-300 to-yellow-500 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+              : "bg-gradient-to-br from-primary via-purple-400 to-primary shadow-[0_0_10px_rgba(167,108,255,0.5)]" 
+            : "bg-muted/30 border border-muted/50"
+        )}
+        style={{
+          width: starSize,
+          height: starSize,
+        }}
+        animate={isRevealing ? {
+          scale: [0.5, 1.4, 1],
+          rotate: [0, 180, 360],
+        } : isCurrent ? {
+          boxShadow: isPostcard ? [
+            "0 0 10px rgba(250,204,21,0.5)",
+            "0 0 20px rgba(250,204,21,0.8)",
+            "0 0 10px rgba(250,204,21,0.5)",
+          ] : [
+            "0 0 10px rgba(167,108,255,0.5)",
+            "0 0 20px rgba(167,108,255,0.8)",
+            "0 0 10px rgba(167,108,255,0.5)",
+          ],
+        } : {}}
+        transition={isRevealing ? {
+          duration: 0.6,
+          ease: "easeOut",
+        } : {
+          duration: 1.5,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+
+      {/* Label */}
+      <div className={cn(
+        "absolute top-full mt-1 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap flex items-center gap-0.5 max-w-[60px] overflow-hidden",
+        isCompleted ? (isPostcard ? "text-yellow-400" : "text-primary") : "text-muted-foreground/50",
+        isFinale && isCompleted && "text-yellow-400"
+      )}>
+        <AnimatePresence mode="wait">
+          {isStart ? (
+            <motion.span 
+              key="start"
+              className="font-semibold"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+            >
+              Start
+            </motion.span>
+          ) : !isCompleted ? (
+            <motion.div
+              key="mystery"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 0, rotate: 180 }}
+              transition={{ duration: 0.3 }}
+            >
+              <MysteryMilestonePopover
+                milestone={milestone}
+                currentProgress={progress}
+                isPostcard={!!isPostcard}
+              />
+            </motion.div>
+          ) : isPostcard ? (
+            <motion.div
+              key="postcard"
+              initial={{ opacity: 0, scale: 0, rotate: -180 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ 
+                type: "spring",
+                stiffness: 300,
+                damping: 20,
+                delay: isRevealing ? 0.3 : 0
+              }}
+            >
+              <MapPin className="w-3 h-3" />
+            </motion.div>
+          ) : (
+            <motion.span 
+              key="title"
+              className="truncate"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                type: "spring",
+                stiffness: 300,
+                damping: 20,
+                delay: isRevealing ? 0.3 : 0
+              }}
+            >
+              {milestone.title.slice(0, 8)}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+};
+
 // Get mood-based filter styles
 const getMoodStyles = (mood?: string) => {
   switch (mood) {
@@ -530,110 +921,16 @@ export const ConstellationTrail = ({
       </svg>
 
       {/* Milestone stars */}
-      {starPositions.map((pos, i) => {
-        const milestone = sortedMilestones[i];
-        const milestonePercent = milestone.milestone_percent;
-        const isCompleted = progress >= milestonePercent || !!milestone.completed_at;
-        const nextMilestonePercent = i < sortedMilestones.length - 1 ? sortedMilestones[i + 1].milestone_percent : 101;
-        const isCurrent = progress >= milestonePercent && progress < nextMilestonePercent;
-        const isPostcard = milestone.is_postcard_milestone;
-        const isFinale = milestonePercent === 100 || i === sortedMilestones.length - 1;
-        const isStart = i === 0;
-        
-        const starSize = isPostcard ? pos.size * 1.3 : pos.size;
-        
-        return (
-          <motion.div
-            key={`star-${milestone.id}`}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${pos.x}%`,
-              top: `${pos.y}%`,
-            }}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.1, duration: 0.5 }}
-          >
-            {isCompleted && (
-              <motion.div
-                className={cn(
-                  "absolute inset-0 rounded-full",
-                  isPostcard 
-                    ? (isCurrent ? "bg-yellow-400" : "bg-yellow-400/50")
-                    : (isCurrent ? "bg-primary" : "bg-primary/50")
-                )}
-                style={{
-                  width: starSize * 3,
-                  height: starSize * 3,
-                  marginLeft: -starSize,
-                  marginTop: -starSize,
-                  filter: "blur(8px)",
-                }}
-                animate={isCurrent ? {
-                  scale: [1, 1.3, 1],
-                  opacity: [0.5, 0.8, 0.5],
-                } : {}}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-            )}
-            
-            <motion.div
-              className={cn(
-                "rounded-full relative z-10",
-                isCompleted 
-                  ? isPostcard
-                    ? "bg-gradient-to-br from-yellow-400 via-amber-300 to-yellow-500 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                    : "bg-gradient-to-br from-primary via-purple-400 to-primary shadow-[0_0_10px_rgba(167,108,255,0.5)]" 
-                  : "bg-muted/30 border border-muted/50"
-              )}
-              style={{
-                width: starSize,
-                height: starSize,
-              }}
-              animate={isCurrent ? {
-                boxShadow: isPostcard ? [
-                  "0 0 10px rgba(250,204,21,0.5)",
-                  "0 0 20px rgba(250,204,21,0.8)",
-                  "0 0 10px rgba(250,204,21,0.5)",
-                ] : [
-                  "0 0 10px rgba(167,108,255,0.5)",
-                  "0 0 20px rgba(167,108,255,0.8)",
-                  "0 0 10px rgba(167,108,255,0.5)",
-                ],
-              } : {}}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            />
-
-            <div className={cn(
-              "absolute top-full mt-1 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap flex items-center gap-0.5 max-w-[60px] overflow-hidden",
-              isCompleted ? (isPostcard ? "text-yellow-400" : "text-primary") : "text-muted-foreground/50",
-              isFinale && isCompleted && "text-yellow-400"
-            )}>
-              {isStart ? (
-                <span className="font-semibold">Start</span>
-              ) : !isCompleted ? (
-                <MysteryMilestonePopover
-                  milestone={milestone}
-                  currentProgress={progress}
-                  isPostcard={!!isPostcard}
-                />
-              ) : isPostcard ? (
-                <MapPin className="w-3 h-3" />
-              ) : (
-                <span className="truncate">{milestone.title.slice(0, 8)}</span>
-              )}
-            </div>
-          </motion.div>
-        );
-      })}
+      {starPositions.map((pos, i) => (
+        <MilestoneStar
+          key={`star-${sortedMilestones[i].id}`}
+          milestone={sortedMilestones[i]}
+          pos={pos}
+          index={i}
+          progress={progress}
+          sortedMilestones={sortedMilestones}
+        />
+      ))}
 
       {/* Companion Avatar on Trail */}
       {showCompanion && companionImageUrl && (
