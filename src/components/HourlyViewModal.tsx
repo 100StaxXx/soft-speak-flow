@@ -92,6 +92,13 @@ export function HourlyViewModal({
     setViewMode('day');
   };
 
+  const handleMilestoneClick = (milestone: CalendarMilestone) => {
+    // Switch to day view for the milestone's target date
+    const milestoneDate = new Date(milestone.target_date + 'T00:00:00');
+    onDateSelect(milestoneDate);
+    setViewMode('day');
+  };
+
   const getTitle = () => {
     if (viewMode === 'month') {
       return format(selectedDate, "MMMM yyyy");
@@ -197,7 +204,7 @@ export function HourlyViewModal({
               tasks={tasks}
               milestones={milestones}
               onTaskClick={handleTaskClick}
-              onMilestoneClick={onMilestoneClick}
+              onMilestoneClick={handleMilestoneClick}
               onDateLongPress={(date) => onTimeSlotLongPress?.(date, '09:00')}
             />
           )}
