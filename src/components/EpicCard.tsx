@@ -11,7 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords, Settings2 } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords, Settings2, ChevronDown, ChevronRight, Star } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -96,6 +97,17 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [bossEncounter, setBossEncounter] = useState<AstralEncounter | null>(null);
   const [bossAdversary, setBossAdversary] = useState<Adversary | null>(null);
   const [bossBattleContext, setBossBattleContext] = useState<BossBattleContext | null>(null);
+  const [milestonesOpen, setMilestonesOpen] = useState(false);
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
+
+  const toggleMilestoneExpanded = useCallback((id: string) => {
+    setExpandedMilestones(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -394,6 +406,86 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           showCompanion={true}
           milestones={trailMilestones}
         />
+
+        {/* Expandable Milestones Section */}
+        {milestones && milestones.length > 0 && (
+          <Collapsible open={milestonesOpen} onOpenChange={setMilestonesOpen} className="mb-4">
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-background/50 rounded-lg hover:bg-background/70 transition-colors">
+              <div className="flex items-center gap-2">
+                {milestonesOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="text-sm font-medium">Journey Milestones</span>
+                <Badge variant="secondary" className="text-xs">
+                  {milestones.filter(m => m.completed_at).length}/{milestones.length}
+                </Badge>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-1">
+              {milestones.map((milestone) => {
+                const isExpanded = expandedMilestones.has(milestone.id);
+                const isCompleted = !!milestone.completed_at;
+                
+                return (
+                  <button
+                    key={milestone.id}
+                    onClick={() => toggleMilestoneExpanded(milestone.id)}
+                    className={cn(
+                      "w-full text-left p-2 rounded-md transition-colors",
+                      "bg-background/30 hover:bg-background/50",
+                      isCompleted && "opacity-70"
+                    )}
+                  >
+                    <div className="flex items-start gap-2">
+                      {/* Status indicator */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        {isCompleted ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : milestone.is_postcard_milestone ? (
+                          <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                        ) : (
+                          <ChevronRight 
+                            className={cn(
+                              "h-4 w-4 text-muted-foreground transition-transform",
+                              isExpanded && "rotate-90"
+                            )} 
+                          />
+                        )}
+                      </div>
+                      
+                      {/* Title */}
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm",
+                          isExpanded ? "whitespace-normal" : "truncate",
+                          isCompleted && "line-through text-muted-foreground"
+                        )}>
+                          {milestone.title}
+                        </p>
+                        {milestone.is_postcard_milestone && !isCompleted && (
+                          <span className="text-xs text-amber-500">Postcard milestone</span>
+                        )}
+                      </div>
+                      
+                      {/* Progress badge */}
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs flex-shrink-0",
+                          isCompleted && "border-green-500/30 text-green-500"
+                        )}
+                      >
+                        {milestone.milestone_percent}%
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-3 mb-4">
