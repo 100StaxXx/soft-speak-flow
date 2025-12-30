@@ -84,14 +84,14 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
       <CardContent className="p-6">
         {/* Session Type Selector */}
         {!timerState.isRunning && (
-          <div className="flex justify-center gap-2 mb-6">
+          <div className="flex justify-start gap-2 mb-6 overflow-x-auto scrollbar-hide pb-1 -mx-2 px-2">
             {SESSION_TYPES.map(({ type, label, icon, color }) => (
               <Button
                 key={type}
                 variant={timerState.sessionType === type ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSessionType(type)}
-                className="gap-2"
+                className="gap-2 flex-shrink-0 uppercase text-xs font-semibold"
               >
                 <span className={cn(timerState.sessionType !== type && color)}>
                   {icon}
