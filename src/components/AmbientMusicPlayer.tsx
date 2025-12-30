@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ambientMusic } from "@/utils/ambientMusic";
 import { globalAudio } from "@/utils/globalAudio";
 import { isIOS, setupIOSAudioInteraction } from "@/utils/iosAudio";
@@ -6,7 +7,11 @@ import { Music, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const DISABLED_ROUTES = ['/journeys'];
+
 export const AmbientMusicPlayer = () => {
+  const location = useLocation();
+  const isDisabledRoute = DISABLED_ROUTES.includes(location.pathname);
   const [state, setState] = useState(ambientMusic.getState());
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
@@ -80,6 +85,18 @@ export const AmbientMusicPlayer = () => {
     };
   }, []);
 
+  // Pause/resume music based on route
+  useEffect(() => {
+    if (isDisabledRoute) {
+      ambientMusic.pause();
+    } else {
+      const currentState = ambientMusic.getState();
+      if (!currentState.isMuted && !globalAudio.getMuted()) {
+        ambientMusic.play();
+      }
+    }
+  }, [isDisabledRoute]);
+
   const handleToggle = () => {
     // Toggle global mute which affects ALL audio (ambient music, sound effects, pep talks, etc.)
     const newMutedState = globalAudio.toggleMute();
@@ -89,6 +106,10 @@ export const AmbientMusicPlayer = () => {
   // Use global mute state for display (covers all audio)
   const isMuted = isGloballyMuted;
 
+  // Hide audio button on disabled routes
+  if (isDisabledRoute) {
+    return null;
+  }
   return (
     <Button
       variant="ghost"
