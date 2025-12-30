@@ -206,7 +206,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                 <div className="flex items-center justify-between mb-2">
                   <span className={cn(
                     "text-sm font-medium",
-                    isToday && "bg-primary text-primary-foreground w-6 h-6 flex items-center justify-center"
+                    isToday && "bg-celestial-blue text-white w-6 h-6 flex items-center justify-center rounded-full ring-2 ring-celestial-blue/30"
                   )}>
                     {format(day, "d")}
                   </span>

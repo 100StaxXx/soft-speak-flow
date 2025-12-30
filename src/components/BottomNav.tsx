@@ -155,13 +155,13 @@ export const BottomNav = memo(() => {
         <NavLink
           to="/guilds"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
-          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          activeClassName="bg-gradient-to-br from-celestial-blue/20 to-celestial-blue/5 shadow-soft"
           onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
-              <Users className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+              <Users className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-celestial-blue drop-shadow-[0_0_8px_hsl(210,80%,50%)]' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/80'}`}>
                 Guilds
               </span>
             </>

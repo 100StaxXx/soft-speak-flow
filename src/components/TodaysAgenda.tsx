@@ -218,7 +218,7 @@ export function TodaysAgenda({
               Main
             </Badge>
           )}
-          <span className="text-xs text-muted-foreground">+{task.xp_reward}</span>
+          <span className="text-xs text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
       </motion.div>
     );
@@ -243,20 +243,30 @@ export function TodaysAgenda({
                 {isToday ? "Today's Agenda" : format(selectedDate, "MMM d")}
               </span>
             </div>
-            {currentStreak > 0 && (
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 text-xs">
+          {currentStreak > 0 && (
+              <div className={cn(
+                "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs",
+                currentStreak >= 30 
+                  ? "bg-stardust-gold/20 text-stardust-gold" 
+                  : currentStreak >= 14 
+                    ? "bg-celestial-blue/20 text-celestial-blue" 
+                    : "bg-orange-500/10 text-orange-400"
+              )}>
                 <Flame className="h-3 w-3" />
                 {currentStreak}
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-sm">
+          <div className={cn(
+            "flex items-center gap-1.5 text-sm px-2 py-0.5 rounded-full",
+            allComplete ? "bg-stardust-gold/20" : "bg-stardust-gold/10"
+          )}>
             <Trophy className={cn(
               "h-4 w-4",
-              allComplete ? "text-stardust-gold" : "text-muted-foreground"
+              allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
             )} />
-            <span className="font-medium">{totalXP} XP</span>
+            <span className="font-medium text-stardust-gold">{totalXP} XP</span>
           </div>
         </div>
 
