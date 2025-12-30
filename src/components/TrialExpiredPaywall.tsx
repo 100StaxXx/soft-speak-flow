@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Crown, Sparkles, Moon, MessageCircle, Lock, RefreshCw, LogOut, Trash2 } from "lucide-react";
+import { Crown, Sparkles, MessageCircle, Lock, RefreshCw, LogOut, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
@@ -202,7 +202,6 @@ export const TrialExpiredPaywall = () => {
         <div className="space-y-3 py-2">
           {[
             { icon: Sparkles, text: "All 21 evolution stages" },
-            { icon: Moon, text: "Daily Cosmiq Insight" },
             { icon: MessageCircle, text: "Unlimited AI Mentor Chat" },
             { icon: Lock, text: "Unlimited Quests & Epics" },
             { icon: Crown, text: "All premium features" },

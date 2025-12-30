@@ -13,7 +13,7 @@ export const AstrologySettings = () => {
           Zodiac Sign
         </CardTitle>
         <CardDescription>
-          Your zodiac sign from onboarding. To manage your cosmiq profile, visit Cosmiq Insight in the Mentor tab.
+          Your zodiac sign from onboarding
         </CardDescription>
       </CardHeader>
       <CardContent>
