@@ -3,7 +3,6 @@ export { StoryOnboarding } from "./StoryOnboarding";
 export { StoryPrologue } from "./StoryPrologue";
 export { DestinyReveal } from "./DestinyReveal";
 export { FactionSelector, type FactionType } from "./FactionSelector";
-export { CosmicBirthReveal } from "./CosmicBirthReveal";
 export { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 export { MentorCalculating } from "./MentorCalculating";
 export { JourneyBegins } from "./JourneyBegins";

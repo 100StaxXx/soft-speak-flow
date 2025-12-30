@@ -11,7 +11,6 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { StoryPrologue } from "./StoryPrologue";
 import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
-import { CosmicBirthReveal } from "./CosmicBirthReveal";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { MentorCalculating } from "./MentorCalculating";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
@@ -56,7 +55,6 @@ type OnboardingStage =
   | "prologue" 
   | "destiny"
   | "faction" 
-  | "cosmic-birth" 
   | "questionnaire" 
   | "calculating"
   | "mentor-result" 
@@ -112,8 +110,6 @@ export const StoryOnboarding = () => {
   }, [stage]);
 
   const [faction, setFaction] = useState<FactionType | null>(null);
-  const [birthdate, setBirthdate] = useState("");
-  const [zodiacSign, setZodiacSign] = useState<ZodiacSign | null>(null);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [recommendedMentor, setRecommendedMentor] = useState<Mentor | null>(null);
@@ -213,40 +209,10 @@ export const StoryOnboarding = () => {
   };
 
   const handleFactionComplete = async (selectedFaction: FactionType) => {
-    setFaction(selectedFaction);
-    
     // Save faction to profile
     if (user) {
       await supabase.from("profiles").update({
         faction: selectedFaction,
-      }).eq("id", user.id);
-    }
-    
-    setStage("cosmic-birth");
-  };
-
-  const handleCosmicBirthComplete = async (bd: string, sign: ZodiacSign) => {
-    setBirthdate(bd);
-    setZodiacSign(sign);
-    
-    // Save to profile
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_data")
-        .eq("id", user.id)
-        .maybeSingle();
-      
-      const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      
-      await supabase.from("profiles").update({
-        birthdate: bd,
-        zodiac_sign: sign,
-        onboarding_data: {
-          ...existingData,
-          birthdate: bd,
-          zodiacSign: sign,
-        },
       }).eq("id", user.id);
     }
     
@@ -568,20 +534,6 @@ export const StoryOnboarding = () => {
           </motion.div>
         )}
 
-        {stage === "cosmic-birth" && faction && (
-          <motion.div
-            key="cosmic-birth"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="relative z-10"
-          >
-            <CosmicBirthReveal
-              faction={faction}
-              onComplete={handleCosmicBirthComplete}
-            />
-          </motion.div>
-        )}
 
         {stage === "questionnaire" && faction && (
           <motion.div
