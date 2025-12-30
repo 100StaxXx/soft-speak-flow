@@ -25,8 +25,6 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
 
-import type { StorySeed, NarrativeCheckpoint } from "@/types/narrativeTypes";
-
 type JourneyTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
 const themeGradients: Record<JourneyTheme, string> = {
@@ -105,29 +103,19 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const postcardProgress = getProgressToNextPostcard();
   const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
 
-  // Generate narrative checkpoints from story_seed
-  const narrativeCheckpoints = useMemo((): NarrativeCheckpoint[] | undefined => {
-    const storySeed = journey.story_seed as StorySeed | null;
-    if (!storySeed?.chapter_blueprints) return undefined;
-    
-    const totalChapters = storySeed.chapter_blueprints.length;
-    
-    return storySeed.chapter_blueprints.map((blueprint, index) => {
-      const progressPercent = Math.round(((index + 1) / totalChapters) * 100);
-      const isReached = journey.progress_percentage >= progressPercent;
-      
-      return {
-        chapter: blueprint.chapter,
-        progressPercent,
-        locationName: blueprint.title,
-        locationRevealed: isReached,
-        isReached,
-        isCurrent: isReached && journey.progress_percentage < (((index + 2) / totalChapters) * 100),
-        isFinale: index === totalChapters - 1,
-        clueText: blueprint.mystery_seed || null,
-      };
-    });
-  }, [journey.story_seed, journey.progress_percentage]);
+  // Get milestones for the trail
+  const { milestones } = useMilestones(journey.id);
+  
+  const trailMilestones = useMemo(() => {
+    if (!milestones || milestones.length === 0) return undefined;
+    return milestones.map(m => ({
+      id: m.id,
+      title: m.title,
+      milestone_percent: m.milestone_percent,
+      is_postcard_milestone: m.is_postcard_milestone,
+      completed_at: m.completed_at,
+    }));
+  }, [milestones]);
 
   const handleShareJourney = async () => {
     if (!journey.invite_code) return;
@@ -212,7 +200,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           companionImageUrl={health?.imageUrl || companion?.current_image_url}
           companionMood={health?.moodState}
           showCompanion={true}
-          narrativeCheckpoints={narrativeCheckpoints}
+          milestones={trailMilestones}
         />
 
         {/* Phase Progress (compact) */}

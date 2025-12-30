@@ -1,8 +1,16 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { HelpCircle } from "lucide-react";
-import type { NarrativeCheckpoint } from "@/types/narrativeTypes";
+import { HelpCircle, MapPin } from "lucide-react";
+
+// Milestone from epic_milestones table
+interface TrailMilestone {
+  id: string;
+  title: string;
+  milestone_percent: number;
+  is_postcard_milestone?: boolean | null;
+  completed_at?: string | null;
+}
 
 interface ConstellationTrailProps {
   progress: number; // 0-100
@@ -11,19 +19,19 @@ interface ConstellationTrailProps {
   companionImageUrl?: string;
   companionMood?: string;
   showCompanion?: boolean;
-  narrativeCheckpoints?: NarrativeCheckpoint[];
+  milestones?: TrailMilestone[]; // Actual milestones from database
 }
 
 // Fixed constellation pattern - zigzag Y positions for visual interest
-const CONSTELLATION_Y_PATTERN = [45, 65, 35, 55, 40, 60, 50]; // Varies between 35-65
+const CONSTELLATION_Y_PATTERN = [45, 65, 35, 55, 40, 60, 50];
 
 // Generate star positions along a constellation-like zigzag path
 const generateStarPositions = (count: number) => {
   const positions: { x: number; y: number; size: number }[] = [];
   
   for (let i = 0; i < count; i++) {
-    const t = i / (count - 1);
-    const x = 10 + t * 80; // 10% to 90% width
+    const t = count === 1 ? 0.5 : i / (count - 1);
+    const x = 10 + t * 80;
     const y = CONSTELLATION_Y_PATTERN[i % CONSTELLATION_Y_PATTERN.length];
     const size = i === 0 || i === count - 1 ? 10 : 6 + Math.random() * 4;
     positions.push({ x, y, size });
@@ -32,7 +40,7 @@ const generateStarPositions = (count: number) => {
   return positions;
 };
 
-// Calculate position along the constellation path for any progress percentage
+// Calculate position along the constellation path
 const getPositionOnPath = (progress: number, starPositions: { x: number; y: number }[]) => {
   if (starPositions.length < 2) return { x: 10, y: 50 };
   
@@ -51,7 +59,7 @@ const getPositionOnPath = (progress: number, starPositions: { x: number; y: numb
   };
 };
 
-// Generate SVG path string connecting all stars with straight lines
+// Generate SVG path string connecting all stars
 const generateFullPathString = (starPositions: { x: number; y: number }[]) => {
   if (starPositions.length < 2) return "";
   return starPositions.map((pos, i) => 
@@ -71,12 +79,10 @@ const generatePartialPathString = (starPositions: { x: number; y: number }[], pr
   
   let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
   
-  // Add all completed segments
   for (let i = 1; i <= completedSegments && i < starPositions.length; i++) {
     path += ` L ${starPositions[i].x} ${starPositions[i].y}`;
   }
   
-  // Add partial segment to current position
   if (completedSegments < totalSegments) {
     path += ` L ${endPos.x} ${endPos.y}`;
   }
@@ -105,50 +111,28 @@ export const ConstellationTrail = ({
   companionImageUrl,
   companionMood,
   showCompanion = true,
-  narrativeCheckpoints
+  milestones: propMilestones
 }: ConstellationTrailProps) => {
-  // Create milestone checkpoints dynamically from narrative checkpoints
-  const milestones = useMemo(() => {
-    if (narrativeCheckpoints && narrativeCheckpoints.length > 0) {
-      // Add 0 (start) + all chapter milestone percentages
-      return [0, ...narrativeCheckpoints.map(cp => cp.progressPercent)];
-    }
-    return [0, 25, 50, 75, 100]; // Fallback for non-narrative epics
-  }, [narrativeCheckpoints]);
-  
-  const starPositions = useMemo(() => generateStarPositions(milestones.length), [milestones.length]);
-  
-  // Get checkpoint label for a milestone index
-  const getCheckpointLabel = (index: number, milestone: number): { label: string; isRevealed: boolean; isFinale: boolean } => {
-    // Index 0 is always "Start"
-    if (index === 0) {
-      return { label: "Start", isRevealed: true, isFinale: false };
+  // Sort milestones by percentage and include start (0%)
+  const sortedMilestones = useMemo(() => {
+    if (!propMilestones || propMilestones.length === 0) {
+      return [
+        { id: 'start', title: 'Start', milestone_percent: 0, is_postcard_milestone: false, completed_at: null },
+        { id: 'end', title: 'Finish', milestone_percent: 100, is_postcard_milestone: true, completed_at: null },
+      ];
     }
     
-    // For narrative epics, use checkpoint data directly
-    if (narrativeCheckpoints && narrativeCheckpoints.length > 0) {
-      const checkpoint = narrativeCheckpoints[index - 1]; // -1 because index 0 is "Start"
-      if (checkpoint) {
-        return {
-          label: checkpoint.locationRevealed ? checkpoint.locationName || `Ch.${checkpoint.chapter}` : "?",
-          isRevealed: checkpoint.locationRevealed,
-          isFinale: checkpoint.isFinale
-        };
-      }
-    }
+    const withStart: TrailMilestone[] = [
+      { id: 'start', title: 'Start', milestone_percent: 0, is_postcard_milestone: false, completed_at: new Date().toISOString() },
+      ...propMilestones,
+    ];
     
-    // Fallback for non-narrative epics - show "?" until reached
-    const isReached = progress >= milestone;
-    const isFinale = milestone === 100;
-    return { 
-      label: isReached ? (isFinale ? "Legend" : `${milestone}%`) : "?",
-      isRevealed: isReached,
-      isFinale
-    };
-  };
-  // Background stars for ambiance - use seeded pseudo-random for consistency
+    return withStart.sort((a, b) => a.milestone_percent - b.milestone_percent);
+  }, [propMilestones]);
+  
+  const starPositions = useMemo(() => generateStarPositions(sortedMilestones.length), [sortedMilestones.length]);
+  
   const bgStars = useMemo(() => {
-    // Simple seeded random function for consistent star positions across renders
     const seededRandom = (seed: number) => {
       const x = Math.sin(seed * 9999) * 10000;
       return x - Math.floor(x);
@@ -202,7 +186,6 @@ export const ConstellationTrail = ({
       {/* Trail paths SVG */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
-          {/* Animated pulsing gradient that travels along the path */}
           <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="hsl(var(--primary) / 0.15)" />
             <stop offset="40%" stopColor="hsl(var(--primary) / 0.15)" />
@@ -213,7 +196,6 @@ export const ConstellationTrail = ({
             <animate attributeName="x2" values="0%;200%" dur="2.5s" repeatCount="indefinite" />
           </linearGradient>
           
-          {/* Glow filter for solid trail */}
           <filter id="trailGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="1" result="blur" />
             <feMerge>
@@ -223,7 +205,6 @@ export const ConstellationTrail = ({
           </filter>
         </defs>
 
-        {/* FULL PATH - Base dim path showing entire journey */}
         <path
           d={generateFullPathString(starPositions)}
           fill="none"
@@ -233,7 +214,6 @@ export const ConstellationTrail = ({
           strokeLinejoin="round"
         />
 
-        {/* FULL PATH - Pulsing energy effect */}
         <path
           d={generateFullPathString(starPositions)}
           fill="none"
@@ -244,7 +224,6 @@ export const ConstellationTrail = ({
           opacity="0.7"
         />
 
-        {/* SOLID TRAIL - Completed portion behind companion */}
         {progress > 0 && (
           <motion.path
             d={generatePartialPathString(starPositions, progress)}
@@ -263,13 +242,20 @@ export const ConstellationTrail = ({
 
       {/* Milestone stars */}
       {starPositions.map((pos, i) => {
-        const milestone = milestones[i];
-        const isCompleted = progress >= milestone;
-        const isCurrent = progress >= milestone && (i === milestones.length - 1 || progress < milestones[i + 1]);
+        const milestone = sortedMilestones[i];
+        const milestonePercent = milestone.milestone_percent;
+        const isCompleted = progress >= milestonePercent || !!milestone.completed_at;
+        const nextMilestonePercent = i < sortedMilestones.length - 1 ? sortedMilestones[i + 1].milestone_percent : 101;
+        const isCurrent = progress >= milestonePercent && progress < nextMilestonePercent;
+        const isPostcard = milestone.is_postcard_milestone;
+        const isFinale = milestonePercent === 100 || i === sortedMilestones.length - 1;
+        const isStart = i === 0;
+        
+        const starSize = isPostcard ? pos.size * 1.3 : pos.size;
         
         return (
           <motion.div
-            key={`star-${i}`}
+            key={`star-${milestone.id}`}
             className="absolute transform -translate-x-1/2 -translate-y-1/2"
             style={{
               left: `${pos.x}%`,
@@ -277,20 +263,21 @@ export const ConstellationTrail = ({
             }}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.15, duration: 0.5 }}
+            transition={{ delay: i * 0.1, duration: 0.5 }}
           >
-            {/* Glow effect for completed/current stars */}
             {isCompleted && (
               <motion.div
                 className={cn(
                   "absolute inset-0 rounded-full",
-                  isCurrent ? "bg-primary" : "bg-primary/50"
+                  isPostcard 
+                    ? (isCurrent ? "bg-yellow-400" : "bg-yellow-400/50")
+                    : (isCurrent ? "bg-primary" : "bg-primary/50")
                 )}
                 style={{
-                  width: pos.size * 3,
-                  height: pos.size * 3,
-                  marginLeft: -pos.size,
-                  marginTop: -pos.size,
+                  width: starSize * 3,
+                  height: starSize * 3,
+                  marginLeft: -starSize,
+                  marginTop: -starSize,
                   filter: "blur(8px)",
                 }}
                 animate={isCurrent ? {
@@ -305,20 +292,25 @@ export const ConstellationTrail = ({
               />
             )}
             
-            {/* Star core */}
             <motion.div
               className={cn(
                 "rounded-full relative z-10",
                 isCompleted 
-                  ? "bg-gradient-to-br from-primary via-purple-400 to-primary shadow-[0_0_10px_rgba(167,108,255,0.5)]" 
+                  ? isPostcard
+                    ? "bg-gradient-to-br from-yellow-400 via-amber-300 to-yellow-500 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                    : "bg-gradient-to-br from-primary via-purple-400 to-primary shadow-[0_0_10px_rgba(167,108,255,0.5)]" 
                   : "bg-muted/30 border border-muted/50"
               )}
               style={{
-                width: pos.size,
-                height: pos.size,
+                width: starSize,
+                height: starSize,
               }}
               animate={isCurrent ? {
-                boxShadow: [
+                boxShadow: isPostcard ? [
+                  "0 0 10px rgba(250,204,21,0.5)",
+                  "0 0 20px rgba(250,204,21,0.8)",
+                  "0 0 10px rgba(250,204,21,0.5)",
+                ] : [
                   "0 0 10px rgba(167,108,255,0.5)",
                   "0 0 20px rgba(167,108,255,0.8)",
                   "0 0 10px rgba(167,108,255,0.5)",
@@ -331,27 +323,21 @@ export const ConstellationTrail = ({
               }}
             />
 
-            {/* Milestone label */}
-            {(() => {
-              const { label, isRevealed, isFinale } = getCheckpointLabel(i, milestone);
-              return (
-                <div className={cn(
-                  "absolute top-full mt-1 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap flex items-center gap-0.5",
-                  isCompleted ? "text-primary" : "text-muted-foreground/50",
-                  isFinale && isCompleted && "text-yellow-400"
-                )}>
-                  {!isRevealed && !isCompleted ? (
-                    <HelpCircle className="w-3 h-3 animate-pulse" />
-                  ) : (
-                    <span className={cn(
-                      isRevealed && isCompleted && "font-semibold"
-                    )}>
-                      {label}
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
+            <div className={cn(
+              "absolute top-full mt-1 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap flex items-center gap-0.5 max-w-[60px] overflow-hidden",
+              isCompleted ? (isPostcard ? "text-yellow-400" : "text-primary") : "text-muted-foreground/50",
+              isFinale && isCompleted && "text-yellow-400"
+            )}>
+              {isStart ? (
+                <span className="font-semibold">Start</span>
+              ) : !isCompleted ? (
+                <HelpCircle className="w-3 h-3 animate-pulse" />
+              ) : isPostcard ? (
+                <MapPin className="w-3 h-3" />
+              ) : (
+                <span className="truncate">{milestone.title.slice(0, 8)}</span>
+              )}
+            </div>
           </motion.div>
         );
       })}
@@ -376,7 +362,6 @@ export const ConstellationTrail = ({
             y: { duration: 2, repeat: Infinity, ease: "easeInOut" }
           }}
         >
-          {/* Glow ring */}
           <motion.div
             className="absolute inset-0 rounded-full bg-primary/40"
             style={{
@@ -397,7 +382,6 @@ export const ConstellationTrail = ({
             }}
           />
           
-          {/* Companion image */}
           <div 
             className={cn(
               "w-7 h-7 rounded-full border-2 border-primary overflow-hidden bg-background shadow-lg",
