@@ -65,20 +65,20 @@ export function DatePillsScroller({
               "min-w-[52px] h-16 rounded-xl transition-all duration-200",
               "border border-border/50",
               isSelected 
-                ? "bg-gradient-to-br from-stardust-gold to-amber-500 text-black border-stardust-gold shadow-lg shadow-stardust-gold/25" 
+                ? "bg-gradient-to-br from-primary to-purple-500 text-white border-primary shadow-lg shadow-primary/25" 
                 : "bg-card/50 hover:bg-card hover:border-primary/30",
               isDayToday && !isSelected && "border-celestial-blue/50 ring-1 ring-celestial-blue/30 bg-celestial-blue/5"
             )}
           >
             <span className={cn(
               "text-[10px] font-medium uppercase tracking-wide",
-              isSelected ? "text-black/80" : isDayToday ? "text-celestial-blue" : "text-muted-foreground"
+              isSelected ? "text-white/90" : isDayToday ? "text-celestial-blue" : "text-muted-foreground"
             )}>
               {format(date, 'EEE')}
             </span>
             <span className={cn(
               "text-lg font-bold leading-tight",
-              isSelected ? "text-black" : isDayToday ? "text-celestial-blue" : "text-foreground"
+              isSelected ? "text-white" : isDayToday ? "text-celestial-blue" : "text-foreground"
             )}>
               {format(date, 'd')}
             </span>
@@ -88,18 +88,18 @@ export function DatePillsScroller({
                 <>
                   <div className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    isSelected ? "bg-black/70" : isDayToday ? "bg-celestial-blue/60" : "bg-stardust-gold/60"
+                    isSelected ? "bg-white/70" : isDayToday ? "bg-celestial-blue/60" : "bg-stardust-gold/60"
                   )} />
                   {taskCount > 1 && (
                     <div className={cn(
                       "h-1.5 w-1.5 rounded-full",
-                      isSelected ? "bg-black/50" : isDayToday ? "bg-celestial-blue/40" : "bg-stardust-gold/40"
+                      isSelected ? "bg-white/50" : isDayToday ? "bg-celestial-blue/40" : "bg-stardust-gold/40"
                     )} />
                   )}
                   {taskCount > 2 && (
                     <div className={cn(
                       "h-1.5 w-1.5 rounded-full",
-                      isSelected ? "bg-black/30" : isDayToday ? "bg-celestial-blue/20" : "bg-stardust-gold/20"
+                      isSelected ? "bg-white/30" : isDayToday ? "bg-celestial-blue/20" : "bg-stardust-gold/20"
                     )} />
                   )}
                 </>
