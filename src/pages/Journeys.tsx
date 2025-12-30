@@ -23,10 +23,12 @@ import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { JourneysTutorialModal } from "@/components/JourneysTutorialModal";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +40,8 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showHourlyModal, setShowHourlyModal] = useState(false);
+  
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   const { currentStreak } = useStreakMultiplier();
   
@@ -373,6 +377,10 @@ const Journeys = () => {
             is_main_quest: task.is_main_quest || false,
           }))}
           onTaskDrop={() => {}}
+        />
+        <JourneysTutorialModal 
+          open={showTutorial} 
+          onClose={dismissTutorial} 
         />
       </div>
 
