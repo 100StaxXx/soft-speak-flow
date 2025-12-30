@@ -102,7 +102,7 @@ export function TodaysAgenda({
           "flex items-center gap-3 p-2 rounded-lg transition-all relative",
           "hover:bg-muted/30 cursor-pointer",
           isComplete && "opacity-60",
-          isTutorialQuest && !isComplete && "overflow-visible"
+          isTutorialQuest && !isComplete && "overflow-visible z-[70]"
         )}
         onClick={() => onToggle(task.id, !isComplete, task.xp_reward)}
       >
@@ -110,7 +110,7 @@ export function TodaysAgenda({
           {/* Animated Arrow Indicator for Tutorial Quest */}
           {isTutorialQuest && !isComplete && (
             <div
-              className="absolute left-1/2 -top-12 -translate-x-1/2 pointer-events-none z-[60] flex flex-col items-center gap-0.5"
+              className="absolute left-1/2 -top-12 -translate-x-1/2 pointer-events-none z-[100] flex flex-col items-center gap-0.5"
               style={{ animation: 'bounceDown 1.2s ease-in-out infinite' }}
             >
               <div
@@ -170,7 +170,7 @@ export function TodaysAgenda({
       {/* Background glow */}
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none" />
       
-      <div className="relative p-4">
+      <div className="relative p-4 overflow-visible">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
