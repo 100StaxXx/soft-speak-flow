@@ -8,8 +8,9 @@ import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { FactionBadge } from "@/components/FactionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Compass, Package, Sparkles, Timer } from "lucide-react";
-import { JourneyTab } from "@/components/companion/JourneyTab";
+import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer } from "lucide-react";
+import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
+import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -142,7 +143,7 @@ const Companion = () => {
           </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -151,14 +152,18 @@ const Companion = () => {
                 <Timer className="h-4 w-4" />
                 <span className="hidden sm:inline">Focus</span>
               </TabsTrigger>
-              <TabsTrigger value="journey" className="flex items-center gap-2 relative">
-                <Compass className="h-4 w-4" />
-                <span className="hidden sm:inline">Journey</span>
+              <TabsTrigger value="stories" className="flex items-center gap-2 relative">
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Stories</span>
                 {unreadStoryCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
                     {unreadStoryCount > 9 ? '9+' : unreadStoryCount}
                   </span>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="postcards" className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                <span className="hidden sm:inline">Postcards</span>
               </TabsTrigger>
               <TabsTrigger value="collection" className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
@@ -180,8 +185,12 @@ const Companion = () => {
               {activeTab === "focus" && <FocusTab />}
             </TabsContent>
 
-            <TabsContent value="journey">
-              {activeTab === "journey" && <JourneyTab unreadStoryCount={unreadStoryCount} />}
+            <TabsContent value="stories">
+              {activeTab === "stories" && <CompanionStoryJournal />}
+            </TabsContent>
+
+            <TabsContent value="postcards">
+              {activeTab === "postcards" && <CompanionPostcards />}
             </TabsContent>
 
             <TabsContent value="collection">
