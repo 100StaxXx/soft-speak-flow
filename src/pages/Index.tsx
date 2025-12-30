@@ -289,11 +289,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             {todaysQuote && (
               <div className="text-right px-4 sm:px-6">
                 <blockquote className="max-w-2xl ml-auto">
-                  <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-[hsl(30,100%,60%)] leading-relaxed">
+                  <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-stardust-gold leading-relaxed">
                     "{todaysQuote.text}"
                   </p>
                   {todaysQuote.author && (
-                    <footer className="mt-2 font-serif italic text-sm sm:text-base text-[hsl(30,100%,60%)]/80">
+                    <footer className="mt-2 font-serif italic text-sm sm:text-base text-celestial-blue">
                       — {todaysQuote.author}
                     </footer>
                   )}

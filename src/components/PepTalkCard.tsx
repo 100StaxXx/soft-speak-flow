@@ -62,20 +62,20 @@ export const PepTalkCard = memo(({ id, title, category, topicCategories, descrip
       </div>
       <div className="flex items-start gap-3">
         <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
-          hasHighlightedTrigger ? 'bg-royal-gold animate-pulse' : 'bg-royal-gold'
+          hasHighlightedTrigger ? 'bg-stardust-gold animate-pulse' : 'bg-stardust-gold'
         }`}>
-          <Heart className="h-5 w-5 text-obsidian" fill="currentColor" />
+          <Heart className="h-5 w-5 text-black" fill="currentColor" />
         </div>
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             {allCategories.map((cat, index) => (
-              <span key={index} className="text-xs font-bold text-royal-gold uppercase tracking-wider">
+              <span key={index} className="text-xs font-bold text-stardust-gold uppercase tracking-wider">
                 {cat}
               </span>
             ))}
             {hasHighlightedTrigger && (
-              <span className="text-xs font-bold text-royal-gold uppercase tracking-wider animate-pulse">
+              <span className="text-xs font-bold text-stardust-gold uppercase tracking-wider animate-pulse">
                 ✨ Match
               </span>
             )}

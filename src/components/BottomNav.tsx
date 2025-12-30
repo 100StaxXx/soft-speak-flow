@@ -90,21 +90,21 @@ export const BottomNav = memo(() => {
         <NavLink
           to="/companion"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative"
-          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          activeClassName="bg-gradient-to-br from-stardust-gold/20 to-stardust-gold/5 shadow-soft"
           data-tour="companion-tab"
           onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
               <div className="relative">
-                <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+                <Sparkles className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]' : 'text-muted-foreground'}`} />
                 {companion && progressToNext > 90 && (
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-primary text-primary-foreground animate-pulse">
+                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-stardust-gold text-black animate-pulse">
                     !
                   </Badge>
                 )}
               </div>
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/80'}`}>
                 Companion
               </span>
             </>

@@ -110,7 +110,7 @@ export const MilestoneProgress = ({
               <div className="flex items-center gap-1">
                 <span className="font-medium truncate">{nextMilestone.title}</span>
                 {nextMilestone.is_postcard_milestone && (
-                  <Sparkles className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  <Sparkles className="w-3 h-3 text-stardust-gold flex-shrink-0" />
                 )}
               </div>
               {nextMilestone.target_date && (
@@ -158,10 +158,10 @@ export const MilestoneProgress = ({
       {/* Header with progress */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Flag className="w-4 h-4 text-primary" />
+          <Flag className="w-4 h-4 text-celestial-blue" />
           <span className="font-medium text-sm">Milestones</span>
         </div>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="gold" className="text-xs">
           {completedCount} / {totalCount}
         </Badge>
       </div>
@@ -169,7 +169,7 @@ export const MilestoneProgress = ({
       {/* Progress Bar */}
       <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <div 
-          className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500"
+          className="h-full bg-gradient-to-r from-celestial-blue via-primary to-stardust-gold rounded-full transition-all duration-500"
           style={{ width: `${(completedCount / totalCount) * 100}%` }}
         />
       </div>
@@ -202,7 +202,7 @@ export const MilestoneProgress = ({
                       {milestone.title}
                     </span>
                     {milestone.is_postcard_milestone && (
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                      <Sparkles className="w-3.5 h-3.5 text-stardust-gold flex-shrink-0" />
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
