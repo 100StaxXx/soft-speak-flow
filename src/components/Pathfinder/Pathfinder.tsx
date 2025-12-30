@@ -182,7 +182,7 @@ export function Pathfinder({
       setEpicTitle(selectedTemplate.name);
       setEpicWhy(selectedTemplate.description);
       setDeadline(addDays(new Date(), selectedTemplate.target_days));
-      setThemeColor(selectedTemplate.theme_color || themeColors[0].value);
+      setThemeColor(selectedTemplate.theme_color || themeColors[0].id);
       
       // Map frequency to valid database values
       const mapFrequency = (freq: string): 'daily' | '5x_week' | '3x_week' | 'custom' => {
@@ -200,7 +200,7 @@ export function Pathfinder({
         description: '',
         difficulty: (h.difficulty || 'medium') as 'easy' | 'medium' | 'hard',
         frequency: mapFrequency(h.frequency || 'daily'),
-        isSelected: true,
+        selected: true,
       }));
       setCustomHabits(templateSuggestions);
       // Template already has habits, go directly to timeline (will need to generate schedule)
@@ -253,16 +253,18 @@ export function Pathfinder({
 
   const calculateXP = useMemo(() => targetDays * EPIC_XP_REWARDS.XP_PER_DAY, [targetDays]);
 
-  const handleGenerateTimeline = useCallback(async () => {
+  const handleGenerateTimeline = useCallback(async (
+    answersOverride?: Record<string, string | number>,
+    contextOverride?: string
+  ) => {
     if (!goalInput.trim() || !deadline) return;
     tap();
     
     const deadlineStr = format(deadline, 'yyyy-MM-dd');
-    // Use local clarification answers if available, otherwise fall back to props
-    const answersToUse = Object.keys(localClarificationAnswers).length > 0 
-      ? localClarificationAnswers 
-      : clarificationAnswers;
-    const contextToUse = localEpicContext || epicContext;
+    // Use override if provided, then local state, then props
+    const answersToUse = answersOverride 
+      ?? (Object.keys(localClarificationAnswers).length > 0 ? localClarificationAnswers : clarificationAnswers);
+    const contextToUse = contextOverride ?? localEpicContext ?? epicContext;
     
     const result = await generateSchedule({
       goal: goalInput,
@@ -336,13 +338,14 @@ export function Pathfinder({
     
     // Re-classify with answers to get refined epic details
     const result = await clarifyEpic(goalInput, answers);
-    if (result?.epicContext) {
-      setLocalEpicContext(result.epicContext);
+    const contextFromClarify = result?.epicContext;
+    if (contextFromClarify) {
+      setLocalEpicContext(contextFromClarify);
     }
     
     if (!epicTitle) setEpicTitle(goalInput);
-    // Go directly to timeline generation
-    await handleGenerateTimeline();
+    // Pass answers directly to avoid race condition with async state updates
+    await handleGenerateTimeline(answers, contextFromClarify);
   }, [goalInput, clarifyEpic, epicTitle, handleGenerateTimeline]);
 
   // Skip clarification - go directly to timeline generation
@@ -359,7 +362,10 @@ export function Pathfinder({
   }, [medium]);
 
   const handleCreateEpic = useCallback(() => {
-    if (selectedHabits.length === 0) return;
+    if (selectedHabits.length === 0) {
+      console.warn('Cannot create epic: no habits selected');
+      return;
+    }
 
     const habits = selectedHabits.map((h) => ({
       title: h.title,
@@ -613,10 +619,8 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 2: Timeline Review (was Step 3) */}
-
-            {/* Step 3: Timeline Review */}
-            {step === 'timeline' && schedule && (
+            {/* Step 2: Timeline Review */}
+            {step === 'timeline' && schedule && deadline && (
               <motion.div
                 key="timeline"
                 initial={{ opacity: 0, x: 20 }}
