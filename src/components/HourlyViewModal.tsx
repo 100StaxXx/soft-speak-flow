@@ -108,16 +108,9 @@ export function HourlyViewModal({
           <div className="flex items-center gap-3">
             {/* View Mode Dropdown */}
             <Select value={viewMode} onValueChange={(value: ViewMode) => setViewMode(value)}>
-              <SelectTrigger className="w-[120px] h-8 text-sm bg-muted border-0">
-                <div className="flex items-center gap-2">
-                  {viewMode === 'day' ? (
-                    <Clock className="h-4 w-4" />
-                  ) : (
-                    <CalendarDays className="h-4 w-4" />
-                  )}
-                  <SelectValue />
-                </div>
-              </SelectTrigger>
+            <SelectTrigger className="w-[140px] h-8 text-sm bg-muted border-0">
+              <SelectValue />
+            </SelectTrigger>
               <SelectContent>
                 <SelectItem value="day">
                   <div className="flex items-center gap-2">
