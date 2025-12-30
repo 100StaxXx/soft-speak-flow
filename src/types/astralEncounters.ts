@@ -138,22 +138,29 @@ export interface EncounterPhase {
   accuracy: number;
 }
 
-// Games disabled from encounters (still available in Arcade for testing)
-export const DISABLED_ENCOUNTER_GAMES: MiniGameType[] = ['eclipse_timing', 'stellar_flow'];
+// Games disabled from encounters (shelved but preserved for future reactivation)
+export const DISABLED_ENCOUNTER_GAMES: MiniGameType[] = [
+  'eclipse_timing', 
+  'stellar_flow',
+  'cosmiq_grid',
+  'starfall_dodge', 
+  'soul_serpent',
+  'astral_frequency'
+];
 
-// Theme to mini-game mapping (rebalanced for variety)
+// Theme to mini-game mapping (using only active games: galactic_match, orb_match, tap_sequence, energy_beam)
 export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
-  distraction: 'tap_sequence',      // Focus challenge - pattern recognition
-  chaos: 'tap_sequence',            // Order from chaos - memorize sequences
-  stagnation: 'soul_serpent',       // Movement/growth - get moving
-  laziness: 'soul_serpent',         // Action required - keep the serpent alive
-  anxiety: 'astral_frequency',      // Finding calm through meditative focus
-  overthinking: 'astral_frequency', // Quieting mental noise - find clarity
-  doubt: 'starfall_dodge',          // Facing fears - courage under fire
-  fear: 'starfall_dodge',           // Overcoming fear - dodge the darkness
-  confusion: 'astral_frequency',    // DISABLED eclipse_timing - remapped to astral_frequency
-  vulnerability: 'astral_frequency', // DISABLED eclipse_timing - remapped to astral_frequency
-  imbalance: 'energy_beam',         // Controlled release - find balance
+  distraction: 'tap_sequence',      // Mind - focus challenge
+  chaos: 'galactic_match',          // Mind - pattern matching
+  stagnation: 'energy_beam',        // Body - action required
+  laziness: 'energy_beam',          // Body - get moving
+  anxiety: 'orb_match',             // Mind - calm focus matching
+  overthinking: 'galactic_match',   // Mind - visual pattern clarity
+  doubt: 'tap_sequence',            // Mind - build confidence through memory
+  fear: 'energy_beam',              // Body - face the challenge
+  confusion: 'orb_match',           // Mind - find matching patterns
+  vulnerability: 'energy_beam',     // Body - defensive action
+  imbalance: 'tap_sequence',        // Mind - restore order
 };
 
 // Theme to stat mapping
