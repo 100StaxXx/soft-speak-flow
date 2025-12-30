@@ -4,12 +4,13 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Star, CheckCircle2, Loader2, ChevronDown, Clock, Calendar, Target } from "lucide-react";
+import { Sparkles, Star, CheckCircle2, Loader2, ChevronDown, Clock, Calendar, Target, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { EditHabitDialog } from "@/components/EditHabitDialog";
 import { format } from "date-fns";
 
 interface Habit {
@@ -47,6 +48,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const [loadingCompletions, setLoadingCompletions] = useState(false);
   const [processingHabits, setProcessingHabits] = useState<Set<string>>(new Set());
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   
   // Ref-based guard for rapid click prevention
   const processingRef = useRef(false);
@@ -190,6 +192,31 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleUpdateHabit = async (habitId: string, updates: {
+    title: string;
+    description: string | null;
+    frequency: string;
+    estimated_minutes: number | null;
+    difficulty: string;
+  }) => {
+    if (!user?.id) return;
+    
+    const { error } = await supabase
+      .from('habits')
+      .update(updates)
+      .eq('id', habitId)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      toast.error('Failed to update habit');
+      throw error;
+    }
+    
+    toast.success('Habit updated!');
+    queryClient.invalidateQueries({ queryKey: ['habits'] });
+    queryClient.invalidateQueries({ queryKey: ['epics'] });
   };
 
   const allCompleted = habits.length > 0 && habits.every(h => completedToday.has(h.id));
@@ -398,7 +425,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                                 {habit.description}
                               </p>
                             )}
-                            <div className="flex flex-wrap gap-3 pt-2">
+                            <div className="flex flex-wrap items-center gap-3 pt-2">
                               {habit.frequency && (
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                   <Calendar className="w-3.5 h-3.5" />
@@ -417,6 +444,18 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                                   <span className="capitalize">{habit.difficulty}</span>
                                 </div>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 ml-auto text-xs text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingHabit(habit);
+                                }}
+                              >
+                                <Pencil className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
                             </div>
                           </div>
                         </CollapsibleContent>
@@ -457,6 +496,13 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
             )}
           </AnimatePresence>
         </div>
+        
+        <EditHabitDialog
+          habit={editingHabit}
+          open={!!editingHabit}
+          onOpenChange={(open) => !open && setEditingHabit(null)}
+          onSave={handleUpdateHabit}
+        />
       </DrawerContent>
     </Drawer>
   );

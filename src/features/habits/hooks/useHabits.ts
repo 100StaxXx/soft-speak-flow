@@ -207,6 +207,45 @@ export function useHabits() {
     },
   });
 
+  // Update habit mutation
+  const updateHabitMutation = useMutation({
+    mutationFn: async ({ 
+      habitId, 
+      updates 
+    }: { 
+      habitId: string; 
+      updates: {
+        title?: string;
+        description?: string | null;
+        frequency?: string;
+        estimated_minutes?: number | null;
+        difficulty?: string;
+      }
+    }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { error } = await supabase
+        .from('habits')
+        .update(updates)
+        .eq('id', habitId)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      toast({ title: "Habit updated successfully!" });
+      haptics.success();
+    },
+    onError: (error) => {
+      toast({ 
+        title: error instanceof Error ? error.message : "Failed to update habit", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const habitProgress = habits.length > 0 
     ? completions.length / habits.length 
     : 0;
@@ -220,5 +259,7 @@ export function useHabits() {
     isAddingHabit: addHabitMutation.isPending,
     toggleHabit: toggleHabitMutation.mutate,
     isTogglingHabit: toggleHabitMutation.isPending,
+    updateHabit: updateHabitMutation.mutateAsync,
+    isUpdatingHabit: updateHabitMutation.isPending,
   };
 }
