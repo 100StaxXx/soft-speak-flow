@@ -141,13 +141,14 @@ export const useEpics = () => {
         phase_order: number;
       }>;
     }) => {
-      if (!user) throw new Error("Not authenticated");
-
-      // Verify session is still valid before proceeding
+      // Get fresh session first - don't rely on potentially stale user from closure
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session || session.user.id !== user.id) {
-        throw new Error("Session expired. Please refresh and try again.");
+      if (sessionError || !session?.user?.id) {
+        throw new Error("Not authenticated. Please refresh and try again.");
       }
+
+      // Use session.user.id instead of the stale user variable
+      const currentUserId = session.user.id;
 
       if (!epicData.habits || epicData.habits.length === 0) {
         throw new Error("Epic must have at least one habit");
@@ -167,7 +168,7 @@ export const useEpics = () => {
           .from("habits")
           .insert(
             epicData.habits.map(habit => ({
-              user_id: user.id,
+              user_id: currentUserId,
               title: habit.title,
               difficulty: normalizeDifficulty(habit.difficulty),
               frequency: normalizeFrequency(habit.frequency),
@@ -197,7 +198,7 @@ export const useEpics = () => {
         const { data: epic, error: epicError } = await supabase
           .from("epics")
           .insert({
-            user_id: user.id,
+            user_id: currentUserId,
             title: epicData.title,
             description: epicData.description,
             target_days: epicData.target_days,
@@ -254,7 +255,7 @@ export const useEpics = () => {
             .insert(
               epicData.phases.map(phase => ({
                 epic_id: epic.id,
-                user_id: user.id,
+                user_id: currentUserId,
                 name: phase.name,
                 description: phase.description,
                 start_date: phase.start_date,
@@ -276,7 +277,7 @@ export const useEpics = () => {
             .insert(
               epicData.milestones.map((milestone, index) => ({
                 epic_id: epic.id,
-                user_id: user.id,
+                user_id: currentUserId,
                 title: milestone.title,
                 description: milestone.description,
                 target_date: milestone.target_date,
@@ -299,12 +300,12 @@ export const useEpics = () => {
             supabase
               .from('user_companion')
               .select('spirit_animal, core_element, favorite_color, fur_color')
-              .eq('user_id', user.id)
+              .eq('user_id', currentUserId)
               .maybeSingle(),
             supabase
               .from('profiles')
               .select('selected_mentor_id')
-              .eq('id', user.id)
+              .eq('id', currentUserId)
               .maybeSingle(),
           ]);
 
@@ -334,7 +335,7 @@ export const useEpics = () => {
 
           supabase.functions.invoke('generate-epic-narrative-seed', {
             body: {
-              userId: user.id,
+              userId: currentUserId,
               epicId: epic.id,
               epicTitle: epicData.title,
               epicDescription: epicData.description,
