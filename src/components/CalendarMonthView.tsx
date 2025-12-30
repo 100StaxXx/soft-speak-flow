@@ -10,12 +10,13 @@ import { CalendarTask } from "@/types/quest";
 interface CalendarMonthViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
+  onMonthChange?: (date: Date) => void;
   tasks: CalendarTask[];
   onTaskClick: (task: CalendarTask) => void;
   onDateLongPress?: (date: Date) => void;
 }
 
-export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskClick, onDateLongPress }: CalendarMonthViewProps) => {
+export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, tasks, onTaskClick, onDateLongPress }: CalendarMonthViewProps) => {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   const monthStart = startOfMonth(selectedDate);
@@ -76,14 +77,14 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, tasks, onTaskCli
           <Button
             variant="outline"
             size="icon"
-            onClick={() => onDateSelect(subMonths(selectedDate, 1))}
+            onClick={() => (onMonthChange || onDateSelect)(subMonths(selectedDate, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button
             variant="outline"
             size="icon"
-            onClick={() => onDateSelect(addMonths(selectedDate, 1))}
+            onClick={() => (onMonthChange || onDateSelect)(addMonths(selectedDate, 1))}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
