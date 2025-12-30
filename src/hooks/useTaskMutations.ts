@@ -394,6 +394,11 @@ export const useTaskMutations = (taskDate: string) => {
         difficulty: string;
         scheduled_time: string | null;
         estimated_duration: number | null;
+        recurrence_pattern?: string | null;
+        recurrence_days?: number[];
+        reminder_enabled?: boolean;
+        reminder_minutes_before?: number;
+        category?: string | null;
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -405,6 +410,11 @@ export const useTaskMutations = (taskDate: string) => {
           difficulty: updates.difficulty,
           scheduled_time: updates.scheduled_time,
           estimated_duration: updates.estimated_duration,
+          recurrence_pattern: updates.recurrence_pattern,
+          recurrence_days: updates.recurrence_days,
+          reminder_enabled: updates.reminder_enabled,
+          reminder_minutes_before: updates.reminder_minutes_before,
+          category: updates.category,
         })
         .eq('id', taskId)
         .eq('user_id', user.id);

@@ -253,6 +253,11 @@ const Journeys = () => {
     difficulty?: string | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
+    recurrence_pattern?: string | null;
+    recurrence_days?: number[] | null;
+    reminder_enabled?: boolean | null;
+    reminder_minutes_before?: number | null;
+    category?: string | null;
   }) => {
     setEditingTask(task);
   };
@@ -262,6 +267,11 @@ const Journeys = () => {
     difficulty: string;
     scheduled_time: string | null;
     estimated_duration: number | null;
+    recurrence_pattern: string | null;
+    recurrence_days: number[];
+    reminder_enabled: boolean;
+    reminder_minutes_before: number;
+    category: string | null;
   }) => {
     await updateTask({ taskId, updates });
     setEditingTask(null);
