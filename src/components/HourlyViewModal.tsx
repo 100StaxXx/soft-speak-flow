@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { format, isSameDay } from "date-fns";
-import { X, Clock, CalendarDays } from "lucide-react";
+import { format, isSameDay, addDays, subDays } from "date-fns";
+import { X, Clock, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -126,9 +126,29 @@ export function HourlyViewModal({
                 </SelectItem>
               </SelectContent>
             </Select>
+            {viewMode === 'day' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onDateSelect(subDays(selectedDate, 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
             <DialogTitle className={cn("text-lg font-semibold", isToday && viewMode === 'day' && "text-primary")}>
               {getTitle()}
             </DialogTitle>
+            {viewMode === 'day' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => onDateSelect(addDays(selectedDate, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           <Button
             variant="ghost"
