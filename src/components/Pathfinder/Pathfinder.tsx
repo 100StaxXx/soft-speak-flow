@@ -60,9 +60,11 @@ interface PathfinderProps {
     target_days: number;
     habits: Array<{
       title: string;
+      description?: string;
       difficulty: string;
       frequency: string;
       custom_days: number[];
+      estimated_minutes?: number;
     }>;
     milestones?: Array<{
       title: string;
@@ -369,9 +371,11 @@ export function Pathfinder({
 
     const habits = selectedHabits.map((h) => ({
       title: h.title,
+      description: h.description,
       difficulty: h.difficulty,
       frequency: h.frequency || 'daily',
       custom_days: [],
+      estimated_minutes: h.estimatedMinutes,
     }));
 
     // Include milestones with dates from schedule
