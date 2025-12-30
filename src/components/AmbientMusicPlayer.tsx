@@ -95,8 +95,9 @@ export const AmbientMusicPlayer = () => {
       size="icon"
       onClick={handleToggle}
       className={cn(
-        "fixed right-4 z-40 rounded-full bg-background/80 backdrop-blur-md border border-border/50 shadow-lg transition-all duration-300 hover:scale-110",
-        state.isPlaying && !isMuted && "animate-pulse"
+        "fixed left-4 z-40 rounded-full bg-background/40 backdrop-blur-sm border border-border/30 transition-all duration-300",
+        "opacity-40 hover:opacity-100 hover:scale-110",
+        state.isPlaying && !isMuted && "animate-pulse opacity-50"
       )}
       style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
       aria-label={isMuted ? "Unmute all audio" : "Mute all audio"}

@@ -8,7 +8,7 @@ import {
   Sparkles, 
   Wand2,
   Target,
-  Clock
+  Calendar
 } from "lucide-react";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { PageTransition } from "@/components/PageTransition";
@@ -286,15 +286,6 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 text-center relative"
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowHourlyModal(true)}
-            className="absolute left-0 top-0 h-10 w-10 text-sky-400 hover:text-sky-300 hover:bg-sky-400/10"
-            aria-label="Open day view"
-          >
-            <Clock className="h-6 w-6" />
-          </Button>
           <PageInfoButton 
             onClick={() => setShowPageInfo(true)} 
             className="absolute right-0 top-0"
@@ -312,13 +303,25 @@ const Journeys = () => {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.05 }}
-          className="mb-6"
+          className="mb-4"
         >
           <DatePillsScroller
             selectedDate={selectedDate}
             onDateSelect={setSelectedDate}
             tasksPerDay={tasksPerDay}
           />
+          
+          {/* Calendar View Button */}
+          <div className="flex justify-center mt-3">
+            <Button
+              variant="ghost"
+              onClick={() => setShowHourlyModal(true)}
+              className="text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 font-medium"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Calendar View
+            </Button>
+          </div>
         </motion.div>
 
         {/* Smart Natural Language Input */}
