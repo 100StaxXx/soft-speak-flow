@@ -14,6 +14,7 @@ import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
+import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
 
 interface MilestoneProgressProps {
   epicId: string;
@@ -41,7 +42,7 @@ export const MilestoneProgress = ({
     isCompleting,
   } = useMilestones(epicId);
 
-  const { checkMilestoneForPostcard } = useCompanionPostcards();
+  const { checkMilestoneForPostcard, postcardJustUnlocked, clearPostcardUnlocked } = useCompanionPostcards();
   const { companion } = useCompanion();
 
   const handleQuickComplete = async (milestone: Milestone, e: React.MouseEvent) => {
@@ -68,7 +69,14 @@ export const MilestoneProgress = ({
   // Compact view for JourneyCard - just shows progress and next milestone
   if (compact) {
     return (
-      <div className="space-y-2">
+      <>
+        <PostcardUnlockCelebration
+          show={!!postcardJustUnlocked}
+          milestoneTitle={postcardJustUnlocked?.milestoneTitle}
+          chapterNumber={postcardJustUnlocked?.chapterNumber}
+          onDismiss={clearPostcardUnlocked}
+        />
+        <div className="space-y-2">
         {/* Progress Bar */}
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground flex items-center gap-1">
@@ -128,7 +136,8 @@ export const MilestoneProgress = ({
             <ChevronRight className="w-3 h-3 ml-1" />
           </Button>
         </JourneyDetailDrawer>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -138,7 +147,14 @@ export const MilestoneProgress = ({
     .slice(0, 3);
 
   return (
-    <div className="space-y-3">
+    <>
+      <PostcardUnlockCelebration
+        show={!!postcardJustUnlocked}
+        milestoneTitle={postcardJustUnlocked?.milestoneTitle}
+        chapterNumber={postcardJustUnlocked?.chapterNumber}
+        onDismiss={clearPostcardUnlocked}
+      />
+      <div className="space-y-3">
       {/* Header with progress */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -223,6 +239,7 @@ export const MilestoneProgress = ({
           <ChevronRight className="w-3 h-3 ml-1" />
         </Button>
       </JourneyDetailDrawer>
-    </div>
+      </div>
+    </>
   );
 };

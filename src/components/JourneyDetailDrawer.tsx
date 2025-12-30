@@ -33,6 +33,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 import { PhaseProgressTimeline } from "./journey/PhaseProgressTimeline";
 import { PhaseProgressCard } from "./journey/PhaseProgressCard";
+import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
 
 interface JourneyDetailDrawerProps {
   epicId: string;
@@ -66,7 +67,7 @@ export const JourneyDetailDrawer = ({
     isCompleting,
   } = useMilestones(epicId);
 
-  const { checkMilestoneForPostcard } = useCompanionPostcards();
+  const { checkMilestoneForPostcard, postcardJustUnlocked, clearPostcardUnlocked } = useCompanionPostcards();
   const { companion } = useCompanion();
 
   const currentPhase = getCurrentPhase();
@@ -99,7 +100,14 @@ export const JourneyDetailDrawer = ({
   };
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <>
+      <PostcardUnlockCelebration
+        show={!!postcardJustUnlocked}
+        milestoneTitle={postcardJustUnlocked?.milestoneTitle}
+        chapterNumber={postcardJustUnlocked?.chapterNumber}
+        onDismiss={clearPostcardUnlocked}
+      />
+      <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
         {children || (
           <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
@@ -332,5 +340,6 @@ export const JourneyDetailDrawer = ({
         </div>
       </DrawerContent>
     </Drawer>
+    </>
   );
 };
