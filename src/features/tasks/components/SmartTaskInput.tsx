@@ -240,12 +240,11 @@ export function SmartTaskInput({
     }
     
     if (!parsed || !parsed.text.trim()) return;
-    success(); // Haptic on submit
-    setJustSubmitted(true);
-    setTimeout(() => setJustSubmitted(false), 300);
-    onSubmit(parsed);
-    reset();
-    setInterimText('');
+    
+    // Show preview for confirmation instead of creating immediately
+    success(); // Haptic feedback
+    setPreviewSource('typed');
+    setShowPreviewCard(true);
   };
 
   const handleClear = () => {
@@ -986,25 +985,27 @@ export function SmartTaskInput({
         )}
       </AnimatePresence>
 
-      {/* Task Preview Card - shown for voice input or when user wants to preview */}
+      {/* Task Preview Card - shown for voice input or typed input confirmation */}
       <AnimatePresence>
-        {voicePreview && !isRecording && (
+        {showPreviewCard && !isRecording && (voicePreview || parsed?.text.trim()) && (
           <TaskPreviewCard
-            parsed={parseNaturalLanguage(voicePreview)}
-            rawInput={voicePreview}
+            parsed={voicePreview ? parseNaturalLanguage(voicePreview) : parsed!}
+            rawInput={voicePreview || input}
             onConfirm={() => handlePreviewConfirm()}
             onConfirmWithSubtasks={handleConfirmWithSubtasks}
             onEdit={handlePreviewEdit}
             onDiscard={handlePreviewDiscard}
-            isVoiceInput={true}
+            isVoiceInput={previewSource === 'voice'}
             onBreakdown={handleBreakdown}
             isBreakingDown={isBreakingDown}
             suggestedSubtasks={suggestedSubtasks}
             onSubtasksChange={setSuggestedSubtasks}
             onCreateAsEpic={() => {
               setShowPreviewCard(false);
-              setInput(voicePreview);
-              setVoicePreview(null);
+              if (voicePreview) {
+                setInput(voicePreview);
+                setVoicePreview(null);
+              }
               setShowEpicWizard(true);
             }}
             className="mx-1"
