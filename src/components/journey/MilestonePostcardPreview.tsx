@@ -11,6 +11,8 @@ interface MilestonePostcardPreviewProps {
   chapterNumber: number;
   className?: string;
   compact?: boolean;
+  isExpanded?: boolean;
+  onClick?: () => void;
 }
 
 export function MilestonePostcardPreview({
@@ -20,19 +22,23 @@ export function MilestonePostcardPreview({
   chapterNumber,
   className,
   compact = false,
+  isExpanded = false,
+  onClick,
 }: MilestonePostcardPreviewProps) {
   const remaining = Math.max(0, targetPercent - currentProgress);
   const progressTowardMilestone = remaining > 0 
     ? ((currentProgress / targetPercent) * 100) 
     : 100;
 
-  if (compact) {
+  if (compact && !isExpanded) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
+        onClick={onClick}
         className={cn(
           'flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20',
+          onClick && 'cursor-pointer hover:border-amber-500/40 transition-colors',
           className
         )}
       >
@@ -45,7 +51,12 @@ export function MilestonePostcardPreview({
             {Math.round(remaining)}% to go
           </div>
         </div>
-        <ChevronRight className="w-4 h-4 text-amber-500/50" />
+        <motion.div
+          animate={{ rotate: isExpanded ? 90 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronRight className="w-4 h-4 text-amber-500/50" />
+        </motion.div>
       </motion.div>
     );
   }
@@ -54,8 +65,10 @@ export function MilestonePostcardPreview({
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
+      onClick={onClick}
       className={cn(
         'p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-purple-500/10 border border-amber-500/20',
+        onClick && 'cursor-pointer hover:border-amber-500/40 transition-colors',
         className
       )}
     >
