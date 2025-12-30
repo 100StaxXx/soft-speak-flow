@@ -8,8 +8,6 @@ import {
   Sparkles, 
   Wand2,
   Target,
-  Mic,
-  Send,
   Clock
 } from "lucide-react";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
@@ -24,6 +22,7 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { JourneysTutorialModal } from "@/components/JourneysTutorialModal";
+import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
@@ -31,6 +30,8 @@ import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
+import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import type { SuggestedSubtask } from "@/hooks/useTaskDecomposition";
 import { cn } from "@/lib/utils";
 
 const MAX_JOURNEYS = 2;
@@ -185,29 +186,43 @@ const Journeys = () => {
           />
         </motion.div>
 
-        {/* Quick Input Bar */}
+        {/* Smart Natural Language Input */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="mb-4"
         >
-          <div 
-            onClick={() => setShowAddSheet(true)}
-            className="flex items-center gap-3 bg-secondary/40 border border-border/50 rounded-xl px-4 py-3 cursor-pointer hover:bg-secondary/60 transition-colors"
-          >
-            <div className="flex-1 text-muted-foreground text-sm">
-              Add a quest or ask me anything...
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="p-2 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
-                <Mic className="w-4 h-4 text-primary" />
-              </button>
-              <button className="p-2 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
-                <Send className="w-4 h-4 text-primary" />
-              </button>
-            </div>
-          </div>
+          <SmartTaskInput
+            onSubmit={async (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => {
+              const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
+              
+              // Create the main task
+              await addTask({
+                taskText: parsed.text,
+                difficulty: parsed.difficulty || 'medium',
+                taskDate,
+                isMainQuest: false,
+                scheduledTime: parsed.scheduledTime,
+                estimatedDuration: parsed.estimatedDuration,
+                recurrencePattern: parsed.recurrencePattern,
+              });
+              
+              // If subtasks were generated, create those too
+              if (subtasks?.length) {
+                for (const subtask of subtasks) {
+                  await addTask({
+                    taskText: subtask.title,
+                    difficulty: 'easy',
+                    taskDate,
+                    isMainQuest: false,
+                    estimatedDuration: subtask.durationMinutes,
+                  });
+                }
+              }
+            }}
+            placeholder="Add a quest or ask me anything..."
+          />
         </motion.div>
 
         {/* Today's Agenda Card */}
