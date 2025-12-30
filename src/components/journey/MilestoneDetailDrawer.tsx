@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Calendar,
   CheckCircle2,
@@ -114,8 +113,15 @@ export const MilestoneDetailDrawer = ({
           </DrawerTitle>
         </DrawerHeader>
 
-        <ScrollArea className="flex-1 max-h-[60vh]">
-          <div className="px-4 py-4 space-y-5" data-vaul-no-drag>
+        <div 
+          className="flex-1 max-h-[60vh] overflow-y-auto overscroll-contain"
+          style={{ 
+            WebkitOverflowScrolling: 'touch', 
+            touchAction: 'pan-y' 
+          }}
+          data-vaul-no-drag
+        >
+          <div className="px-4 py-4 space-y-5">
             {/* Status & Date Section */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -311,7 +317,7 @@ export const MilestoneDetailDrawer = ({
               </motion.div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Action Button */}
         <div className="p-4 border-t border-border/50">
