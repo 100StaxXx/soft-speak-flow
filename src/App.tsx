@@ -44,7 +44,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
 const Mentor = lazy(() => import("./pages/Mentor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Tasks = lazy(() => import("./pages/Tasks"));
+// Tasks removed - consolidated into Journeys
 const Reflection = lazy(() => import("./pages/Reflection"));
 const MentorChat = lazy(() => import("./pages/MentorChat"));
 const Library = lazy(() => import("./pages/Library"));
