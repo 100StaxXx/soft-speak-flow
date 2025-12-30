@@ -277,6 +277,9 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             isExpanded={milestoneExpanded}
             onClick={() => setMilestoneExpanded(!milestoneExpanded)}
             className="mb-3"
+            storySeed={journey.story_seed as import('@/types/narrativeTypes').StorySeed | null}
+            totalChapters={journey.total_chapters}
+            companionSpecies={companion?.spirit_animal}
           />
         )}
 
