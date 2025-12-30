@@ -8,6 +8,7 @@ interface QuestCardProps {
   completed: boolean;
   xpReward: number;
   isMainQuest?: boolean;
+  isTutorialQuest?: boolean;
   difficulty?: "easy" | "medium" | "hard";
   category?: "mind" | "body" | "soul" | null;
   scheduledTime?: string | null;
@@ -34,6 +35,7 @@ export function QuestCard({
   completed,
   xpReward,
   isMainQuest,
+  isTutorialQuest,
   difficulty = "medium",
   category,
   scheduledTime,
@@ -58,19 +60,32 @@ export function QuestCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
+      data-tutorial-quest={isTutorialQuest && !completed ? "true" : undefined}
       className={cn(
         "group relative flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
         "bg-card/80 backdrop-blur-sm hover:bg-card",
         completed 
           ? "border-border/30 opacity-70" 
           : diffStyle.border,
-        isMainQuest && !completed && "ring-1 ring-stardust-gold/30 shadow-glow"
+        isMainQuest && !completed && "ring-1 ring-stardust-gold/30 shadow-glow",
+        isTutorialQuest && !completed && "ring-2 ring-primary/50 border-primary/40 shadow-[0_0_20px_rgba(129,140,248,0.3)]"
       )}
       onClick={onEdit}
     >
       {/* Main quest glow effect */}
       {isMainQuest && !completed && (
         <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-stardust-gold/5 to-transparent pointer-events-none" />
+      )}
+
+      {/* Tutorial quest arrow indicator */}
+      {isTutorialQuest && !completed && (
+        <motion.div
+          className="absolute -left-8 top-1/2 -translate-y-1/2 text-primary"
+          animate={{ x: [0, 6, 0] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <span className="text-lg">👉</span>
+        </motion.div>
       )}
 
       {/* Checkbox with XP burst animation */}
@@ -83,7 +98,8 @@ export function QuestCard({
           "relative flex-shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
           completed
             ? "bg-primary border-primary text-primary-foreground"
-            : "border-primary/50 hover:border-primary hover:bg-primary/10"
+            : "border-primary/50 hover:border-primary hover:bg-primary/10",
+          isTutorialQuest && !completed && "ring-4 ring-primary/30 animate-pulse"
         )}
         whileTap={{ scale: 0.9 }}
       >

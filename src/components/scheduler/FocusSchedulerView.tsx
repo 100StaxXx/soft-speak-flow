@@ -23,6 +23,7 @@ interface FocusSchedulerViewProps {
   onAddQuest: () => void;
   completedCount: number;
   totalCount: number;
+  tutorialQuestId?: string;
 }
 
 export function FocusSchedulerView({
@@ -33,6 +34,7 @@ export function FocusSchedulerView({
   onAddQuest,
   completedCount,
   totalCount,
+  tutorialQuestId,
 }: FocusSchedulerViewProps) {
   // Group tasks: scheduled (sorted by time), then unscheduled
   const { scheduledTasks, unscheduledTasks } = useMemo(() => {
@@ -87,6 +89,7 @@ export function FocusSchedulerView({
                 completed={!!task.completed}
                 scheduledTime={task.scheduled_time}
                 estimatedDuration={task.estimated_duration}
+                isTutorialQuest={task.id === tutorialQuestId}
                 onToggle={(id, completed) => onToggle(id, completed, task.xp_reward || 10)}
                 onEdit={() => onEdit(task)}
               />
@@ -110,6 +113,7 @@ export function FocusSchedulerView({
                 completed={!!task.completed}
                 scheduledTime={task.scheduled_time}
                 estimatedDuration={task.estimated_duration}
+                isTutorialQuest={task.id === tutorialQuestId}
                 onToggle={(id, completed) => onToggle(id, completed, task.xp_reward || 10)}
                 onEdit={() => onEdit(task)}
               />
