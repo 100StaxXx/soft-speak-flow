@@ -23,12 +23,22 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { JourneysTutorialModal } from "@/components/JourneysTutorialModal";
 import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
+import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
+import { ComboCounter } from "@/components/ComboCounter";
+import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
+import { useComboTracker } from "@/hooks/useComboTracker";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { safeLocalStorage } from "@/utils/storage";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { SuggestedSubtask } from "@/hooks/useTaskDecomposition";
@@ -42,8 +52,28 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showHourlyModal, setShowHourlyModal] = useState(false);
+  const [showQuestClear, setShowQuestClear] = useState(false);
   
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
+  
+  // Auth and profile for tutorial quest
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const queryClient = useQueryClient();
+  const tutorialCheckRef = useRef(false);
+  
+  // Streak freeze
+  const { 
+    needsStreakDecision, 
+    currentStreak: freezeStreak, 
+    freezesAvailable, 
+    useFreeze, 
+    resetStreak, 
+    isResolving 
+  } = useStreakAtRisk();
+  
+  // Combo tracking
+  const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
   
   const { currentStreak } = useStreakMultiplier();
   
@@ -90,6 +120,66 @@ const Journeys = () => {
     }
   }, [unsurfacedEpicHabitsCount, selectedDate, surfaceAllEpicHabits]);
   
+  // Tutorial quest creation for new users - "Join Cosmiq" quest
+  useEffect(() => {
+    if (!user?.id || !profile) return;
+    
+    const tutorialSeen = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`) === 'true';
+    const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
+    const profileTutorialSeen = onboardingData.quests_tutorial_seen === true;
+    
+    if ((tutorialSeen || profileTutorialSeen) || tutorialCheckRef.current) return;
+    
+    tutorialCheckRef.current = true;
+    
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const questCreationKey = `tutorial_quest_created_${user.id}`;
+    const questAlreadyCreated = safeLocalStorage.getItem(questCreationKey) === 'true';
+    
+    if (questAlreadyCreated) {
+      tutorialCheckRef.current = false;
+      return;
+    }
+    
+    safeLocalStorage.setItem(questCreationKey, 'true');
+    
+    const checkAndCreateQuest = async () => {
+      try {
+        const { data: existingQuest } = await supabase
+          .from('daily_tasks')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('task_text', 'Join Cosmiq')
+          .maybeSingle();
+        
+        if (!existingQuest) {
+          const { error: insertError } = await supabase
+            .from('daily_tasks')
+            .insert({
+              user_id: user.id,
+              task_text: 'Join Cosmiq',
+              difficulty: 'easy',
+              xp_reward: 10,
+              task_date: today,
+              is_main_quest: false,
+            });
+          
+          if (insertError) {
+            safeLocalStorage.removeItem(questCreationKey);
+          } else {
+            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+          }
+        }
+      } catch {
+        safeLocalStorage.removeItem(questCreationKey);
+      } finally {
+        tutorialCheckRef.current = false;
+      }
+    };
+    
+    checkAndCreateQuest();
+  }, [user?.id, profile, queryClient]);
+  
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
     allCalendarTasks.forEach((task: any) => {
@@ -135,6 +225,9 @@ const Journeys = () => {
   };
 
   const handleToggleTask = (taskId: string, completed: boolean, xpReward: number) => {
+    if (completed) {
+      recordCompletion(); // Track combo for consecutive completions
+    }
     toggleTask({ taskId, completed, xpReward });
   };
 
@@ -420,6 +513,31 @@ const Journeys = () => {
         <JourneysTutorialModal 
           open={showTutorial} 
           onClose={dismissTutorial} 
+        />
+        
+        {/* Streak Freeze Prompt */}
+        <StreakFreezePromptModal
+          open={needsStreakDecision}
+          currentStreak={freezeStreak}
+          freezesAvailable={freezesAvailable}
+          onUseFreeze={useFreeze}
+          onResetStreak={resetStreak}
+          isResolving={isResolving}
+        />
+        
+        {/* Combo Counter Overlay */}
+        <ComboCounter
+          count={comboCount}
+          show={showCombo}
+          bonusXP={bonusXP}
+        />
+        
+        {/* Quest Clear Celebration */}
+        <QuestClearCelebration
+          show={showQuestClear}
+          totalXP={dailyTasks.reduce((sum, t) => sum + (t.xp_reward || 0), 0)}
+          currentStreak={currentStreak}
+          onDismiss={() => setShowQuestClear(false)}
         />
       </div>
 
