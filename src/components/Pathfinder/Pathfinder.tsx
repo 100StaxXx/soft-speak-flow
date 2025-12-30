@@ -545,7 +545,7 @@ export function Pathfinder({
                 {/* Timeline Context - Optional */}
                 <div className="space-y-2">
                   <Label htmlFor="context-input" className="text-base font-semibold flex items-center gap-2">
-                    What's your current preparation status?
+                    List current experience
                     <span className="text-sm font-normal text-muted-foreground">(optional)</span>
                   </Label>
                   <Textarea
