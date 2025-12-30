@@ -29,6 +29,7 @@ interface HabitCardProps {
   completedToday: boolean;
   difficulty?: string;
   onComplete: () => void;
+  onDelete?: (habitId: string) => void;
 }
 
 export const HabitCard = memo(({
@@ -39,11 +40,17 @@ export const HabitCard = memo(({
   completedToday,
   difficulty = "medium",
   onComplete,
+  onDelete,
 }: HabitCardProps) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [showActions, setShowActions] = useState(false);
 
+  const handleDelete = useCallback(() => {
+    if (onDelete) {
+      onDelete(id);
+    }
+  }, [id, onDelete]);
   const handleArchive = useCallback(async () => {
     if (!id) {
       toast.error("Invalid habit ID");
@@ -243,6 +250,38 @@ export const HabitCard = memo(({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              
+              {onDelete && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive/50 hover:text-destructive opacity-50 hover:opacity-100"
+                      aria-label="Delete habit permanently"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this habit permanently?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete "{title}" and all its streak data. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDelete}
+                        className="bg-destructive hover:bg-destructive/90"
+                      >
+                        Delete Forever
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </div>
         </div>

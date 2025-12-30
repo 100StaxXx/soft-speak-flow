@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Check } from "lucide-react";
+import { Plus, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ interface HabitSectionProps {
   habitProgress: number;
   onAddHabit: (data: { title: string; difficulty: HabitDifficulty; selectedDays: number[] }) => void;
   onToggleHabit: (data: { habitId: string; isCompleted: boolean }) => void;
+  onDeleteHabit?: (habitId: string) => void;
+  onReorderHabits?: (habits: { id: string; sort_order: number }[]) => void;
   isAddingHabit: boolean;
 }
 
@@ -25,6 +27,8 @@ export function HabitSection({
   habitProgress,
   onAddHabit,
   onToggleHabit,
+  onDeleteHabit,
+  onReorderHabits,
   isAddingHabit,
 }: HabitSectionProps) {
   const [showAddHabit, setShowAddHabit] = useState(false);
@@ -49,6 +53,23 @@ export function HabitSection({
 
   const isHabitCompleted = (habitId: string) => 
     completions.some(c => c.habit_id === habitId);
+
+  const moveHabit = (index: number, direction: 'up' | 'down') => {
+    if (!onReorderHabits) return;
+    
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= habits.length) return;
+    
+    const reorderedHabits = [...habits];
+    [reorderedHabits[index], reorderedHabits[newIndex]] = [reorderedHabits[newIndex], reorderedHabits[index]];
+    
+    const updates = reorderedHabits.map((habit, idx) => ({
+      id: habit.id,
+      sort_order: idx,
+    }));
+    
+    onReorderHabits(updates);
+  };
 
   if (showTemplates && habits.length === 0) {
     return (
@@ -101,34 +122,59 @@ export function HabitSection({
 
       {/* Habit List */}
       <div className="space-y-2">
-        {habits.map((habit) => {
+        {habits.map((habit, index) => {
           const completed = isHabitCompleted(habit.id);
           return (
-            <button
-              key={habit.id}
-              onClick={() => onToggleHabit({ habitId: habit.id, isCompleted: completed })}
-              className={cn(
-                "w-full flex items-center gap-3 p-3 rounded-lg border transition-all",
-                completed 
-                  ? "bg-primary/10 border-primary/30" 
-                  : "bg-card hover:bg-accent/50"
+            <div key={habit.id} className="flex items-center gap-2">
+              {/* Reorder controls */}
+              {habits.length > 1 && onReorderHabits && (
+                <div className="flex flex-col">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-5 w-5"
+                    onClick={() => moveHabit(index, 'up')}
+                    disabled={index === 0}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-5 w-5"
+                    onClick={() => moveHabit(index, 'down')}
+                    disabled={index === habits.length - 1}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </div>
               )}
-            >
-              <div className={cn(
-                "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
-                completed 
-                  ? "bg-primary border-primary" 
-                  : "border-muted-foreground/30"
-              )}>
-                {completed && <Check className="h-4 w-4 text-primary-foreground" />}
-              </div>
-              <span className={cn(
-                "font-medium",
-                completed && "line-through text-muted-foreground"
-              )}>
-                {habit.title}
-              </span>
-            </button>
+              
+              <button
+                onClick={() => onToggleHabit({ habitId: habit.id, isCompleted: completed })}
+                className={cn(
+                  "flex-1 flex items-center gap-3 p-3 rounded-lg border transition-all",
+                  completed 
+                    ? "bg-primary/10 border-primary/30" 
+                    : "bg-card hover:bg-accent/50"
+                )}
+              >
+                <div className={cn(
+                  "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+                  completed 
+                    ? "bg-primary border-primary" 
+                    : "border-muted-foreground/30"
+                )}>
+                  {completed && <Check className="h-4 w-4 text-primary-foreground" />}
+                </div>
+                <span className={cn(
+                  "font-medium",
+                  completed && "line-through text-muted-foreground"
+                )}>
+                  {habit.title}
+                </span>
+              </button>
+            </div>
           );
         })}
       </div>
