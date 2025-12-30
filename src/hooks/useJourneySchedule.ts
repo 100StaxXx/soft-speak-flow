@@ -25,7 +25,7 @@ export interface JourneyRitual {
   id: string;
   title: string;
   description: string;
-  frequency: 'daily' | 'weekly' | 'custom';
+  frequency: 'daily' | '5x_week' | '3x_week' | 'custom';
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedMinutes?: number;
 }

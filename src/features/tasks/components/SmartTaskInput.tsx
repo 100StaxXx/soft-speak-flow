@@ -1031,7 +1031,6 @@ export function SmartTaskInput({
         initialTargetDays={epicDetails?.suggestedTargetDays || classification?.suggestedDuration}
         clarificationAnswers={epicClarificationAnswers || undefined}
         epicContext={epicContext}
-        autoGenerateSuggestions={!!epicClarificationAnswers}
       />
 
       {/* Task Batch Preview Modal */}
