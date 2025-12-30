@@ -272,8 +272,8 @@ const App = () => {
             <Toaster />
             <Sonner />
             <InstallPWA />
-            <AmbientMusicPlayer />
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <AmbientMusicPlayer />
               <ScrollToTop />
               <AppContent />
             </BrowserRouter>
