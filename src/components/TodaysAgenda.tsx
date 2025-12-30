@@ -8,7 +8,8 @@ import {
   Plus,
   Check,
   Circle,
-  Target
+  Target,
+  ArrowDown
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,7 @@ export function TodaysAgenda({
 
   const renderTaskItem = (task: Task, isRitual: boolean) => {
     const isComplete = !!task.completed;
+    const isTutorialQuest = task.task_text === 'Join Cosmiq';
     
     return (
       <motion.div
@@ -97,19 +99,40 @@ export function TodaysAgenda({
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
-          "flex items-center gap-3 p-2 rounded-lg transition-all",
+          "flex items-center gap-3 p-2 rounded-lg transition-all relative",
           "hover:bg-muted/30 cursor-pointer",
-          isComplete && "opacity-60"
+          isComplete && "opacity-60",
+          isTutorialQuest && !isComplete && "overflow-visible"
         )}
         onClick={() => onToggle(task.id, !isComplete, task.xp_reward)}
       >
-        <div className={cn(
-          "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-          isComplete 
-            ? "bg-primary border-primary" 
-            : "border-muted-foreground/30"
-        )}>
-          {isComplete && <Check className="w-3 h-3 text-primary-foreground" />}
+        <div className="relative">
+          {/* Animated Arrow Indicator for Tutorial Quest */}
+          {isTutorialQuest && !isComplete && (
+            <div
+              className="absolute left-1/2 -top-12 -translate-x-1/2 pointer-events-none z-[60] flex flex-col items-center gap-0.5"
+              style={{ animation: 'bounceDown 1.2s ease-in-out infinite' }}
+            >
+              <div
+                className="text-[10px] font-bold text-primary bg-primary/20 px-2 py-0.5 rounded-full border border-primary shadow-lg whitespace-nowrap"
+                style={{ animation: 'clickHerePulse 1.5s ease-in-out infinite' }}
+              >
+                Click here!
+              </div>
+              <ArrowDown className="h-4 w-4 text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]" strokeWidth={3} />
+            </div>
+          )}
+          
+          <div className={cn(
+            "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+            isComplete 
+              ? "bg-primary border-primary" 
+              : isTutorialQuest 
+                ? "border-primary ring-2 ring-primary ring-offset-1 ring-offset-background"
+                : "border-muted-foreground/30"
+          )}>
+            {isComplete && <Check className="w-3 h-3 text-primary-foreground" />}
+          </div>
         </div>
         
         <div className="flex-1 min-w-0">
