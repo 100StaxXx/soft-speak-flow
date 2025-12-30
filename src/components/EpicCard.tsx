@@ -25,10 +25,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
+import { useMilestones } from "@/hooks/useMilestones";
 
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { generateAdversary } from "@/utils/adversaryGenerator";
-import type { StorySeed, BossBattleContext, NarrativeCheckpoint } from "@/types/narrativeTypes";
+import type { StorySeed, BossBattleContext } from "@/types/narrativeTypes";
 import type { Adversary, AstralEncounter } from "@/types/astralEncounters";
 import type { RewardRevealData } from "@/types/epicRewards";
 import { STORY_TYPE_BADGES } from "@/types/epicRewards";
@@ -99,8 +100,19 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
-  // Encounter triggering is handled centrally by AstralEncounterProvider
+  const { milestones } = useMilestones(epic.id);
   const { generateRewardReveal } = useEpicRewards();
+  
+  const trailMilestones = useMemo(() => {
+    if (!milestones || milestones.length === 0) return undefined;
+    return milestones.map(m => ({
+      id: m.id,
+      title: m.title,
+      milestone_percent: m.milestone_percent,
+      is_postcard_milestone: m.is_postcard_milestone,
+      completed_at: m.completed_at,
+    }));
+  }, [milestones]);
   
   // Initialize to -1 on first render to catch any milestones that may have been
   // crossed before this component mounted. Server handles duplicate prevention.
@@ -116,30 +128,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const theme = (epic.theme_color || 'heroic') as EpicTheme;
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
-
-  // Generate narrative checkpoints from story_seed if available
-  const narrativeCheckpoints = useMemo((): NarrativeCheckpoint[] | undefined => {
-    const storySeed = epic.story_seed as StorySeed | null;
-    if (!storySeed?.chapter_blueprints) return undefined;
-    
-    const totalChapters = storySeed.chapter_blueprints.length;
-    
-    return storySeed.chapter_blueprints.map((blueprint, index) => {
-      const progressPercent = Math.round(((index + 1) / totalChapters) * 100);
-      const isReached = epic.progress_percentage >= progressPercent;
-      
-      return {
-        chapter: blueprint.chapter,
-        progressPercent,
-        locationName: blueprint.title,
-        locationRevealed: isReached,
-        isReached,
-        isCurrent: isReached && epic.progress_percentage < (((index + 2) / totalChapters) * 100),
-        isFinale: index === totalChapters - 1,
-        clueText: blueprint.mystery_seed || null,
-      };
-    });
-  }, [epic.story_seed, epic.progress_percentage]);
 
   // Build boss battle context from story_seed
   const buildBossBattleContext = useCallback((): BossBattleContext | null => {
@@ -404,7 +392,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           companionImageUrl={health?.imageUrl || companion?.current_image_url}
           companionMood={health?.moodState}
           showCompanion={true}
-          narrativeCheckpoints={narrativeCheckpoints}
+          milestones={trailMilestones}
         />
 
         {/* Stats Grid */}
