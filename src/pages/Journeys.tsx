@@ -30,6 +30,7 @@ import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
+import { useCalendarMilestones } from "@/hooks/useCalendarMilestones";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
@@ -106,8 +107,8 @@ const Journeys = () => {
     scheduled_time?: string | null;
     estimated_duration?: number | null;
   } | null>(null);
-  
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
+  const { milestones: calendarMilestones } = useCalendarMilestones(selectedDate);
   
   // Habit surfacing - auto-surface active epic habits as daily tasks
   const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
@@ -564,6 +565,7 @@ const Journeys = () => {
             xp_reward: task.xp_reward,
             is_main_quest: task.is_main_quest || false,
           }))}
+          milestones={calendarMilestones}
           onTaskDrop={() => {}}
         />
         <QuestHubTutorial 

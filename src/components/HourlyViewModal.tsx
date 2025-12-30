@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarDayView } from "./CalendarDayView";
 import { CalendarMonthView } from "./CalendarMonthView";
-import { CalendarTask } from "@/types/quest";
+import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { cn } from "@/lib/utils";
 
 interface HourlyViewModalProps {
@@ -15,9 +15,11 @@ interface HourlyViewModalProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
   tasks: CalendarTask[];
+  milestones?: CalendarMilestone[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
   onTaskLongPress?: (taskId: string) => void;
+  onMilestoneClick?: (milestone: CalendarMilestone) => void;
 }
 
 type ViewMode = 'day' | 'month';
@@ -28,9 +30,11 @@ export function HourlyViewModal({
   selectedDate,
   onDateSelect,
   tasks,
+  milestones = [],
   onTaskDrop,
   onTimeSlotLongPress,
   onTaskLongPress,
+  onMilestoneClick,
 }: HourlyViewModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -172,9 +176,11 @@ export function HourlyViewModal({
               selectedDate={selectedDate}
               onDateSelect={onDateSelect}
               tasks={tasks}
+              milestones={milestones}
               onTaskDrop={onTaskDrop}
               onTimeSlotLongPress={onTimeSlotLongPress}
               onTaskLongPress={onTaskLongPress}
+              onMilestoneClick={onMilestoneClick}
               fullDayMode
               hideHeader
             />
@@ -184,7 +190,9 @@ export function HourlyViewModal({
               onDateSelect={handleDateSelectFromMonth}
               onMonthChange={handleMonthChange}
               tasks={tasks}
+              milestones={milestones}
               onTaskClick={handleTaskClick}
+              onMilestoneClick={onMilestoneClick}
               onDateLongPress={(date) => onTimeSlotLongPress?.(date, '09:00')}
             />
           )}

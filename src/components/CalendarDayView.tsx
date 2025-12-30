@@ -1,22 +1,25 @@
 import { format, addDays, subDays, isSameDay } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, ChevronDown, ChevronUp, Zap, AlertTriangle, TrendingUp, CheckCircle2, Star } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
+import { MilestoneCalendarCard } from "./MilestoneCalendarCard";
 import { useEffect, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
-import { CalendarTask } from "@/types/quest";
+import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
 
 interface CalendarDayViewProps {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
   tasks: CalendarTask[];
+  milestones?: CalendarMilestone[];
   onTaskDrop: (taskId: string, newDate: Date, newTime?: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
   onTaskLongPress?: (taskId: string) => void;
+  onMilestoneClick?: (milestone: CalendarMilestone) => void;
   fullDayMode?: boolean;
   hideHeader?: boolean;
 }
@@ -25,9 +28,11 @@ export const CalendarDayView = ({
   selectedDate,
   onDateSelect,
   tasks,
+  milestones = [],
   onTaskDrop,
   onTimeSlotLongPress,
   onTaskLongPress,
+  onMilestoneClick,
   fullDayMode = false,
   hideHeader = false
 }: CalendarDayViewProps) => {
@@ -105,6 +110,10 @@ export const CalendarDayView = ({
     return dayTasks.filter(task => task.completed);
   };
 
+  const getDayMilestones = () => {
+    return milestones.filter(m => m.target_date === dateStr);
+  };
+
   const calculateTaskHeight = (duration: number | null) => {
     if (!duration) return 60; // Default 30min slot height
     // Each 30min = 60px, so duration in minutes / 30 * 60px
@@ -129,6 +138,7 @@ export const CalendarDayView = ({
   };
 
   const unscheduledTasks = getUnscheduledTasks();
+  const dayMilestones = getDayMilestones();
   const scheduledTasksCount = dayTasks.length - unscheduledTasks.length;
   const MAX_UNSCHEDULED_PREVIEW = 3;
   const visibleUnscheduledTasks = showAllUnscheduled
@@ -303,6 +313,25 @@ export const CalendarDayView = ({
             </div>
           )}
         </Card>
+      )}
+
+      {/* Milestones Section */}
+      {dayMilestones.length > 0 && (
+        <div className="rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-500 mb-3">
+            <Star className="h-4 w-4" />
+            Goals for Today ({dayMilestones.length})
+          </div>
+          <div className="space-y-2">
+            {dayMilestones.map((milestone) => (
+              <MilestoneCalendarCard
+                key={milestone.id}
+                milestone={milestone}
+                onClick={() => onMilestoneClick?.(milestone)}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Unscheduled Tasks - Full section in normal mode */}

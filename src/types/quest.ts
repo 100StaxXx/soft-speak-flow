@@ -7,6 +7,20 @@ export type TaskCategory = 'mind' | 'body' | 'soul';
 export type TaskDifficulty = 'easy' | 'medium' | 'hard';
 
 /**
+ * Milestone interface for calendar display
+ */
+export interface CalendarMilestone {
+  id: string;
+  title: string;
+  target_date: string;
+  milestone_percent: number;
+  completed_at: string | null;
+  epic_id: string;
+  epic_title?: string;
+  phase_name?: string | null;
+}
+
+/**
  * Base task interface with fields commonly needed across calendar components
  */
 export interface CalendarTask {

@@ -1,11 +1,11 @@
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Clock, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, AlertCircle, Star } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
-import { CalendarTask } from "@/types/quest";
+import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import {
   Select,
   SelectContent,
@@ -24,11 +24,13 @@ interface CalendarMonthViewProps {
   onDateSelect: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
   tasks: CalendarTask[];
+  milestones?: CalendarMilestone[];
   onTaskClick: (task: CalendarTask) => void;
+  onMilestoneClick?: (milestone: CalendarMilestone) => void;
   onDateLongPress?: (date: Date) => void;
 }
 
-export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, tasks, onTaskClick, onDateLongPress }: CalendarMonthViewProps) => {
+export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, tasks, milestones = [], onTaskClick, onMilestoneClick, onDateLongPress }: CalendarMonthViewProps) => {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   const monthStart = startOfMonth(selectedDate);
@@ -77,6 +79,11 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
       // task_date is already in 'yyyy-MM-dd' format from database
       return task.task_date === dateStr;
     });
+  };
+
+  const getMilestonesForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return milestones.filter(m => m.target_date === dateStr);
   };
 
   const hasTimeConflict = (date: Date) => {
@@ -169,11 +176,14 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
         <div className="grid grid-cols-7">
           {days.map((day, index) => {
             const dayTasks = getTasksForDate(day);
+            const dayMilestones = getMilestonesForDate(day);
             const isSelected = isSameDay(day, selectedDate);
             const isToday = isSameDay(day, new Date());
             const hasConflict = hasTimeConflict(day);
             const isLastInRow = (index + 1) % 7 === 0;
             const isInLastRow = index >= days.length - 7;
+            const totalItems = dayTasks.length + dayMilestones.length;
+            const maxVisibleItems = 3;
             
             return (
               <div
@@ -200,13 +210,38 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                   )}>
                     {format(day, "d")}
                   </span>
-                  {hasConflict && (
-                    <AlertCircle className="h-3 w-3 text-destructive" />
-                  )}
+                  <div className="flex items-center gap-1">
+                    {dayMilestones.length > 0 && (
+                      <Star className="h-3 w-3 text-amber-500" />
+                    )}
+                    {hasConflict && (
+                      <AlertCircle className="h-3 w-3 text-destructive" />
+                    )}
+                  </div>
                 </div>
                 
                 <div className="space-y-0.5">
-                  {dayTasks.slice(0, 3).map(task => (
+                  {/* Show milestones first */}
+                  {dayMilestones.slice(0, 2).map(milestone => (
+                    <div
+                      key={milestone.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMilestoneClick?.(milestone);
+                      }}
+                      className={cn(
+                        "text-xs p-1 border-l-2 truncate transition-all hover:bg-amber-500/10",
+                        "border-l-amber-500 bg-amber-500/5",
+                        milestone.completed_at && "opacity-50 line-through"
+                      )}
+                    >
+                      <Star className="h-2 w-2 inline mr-1 text-amber-500" />
+                      {milestone.title}
+                    </div>
+                  ))}
+                  
+                  {/* Then show tasks */}
+                  {dayTasks.slice(0, Math.max(0, maxVisibleItems - dayMilestones.length)).map(task => (
                     <div
                       key={task.id}
                       onClick={(e) => {
@@ -228,9 +263,9 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                       {task.task_text}
                     </div>
                   ))}
-                  {dayTasks.length > 3 && (
+                  {totalItems > maxVisibleItems && (
                     <Badge variant="secondary" className="text-[10px] py-0">
-                      +{dayTasks.length - 3} more
+                      +{totalItems - maxVisibleItems} more
                     </Badge>
                   )}
                 </div>
