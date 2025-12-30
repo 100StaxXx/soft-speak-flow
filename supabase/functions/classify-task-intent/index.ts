@@ -159,13 +159,14 @@ ASK CLARIFICATION IF the goal is:
 DO NOT ASK IF:
 - User already provided specific details AND timeline context ("I'm a retaker studying 2 hours daily for bar exam until July")
 - Goal is simple enough to break down without context ("read more books")
+- About target dates, deadlines, or exam dates (the user already provides their deadline separately)
 
 When asking epic clarification, generate 2-5 questions appropriate to the goal type:
 - For aggressive timelines: ALWAYS include timeline_context question first
-- Use "date" type for target dates/deadlines
-- Use "number" type for hours per day, days per week
+- Use "text" type for time commitments (hours per day, days per week) - allows flexible answers like "4-6 hours" or "2 in morning, 1 at night"
 - Use "select" type for predefined options (subjects, current level, etc.)
 - Use "text" type for open-ended answers
+- NEVER use "date" type - the deadline is already collected in the goal step
 
 **EPIC CLARIFICATION EXAMPLES:**
 
@@ -182,7 +183,7 @@ For "pass bar exam in 2 weeks" (very aggressive timeline):
   },
   "epicClarifyingQuestions": [
     { "id": "timeline_context", "question": "That's an intensive 2-week sprint! What's your preparation status?", "type": "select", "options": ["Just starting fresh", "Already studied 1-2 months", "Completed full prep course", "This is a retake"], "required": true },
-    { "id": "daily_hours", "question": "How many hours per day can you dedicate?", "type": "number", "placeholder": "e.g., 8-12 for intensive prep", "required": true },
+    { "id": "daily_hours", "question": "How many hours per day can you dedicate?", "type": "text", "placeholder": "e.g., 8-12 for intensive prep", "required": true },
     { "id": "subjects", "question": "Which areas need the most focus?", "type": "select", "options": ["All MBE subjects evenly", "Weak subjects only", "Essays & Performance Test", "State-specific law"], "required": true },
     { "id": "current_status", "question": "Where are you in your preparation?", "type": "select", "options": ["Need full review", "In review phase", "Just need practice tests", "Final polish"], "required": false }
   ]
@@ -212,10 +213,9 @@ For "prepare for the bar exam" (no specific timeline - normal flow):
   "epicContext": "exam_preparation",
   "timelineAnalysis": null,
   "epicClarifyingQuestions": [
-    { "id": "exam_date", "question": "When is your exam?", "type": "date", "placeholder": "Select exam date", "required": true },
+    { "id": "current_level", "question": "Current preparation status:", "type": "select", "options": ["Just starting fresh", "Some study done", "In review phase", "Final cramming"], "required": true },
     { "id": "subjects", "question": "Which subjects do you need to focus on?", "type": "select", "options": ["All MBE subjects", "Essays & PT", "State-specific", "Full review"], "required": true },
-    { "id": "hours_per_day", "question": "How many hours per day can you study?", "type": "number", "placeholder": "e.g., 4", "required": true },
-    { "id": "current_status", "question": "Where are you in your preparation?", "type": "select", "options": ["Just starting", "Some progress made", "In review phase", "Final cramming"], "required": false }
+    { "id": "hours_per_day", "question": "How many hours per day can you study?", "type": "text", "placeholder": "e.g., 4-6 hours", "required": true }
   ]
 }
 
