@@ -29,7 +29,14 @@ export function RitualEditor({
   const weeklyMinutes = useMemo(() => {
     return rituals.reduce((total, ritual) => {
       const minutes = ritual.estimatedMinutes || 15;
-      const multiplier = ritual.frequency === 'daily' ? 7 : ritual.frequency === 'weekly' ? 1 : 3;
+      const multiplierMap: Record<string, number> = {
+        daily: 7,
+        '5x_week': 5,
+        '3x_week': 3,
+        weekly: 1, // backwards compat
+        custom: 3, // default assumption
+      };
+      const multiplier = multiplierMap[ritual.frequency] || 3;
       return total + (minutes * multiplier);
     }, 0);
   }, [rituals]);

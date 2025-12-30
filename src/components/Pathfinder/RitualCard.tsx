@@ -34,9 +34,11 @@ const difficultyColors = {
   hard: 'bg-red-500/10 text-red-500 border-red-500/30',
 };
 
-const frequencyLabels = {
+const frequencyLabels: Record<string, string> = {
   daily: 'Daily',
-  weekly: 'Weekly',
+  '5x_week': '5x/week',
+  '3x_week': '3x/week',
+  weekly: 'Weekly', // backwards compat
   custom: 'Custom',
 };
 
@@ -80,7 +82,7 @@ export function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditi
             <label className="text-[10px] text-muted-foreground mb-1 block">Frequency</label>
             <Select
               value={editedRitual.frequency}
-              onValueChange={(value: 'daily' | 'weekly' | 'custom') => 
+              onValueChange={(value: 'daily' | '5x_week' | '3x_week' | 'custom') => 
                 setEditedRitual({ ...editedRitual, frequency: value })
               }
             >
@@ -89,7 +91,8 @@ export function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditi
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="5x_week">5x per week</SelectItem>
+                <SelectItem value="3x_week">3x per week</SelectItem>
                 <SelectItem value="custom">Custom</SelectItem>
               </SelectContent>
             </Select>
