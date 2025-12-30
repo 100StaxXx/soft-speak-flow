@@ -223,7 +223,7 @@ export const RescheduleDrawer = ({
           <div className="flex items-center justify-between">
             <DrawerTitle className="flex items-center gap-2">
               <Wand2 className="w-5 h-5 text-primary" />
-              AI Reschedule
+              Smart Reschedule
             </DrawerTitle>
             {journeyHealth && (
               <Badge 
@@ -242,7 +242,7 @@ export const RescheduleDrawer = ({
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {step === "input" && "AI-powered suggestions to optimize your journey"}
+            {step === "input" && "Personalized suggestions to optimize your journey"}
             {step === "preview" && "Review and apply the new schedule"}
             {step === "saving" && "Applying changes..."}
           </p>
