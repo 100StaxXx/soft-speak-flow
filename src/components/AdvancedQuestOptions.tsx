@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Clock, Calendar, ChevronDown, Repeat, Bell, Info } from "lucide-react";
 import { FrequencyPicker } from "./FrequencyPicker";
 
@@ -48,18 +48,9 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     { value: 'custom', label: 'Custom Days' },
   ];
 
-  const moreInfoOptions = [
-    { value: '', label: 'No extra info' },
-    { value: 'Remember to bring materials', label: 'Remember to bring materials' },
-    { value: 'Add relevant links', label: 'Add relevant links' },
-    { value: 'Share a progress update afterward', label: 'Share a progress update afterward' },
-  ];
-
   const [showDurationOptions, setShowDurationOptions] = useState(false);
   const [showRecurrenceOptions, setShowRecurrenceOptions] = useState(false);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
-  const [showMoreInfoOptions, setShowMoreInfoOptions] = useState(false);
-  const [customNote, setCustomNote] = useState('');
 
   return (
     <div className="space-y-4 border-t pt-4">
@@ -224,74 +215,12 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           <Info className="w-4 h-4 text-muted-foreground" />
           <Label className="text-sm font-medium">More Information</Label>
         </div>
-
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowMoreInfoOptions(!showMoreInfoOptions)}
-            className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
-          >
-            <span>{props.moreInformation || "Add extra context (optional)"}</span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
-
-          {showMoreInfoOptions && (
-            <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg space-y-2 p-2">
-              <div className="space-y-1">
-                {moreInfoOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      props.onMoreInformationChange(option.value || null);
-                      setShowMoreInfoOptions(false);
-                      setCustomNote('');
-                    }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
-                      (props.moreInformation || '') === option.value ? 'bg-accent' : ''
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="border-t pt-2 space-y-2">
-                <Label className="text-xs font-medium text-muted-foreground">Custom note</Label>
-                <Input
-                  value={customNote}
-                  onChange={(e) => setCustomNote(e.target.value)}
-                  placeholder="Add your own details"
-                  className="text-sm"
-                />
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setCustomNote('');
-                      props.onMoreInformationChange(null);
-                    }}
-                  >
-                    Clear
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      props.onMoreInformationChange(customNote.trim() ? customNote : null);
-                      setShowMoreInfoOptions(false);
-                    }}
-                    disabled={!customNote.trim()}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <Textarea
+          value={props.moreInformation || ''}
+          onChange={(e) => props.onMoreInformationChange(e.target.value || null)}
+          placeholder="Add extra context, notes, or details (optional)"
+          className="min-h-[100px] resize-none"
+        />
       </div>
     </div>
   );
