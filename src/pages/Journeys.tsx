@@ -21,7 +21,7 @@ import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { JourneysTutorialModal } from "@/components/JourneysTutorialModal";
+import { QuestHubTutorial } from "@/components/QuestHubTutorial";
 import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { ComboCounter } from "@/components/ComboCounter";
@@ -510,9 +510,9 @@ const Journeys = () => {
           }))}
           onTaskDrop={() => {}}
         />
-        <JourneysTutorialModal 
+        <QuestHubTutorial 
           open={showTutorial} 
-          onClose={dismissTutorial} 
+          onClose={dismissTutorial}
         />
         
         {/* Streak Freeze Prompt */}
