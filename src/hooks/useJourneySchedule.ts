@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
 export interface JourneyPhase {
   id: string;
@@ -43,7 +44,9 @@ export interface JourneySchedule {
   milestones: JourneyMilestone[];
   rituals: JourneyRitual[];
   weeklyHoursEstimate: number;
-  suggestedChapterCount: number; // AI-determined optimal number of chapters/postcards
+  suggestedChapterCount: number;
+  suggestedStoryType?: StoryTypeSlug;
+  suggestedThemeColor?: string;
 }
 
 interface GenerateScheduleParams {
