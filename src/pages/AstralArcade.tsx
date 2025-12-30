@@ -60,16 +60,12 @@ const StellarFlowGame = lazy(() => import('@/components/astral-encounters/Stella
 // Track which games user has practiced in this arcade session
 const arcadePracticedGames = new Set<MiniGameType>();
 
+// Active games (shelved games preserved in code but not displayed)
 const GAMES = [
   { type: 'energy_beam' as MiniGameType, label: 'Star Defender', icon: Zap, stat: 'body' as const },
   { type: 'tap_sequence' as MiniGameType, label: 'Tap Sequence', icon: Target, stat: 'mind' as const },
-  { type: 'cosmiq_grid' as MiniGameType, label: 'Cosmiq Grid', icon: Grid3X3, stat: 'mind' as const },
-  { type: 'eclipse_timing' as MiniGameType, label: 'Stellar Beats', icon: Clock, stat: 'soul' as const },
-  { type: 'starfall_dodge' as MiniGameType, label: 'Starfall Dodge', icon: Shield, stat: 'body' as const },
-  { type: 'soul_serpent' as MiniGameType, label: 'Soul Serpent', icon: Gamepad2, stat: 'body' as const },
   { type: 'orb_match' as MiniGameType, label: 'Starburst', icon: Grid3X3, stat: 'mind' as const },
-  { type: 'galactic_match' as MiniGameType, label: 'Galactic Match', icon: Grid3X3, stat: 'mind' as const },
-  { type: 'stellar_flow' as MiniGameType, label: 'Pathfinder', icon: GitBranch, stat: 'soul' as const },
+  { type: 'galactic_match' as MiniGameType, label: 'Galactic Mind', icon: Grid3X3, stat: 'mind' as const },
 ];
 
 type Difficulty = ArcadeDifficulty;

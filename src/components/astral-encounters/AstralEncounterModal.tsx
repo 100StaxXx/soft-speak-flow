@@ -183,14 +183,14 @@ export const AstralEncounterModal = ({
     soul: companion?.soul || 50,
   };
 
-  // Get current mini-game type for instructions
+  // Get current mini-game type for instructions (only active games: galactic_match, orb_match, tap_sequence, energy_beam)
   const getCurrentGameType = useCallback((): MiniGameType => {
     if (!adversary) return 'energy_beam';
     
     const themeGameMap: Record<string, MiniGameType[]> = {
-      mind: ['tap_sequence', 'galactic_match'],
-      body: ['energy_beam', 'starfall_dodge'],
-      soul: ['astral_frequency'], // eclipse_timing disabled for now
+      mind: ['tap_sequence', 'galactic_match', 'orb_match'],
+      body: ['energy_beam'],
+      soul: ['orb_match', 'galactic_match'], // Fallback to mind games for soul
     };
     
     const themeGames = themeGameMap[adversary.statType] || ['energy_beam', 'tap_sequence'];
@@ -322,8 +322,8 @@ export const AstralEncounterModal = ({
 
   if (!encounter || !adversary) return null;
 
-  // Games that need fullscreen rendering outside the Dialog
-  const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge', 'astral_frequency'];
+  // Games that need fullscreen rendering outside the Dialog (shelved games removed)
+  const FULLSCREEN_GAMES: MiniGameType[] = [];
   const currentGameType = getCurrentGameType();
   const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
 
