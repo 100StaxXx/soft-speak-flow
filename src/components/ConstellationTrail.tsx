@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { HelpCircle, MapPin } from "lucide-react";
+import { HelpCircle, MapPin, Sparkles, Lock, Star } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -10,6 +13,11 @@ interface TrailMilestone {
   milestone_percent: number;
   is_postcard_milestone?: boolean | null;
   completed_at?: string | null;
+  // Extended fields for teaser content
+  description?: string | null;
+  phase_name?: string | null;
+  target_date?: string | null;
+  chapter_number?: number | null;
 }
 
 interface ConstellationTrailProps {
@@ -88,6 +96,169 @@ const generatePartialPathString = (starPositions: { x: number; y: number }[], pr
   }
   
   return path;
+};
+
+// Mystery Milestone Popover Component
+const MysteryMilestonePopover = ({ 
+  milestone, 
+  currentProgress,
+  isPostcard 
+}: { 
+  milestone: TrailMilestone; 
+  currentProgress: number;
+  isPostcard: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const progressToMilestone = milestone.milestone_percent - currentProgress;
+  const progressPercent = Math.min(100, Math.max(0, (currentProgress / milestone.milestone_percent) * 100));
+  
+  const handleOpen = async () => {
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch {
+      // Haptics not available
+    }
+    setIsOpen(true);
+  };
+  
+  const getTeaserText = () => {
+    if (isPostcard) {
+      const chapterText = milestone.chapter_number 
+        ? `Chapter ${milestone.chapter_number}` 
+        : "A new chapter";
+      return `A cosmic postcard is forming in the starlight... ${chapterText} of your companion's tale awaits.`;
+    }
+    return "A new milestone on your journey awaits... Keep going to discover what lies ahead.";
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          onClick={handleOpen}
+          className="group cursor-pointer focus:outline-none"
+        >
+          <HelpCircle className="w-3 h-3 animate-pulse group-hover:scale-125 transition-transform" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className={cn(
+          "w-56 p-0 border-0 overflow-hidden",
+          isPostcard 
+            ? "bg-gradient-to-br from-amber-950/95 via-yellow-950/90 to-slate-950/95" 
+            : "bg-gradient-to-br from-purple-950/95 via-slate-950/90 to-slate-950/95"
+        )}
+        sideOffset={8}
+      >
+        {/* Sparkle decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div
+            className="absolute top-2 right-3 text-white/30"
+            animate={{ rotate: 360, scale: [1, 1.2, 1] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          >
+            <Sparkles className="w-3 h-3" />
+          </motion.div>
+          <motion.div
+            className="absolute bottom-4 left-2 text-white/20"
+            animate={{ rotate: -360, scale: [1, 1.3, 1] }}
+            transition={{ duration: 4, repeat: Infinity, delay: 0.5 }}
+          >
+            <Star className="w-2 h-2" />
+          </motion.div>
+        </div>
+        
+        <div className="p-3 relative z-10">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className={cn(
+              "w-6 h-6 rounded-full flex items-center justify-center",
+              isPostcard 
+                ? "bg-amber-500/20 text-amber-400" 
+                : "bg-purple-500/20 text-purple-400"
+            )}>
+              <Lock className="w-3 h-3" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white">Mystery Awaits...</h4>
+              <p className={cn(
+                "text-[10px]",
+                isPostcard ? "text-amber-400/80" : "text-purple-400/80"
+              )}>
+                {isPostcard ? "Postcard Milestone" : "Journey Milestone"}
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Ring */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="relative w-10 h-10">
+              <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  className="text-white/10"
+                />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeDasharray={`${progressPercent * 0.88} 100`}
+                  strokeLinecap="round"
+                  className={isPostcard ? "text-amber-400" : "text-purple-400"}
+                />
+              </svg>
+              <span className={cn(
+                "absolute inset-0 flex items-center justify-center text-[10px] font-bold",
+                isPostcard ? "text-amber-400" : "text-purple-400"
+              )}>
+                {Math.round(progressPercent)}%
+              </span>
+            </div>
+            <div>
+              <p className="text-[10px] text-white/70">Unlock at</p>
+              <p className={cn(
+                "text-sm font-bold",
+                isPostcard ? "text-amber-400" : "text-purple-400"
+              )}>
+                {milestone.milestone_percent}%
+              </p>
+              <p className="text-[10px] text-white/50">
+                {progressToMilestone > 0 ? `${progressToMilestone}% to go` : "Almost there!"}
+              </p>
+            </div>
+          </div>
+
+          {/* Teaser Text */}
+          <p className="text-[11px] text-white/80 leading-relaxed italic mb-2">
+            "{getTeaserText()}"
+          </p>
+
+          {/* Phase & Date Info */}
+          <div className="flex flex-wrap gap-2 text-[9px]">
+            {milestone.phase_name && (
+              <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/60">
+                {milestone.phase_name}
+              </span>
+            )}
+            {milestone.target_date && (
+              <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/60">
+                Est. {format(new Date(milestone.target_date), "MMM d")}
+              </span>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 // Get mood-based filter styles
@@ -331,7 +502,11 @@ export const ConstellationTrail = ({
               {isStart ? (
                 <span className="font-semibold">Start</span>
               ) : !isCompleted ? (
-                <HelpCircle className="w-3 h-3 animate-pulse" />
+                <MysteryMilestonePopover
+                  milestone={milestone}
+                  currentProgress={progress}
+                  isPostcard={!!isPostcard}
+                />
               ) : isPostcard ? (
                 <MapPin className="w-3 h-3" />
               ) : (
