@@ -524,7 +524,7 @@ export const StoryOnboarding = () => {
 
   const handleJourneyComplete = () => {
     toast.success("Welcome to Cosmiq! Your journey begins.");
-    safeNavigate(navigate, "/tasks");
+    safeNavigate(navigate, "/journeys");
   };
 
   return (

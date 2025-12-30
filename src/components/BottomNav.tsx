@@ -112,7 +112,7 @@ export const BottomNav = memo(() => {
         </NavLink>
 
         <NavLink
-          to="/tasks"
+          to="/journeys"
           className={cn(
             "flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95",
             isLongPressing && "scale-95 opacity-70"

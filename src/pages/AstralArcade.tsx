@@ -946,7 +946,7 @@ export default function AstralArcade() {
           >
             <Button
               variant="ghost"
-              onClick={() => navigate('/tasks')}
+              onClick={() => navigate('/journeys')}
               className="w-full py-6 border border-white/10 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-all"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />

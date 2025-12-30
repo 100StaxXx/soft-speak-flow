@@ -283,10 +283,10 @@ export const GlobalSearch = ({
                         <Card
                           key={task.id}
                           className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
-                          onClick={() => navigate("/tasks")}
+                          onClick={() => navigate("/journeys")}
                           onTouchEnd={(e) => {
                             e.preventDefault();
-                            navigate("/tasks");
+                            navigate("/journeys");
                           }}
                           role="button"
                           tabIndex={0}
@@ -431,10 +431,10 @@ export const GlobalSearch = ({
                 <Card
                   key={task.id}
                   className="p-4 cursor-pointer sm:hover:border-primary/50 transition-colors select-none active:scale-[0.98]"
-                  onClick={() => navigate("/tasks")}
+                  onClick={() => navigate("/journeys")}
                   onTouchEnd={(e) => {
                     e.preventDefault();
-                    navigate("/tasks");
+                    navigate("/journeys");
                   }}
                   role="button"
                   tabIndex={0}
