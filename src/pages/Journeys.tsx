@@ -26,6 +26,7 @@ import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
+import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
@@ -90,10 +91,21 @@ const Journeys = () => {
     tasks: dailyTasks,
     addTask,
     toggleTask,
+    updateTask,
     completedCount,
     totalCount,
-    isAdding
+    isAdding,
+    isUpdating
   } = useDailyTasks(selectedDate);
+  
+  // Edit quest state
+  const [editingTask, setEditingTask] = useState<{
+    id: string;
+    task_text: string;
+    difficulty?: string | null;
+    scheduled_time?: string | null;
+    estimated_duration?: number | null;
+  } | null>(null);
   
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
   
@@ -230,6 +242,30 @@ const Journeys = () => {
     }
     toggleTask({ taskId, completed, xpReward });
   };
+  
+  const handleUndoToggle = (taskId: string, xpReward: number) => {
+    toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
+  };
+  
+  const handleEditQuest = (task: {
+    id: string;
+    task_text: string;
+    difficulty?: string | null;
+    scheduled_time?: string | null;
+    estimated_duration?: number | null;
+  }) => {
+    setEditingTask(task);
+  };
+  
+  const handleSaveEdit = async (taskId: string, updates: {
+    task_text: string;
+    difficulty: string;
+    scheduled_time: string | null;
+    estimated_duration: number | null;
+  }) => {
+    await updateTask({ taskId, updates });
+    setEditingTask(null);
+  };
 
   return (
     <PageTransition>
@@ -330,6 +366,8 @@ const Journeys = () => {
             totalCount={totalCount}
             currentStreak={currentStreak}
             activeJourneys={activeJourneys}
+            onUndoToggle={handleUndoToggle}
+            onEditQuest={handleEditQuest}
           />
         </motion.div>
 
@@ -470,6 +508,15 @@ const Journeys = () => {
           onAdd={handleAddQuest}
           isAdding={isAdding}
           prefilledTime={null}
+        />
+        
+        {/* Edit Quest Dialog */}
+        <EditQuestDialog
+          task={editingTask}
+          open={!!editingTask}
+          onOpenChange={(open) => !open && setEditingTask(null)}
+          onSave={handleSaveEdit}
+          isSaving={isUpdating}
         />
 
         <PageInfoModal

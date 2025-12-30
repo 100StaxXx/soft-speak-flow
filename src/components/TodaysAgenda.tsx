@@ -10,7 +10,9 @@ import {
   Check,
   Circle,
   Target,
-  ArrowDown
+  ArrowDown,
+  Clock,
+  Pencil
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +46,18 @@ interface TodaysAgendaProps {
   totalCount: number;
   currentStreak?: number;
   activeJourneys?: Journey[];
+  onUndoToggle?: (taskId: string, xpReward: number) => void;
+  onEditQuest?: (task: Task) => void;
 }
+
+// Helper to format time in 12-hour format
+const formatTime = (time: string) => {
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+};
 
 export function TodaysAgenda({
   tasks,
@@ -55,6 +68,8 @@ export function TodaysAgenda({
   totalCount,
   currentStreak = 0,
   activeJourneys = [],
+  onUndoToggle,
+  onEditQuest,
 }: TodaysAgendaProps) {
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
@@ -126,17 +141,26 @@ export function TodaysAgenda({
     const isComplete = !!task.completed;
     const isTutorialQuest = task.task_text === 'Join Cosmiq';
     
+    const handleClick = () => {
+      if (isComplete && onUndoToggle) {
+        // Untoggle completed quest - revert XP
+        onUndoToggle(task.id, task.xp_reward);
+      } else {
+        onToggle(task.id, !isComplete, task.xp_reward);
+      }
+    };
+    
     return (
       <motion.div
         key={task.id}
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
-          "flex items-center gap-3 p-2 rounded-lg transition-all relative",
+          "flex items-center gap-3 p-2 rounded-lg transition-all relative group",
           "hover:bg-muted/30 cursor-pointer",
           isComplete && "opacity-60"
         )}
-        onClick={() => onToggle(task.id, !isComplete, task.xp_reward)}
+        onClick={handleClick}
       >
         <div 
           ref={isTutorialQuest && !isComplete ? tutorialCheckboxRef : undefined}
@@ -161,9 +185,29 @@ export function TodaysAgenda({
           )}>
             {task.task_text}
           </p>
+          {task.scheduled_time && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Clock className="w-3 h-3" />
+              {formatTime(task.scheduled_time)}
+            </span>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
+          {/* Edit button - shows on hover for incomplete quests */}
+          {onEditQuest && !isComplete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditQuest(task);
+              }}
+            >
+              <Pencil className="w-3 h-3" />
+            </Button>
+          )}
           {isRitual && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-accent/10 border-accent/30">
               Ritual
