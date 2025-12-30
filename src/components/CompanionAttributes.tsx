@@ -36,8 +36,8 @@ const ATTRIBUTE_INFO = {
   soul: {
     icon: Sparkles,
     label: "Soul",
-    color: "text-category-soul",
-    progressColor: "bg-category-soul"
+    color: "text-celestial-blue",
+    progressColor: "bg-celestial-blue"
   },
 };
 

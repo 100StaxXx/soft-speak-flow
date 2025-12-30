@@ -81,12 +81,12 @@ export const QuoteCard = memo(({ quote, isFavorited: initialFavorited, onFavorit
         className="absolute top-4 left-4 hover:scale-110 transition-transform disabled:opacity-50"
       >
         <Heart
-          className={`h-5 w-5 ${isFavorited ? "fill-blush-rose text-blush-rose" : "text-warm-charcoal/40"}`}
+          className={`h-5 w-5 ${isFavorited ? "fill-nebula-pink text-nebula-pink" : "text-celestial-blue/50"}`}
         />
       </button>
       <div className="absolute top-4 right-4 flex items-center gap-2">
         {is_premium && (
-          <span className="bg-gradient-to-r from-gold-accent to-soft-mauve text-white text-xs font-medium px-3 py-1 rounded-full">
+          <span className="bg-gradient-to-r from-stardust-gold to-amber-500 text-black text-xs font-medium px-3 py-1 rounded-full shadow-[0_0_10px_hsl(var(--stardust-gold)/0.4)]">
             Premium
           </span>
         )}

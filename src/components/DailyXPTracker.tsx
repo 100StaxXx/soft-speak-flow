@@ -46,17 +46,17 @@ export function DailyXPTracker({ totalXP, className }: DailyXPTrackerProps) {
     <div className={cn("flex items-center gap-1.5", className)}>
       <div className={cn(
         "flex items-center gap-1 px-2.5 py-1 rounded-full",
-        "bg-primary/10 border border-primary/20",
+        "bg-stardust-gold/15 border border-stardust-gold/30",
         isAnimating && "animate-xp-pulse"
       )}>
         <Zap className={cn(
-          "h-3.5 w-3.5 text-primary",
+          "h-3.5 w-3.5 text-stardust-gold",
           isAnimating && "animate-bounce"
         )} />
-        <span className="text-sm font-bold text-primary tabular-nums">
+        <span className="text-sm font-bold text-stardust-gold tabular-nums">
           {displayXP}
         </span>
-        <span className="text-xs text-primary/70">XP</span>
+        <span className="text-xs text-stardust-gold/70">XP</span>
       </div>
       
       {/* Sparkle on XP gain */}

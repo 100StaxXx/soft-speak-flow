@@ -21,22 +21,22 @@ export const WeeklyRecapCard = () => {
     >
       <button
         onClick={() => openRecap(currentRecap)}
-        className="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 border border-amber-500/30 backdrop-blur-sm hover:border-amber-500/50 transition-all group"
+        className="w-full p-4 rounded-2xl bg-gradient-to-r from-stardust-gold/20 via-amber-500/15 to-celestial-blue/15 border border-stardust-gold/30 backdrop-blur-sm hover:border-stardust-gold/50 transition-all group"
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-full bg-amber-500/20 group-hover:bg-amber-500/30 transition-colors">
-            <Sparkles className="h-5 w-5 text-amber-300" />
+          <div className="p-2 rounded-full bg-stardust-gold/20 group-hover:bg-stardust-gold/30 transition-colors">
+            <Sparkles className="h-5 w-5 text-stardust-gold" />
           </div>
           <div className="flex-1 text-left">
             <p className="font-medium text-foreground">Your Week in Review</p>
-            <p className="text-sm text-muted-foreground">{dateRange}</p>
+            <p className="text-sm text-celestial-blue">{dateRange}</p>
           </div>
           {!currentRecap.viewed_at && (
-            <div className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary font-medium">
+            <div className="text-xs px-2 py-1 rounded-full bg-stardust-gold/20 text-stardust-gold font-medium">
               +5 XP
             </div>
           )}
-          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-stardust-gold transition-colors" />
         </div>
       </button>
     </motion.div>

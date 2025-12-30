@@ -169,10 +169,10 @@ const MorningCheckInContent = () => {
 
   if (existingCheckIn?.completed_at) {
     return (
-      <Card data-tour="morning-checkin" className="p-6 bg-gradient-to-br from-primary/5 to-accent/5">
+      <Card data-tour="morning-checkin" className="p-6 bg-gradient-to-br from-stardust-gold/10 via-primary/5 to-celestial-blue/10 border-celestial-blue/20">
         <div className="flex items-start gap-4">
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Sunrise className="h-6 w-6 text-orange-500" />
+          <div className="h-12 w-12 rounded-full bg-stardust-gold/20 flex items-center justify-center flex-shrink-0 ring-2 ring-stardust-gold/30">
+            <Sunrise className="h-6 w-6 text-stardust-gold" />
           </div>
           <div className="flex-1 space-y-3">
             <div>
@@ -196,7 +196,7 @@ const MorningCheckInContent = () => {
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{personality.name}</p>
-                      <Sparkles className="h-3 w-3 text-primary" />
+                      <Sparkles className="h-3 w-3 text-stardust-gold" />
                     </div>
                     {existingCheckIn.mentor_response ? (
                       <p className="text-sm italic text-foreground/90 leading-relaxed">
