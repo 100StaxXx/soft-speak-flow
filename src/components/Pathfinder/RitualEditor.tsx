@@ -105,8 +105,7 @@ export function RitualEditor({
       </div>
 
       {/* Rituals list */}
-      <ScrollArea className="max-h-[300px]">
-        <div className="space-y-2 pr-2">
+      <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {rituals.map((ritual) => (
               <motion.div
@@ -166,8 +165,7 @@ export function RitualEditor({
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      </ScrollArea>
+      </div>
 
       {/* Difficulty breakdown */}
       <div className="flex gap-2 text-xs text-muted-foreground">
