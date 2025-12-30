@@ -70,6 +70,9 @@ interface ScheduleRequest {
   };
 }
 
+type StoryTypeSlug = 'treasure_hunt' | 'mystery' | 'pilgrimage' | 'heroes_journey' | 'rescue_mission' | 'exploration';
+type ThemeColorId = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
+
 interface ScheduleResponse {
   feasibilityAssessment: {
     daysAvailable: number;
@@ -82,6 +85,8 @@ interface ScheduleResponse {
   rituals: JourneyRitual[];
   weeklyHoursEstimate: number;
   suggestedChapterCount: number; // AI-determined optimal number of chapters/postcards
+  suggestedStoryType: StoryTypeSlug;
+  suggestedThemeColor: ThemeColorId;
 }
 
 serve(async (req) => {
@@ -182,6 +187,19 @@ Your job is to:
 5. You may also create 1-3 additional non-postcard milestones as intermediate goals
 6. Create 3-6 RITUALS (recurring habits)
 7. Estimate weekly time commitment
+8. INFER THE BEST STORY TYPE based on the goal:
+   - "treasure_hunt": Finding/acquiring something (job, house, money, items, certifications)
+   - "mystery": Learning/understanding (studying, research, problem-solving, exams)
+   - "pilgrimage": Inner growth/wellness (meditation, health, spirituality, mental health)
+   - "heroes_journey": Becoming something (career change, mastering skills, transformation)
+   - "rescue_mission": Urgency/helping others (deadlines, caregiving, emergencies)
+   - "exploration": Discovery/creativity (travel, art, trying new things, hobbies)
+9. SELECT A MATCHING THEME COLOR based on story type:
+   - "heroic" (gold): treasure_hunt, heroes_journey
+   - "warrior" (red): rescue_mission
+   - "mystic" (pink): mystery
+   - "nature" (green): exploration, pilgrimage
+   - "solar" (orange): general/default
 
 POSTCARD MILESTONE GUIDELINES:
 - Each postcard milestone represents a story chapter - a major progress point
@@ -237,7 +255,9 @@ CRITICAL: Return ONLY valid JSON with this exact structure:
     }
   ],
   "weeklyHoursEstimate": <number>,
-  "suggestedChapterCount": <number between 3-7 - must match the count of postcard milestones>
+  "suggestedChapterCount": <number between 3-7 - must match the count of postcard milestones>,
+  "suggestedStoryType": "treasure_hunt" | "mystery" | "pilgrimage" | "heroes_journey" | "rescue_mission" | "exploration",
+  "suggestedThemeColor": "heroic" | "warrior" | "mystic" | "nature" | "solar"
 }`;
 
     const today = new Date().toISOString().split('T')[0];
@@ -328,6 +348,26 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
       // Ensure suggestedChapterCount matches actual postcard milestone count
       const postcardCount = schedule.milestones.filter(m => m.isPostcardMilestone).length;
       schedule.suggestedChapterCount = postcardCount > 0 ? postcardCount : (schedule.suggestedChapterCount || 5);
+      
+      // Ensure story type and theme color have valid values
+      const validStoryTypes: StoryTypeSlug[] = ['treasure_hunt', 'mystery', 'pilgrimage', 'heroes_journey', 'rescue_mission', 'exploration'];
+      const validThemeColors: ThemeColorId[] = ['heroic', 'warrior', 'mystic', 'nature', 'solar'];
+      
+      if (!validStoryTypes.includes(schedule.suggestedStoryType)) {
+        schedule.suggestedStoryType = 'heroes_journey';
+      }
+      if (!validThemeColors.includes(schedule.suggestedThemeColor)) {
+        // Default theme based on story type
+        const themeMap: Record<StoryTypeSlug, ThemeColorId> = {
+          treasure_hunt: 'heroic',
+          heroes_journey: 'heroic',
+          rescue_mission: 'warrior',
+          mystery: 'mystic',
+          exploration: 'nature',
+          pilgrimage: 'nature',
+        };
+        schedule.suggestedThemeColor = themeMap[schedule.suggestedStoryType] || 'solar';
+      }
       
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, content);
@@ -427,6 +467,8 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
         ],
         weeklyHoursEstimate: 5,
         suggestedChapterCount: fallbackChapterCount,
+        suggestedStoryType: 'heroes_journey',
+        suggestedThemeColor: 'heroic',
       };
     }
 

@@ -39,7 +39,7 @@ import { SuggestionCard } from './SuggestionCard';
 import { RitualEditor } from './RitualEditor';
 import { PostcardPreview } from './PostcardPreview';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
-import { StoryStep, themeColors } from './StoryStep';
+import { themeColors } from './StoryStep';
 import { EpicClarificationFlow } from '@/features/tasks/components/EpicClarificationFlow';
 import { storyTypes } from '@/components/narrative/StoryTypeSelector';
 import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
@@ -49,7 +49,7 @@ import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
-type WizardStep = 'goal' | 'story' | 'timeline' | 'suggestions' | 'review';
+type WizardStep = 'goal' | 'timeline' | 'suggestions' | 'review';
 
 interface PathfinderProps {
   open: boolean;
@@ -203,7 +203,8 @@ export function Pathfinder({
         isSelected: true,
       }));
       setCustomHabits(templateSuggestions);
-      setStep('story');
+      // Template already has habits, go directly to timeline (will need to generate schedule)
+      setStep('goal');
     }
   }, [selectedTemplate, open]);
 
@@ -276,9 +277,18 @@ export function Pathfinder({
       setOriginalRituals([...result.rituals]);
     }
     
+    // Auto-set story type and theme color from AI suggestions
+    if (result?.suggestedStoryType) {
+      setStoryType(result.suggestedStoryType);
+    }
+    if (result?.suggestedThemeColor) {
+      setThemeColor(result.suggestedThemeColor);
+    }
+    
+    if (!epicTitle) setEpicTitle(goalInput);
     setStep('timeline');
     success();
-  }, [goalInput, deadline, clarificationAnswers, epicContext, localClarificationAnswers, localEpicContext, timelineContext, generateSchedule, tap, success]);
+  }, [goalInput, deadline, clarificationAnswers, epicContext, localClarificationAnswers, localEpicContext, timelineContext, epicTitle, generateSchedule, tap, success]);
 
   const handleAdjustSchedule = useCallback(async (feedback: string) => {
     if (!schedule || !deadline) return;
@@ -301,8 +311,8 @@ export function Pathfinder({
     medium();
   }, [schedule, medium]);
 
-  // After goal step, classify and potentially show clarification
-  const handleProceedToStory = useCallback(async () => {
+  // After goal step, classify and potentially show clarification, then generate timeline
+  const handleProceedToTimeline = useCallback(async () => {
     if (!goalInput.trim() || !deadline) return;
     tap();
     
@@ -313,12 +323,11 @@ export function Pathfinder({
       // Show clarification UI
       setShowClarification(true);
     } else {
-      // No clarification needed, proceed to story
+      // No clarification needed, proceed directly to timeline generation
       if (!epicTitle) setEpicTitle(goalInput);
-      setStep('story');
-      medium();
+      await handleGenerateTimeline();
     }
-  }, [goalInput, deadline, epicTitle, classify, tap, medium]);
+  }, [goalInput, deadline, epicTitle, classify, tap, handleGenerateTimeline]);
 
   // Handle clarification submission
   const handleClarificationSubmit = useCallback(async (answers: Record<string, string | number>) => {
@@ -332,23 +341,22 @@ export function Pathfinder({
     }
     
     if (!epicTitle) setEpicTitle(goalInput);
-    setStep('story');
-    medium();
-  }, [goalInput, clarifyEpic, epicTitle, medium]);
+    // Go directly to timeline generation
+    await handleGenerateTimeline();
+  }, [goalInput, clarifyEpic, epicTitle, handleGenerateTimeline]);
 
-  // Skip clarification
-  const handleSkipClarification = useCallback(() => {
+  // Skip clarification - go directly to timeline generation
+  const handleSkipClarification = useCallback(async () => {
     setShowClarification(false);
     if (!epicTitle) setEpicTitle(goalInput);
-    setStep('story');
-    medium();
-  }, [goalInput, epicTitle, medium]);
+    await handleGenerateTimeline();
+  }, [goalInput, epicTitle, handleGenerateTimeline]);
 
   const handleProceedToReview = useCallback(() => {
-    if (!storyType) return;
+    // Story type is now auto-set, no need to check
     setStep('review');
     medium();
-  }, [storyType, medium]);
+  }, [medium]);
 
   const handleCreateEpic = useCallback(() => {
     if (selectedHabits.length === 0) return;
@@ -409,9 +417,8 @@ export function Pathfinder({
 
   const handleBack = useCallback(() => {
     light();
-    // New order: goal -> story -> timeline -> suggestions -> review
-    if (step === 'story') setStep('goal');
-    else if (step === 'timeline') setStep('story');
+    // Updated flow: goal -> timeline -> suggestions -> review
+    if (step === 'timeline') setStep('goal');
     else if (step === 'suggestions') setStep('timeline');
     else if (step === 'review') setStep('suggestions');
   }, [step, light]);
@@ -445,7 +452,7 @@ export function Pathfinder({
     tap();
   }, [isRecording, startRecording, stopRecording, tap]);
 
-  const steps: WizardStep[] = ['goal', 'story', 'timeline', 'suggestions', 'review'];
+  const steps: WizardStep[] = ['goal', 'timeline', 'suggestions', 'review'];
   const currentStepIndex = steps.indexOf(step);
 
   return (
@@ -458,7 +465,6 @@ export function Pathfinder({
           </DialogTitle>
           <DialogDescription>
             {step === 'goal' && 'Set your goal and deadline'}
-            {step === 'story' && 'Choose your narrative adventure style'}
             {step === 'timeline' && 'Review your personalized timeline'}
             {step === 'suggestions' && 'Confirm your rituals and milestones'}
             {step === 'review' && 'Review and create your campaign'}
@@ -577,8 +583,8 @@ export function Pathfinder({
                 {/* Continue button - hide when showing clarification */}
                 {!showClarification && (
                   <Button
-                    onClick={handleProceedToStory}
-                    disabled={!goalInput.trim() || !deadline || isClassifying}
+                    onClick={handleProceedToTimeline}
+                    disabled={!goalInput.trim() || !deadline || isClassifying || isScheduleLoading}
                     className="w-full h-12 text-base"
                     size="lg"
                   >
@@ -587,10 +593,15 @@ export function Pathfinder({
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Analyzing your goal...
                       </>
+                    ) : isScheduleLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating your plan...
+                      </>
                     ) : (
                       <>
-                        <ChevronRight className="w-5 h-5 mr-2" />
-                        Choose Your Story Type
+                        <Wand2 className="w-5 h-5 mr-2" />
+                        Generate My Plan
                       </>
                     )}
                   </Button>
@@ -602,18 +613,7 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 2: Story & Theme */}
-            {step === 'story' && (
-              <StoryStep
-                storyType={storyType}
-                themeColor={themeColor}
-                onStoryTypeChange={setStoryType}
-                onThemeColorChange={setThemeColor}
-                onContinue={handleGenerateTimeline}
-                onBack={handleBack}
-                isLoading={isScheduleLoading}
-              />
-            )}
+            {/* Step 2: Timeline Review (was Step 3) */}
 
             {/* Step 3: Timeline Review */}
             {step === 'timeline' && schedule && (
@@ -650,7 +650,7 @@ export function Pathfinder({
                       </Button>
                       <Button variant="ghost" onClick={handleBack} className="w-full">
                         <ChevronLeft className="w-4 h-4 mr-1" />
-                        Change goal or deadline
+                        Back
                       </Button>
                     </div>
                   </div>
@@ -658,7 +658,7 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 4: Suggestions Confirmation */}
+            {/* Step 3: Suggestions Confirmation (was Step 4) */}
             {step === 'suggestions' && (
               <motion.div
                 key="suggestions"
@@ -719,7 +719,7 @@ export function Pathfinder({
               </motion.div>
             )}
 
-            {/* Step 5: Review */}
+            {/* Step 4: Review (was Step 5) */}
             {step === 'review' && (
               <motion.div
                 key="review"
