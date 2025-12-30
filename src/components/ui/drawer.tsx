@@ -33,8 +33,6 @@ const DrawerOverlay = React.forwardRef<
       touchAction: 'none',
       WebkitTapHighlightColor: 'transparent',
     }}
-    onPointerDown={(e) => e.stopPropagation()}
-    onTouchStart={(e) => e.stopPropagation()}
     {...props} 
   />
 ));
@@ -56,7 +54,6 @@ const DrawerContent = React.forwardRef<
         touchAction: 'pan-y',
         WebkitTapHighlightColor: 'transparent',
       }}
-      onPointerDown={(e) => e.stopPropagation()}
       {...props}
     >
       <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
