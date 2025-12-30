@@ -41,6 +41,7 @@ export function HourlyViewModal({
   const isToday = isSameDay(selectedDate, new Date());
 
   // Auto-scroll to show previous hour at top when modal opens (day view only)
+  // Scroll to top when switching to month view
   useEffect(() => {
     if (open && viewMode === 'day') {
       const currentHour = new Date().getHours();
@@ -67,6 +68,10 @@ export function HourlyViewModal({
       const timer = setTimeout(attemptScroll, 300);
       
       return () => clearTimeout(timer);
+    } else if (open && viewMode === 'month') {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = 0;
+      }
     }
   }, [open, viewMode]);
 
