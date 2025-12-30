@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { 
@@ -69,12 +69,25 @@ const Journeys = () => {
   // Habit surfacing - auto-surface active epic habits as daily tasks
   const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
   
-  // Auto-surface habits when there are unsurfaced ones
+  // Auto-surface habits when there are unsurfaced ones (with ref to prevent infinite loop)
+  const hasSurfacedRef = useRef(false);
+  const dateKeyRef = useRef(format(selectedDate, 'yyyy-MM-dd'));
+
   useEffect(() => {
-    if (unsurfacedEpicHabitsCount > 0) {
+    const currentDateKey = format(selectedDate, 'yyyy-MM-dd');
+    
+    // Reset if date changed
+    if (dateKeyRef.current !== currentDateKey) {
+      dateKeyRef.current = currentDateKey;
+      hasSurfacedRef.current = false;
+    }
+    
+    // Only surface once per date
+    if (unsurfacedEpicHabitsCount > 0 && !hasSurfacedRef.current) {
+      hasSurfacedRef.current = true;
       surfaceAllEpicHabits();
     }
-  }, [unsurfacedEpicHabitsCount, surfaceAllEpicHabits]);
+  }, [unsurfacedEpicHabitsCount, selectedDate, surfaceAllEpicHabits]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
