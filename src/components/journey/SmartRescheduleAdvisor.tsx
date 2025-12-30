@@ -156,7 +156,7 @@ export function SmartRescheduleAdvisor({
                   {primaryInsight?.title || 'Journey Check-in'}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {primaryInsight?.description || 'Let AI help optimize your plan'}
+                  {primaryInsight?.description || 'Get suggestions to optimize your plan'}
                 </p>
               </div>
             </div>
