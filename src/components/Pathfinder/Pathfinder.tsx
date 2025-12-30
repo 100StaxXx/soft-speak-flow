@@ -479,7 +479,7 @@ export function Pathfinder({
 
         {/* Progress indicator */}
         <div className="px-6 pb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             {steps.map((s, i) => (
               <div key={s} className="flex items-center">
                 <div
