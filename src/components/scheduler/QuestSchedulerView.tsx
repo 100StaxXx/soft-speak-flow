@@ -28,6 +28,7 @@ interface QuestSchedulerViewProps {
   completedCount: number;
   totalCount: number;
   currentStreak?: number;
+  tutorialQuestId?: string;
 }
 
 export function QuestSchedulerView({
@@ -39,6 +40,7 @@ export function QuestSchedulerView({
   completedCount,
   totalCount,
   currentStreak = 0,
+  tutorialQuestId,
 }: QuestSchedulerViewProps) {
   // Group tasks by time phase
   const { phasedTasks, unscheduledTasks } = useMemo(() => {
@@ -150,6 +152,7 @@ export function QuestSchedulerView({
               completed={!!task.completed}
               xpReward={task.xp_reward}
               isMainQuest={!!task.is_main_quest}
+              isTutorialQuest={task.id === tutorialQuestId}
               difficulty={(task.difficulty as "easy" | "medium" | "hard") || "medium"}
               category={task.category as "mind" | "body" | "soul" | null}
               scheduledTime={task.scheduled_time}
@@ -180,6 +183,7 @@ export function QuestSchedulerView({
                 completed={!!task.completed}
                 xpReward={task.xp_reward}
                 isMainQuest={!!task.is_main_quest}
+                isTutorialQuest={task.id === tutorialQuestId}
                 difficulty={(task.difficulty as "easy" | "medium" | "hard") || "medium"}
                 category={task.category as "mind" | "body" | "soul" | null}
                 scheduledTime={task.scheduled_time}

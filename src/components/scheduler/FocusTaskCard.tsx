@@ -7,6 +7,7 @@ interface FocusTaskCardProps {
   completed: boolean;
   scheduledTime?: string | null;
   estimatedDuration?: number | null;
+  isTutorialQuest?: boolean;
   onToggle: (id: string, completed: boolean) => void;
   onEdit?: () => void;
 }
@@ -17,6 +18,7 @@ export function FocusTaskCard({
   completed,
   scheduledTime,
   estimatedDuration,
+  isTutorialQuest,
   onToggle,
   onEdit,
 }: FocusTaskCardProps) {
@@ -30,12 +32,14 @@ export function FocusTaskCard({
 
   return (
     <div
+      data-tutorial-quest={isTutorialQuest && !completed ? "true" : undefined}
       className={cn(
         "group flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer",
         "bg-card hover:bg-muted/50",
         completed 
           ? "border-border/30 opacity-60" 
-          : "border-border"
+          : "border-border",
+        isTutorialQuest && !completed && "ring-2 ring-primary/50 border-primary/40 shadow-[0_0_20px_rgba(129,140,248,0.3)]"
       )}
       onClick={onEdit}
     >
@@ -49,7 +53,8 @@ export function FocusTaskCard({
           "flex-shrink-0 h-5 w-5 rounded border-2 flex items-center justify-center transition-all",
           completed
             ? "bg-primary border-primary text-primary-foreground"
-            : "border-muted-foreground/40 hover:border-primary"
+            : "border-muted-foreground/40 hover:border-primary",
+          isTutorialQuest && !completed && "ring-4 ring-primary/30 animate-pulse"
         )}
       >
         {completed && <Check className="h-3 w-3" />}

@@ -608,6 +608,7 @@ export default function Tasks() {
                   onAddQuest={() => openAddSheet()}
                   completedCount={completedCount}
                   totalCount={totalCount}
+                  tutorialQuestId={tutorialQuestId}
                 />
               ) : (
                 <QuestSchedulerView
@@ -622,6 +623,7 @@ export default function Tasks() {
                   completedCount={completedCount}
                   totalCount={totalCount}
                   currentStreak={streakCount}
+                  tutorialQuestId={tutorialQuestId}
                 />
               )}
             </Card>
