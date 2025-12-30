@@ -31,7 +31,20 @@ export function PhaseCard({
   onMilestoneDateChange,
 }: PhaseCardProps) {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
   const startDate = parseISO(phase.startDate);
+
+  const toggleExpanded = (milestoneId: string) => {
+    setExpandedMilestones(prev => {
+      const next = new Set(prev);
+      if (next.has(milestoneId)) {
+        next.delete(milestoneId);
+      } else {
+        next.add(milestoneId);
+      }
+      return next;
+    });
+  };
   const endDate = parseISO(phase.endDate);
   const durationDays = differenceInDays(endDate, startDate) + 1;
 
@@ -101,10 +114,21 @@ export function PhaseCard({
                     <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
                   )}
                   <button
-                    onClick={() => onMilestoneToggle?.(milestone.id)}
-                    className="flex-1 min-w-0 text-left"
+                    onClick={() => toggleExpanded(milestone.id)}
+                    className="flex-1 min-w-0 text-left flex items-center gap-1"
                   >
-                    <p className="text-sm font-medium truncate">{milestone.title}</p>
+                    <ChevronRight className={cn(
+                      "w-3 h-3 flex-shrink-0 transition-transform",
+                      expandedMilestones.has(milestone.id) && "rotate-90"
+                    )} />
+                    <p className={cn(
+                      "text-sm font-medium",
+                      expandedMilestones.has(milestone.id) 
+                        ? "whitespace-normal break-words" 
+                        : "truncate"
+                    )}>
+                      {milestone.title}
+                    </p>
                   </button>
                   <Popover 
                     open={openPopoverId === milestone.id} 
