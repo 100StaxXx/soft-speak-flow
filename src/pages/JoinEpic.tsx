@@ -203,7 +203,7 @@ const JoinEpic = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen pb-nav-safe pt-12 px-4">
+      <div className="min-h-screen pb-nav-safe pt-safe-lg px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

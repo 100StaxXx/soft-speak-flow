@@ -149,7 +149,7 @@ export default function SharedEpics() {
 
   return (
     <PageTransition>
-      <div className="min-h-screen pb-nav-safe pt-6 px-4">
+      <div className="min-h-screen pb-nav-safe pt-safe px-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <Share2 className="h-8 w-8 text-primary" />

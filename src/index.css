@@ -494,6 +494,15 @@ All colors MUST be HSL.
     -webkit-overflow-scrolling: touch;
   }
 
+  /* iOS Safe Area padding utilities */
+  .pt-safe {
+    padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+  }
+  
+  .pt-safe-lg {
+    padding-top: calc(2.5rem + env(safe-area-inset-top, 0px));
+  }
+
   /* Better touch targets for iOS inputs */
   input, textarea, select {
     touch-action: manipulation;

@@ -280,7 +280,7 @@ const Journeys = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen pb-nav-safe pt-6 safe-area-top px-4">
+      <div className="min-h-screen pb-nav-safe pt-safe px-4">
         {/* Hero Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
