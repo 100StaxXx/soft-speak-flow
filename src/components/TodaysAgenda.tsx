@@ -48,6 +48,7 @@ interface TodaysAgendaProps {
   activeJourneys?: Journey[];
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
+  hideIndicator?: boolean;
 }
 
 // Helper to format time in 12-hour format
@@ -70,6 +71,7 @@ export function TodaysAgenda({
   activeJourneys = [],
   onUndoToggle,
   onEditQuest,
+  hideIndicator = false,
 }: TodaysAgendaProps) {
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
@@ -361,7 +363,7 @@ export function TodaysAgenda({
       </div>
 
       {/* Portal: Tutorial indicator floats above everything */}
-      {indicatorPosition && createPortal(
+      {indicatorPosition && !hideIndicator && createPortal(
         <div
           className="fixed pointer-events-none z-[9999] flex flex-col items-center gap-0.5"
           style={{ 
