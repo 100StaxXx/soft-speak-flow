@@ -80,6 +80,7 @@ interface JourneyCardProps {
 export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
+  const [milestoneExpanded, setMilestoneExpanded] = useState(false);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -272,7 +273,9 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             targetPercent={postcardProgress.target}
             milestoneTitle={postcardProgress.milestone.title}
             chapterNumber={postcardProgress.milestone.chapter_number || 1}
-            compact
+            compact={!milestoneExpanded}
+            isExpanded={milestoneExpanded}
+            onClick={() => setMilestoneExpanded(!milestoneExpanded)}
             className="mb-3"
           />
         )}
