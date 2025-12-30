@@ -5,11 +5,9 @@ import { Button } from "@/components/ui/button";
 import { 
   Swords, 
   Target, 
-  Compass, 
   CheckCircle2, 
   Sparkles, 
   Zap,
-  Flame,
   MapPin,
   Repeat,
   Brain
@@ -49,20 +47,6 @@ const STEPS = [
     ],
     gradient: "from-purple-500/20 via-pink-500/20 to-rose-500/20",
     iconGlow: "shadow-[0_0_60px_rgba(168,85,247,0.4)]",
-  },
-  {
-    id: "hub",
-    icon: Compass,
-    title: "Your Quest Hub",
-    subtitle: "This is your command center...",
-    features: [
-      { icon: Swords, text: "Daily quests keep you moving forward every day", color: "text-green-400" },
-      { icon: Target, text: "Campaigns guide your bigger ambitions", color: "text-purple-400" },
-      { icon: Zap, text: "Smart input understands natural language", color: "text-sky-400" },
-      { icon: Flame, text: "Your companion grows stronger with every quest", color: "text-orange-400" },
-    ],
-    gradient: "from-primary/20 via-purple-500/20 to-pink-500/20",
-    iconGlow: "shadow-[0_0_60px_rgba(var(--primary),0.4)]",
   },
 ];
 
