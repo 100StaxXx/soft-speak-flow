@@ -163,6 +163,7 @@ export function HourlyViewModal({
               onDateSelect={handleDateSelectFromMonth}
               tasks={tasks}
               onTaskClick={handleTaskClick}
+              onDateLongPress={(date) => onTimeSlotLongPress?.(date, '09:00')}
             />
           )}
         </div>

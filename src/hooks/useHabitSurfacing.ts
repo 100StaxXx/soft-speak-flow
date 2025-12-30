@@ -109,6 +109,8 @@ export function useHabitSurfacing(selectedDate?: Date) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
     },
   });
 
@@ -144,6 +146,8 @@ export function useHabitSurfacing(selectedDate?: Date) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
     },
   });
 
