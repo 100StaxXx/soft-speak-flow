@@ -36,11 +36,12 @@ export function GamifiedProgress({ value, completedCount, totalCount, className 
     prevValueRef.current = value;
   }, [value]);
   
-  // Determine color based on progress
+  // Determine color based on progress - purple → blue → gold journey
   const getProgressColor = () => {
     if (value >= 100) return "from-stardust-gold via-amber-400 to-stardust-gold";
-    if (value >= 75) return "from-accent via-primary to-accent";
-    if (value >= 50) return "from-primary via-accent to-primary";
+    if (value >= 75) return "from-celestial-blue via-stardust-gold to-stardust-gold";
+    if (value >= 50) return "from-primary via-celestial-blue to-celestial-blue";
+    if (value >= 25) return "from-primary via-primary to-celestial-blue";
     return "from-primary to-primary";
   };
   
