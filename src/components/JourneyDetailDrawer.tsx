@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -30,10 +30,13 @@ import { cn } from "@/lib/utils";
 import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useXPRewards } from "@/hooks/useXPRewards";
+import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 import { PhaseProgressTimeline } from "./journey/PhaseProgressTimeline";
 import { PhaseProgressCard } from "./journey/PhaseProgressCard";
 import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
+import { MilestoneDetailDrawer } from "./journey/MilestoneDetailDrawer";
 
 interface JourneyDetailDrawerProps {
   epicId: string;
@@ -52,8 +55,10 @@ export const JourneyDetailDrawer = ({
 }: JourneyDetailDrawerProps) => {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   
   const {
+    milestones,
     milestonesByPhase,
     isLoading,
     completedCount,
@@ -67,30 +72,84 @@ export const JourneyDetailDrawer = ({
     isCompleting,
   } = useMilestones(epicId);
 
-  const { checkMilestoneForPostcard, postcardJustUnlocked, clearPostcardUnlocked } = useCompanionPostcards();
+  const { postcards, checkMilestoneForPostcard, postcardJustUnlocked, clearPostcardUnlocked } = useCompanionPostcards();
   const { companion } = useCompanion();
+  const { awardMilestoneComplete, awardPhaseComplete, awardEpicComplete } = useXPRewards();
+  const { multiplier: streakMultiplier } = useStreakMultiplier();
 
   const currentPhase = getCurrentPhase();
   const phaseStats = getPhaseStats();
 
-  const handleMilestoneToggle = async (milestone: Milestone) => {
-    if (milestone.completed_at) {
-      uncompleteMilestone.mutate(milestone.id);
-    } else {
-      completeMilestone.mutate({
-        milestoneId: milestone.id,
-        epicId,
-        onPostcardTrigger: (completedMilestone) => {
-          checkMilestoneForPostcard(completedMilestone.id, epicId, companion?.id || "", {
-            spirit_animal: companion?.spirit_animal,
-            favorite_color: companion?.favorite_color,
-            core_element: companion?.core_element,
-            eye_color: companion?.eye_color,
-            fur_color: companion?.fur_color,
-          });
-        },
-      });
+  // Get postcards for this epic
+  const epicPostcards = useMemo(() => 
+    postcards?.filter(p => p.epic_id === epicId) || [], 
+    [postcards, epicId]
+  );
+
+  // Get postcard for a specific milestone
+  const getPostcardForMilestone = (milestone: Milestone) => 
+    epicPostcards.find(p => p.milestone_percent === milestone.milestone_percent);
+
+  // Check if phase is complete after milestone completion
+  const checkPhaseCompletion = (completedMilestone: Milestone) => {
+    const phase = milestonesByPhase.find(p => p.phaseName === completedMilestone.phase_name);
+    if (!phase) return;
+    
+    // Check if all milestones in phase will be complete after this one
+    const allComplete = phase.milestones.every(m => 
+      m.id === completedMilestone.id || m.completed_at
+    );
+    
+    if (allComplete) {
+      awardPhaseComplete(phase.phaseName);
     }
+  };
+
+  // Check if epic is complete after milestone completion
+  const checkEpicCompletion = () => {
+    // After this milestone, check if all will be complete
+    const allComplete = milestones.every(m => 
+      m.id === selectedMilestone?.id || m.completed_at
+    );
+    
+    if (allComplete && totalCount > 0) {
+      awardEpicComplete(epicTitle);
+    }
+  };
+
+  const handleMilestoneComplete = async (milestone: Milestone) => {
+    completeMilestone.mutate({
+      milestoneId: milestone.id,
+      epicId,
+      onPostcardTrigger: (completedMilestone) => {
+        checkMilestoneForPostcard(completedMilestone.id, epicId, companion?.id || "", {
+          spirit_animal: companion?.spirit_animal,
+          favorite_color: companion?.favorite_color,
+          core_element: companion?.core_element,
+          eye_color: companion?.eye_color,
+          fur_color: companion?.fur_color,
+        });
+      },
+    });
+    
+    // Award XP
+    awardMilestoneComplete(milestone.is_postcard_milestone || false);
+    
+    // Check for phase/epic completion bonuses
+    checkPhaseCompletion(milestone);
+    checkEpicCompletion();
+    
+    // Close the detail drawer
+    setSelectedMilestone(null);
+  };
+
+  const handleMilestoneUncomplete = (milestone: Milestone) => {
+    uncompleteMilestone.mutate(milestone.id);
+    setSelectedMilestone(null);
+  };
+
+  const handleMilestoneClick = (milestone: Milestone) => {
+    setSelectedMilestone(milestone);
   };
 
   const getMilestoneStatus = (milestone: Milestone) => {
@@ -243,7 +302,7 @@ export const JourneyDetailDrawer = ({
                             transition={{ delay: phaseIndex * 0.1 + mIndex * 0.05 }}
                             data-vaul-no-drag
                             onPointerDown={(e) => e.stopPropagation()}
-                            onClick={() => handleMilestoneToggle(milestone)}
+                            onClick={() => handleMilestoneClick(milestone)}
                             style={{ 
                               touchAction: 'manipulation',
                               WebkitTapHighlightColor: 'transparent',
@@ -268,13 +327,12 @@ export const JourneyDetailDrawer = ({
                               }}
                             />
 
-                            {/* Checkbox */}
+                            {/* Checkbox - visual indicator only */}
                             <Checkbox
                               checked={!!milestone.completed_at}
-                              onCheckedChange={() => handleMilestoneToggle(milestone)}
-                              disabled={isCompleting}
+                              disabled={true}
                               onClick={(e) => e.stopPropagation()}
-                              className="mt-0.5"
+                              className="mt-0.5 pointer-events-none"
                             />
 
                             {/* Content */}
@@ -350,6 +408,19 @@ export const JourneyDetailDrawer = ({
         </div>
       </DrawerContent>
     </Drawer>
+    
+    {/* Milestone Detail Drawer */}
+    <MilestoneDetailDrawer
+      milestone={selectedMilestone}
+      isOpen={!!selectedMilestone}
+      onClose={() => setSelectedMilestone(null)}
+      onComplete={handleMilestoneComplete}
+      onUncomplete={handleMilestoneUncomplete}
+      isCompleting={isCompleting}
+      status={selectedMilestone ? getMilestoneStatus(selectedMilestone) : "pending"}
+      postcard={selectedMilestone ? getPostcardForMilestone(selectedMilestone) : undefined}
+      streakMultiplier={streakMultiplier ?? 1}
+    />
     </>
   );
 };
