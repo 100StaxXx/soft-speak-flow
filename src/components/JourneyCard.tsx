@@ -244,7 +244,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                 <div className={cn(
                   "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
                   journeyHealth.score === 'A' && "bg-green-500/20 text-green-500",
-                  journeyHealth.score === 'B' && "bg-blue-500/20 text-blue-500",
+                  journeyHealth.score === 'B' && "bg-celestial-blue/20 text-celestial-blue",
                   journeyHealth.score === 'C' && "bg-amber-500/20 text-amber-500",
                   journeyHealth.score === 'D' && "bg-orange-500/20 text-orange-500",
                   journeyHealth.score === 'F' && "bg-red-500/20 text-red-500",
@@ -260,10 +260,10 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
               </>
             ) : (
               <>
-                <Zap className="w-3.5 h-3.5 text-yellow-500" />
+                <Zap className="w-3.5 h-3.5 text-stardust-gold" />
                 <div>
                   <div className="text-[10px] text-muted-foreground">XP</div>
-                  <div className="text-xs font-bold">{journey.xp_reward}</div>
+                  <div className="text-xs font-bold text-stardust-gold">{journey.xp_reward}</div>
                 </div>
               </>
             )}

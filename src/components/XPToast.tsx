@@ -78,12 +78,12 @@ export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
           className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50"
         >
           <motion.div 
-            className="relative bg-gradient-to-r from-primary via-accent to-primary text-primary-foreground px-8 py-4 rounded-full shadow-neon border-2 border-primary/30"
+            className="relative bg-gradient-to-r from-stardust-gold via-amber-400 to-stardust-gold text-black px-8 py-4 rounded-full shadow-neon border-2 border-stardust-gold/50"
             animate={{
               boxShadow: [
-                "0 0 20px hsl(var(--primary) / 0.8), 0 0 40px hsl(var(--primary) / 0.5)",
-                "0 0 30px hsl(var(--accent) / 0.8), 0 0 60px hsl(var(--accent) / 0.5)",
-                "0 0 20px hsl(var(--primary) / 0.8), 0 0 40px hsl(var(--primary) / 0.5)",
+                "0 0 20px hsl(var(--stardust-gold) / 0.8), 0 0 40px hsl(var(--stardust-gold) / 0.5)",
+                "0 0 30px hsl(var(--stardust-gold) / 0.9), 0 0 60px hsl(var(--stardust-gold) / 0.6)",
+                "0 0 20px hsl(var(--stardust-gold) / 0.8), 0 0 40px hsl(var(--stardust-gold) / 0.5)",
               ]
             }}
             transition={{ duration: 2, repeat: Infinity }}
@@ -96,10 +96,10 @@ export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
               >
-                <Sparkles className="h-6 w-6 drop-shadow-[0_0_8px_hsl(var(--primary-foreground))]" />
+                <Sparkles className="h-6 w-6 text-amber-700 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
               </motion.div>
-              <span className="text-2xl font-heading font-black tracking-wider">+{xp} XP</span>
-              <span className="text-base font-medium">{reason}</span>
+              <span className="text-2xl font-heading font-black tracking-wider text-amber-900">+{xp} XP</span>
+              <span className="text-base font-medium text-amber-800">{reason}</span>
             </div>
           </motion.div>
         </motion.div>

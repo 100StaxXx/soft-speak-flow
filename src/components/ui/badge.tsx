@@ -12,6 +12,10 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        celestial: "border-celestial-blue/30 bg-celestial-blue/20 text-celestial-blue",
+        gold: "border-stardust-gold/30 bg-stardust-gold/20 text-stardust-gold",
+        info: "border-celestial-blue/40 bg-celestial-blue/10 text-celestial-blue",
+        reward: "border-stardust-gold/40 bg-stardust-gold/10 text-stardust-gold",
       },
     },
     defaultVariants: {

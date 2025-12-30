@@ -19,21 +19,21 @@ export function ComboCounter({ count, show, bonusXP }: ComboCounterProps) {
     >
       <div className={cn(
         "flex items-center gap-2 px-4 py-2 rounded-full",
-        "bg-gradient-to-r from-orange-500 via-red-500 to-orange-500",
-        "shadow-[0_0_30px_rgba(255,100,0,0.5)]",
-        "border border-orange-300/50"
+        "bg-gradient-to-r from-stardust-gold via-amber-500 to-stardust-gold",
+        "shadow-[0_0_30px_hsl(var(--stardust-gold)/0.6)]",
+        "border border-stardust-gold/50"
       )}>
-        <Flame className="h-5 w-5 text-yellow-200 animate-pulse" />
-        <span className="text-lg font-black text-white tracking-wide">
+        <Flame className="h-5 w-5 text-yellow-100 animate-pulse" />
+        <span className="text-lg font-black text-black tracking-wide">
           {count}x COMBO!
         </span>
-        <Zap className="h-4 w-4 text-yellow-200" />
+        <Zap className="h-4 w-4 text-yellow-100" />
       </div>
       
       {/* Bonus XP indicator */}
       {bonusXP > 0 && (
         <div className="text-center mt-1 animate-fade-in">
-          <span className="text-sm font-bold text-orange-400">
+          <span className="text-sm font-bold text-stardust-gold">
             +{bonusXP} Bonus XP
           </span>
         </div>

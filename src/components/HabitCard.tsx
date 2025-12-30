@@ -81,9 +81,9 @@ export const HabitCard = memo(({
     if (currentStreak === 0) return { color: "text-muted-foreground", message: "Start your streak today", badge: null };
     if (currentStreak < 7) return { color: "text-muted-foreground", message: "Building momentum...", badge: null };
     if (currentStreak < 14) return { color: "text-streak-building", message: "Building momentum", badge: "Building" };
-    if (currentStreak < 30) return { color: "text-streak-strong", message: "Strong consistency", badge: "Strong" };
+    if (currentStreak < 30) return { color: "text-celestial-blue", message: "Strong consistency", badge: "Strong" };
     if (currentStreak < 60) return { color: "text-streak-elite", message: "Elite level", badge: "Elite" };
-    return { color: "text-streak-legendary", message: "Legendary streak", badge: "Legendary" };
+    return { color: "text-stardust-gold", message: "Legendary streak", badge: "Legendary" };
   }, [currentStreak]);
 
   const getDifficultyConfig = useCallback(() => {
@@ -187,8 +187,8 @@ export const HabitCard = memo(({
                 )}
                 {longestStreak > 0 && (
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-foreground">{longestStreak}</span>
-                    <span className="text-xs text-muted-foreground">personal best</span>
+                    <span className="text-sm font-bold text-stardust-gold">{longestStreak}</span>
+                    <span className="text-xs text-celestial-blue">personal best</span>
                   </div>
                 )}
               </div>

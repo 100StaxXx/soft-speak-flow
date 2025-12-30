@@ -81,6 +81,11 @@ export default {
         // Evolution Stage Tiers
         'stage-tier-2': 'hsl(var(--stage-tier-2))',
         'stage-tier-3': 'hsl(var(--stage-tier-3))',
+        
+        // Cosmic Accent Colors
+        'celestial-blue': 'hsl(var(--celestial-blue))',
+        'stardust-gold': 'hsl(var(--stardust-gold))',
+        'nebula-pink': 'hsl(var(--nebula-pink))',
       },
       fontFamily: {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
