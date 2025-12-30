@@ -5,7 +5,7 @@ import { useAccessStatus } from "@/hooks/useAccessStatus";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Crown, Sparkles, Lock, Moon, MessageCircle } from "lucide-react";
+import { Crown, Sparkles, Lock, MessageCircle } from "lucide-react";
 import { safeLocalStorage } from "@/utils/storage";
 
 const SUBSCRIPTION_MODAL_LAST_SHOWN_KEY = "subscription_modal_last_shown";
@@ -95,7 +95,6 @@ export const SubscriptionGate = () => {
           <div className="space-y-3">
           {[
             { icon: Sparkles, text: "All 21 evolution stages" },
-            { icon: Moon, text: "Personalized Daily Cosmiq Insight" },
             { icon: MessageCircle, text: "Unlimited AI Mentor Chat" },
             { icon: Crown, text: "Pet Mode, Guild Stories & all features" },
             { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },

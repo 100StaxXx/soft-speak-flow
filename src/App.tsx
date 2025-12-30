@@ -61,11 +61,11 @@ const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
 const AstralArcade = lazy(() => import("./pages/AstralArcade"));
-const Horoscope = lazy(() => import("./pages/Horoscope"));
+// const Horoscope = lazy(() => import("./pages/Horoscope")); // Shelved
 const Creator = lazy(() => import("./pages/Creator"));
 const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 
-const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive"));
+// const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive")); // Shelved
 const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 const Recaps = lazy(() => import("./pages/Recaps"));
 const Community = lazy(() => import("./pages/Community"));
@@ -228,9 +228,8 @@ const AppContent = memo(() => {
                 <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                 <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} />
                 <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-                <Route path="/horoscope" element={<ProtectedRoute><Horoscope /></ProtectedRoute>} />
-                
-                <Route path="/cosmic/:placement/:sign" element={<ProtectedRoute><CosmiqDeepDive /></ProtectedRoute>} />
+<Route path="/horoscope" element={<Navigate to="/tasks" replace />} />
+                <Route path="/cosmic/:placement/:sign" element={<Navigate to="/tasks" replace />} />
                 <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
                 <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
                 <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
