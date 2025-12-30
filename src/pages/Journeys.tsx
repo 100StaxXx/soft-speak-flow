@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { 
@@ -29,6 +29,7 @@ import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +65,16 @@ const Journeys = () => {
   } = useDailyTasks(selectedDate);
   
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
+  
+  // Habit surfacing - auto-surface active epic habits as daily tasks
+  const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
+  
+  // Auto-surface habits when there are unsurfaced ones
+  useEffect(() => {
+    if (unsurfacedEpicHabitsCount > 0) {
+      surfaceAllEpicHabits();
+    }
+  }, [unsurfacedEpicHabitsCount, surfaceAllEpicHabits]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -365,7 +376,7 @@ const Journeys = () => {
           onOpenChange={setShowHourlyModal}
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
-          tasks={dailyTasks.map(task => ({
+          tasks={allCalendarTasks.map(task => ({
             id: task.id,
             task_text: task.task_text,
             completed: task.completed || false,

@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, isSameDay } from "date-fns";
-import { X, Clock } from "lucide-react";
+import { X, Clock, CalendarDays } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CalendarDayView } from "./CalendarDayView";
+import { CalendarMonthView } from "./CalendarMonthView";
 import { CalendarTask } from "@/types/quest";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,8 @@ interface HourlyViewModalProps {
   onTaskLongPress?: (taskId: string) => void;
 }
 
+type ViewMode = 'day' | 'month';
+
 export function HourlyViewModal({
   open,
   onOpenChange,
@@ -29,11 +32,12 @@ export function HourlyViewModal({
   onTaskLongPress,
 }: HourlyViewModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
   const isToday = isSameDay(selectedDate, new Date());
 
-  // Auto-scroll to show previous hour at top when modal opens
+  // Auto-scroll to show previous hour at top when modal opens (day view only)
   useEffect(() => {
-    if (open) {
+    if (open && viewMode === 'day') {
       const currentHour = new Date().getHours();
       const previousHour = Math.max(0, currentHour - 1);
       
@@ -41,30 +45,51 @@ export function HourlyViewModal({
       const maxAttempts = 10;
       
       const attemptScroll = () => {
-        // Find the time slot element by data-hour attribute
         const targetElement = scrollRef.current?.querySelector(`[data-hour="${previousHour}"]`);
         
         if (targetElement) {
-          // Use scrollIntoView with block: 'start' to put the element at the top
           targetElement.scrollIntoView({ block: 'start', behavior: 'instant' });
           
-          // Add a small offset to not have it flush against the top
           if (scrollRef.current) {
             scrollRef.current.scrollTop = Math.max(0, scrollRef.current.scrollTop - 8);
           }
         } else if (attempts < maxAttempts) {
-          // Element not found yet, content still rendering
           attempts++;
           setTimeout(attemptScroll, 100);
         }
       };
       
-      // Initial delay for dialog animation to complete
       const timer = setTimeout(attemptScroll, 300);
       
       return () => clearTimeout(timer);
     }
-  }, [open]);
+  }, [open, viewMode]);
+
+  const handleDateSelectFromMonth = (date: Date) => {
+    onDateSelect(date);
+    setViewMode('day');
+  };
+
+  const handleTaskClick = (task: CalendarTask) => {
+    // Switch to day view for the task's date
+    const taskDate = new Date(task.task_date + 'T00:00:00');
+    onDateSelect(taskDate);
+    setViewMode('day');
+  };
+
+  const getTitle = () => {
+    if (viewMode === 'month') {
+      return format(selectedDate, "MMMM yyyy");
+    }
+    return isToday ? "Today's Schedule" : `${format(selectedDate, "EEEE")}'s Schedule`;
+  };
+
+  const getSubtitle = () => {
+    if (viewMode === 'month') {
+      return "Tap any date to view daily schedule";
+    }
+    return `${format(selectedDate, "MMMM d, yyyy")} • Scroll to view full day`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,9 +100,33 @@ export function HourlyViewModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-primary" />
-            <DialogTitle className={cn("text-lg font-semibold", isToday && "text-primary")}>
-              {isToday ? "Today's Schedule" : `${format(selectedDate, "EEEE")}'s Schedule`}
+            {/* View Toggle */}
+            <div className="flex items-center bg-muted rounded-lg p-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setViewMode('day')}
+                className={cn(
+                  "h-7 w-7 rounded-md",
+                  viewMode === 'day' && "bg-background shadow-sm"
+                )}
+              >
+                <Clock className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setViewMode('month')}
+                className={cn(
+                  "h-7 w-7 rounded-md",
+                  viewMode === 'month' && "bg-background shadow-sm"
+                )}
+              >
+                <CalendarDays className="h-4 w-4" />
+              </Button>
+            </div>
+            <DialogTitle className={cn("text-lg font-semibold", isToday && viewMode === 'day' && "text-primary")}>
+              {getTitle()}
             </DialogTitle>
           </div>
           <Button
@@ -90,23 +139,32 @@ export function HourlyViewModal({
           </Button>
         </div>
 
-        {/* Date subtitle */}
+        {/* Subtitle */}
         <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border/50 shrink-0">
-          {format(selectedDate, "MMMM d, yyyy")} • Scroll to view full day (12:00 AM - 11:59 PM)
+          {getSubtitle()}
         </div>
 
-        {/* Scrollable Timeline */}
+        {/* Content */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
-          <CalendarDayView
-            selectedDate={selectedDate}
-            onDateSelect={onDateSelect}
-            tasks={tasks}
-            onTaskDrop={onTaskDrop}
-            onTimeSlotLongPress={onTimeSlotLongPress}
-            onTaskLongPress={onTaskLongPress}
-            fullDayMode
-            hideHeader
-          />
+          {viewMode === 'day' ? (
+            <CalendarDayView
+              selectedDate={selectedDate}
+              onDateSelect={onDateSelect}
+              tasks={tasks}
+              onTaskDrop={onTaskDrop}
+              onTimeSlotLongPress={onTimeSlotLongPress}
+              onTaskLongPress={onTaskLongPress}
+              fullDayMode
+              hideHeader
+            />
+          ) : (
+            <CalendarMonthView
+              selectedDate={selectedDate}
+              onDateSelect={handleDateSelectFromMonth}
+              tasks={tasks}
+              onTaskClick={handleTaskClick}
+            />
+          )}
         </div>
       </DialogContent>
     </Dialog>
