@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -157,7 +157,11 @@ export const JourneyDetailDrawer = ({
           </Tabs>
         </div>
 
-        <ScrollArea className="flex-1 px-4 pb-6 max-h-[60vh]">
+        <div 
+          className="flex-1 px-4 pb-6 max-h-[60vh] overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          data-vaul-no-drag
+        >
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
@@ -325,7 +329,7 @@ export const JourneyDetailDrawer = ({
               </AnimatePresence>
             </div>
           )}
-        </ScrollArea>
+        </div>
       </DrawerContent>
     </Drawer>
   );
