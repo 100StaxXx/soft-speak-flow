@@ -12,6 +12,7 @@ interface StoryPrologueProps {
 
 export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
   const [name, setName] = useState("");
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -25,7 +26,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
       delay: Math.random() * 2,
     })), []);
 
-  const canContinue = name.trim().length >= 2 && legalAccepted;
+  const canContinue = name.trim().length >= 2 && ageConfirmed && legalAccepted;
 
   const handleContinue = () => {
     if (canContinue) {
@@ -109,13 +110,24 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
           />
         </motion.div>
 
-        {/* Legal Checkbox */}
+        {/* Age & Legal Checkboxes */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9 }}
-          className="mb-8"
+          className="mb-8 space-y-4"
         >
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="age"
+              checked={ageConfirmed}
+              onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
+              className="mt-1"
+            />
+            <label htmlFor="age" className="text-white/70 text-sm leading-relaxed">
+              I confirm that I am 13 years of age or older
+            </label>
+          </div>
           <div className="flex items-start gap-3">
             <Checkbox
               id="legal"
