@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionPostcards, CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { PostcardCard } from "./PostcardCard";
 import { PostcardFullscreen } from "./PostcardFullscreen";
-import { MapPin, Sparkles, BookOpen, ChevronRight } from "lucide-react";
+import { PostcardsTutorialModal } from "@/components/PostcardsTutorialModal";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { MapPin, Sparkles, BookOpen, ChevronRight, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -31,6 +33,8 @@ export const CompanionPostcards = () => {
   const { postcards, isLoading } = useCompanionPostcards();
   const [selectedPostcard, setSelectedPostcard] = useState<CompanionPostcard | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
+  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("postcards");
+  const [manualTutorialOpen, setManualTutorialOpen] = useState(false);
 
   // Fetch epic info for grouping
   const epicIds = useMemo(() => 
@@ -111,11 +115,27 @@ export const CompanionPostcards = () => {
 
   return (
     <div className="space-y-6">
+      {/* Tutorial Modal */}
+      <PostcardsTutorialModal 
+        open={showTutorial || manualTutorialOpen} 
+        onClose={() => {
+          dismissTutorial();
+          setManualTutorialOpen(false);
+        }} 
+      />
+
       {/* Header Stats */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MapPin className="w-5 h-5 text-primary" />
           <h3 className="font-semibold text-foreground">Cosmic Postcards</h3>
+          <button
+            onClick={() => setManualTutorialOpen(true)}
+            className="p-1 rounded-full hover:bg-muted/50 transition-colors"
+            aria-label="Learn about postcards"
+          >
+            <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
+          </button>
         </div>
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Sparkles className="w-4 h-4 text-yellow-400" />
