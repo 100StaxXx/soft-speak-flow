@@ -114,12 +114,12 @@ export function TodaysAgenda({
               style={{ animation: 'bounceDown 1.2s ease-in-out infinite' }}
             >
               <div
-                className="text-[10px] font-bold text-primary bg-primary/20 px-2 py-0.5 rounded-full border border-primary shadow-lg whitespace-nowrap"
+                className="text-[10px] font-bold text-yellow-400 bg-yellow-400/20 px-2 py-0.5 rounded-full border border-yellow-400 shadow-lg whitespace-nowrap"
                 style={{ animation: 'clickHerePulse 1.5s ease-in-out infinite' }}
               >
                 Click here!
               </div>
-              <ArrowDown className="h-4 w-4 text-primary drop-shadow-[0_0_8px_hsl(var(--primary))]" strokeWidth={3} />
+              <ArrowDown className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_8px_#facc15]" strokeWidth={3} />
             </div>
           )}
           
@@ -128,7 +128,7 @@ export function TodaysAgenda({
             isComplete 
               ? "bg-primary border-primary" 
               : isTutorialQuest 
-                ? "border-primary ring-2 ring-primary ring-offset-1 ring-offset-background"
+                ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
                 : "border-muted-foreground/30"
           )}>
             {isComplete && <Check className="w-3 h-3 text-primary-foreground" />}
@@ -163,7 +163,7 @@ export function TodaysAgenda({
 
   return (
     <Card className={cn(
-      "relative overflow-hidden",
+      "relative",
       "bg-gradient-to-br from-card via-card to-primary/5",
       "border-primary/20"
     )}>
