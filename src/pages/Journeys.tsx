@@ -382,6 +382,7 @@ const Journeys = () => {
             activeJourneys={activeJourneys}
             onUndoToggle={handleUndoToggle}
             onEditQuest={handleEditQuest}
+            hideIndicator={showTutorial}
           />
         </motion.div>
 
