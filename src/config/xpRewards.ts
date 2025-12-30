@@ -215,6 +215,22 @@ export const SCHEDULING_XP_REWARDS = {
 } as const;
 
 /**
+ * Milestone XP Rewards
+ * 
+ * Rewards for completing epic milestones.
+ */
+export const MILESTONE_XP_REWARDS = {
+  /** Regular milestone completion */
+  REGULAR: 20,
+  /** Postcard/celebration milestone completion */
+  POSTCARD: 35,
+  /** Phase completion bonus (all milestones in phase done) */
+  PHASE_COMPLETE: 50,
+  /** Epic completion (all milestones done) */
+  EPIC_COMPLETE: 150,
+} as const;
+
+/**
  * Type-safe difficulty type
  */
 export type Difficulty = 'easy' | 'medium' | 'hard';

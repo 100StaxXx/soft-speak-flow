@@ -13,6 +13,7 @@ import {
   INBOX_XP_REWARDS,
   PRODUCTIVITY_XP_REWARDS,
   SCHEDULING_XP_REWARDS,
+  MILESTONE_XP_REWARDS,
 } from "@/config/xpRewards";
 
 // Helper to mark user as active (resets companion decay)
@@ -452,6 +453,48 @@ export const useXPRewards = () => {
     });
   };
 
+  // ============================================
+  // NEW: Milestone XP Rewards
+  // ============================================
+
+  const awardMilestoneComplete = (isPostcardMilestone: boolean = false) => {
+    if (!companion || awardXP.isPending) return;
+
+    const baseReward = isPostcardMilestone
+      ? MILESTONE_XP_REWARDS.POSTCARD
+      : MILESTONE_XP_REWARDS.REGULAR;
+    const reward = applyStreakMultiplier(baseReward);
+    const label = isPostcardMilestone ? "Celebration Milestone!" : "Milestone Complete!";
+
+    showXPToast(reward, label);
+    awardXP.mutate({
+      eventType: isPostcardMilestone ? "postcard_milestone" : "milestone_complete",
+      xpAmount: reward,
+    });
+  };
+
+  const awardPhaseComplete = (phaseName: string) => {
+    if (!companion || awardXP.isPending) return;
+    const reward = applyStreakMultiplier(MILESTONE_XP_REWARDS.PHASE_COMPLETE);
+    showXPToast(reward, `Phase Complete: ${phaseName}!`);
+    awardXP.mutate({
+      eventType: "phase_complete",
+      xpAmount: reward,
+      metadata: { phaseName },
+    });
+  };
+
+  const awardEpicComplete = (epicTitle: string) => {
+    if (!companion || awardXP.isPending) return;
+    const reward = applyStreakMultiplier(MILESTONE_XP_REWARDS.EPIC_COMPLETE);
+    showXPToast(reward, "Epic Complete! 🏆");
+    awardXP.mutate({
+      eventType: "epic_complete",
+      xpAmount: reward,
+      metadata: { epicTitle },
+    });
+  };
+
   const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
     // Guard: Don't attempt XP award if companion not loaded or mutation in progress
     if (!companion) {
@@ -520,6 +563,11 @@ export const useXPRewards = () => {
     awardOnTimeCompletion,
     awardContextMatch,
     
+    // NEW: Milestone rewards
+    awardMilestoneComplete,
+    awardPhaseComplete,
+    awardEpicComplete,
+    
     // Legacy aliases (for backward compatibility)
     awardCheckIn: awardCheckInComplete,
     awardChallengeComplete: awardChallengeCompletion,
@@ -534,5 +582,6 @@ export const useXPRewards = () => {
     INBOX_XP_REWARDS,
     PRODUCTIVITY_XP_REWARDS,
     SCHEDULING_XP_REWARDS,
+    MILESTONE_XP_REWARDS,
   };
 };
