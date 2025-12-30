@@ -545,12 +545,12 @@ export function Pathfinder({
                 {/* Timeline Context - Optional */}
                 <div className="space-y-2">
                   <Label htmlFor="context-input" className="text-base font-semibold flex items-center gap-2">
-                    Anything that might affect your timeline?
+                    What's your current preparation status?
                     <span className="text-sm font-normal text-muted-foreground">(optional)</span>
                   </Label>
                   <Textarea
                     id="context-input"
-                    placeholder="e.g., I already know basic Spanish"
+                    placeholder="e.g., Already know basics, studying for 2 weeks, starting from scratch"
                     value={timelineContext}
                     onChange={(e) => setTimelineContext(e.target.value)}
                     rows={2}
