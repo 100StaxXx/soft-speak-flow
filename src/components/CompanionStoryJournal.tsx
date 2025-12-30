@@ -250,22 +250,23 @@ export const CompanionStoryJournal = () => {
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setViewingStage(Math.max(0, viewingStage - 1))}
             disabled={viewingStage === 0}
+            className="flex-shrink-0 px-2 sm:px-3"
           >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Previous
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden sm:inline ml-1">Previous</span>
           </Button>
 
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="text-center min-w-0 flex-1">
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
               {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
             </p>
-            <p className="font-semibold">{getStageName(debouncedStage)}</p>
+            <p className="font-semibold text-sm sm:text-base truncate">{getStageName(debouncedStage)}</p>
           </div>
 
           <Button
@@ -278,9 +279,10 @@ export const CompanionStoryJournal = () => {
               }
             }}
             disabled={viewingStage === 20 || !canAccessStage(viewingStage + 1)}
+            className="flex-shrink-0 px-2 sm:px-3"
           >
-            Next
-            <ChevronRight className="w-4 h-4 ml-1" />
+            <span className="hidden sm:inline mr-1">Next</span>
+            <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
 
