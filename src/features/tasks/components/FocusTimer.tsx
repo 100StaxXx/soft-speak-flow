@@ -84,21 +84,45 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
       <CardContent className="p-6">
         {/* Session Type Selector */}
         {!timerState.isRunning && (
-          <div className="flex justify-start gap-2 mb-6 overflow-x-auto scrollbar-hide pb-1 -mx-2 px-2">
-            {SESSION_TYPES.map(({ type, label, icon, color }) => (
+          <div className="flex flex-col items-center gap-2 mb-6">
+            {/* Top: Focus button */}
+            <Button
+              variant={timerState.sessionType === 'pomodoro' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSessionType('pomodoro')}
+              className="gap-2 uppercase text-xs font-semibold min-w-[100px]"
+            >
+              <span className={cn(timerState.sessionType !== 'pomodoro' && 'text-primary')}>
+                <Brain className="w-4 h-4" />
+              </span>
+              Focus
+            </Button>
+            
+            {/* Bottom: Break buttons side by side */}
+            <div className="flex gap-2">
               <Button
-                key={type}
-                variant={timerState.sessionType === type ? 'default' : 'outline'}
+                variant={timerState.sessionType === 'short_break' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setSessionType(type)}
-                className="gap-2 flex-shrink-0 uppercase text-xs font-semibold"
+                onClick={() => setSessionType('short_break')}
+                className="gap-2 uppercase text-xs font-semibold"
               >
-                <span className={cn(timerState.sessionType !== type && color)}>
-                  {icon}
+                <span className={cn(timerState.sessionType !== 'short_break' && 'text-green-500')}>
+                  <Coffee className="w-4 h-4" />
                 </span>
-                {label}
+                Short Break
               </Button>
-            ))}
+              <Button
+                variant={timerState.sessionType === 'long_break' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSessionType('long_break')}
+                className="gap-2 uppercase text-xs font-semibold"
+              >
+                <span className={cn(timerState.sessionType !== 'long_break' && 'text-blue-500')}>
+                  <Zap className="w-4 h-4" />
+                </span>
+                Long Break
+              </Button>
+            </div>
           </div>
         )}
 
