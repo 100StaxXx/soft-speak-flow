@@ -148,7 +148,7 @@ const AppContent = memo(() => {
       const hasRedirected = window.sessionStorage.getItem("initialRouteRedirected");
       if (!hasRedirected) {
         window.sessionStorage.setItem("initialRouteRedirected", "true");
-        navigate("/tasks", { replace: true });
+        navigate("/journeys", { replace: true });
       }
     } catch (error) {
       logger.error("Failed to persist initial route redirect flag:", error);
@@ -221,15 +221,15 @@ const AppContent = memo(() => {
                 <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
                 <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-                <Route path="/tasks" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
+                <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
                 <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
                 <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
                 <Route path="/join/:code" element={<JoinEpic />} />
                 <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                 <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} />
                 <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-<Route path="/horoscope" element={<Navigate to="/tasks" replace />} />
-                <Route path="/cosmic/:placement/:sign" element={<Navigate to="/tasks" replace />} />
+                <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
+                <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />
                 <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
                 <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
                 <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />

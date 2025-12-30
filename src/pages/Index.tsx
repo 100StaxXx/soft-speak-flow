@@ -249,7 +249,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             <Button onClick={() => navigate("/mentor-selection")} className="flex-1 min-w-[180px]">
               Select Mentor
             </Button>
-            <Button variant="ghost" onClick={() => navigate("/tasks")} className="flex-1 min-w-[180px]">
+            <Button variant="ghost" onClick={() => navigate("/journeys")} className="flex-1 min-w-[180px]">
               View Quests
             </Button>
           </div>
@@ -327,14 +327,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                     case 'reschedule':
                     case 'add_break':
                     case 'simplify':
-                      navigate('/tasks');
+                      navigate('/journeys');
                       break;
                     case 'celebrate':
-                      // Could show celebration modal, for now navigate to tasks
-                      navigate('/tasks');
+                      // Could show celebration modal, for now navigate to journeys
+                      navigate('/journeys');
                       break;
                     default:
-                      navigate('/tasks');
+                      navigate('/journeys');
                   }
                 }}
               />
