@@ -115,6 +115,10 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       milestone_percent: m.milestone_percent,
       is_postcard_milestone: m.is_postcard_milestone,
       completed_at: m.completed_at,
+      description: m.description,
+      phase_name: m.phase_name,
+      target_date: m.target_date,
+      chapter_number: m.chapter_number,
     }));
   }, [milestones]);
 
