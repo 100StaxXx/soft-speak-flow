@@ -28,10 +28,10 @@ const STEPS = [
     title: "Daily Quests",
     subtitle: "Every hero starts somewhere...",
     features: [
+      { icon: Brain, text: "Use the Quick Add Bar to create quests with natural language", color: "text-sky-400" },
       { icon: CheckCircle2, text: "Complete quests to earn XP and grow your companion", color: "text-green-400" },
       { icon: Zap, text: "First 3 quests earn full XP, then rewards gradually decrease", color: "text-amber-400" },
       { icon: Sparkles, text: "Set a Main Quest for 1.5x XP bonus", color: "text-primary" },
-      { icon: Flame, text: "Keep your streak alive to level up faster", color: "text-orange-400" },
     ],
     gradient: "from-green-500/20 via-emerald-500/20 to-teal-500/20",
     iconGlow: "shadow-[0_0_60px_rgba(34,197,94,0.4)]",
