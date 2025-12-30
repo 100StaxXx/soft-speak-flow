@@ -55,7 +55,7 @@ const QuickActionCard = ({
   label: string; 
   description?: string;
   onClick: () => void;
-  variant?: "default" | "accent";
+  variant?: "default" | "accent" | "info";
 }) => (
   <button
     onClick={onClick}
@@ -63,7 +63,9 @@ const QuickActionCard = ({
       group flex items-center gap-3 p-4 rounded-xl border transition-all text-left w-full
       active:scale-[0.98] select-none
       ${variant === "accent" 
-        ? "bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20 sm:hover:border-amber-500/40" 
+        ? "bg-gradient-to-br from-stardust-gold/10 to-amber-600/5 border-stardust-gold/20 sm:hover:border-stardust-gold/40" 
+        : variant === "info"
+        ? "bg-gradient-to-br from-celestial-blue/10 to-blue-600/5 border-celestial-blue/20 sm:hover:border-celestial-blue/40"
         : "bg-card/50 border-border/50 sm:hover:border-primary/40 sm:hover:bg-card/80"
       }
     `}
@@ -72,7 +74,9 @@ const QuickActionCard = ({
     <div className={`
       flex items-center justify-center w-10 h-10 rounded-lg shrink-0
       ${variant === "accent" 
-        ? "bg-amber-500/20 text-amber-400" 
+        ? "bg-stardust-gold/20 text-stardust-gold" 
+        : variant === "info"
+        ? "bg-celestial-blue/20 text-celestial-blue"
         : "bg-primary/10 text-primary"
       }
     `}>
@@ -298,6 +302,7 @@ const Profile = () => {
                 label="Search" 
                 description="Find quotes, pep talks & more"
                 onClick={() => navigate("/search")} 
+                variant="info"
               />
               <QuickActionCard 
                 icon={BookHeart} 
@@ -310,6 +315,7 @@ const Profile = () => {
                 label="Help Center" 
                 description="Guides & tutorials"
                 onClick={() => navigate("/help")} 
+                variant="info"
               />
               <QuickActionCard 
                 icon={Sparkles} 

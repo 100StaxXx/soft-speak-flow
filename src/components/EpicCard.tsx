@@ -352,9 +352,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               {isCompleted ? (
-                <Trophy className="w-6 h-6 text-yellow-400" />
+                <Trophy className="w-6 h-6 text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]" />
               ) : (
-                <Target className="w-6 h-6 text-primary" />
+                <Target className="w-6 h-6 text-celestial-blue" />
               )}
               <h3 className="text-xl font-bold">{epic.title}</h3>
               {epic.invite_code && (
@@ -380,7 +380,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           </div>
           <div className="flex items-center gap-2 ml-2">
             <Badge
-              variant={isCompleted ? "default" : "secondary"}
+              variant={isCompleted ? "gold" : isActive ? "celestial" : "secondary"}
             >
               {isCompleted ? "Legendary" : isActive ? "Active" : "Abandoned"}
             </Badge>
@@ -442,9 +442,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                       {/* Status indicator */}
                       <div className="flex-shrink-0 mt-0.5">
                         {isCompleted ? (
-                          <Check className="h-4 w-4 text-green-500" />
+                          <Check className="h-4 w-4 text-stardust-gold" />
                         ) : milestone.is_postcard_milestone ? (
-                          <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                          <Star className="h-4 w-4 text-stardust-gold fill-stardust-gold" />
                         ) : (
                           <ChevronRight 
                             className={cn(

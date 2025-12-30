@@ -59,24 +59,40 @@ export const StarfieldBackground = () => {
         />
       </div>
 
-      {/* Twinkling stars */}
-      {stars.map((star) => (
-        <div
-          key={star.id}
-          className="absolute rounded-full bg-white"
-          style={{
-            left: `${star.x}%`,
-            top: `${star.y}%`,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            opacity: star.opacity,
-            animation: prefersReducedMotion 
-              ? 'none' 
-              : `twinkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`,
-            boxShadow: `0 0 ${star.size * 2}px rgba(255, 255, 255, ${star.opacity})`,
-          }}
-        />
-      ))}
+      {/* Twinkling stars - with blue and gold variety */}
+      {stars.map((star) => {
+        // Add color variety: 70% white, 15% blue, 15% gold
+        const colorRoll = Math.random();
+        const starColor = colorRoll > 0.85 
+          ? 'hsl(45, 100%, 65%)' // Gold
+          : colorRoll > 0.70 
+            ? 'hsl(210, 80%, 60%)' // Blue
+            : 'white';
+        const shadowColor = colorRoll > 0.85 
+          ? 'rgba(245, 197, 66, ' 
+          : colorRoll > 0.70 
+            ? 'rgba(91, 181, 224, ' 
+            : 'rgba(255, 255, 255, ';
+        
+        return (
+          <div
+            key={star.id}
+            className="absolute rounded-full"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              backgroundColor: starColor,
+              animation: prefersReducedMotion 
+                ? 'none' 
+                : `twinkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`,
+              boxShadow: `0 0 ${star.size * 2}px ${shadowColor}${star.opacity})`,
+            }}
+          />
+        );
+      })}
 
       {/* Rare shooting star */}
       {!prefersReducedMotion && (

@@ -118,7 +118,10 @@ export function GamifiedProgress({ value, completedCount, totalCount, className 
             key={milestone}
             className={cn(
               "transition-colors",
-              value >= milestone && "text-primary font-medium"
+              value >= milestone && milestone === 100 && "text-stardust-gold font-bold",
+              value >= milestone && milestone === 75 && "text-stardust-gold/80 font-medium",
+              value >= milestone && milestone === 50 && "text-celestial-blue font-medium",
+              value >= milestone && milestone === 25 && "text-celestial-blue/80 font-medium"
             )}
           >
             {milestone}%

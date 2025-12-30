@@ -17,7 +17,7 @@ const getMilestoneConfig = (streak: number) => {
       title: "LEGENDARY STREAK!",
       subtitle: `${streak} days of pure dedication`,
       icon: Crown,
-      gradient: "from-yellow-400 via-orange-500 to-red-500",
+      gradient: "from-stardust-gold via-amber-400 to-yellow-300",
       message: "You are unstoppable. This is what greatness looks like.",
       particles: 400,
     };
@@ -26,7 +26,7 @@ const getMilestoneConfig = (streak: number) => {
       title: "ELITE STREAK!",
       subtitle: `${streak} days strong`,
       icon: Trophy,
-      gradient: "from-purple-400 via-pink-500 to-red-500",
+      gradient: "from-purple-400 via-celestial-blue to-purple-500",
       message: "You've built an unshakeable habit. This is discipline.",
       particles: 300,
     };
@@ -35,7 +35,7 @@ const getMilestoneConfig = (streak: number) => {
       title: "STREAK MILESTONE!",
       subtitle: `${streak} days in a row`,
       icon: Flame,
-      gradient: "from-orange-400 via-red-500 to-pink-500",
+      gradient: "from-celestial-blue via-blue-500 to-celestial-blue",
       message: "Momentum is building. Keep the fire burning.",
       particles: 200,
     };
@@ -58,14 +58,14 @@ export const StreakMilestoneModal = ({ open, streak, onClose }: StreakMilestoneM
           angle: 60,
           spread: 55,
           origin: { x: 0, y: 0.6 },
-          colors: ['#FFD700', '#FFA500', '#FF6347', '#FF1493'],
+          colors: ['#f5c542', '#5bb5e0', '#a76cff', '#ffffff'],
         });
         confetti({
           particleCount: config.particles / 10,
           angle: 120,
           spread: 55,
           origin: { x: 1, y: 0.6 },
-          colors: ['#FFD700', '#FFA500', '#FF6347', '#FF1493'],
+          colors: ['#f5c542', '#5bb5e0', '#a76cff', '#ffffff'],
         });
 
         if (Date.now() < end) {
@@ -170,7 +170,7 @@ export const StreakMilestoneModal = ({ open, streak, onClose }: StreakMilestoneM
                   <Button
                     onClick={onClose}
                     size="lg"
-                    className="bg-white text-primary hover:bg-white/90 font-bold shadow-glow-lg"
+                    className="bg-gradient-to-r from-stardust-gold to-amber-400 text-black hover:from-stardust-gold/90 hover:to-amber-400/90 font-bold shadow-glow-lg"
                   >
                     Let's Go! 🔥
                   </Button>

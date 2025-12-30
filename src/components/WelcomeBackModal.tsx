@@ -137,7 +137,7 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
                   >
                     ❤️
                   </motion.div>
-                  <Sparkles className="absolute -top-4 left-1/2 -translate-x-1/2 h-8 w-8 text-yellow-400 animate-pulse" />
+                  <Sparkles className="absolute -top-4 left-1/2 -translate-x-1/2 h-8 w-8 text-stardust-gold animate-pulse" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -169,14 +169,14 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
               </div>
 
               {/* Recovery Bonus */}
-              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="p-3 rounded-lg bg-stardust-gold/10 border border-stardust-gold/20">
                 <div className="flex items-center gap-2 justify-center">
-                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <TrendingUp className="h-4 w-4 text-stardust-gold" />
                   <span className="text-sm font-medium">Come back and earn:</span>
                 </div>
                 <div className="flex items-center gap-4 justify-center mt-2">
                   <span className="text-sm text-muted-foreground">+10 to all stats</span>
-                  <span className="text-sm text-primary font-bold">+25 XP bonus!</span>
+                  <span className="text-sm text-stardust-gold font-bold">+25 XP bonus!</span>
                 </div>
               </div>
             </div>
@@ -189,13 +189,13 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
               animate={{ opacity: 1, y: 0 }}
               className="text-center space-y-2"
             >
-              <p className="text-lg font-medium text-primary">
+              <p className="text-lg font-medium text-stardust-gold">
                 Your companion is overjoyed! 
               </p>
               <p className="text-sm text-muted-foreground">
                 +10 Body, +10 Mind, +10 Soul restored
               </p>
-              <p className="text-sm font-bold text-primary">
+              <p className="text-sm font-bold text-stardust-gold">
                 +25 XP Welcome Back Bonus!
               </p>
             </motion.div>
@@ -205,7 +205,7 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
           {!showReunion && (
             <Button 
               onClick={handleWelcomeBack}
-              className="w-full rounded-2xl min-h-[48px]"
+              className="w-full rounded-2xl min-h-[48px] bg-gradient-to-r from-stardust-gold to-amber-500 text-black hover:from-stardust-gold/90 hover:to-amber-500/90"
             >
               <Heart className="h-5 w-5 mr-2" />
               Reunite with Your Companion
