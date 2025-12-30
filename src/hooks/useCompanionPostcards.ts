@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 export interface CompanionPostcard {
   id: string;
@@ -28,9 +28,22 @@ export interface CompanionPostcard {
   location_revealed: boolean | null;
 }
 
+export interface PostcardUnlockInfo {
+  milestoneTitle?: string;
+  chapterNumber?: number;
+  locationName?: string;
+}
+
 export const useCompanionPostcards = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Track when a postcard was just unlocked for celebration
+  const [postcardJustUnlocked, setPostcardJustUnlocked] = useState<PostcardUnlockInfo | null>(null);
+
+  const clearPostcardUnlocked = useCallback(() => {
+    setPostcardJustUnlocked(null);
+  }, []);
 
   const { data: postcards, isLoading, error } = useQuery({
     queryKey: ["companion-postcards", user?.id],
@@ -55,6 +68,7 @@ export const useCompanionPostcards = () => {
       epicId,
       milestonePercent,
       companionData,
+      milestoneTitle,
     }: {
       companionId: string;
       epicId: string;
@@ -66,6 +80,7 @@ export const useCompanionPostcards = () => {
         eye_color?: string;
         fur_color?: string;
       };
+      milestoneTitle?: string;
     }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
@@ -82,11 +97,19 @@ export const useCompanionPostcards = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       
-      return data;
+      return { ...data, milestoneTitle };
     },
     onSuccess: (data) => {
       if (!data?.existing) {
         queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
+        
+        // Set unlock info for celebration animation
+        setPostcardJustUnlocked({
+          milestoneTitle: data?.milestoneTitle,
+          chapterNumber: data?.postcard?.chapter_number,
+          locationName: data?.postcard?.location_name,
+        });
+        
         toast.success("📸 New cosmic postcard unlocked!", {
           description: `Your companion visited ${data?.postcard?.location_name}!`,
         });
@@ -183,12 +206,13 @@ export const useCompanionPostcards = () => {
         return;
       }
 
-      // Generate the postcard
+      // Generate the postcard with milestone title for celebration
       generatePostcard.mutate({
         companionId,
         epicId,
         milestonePercent: milestone.milestone_percent,
         companionData,
+        milestoneTitle: milestone.title,
       });
     },
     [user?.id, postcards, generatePostcard]
@@ -202,5 +226,7 @@ export const useCompanionPostcards = () => {
     checkAndGeneratePostcard,
     checkMilestoneForPostcard,
     isGenerating: generatePostcard.isPending,
+    postcardJustUnlocked,
+    clearPostcardUnlocked,
   };
 };
