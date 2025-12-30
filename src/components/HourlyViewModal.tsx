@@ -3,6 +3,7 @@ import { format, isSameDay } from "date-fns";
 import { X, Clock, CalendarDays } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarDayView } from "./CalendarDayView";
 import { CalendarMonthView } from "./CalendarMonthView";
 import { CalendarTask } from "@/types/quest";
@@ -100,31 +101,33 @@ export function HourlyViewModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            {/* View Toggle */}
-            <div className="flex items-center bg-muted rounded-lg p-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setViewMode('day')}
-                className={cn(
-                  "h-7 w-7 rounded-md",
-                  viewMode === 'day' && "bg-background shadow-sm"
-                )}
-              >
-                <Clock className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setViewMode('month')}
-                className={cn(
-                  "h-7 w-7 rounded-md",
-                  viewMode === 'month' && "bg-background shadow-sm"
-                )}
-              >
-                <CalendarDays className="h-4 w-4" />
-              </Button>
-            </div>
+            {/* View Mode Dropdown */}
+            <Select value={viewMode} onValueChange={(value: ViewMode) => setViewMode(value)}>
+              <SelectTrigger className="w-[120px] h-8 text-sm bg-muted border-0">
+                <div className="flex items-center gap-2">
+                  {viewMode === 'day' ? (
+                    <Clock className="h-4 w-4" />
+                  ) : (
+                    <CalendarDays className="h-4 w-4" />
+                  )}
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>Day View</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="month">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    <span>Month View</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <DialogTitle className={cn("text-lg font-semibold", isToday && viewMode === 'day' && "text-primary")}>
               {getTitle()}
             </DialogTitle>
