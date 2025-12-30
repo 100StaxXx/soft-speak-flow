@@ -71,6 +71,11 @@ export function HourlyViewModal({
     setViewMode('day');
   };
 
+  const handleMonthChange = (date: Date) => {
+    onDateSelect(date);
+    // Stay in month view - don't change viewMode
+  };
+
   const handleTaskClick = (task: CalendarTask) => {
     // Switch to day view for the task's date
     const taskDate = new Date(task.task_date + 'T00:00:00');
@@ -164,6 +169,7 @@ export function HourlyViewModal({
             <CalendarMonthView
               selectedDate={selectedDate}
               onDateSelect={handleDateSelectFromMonth}
+              onMonthChange={handleMonthChange}
               tasks={tasks}
               onTaskClick={handleTaskClick}
               onDateLongPress={(date) => onTimeSlotLongPress?.(date, '09:00')}
