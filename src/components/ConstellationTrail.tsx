@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HelpCircle, MapPin, Sparkles, Lock, Star } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -113,9 +113,19 @@ const MysteryMilestonePopover = ({
   const progressToMilestone = milestone.milestone_percent - currentProgress;
   const progressPercent = Math.min(100, Math.max(0, (currentProgress / milestone.milestone_percent) * 100));
   
-  const handleOpen = async () => {
+  // Prevent background scroll on iOS when popover is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+  
+  const handleTap = async () => {
     try {
-      await Haptics.impact({ style: ImpactStyle.Light });
+      await Haptics.impact({ style: ImpactStyle.Medium });
     } catch {
       // Haptics not available
     }
@@ -135,127 +145,235 @@ const MysteryMilestonePopover = ({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
+        {/* 44x44px touch target for accessibility */}
         <button
-          onClick={handleOpen}
-          className="group cursor-pointer focus:outline-none"
+          onClick={handleTap}
+          className={cn(
+            "w-11 h-11 -m-4 flex items-center justify-center",
+            "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-full",
+            "group transition-all duration-200",
+            "active:scale-90 active:bg-white/5" // Android touch feedback
+          )}
+          aria-label={`Unlock milestone at ${milestone.milestone_percent}%`}
         >
-          <HelpCircle className="w-3 h-3 animate-pulse group-hover:scale-125 transition-transform" />
+          <motion.div
+            className={cn(
+              "w-4 h-4 rounded-full flex items-center justify-center",
+              isPostcard ? "text-amber-400/70" : "text-purple-400/70",
+              "group-hover:scale-125 transition-transform"
+            )}
+            animate={{ 
+              opacity: [0.5, 1, 0.5],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+          </motion.div>
         </button>
       </PopoverTrigger>
       <PopoverContent 
         className={cn(
-          "w-56 p-0 border-0 overflow-hidden",
+          "w-64 p-0 border overflow-hidden shadow-xl",
+          // Backdrop blur with fallback for older Android
+          "supports-[backdrop-filter]:backdrop-blur-xl",
           isPostcard 
-            ? "bg-gradient-to-br from-amber-950/95 via-yellow-950/90 to-slate-950/95" 
-            : "bg-gradient-to-br from-purple-950/95 via-slate-950/90 to-slate-950/95"
+            ? "bg-gradient-to-br from-amber-950/98 via-yellow-950/95 to-slate-950/98 border-amber-500/20" 
+            : "bg-gradient-to-br from-purple-950/98 via-slate-950/95 to-slate-950/98 border-purple-500/20"
         )}
-        sideOffset={8}
+        sideOffset={12}
+        collisionPadding={{ top: 50, bottom: 50, left: 16, right: 16 }}
       >
-        {/* Sparkle decorations */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div
-            className="absolute top-2 right-3 text-white/30"
-            animate={{ rotate: 360, scale: [1, 1.2, 1] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          >
-            <Sparkles className="w-3 h-3" />
-          </motion.div>
-          <motion.div
-            className="absolute bottom-4 left-2 text-white/20"
-            animate={{ rotate: -360, scale: [1, 1.3, 1] }}
-            transition={{ duration: 4, repeat: Infinity, delay: 0.5 }}
-          >
-            <Star className="w-2 h-2" />
-          </motion.div>
-        </div>
-        
-        <div className="p-3 relative z-10">
-          {/* Header */}
-          <div className="flex items-center gap-2 mb-2">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: -5 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ 
+            type: "spring",
+            stiffness: 300,
+            damping: 25
+          }}
+        >
+          {/* Sparkle decorations with AnimatePresence for cleanup */}
+          <AnimatePresence>
+            {isOpen && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <motion.div
+                  className={cn(
+                    "absolute top-3 right-4",
+                    isPostcard ? "text-amber-400/40" : "text-purple-400/40"
+                  )}
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: 1,
+                    rotate: 360 
+                  }}
+                  exit={{ opacity: 0, scale: 0 }}
+                  transition={{ 
+                    opacity: { duration: 0.3 },
+                    rotate: { duration: 4, repeat: Infinity, ease: "linear" }
+                  }}
+                >
+                  <Sparkles className="w-4 h-4" />
+                </motion.div>
+                <motion.div
+                  className={cn(
+                    "absolute bottom-6 left-3",
+                    isPostcard ? "text-amber-400/25" : "text-purple-400/25"
+                  )}
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: [1, 1.3, 1],
+                    rotate: -360 
+                  }}
+                  exit={{ opacity: 0, scale: 0 }}
+                  transition={{ 
+                    opacity: { duration: 0.3, delay: 0.1 },
+                    scale: { duration: 3, repeat: Infinity },
+                    rotate: { duration: 5, repeat: Infinity, ease: "linear" }
+                  }}
+                >
+                  <Star className="w-3 h-3" />
+                </motion.div>
+                {/* Extra floating particle */}
+                <motion.div
+                  className={cn(
+                    "absolute top-1/2 right-6 w-1.5 h-1.5 rounded-full",
+                    isPostcard ? "bg-amber-400/30" : "bg-purple-400/30"
+                  )}
+                  initial={{ opacity: 0 }}
+                  animate={{ 
+                    opacity: [0, 1, 0],
+                    y: [0, -10, 0],
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={{ 
+                    duration: 2,
+                    repeat: Infinity,
+                    delay: 0.5
+                  }}
+                />
+              </div>
+            )}
+          </AnimatePresence>
+          
+          <div className="p-4 relative z-10">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-3">
+              <motion.div 
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center",
+                  isPostcard 
+                    ? "bg-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)]" 
+                    : "bg-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.3)]"
+                )}
+                animate={{ 
+                  boxShadow: isPostcard 
+                    ? ["0 0 12px rgba(251,191,36,0.3)", "0 0 20px rgba(251,191,36,0.5)", "0 0 12px rgba(251,191,36,0.3)"]
+                    : ["0 0 12px rgba(168,85,247,0.3)", "0 0 20px rgba(168,85,247,0.5)", "0 0 12px rgba(168,85,247,0.3)"]
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Lock className="w-4 h-4" />
+              </motion.div>
+              <div>
+                <h4 className="text-sm font-bold text-white leading-tight">Mystery Awaits...</h4>
+                <p className={cn(
+                  "text-xs leading-tight",
+                  isPostcard ? "text-amber-400/80" : "text-purple-400/80"
+                )}>
+                  {isPostcard ? "Postcard Milestone" : "Journey Milestone"}
+                </p>
+              </div>
+            </div>
+
+            {/* Divider */}
             <div className={cn(
-              "w-6 h-6 rounded-full flex items-center justify-center",
-              isPostcard 
-                ? "bg-amber-500/20 text-amber-400" 
-                : "bg-purple-500/20 text-purple-400"
-            )}>
-              <Lock className="w-3 h-3" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-white">Mystery Awaits...</h4>
-              <p className={cn(
-                "text-[10px]",
-                isPostcard ? "text-amber-400/80" : "text-purple-400/80"
-              )}>
-                {isPostcard ? "Postcard Milestone" : "Journey Milestone"}
-              </p>
-            </div>
-          </div>
+              "h-px w-full mb-3",
+              isPostcard ? "bg-amber-400/20" : "bg-purple-400/20"
+            )} />
 
-          {/* Progress Ring */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="relative w-10 h-10">
-              <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  className="text-white/10"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeDasharray={`${progressPercent * 0.88} 100`}
-                  strokeLinecap="round"
-                  className={isPostcard ? "text-amber-400" : "text-purple-400"}
-                />
-              </svg>
-              <span className={cn(
-                "absolute inset-0 flex items-center justify-center text-[10px] font-bold",
-                isPostcard ? "text-amber-400" : "text-purple-400"
-              )}>
-                {Math.round(progressPercent)}%
-              </span>
+            {/* Progress Ring */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative w-12 h-12 flex-shrink-0">
+                <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    className="text-white/10"
+                  />
+                  <motion.circle
+                    cx="18"
+                    cy="18"
+                    r="14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    className={isPostcard ? "text-amber-400" : "text-purple-400"}
+                    initial={{ strokeDasharray: "0 100" }}
+                    animate={{ strokeDasharray: `${progressPercent * 0.88} 100` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                  />
+                </svg>
+                <span className={cn(
+                  "absolute inset-0 flex items-center justify-center text-xs font-bold",
+                  isPostcard ? "text-amber-400" : "text-purple-400"
+                )}>
+                  {Math.round(progressPercent)}%
+                </span>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-white/60 leading-snug">Unlock at</p>
+                <p className={cn(
+                  "text-lg font-bold leading-tight",
+                  isPostcard ? "text-amber-400" : "text-purple-400"
+                )}>
+                  {milestone.milestone_percent}%
+                </p>
+                <p className="text-xs text-white/50 leading-snug">
+                  {progressToMilestone > 0 ? `${Math.round(progressToMilestone)}% to go` : "Almost there!"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-white/70">Unlock at</p>
-              <p className={cn(
-                "text-sm font-bold",
-                isPostcard ? "text-amber-400" : "text-purple-400"
-              )}>
-                {milestone.milestone_percent}%
-              </p>
-              <p className="text-[10px] text-white/50">
-                {progressToMilestone > 0 ? `${progressToMilestone}% to go` : "Almost there!"}
-              </p>
-            </div>
-          </div>
 
-          {/* Teaser Text */}
-          <p className="text-[11px] text-white/80 leading-relaxed italic mb-2">
-            "{getTeaserText()}"
-          </p>
+            {/* Teaser Text */}
+            <p className="text-xs text-white/75 leading-relaxed italic mb-3">
+              "{getTeaserText()}"
+            </p>
 
-          {/* Phase & Date Info */}
-          <div className="flex flex-wrap gap-2 text-[9px]">
-            {milestone.phase_name && (
-              <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/60">
-                {milestone.phase_name}
-              </span>
-            )}
-            {milestone.target_date && (
-              <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/60">
-                Est. {format(new Date(milestone.target_date), "MMM d")}
-              </span>
+            {/* Phase & Date Info */}
+            {(milestone.phase_name || milestone.target_date) && (
+              <div className="flex flex-wrap gap-2">
+                {milestone.phase_name && (
+                  <span className={cn(
+                    "px-2 py-1 rounded-md text-[11px] font-medium",
+                    isPostcard ? "bg-amber-400/10 text-amber-400/70" : "bg-purple-400/10 text-purple-400/70"
+                  )}>
+                    {milestone.phase_name}
+                  </span>
+                )}
+                {milestone.target_date && (
+                  <span className={cn(
+                    "px-2 py-1 rounded-md text-[11px] font-medium",
+                    isPostcard ? "bg-amber-400/10 text-amber-400/70" : "bg-purple-400/10 text-purple-400/70"
+                  )}>
+                    Est. {format(new Date(milestone.target_date), "MMM d")}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-        </div>
+        </motion.div>
       </PopoverContent>
     </Popover>
   );
