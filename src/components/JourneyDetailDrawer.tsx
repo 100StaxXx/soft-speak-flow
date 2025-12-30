@@ -241,11 +241,20 @@ export const JourneyDetailDrawer = ({
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: phaseIndex * 0.1 + mIndex * 0.05 }}
+                            data-vaul-no-drag
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => handleMilestoneToggle(milestone)}
+                            style={{ 
+                              touchAction: 'manipulation',
+                              WebkitTapHighlightColor: 'transparent',
+                              userSelect: 'none'
+                            }}
                             className={cn(
-                              "relative flex items-start gap-3 p-3 rounded-lg transition-all",
+                              "relative flex items-start gap-3 p-3 rounded-lg transition-all cursor-pointer",
                               status === "completed" && "bg-green-500/5",
                               status === "overdue" && "bg-destructive/5",
-                              status === "pending" && "bg-background hover:bg-secondary/30"
+                              status === "pending" && "bg-background hover:bg-secondary/30",
+                              isCompleting && "opacity-50 pointer-events-none"
                             )}
                           >
                             {/* Timeline dot */}
@@ -264,6 +273,7 @@ export const JourneyDetailDrawer = ({
                               checked={!!milestone.completed_at}
                               onCheckedChange={() => handleMilestoneToggle(milestone)}
                               disabled={isCompleting}
+                              onClick={(e) => e.stopPropagation()}
                               className="mt-0.5"
                             />
 
