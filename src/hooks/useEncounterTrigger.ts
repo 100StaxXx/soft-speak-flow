@@ -15,9 +15,9 @@ interface TriggerResult {
   activityType?: ActivityType;
 }
 
-// Generate random interval between 2-5 activities
-const getRandomInterval = () => Math.floor(Math.random() * 4) + 2;
-const MIN_ACTIVITIES_BEFORE_ENCOUNTERS = 2;
+// Generate random interval between 4-6 activities
+const getRandomInterval = () => Math.floor(Math.random() * 3) + 4;
+const MIN_ACTIVITIES_BEFORE_ENCOUNTERS = 4;
 
 export const useEncounterTrigger = () => {
   const { user } = useAuth();
