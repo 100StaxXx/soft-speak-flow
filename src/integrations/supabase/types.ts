@@ -3631,6 +3631,7 @@ export type Database = {
           reminder_enabled: boolean | null
           reminder_minutes_before: number | null
           reminder_sent_today: boolean | null
+          sort_order: number | null
           title: string
           user_id: string
         }
@@ -3649,6 +3650,7 @@ export type Database = {
           reminder_enabled?: boolean | null
           reminder_minutes_before?: number | null
           reminder_sent_today?: boolean | null
+          sort_order?: number | null
           title: string
           user_id: string
         }
@@ -3667,6 +3669,7 @@ export type Database = {
           reminder_enabled?: boolean | null
           reminder_minutes_before?: number | null
           reminder_sent_today?: boolean | null
+          sort_order?: number | null
           title?: string
           user_id?: string
         }

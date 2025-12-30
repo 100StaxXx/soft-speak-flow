@@ -33,7 +33,8 @@ export function useHabits() {
         .from('habits')
         .select('*')
         .eq('user_id', user.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
       return (data || []) as Habit[];
     },
     enabled: !!user,
@@ -246,6 +247,52 @@ export function useHabits() {
     },
   });
 
+  // Delete habit permanently
+  const deleteHabitMutation = useMutation({
+    mutationFn: async (habitId: string) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { error } = await supabase
+        .from('habits')
+        .delete()
+        .eq('id', habitId)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      toast({ title: "Habit deleted permanently" });
+      haptics.success();
+    },
+    onError: (error) => {
+      toast({ 
+        title: error instanceof Error ? error.message : "Failed to delete habit", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Reorder habits
+  const reorderHabitsMutation = useMutation({
+    mutationFn: async (reorderedHabits: { id: string; sort_order: number }[]) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      for (const habit of reorderedHabits) {
+        const { error } = await supabase
+          .from('habits')
+          .update({ sort_order: habit.sort_order })
+          .eq('id', habit.id)
+          .eq('user_id', user.id);
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+    },
+  });
+
   const habitProgress = habits.length > 0 
     ? completions.length / habits.length 
     : 0;
@@ -261,5 +308,9 @@ export function useHabits() {
     isTogglingHabit: toggleHabitMutation.isPending,
     updateHabit: updateHabitMutation.mutateAsync,
     isUpdatingHabit: updateHabitMutation.isPending,
+    deleteHabit: deleteHabitMutation.mutate,
+    isDeletingHabit: deleteHabitMutation.isPending,
+    reorderHabits: reorderHabitsMutation.mutate,
+    isReorderingHabits: reorderHabitsMutation.isPending,
   };
 }
