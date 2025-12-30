@@ -67,6 +67,9 @@ interface Journey {
       id: string;
       title: string;
       difficulty: string;
+      description?: string;
+      frequency?: string;
+      estimated_minutes?: number;
     };
   }>;
 }
@@ -309,6 +312,9 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                   id: eh.habit_id,
                   title: eh.habits.title,
                   difficulty: eh.habits.difficulty || 'medium',
+                  description: eh.habits.description,
+                  frequency: eh.habits.frequency,
+                  estimated_minutes: eh.habits.estimated_minutes,
                 }))}
               isActive={isActive}
             />
