@@ -6,6 +6,18 @@ import { Badge } from "./ui/badge";
 import { useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { CalendarTask } from "@/types/quest";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 interface CalendarMonthViewProps {
   selectedDate: Date;
@@ -24,6 +36,25 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfMonth(monthEnd);
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  // Generate year range (current year -2 to +5)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 8 }, (_, i) => currentYear - 2 + i);
+  
+  const selectedMonth = selectedDate.getMonth();
+  const selectedYear = selectedDate.getFullYear();
+  
+  const handleMonthSelect = (monthIndex: string) => {
+    const newDate = new Date(selectedDate);
+    newDate.setMonth(parseInt(monthIndex));
+    (onMonthChange || onDateSelect)(newDate);
+  };
+
+  const handleYearSelect = (year: string) => {
+    const newDate = new Date(selectedDate);
+    newDate.setFullYear(parseInt(year));
+    (onMonthChange || onDateSelect)(newDate);
+  };
 
   const handleLongPressStart = (date: Date) => {
     const timer = setTimeout(() => {
@@ -70,10 +101,37 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-foreground">
-          {format(selectedDate, "MMMM yyyy")}
-        </h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1">
+          {/* Month Dropdown */}
+          <Select value={selectedMonth.toString()} onValueChange={handleMonthSelect}>
+            <SelectTrigger className="w-[120px] h-9 text-xl font-bold border-0 bg-transparent hover:bg-muted/50 focus:ring-0 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border border-border z-[110]">
+              {MONTHS.map((month, index) => (
+                <SelectItem key={month} value={index.toString()}>
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Year Dropdown */}
+          <Select value={selectedYear.toString()} onValueChange={handleYearSelect}>
+            <SelectTrigger className="w-[80px] h-9 text-xl font-bold border-0 bg-transparent hover:bg-muted/50 focus:ring-0 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border border-border z-[110]">
+              {years.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex gap-1">
           <Button
             variant="outline"
             size="icon"
