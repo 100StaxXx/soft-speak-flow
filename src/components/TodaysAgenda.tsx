@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { 
@@ -55,6 +56,38 @@ export function TodaysAgenda({
   currentStreak = 0,
   activeJourneys = [],
 }: TodaysAgendaProps) {
+  const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
+  const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
+
+  // Find tutorial quest
+  const tutorialQuest = tasks.find(t => t.task_text === 'Join Cosmiq' && !t.completed);
+
+  // Update indicator position when tutorial quest is visible
+  useEffect(() => {
+    if (!tutorialQuest || !tutorialCheckboxRef.current) {
+      setIndicatorPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      if (tutorialCheckboxRef.current) {
+        const rect = tutorialCheckboxRef.current.getBoundingClientRect();
+        setIndicatorPosition({
+          top: rect.top - 44,
+          left: rect.left + rect.width / 2,
+        });
+      }
+    };
+
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [tutorialQuest]);
   const { rituals, quests } = useMemo(() => {
     const ritualsList: Task[] = [];
     const questsList: Task[] = [];
@@ -101,28 +134,14 @@ export function TodaysAgenda({
         className={cn(
           "flex items-center gap-3 p-2 rounded-lg transition-all relative",
           "hover:bg-muted/30 cursor-pointer",
-          isComplete && "opacity-60",
-          isTutorialQuest && !isComplete && "overflow-visible z-[70]"
+          isComplete && "opacity-60"
         )}
         onClick={() => onToggle(task.id, !isComplete, task.xp_reward)}
       >
-        <div className="relative">
-          {/* Animated Arrow Indicator for Tutorial Quest */}
-          {isTutorialQuest && !isComplete && (
-            <div
-              className="absolute left-1/2 -top-12 -translate-x-1/2 pointer-events-none z-[100] flex flex-col items-center gap-0.5"
-              style={{ animation: 'bounceDown 1.2s ease-in-out infinite' }}
-            >
-              <div
-                className="text-[10px] font-bold text-yellow-400 bg-yellow-400/20 px-2 py-0.5 rounded-full border border-yellow-400 shadow-lg whitespace-nowrap"
-                style={{ animation: 'clickHerePulse 1.5s ease-in-out infinite' }}
-              >
-                Click here!
-              </div>
-              <ArrowDown className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_8px_#facc15]" strokeWidth={3} />
-            </div>
-          )}
-          
+        <div 
+          ref={isTutorialQuest && !isComplete ? tutorialCheckboxRef : undefined}
+          className="relative"
+        >
           <div className={cn(
             "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
             isComplete 
@@ -286,6 +305,28 @@ export function TodaysAgenda({
           </div>
         )}
       </div>
+
+      {/* Portal: Tutorial indicator floats above everything */}
+      {indicatorPosition && createPortal(
+        <div
+          className="fixed pointer-events-none z-[9999] flex flex-col items-center gap-0.5"
+          style={{ 
+            top: indicatorPosition.top,
+            left: indicatorPosition.left,
+            transform: 'translateX(-50%)',
+            animation: 'bounceDown 1.2s ease-in-out infinite'
+          }}
+        >
+          <div
+            className="text-[10px] font-bold text-yellow-400 bg-yellow-400/20 px-2 py-0.5 rounded-full border border-yellow-400 shadow-lg whitespace-nowrap"
+            style={{ animation: 'clickHerePulse 1.5s ease-in-out infinite' }}
+          >
+            Click here!
+          </div>
+          <ArrowDown className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_8px_#facc15]" strokeWidth={3} />
+        </div>,
+        document.body
+      )}
     </Card>
   );
 }
