@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Star, CheckCircle2, Loader2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sparkles, Star, CheckCircle2, Loader2, ChevronDown, Clock, Calendar, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,8 +15,21 @@ import { format } from "date-fns";
 interface Habit {
   id: string;
   title: string;
+  description?: string | null;
   difficulty: string;
+  frequency?: string;
+  estimated_minutes?: number | null;
 }
+
+const formatFrequency = (freq: string): string => {
+  switch (freq) {
+    case 'daily': return 'Daily';
+    case '5x_week': return '5x per week';
+    case '3x_week': return '3x per week';
+    case 'custom': return 'Custom';
+    default: return freq;
+  }
+};
 
 interface EpicCheckInDrawerProps {
   epicId: string;
@@ -32,6 +46,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const [showSuccess, setShowSuccess] = useState(false);
   const [loadingCompletions, setLoadingCompletions] = useState(false);
   const [processingHabits, setProcessingHabits] = useState<Set<string>>(new Set());
+  const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   
   // Ref-based guard for rapid click prevention
   const processingRef = useRef(false);
@@ -285,62 +300,128 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                 {habits.map((habit, index) => {
                   const isCompleted = completedToday.has(habit.id);
                   const isProcessing = processingHabits.has(habit.id);
+                  const isExpanded = expandedHabit === habit.id;
+                  const hasDetails = habit.description || habit.frequency || habit.estimated_minutes;
+                  
                   return (
-                    <motion.div
+                    <Collapsible
                       key={habit.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      data-vaul-no-drag
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        if (!submitting && !isProcessing) {
-                          handleToggleHabit(habit.id, !isCompleted);
-                        }
-                      }}
-                      style={{ 
-                        touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent',
-                        userSelect: 'none'
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 p-4 rounded-xl transition-all cursor-pointer min-h-[60px]",
-                        "bg-secondary/30 border border-border/50",
-                        "active:scale-[0.98] active:bg-primary/20",
-                        isCompleted && "bg-primary/10 border-primary/30",
-                        isProcessing && "opacity-50 pointer-events-none"
-                      )}
+                      open={isExpanded}
+                      onOpenChange={(open) => setExpandedHabit(open ? habit.id : null)}
                     >
-                      <Checkbox
-                        checked={isCompleted}
-                        disabled={submitting || isProcessing}
-                        onCheckedChange={(checked) => {
-                          handleToggleHabit(habit.id, Boolean(checked));
-                        }}
-                        onClick={(e) => e.stopPropagation()}
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        data-vaul-no-drag
                         className={cn(
-                          "h-6 w-6 rounded-full border-2",
-                          isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "flex-1 text-sm font-medium transition-all",
-                          isCompleted && "line-through text-muted-foreground"
+                          "rounded-xl transition-all overflow-hidden",
+                          "bg-secondary/30 border border-border/50",
+                          isCompleted && "bg-primary/10 border-primary/30",
+                          isProcessing && "opacity-50 pointer-events-none"
                         )}
                       >
-                        {habit.title}
-                      </span>
-                      {isCompleted && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="text-primary"
+                        {/* Main habit row */}
+                        <div
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (!submitting && !isProcessing) {
+                              handleToggleHabit(habit.id, !isCompleted);
+                            }
+                          }}
+                          style={{ 
+                            touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent',
+                            userSelect: 'none'
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 p-4 cursor-pointer min-h-[60px]",
+                            "active:scale-[0.98] active:bg-primary/20"
+                          )}
                         >
-                          <Sparkles className="w-4 h-4" />
-                        </motion.div>
-                      )}
-                    </motion.div>
+                          <Checkbox
+                            checked={isCompleted}
+                            disabled={submitting || isProcessing}
+                            onCheckedChange={(checked) => {
+                              handleToggleHabit(habit.id, Boolean(checked));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              "h-6 w-6 rounded-full border-2",
+                              isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              "flex-1 text-sm font-medium transition-all",
+                              isCompleted && "line-through text-muted-foreground"
+                            )}
+                          >
+                            {habit.title}
+                          </span>
+                          {isCompleted && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="text-primary"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                            </motion.div>
+                          )}
+                          {hasDetails && (
+                            <CollapsibleTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ChevronDown 
+                                  className={cn(
+                                    "h-4 w-4 text-muted-foreground transition-transform",
+                                    isExpanded && "rotate-180"
+                                  )} 
+                                />
+                              </Button>
+                            </CollapsibleTrigger>
+                          )}
+                        </div>
+                        
+                        {/* Expandable details section */}
+                        <CollapsibleContent>
+                          <div 
+                            className="px-4 pb-4 pt-0 space-y-2 border-t border-border/30"
+                            data-vaul-no-drag
+                          >
+                            {habit.description && (
+                              <p className="text-sm text-muted-foreground pt-3">
+                                {habit.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-3 pt-2">
+                              {habit.frequency && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  <span>{formatFrequency(habit.frequency)}</span>
+                                </div>
+                              )}
+                              {habit.estimated_minutes && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>~{habit.estimated_minutes} min</span>
+                                </div>
+                              )}
+                              {habit.difficulty && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Target className="w-3.5 h-3.5" />
+                                  <span className="capitalize">{habit.difficulty}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </motion.div>
+                    </Collapsible>
                   );
                 })}
                 

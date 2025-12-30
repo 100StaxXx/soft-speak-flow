@@ -3620,7 +3620,9 @@ export type Database = {
           created_at: string | null
           current_streak: number | null
           custom_days: number[] | null
+          description: string | null
           difficulty: string | null
+          estimated_minutes: number | null
           frequency: string
           id: string
           is_active: boolean | null
@@ -3636,7 +3638,9 @@ export type Database = {
           created_at?: string | null
           current_streak?: number | null
           custom_days?: number[] | null
+          description?: string | null
           difficulty?: string | null
+          estimated_minutes?: number | null
           frequency: string
           id?: string
           is_active?: boolean | null
@@ -3652,7 +3656,9 @@ export type Database = {
           created_at?: string | null
           current_streak?: number | null
           custom_days?: number[] | null
+          description?: string | null
           difficulty?: string | null
+          estimated_minutes?: number | null
           frequency?: string
           id?: string
           is_active?: boolean | null
