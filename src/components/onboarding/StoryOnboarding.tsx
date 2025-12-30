@@ -208,16 +208,19 @@ export const StoryOnboarding = () => {
     setStage("faction");
   };
 
-  const handleFactionComplete = async (selectedFaction: FactionType) => {
-    // Save faction to profile
-    if (user) {
-      await supabase.from("profiles").update({
-        faction: selectedFaction,
-      }).eq("id", user.id);
-    }
-    
-    setStage("questionnaire");
-  };
+const handleFactionComplete = async (selectedFaction: FactionType) => {
+  // Set faction in local state FIRST
+  setFaction(selectedFaction);
+  
+  // Save faction to profile
+  if (user) {
+    await supabase.from("profiles").update({
+      faction: selectedFaction,
+    }).eq("id", user.id);
+  }
+  
+  setStage("questionnaire");
+};
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
