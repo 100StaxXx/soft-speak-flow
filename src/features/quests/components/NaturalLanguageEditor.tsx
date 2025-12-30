@@ -25,11 +25,15 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
     autoStopOnSilence: true,
   });
 
-  const hasParsedValues = parsed.scheduledTime || parsed.scheduledDate || parsed.estimatedDuration || 
-    parsed.difficulty !== "medium" || parsed.recurrencePattern;
+  const hasParsedValues = parsed && (
+    parsed.scheduledTime || parsed.scheduledDate || parsed.estimatedDuration || 
+    parsed.difficulty !== "medium" || parsed.recurrencePattern
+  );
 
   const handleApply = () => {
-    onApply(parsed);
+    if (parsed) {
+      onApply(parsed);
+    }
     reset();
     setIsExpanded(false);
   };
