@@ -19,6 +19,7 @@ import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { MilestoneProgress } from "./MilestoneProgress";
 import { PhaseProgressCard } from "./journey/PhaseProgressCard";
+import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -276,23 +277,16 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           </div>
         </div>
 
-        {/* Next Postcard Preview */}
-        {postcardProgress && postcardProgress.remaining <= 15 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mb-3 p-2.5 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20"
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <div className="flex-1">
-                <div className="text-xs font-medium">Next Chapter Unlocks Soon!</div>
-                <div className="text-[10px] text-muted-foreground">
-                  {Math.round(postcardProgress.remaining)}% until "{postcardProgress.milestone.title}"
-                </div>
-              </div>
-            </div>
-          </motion.div>
+        {/* Next Postcard Preview - Always visible for active campaigns */}
+        {postcardProgress && isActive && (
+          <MilestonePostcardPreview
+            currentProgress={postcardProgress.current}
+            targetPercent={postcardProgress.target}
+            milestoneTitle={postcardProgress.milestone.title}
+            chapterNumber={postcardProgress.milestone.chapter_number || 1}
+            compact
+            className="mb-3"
+          />
         )}
 
         {/* Milestone Progress Section */}
