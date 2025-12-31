@@ -385,8 +385,22 @@ class AmbientMusicManager {
     }
   }
 
+  // Check if we're on a route where audio should be disabled
+  private isOnDisabledRoute(): boolean {
+    const disabledRoutes = ['/journeys'];
+    if (typeof window !== 'undefined') {
+      return disabledRoutes.includes(window.location.pathname);
+    }
+    return false;
+  }
+
   play() {
     if (!this.audio) return;
+    
+    // Don't play on disabled routes (like /journeys where music should be off)
+    if (this.isOnDisabledRoute()) {
+      return;
+    }
     
     // Don't play if already playing
     if (this.isPlaying && !this.audio.paused) return;
