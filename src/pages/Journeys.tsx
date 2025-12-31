@@ -30,6 +30,7 @@ import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
+import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
@@ -60,6 +61,13 @@ const Journeys = () => {
   const [showHourlyModal, setShowHourlyModal] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
   
+  // Campaign creation animation state
+  const [showCampaignAnimation, setShowCampaignAnimation] = useState(false);
+  const [newCampaignData, setNewCampaignData] = useState<{
+    title: string;
+    habits: Array<{ title: string }>;
+  } | null>(null);
+  
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for tutorial quest
@@ -89,8 +97,16 @@ const Journeys = () => {
     isLoading: journeysLoading,
     createEpic: createJourney,
     isCreating,
+    isCreateSuccess,
     updateEpicStatus: updateJourneyStatus,
   } = useEpics();
+  
+  // Trigger animation when campaign is created successfully
+  useEffect(() => {
+    if (isCreateSuccess && newCampaignData) {
+      setShowCampaignAnimation(true);
+    }
+  }, [isCreateSuccess, newCampaignData]);
 
   const { 
     tasks: dailyTasks,
@@ -247,6 +263,11 @@ const Journeys = () => {
     }>;
   }) => {
     console.log('[Journeys] Creating journey with milestones:', data.milestones?.length || 0);
+    // Store campaign data for animation
+    setNewCampaignData({
+      title: data.title,
+      habits: data.habits.map(h => ({ title: h.title })),
+    });
     createJourney(data);
     setSmartWizardOpen(false);
   };
@@ -685,6 +706,17 @@ const Journeys = () => {
           tasksCompleted={perfectDayTasksCompleted}
           currentStreak={currentStreak}
           onDismiss={dismissPerfectDay}
+        />
+        
+        {/* Campaign Created Animation */}
+        <CampaignCreatedAnimation
+          isVisible={showCampaignAnimation}
+          campaignTitle={newCampaignData?.title || ''}
+          habits={newCampaignData?.habits || []}
+          onComplete={() => {
+            setShowCampaignAnimation(false);
+            setNewCampaignData(null);
+          }}
         />
       </div>
 
