@@ -10,6 +10,7 @@ export interface EpicTemplate {
   difficulty_tier: 'beginner' | 'intermediate' | 'advanced';
   habits: {
     title: string;
+    description?: string;
     frequency: string;
     difficulty: 'easy' | 'medium' | 'hard';
   }[];
