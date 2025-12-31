@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { PageTransition } from "@/components/PageTransition";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { JourneyCard } from "@/components/JourneyCard";
@@ -280,7 +281,8 @@ const Journeys = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen pb-nav-safe pt-safe px-4">
+      <StarfieldBackground />
+      <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         {/* Hero Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
