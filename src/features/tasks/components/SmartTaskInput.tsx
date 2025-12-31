@@ -599,13 +599,17 @@ export function SmartTaskInput({
   }
 
   if (parsed?.priority) {
+    const priorityConfig: Record<'low' | 'medium' | 'high' | 'urgent', { label: string; color: string }> = {
+      urgent: { label: 'Urgent', color: 'text-red-500 bg-red-500/10 border-red-500/30' },
+      high: { label: 'High Priority', color: 'text-orange-500 bg-orange-500/10 border-orange-500/30' },
+      medium: { label: 'Medium', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/30' },
+      low: { label: 'Low Priority', color: 'text-muted-foreground bg-muted/10 border-muted/30' },
+    };
     badges.push({
       key: 'priority',
       icon: AlertTriangle,
-      label: parsed.priority === 'urgent-important' ? 'Urgent & Important' :
-             parsed.priority === 'urgent-not-important' ? 'Urgent' :
-             parsed.priority === 'not-urgent-important' ? 'Important' : '',
-      color: 'text-orange-500 bg-orange-500/10 border-orange-500/30',
+      label: priorityConfig[parsed.priority].label,
+      color: priorityConfig[parsed.priority].color,
       onRemove: clearPriority,
     });
   }
