@@ -142,14 +142,23 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
                 className="text-primary underline hover:text-primary/80"
               >
                 Terms of Service
-              </button>{" "}
-              and{" "}
+              </button>
+              ,{" "}
               <button
                 onClick={() => setShowPrivacy(true)}
                 className="text-primary underline hover:text-primary/80"
               >
                 Privacy Policy
               </button>
+              , and{" "}
+              <a
+                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:text-primary/80"
+              >
+                Apple's EULA
+              </a>
             </label>
           </div>
         </motion.div>
