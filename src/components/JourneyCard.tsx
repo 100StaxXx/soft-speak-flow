@@ -17,6 +17,9 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
+import { PhaseProgressCard } from "./journey/PhaseProgressCard";
+import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
+import { MilestoneProgress } from "./MilestoneProgress";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -95,7 +98,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const themeBorder = themeBorders[theme];
 
   // Get milestones for the trail
-  const { milestones } = useMilestones(journey.id);
+  const { milestones, milestonesByPhase, getCurrentPhase, nextMilestone } = useMilestones(journey.id);
   
   const trailMilestones = useMemo(() => {
     if (!milestones || milestones.length === 0) return undefined;
@@ -198,6 +201,16 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           milestones={trailMilestones}
         />
 
+        {/* Phase Progress */}
+        {milestonesByPhase && milestonesByPhase.length > 0 && (
+          <PhaseProgressCard
+            milestonesByPhase={milestonesByPhase}
+            currentPhaseName={getCurrentPhase()}
+            className="mb-3"
+            compact
+          />
+        )}
+
         {/* Compact Stats Bar */}
         <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
           <span className="flex items-center gap-1">
@@ -215,6 +228,28 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             {journey.xp_reward} XP
           </span>
         </div>
+
+        {/* Milestone Postcard Preview */}
+        {nextMilestone && (
+          <MilestonePostcardPreview
+            currentProgress={journey.progress_percentage}
+            targetPercent={nextMilestone.milestone_percent}
+            milestoneTitle={nextMilestone.title}
+            chapterNumber={nextMilestone.chapter_number || 1}
+            storySeed={journey.story_seed as any}
+            companionSpecies={companion?.spirit_animal}
+            compact
+          />
+        )}
+
+        {/* Milestone Progress */}
+        <MilestoneProgress
+          epicId={journey.id}
+          epicTitle={journey.title}
+          epicGoal={journey.description}
+          currentDeadline={journey.end_date}
+          compact
+        />
 
         {/* View Rituals Button */}
         {journey.epic_habits && ritualCount > 0 && (
