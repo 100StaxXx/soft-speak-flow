@@ -14,6 +14,7 @@ export interface ParsedTask {
   isTopThree: boolean;
   reminderEnabled: boolean;
   reminderMinutesBefore: number | null;
+  notes: string | null;
 }
 
 // Month name to number mapping
@@ -296,6 +297,18 @@ const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) =
   { regex: /(?:set|with)\s*(?:a\s+)?reminder/i, handler: () => 15 },
 ];
 
+// Notes patterns - detect phrases like "note: something" or "(parenthetical notes)"
+const NOTE_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => string }> = [
+  // "note: something" or "notes: something"
+  { regex: /\bnotes?:\s*(.+?)(?=\s*(?:!{1,4}|p[1-4]|\bat\s+\d|@|\bremind|\btomorrow|\btoday|$))/i, handler: (m) => m[1].trim() },
+  // "// comment style" at end
+  { regex: /\/\/\s*(.+?)$/i, handler: (m) => m[1].trim() },
+  // "(parenthetical notes)" at end
+  { regex: /\(([^)]+)\)\s*$/i, handler: (m) => m[1].trim() },
+  // "- additional info" at end
+  { regex: /\s+-\s+(.+?)$/i, handler: (m) => m[1].trim() },
+];
+
 function cleanTaskText(text: string): string {
   let cleaned = text;
 
@@ -310,6 +323,7 @@ function cleanTaskText(text: string): string {
     ...CONTEXT_PATTERNS.map(p => p.regex),
     ...ENERGY_PATTERNS.map(p => p.regex),
     ...REMINDER_PATTERNS.map(p => p.regex),
+    ...NOTE_PATTERNS.map(p => p.regex),
   ];
 
   patternsToRemove.forEach(pattern => {
@@ -338,6 +352,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   let isTopThree = false;
   let reminderEnabled = false;
   let reminderMinutesBefore: number | null = null;
+  let notes: string | null = null;
 
   // Parse time
   for (const pattern of TIME_PATTERNS) {
@@ -419,6 +434,15 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     }
   }
 
+  // Parse notes
+  for (const pattern of NOTE_PATTERNS) {
+    const match = input.match(pattern.regex);
+    if (match) {
+      notes = pattern.handler(match);
+      break;
+    }
+  }
+
   // Infer energy from duration if not explicitly set
   if (estimatedDuration && estimatedDuration >= 60) {
     energyLevel = 'high';
@@ -442,6 +466,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     isTopThree,
     reminderEnabled,
     reminderMinutesBefore,
+    notes,
   };
 }
 

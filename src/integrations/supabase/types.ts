@@ -1754,6 +1754,7 @@ export type Database = {
           is_milestone: boolean | null
           is_recurring: boolean | null
           is_top_three: boolean | null
+          notes: string | null
           parent_template_id: string | null
           priority: string | null
           recurrence_days: number[] | null
@@ -1787,6 +1788,7 @@ export type Database = {
           is_milestone?: boolean | null
           is_recurring?: boolean | null
           is_top_three?: boolean | null
+          notes?: string | null
           parent_template_id?: string | null
           priority?: string | null
           recurrence_days?: number[] | null
@@ -1820,6 +1822,7 @@ export type Database = {
           is_milestone?: boolean | null
           is_recurring?: boolean | null
           is_top_three?: boolean | null
+          notes?: string | null
           parent_template_id?: string | null
           priority?: string | null
           recurrence_days?: number[] | null

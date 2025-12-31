@@ -347,6 +347,7 @@ const Journeys = () => {
                 recurrencePattern: parsed.recurrencePattern,
                 reminderEnabled: parsed.reminderEnabled,
                 reminderMinutesBefore: parsed.reminderMinutesBefore,
+                notes: parsed.notes,
               });
               
               // If subtasks were generated, create those too
