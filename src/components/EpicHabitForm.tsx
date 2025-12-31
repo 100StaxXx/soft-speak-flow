@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -16,6 +17,7 @@ import {
 
 interface EpicHabitFormProps {
   habitTitle: string;
+  habitDescription?: string;
   difficulty: "easy" | "medium" | "hard";
   selectedDays: number[];
   habitCount: number;
@@ -24,6 +26,7 @@ interface EpicHabitFormProps {
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
   onTitleChange: (value: string) => void;
+  onDescriptionChange?: (value: string) => void;
   onDifficultyChange: (value: "easy" | "medium" | "hard") => void;
   onDaysChange: (days: number[]) => void;
   onPreferredTimeChange: (value: string) => void;
@@ -36,6 +39,7 @@ interface EpicHabitFormProps {
 
 export const EpicHabitForm = memo(({
   habitTitle,
+  habitDescription = "",
   difficulty,
   selectedDays,
   habitCount,
@@ -44,6 +48,7 @@ export const EpicHabitForm = memo(({
   reminderEnabled,
   reminderMinutesBefore,
   onTitleChange,
+  onDescriptionChange,
   onDifficultyChange,
   onDaysChange,
   onPreferredTimeChange,
@@ -62,6 +67,17 @@ export const EpicHabitForm = memo(({
         onChange={(e) => onTitleChange(e.target.value)}
         maxLength={60}
       />
+
+      {onDescriptionChange && (
+        <Textarea
+          placeholder="Brief description or ritual details (optional)"
+          value={habitDescription}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          maxLength={200}
+          rows={2}
+          className="text-sm resize-none"
+        />
+      )}
       
       <HabitDifficultySelector
         value={difficulty}

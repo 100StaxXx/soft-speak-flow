@@ -58,6 +58,7 @@ const themeConfig: Record<EpicTheme, { icon: typeof Target; label: string; color
 
 interface NewHabit {
   title: string;
+  description?: string;
   difficulty: "easy" | "medium" | "hard";
   frequency: string;
   custom_days: number[];
@@ -98,6 +99,7 @@ export const CreateEpicDialog = ({
   const [difficultyTier, setDifficultyTier] = useState<DifficultyTier>("beginner");
   const [newHabits, setNewHabits] = useState<NewHabit[]>([]);
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
+  const [currentHabitDescription, setCurrentHabitDescription] = useState("");
   const [currentHabitDifficulty, setCurrentHabitDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [currentHabitDays, setCurrentHabitDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [currentPreferredTime, setCurrentPreferredTime] = useState("");
@@ -123,6 +125,7 @@ export const CreateEpicDialog = ({
       // Convert template habits to NewHabit format (respect tier limit)
       const templateHabits: NewHabit[] = template.habits.slice(0, limit).map(h => ({
         title: h.title,
+        description: h.description || undefined,
         difficulty: h.difficulty as "easy" | "medium" | "hard",
         frequency: h.frequency || 'daily',
         custom_days: h.frequency === 'daily' ? [] : [0, 1, 2, 3, 4, 5, 6],
@@ -141,6 +144,7 @@ export const CreateEpicDialog = ({
     
     const newHabit: NewHabit = {
       title: currentHabitTitle.trim(),
+      description: currentHabitDescription.trim() || undefined,
       difficulty: currentHabitDifficulty,
       frequency: currentHabitDays.length === 7 ? 'daily' : 'custom',
       custom_days: currentHabitDays.length === 7 ? [] : currentHabitDays,
@@ -160,16 +164,18 @@ export const CreateEpicDialog = ({
     
     // Reset form fields
     setCurrentHabitTitle("");
+    setCurrentHabitDescription("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
     setCurrentPreferredTime("");
     setCurrentReminderEnabled(false);
     setCurrentReminderMinutes(15);
-  }, [currentHabitTitle, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, newHabits.length, editingHabitIndex, maxHabits]);
+  }, [currentHabitTitle, currentHabitDescription, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, newHabits.length, editingHabitIndex, maxHabits]);
 
   const editHabit = useCallback((index: number) => {
     const habit = newHabits[index];
     setCurrentHabitTitle(habit.title);
+    setCurrentHabitDescription(habit.description || "");
     setCurrentHabitDifficulty(habit.difficulty);
     setCurrentHabitDays(habit.frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : habit.custom_days);
     setCurrentPreferredTime(habit.preferred_time || "");
@@ -181,6 +187,7 @@ export const CreateEpicDialog = ({
   const cancelEdit = useCallback(() => {
     setEditingHabitIndex(null);
     setCurrentHabitTitle("");
+    setCurrentHabitDescription("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
     setCurrentPreferredTime("");
@@ -219,6 +226,7 @@ export const CreateEpicDialog = ({
     setDifficultyTier("beginner");
     setNewHabits([]);
     setCurrentHabitTitle("");
+    setCurrentHabitDescription("");
     setCurrentHabitDifficulty("medium");
     setCurrentHabitDays([0, 1, 2, 3, 4, 5, 6]);
     setCurrentPreferredTime("");
@@ -442,6 +450,7 @@ export const CreateEpicDialog = ({
               {(newHabits.length < maxHabits || editingHabitIndex !== null) && (
                 <EpicHabitForm
                   habitTitle={currentHabitTitle}
+                  habitDescription={currentHabitDescription}
                   difficulty={currentHabitDifficulty}
                   selectedDays={currentHabitDays}
                   habitCount={newHabits.length}
@@ -450,6 +459,7 @@ export const CreateEpicDialog = ({
                   reminderEnabled={currentReminderEnabled}
                   reminderMinutesBefore={currentReminderMinutes}
                   onTitleChange={setCurrentHabitTitle}
+                  onDescriptionChange={setCurrentHabitDescription}
                   onDifficultyChange={setCurrentHabitDifficulty}
                   onDaysChange={setCurrentHabitDays}
                   onPreferredTimeChange={setCurrentPreferredTime}
