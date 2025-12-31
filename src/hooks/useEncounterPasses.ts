@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { safeLocalStorage } from '@/utils/storage';
 
 const STORAGE_KEY = 'encounter_passes';
 const PROMPT_THRESHOLD = 3;
@@ -13,9 +14,9 @@ const getTodayKey = (): string => {
 };
 
 const getStoredData = (): PassData | null => {
+  const stored = safeLocalStorage.getItem(STORAGE_KEY);
+  if (!stored) return null;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
     return JSON.parse(stored) as PassData;
   } catch {
     return null;
@@ -23,7 +24,7 @@ const getStoredData = (): PassData | null => {
 };
 
 const setStoredData = (data: PassData): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  safeLocalStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 };
 
 export const useEncounterPasses = () => {

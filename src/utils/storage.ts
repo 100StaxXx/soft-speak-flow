@@ -1,9 +1,9 @@
 /**
- * Safe localStorage wrapper with availability checks
+ * Safe localStorage and sessionStorage wrappers with availability checks
  * Handles private browsing mode and storage disabled scenarios
  */
 
-const isStorageAvailable = (): boolean => {
+const isLocalStorageAvailable = (): boolean => {
   try {
     const test = '__storage_test__';
     localStorage.setItem(test, test);
@@ -14,46 +14,94 @@ const isStorageAvailable = (): boolean => {
   }
 };
 
+const isSessionStorageAvailable = (): boolean => {
+  try {
+    const test = '__storage_test__';
+    sessionStorage.setItem(test, test);
+    sessionStorage.removeItem(test);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const safeLocalStorage = {
   getItem: (key: string): string | null => {
     try {
-      if (!isStorageAvailable()) return null;
+      if (!isLocalStorageAvailable()) return null;
       return localStorage.getItem(key);
-    } catch (error) {
-      console.error('localStorage.getItem error:', error);
+    } catch {
       return null;
     }
   },
 
   setItem: (key: string, value: string): boolean => {
     try {
-      if (!isStorageAvailable()) return false;
+      if (!isLocalStorageAvailable()) return false;
       localStorage.setItem(key, value);
       return true;
-    } catch (error) {
-      console.error('localStorage.setItem error:', error);
+    } catch {
       return false;
     }
   },
 
   removeItem: (key: string): boolean => {
     try {
-      if (!isStorageAvailable()) return false;
+      if (!isLocalStorageAvailable()) return false;
       localStorage.removeItem(key);
       return true;
-    } catch (error) {
-      console.error('localStorage.removeItem error:', error);
+    } catch {
       return false;
     }
   },
 
   clear: (): boolean => {
     try {
-      if (!isStorageAvailable()) return false;
+      if (!isLocalStorageAvailable()) return false;
       localStorage.clear();
       return true;
-    } catch (error) {
-      console.error('localStorage.clear error:', error);
+    } catch {
+      return false;
+    }
+  },
+};
+
+export const safeSessionStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (!isSessionStorageAvailable()) return null;
+      return sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+
+  setItem: (key: string, value: string): boolean => {
+    try {
+      if (!isSessionStorageAvailable()) return false;
+      sessionStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  removeItem: (key: string): boolean => {
+    try {
+      if (!isSessionStorageAvailable()) return false;
+      sessionStorage.removeItem(key);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  clear: (): boolean => {
+    try {
+      if (!isSessionStorageAvailable()) return false;
+      sessionStorage.clear();
+      return true;
+    } catch {
       return false;
     }
   },

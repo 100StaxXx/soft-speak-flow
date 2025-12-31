@@ -28,6 +28,7 @@ import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
+import { safeSessionStorage } from "@/utils/storage";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -144,14 +145,10 @@ const AppContent = memo(() => {
     if (location.pathname !== "/") return;
     if (typeof window === "undefined") return;
     
-    try {
-      const hasRedirected = window.sessionStorage.getItem("initialRouteRedirected");
-      if (!hasRedirected) {
-        window.sessionStorage.setItem("initialRouteRedirected", "true");
-        navigate("/journeys", { replace: true });
-      }
-    } catch (error) {
-      logger.error("Failed to persist initial route redirect flag:", error);
+    const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
+    if (!hasRedirected) {
+      safeSessionStorage.setItem("initialRouteRedirected", "true");
+      navigate("/journeys", { replace: true });
     }
   }, [location.pathname, navigate]);
   

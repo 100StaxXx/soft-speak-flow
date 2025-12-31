@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useWeeklyRecapContext } from "@/contexts/WeeklyRecapContext";
 import { format } from "date-fns";
+import { safeLocalStorage } from "@/utils/storage";
 
 export interface WeeklyRecap {
   id: string;
@@ -141,7 +142,7 @@ export const useWeeklyRecap = () => {
     if (isSunday && currentRecap && !currentRecap.viewed_at && !isLoading) {
       // Check localStorage to prevent showing multiple times per session
       const dismissedKey = `recap-dismissed-${currentRecap.week_start_date}`;
-      const dismissed = localStorage.getItem(dismissedKey);
+      const dismissed = safeLocalStorage.getItem(dismissedKey);
       
       if (!dismissed) {
         contextOpenRecap(currentRecap);
@@ -185,7 +186,7 @@ export const useWeeklyRecap = () => {
     if (selectedRecap) {
       // Mark dismissed in localStorage
       const dismissedKey = `recap-dismissed-${selectedRecap.week_start_date}`;
-      localStorage.setItem(dismissedKey, "true");
+      safeLocalStorage.setItem(dismissedKey, "true");
       
       // Mark as viewed if not already
       if (!selectedRecap.viewed_at) {

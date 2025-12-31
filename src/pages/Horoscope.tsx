@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { HoroscopePageSkeleton } from "@/components/skeletons";
+import { safeLocalStorage } from "@/utils/storage";
 
 // Type definitions for horoscope data
 interface EnergyForecast {
@@ -70,10 +71,10 @@ const Horoscope = () => {
 
   // Check if user has visited Cosmiq Insight before
   useEffect(() => {
-    const hasVisited = localStorage.getItem('cosmiq_insight_visited');
+    const hasVisited = safeLocalStorage.getItem('cosmiq_insight_visited');
     if (!hasVisited) {
       setShowWelcomeTooltip(true);
-      localStorage.setItem('cosmiq_insight_visited', 'true');
+      safeLocalStorage.setItem('cosmiq_insight_visited', 'true');
     }
   }, []);
 
