@@ -219,7 +219,9 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           value={props.moreInformation || ''}
           onChange={(e) => props.onMoreInformationChange(e.target.value || null)}
           placeholder="Add extra context, notes, or details (optional)"
-          className="min-h-[100px] resize-none"
+          className="min-h-[100px] resize-none bg-muted/30 border-border/50"
+          style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
+          data-vaul-no-drag
         />
       </div>
     </div>
