@@ -24,6 +24,7 @@ interface ClarifyingQuestion {
   options?: string[];
   placeholder?: string;
   required: boolean;
+  multiSelect?: boolean;
 }
 
 interface TimelineAnalysis {
@@ -168,6 +169,18 @@ When asking epic clarification, generate 2-5 questions appropriate to the goal t
 - Use "text" type for open-ended answers
 - NEVER use "date" type - the deadline is already collected in the goal step
 
+**MULTI-SELECT QUESTIONS:**
+Use "multiSelect": true when the user can logically choose multiple options:
+- Subjects/topics to focus on (e.g., "Which subjects need focus?" - user may need help with multiple)
+- Skills to develop (e.g., "What areas do you want to improve?")
+- Days of the week available
+- Focus areas or modules
+- Any question where selecting multiple answers makes sense
+
+Examples with multiSelect:
+{ "id": "subjects", "question": "Which subjects need focus?", "type": "select", "options": ["Contracts", "Torts", "Constitutional Law", "Criminal Law"], "multiSelect": true, "required": true }
+{ "id": "focus_areas", "question": "What areas do you want to improve?", "type": "select", "options": ["Endurance", "Speed", "Strength", "Flexibility"], "multiSelect": true, "required": false }
+
 **EPIC CLARIFICATION EXAMPLES:**
 
 For "pass bar exam in 2 weeks" (very aggressive timeline):
@@ -256,6 +269,7 @@ Respond ONLY with valid JSON matching this schema:
   "extractedTasks": [{ "title": string, "estimatedDuration": number, "energyLevel": string, "suggestedTimeOfDay": string, "category": string }],
   "suggestedTasks": [{ "title": string, "reason": string, "estimatedDuration": number, "energyLevel": string }],
   "detectedContext": { "dayOfWeek": string, "userSituation": string, "targetDate": string },
+  "epicClarifyingQuestions": [{ "id": string, "question": string, "type": string, "options": array, "placeholder": string, "required": boolean, "multiSelect": boolean }],
   "epicClarifyingQuestions": [{ "id": string, "question": string, "type": string, "options": array, "placeholder": string, "required": boolean }],
   "epicContext": "exam_preparation|fitness_goal|learning|project|other",
   "epicDetails": { "subjects": array, "targetDate": string, "hoursPerDay": number, "currentStatus": string, "suggestedTargetDays": number },
