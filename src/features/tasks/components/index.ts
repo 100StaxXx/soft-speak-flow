@@ -1,4 +1,5 @@
 export { SmartTaskInput } from './SmartTaskInput';
+export { TaskAdvancedEditSheet } from './TaskAdvancedEditSheet';
 export { SubtaskList } from './SubtaskList';
 export { ProgressRing } from './ProgressRing';
 export { DependencyPicker } from './DependencyPicker';

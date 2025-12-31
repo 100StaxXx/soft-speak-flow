@@ -40,6 +40,7 @@ import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
+import { TaskAdvancedEditSheet } from './TaskAdvancedEditSheet';
 import { ClarificationBubble } from './ClarificationBubble';
 import { TaskBatchPreview } from './TaskBatchPreview';
 import { EpicClarificationFlow } from './EpicClarificationFlow';
@@ -77,6 +78,8 @@ export function SmartTaskInput({
   const [showPreviewCard, setShowPreviewCard] = useState(false);
   const [previewSource, setPreviewSource] = useState<'voice' | 'typed'>('typed');
   const [showEpicWizard, setShowEpicWizard] = useState(false);
+  const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
+  const [editingParsed, setEditingParsed] = useState<ParsedTask | null>(null);
   const prevParsedRef = useRef<ParsedTask | null>(null);
   
   // Brain dump state
@@ -405,14 +408,37 @@ export function SmartTaskInput({
     handlePreviewConfirm(subtasks);
   };
 
-  // Handle editing from preview card
+  // Handle editing from preview card - open advanced edit sheet
   const handlePreviewEdit = () => {
-    if (voicePreview) {
-      setInput(voicePreview);
-      setVoicePreview(null);
+    const taskToEdit = voicePreview ? parseNaturalLanguage(voicePreview) : parsed;
+    if (taskToEdit) {
+      setEditingParsed(taskToEdit);
+      setShowAdvancedEdit(true);
     }
+  };
+
+  // Handle saving from advanced edit sheet
+  const handleAdvancedEditSave = (updated: ParsedTask) => {
+    // Submit the updated task directly
+    success();
+    setJustSubmitted(true);
+    setTimeout(() => setJustSubmitted(false), 300);
+    onSubmit(updated);
+    
+    // Clean up state
+    setShowAdvancedEdit(false);
+    setEditingParsed(null);
     setShowPreviewCard(false);
-    inputRef.current?.focus();
+    setVoicePreview(null);
+    reset();
+    resetClassification();
+    setSuggestedSubtasks([]);
+  };
+
+  // Handle canceling advanced edit
+  const handleAdvancedEditCancel = () => {
+    setShowAdvancedEdit(false);
+    setEditingParsed(null);
   };
 
   // Handle discarding preview
@@ -1073,6 +1099,17 @@ export function SmartTaskInput({
         onConfirm={handleBatchConfirm}
         isCreating={isCreatingBatch}
       />
+
+      {/* Advanced Edit Sheet */}
+      {editingParsed && (
+        <TaskAdvancedEditSheet
+          open={showAdvancedEdit}
+          onOpenChange={setShowAdvancedEdit}
+          parsed={editingParsed}
+          onSave={handleAdvancedEditSave}
+          onCancel={handleAdvancedEditCancel}
+        />
+      )}
     </div>
   );
 }
