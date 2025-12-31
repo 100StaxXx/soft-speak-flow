@@ -28,6 +28,7 @@ import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
+import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
@@ -39,6 +40,7 @@ import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
+import { usePerfectDayTracker } from "@/hooks/usePerfectDayTracker";
 import { useComboTracker } from "@/hooks/useComboTracker";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,6 +102,14 @@ const Journeys = () => {
     isAdding,
     isUpdating
   } = useDailyTasks(selectedDate);
+  
+  // Perfect Day celebration tracking
+  const { 
+    showPerfectDay, 
+    totalXP: perfectDayXP, 
+    tasksCompleted: perfectDayTasksCompleted,
+    dismissPerfectDay 
+  } = usePerfectDayTracker(dailyTasks, selectedDate);
   
   // Edit quest state
   const [editingTask, setEditingTask] = useState<{
@@ -647,6 +657,15 @@ const Journeys = () => {
           totalXP={dailyTasks.reduce((sum, t) => sum + (t.xp_reward || 0), 0)}
           currentStreak={currentStreak}
           onDismiss={() => setShowQuestClear(false)}
+        />
+        
+        {/* Perfect Day Celebration */}
+        <PerfectDayCelebration
+          show={showPerfectDay}
+          totalXP={perfectDayXP}
+          tasksCompleted={perfectDayTasksCompleted}
+          currentStreak={currentStreak}
+          onDismiss={dismissPerfectDay}
         />
       </div>
 
