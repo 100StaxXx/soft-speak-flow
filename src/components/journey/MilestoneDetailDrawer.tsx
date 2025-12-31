@@ -295,14 +295,18 @@ export const MilestoneDetailDrawer = ({
                   </div>
                 ) : !isCompleted ? (
                   // Teaser for uncompleted postcard milestone
-                  <div className="rounded-xl border border-dashed border-amber-300/50 bg-amber-50/30 p-4 text-center">
-                    <Sparkles className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-                    <p className="text-sm text-amber-700">
+                  <div className="rounded-xl border border-dashed border-stardust-gold/40 bg-gradient-to-br from-stardust-gold/10 via-amber-500/5 to-royal-purple/10 p-5 text-center">
+                    <div className="w-12 h-12 rounded-full bg-stardust-gold/20 flex items-center justify-center mx-auto mb-3">
+                      <Sparkles className="w-6 h-6 text-stardust-gold" />
+                    </div>
+                    <p className="text-sm text-foreground/90 font-medium">
                       Complete this milestone to unlock{" "}
-                      {milestone.chapter_number
-                        ? `Chapter ${milestone.chapter_number}`
-                        : "a new chapter"}{" "}
-                      of your cosmic journey!
+                      <span className="text-stardust-gold">
+                        {milestone.chapter_number
+                          ? `Chapter ${milestone.chapter_number}`
+                          : "a new chapter"}
+                      </span>
+                      {" "}of your cosmic journey!
                     </p>
                   </div>
                 ) : (
