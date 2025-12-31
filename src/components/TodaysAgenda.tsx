@@ -12,11 +12,13 @@ import {
   ArrowDown,
   Clock,
   Pencil,
-  Repeat
+  Repeat,
+  ChevronDown
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
 interface Task {
@@ -75,6 +77,7 @@ export function TodaysAgenda({
 }: TodaysAgendaProps) {
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
+  const [ritualsExpanded, setRitualsExpanded] = useState(true);
 
   // Find tutorial quest
   const tutorialQuest = tasks.find(t => t.task_text === 'Join Cosmiq' && !t.completed);
@@ -332,25 +335,33 @@ export function TodaysAgenda({
             
             {/* Cosmiq Rituals Section */}
             {ritualTasks.length > 0 && (
-              <>
-                <div className="flex items-center gap-2 py-1.5 px-1 mt-2">
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
-                    <Sparkles className="w-3 h-3 text-accent" />
-                    <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
-                      Cosmiq Rituals
-                    </span>
-                    <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-accent/20 text-accent border-0">
-                      {ritualTasks.length}
-                    </Badge>
+              <Collapsible open={ritualsExpanded} onOpenChange={setRitualsExpanded} className="mt-2">
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between py-1.5 px-1 cursor-pointer hover:bg-muted/30 rounded transition-colors">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
+                      <Sparkles className="w-3 h-3 text-accent" />
+                      <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
+                        Cosmiq Rituals
+                      </span>
+                      <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-accent/20 text-accent border-0">
+                        {ritualTasks.length}
+                      </Badge>
+                    </div>
+                    <ChevronDown className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      ritualsExpanded ? "" : "-rotate-90"
+                    )} />
                   </div>
-                </div>
-                {ritualTasks.slice(0, RITUAL_LIMIT).map((task) => renderTaskItem(task))}
-                {ritualTasks.length > RITUAL_LIMIT && (
-                  <p className="text-xs text-muted-foreground text-center py-0.5">
-                    +{ritualTasks.length - RITUAL_LIMIT} more rituals
-                  </p>
-                )}
-              </>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  {ritualTasks.slice(0, RITUAL_LIMIT).map((task) => renderTaskItem(task))}
+                  {ritualTasks.length > RITUAL_LIMIT && (
+                    <p className="text-xs text-muted-foreground text-center py-0.5">
+                      +{ritualTasks.length - RITUAL_LIMIT} more rituals
+                    </p>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
             )}
           </div>
         )}
