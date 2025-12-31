@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, Zap, Flame, Mountain, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,9 +56,9 @@ export function AddQuestSheet({
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
 
   // Update scheduled time when prefilledTime changes
-  useState(() => {
+  useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
-  });
+  }, [prefilledTime]);
 
   // Swipe-up gesture tracking
   const touchStartY = useRef<number>(0);
