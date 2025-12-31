@@ -20,6 +20,8 @@ interface PhaseCardProps {
   isLast?: boolean;
   onMilestoneToggle?: (milestoneId: string) => void;
   onMilestoneDateChange?: (milestoneId: string, newDate: string) => void;
+  postcardCount?: number;
+  maxPostcards?: number;
 }
 
 export function PhaseCard({ 
@@ -29,6 +31,8 @@ export function PhaseCard({
   isLast,
   onMilestoneToggle,
   onMilestoneDateChange,
+  postcardCount = 0,
+  maxPostcards = 7,
 }: PhaseCardProps) {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
@@ -110,9 +114,34 @@ export function PhaseCard({
                 )}
               >
                 <div className="flex items-center gap-2">
-                  {milestone.isPostcardMilestone && (
-                    <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                  )}
+                  {/* Postcard Toggle Star */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMilestoneToggle?.(milestone.id);
+                    }}
+                    disabled={!milestone.isPostcardMilestone && postcardCount >= maxPostcards}
+                    className={cn(
+                      "flex-shrink-0 transition-all",
+                      milestone.isPostcardMilestone 
+                        ? "text-amber-500 hover:text-amber-600" 
+                        : postcardCount >= maxPostcards
+                          ? "text-muted-foreground/30 cursor-not-allowed"
+                          : "text-muted-foreground hover:text-amber-500"
+                    )}
+                    title={
+                      milestone.isPostcardMilestone 
+                        ? "Remove celebration milestone" 
+                        : postcardCount >= maxPostcards 
+                          ? `Max ${maxPostcards} postcards reached` 
+                          : "Mark as celebration milestone"
+                    }
+                  >
+                    <Star 
+                      className="w-4 h-4" 
+                      fill={milestone.isPostcardMilestone ? "currentColor" : "none"}
+                    />
+                  </button>
                   <button
                     onClick={() => toggleExpanded(milestone.id)}
                     className="flex-1 min-w-0 text-left flex items-center gap-1"
