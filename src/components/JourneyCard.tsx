@@ -70,6 +70,7 @@ interface Journey {
       description?: string;
       frequency?: string;
       estimated_minutes?: number;
+      custom_days?: number[] | null;
     };
   }>;
 }
@@ -315,6 +316,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                   description: eh.habits?.description,
                   frequency: eh.habits?.frequency,
                   estimated_minutes: eh.habits?.estimated_minutes,
+                  custom_days: eh.habits?.custom_days,
                 }))}
               isActive={isActive}
             />

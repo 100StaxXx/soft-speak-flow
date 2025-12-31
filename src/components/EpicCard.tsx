@@ -80,6 +80,7 @@ interface Epic {
       description?: string;
       frequency?: string;
       estimated_minutes?: number;
+      custom_days?: number[] | null;
     };
   }>;
 }
@@ -533,6 +534,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                   description: eh.habits?.description,
                   frequency: eh.habits?.frequency,
                   estimated_minutes: eh.habits?.estimated_minutes,
+                  custom_days: eh.habits?.custom_days,
                 }))}
               isActive={isActive}
             />
