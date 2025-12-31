@@ -6,7 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
-import { Loader2 } from "lucide-react";
+import { Loader2, Brain, Dumbbell, Flame } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type HabitCategory = 'mind' | 'body' | 'soul';
 
 interface Habit {
   id: string;
@@ -16,6 +19,7 @@ interface Habit {
   frequency?: string;
   estimated_minutes?: number | null;
   preferred_time?: string | null;
+  category?: HabitCategory | null;
 }
 
 interface EditHabitDialogProps {
@@ -29,8 +33,15 @@ interface EditHabitDialogProps {
     estimated_minutes: number | null;
     difficulty: string;
     preferred_time: string | null;
+    category: HabitCategory | null;
   }) => Promise<void>;
 }
+
+const categoryConfig: Record<HabitCategory, { icon: typeof Brain; label: string; color: string }> = {
+  mind: { icon: Brain, label: 'Mind', color: 'text-blue-500 border-blue-500/50 bg-blue-500/10' },
+  body: { icon: Dumbbell, label: 'Body', color: 'text-green-500 border-green-500/50 bg-green-500/10' },
+  soul: { icon: Flame, label: 'Soul', color: 'text-orange-500 border-orange-500/50 bg-orange-500/10' },
+};
 
 export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabitDialogProps) => {
   const [title, setTitle] = useState(habit?.title || "");
@@ -40,6 +51,9 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
   const [preferredTime, setPreferredTime] = useState(habit?.preferred_time || "");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
     (habit?.difficulty as "easy" | "medium" | "hard") || "easy"
+  );
+  const [category, setCategory] = useState<HabitCategory>(
+    (habit?.category as HabitCategory) || "soul"
   );
   const [saving, setSaving] = useState(false);
 
@@ -51,6 +65,7 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
     setEstimatedMinutes(habit.estimated_minutes?.toString() || "");
     setPreferredTime(habit.preferred_time || "");
     setDifficulty((habit.difficulty as "easy" | "medium" | "hard") || "easy");
+    setCategory((habit.category as HabitCategory) || "soul");
   }
 
   const handleSave = async () => {
@@ -65,6 +80,7 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
         estimated_minutes: estimatedMinutes ? parseInt(estimatedMinutes, 10) : null,
         difficulty,
         preferred_time: preferredTime || null,
+        category,
       });
       onOpenChange(false);
     } finally {
@@ -149,6 +165,36 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
           
           {/* Difficulty */}
           <HabitDifficultySelector value={difficulty} onChange={setDifficulty} />
+          
+          {/* Category */}
+          <div className="space-y-2">
+            <Label>Attribute Boost</Label>
+            <div className="flex gap-2">
+              {(Object.keys(categoryConfig) as HabitCategory[]).map((cat) => {
+                const config = categoryConfig[cat];
+                const Icon = config.icon;
+                return (
+                  <Button
+                    key={cat}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCategory(cat)}
+                    className={cn(
+                      "flex-1 gap-2",
+                      category === cat && config.color
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {config.label}
+                  </Button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Which companion attribute grows when you complete this habit
+            </p>
+          </div>
           
           {/* Actions */}
           <div className="flex gap-3 pt-2">

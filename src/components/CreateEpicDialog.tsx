@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { EPIC_XP_REWARDS } from "@/config/xpRewards";
 import { getHabitLimitForTier, DifficultyTier } from "@/config/habitLimits";
+import { categorizeQuest } from "@/utils/questCategorization";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,8 @@ import { StoryTypeSelector } from "@/components/narrative/StoryTypeSelector";
 import { cn } from "@/lib/utils";
 import { EpicTemplate } from "@/hooks/useEpicTemplates";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
+
+type HabitCategory = 'mind' | 'body' | 'soul';
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
@@ -65,6 +68,7 @@ interface NewHabit {
   preferred_time?: string;
   reminder_enabled?: boolean;
   reminder_minutes_before?: number;
+  category?: HabitCategory;
 }
 
 interface CreateEpicDialogProps {
@@ -142,6 +146,9 @@ export const CreateEpicDialog = ({
   const addHabit = useCallback(() => {
     if (!currentHabitTitle.trim()) return;
     
+    // Auto-categorize based on habit title
+    const autoCategory = categorizeQuest(currentHabitTitle) as HabitCategory | null;
+    
     const newHabit: NewHabit = {
       title: currentHabitTitle.trim(),
       description: currentHabitDescription.trim() || undefined,
@@ -151,6 +158,7 @@ export const CreateEpicDialog = ({
       preferred_time: currentPreferredTime || undefined,
       reminder_enabled: currentReminderEnabled,
       reminder_minutes_before: currentReminderMinutes,
+      category: autoCategory || 'soul', // Default to 'soul' for personal growth
     };
     
     if (editingHabitIndex !== null) {
