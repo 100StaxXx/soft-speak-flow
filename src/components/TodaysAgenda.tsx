@@ -106,8 +106,13 @@ export function TodaysAgenda({
     };
   }, [tutorialQuest]);
   
+// Display limits
+  const QUEST_LIMIT_WITH_RITUALS = 4;
+  const QUEST_LIMIT_SOLO = 8;
+  const RITUAL_LIMIT = 4;
+
   // Separate ritual tasks (from campaigns) and regular quests
-  const { ritualTasks, questTasks, sortedTasks } = useMemo(() => {
+  const { ritualTasks, questTasks } = useMemo(() => {
     const rituals = tasks.filter(t => !!t.habit_source_id);
     const quests = tasks.filter(t => !t.habit_source_id);
     
@@ -127,9 +132,10 @@ export function TodaysAgenda({
     return {
       ritualTasks: sortGroup(rituals),
       questTasks: sortGroup(quests),
-      sortedTasks: [...sortGroup(rituals), ...sortGroup(quests)],
     };
   }, [tasks]);
+
+  const questLimit = ritualTasks.length > 0 ? QUEST_LIMIT_WITH_RITUALS : QUEST_LIMIT_SOLO;
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
@@ -302,7 +308,7 @@ export function TodaysAgenda({
           </div>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {/* Regular Quests Section */}
+            {/* Quests Section */}
             {questTasks.length > 0 && (
               <>
                 {ritualTasks.length > 0 && (
@@ -310,12 +316,15 @@ export function TodaysAgenda({
                     <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                       Quests
                     </span>
+                    <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-muted text-muted-foreground border-0">
+                      {questTasks.length}
+                    </Badge>
                   </div>
                 )}
-                {questTasks.slice(0, ritualTasks.length > 0 ? 4 : 8).map((task) => renderTaskItem(task))}
-                {questTasks.length > (ritualTasks.length > 0 ? 4 : 8) && (
+                {questTasks.slice(0, questLimit).map((task) => renderTaskItem(task))}
+                {questTasks.length > questLimit && (
                   <p className="text-xs text-muted-foreground text-center py-0.5">
-                    +{questTasks.length - (ritualTasks.length > 0 ? 4 : 8)} more
+                    +{questTasks.length - questLimit} more quests
                   </p>
                 )}
               </>
@@ -335,10 +344,10 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 </div>
-                {ritualTasks.slice(0, 4).map((task) => renderTaskItem(task))}
-                {ritualTasks.length > 4 && (
+                {ritualTasks.slice(0, RITUAL_LIMIT).map((task) => renderTaskItem(task))}
+                {ritualTasks.length > RITUAL_LIMIT && (
                   <p className="text-xs text-muted-foreground text-center py-0.5">
-                    +{ritualTasks.length - 4} more rituals
+                    +{ritualTasks.length - RITUAL_LIMIT} more rituals
                   </p>
                 )}
               </>
