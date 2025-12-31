@@ -8,7 +8,7 @@ export interface ParsedTask {
   scheduledDate: string | null;
   estimatedDuration: number | null;
   recurrencePattern: string | null;
-  priority: 'urgent-important' | 'not-urgent-important' | 'urgent-not-important' | 'not-urgent-not-important' | null;
+  priority: 'low' | 'medium' | 'high' | 'urgent' | null;
   energyLevel: 'low' | 'medium' | 'high';
   context: string | null;
   isTopThree: boolean;
@@ -195,19 +195,56 @@ const DIFFICULTY_PATTERNS = [
   { regex: /\bdeep\s*work\b/i, result: 'hard' as const },
 ];
 
-const PRIORITY_PATTERNS = [
-  // Todoist-style shortcuts
-  { regex: /!{3,}/, priority: 'urgent-important' },
-  { regex: /!high\b/i, priority: 'important' },
-  { regex: /!low\b/i, priority: 'low' },
-  { regex: /!med(?:ium)?\b/i, priority: 'medium' },
-  // Natural language
+const PRIORITY_PATTERNS: Array<{ regex: RegExp; priority?: 'low' | 'medium' | 'high' | 'urgent'; isTopThree?: boolean }> = [
+  // Exclamation shortcuts (Todoist-style)
+  { regex: /!{4,}/, priority: 'urgent' },           // !!!! = urgent
+  { regex: /!{3}/, priority: 'high' },              // !!! = high
+  { regex: /!{2}/, priority: 'medium' },            // !! = medium
+  { regex: /!1\b/i, priority: 'urgent' },           // !1 = urgent
+  { regex: /!2\b/i, priority: 'high' },             // !2 = high  
+  { regex: /!3\b/i, priority: 'medium' },           // !3 = medium
+  { regex: /!4\b/i, priority: 'low' },              // !4 = low
+  
+  // P-notation (common in task managers)
+  { regex: /\bp1\b/i, priority: 'urgent' },         // p1 = urgent
+  { regex: /\bp2\b/i, priority: 'high' },           // p2 = high
+  { regex: /\bp3\b/i, priority: 'medium' },         // p3 = medium
+  { regex: /\bp4\b/i, priority: 'low' },            // p4 = low
+  
+  // Natural language - Urgent
   { regex: /\bURGENT\b/i, priority: 'urgent' },
   { regex: /\bASAP\b/i, priority: 'urgent' },
-  { regex: /\bimportant\b/i, priority: 'important' },
-  { regex: /\bcritical\b/i, priority: 'urgent-important' },
+  { regex: /\bcritical\b/i, priority: 'urgent' },
+  { regex: /\bemergency\b/i, priority: 'urgent' },
+  { regex: /\bdue\s+today\b/i, priority: 'urgent' },
+  { regex: /\btime\s*sensitive\b/i, priority: 'urgent' },
+  
+  // Natural language - High
+  { regex: /\bhigh\s*priority\b/i, priority: 'high' },
+  { regex: /\bhigh\s*prio\b/i, priority: 'high' },
+  { regex: /\bimportant\b/i, priority: 'high' },
+  { regex: /\bmust\s+do\b/i, priority: 'high' },
+  
+  // Natural language - Medium  
+  { regex: /\bmedium\s*priority\b/i, priority: 'medium' },
+  { regex: /\bmed\s*prio\b/i, priority: 'medium' },
+  { regex: /\bnormal\s*priority\b/i, priority: 'medium' },
+  
+  // Natural language - Low
+  { regex: /\blow\s*priority\b/i, priority: 'low' },
+  { regex: /\blow\s*prio\b/i, priority: 'low' },
+  { regex: /\bcould\s+do\b/i, priority: 'low' },
+  { regex: /\bwhen\s+(?:I\s+)?(?:have|get)\s+time\b/i, priority: 'low' },
+  { regex: /\bsomeday\b/i, priority: 'low' },
+  { regex: /\bmaybe\b/i, priority: 'low' },
+  { regex: /\boptional\b/i, priority: 'low' },
+  { regex: /\bbacklog\b/i, priority: 'low' },
+  
+  // Top 3 detection
   { regex: /\btop\s*3\b/i, isTopThree: true },
   { regex: /\b#1\b/, isTopThree: true },
+  { regex: /\bpriority\s*(?:one|1)\b/i, isTopThree: true },
+  { regex: /\btoday'?s?\s*priority\b/i, isTopThree: true },
 ];
 
 const RECURRENCE_PATTERNS = [
@@ -337,31 +374,16 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     }
   }
 
-  // Parse priority
-  let hasUrgent = false;
-  let hasImportant = false;
-  let hasLow = false;
+  // Parse priority - simplified to match database schema
   for (const pattern of PRIORITY_PATTERNS) {
     if (pattern.regex.test(input)) {
-      if ('isTopThree' in pattern) {
+      if (pattern.isTopThree) {
         isTopThree = true;
-      } else if (pattern.priority === 'urgent') {
-        hasUrgent = true;
-      } else if (pattern.priority === 'important') {
-        hasImportant = true;
-      } else if (pattern.priority === 'urgent-important') {
-        hasUrgent = true;
-        hasImportant = true;
-      } else if (pattern.priority === 'low') {
-        hasLow = true;
+      } else if (pattern.priority && !priority) {
+        priority = pattern.priority;
       }
     }
   }
-  
-  if (hasUrgent && hasImportant) priority = 'urgent-important';
-  else if (hasUrgent) priority = 'urgent-not-important';
-  else if (hasImportant) priority = 'not-urgent-important';
-  else if (hasLow) priority = 'not-urgent-not-important';
 
   // Parse recurrence
   for (const pattern of RECURRENCE_PATTERNS) {
