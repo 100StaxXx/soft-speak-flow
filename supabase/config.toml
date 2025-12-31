@@ -251,3 +251,6 @@ verify_jwt = true
 
 [functions.optimize-daily-plan]
 verify_jwt = true
+
+[functions.suggest-task-times]
+verify_jwt = true
