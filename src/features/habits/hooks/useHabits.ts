@@ -11,7 +11,8 @@ import { getHabitXP, HABIT_XP_REWARDS } from "@/config/xpRewards";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
 import { format } from "date-fns";
-import type { Habit, HabitCompletion, HabitDifficulty } from "../types";
+import { categorizeQuest } from "@/utils/questCategorization";
+import type { Habit, HabitCompletion, HabitDifficulty, HabitCategory } from "../types";
 
 export function useHabits() {
   const { user } = useAuth();
@@ -119,12 +120,16 @@ export function useHabits() {
         throw new Error('Maximum 2 habits allowed');
       }
       
+      // Auto-categorize based on habit title
+      const autoCategory = categorizeQuest(title) as HabitCategory | null;
+      
       const { error } = await supabase.from('habits').insert({
         user_id: user.id,
         title,
         frequency: selectedDays.length === 7 ? 'daily' : 'custom',
         custom_days: selectedDays.length === 7 ? null : selectedDays,
         difficulty,
+        category: autoCategory || 'soul', // Default to 'soul' for personal growth
         preferred_time: preferredTime || null,
       });
       
@@ -225,6 +230,7 @@ export function useHabits() {
         estimated_minutes?: number | null;
         difficulty?: string;
         preferred_time?: string | null;
+        category?: HabitCategory | null;
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');

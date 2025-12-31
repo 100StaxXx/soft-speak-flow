@@ -3620,6 +3620,7 @@ export type Database = {
       }
       habits: {
         Row: {
+          category: string | null
           created_at: string | null
           current_streak: number | null
           custom_days: number[] | null
@@ -3639,6 +3640,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string | null
           current_streak?: number | null
           custom_days?: number[] | null
@@ -3658,6 +3660,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string | null
           current_streak?: number | null
           custom_days?: number[] | null
