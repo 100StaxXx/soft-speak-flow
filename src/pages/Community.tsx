@@ -5,11 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { useCommunity, CommunityWithMembership } from "@/hooks/useCommunity";
 import { useCommunityMembers } from "@/hooks/useCommunityMembers";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { 
   GuildCard, 
   PublicGuildCard, 
   GuildDetailHeader, 
-  GuildParticles,
   GuildOnlineBanner,
   GuildBossCard,
   ActiveBlessingsDisplay,
@@ -96,10 +96,8 @@ const Community = () => {
 
   return (
     <div className="min-h-screen bg-background pb-nav-safe relative overflow-hidden">
-      {/* Ambient background particles */}
-      <div className="fixed inset-0 pointer-events-none opacity-30">
-        <GuildParticles effect="stars" intensity="low" />
-      </div>
+      {/* Cosmic Starfield Background */}
+      <StarfieldBackground />
       
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 pt-[env(safe-area-inset-top)]">
@@ -254,9 +252,6 @@ const EmptyState = ({ title, description, onCreateClick, onJoinClick }: EmptySta
     animate={{ opacity: 1, y: 0 }}
   >
     <Card className="p-8 text-center guild-glass-intense relative overflow-hidden">
-      {/* Background particles */}
-      <GuildParticles effect="divine" intensity="low" />
-      
       <Shield className="h-16 w-16 mx-auto mb-4 text-primary/30" />
       <h3 className="text-lg font-semibold mb-2">{title}</h3>
       <p className="text-muted-foreground mb-6">{description}</p>
@@ -302,6 +297,8 @@ const CommunityDetailView = ({ community, onBack, onLeave, isLeaving, memberCoun
 
   return (
     <div className="h-screen bg-background overflow-y-auto relative">
+      {/* Cosmic Starfield Background */}
+      <StarfieldBackground />
       {/* Guild Detail Header */}
       <GuildDetailHeader
         name={community.name}
