@@ -405,6 +405,11 @@ export const useTaskMutations = (taskDate: string) => {
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
+      // Validate category - must be null or one of the valid values
+      const validatedCategory = updates.category && validCategories.includes(updates.category as TaskCategory)
+        ? updates.category
+        : detectCategory(updates.task_text, updates.category || undefined);
+
       const { error } = await supabase
         .from('daily_tasks')
         .update({
@@ -416,7 +421,7 @@ export const useTaskMutations = (taskDate: string) => {
           recurrence_days: updates.recurrence_days,
           reminder_enabled: updates.reminder_enabled,
           reminder_minutes_before: updates.reminder_minutes_before,
-          category: updates.category,
+          category: validatedCategory,
         })
         .eq('id', taskId)
         .eq('user_id', user.id);
