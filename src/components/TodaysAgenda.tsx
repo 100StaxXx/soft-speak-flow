@@ -160,7 +160,7 @@ export function TodaysAgenda({
     };
   }, [tasks]);
 
-  // Check if user has seen rituals grouping before - must be after ritualTasks definition
+  // Show first-time tooltip for rituals grouping feature
   useEffect(() => {
     if (tooltipShownRef.current) return;
     const seen = localStorage.getItem('rituals_grouping_seen');
