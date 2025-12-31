@@ -14,7 +14,7 @@ interface HabitSectionProps {
   habits: Habit[];
   completions: HabitCompletion[];
   habitProgress: number;
-  onAddHabit: (data: { title: string; difficulty: HabitDifficulty; selectedDays: number[] }) => void;
+  onAddHabit: (data: { title: string; difficulty: HabitDifficulty; selectedDays: number[]; preferredTime?: string }) => void;
   onToggleHabit: (data: { habitId: string; isCompleted: boolean }) => void;
   onDeleteHabit?: (habitId: string) => void;
   onReorderHabits?: (habits: { id: string; sort_order: number }[]) => void;
@@ -36,6 +36,7 @@ export function HabitSection({
   const [newHabitTitle, setNewHabitTitle] = useState("");
   const [habitDifficulty, setHabitDifficulty] = useState<HabitDifficulty>("medium");
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  const [preferredTime, setPreferredTime] = useState("");
 
   // Update showTemplates when habits change
   useEffect(() => {
@@ -44,10 +45,16 @@ export function HabitSection({
 
   const handleAddHabit = () => {
     if (!newHabitTitle.trim()) return;
-    onAddHabit({ title: newHabitTitle, difficulty: habitDifficulty, selectedDays });
+    onAddHabit({ 
+      title: newHabitTitle, 
+      difficulty: habitDifficulty, 
+      selectedDays,
+      preferredTime: preferredTime || undefined 
+    });
     setNewHabitTitle("");
     setHabitDifficulty("medium");
     setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+    setPreferredTime("");
     setShowAddHabit(false);
   };
 
@@ -196,6 +203,59 @@ export function HabitSection({
             selectedDays={selectedDays}
             onDaysChange={setSelectedDays}
           />
+          
+          {/* Schedule Time */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">
+              Schedule at (optional)
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPreferredTime("07:00")}
+                className={cn(
+                  "flex-1 px-3 py-2 text-xs rounded-md border transition-colors",
+                  preferredTime === "07:00" 
+                    ? "bg-primary text-primary-foreground border-primary" 
+                    : "bg-secondary/50 border-border hover:bg-secondary"
+                )}
+              >
+                Morning
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferredTime("12:00")}
+                className={cn(
+                  "flex-1 px-3 py-2 text-xs rounded-md border transition-colors",
+                  preferredTime === "12:00" 
+                    ? "bg-primary text-primary-foreground border-primary" 
+                    : "bg-secondary/50 border-border hover:bg-secondary"
+                )}
+              >
+                Midday
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferredTime("19:00")}
+                className={cn(
+                  "flex-1 px-3 py-2 text-xs rounded-md border transition-colors",
+                  preferredTime === "19:00" 
+                    ? "bg-primary text-primary-foreground border-primary" 
+                    : "bg-secondary/50 border-border hover:bg-secondary"
+                )}
+              >
+                Evening
+              </button>
+            </div>
+            <Input
+              type="time"
+              value={preferredTime}
+              onChange={(e) => setPreferredTime(e.target.value)}
+              className="w-full"
+              placeholder="Custom time"
+            />
+          </div>
+          
           <div className="flex gap-2">
             <Button 
               onClick={handleAddHabit}

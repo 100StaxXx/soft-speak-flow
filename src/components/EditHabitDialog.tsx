@@ -15,6 +15,7 @@ interface Habit {
   difficulty: string;
   frequency?: string;
   estimated_minutes?: number | null;
+  preferred_time?: string | null;
 }
 
 interface EditHabitDialogProps {
@@ -27,6 +28,7 @@ interface EditHabitDialogProps {
     frequency: string;
     estimated_minutes: number | null;
     difficulty: string;
+    preferred_time: string | null;
   }) => Promise<void>;
 }
 
@@ -35,6 +37,7 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
   const [description, setDescription] = useState(habit?.description || "");
   const [frequency, setFrequency] = useState(habit?.frequency || "daily");
   const [estimatedMinutes, setEstimatedMinutes] = useState(habit?.estimated_minutes?.toString() || "");
+  const [preferredTime, setPreferredTime] = useState(habit?.preferred_time || "");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
     (habit?.difficulty as "easy" | "medium" | "hard") || "easy"
   );
@@ -46,6 +49,7 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
     setDescription(habit.description || "");
     setFrequency(habit.frequency || "daily");
     setEstimatedMinutes(habit.estimated_minutes?.toString() || "");
+    setPreferredTime(habit.preferred_time || "");
     setDifficulty((habit.difficulty as "easy" | "medium" | "hard") || "easy");
   }
 
@@ -60,6 +64,7 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
         frequency,
         estimated_minutes: estimatedMinutes ? parseInt(estimatedMinutes, 10) : null,
         difficulty,
+        preferred_time: preferredTime || null,
       });
       onOpenChange(false);
     } finally {
@@ -126,6 +131,20 @@ export const EditHabitDialog = ({ habit, open, onOpenChange, onSave }: EditHabit
               onChange={(e) => setEstimatedMinutes(e.target.value)}
               placeholder="e.g. 15"
             />
+          </div>
+          
+          {/* Preferred Time */}
+          <div className="space-y-2">
+            <Label htmlFor="preferred_time">Appears on calendar at</Label>
+            <Input
+              id="preferred_time"
+              type="time"
+              value={preferredTime}
+              onChange={(e) => setPreferredTime(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty to add as unscheduled
+            </p>
           </div>
           
           {/* Difficulty */}
