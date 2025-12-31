@@ -397,19 +397,28 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                           )}
                           {hasDetails && (
                             <CollapsibleTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={(e) => e.stopPropagation()}
+                              <button
+                                type="button"
+                                className={cn(
+                                  "h-10 w-10 -mr-2 flex items-center justify-center rounded-lg",
+                                  "active:bg-primary/20 transition-colors",
+                                  "touch-manipulation"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                }}
+                                onPointerDown={(e) => {
+                                  e.stopPropagation();
+                                }}
                               >
                                 <ChevronDown 
                                   className={cn(
-                                    "h-4 w-4 text-muted-foreground transition-transform",
+                                    "h-5 w-5 text-muted-foreground transition-transform duration-200",
                                     isExpanded && "rotate-180"
                                   )} 
                                 />
-                              </Button>
+                              </button>
                             </CollapsibleTrigger>
                           )}
                         </div>
