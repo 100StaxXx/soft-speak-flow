@@ -22,7 +22,8 @@ import {
   ChevronDown,
   Loader2,
   Wand2,
-  Target
+  Target,
+  Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -185,6 +186,7 @@ export function TaskPreviewCard({
     parsed.priority || 
     parsed.isTopThree || 
     parsed.recurrencePattern ||
+    parsed.reminderEnabled ||
     parsed.difficulty !== 'medium' ||
     parsed.energyLevel !== 'medium';
 
@@ -306,6 +308,13 @@ export function TaskPreviewCard({
                 icon={Repeat} 
                 label={parsed.recurrencePattern} 
                 colorClass="text-indigo-500 bg-indigo-500/10"
+              />
+            )}
+            {parsed.reminderEnabled && parsed.reminderMinutesBefore && (
+              <MetaBadge 
+                icon={Bell} 
+                label={formatReminderTime(parsed.reminderMinutesBefore)} 
+                colorClass="text-amber-500 bg-amber-500/10"
               />
             )}
             {parsed.energyLevel !== 'medium' && (
@@ -544,4 +553,14 @@ function formatPriority(priority: string): string {
     case 'not-urgent-important': return 'Important';
     default: return '';
   }
+}
+
+// Format reminder time
+function formatReminderTime(minutes: number): string {
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins ? `${hours}h ${mins}m before` : `${hours}h before`;
+  }
+  return `${minutes}m before`;
 }

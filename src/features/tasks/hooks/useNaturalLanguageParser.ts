@@ -12,6 +12,8 @@ export interface ParsedTask {
   energyLevel: 'low' | 'medium' | 'high';
   context: string | null;
   isTopThree: boolean;
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number | null;
 }
 
 // Month name to number mapping
@@ -235,6 +237,28 @@ const ENERGY_PATTERNS = [
   { regex: /\bfocused\b/i, result: 'high' as const },
 ];
 
+// Reminder patterns - detect phrases like "remind me 30 minutes before"
+const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => number }> = [
+  // "remind me X minutes before" / "remind me X min early"
+  { regex: /remind\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
+  // "remind me X hours before" / "at least X hour before"
+  { regex: /remind\s*(?:me\s+)?(?:at\s+least\s+)?(\d+)\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) * 60 },
+  // Word-based: "remind me half an hour before"
+  { regex: /remind\s*(?:me\s+)?(?:a\s+)?half\s*(?:an?\s+)?(?:h(?:ou)?r)\s*(?:before|early|prior)/i, handler: () => 30 },
+  // Word-based: "remind me an hour before" / "remind me one hour before"
+  { regex: /remind\s*(?:me\s+)?(?:an?\s+|one\s+)(?:h(?:ou)?r)\s*(?:before|early|prior)/i, handler: () => 60 },
+  // Word-based: "remind me two hours before"
+  { regex: /remind\s*(?:me\s+)?two\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)/i, handler: () => 120 },
+  // "notify me X min before"
+  { regex: /notify\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
+  // "alert me X minutes before"
+  { regex: /alert\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
+  // "remind me" (default 15 min) - must be last as it's the most general
+  { regex: /remind\s*me\b/i, handler: () => 15 },
+  // "set reminder" / "with reminder"
+  { regex: /(?:set|with)\s*(?:a\s+)?reminder/i, handler: () => 15 },
+];
+
 function cleanTaskText(text: string): string {
   let cleaned = text;
 
@@ -248,6 +272,7 @@ function cleanTaskText(text: string): string {
     ...RECURRENCE_PATTERNS.map(p => p.regex),
     ...CONTEXT_PATTERNS.map(p => p.regex),
     ...ENERGY_PATTERNS.map(p => p.regex),
+    ...REMINDER_PATTERNS.map(p => p.regex),
   ];
 
   patternsToRemove.forEach(pattern => {
@@ -274,6 +299,8 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   let context: string | null = null;
   let recurrencePattern: string | null = null;
   let isTopThree = false;
+  let reminderEnabled = false;
+  let reminderMinutesBefore: number | null = null;
 
   // Parse time
   for (const pattern of TIME_PATTERNS) {
@@ -360,6 +387,16 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     }
   }
 
+  // Parse reminder
+  for (const pattern of REMINDER_PATTERNS) {
+    const match = input.match(pattern.regex);
+    if (match) {
+      reminderEnabled = true;
+      reminderMinutesBefore = pattern.handler(match);
+      break;
+    }
+  }
+
   // Infer energy from duration if not explicitly set
   if (estimatedDuration && estimatedDuration >= 60) {
     energyLevel = 'high';
@@ -381,6 +418,8 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     energyLevel,
     context,
     isTopThree,
+    reminderEnabled,
+    reminderMinutesBefore,
   };
 }
 
