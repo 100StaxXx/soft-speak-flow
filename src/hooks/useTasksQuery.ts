@@ -33,6 +33,8 @@ export interface DailyTask {
   ai_generated: boolean | null;
   context_id: string | null;
   source: string | null;
+  // Habit integration
+  habit_source_id: string | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {

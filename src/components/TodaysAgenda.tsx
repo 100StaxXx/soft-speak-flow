@@ -9,10 +9,10 @@ import {
   Plus,
   Check,
   Circle,
-  Target,
   ArrowDown,
   Clock,
-  Pencil
+  Pencil,
+  Repeat
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,33 +105,20 @@ export function TodaysAgenda({
       window.removeEventListener('resize', updatePosition);
     };
   }, [tutorialQuest]);
-  const { rituals, quests } = useMemo(() => {
-    const ritualsList: Task[] = [];
-    const questsList: Task[] = [];
-    
-    tasks.forEach((task) => {
-      if (task.habit_source_id) {
-        ritualsList.push(task);
-      } else {
-        questsList.push(task);
-      }
-    });
-    
+  // Unified task list - no more separation between rituals and quests
+  const sortedTasks = useMemo(() => {
     // Sort: incomplete first, then by scheduled time
-    const sortTasks = (a: Task, b: Task) => {
+    return [...tasks].sort((a, b) => {
       if (a.completed !== b.completed) {
         return a.completed ? 1 : -1;
       }
       if (a.scheduled_time && b.scheduled_time) {
         return a.scheduled_time.localeCompare(b.scheduled_time);
       }
+      if (a.scheduled_time) return -1;
+      if (b.scheduled_time) return 1;
       return 0;
-    };
-    
-    return {
-      rituals: ritualsList.sort(sortTasks),
-      quests: questsList.sort(sortTasks),
-    };
+    });
   }, [tasks]);
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
@@ -139,9 +126,10 @@ export function TodaysAgenda({
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
   const allComplete = totalCount > 0 && completedCount === totalCount;
 
-  const renderTaskItem = (task: Task, isRitual: boolean) => {
+  const renderTaskItem = (task: Task) => {
     const isComplete = !!task.completed;
     const isTutorialQuest = task.task_text === 'Join Cosmiq';
+    const isRitual = !!task.habit_source_id;
     
     const handleClick = () => {
       if (isComplete && onUndoToggle) {
@@ -181,12 +169,17 @@ export function TodaysAgenda({
         </div>
         
         <div className="flex-1 min-w-0">
-          <p className={cn(
-            "text-sm truncate",
-            isComplete && "line-through text-muted-foreground"
-          )}>
-            {task.task_text}
-          </p>
+          <div className="flex items-center gap-1.5">
+            {isRitual && (
+              <Repeat className="w-3 h-3 text-accent flex-shrink-0" />
+            )}
+            <p className={cn(
+              "text-sm truncate",
+              isComplete && "line-through text-muted-foreground"
+            )}>
+              {task.task_text}
+            </p>
+          </div>
           {task.scheduled_time && (
             <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
               <Clock className="w-3 h-3" />
@@ -209,11 +202,6 @@ export function TodaysAgenda({
             >
               <Pencil className="w-3 h-3" />
             </Button>
-          )}
-          {isRitual && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-accent/10 border-accent/30">
-              Ritual
-            </Badge>
           )}
           {task.is_main_quest && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-primary/10 border-primary/30">
@@ -303,41 +291,12 @@ export function TodaysAgenda({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4 max-h-64 overflow-y-auto">
-            {/* Quests Section */}
-            {quests.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Quests ({quests.filter(q => q.completed).length}/{quests.length})
-                  </span>
-                </div>
-                {quests.slice(0, 5).map((task) => renderTaskItem(task, false))}
-                {quests.length > 5 && (
-                  <p className="text-xs text-muted-foreground text-center py-1">
-                    +{quests.length - 5} more quests
-                  </p>
-                )}
-              </div>
-            )}
-            
-            {/* Rituals Section */}
-            {rituals.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="w-3.5 h-3.5 text-accent" />
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Rituals ({rituals.filter(r => r.completed).length}/{rituals.length})
-                  </span>
-                </div>
-                {rituals.slice(0, 5).map((task) => renderTaskItem(task, true))}
-                {rituals.length > 5 && (
-                  <p className="text-xs text-muted-foreground text-center py-1">
-                    +{rituals.length - 5} more rituals
-                  </p>
-                )}
-              </div>
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {sortedTasks.slice(0, 8).map((task) => renderTaskItem(task))}
+            {sortedTasks.length > 8 && (
+              <p className="text-xs text-muted-foreground text-center py-1">
+                +{sortedTasks.length - 8} more
+              </p>
             )}
           </div>
         )}
