@@ -48,6 +48,32 @@ import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
+import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
+
+// Default clarification questions when AI doesn't provide any
+const DEFAULT_CLARIFICATION_QUESTIONS: ClarifyingQuestion[] = [
+  {
+    id: 'experience_level',
+    question: 'What is your current experience level?',
+    type: 'select',
+    options: ['Complete beginner', 'Some experience', 'Intermediate', 'Advanced'],
+    required: true,
+  },
+  {
+    id: 'daily_time',
+    question: 'How much time can you dedicate daily?',
+    type: 'text',
+    placeholder: 'e.g., 1-2 hours, 30 minutes',
+    required: true,
+  },
+  {
+    id: 'priority_focus',
+    question: 'What aspect is most important to you?',
+    type: 'text',
+    placeholder: 'e.g., speed, thoroughness, consistency',
+    required: false,
+  },
+];
 
 type WizardStep = 'goal' | 'timeline' | 'suggestions' | 'review';
 
@@ -128,6 +154,7 @@ export function Pathfinder({
     reset: resetClassification,
   } = useIntentClassifier({ useOrchestrator: false });
   const [showClarification, setShowClarification] = useState(false);
+  const [clarificationQuestions, setClarificationQuestions] = useState<ClarifyingQuestion[]>([]);
   const [localClarificationAnswers, setLocalClarificationAnswers] = useState<Record<string, string | number>>({});
   const [localEpicContext, setLocalEpicContext] = useState<string | undefined>(undefined);
   
@@ -323,11 +350,15 @@ export function Pathfinder({
     // Classify the goal to check if clarification is needed
     const result = await classify(goalInput);
     
-    if (result?.type === 'epic' && result.needsClarification && result.epicClarifyingQuestions?.length) {
-      // Show clarification UI
+    // For epics, ALWAYS show clarification - use AI questions or fallback defaults
+    if (result?.type === 'epic') {
+      const questions = result.epicClarifyingQuestions?.length 
+        ? result.epicClarifyingQuestions 
+        : DEFAULT_CLARIFICATION_QUESTIONS;
+      setClarificationQuestions(questions);
       setShowClarification(true);
     } else {
-      // No clarification needed, proceed directly to timeline generation
+      // Non-epic types proceed directly to timeline generation
       if (!epicTitle) setEpicTitle(goalInput);
       await handleGenerateTimeline();
     }
@@ -445,6 +476,7 @@ export function Pathfinder({
     setThemeColor(themeColors[0].id);
     setSelectedTemplate(null);
     setShowClarification(false);
+    setClarificationQuestions([]);
     setLocalClarificationAnswers({});
     setLocalEpicContext(undefined);
     resetSuggestions();
@@ -579,10 +611,10 @@ export function Pathfinder({
 
                 {/* AI Clarification Flow */}
                 <AnimatePresence>
-                  {showClarification && classification?.epicClarifyingQuestions && classification.epicClarifyingQuestions.length > 0 && (
+                  {showClarification && clarificationQuestions.length > 0 && (
                     <EpicClarificationFlow
                       goal={goalInput}
-                      questions={classification.epicClarifyingQuestions}
+                      questions={clarificationQuestions}
                       onSubmit={handleClarificationSubmit}
                       onSkip={handleSkipClarification}
                       isLoading={isClassifying}

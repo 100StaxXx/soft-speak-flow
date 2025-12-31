@@ -148,19 +148,22 @@ Customize options based on goal type:
 
 **FOR EPIC TYPE - CLARIFICATION LOGIC:**
 
-When detecting an epic, decide if you need clarifying questions:
+When detecting an epic, ALWAYS generate clarifying questions to personalize the plan:
 
-ASK CLARIFICATION IF the goal is:
-- An exam/certification (bar exam, CPA, MCAT, real estate license, etc.) - Ask about subjects, exam date, study hours
-- A fitness goal (run marathon, lose weight) - Ask about current level, target date, available time
-- Learning a skill (learn Spanish, learn coding) - Ask about current level, target proficiency, study time
-- A major project (write a book, launch business) - Ask about scope, deadline, available hours
-- Timeline seems aggressive (< 50% of typical time needed)
+ALWAYS ASK FOR EPICS (2-4 questions minimum):
+- Every epic benefits from knowing: current experience level, time commitment, specific focus areas
+- Even simple goals like "read more books" benefit from: "What genre interests you?", "How much time per day?"
+- This ensures personalized, actionable plan generation
 
-DO NOT ASK IF:
-- User already provided specific details AND timeline context ("I'm a retaker studying 2 hours daily for bar exam until July")
-- Goal is simple enough to break down without context ("read more books")
-- About target dates, deadlines, or exam dates (the user already provides their deadline separately)
+QUESTION GUIDELINES:
+- Always include an experience/current level question
+- Always include a time commitment question  
+- Add 1-2 goal-specific questions based on the type (subjects for exams, target metrics for fitness, etc.)
+- For aggressive timelines: ALWAYS include timeline_context question first
+- Use "text" type for time commitments (hours per day, days per week) - allows flexible answers like "4-6 hours" or "2 in morning, 1 at night"
+- Use "select" type for predefined options (subjects, current level, etc.)
+- Use "text" type for open-ended answers
+- NEVER use "date" type - the deadline is already collected in the goal step
 
 When asking epic clarification, generate 2-5 questions appropriate to the goal type:
 - For aggressive timelines: ALWAYS include timeline_context question first
@@ -365,9 +368,9 @@ Now provide epic details with suggestedTargetDays calculated from their answers.
       classification.needsClarification = classification.needsClarification ?? false;
     }
 
-    // For epic, ensure clarification fields exist
+    // For epic, ensure clarification fields exist - always enable clarification for epics
     if (classification.type === 'epic') {
-      classification.needsClarification = classification.needsClarification ?? false;
+      classification.needsClarification = true; // Always show clarification for epics
       classification.epicClarifyingQuestions = classification.epicClarifyingQuestions || [];
     }
 
