@@ -428,13 +428,11 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-1">
-              {milestones.map((milestone, index) => {
+            {milestones.map((milestone, index) => {
                 const isExpanded = expandedMilestones.has(milestone.id);
                 const isCompleted = !!milestone.completed_at;
-                // Find the next incomplete milestone (first one not completed)
-                const isNextMilestone = !isCompleted && 
-                  milestones.slice(0, index).every(m => m.completed_at) &&
-                  !milestones.slice(0, index).some(m => !m.completed_at);
+                // Find the next incomplete milestone: first one where all previous are completed
+                const isNextMilestone = !isCompleted && milestones.slice(0, index).every(m => m.completed_at);
                 
                 return (
                   <motion.button
@@ -444,12 +442,8 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                       "w-full text-left p-2 rounded-md transition-colors relative",
                       "bg-background/30 hover:bg-background/50",
                       isCompleted && "opacity-70",
-                      isNextMilestone && "ring-1 ring-primary/40"
+                      isNextMilestone && "ring-1 ring-primary/40 bg-primary/5"
                     )}
-                    animate={isNextMilestone ? {
-                      boxShadow: ['0 0 0 0 hsl(var(--primary) / 0.3)', '0 0 0 4px hsl(var(--primary) / 0)', '0 0 0 0 hsl(var(--primary) / 0.3)']
-                    } : {}}
-                    transition={{ duration: 2, repeat: isNextMilestone ? Infinity : 0 }}
                   >
                     {isNextMilestone && (
                       <Badge 

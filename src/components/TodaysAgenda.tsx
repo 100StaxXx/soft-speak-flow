@@ -86,19 +86,8 @@ export function TodaysAgenda({
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
   
-  // Check if user has seen rituals grouping before
-  useEffect(() => {
-    const seen = localStorage.getItem('rituals_grouping_seen');
-    if (!seen && ritualTasks.length > 0) {
-      setShowRitualsTooltip(true);
-      // Auto-dismiss after 5 seconds
-      const timer = setTimeout(() => {
-        setShowRitualsTooltip(false);
-        localStorage.setItem('rituals_grouping_seen', 'true');
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+  // Track if we've already shown the tooltip this session
+  const tooltipShownRef = useRef(false);
   
   const toggleCampaign = (campaignId: string) => {
     setExpandedCampaigns(prev => {
@@ -170,6 +159,22 @@ export function TodaysAgenda({
       questTasks: sortGroup(quests),
     };
   }, [tasks]);
+
+  // Check if user has seen rituals grouping before - must be after ritualTasks definition
+  useEffect(() => {
+    if (tooltipShownRef.current) return;
+    const seen = localStorage.getItem('rituals_grouping_seen');
+    if (!seen && ritualTasks.length > 0) {
+      tooltipShownRef.current = true;
+      setShowRitualsTooltip(true);
+      // Auto-dismiss after 5 seconds
+      const timer = setTimeout(() => {
+        setShowRitualsTooltip(false);
+        localStorage.setItem('rituals_grouping_seen', 'true');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [ritualTasks.length]);
 
   // Group ritual tasks by campaign
   const ritualsByCampaign = useMemo(() => {
