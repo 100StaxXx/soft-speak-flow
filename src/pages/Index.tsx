@@ -17,11 +17,12 @@ import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
 import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
+import { MentorTutorialModal } from "@/components/MentorTutorialModal";
+import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
-import { Moon, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     text: string;
     author: string | null;
   } | null>(null);
+  const { showModal, dismissModal } = useFirstTimeModal("mentor");
 
   // Combined initialization effect for better performance
   const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
@@ -359,6 +361,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       <ErrorBoundary>
         <BottomNav />
       </ErrorBoundary>
+      <MentorTutorialModal open={showModal} onClose={dismissModal} />
     </>
   );
 };
