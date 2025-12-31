@@ -89,7 +89,7 @@ export const MilestoneDetailDrawer = ({
               {isPostcardMilestone && (
                 <Badge
                   variant="outline"
-                  className="text-xs text-amber-600 border-amber-200 bg-amber-50/50"
+                  className="text-xs text-royal-purple border-royal-purple/30 bg-royal-purple/10"
                 >
                   <Sparkles className="w-3 h-3 mr-1" />
                   Celebration
