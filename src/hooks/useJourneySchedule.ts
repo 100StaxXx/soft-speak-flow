@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
@@ -123,9 +123,28 @@ export function useJourneySchedule() {
     }
   }, []);
 
+  const MAX_POSTCARDS = 7;
+
+  const postcardCount = useMemo(() => {
+    return schedule?.milestones.filter(m => m.isPostcardMilestone).length ?? 0;
+  }, [schedule]);
+
   const toggleMilestone = useCallback((milestoneId: string) => {
     setSchedule(prev => {
       if (!prev) return prev;
+      
+      const milestone = prev.milestones.find(m => m.id === milestoneId);
+      if (!milestone) return prev;
+      
+      // If trying to turn ON, check the cap
+      if (!milestone.isPostcardMilestone) {
+        const currentPostcardCount = prev.milestones.filter(m => m.isPostcardMilestone).length;
+        if (currentPostcardCount >= MAX_POSTCARDS) {
+          // Already at max, don't allow toggle
+          return prev;
+        }
+      }
+      
       return {
         ...prev,
         milestones: prev.milestones.map(m => 
@@ -212,5 +231,7 @@ export function useJourneySchedule() {
     setRituals,
     updateMilestoneDate,
     reset,
+    postcardCount,
+    maxPostcards: MAX_POSTCARDS,
   };
 }

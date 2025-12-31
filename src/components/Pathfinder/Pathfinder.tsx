@@ -116,7 +116,7 @@ export function Pathfinder({
   
   const { preferences, isAtEpicLimit } = useUserAIContext();
   const { trackInteraction } = useAIInteractionTracker();
-  const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals } = useJourneySchedule();
+  const { schedule, isLoading: isScheduleLoading, generateSchedule, adjustSchedule, toggleMilestone, updateMilestoneDate, reset: resetSchedule, setRituals, postcardCount, maxPostcards } = useJourneySchedule();
   const [originalRituals, setOriginalRituals] = useState<JourneyRitual[]>([]);
   
   // AI Clarification state
@@ -643,6 +643,8 @@ export function Pathfinder({
                       deadline={format(deadline!, 'yyyy-MM-dd')}
                       onMilestoneToggle={toggleMilestone}
                       onMilestoneDateChange={updateMilestoneDate}
+                      postcardCount={postcardCount}
+                      maxPostcards={maxPostcards}
                     />
 
                     {/* Adjustment input */}

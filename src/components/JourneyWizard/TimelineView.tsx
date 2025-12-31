@@ -24,6 +24,8 @@ interface TimelineViewProps {
   deadline: string;
   onMilestoneToggle?: (milestoneId: string) => void;
   onMilestoneDateChange?: (milestoneId: string, newDate: string) => void;
+  postcardCount?: number;
+  maxPostcards?: number;
 }
 
 export function TimelineView({
@@ -35,6 +37,8 @@ export function TimelineView({
   deadline,
   onMilestoneToggle,
   onMilestoneDateChange,
+  postcardCount = 0,
+  maxPostcards = 7,
 }: TimelineViewProps) {
   const sortedPhases = useMemo(() => 
     [...phases].sort((a, b) => a.phaseOrder - b.phaseOrder),
@@ -93,7 +97,7 @@ export function TimelineView({
         </div>
         <div className="flex items-center gap-1.5">
           <Star className="w-4 h-4 text-amber-500" />
-          <span>{postcardMilestones.length} celebration milestones</span>
+          <span>{postcardCount}/{maxPostcards} celebration milestones</span>
         </div>
       </div>
 
@@ -113,6 +117,8 @@ export function TimelineView({
               isLast={index === sortedPhases.length - 1}
               onMilestoneToggle={onMilestoneToggle}
               onMilestoneDateChange={onMilestoneDateChange}
+              postcardCount={postcardCount}
+              maxPostcards={maxPostcards}
             />
           </motion.div>
         ))}
