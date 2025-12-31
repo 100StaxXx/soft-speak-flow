@@ -391,10 +391,10 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             {isActive && (
               <button
                 onClick={() => setShowAbandonDialog(true)}
-                className="h-5 w-5 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors"
+                className="h-11 w-11 -m-3 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground/40 hover:text-destructive transition-colors touch-manipulation"
                 title="Abandon epic"
               >
-                <X className="h-3 w-3" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -428,20 +428,37 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-1">
-              {milestones.map((milestone) => {
+              {milestones.map((milestone, index) => {
                 const isExpanded = expandedMilestones.has(milestone.id);
                 const isCompleted = !!milestone.completed_at;
+                // Find the next incomplete milestone (first one not completed)
+                const isNextMilestone = !isCompleted && 
+                  milestones.slice(0, index).every(m => m.completed_at) &&
+                  !milestones.slice(0, index).some(m => !m.completed_at);
                 
                 return (
-                  <button
+                  <motion.button
                     key={milestone.id}
                     onClick={() => toggleMilestoneExpanded(milestone.id)}
                     className={cn(
-                      "w-full text-left p-2 rounded-md transition-colors",
+                      "w-full text-left p-2 rounded-md transition-colors relative",
                       "bg-background/30 hover:bg-background/50",
-                      isCompleted && "opacity-70"
+                      isCompleted && "opacity-70",
+                      isNextMilestone && "ring-1 ring-primary/40"
                     )}
+                    animate={isNextMilestone ? {
+                      boxShadow: ['0 0 0 0 hsl(var(--primary) / 0.3)', '0 0 0 4px hsl(var(--primary) / 0)', '0 0 0 0 hsl(var(--primary) / 0.3)']
+                    } : {}}
+                    transition={{ duration: 2, repeat: isNextMilestone ? Infinity : 0 }}
                   >
+                    {isNextMilestone && (
+                      <Badge 
+                        variant="default" 
+                        className="absolute -top-1.5 -right-1.5 h-4 px-1.5 text-[10px] bg-primary text-primary-foreground"
+                      >
+                        Next
+                      </Badge>
+                    )}
                     <div className="flex items-start gap-2">
                       {/* Status indicator */}
                       <div className="flex-shrink-0 mt-0.5">
@@ -484,7 +501,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                         {milestone.milestone_percent}%
                       </Badge>
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </CollapsibleContent>

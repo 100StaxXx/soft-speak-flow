@@ -340,10 +340,20 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 text-center relative"
         >
-          <PageInfoButton 
-            onClick={() => setShowPageInfo(true)} 
-            className="absolute right-0 top-0"
-          />
+          <div className="absolute right-0 top-0 flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowHourlyModal(true)}
+              className="h-11 w-11 text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 touch-manipulation"
+              title="Calendar View"
+            >
+              <Calendar className="h-5 w-5" />
+            </Button>
+            <PageInfoButton 
+              onClick={() => setShowPageInfo(true)} 
+            />
+          </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
             Quests & Campaigns
           </h1>
@@ -364,18 +374,6 @@ const Journeys = () => {
             onDateSelect={setSelectedDate}
             tasksPerDay={tasksPerDay}
           />
-          
-          {/* Calendar View Button */}
-          <div className="flex justify-center mt-3">
-            <Button
-              variant="ghost"
-              onClick={() => setShowHourlyModal(true)}
-              className="text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 font-medium"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Calendar View
-            </Button>
-          </div>
         </motion.div>
 
         {/* Smart Natural Language Input */}
@@ -563,16 +561,16 @@ const Journeys = () => {
                 />
               ))}
               
-              {/* Subtle add campaign button */}
+              {/* Subtle add campaign button with proper touch target */}
               {!hasReachedLimit && (
                 <div className="flex justify-center pt-1">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={() => setSmartWizardOpen(true)}
-                    className="h-7 w-7 rounded-full opacity-30 hover:opacity-60 text-muted-foreground p-0"
+                    className="h-11 w-11 rounded-full opacity-40 hover:opacity-70 text-muted-foreground touch-manipulation"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </Button>
                 </div>
               )}

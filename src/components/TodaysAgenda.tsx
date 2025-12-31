@@ -14,6 +14,7 @@ import {
   Pencil,
   Repeat,
   ChevronDown,
+  ChevronUp,
   Target,
   CheckCircle2
 } from "lucide-react";
@@ -21,6 +22,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface Task {
@@ -81,6 +83,22 @@ export function TodaysAgenda({
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [showAllTasks, setShowAllTasks] = useState(false);
+  const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
+  
+  // Check if user has seen rituals grouping before
+  useEffect(() => {
+    const seen = localStorage.getItem('rituals_grouping_seen');
+    if (!seen && ritualTasks.length > 0) {
+      setShowRitualsTooltip(true);
+      // Auto-dismiss after 5 seconds
+      const timer = setTimeout(() => {
+        setShowRitualsTooltip(false);
+        localStorage.setItem('rituals_grouping_seen', 'true');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
   
   const toggleCampaign = (campaignId: string) => {
     setExpandedCampaigns(prev => {
@@ -125,9 +143,9 @@ export function TodaysAgenda({
   }, [tutorialQuest]);
   
 // Display limits
-  const QUEST_LIMIT_WITH_RITUALS = 4;
-  const QUEST_LIMIT_SOLO = 8;
-  const RITUAL_LIMIT = 4;
+  const QUEST_LIMIT_WITH_RITUALS = 6;
+  const QUEST_LIMIT_SOLO = 6;
+  const RITUAL_LIMIT = 6;
 
   // Separate ritual tasks (from campaigns) and regular quests
   const { ritualTasks, questTasks } = useMemo(() => {
@@ -248,22 +266,22 @@ export function TodaysAgenda({
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Edit button - shows on hover for incomplete quests */}
+          {/* Edit button - shows on hover for incomplete quests with proper 44px touch target */}
           {onEditQuest && !isComplete && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="h-11 w-11 -m-2.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
               onClick={(e) => {
                 e.stopPropagation();
                 onEditQuest(task);
               }}
             >
-              <Pencil className="w-3 h-3" />
+              <Pencil className="w-4 h-4" />
             </Button>
           )}
           {task.is_main_quest && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-primary/10 border-primary/30">
+            <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-primary/10 border-primary/30">
               Main
             </Badge>
           )}
@@ -350,25 +368,40 @@ export function TodaysAgenda({
             </Button>
           </div>
         ) : (
-          <div className="space-y-1 max-h-64 overflow-y-auto">
+          <div className="space-y-1">
             {/* Quests Section */}
             {questTasks.length > 0 && (
               <>
                 {ritualTasks.length > 0 && (
                   <div className="flex items-center gap-2 py-1.5 px-1">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Quests
                     </span>
-                    <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-muted text-muted-foreground border-0">
+                    <Badge variant="secondary" className="h-4 px-1.5 text-xs bg-muted text-muted-foreground border-0">
                       {questTasks.length}
                     </Badge>
                   </div>
                 )}
-                {questTasks.slice(0, questLimit).map((task) => renderTaskItem(task))}
+                {(showAllTasks ? questTasks : questTasks.slice(0, questLimit)).map((task) => renderTaskItem(task))}
                 {questTasks.length > questLimit && (
-                  <p className="text-xs text-muted-foreground text-center py-0.5">
-                    +{questTasks.length - questLimit} more quests
-                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllTasks(!showAllTasks)}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground py-1 h-8"
+                  >
+                    {showAllTasks ? (
+                      <>
+                        <ChevronUp className="w-3 h-3 mr-1" />
+                        Show less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3 h-3 mr-1" />
+                        View all {questTasks.length} quests
+                      </>
+                    )}
+                  </Button>
                 )}
               </>
             )}
@@ -376,18 +409,46 @@ export function TodaysAgenda({
             {/* Rituals Section - Grouped by Campaign */}
             {ritualTasks.length > 0 && (
               <>
-                {/* Simple Rituals header - NOT collapsible */}
-                <div className="flex items-center gap-2 py-1.5 px-1 mt-2">
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
-                    <Sparkles className="w-3 h-3 text-accent" />
-                    <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
-                      Rituals
-                    </span>
-                    <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-accent/20 text-accent border-0">
-                      {ritualTasks.length}
-                    </Badge>
-                  </div>
-                </div>
+                {/* Rituals header with first-time tooltip */}
+                <TooltipProvider>
+                  <Tooltip open={showRitualsTooltip} onOpenChange={setShowRitualsTooltip}>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className="flex items-center gap-2 py-1.5 px-1 mt-2 cursor-default"
+                        onClick={() => {
+                          if (showRitualsTooltip) {
+                            setShowRitualsTooltip(false);
+                            localStorage.setItem('rituals_grouping_seen', 'true');
+                          }
+                        }}
+                      >
+                        <motion.div 
+                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30"
+                          animate={showRitualsTooltip ? { 
+                            boxShadow: ['0 0 0 0 hsl(var(--accent) / 0.4)', '0 0 0 6px hsl(var(--accent) / 0)', '0 0 0 0 hsl(var(--accent) / 0.4)']
+                          } : {}}
+                          transition={{ duration: 1.5, repeat: showRitualsTooltip ? Infinity : 0 }}
+                        >
+                          <Sparkles className="w-3 h-3 text-accent" />
+                          <span className="text-xs font-semibold text-accent uppercase tracking-wide">
+                            Rituals
+                          </span>
+                          <Badge variant="secondary" className="h-4 px-1.5 text-xs bg-accent/20 text-accent border-0">
+                            {ritualTasks.length}
+                          </Badge>
+                          {showRitualsTooltip && (
+                            <Badge variant="default" className="h-4 px-1.5 text-[10px] bg-accent text-accent-foreground animate-pulse">
+                              New!
+                            </Badge>
+                          )}
+                        </motion.div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[200px] text-center">
+                      <p className="text-xs">Rituals are now grouped by campaign! Tap a campaign to expand.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 
                 {/* Campaign groups - each collapsible */}
                 {Array.from(ritualsByCampaign.entries()).map(([campaignId, group]) => {
@@ -419,7 +480,7 @@ export function TodaysAgenda({
                               {group.title}
                             </span>
                             <Badge variant="outline" className={cn(
-                              "h-4 px-1.5 text-[10px] border-muted-foreground/30",
+                              "h-4 px-1.5 text-xs border-muted-foreground/30",
                               isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
                             )}>
                               {group.completedCount}/{group.totalCount}
