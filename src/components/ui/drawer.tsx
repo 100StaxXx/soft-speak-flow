@@ -53,6 +53,7 @@ const DrawerContent = React.forwardRef<
       style={{
         touchAction: 'pan-y',
         WebkitTapHighlightColor: 'transparent',
+        willChange: 'transform',
       }}
       {...props}
     >

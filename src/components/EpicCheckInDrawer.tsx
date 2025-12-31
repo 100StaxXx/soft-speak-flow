@@ -261,7 +261,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
         </Button>
       </DrawerTrigger>
       
-      <DrawerContent className="bg-background/95 backdrop-blur-lg border-t border-primary/20">
+      <DrawerContent className="bg-background border-t border-primary/20">
         <div className="mx-auto w-full max-w-lg p-6">
           <DrawerHeader className="px-0 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl">
@@ -300,187 +300,147 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                 >
                   Rituals Complete! ⭐
                 </motion.p>
-                {/* Star burst animation */}
-                {[...Array(8)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-2 h-2 bg-primary rounded-full"
-                    initial={{ opacity: 1, scale: 0 }}
-                    animate={{
-                      opacity: [1, 0],
-                      scale: [0, 1],
-                      x: [0, Math.cos(i * 45 * Math.PI / 180) * 60],
-                      y: [0, Math.sin(i * 45 * Math.PI / 180) * 60],
-                    }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                  />
-                ))}
               </motion.div>
             ) : (
-              <motion.div
-                key="form"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-3"
-              >
-                {habits.map((habit, index) => {
-                  const isCompleted = completedToday.has(habit.id);
-                  const isProcessing = processingHabits.has(habit.id);
-                  const isExpanded = expandedHabit === habit.id;
-                  const hasDetails = habit.description || habit.frequency || habit.estimated_minutes;
-                  
-                  return (
-                    <Collapsible
-                      key={habit.id}
-                      open={isExpanded}
-                      onOpenChange={(open) => setExpandedHabit(open ? habit.id : null)}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        data-vaul-no-drag
-                        className={cn(
-                          "rounded-xl transition-all overflow-hidden",
-                          "bg-secondary/30 border border-border/50",
-                          isCompleted && "bg-primary/10 border-primary/30",
-                          isProcessing && "opacity-50 pointer-events-none"
-                        )}
+              <>
+                <div
+                  className="space-y-3 overflow-y-auto overscroll-contain max-h-[60vh] -mx-2 px-2"
+                  data-vaul-no-drag
+                >
+                  {habits.map((habit, index) => {
+                    const isCompleted = completedToday.has(habit.id);
+                    const isProcessing = processingHabits.has(habit.id);
+                    const isExpanded = expandedHabit === habit.id;
+                    const hasDetails = habit.description || habit.frequency || habit.estimated_minutes;
+                    
+                    return (
+                      <Collapsible
+                        key={habit.id}
+                        open={isExpanded}
+                        onOpenChange={(open) => setExpandedHabit(open ? habit.id : null)}
                       >
-                        {/* Main habit row */}
                         <div
-                          onPointerDown={(e) => {
-                            e.stopPropagation();
-                            if (!submitting && !isProcessing) {
-                              handleToggleHabit(habit.id, !isCompleted);
-                            }
-                          }}
-                          style={{ 
-                            touchAction: 'manipulation',
-                            WebkitTapHighlightColor: 'transparent',
-                            userSelect: 'none'
-                          }}
                           className={cn(
-                            "flex items-center gap-3 p-4 cursor-pointer min-h-[60px]",
-                            "active:scale-[0.98] active:bg-primary/20"
+                            "rounded-xl transition-colors overflow-hidden",
+                            "bg-secondary/30 border border-border/50",
+                            isCompleted && "bg-primary/10 border-primary/30",
+                            isProcessing && "opacity-50 pointer-events-none"
                           )}
                         >
-                          <Checkbox
-                            checked={isCompleted}
-                            disabled={submitting || isProcessing}
-                            onCheckedChange={(checked) => {
-                              handleToggleHabit(habit.id, Boolean(checked));
+                          {/* Main habit row */}
+                          <div
+                            className="flex items-center gap-3 p-4 min-h-[60px]"
+                            style={{ 
+                              touchAction: 'manipulation',
+                              WebkitTapHighlightColor: 'transparent',
                             }}
-                            onClick={(e) => e.stopPropagation()}
-                            className={cn(
-                              "h-6 w-6 rounded-full border-2",
-                              isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
-                            )}
-                          />
-                          <span
-                            className={cn(
-                              "flex-1 text-sm font-medium transition-all",
-                              isCompleted && "line-through text-muted-foreground"
-                            )}
                           >
-                            {habit.title}
-                          </span>
-                          {isCompleted && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="text-primary"
+                            <Checkbox
+                              id={`habit-${habit.id}`}
+                              checked={isCompleted}
+                              disabled={submitting || isProcessing}
+                              onCheckedChange={(checked) => {
+                                handleToggleHabit(habit.id, Boolean(checked));
+                              }}
+                              className={cn(
+                                "h-6 w-6 rounded-full border-2 touch-manipulation",
+                                isCompleted ? "border-primary bg-primary" : "border-muted-foreground/30"
+                              )}
+                            />
+                            <label
+                              htmlFor={`habit-${habit.id}`}
+                              className={cn(
+                                "flex-1 text-sm font-medium cursor-pointer touch-manipulation select-none",
+                                isCompleted && "line-through text-muted-foreground"
+                              )}
                             >
-                              <Sparkles className="w-4 h-4" />
-                            </motion.div>
-                          )}
-                          {hasDetails && (
-                            <CollapsibleTrigger asChild>
-                              <button
-                                type="button"
-                                className={cn(
-                                  "h-10 w-10 -mr-2 flex items-center justify-center rounded-lg",
-                                  "active:bg-primary/20 transition-colors",
-                                  "touch-manipulation"
-                                )}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                }}
-                                onPointerDown={(e) => {
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <ChevronDown 
-                                  className={cn(
-                                    "h-5 w-5 text-muted-foreground transition-transform duration-200",
-                                    isExpanded && "rotate-180"
-                                  )} 
-                                />
-                              </button>
-                            </CollapsibleTrigger>
-                          )}
-                        </div>
-                        
-                        {/* Expandable details section */}
-                        <CollapsibleContent>
-                          <div 
-                            className="px-4 pb-4 pt-0 space-y-2 border-t border-border/30"
-                            data-vaul-no-drag
-                          >
-                            {habit.description && (
-                              <p className="text-sm text-muted-foreground pt-3">
-                                {habit.description}
-                              </p>
+                              {habit.title}
+                            </label>
+                            {isCompleted && (
+                              <Sparkles className="w-4 h-4 text-primary" />
                             )}
-                            <div className="flex flex-wrap items-center gap-3 pt-2">
-                              {habit.frequency && (
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <Calendar className="w-3.5 h-3.5" />
-                                  <span>{formatFrequency(habit.frequency)}</span>
-                                </div>
-                              )}
-                              {habit.estimated_minutes && (
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span>~{habit.estimated_minutes} min</span>
-                                </div>
-                              )}
-                              {habit.difficulty && (
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <Target className="w-3.5 h-3.5" />
-                                  <span className="capitalize">{habit.difficulty}</span>
-                                </div>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 ml-auto text-xs text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingHabit(habit);
-                                }}
-                              >
-                                <Pencil className="w-3 h-3 mr-1" />
-                                Edit
-                              </Button>
-                            </div>
+                            {hasDetails && (
+                              <CollapsibleTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    "h-10 w-10 -mr-2 flex items-center justify-center rounded-lg",
+                                    "active:bg-primary/20 transition-colors",
+                                    "touch-manipulation"
+                                  )}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                  }}
+                                  onPointerDown={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                >
+                                  <ChevronDown 
+                                    className={cn(
+                                      "h-5 w-5 text-muted-foreground transition-transform duration-200",
+                                      isExpanded && "rotate-180"
+                                    )} 
+                                  />
+                                </button>
+                              </CollapsibleTrigger>
+                            )}
                           </div>
-                        </CollapsibleContent>
-                      </motion.div>
-                    </Collapsible>
-                  );
-                })}
-                
+                          
+                          {/* Expandable details section */}
+                          <CollapsibleContent>
+                            <div 
+                              className="px-4 pb-4 pt-0 space-y-2 border-t border-border/30"
+                              data-vaul-no-drag
+                            >
+                              {habit.description && (
+                                <p className="text-sm text-muted-foreground pt-3">
+                                  {habit.description}
+                                </p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-3 pt-2">
+                                {habit.frequency && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span>{formatFrequency(habit.frequency)}</span>
+                                  </div>
+                                )}
+                                {habit.estimated_minutes && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <span>~{habit.estimated_minutes} min</span>
+                                  </div>
+                                )}
+                                {habit.difficulty && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Target className="w-3.5 h-3.5" />
+                                    <span className="capitalize">{habit.difficulty}</span>
+                                  </div>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 ml-auto text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingHabit(habit);
+                                  }}
+                                >
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  Edit
+                                </Button>
+                              </div>
+                            </div>
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    );
+                  })}
+                </div>
+                  
                 {/* Complete All Button */}
                 {!allCompleted && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: habits.length * 0.1 }}
-                    className="pt-4"
-                  >
+                  <div className="pt-4">
                     <Button
                       onClick={handleCompleteAll}
                       disabled={submitting || allCompleted}
@@ -489,19 +449,15 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                       <Star className="w-4 h-4 mr-2" />
                       Complete All Rituals
                     </Button>
-                  </motion.div>
+                  </div>
                 )}
                 
                 {allCompleted && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-center text-sm text-muted-foreground pt-4"
-                  >
+                  <p className="text-center text-sm text-muted-foreground pt-4">
                     ✨ You've completed all rituals for today!
-                  </motion.p>
+                  </p>
                 )}
-              </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>
