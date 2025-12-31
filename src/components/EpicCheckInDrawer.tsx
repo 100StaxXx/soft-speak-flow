@@ -4,11 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-import { EditHabitDialog } from "@/components/EditHabitDialog";
+import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 
 interface Habit {
   id: string;
@@ -19,6 +15,7 @@ interface Habit {
   estimated_minutes?: number | null;
   custom_days?: number[] | null;
   preferred_time?: string | null;
+  category?: 'mind' | 'body' | 'soul' | null;
 }
 
 const formatFrequency = (freq: string): string => {
@@ -65,12 +62,25 @@ interface EpicCheckInDrawerProps {
 }
 
 export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawerProps) => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
   const [earlyBirdExpanded, setEarlyBirdExpanded] = useState(false);
+  
+  // Convert habit to RitualData for the unified editor
+  const handleEditHabit = (habit: Habit) => {
+    setEditingRitual({
+      habitId: habit.id,
+      title: habit.title,
+      description: habit.description,
+      difficulty: habit.difficulty,
+      frequency: habit.frequency,
+      estimated_minutes: habit.estimated_minutes,
+      preferred_time: habit.preferred_time,
+      category: habit.category,
+      custom_days: habit.custom_days,
+    });
+  };
   
   // Split habits into today's and upcoming
   const { todayHabits, upcomingHabits } = useMemo(() => {
@@ -87,32 +97,6 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     
     return { todayHabits: todayList, upcomingHabits: upcomingList };
   }, [habits]);
-
-  const handleUpdateHabit = async (habitId: string, updates: {
-    title: string;
-    description: string | null;
-    frequency: string;
-    estimated_minutes: number | null;
-    difficulty: string;
-    preferred_time: string | null;
-  }) => {
-    if (!user?.id) return;
-    
-    const { error } = await supabase
-      .from('habits')
-      .update(updates)
-      .eq('id', habitId)
-      .eq('user_id', user.id);
-    
-    if (error) {
-      toast.error('Failed to update habit');
-      throw error;
-    }
-    
-    toast.success('Habit updated!');
-    queryClient.invalidateQueries({ queryKey: ['habits'] });
-    queryClient.invalidateQueries({ queryKey: ['epics'] });
-  };
 
   if (!isActive || habits.length === 0) return null;
 
@@ -266,7 +250,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                             className="h-7 px-2 ml-auto text-xs text-muted-foreground hover:text-foreground"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingHabit(habit);
+                              handleEditHabit(habit);
                             }}
                           >
                             <Pencil className="w-3 h-3 mr-1" />
@@ -417,7 +401,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                                     className="h-7 px-2 ml-auto text-xs text-amber-500/70 hover:text-amber-500"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setEditingHabit(habit);
+                                      handleEditHabit(habit);
                                     }}
                                   >
                                     <Pencil className="w-3 h-3 mr-1" />
@@ -449,11 +433,10 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
           )}
         </div>
         
-        <EditHabitDialog
-          habit={editingHabit}
-          open={!!editingHabit}
-          onOpenChange={(open) => !open && setEditingHabit(null)}
-          onSave={handleUpdateHabit}
+        <EditRitualSheet
+          ritual={editingRitual}
+          open={!!editingRitual}
+          onOpenChange={(open) => !open && setEditingRitual(null)}
         />
       </DrawerContent>
     </Drawer>
