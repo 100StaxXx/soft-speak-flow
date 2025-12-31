@@ -7,6 +7,7 @@ import { PromotionOpportunityCard } from './PromotionOpportunityCard';
 import { Pathfinder } from './Pathfinder/Pathfinder';
 import { useEpics } from '@/hooks/useEpics';
 import { toast } from 'sonner';
+import { safeLocalStorage } from '@/utils/storage';
 
 const DISMISSED_OPPORTUNITIES_KEY = 'dismissed_promotion_opportunities';
 
@@ -24,23 +25,22 @@ export const PromotionOpportunitiesSection = memo(function PromotionOpportunitie
   const [showAll, setShowAll] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     // Load dismissed IDs from localStorage on mount
-    try {
-      const stored = localStorage.getItem(DISMISSED_OPPORTUNITIES_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
+    const stored = safeLocalStorage.getItem(DISMISSED_OPPORTUNITIES_KEY);
+    if (stored) {
+      try {
+        return new Set(JSON.parse(stored));
+      } catch {
+        return new Set();
+      }
     }
+    return new Set();
   });
   const [selectedOpportunity, setSelectedOpportunity] = useState<PromotionOpportunity | null>(null);
   const [showWizard, setShowWizard] = useState(false);
 
   // Persist dismissed IDs to localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(DISMISSED_OPPORTUNITIES_KEY, JSON.stringify([...dismissedIds]));
-    } catch {
-      // Ignore localStorage errors
-    }
+    safeLocalStorage.setItem(DISMISSED_OPPORTUNITIES_KEY, JSON.stringify([...dismissedIds]));
   }, [dismissedIds]);
 
   // Filter out dismissed opportunities

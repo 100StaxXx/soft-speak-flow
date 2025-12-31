@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MiniGameType } from '@/types/astralEncounters';
 import { ArcadeDifficulty, DIFFICULTY_ORDER, getNextDifficulty, getPrevDifficulty } from '@/types/arcadeDifficulty';
+import { safeLocalStorage } from '@/utils/storage';
 
 interface GameResult {
   difficulty: ArcadeDifficulty;
@@ -34,13 +35,13 @@ export const useArcadeSkillTracker = () => {
 
   // Load from localStorage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
+    const stored = safeLocalStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
         setSkillData(JSON.parse(stored));
+      } catch {
+        // Invalid data, start fresh
       }
-    } catch (e) {
-      // Invalid data, start fresh
     }
   }, []);
 
@@ -84,11 +85,7 @@ export const useArcadeSkillTracker = () => {
       };
 
       // Persist to localStorage
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newSkillData));
-      } catch (e) {
-        // Storage full or unavailable
-      }
+      safeLocalStorage.setItem(STORAGE_KEY, JSON.stringify(newSkillData));
 
       return newSkillData;
     });

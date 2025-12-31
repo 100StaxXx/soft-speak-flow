@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
+import { safeLocalStorage } from "@/utils/storage";
 
 interface ReferralCode {
   id: string;
@@ -58,11 +59,11 @@ const InfluencerDashboard = () => {
   // Check for code in URL params or localStorage
   useEffect(() => {
     const urlCode = searchParams.get("code");
-    const storedCode = localStorage.getItem("influencer_code");
+    const storedCode = safeLocalStorage.getItem("influencer_code");
     
     if (urlCode) {
       setVerifiedCode(urlCode);
-      localStorage.setItem("influencer_code", urlCode);
+      safeLocalStorage.setItem("influencer_code", urlCode);
     } else if (storedCode) {
       setVerifiedCode(storedCode);
     }
@@ -169,7 +170,7 @@ const InfluencerDashboard = () => {
       return;
     }
     setVerifiedCode(codeInput.trim().toUpperCase());
-    localStorage.setItem("influencer_code", codeInput.trim().toUpperCase());
+    safeLocalStorage.setItem("influencer_code", codeInput.trim().toUpperCase());
   };
 
   const copyCode = () => {
@@ -208,7 +209,7 @@ const InfluencerDashboard = () => {
   };
 
   const logout = () => {
-    localStorage.removeItem("influencer_code");
+    safeLocalStorage.removeItem("influencer_code");
     setVerifiedCode(null);
     navigate("/creator");
   };

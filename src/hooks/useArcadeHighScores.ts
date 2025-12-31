@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MiniGameType } from '@/types/astralEncounters';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
+import { safeLocalStorage } from '@/utils/storage';
 
 // Game-specific metric configurations
 export const GAME_METRICS: Record<MiniGameType, { 
@@ -54,16 +55,20 @@ export const useArcadeHighScores = () => {
 
   // Load from localStorage on mount, with migration from v2
   useEffect(() => {
-    try {
-      const storedV3 = localStorage.getItem(STORAGE_KEY_V3);
-      if (storedV3) {
+    const storedV3 = safeLocalStorage.getItem(STORAGE_KEY_V3);
+    if (storedV3) {
+      try {
         setHighScores(JSON.parse(storedV3));
-        return;
+      } catch {
+        // Invalid data, start fresh
       }
+      return;
+    }
 
-      // Migrate from v2 if exists
-      const storedV2 = localStorage.getItem(STORAGE_KEY_V2);
-      if (storedV2) {
+    // Migrate from v2 if exists
+    const storedV2 = safeLocalStorage.getItem(STORAGE_KEY_V2);
+    if (storedV2) {
+      try {
         const v2Data: HighScoresV2 = JSON.parse(storedV2);
         const migratedData: HighScoresV3 = {};
 
@@ -79,10 +84,10 @@ export const useArcadeHighScores = () => {
         }
 
         setHighScores(migratedData);
-        localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(migratedData));
+        safeLocalStorage.setItem(STORAGE_KEY_V3, JSON.stringify(migratedData));
+      } catch {
+        // Invalid data, start fresh
       }
-    } catch (e) {
-      // Invalid data, start fresh
     }
   }, []);
 
@@ -128,11 +133,7 @@ export const useArcadeHighScores = () => {
         };
 
         // Persist to localStorage
-        try {
-          localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(newScores));
-        } catch (e) {
-          // Storage full or unavailable
-        }
+        safeLocalStorage.setItem(STORAGE_KEY_V3, JSON.stringify(newScores));
 
         return newScores;
       });
