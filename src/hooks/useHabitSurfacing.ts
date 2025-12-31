@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { categorizeQuest } from '@/utils/questCategorization';
 
 export interface SurfacedHabit {
   id: string;
@@ -81,7 +82,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           epic_title: epic?.status === 'active' ? epic.title : null,
           task_id: existingTask?.id || null,
           is_completed: existingTask?.completed || false,
-          category: habit.difficulty || 'medium',
+          category: categorizeQuest(habit.title),
         };
       });
 
@@ -111,7 +112,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           task_date: taskDate,
           habit_source_id: habitId,
           epic_id: habit.epic_id,
-          category: habit.category,
+          category: categorizeQuest(habit.habit_name),
           source: 'recurring',
           scheduled_time: habit.preferred_time,
           estimated_duration: habit.estimated_minutes,
@@ -152,7 +153,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
         task_date: taskDate,
         habit_source_id: habit.habit_id,
         epic_id: habit.epic_id,
-        category: habit.category,
+        category: categorizeQuest(habit.habit_name),
         source: 'recurring',
         scheduled_time: habit.preferred_time,
         estimated_duration: habit.estimated_minutes,
