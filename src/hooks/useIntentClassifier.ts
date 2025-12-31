@@ -26,6 +26,7 @@ export interface ClarifyingQuestion {
   options?: string[];
   placeholder?: string;
   required: boolean;
+  multiSelect?: boolean;
 }
 
 export interface EpicDetails {

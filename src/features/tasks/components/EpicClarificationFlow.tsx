@@ -8,7 +8,8 @@ import {
   Clock,
   Target,
   BookOpen,
-  ChevronRight
+  ChevronRight,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,19 +39,41 @@ export function EpicClarificationFlow({
   onSkip,
   isLoading = false,
 }: EpicClarificationFlowProps) {
-  const [answers, setAnswers] = useState<Record<string, string | number>>({});
+  const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({});
 
   const handleChange = (questionId: string, value: string | number) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
   };
 
+  const handleMultiSelectToggle = (questionId: string, option: string) => {
+    setAnswers(prev => {
+      const current = (prev[questionId] as string[]) || [];
+      const updated = current.includes(option)
+        ? current.filter(o => o !== option)
+        : [...current, option];
+      return { ...prev, [questionId]: updated };
+    });
+  };
+
   const handleSubmit = () => {
-    onSubmit(answers);
+    // Convert multi-select arrays to comma-separated strings for the API
+    const processedAnswers: Record<string, string | number> = {};
+    Object.entries(answers).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        processedAnswers[key] = value.join(', ');
+      } else {
+        processedAnswers[key] = value;
+      }
+    });
+    onSubmit(processedAnswers);
   };
 
   const requiredQuestions = questions.filter(q => q.required);
   const allRequiredAnswered = requiredQuestions.every(q => {
     const answer = answers[q.id];
+    if (q.multiSelect) {
+      return Array.isArray(answer) && answer.length > 0;
+    }
     return answer !== undefined && answer !== '';
   });
 
@@ -106,7 +129,31 @@ export function EpicClarificationFlow({
                 {question.required && <span className="text-destructive">*</span>}
               </Label>
               
-              {question.type === 'select' && question.options && (
+              {question.type === 'select' && question.options && question.multiSelect ? (
+                // Multi-select: render as toggleable chips
+                <div className="flex flex-wrap gap-2">
+                  {question.options.map((option) => {
+                    const selected = ((answers[question.id] as string[]) || []).includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => handleMultiSelectToggle(question.id, option)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-full text-sm border transition-all flex items-center gap-1",
+                          selected 
+                            ? "bg-primary text-primary-foreground border-primary" 
+                            : "bg-background border-border hover:border-primary/50"
+                        )}
+                      >
+                        {selected && <Check className="w-3 h-3" />}
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : question.type === 'select' && question.options && (
+                // Single select: existing Select component
                 <Select
                   value={answers[question.id]?.toString() || ''}
                   onValueChange={(value) => handleChange(question.id, value)}
