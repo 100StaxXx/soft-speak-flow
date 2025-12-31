@@ -214,6 +214,8 @@ export function AddQuestSheet({
                 onReminderMinutesBeforeChange={setReminderMinutesBefore}
                 moreInformation={moreInformation}
                 onMoreInformationChange={setMoreInformation}
+                selectedDate={selectedDate}
+                taskDifficulty={difficulty}
               />
             </div>
           )}

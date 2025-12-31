@@ -3,8 +3,15 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Clock, Calendar, ChevronDown, Repeat, Bell, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, Calendar, ChevronDown, Repeat, Bell, Info, Sparkles, Loader2, Star } from "lucide-react";
 import { FrequencyPicker } from "./FrequencyPicker";
+import { useSmartScheduling } from "@/hooks/useSmartScheduling";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface AdvancedQuestOptionsProps {
   scheduledTime: string | null;
@@ -21,9 +28,23 @@ interface AdvancedQuestOptionsProps {
   onReminderMinutesBeforeChange: (minutes: number) => void;
   moreInformation: string | null;
   onMoreInformationChange: (info: string | null) => void;
+  // New props for smart scheduling
+  selectedDate?: Date;
+  taskDifficulty?: 'easy' | 'medium' | 'hard';
+}
+
+// Helper to format 24h time to 12h
+function formatTime(time24: string): string {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
 export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
+  const { suggestedSlots, getSuggestedSlots, isLoading: isSuggestLoading } = useSmartScheduling();
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const durationOptions = [
     { value: 15, label: "15 min" },
     { value: 30, label: "30 min" },
@@ -52,20 +73,96 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const [showRecurrenceOptions, setShowRecurrenceOptions] = useState(false);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
 
+  const handleSuggestClick = async () => {
+    if (!props.selectedDate) return;
+    
+    await getSuggestedSlots(
+      props.selectedDate,
+      props.estimatedDuration || 30,
+      props.taskDifficulty
+    );
+    
+    setShowSuggestions(true);
+  };
+
+  const suggestions = suggestedSlots.slice(0, 3);
+
+  const handleSelectSuggestion = (time: string) => {
+    props.onScheduledTimeChange(time);
+    setShowSuggestions(false);
+  };
+
   return (
     <div className="space-y-4 border-t pt-4">
-      {/* Scheduled Time */}
+      {/* Scheduled Time with Suggest Button */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-muted-foreground" />
           <Label className="text-sm font-medium">Scheduled Time</Label>
         </div>
-        <Input
-          type="time"
-          value={props.scheduledTime || ''}
-          onChange={(e) => props.onScheduledTimeChange(e.target.value || null)}
-          className="w-full"
-        />
+        <div className="flex gap-2">
+          <Input
+            type="time"
+            value={props.scheduledTime || ''}
+            onChange={(e) => props.onScheduledTimeChange(e.target.value || null)}
+            className="flex-1"
+          />
+          {props.selectedDate && (
+            <Popover open={showSuggestions} onOpenChange={setShowSuggestions}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleSuggestClick}
+                  disabled={isSuggestLoading}
+                  className="shrink-0"
+                >
+                  {isSuggestLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="end">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                    Suggested Times
+                  </p>
+                  {suggestions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground px-2 py-2">
+                      No suggestions available
+                    </p>
+                  ) : (
+                    suggestions.map((slot, index) => (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(slot.time)}
+                        className="w-full flex items-start gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            {index === 0 && (
+                              <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                            )}
+                            <span className="font-medium text-sm">
+                              {formatTime(slot.time)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {slot.reason}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
       </div>
 
       {/* Estimated Duration */}
