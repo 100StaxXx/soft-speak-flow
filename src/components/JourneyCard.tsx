@@ -310,11 +310,11 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                 .filter(eh => eh.habits)
                 .map(eh => ({
                   id: eh.habit_id,
-                  title: eh.habits.title,
-                  difficulty: eh.habits.difficulty || 'medium',
-                  description: eh.habits.description,
-                  frequency: eh.habits.frequency,
-                  estimated_minutes: eh.habits.estimated_minutes,
+                  title: eh.habits?.title || 'Untitled',
+                  difficulty: eh.habits?.difficulty || 'medium',
+                  description: eh.habits?.description,
+                  frequency: eh.habits?.frequency,
+                  estimated_minutes: eh.habits?.estimated_minutes,
                 }))}
               isActive={isActive}
             />

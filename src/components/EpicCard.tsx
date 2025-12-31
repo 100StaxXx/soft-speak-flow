@@ -528,11 +528,11 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                 .filter(eh => eh.habits) // Filter out deleted habits
                 .map(eh => ({
                   id: eh.habit_id,
-                  title: eh.habits.title,
-                  difficulty: eh.habits.difficulty || 'medium',
-                  description: eh.habits.description,
-                  frequency: eh.habits.frequency,
-                  estimated_minutes: eh.habits.estimated_minutes,
+                  title: eh.habits?.title || 'Untitled',
+                  difficulty: eh.habits?.difficulty || 'medium',
+                  description: eh.habits?.description,
+                  frequency: eh.habits?.frequency,
+                  estimated_minutes: eh.habits?.estimated_minutes,
                 }))}
               isActive={isActive}
             />
