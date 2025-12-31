@@ -184,7 +184,8 @@ export function HourlyViewModal({
         {/* Content */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
           {viewMode === 'day' ? (
-            <CalendarDayView
+            <div className="relative">
+              <CalendarDayView
               selectedDate={selectedDate}
               onDateSelect={onDateSelect}
               tasks={tasks}
@@ -196,6 +197,7 @@ export function HourlyViewModal({
               fullDayMode
               hideHeader
             />
+            </div>
           ) : (
             <CalendarMonthView
               selectedDate={selectedDate}

@@ -315,21 +315,23 @@ export const CalendarDayView = ({
         </Card>
       )}
 
-      {/* Milestones Section */}
+      {/* Sticky Milestones Section */}
       {dayMilestones.length > 0 && (
-        <div className="rounded-lg border border-stardust-gold/30 bg-gradient-to-r from-stardust-gold/10 to-stardust-gold/5 p-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-stardust-gold mb-3">
-            <Star className="h-4 w-4" />
-            Goals for Today ({dayMilestones.length})
-          </div>
-          <div className="space-y-2">
-            {dayMilestones.map((milestone) => (
-              <MilestoneCalendarCard
-                key={milestone.id}
-                milestone={milestone}
-                onClick={() => onMilestoneClick?.(milestone)}
-              />
-            ))}
+        <div className="sticky top-0 z-10 -mx-4 px-4 pb-3 pt-1 bg-background/95 backdrop-blur-sm">
+          <div className="rounded-lg border border-stardust-gold/30 bg-gradient-to-r from-stardust-gold/10 to-stardust-gold/5 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-stardust-gold mb-3">
+              <Star className="h-4 w-4" />
+              Goals for Today ({dayMilestones.length})
+            </div>
+            <div className="space-y-2">
+              {dayMilestones.map((milestone) => (
+                <MilestoneCalendarCard
+                  key={milestone.id}
+                  milestone={milestone}
+                  onClick={() => onMilestoneClick?.(milestone)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
