@@ -90,7 +90,7 @@ export const useEpics = () => {
           *,
           epic_habits(
             habit_id,
-            habits(id, title, difficulty)
+            habits(id, title, difficulty, description, frequency, estimated_minutes)
           )
         `)
         .eq("user_id", user.id)
