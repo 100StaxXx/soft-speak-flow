@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,6 +27,7 @@ interface Task {
   reminder_enabled?: boolean | null;
   reminder_minutes_before?: number | null;
   category?: string | null;
+  habit_source_id?: string | null;
 }
 
 interface EditQuestDialogProps {
@@ -121,14 +122,30 @@ export function EditQuestDialog({
     onOpenChange(false);
   };
 
+  const isRitual = !!task?.habit_source_id;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[85vh] rounded-t-xl">
         <SheetHeader className="pb-2">
           <SheetTitle className="flex items-center gap-2">
-            <Pencil className="h-5 w-5" />
-            Edit Quest
+            {isRitual ? (
+              <>
+                <Repeat className="h-5 w-5 text-accent" />
+                Edit Ritual
+              </>
+            ) : (
+              <>
+                <Pencil className="h-5 w-5" />
+                Edit Quest
+              </>
+            )}
           </SheetTitle>
+          {isRitual && (
+            <p className="text-xs text-muted-foreground">
+              This is a daily ritual from your habits
+            </p>
+          )}
         </SheetHeader>
         
         <ScrollArea className="h-[calc(85vh-140px)] pr-4">
