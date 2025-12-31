@@ -134,24 +134,15 @@ const Welcome = () => {
             onClick={() => navigate("/terms")}
             className="underline hover:text-foreground transition-colors"
           >
-            Terms
-          </button>
-          ,{" "}
+          Terms
+          </button>{" "}
+          and{" "}
           <button
             onClick={() => navigate("/privacy")}
             className="underline hover:text-foreground transition-colors"
           >
             Privacy Policy
           </button>
-          , and{" "}
-          <a
-            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-foreground transition-colors"
-          >
-            Apple's EULA
-          </a>
         </p>
       </motion.div>
     </div>
