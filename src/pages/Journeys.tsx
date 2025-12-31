@@ -30,6 +30,7 @@ import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
+import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { useEpics } from "@/hooks/useEpics";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
@@ -127,14 +128,18 @@ const Journeys = () => {
     dismissPerfectDay 
   } = usePerfectDayTracker(dailyTasks, selectedDate);
   
-  // Edit quest state
+  // Edit quest state (for regular quests)
   const [editingTask, setEditingTask] = useState<{
     id: string;
     task_text: string;
     difficulty?: string | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
+    habit_source_id?: string | null;
   } | null>(null);
+  
+  // Edit ritual state (for tasks linked to habits)
+  const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
   const { milestones: calendarMilestones } = useCalendarMilestones(selectedDate);
   
@@ -311,8 +316,29 @@ const Journeys = () => {
     reminder_enabled?: boolean | null;
     reminder_minutes_before?: number | null;
     category?: string | null;
+    habit_source_id?: string | null;
   }) => {
-    setEditingTask(task);
+    // Route to the appropriate editor based on whether it's a ritual
+    if (task.habit_source_id) {
+      // This is a ritual - open the unified ritual editor
+      setEditingRitual({
+        habitId: task.habit_source_id,
+        taskId: task.id,
+        title: task.task_text,
+        description: null, // Task doesn't have description, but habit does
+        difficulty: task.difficulty || 'medium',
+        estimated_minutes: task.estimated_duration,
+        preferred_time: task.scheduled_time,
+        category: task.category as 'mind' | 'body' | 'soul' | null,
+        recurrence_pattern: task.recurrence_pattern,
+        recurrence_days: task.recurrence_days,
+        reminder_enabled: task.reminder_enabled,
+        reminder_minutes_before: task.reminder_minutes_before,
+      });
+    } else {
+      // Regular quest - use the standard edit dialog
+      setEditingTask(task);
+    }
   };
   
   const handleSaveEdit = async (taskId: string, updates: {
@@ -622,13 +648,20 @@ const Journeys = () => {
           prefilledTime={null}
         />
         
-        {/* Edit Quest Dialog */}
+        {/* Edit Quest Dialog (for regular quests) */}
         <EditQuestDialog
           task={editingTask}
-          open={!!editingTask}
+          open={!!editingTask && !editingTask.habit_source_id}
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
+        />
+        
+        {/* Edit Ritual Sheet (for habits/rituals with two-way sync) */}
+        <EditRitualSheet
+          ritual={editingRitual}
+          open={!!editingRitual}
+          onOpenChange={(open) => !open && setEditingRitual(null)}
         />
 
         <PageInfoModal
