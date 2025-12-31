@@ -252,7 +252,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
           </span>
           
           {completionCount > 0 && !allCompleted && (
-            <span className="ml-2 px-2 py-0.5 text-xs bg-primary/20 rounded-full">
+            <span className="ml-2 px-2 py-0.5 text-xs bg-celestial-blue/20 text-celestial-blue rounded-full">
               {completionCount}/{habits.length}
             </span>
           )}
@@ -265,7 +265,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
         <div className="mx-auto w-full max-w-lg p-6">
           <DrawerHeader className="px-0 pb-4">
             <DrawerTitle className="flex items-center gap-2 text-xl">
-              <Star className="w-5 h-5 text-primary fill-primary/30" />
+              <Star className="w-5 h-5 text-stardust-gold fill-stardust-gold/30" />
               Today's Cosmiq habits
             </DrawerTitle>
           </DrawerHeader>
@@ -290,7 +290,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                   }}
                   transition={{ duration: 0.6 }}
                 >
-                  <CheckCircle2 className="w-20 h-20 text-green-500" />
+                  <CheckCircle2 className="w-20 h-20 text-stardust-gold" />
                 </motion.div>
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}
@@ -323,7 +323,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                           className={cn(
                             "rounded-xl transition-colors overflow-hidden",
                             "bg-secondary/30 border border-border/50",
-                            isCompleted && "bg-primary/10 border-primary/30",
+                            isCompleted && "bg-stardust-gold/10 border-stardust-gold/30",
                             isProcessing && "opacity-50 pointer-events-none"
                           )}
                         >
@@ -357,7 +357,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                               {habit.title}
                             </label>
                             {isCompleted && (
-                              <Sparkles className="w-4 h-4 text-primary" />
+                              <Sparkles className="w-4 h-4 text-stardust-gold" />
                             )}
                             {hasDetails && (
                               <CollapsibleTrigger asChild>
@@ -394,26 +394,26 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                               data-vaul-no-drag
                             >
                               {habit.description && (
-                                <p className="text-sm text-muted-foreground pt-3">
+                                <p className="text-sm text-celestial-blue/80 pt-3">
                                   {habit.description}
                                 </p>
                               )}
                               <div className="flex flex-wrap items-center gap-3 pt-2">
                                 {habit.frequency && (
                                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Calendar className="w-3.5 h-3.5" />
+                                    <Calendar className="w-3.5 h-3.5 text-celestial-blue" />
                                     <span>{formatFrequency(habit.frequency)}</span>
                                   </div>
                                 )}
                                 {habit.estimated_minutes && (
                                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Clock className="w-3.5 h-3.5" />
+                                    <Clock className="w-3.5 h-3.5 text-celestial-blue" />
                                     <span>~{habit.estimated_minutes} min</span>
                                   </div>
                                 )}
                                 {habit.difficulty && (
                                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Target className="w-3.5 h-3.5" />
+                                    <Target className="w-3.5 h-3.5 text-celestial-blue" />
                                     <span className="capitalize">{habit.difficulty}</span>
                                   </div>
                                 )}
@@ -444,7 +444,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                     <Button
                       onClick={handleCompleteAll}
                       disabled={submitting || allCompleted}
-                      className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                      className="w-full bg-gradient-to-r from-stardust-gold to-primary hover:from-stardust-gold/90 hover:to-primary/90 text-primary-foreground"
                     >
                       <Star className="w-4 h-4 mr-2" />
                       Complete All Rituals
