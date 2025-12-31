@@ -8,7 +8,8 @@ import {
   Sparkles, 
   Wand2,
   Target,
-  Calendar
+  Calendar,
+  Loader2
 } from "lucide-react";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { PageTransition } from "@/components/PageTransition";
@@ -409,6 +410,50 @@ const Journeys = () => {
             <div className="text-center py-8">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
+          ) : isCreating ? (
+            // Campaign creation loading state
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-12 bg-gradient-to-br from-primary/10 via-purple-500/10 to-primary/5 rounded-2xl border-2 border-primary/30 relative overflow-hidden"
+            >
+              {/* Animated sparkles background */}
+              <div className="absolute inset-0 pointer-events-none">
+                <Sparkles className="absolute top-4 left-8 w-4 h-4 text-primary/40 animate-pulse" />
+                <Sparkles className="absolute top-8 right-12 w-3 h-3 text-purple-400/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
+                <Sparkles className="absolute bottom-6 left-16 w-3 h-3 text-primary/30 animate-pulse" style={{ animationDelay: '1s' }} />
+                <Sparkles className="absolute bottom-10 right-8 w-4 h-4 text-purple-400/30 animate-pulse" style={{ animationDelay: '0.3s' }} />
+              </div>
+              
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="inline-block"
+              >
+                <Loader2 className="w-16 h-16 text-primary mx-auto mb-4" />
+              </motion.div>
+              <h3 className="text-xl font-bold mb-2">Creating Your Campaign...</h3>
+              <p className="text-muted-foreground mb-4 max-w-xs mx-auto">
+                Setting up rituals, milestones, and your adventure awaits
+              </p>
+              <div className="flex justify-center gap-1">
+                <motion.div
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+                  className="w-2 h-2 rounded-full bg-primary"
+                />
+                <motion.div
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.3 }}
+                  className="w-2 h-2 rounded-full bg-primary"
+                />
+                <motion.div
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.6 }}
+                  className="w-2 h-2 rounded-full bg-primary"
+                />
+              </div>
+            </motion.div>
           ) : activeJourneys.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
