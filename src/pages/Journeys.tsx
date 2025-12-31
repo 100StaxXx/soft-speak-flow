@@ -345,6 +345,8 @@ const Journeys = () => {
                 scheduledTime: parsed.scheduledTime,
                 estimatedDuration: parsed.estimatedDuration,
                 recurrencePattern: parsed.recurrencePattern,
+                reminderEnabled: parsed.reminderEnabled,
+                reminderMinutesBefore: parsed.reminderMinutesBefore,
               });
               
               // If subtasks were generated, create those too
