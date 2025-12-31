@@ -295,19 +295,23 @@ export const MilestoneDetailDrawer = ({
                   </div>
                 ) : !isCompleted ? (
                   // Teaser for uncompleted postcard milestone
-                  <div className="rounded-xl border border-dashed border-stardust-gold/40 bg-gradient-to-br from-stardust-gold/10 via-amber-500/5 to-royal-purple/10 p-5 text-center">
-                    <div className="w-12 h-12 rounded-full bg-stardust-gold/20 flex items-center justify-center mx-auto mb-3">
-                      <Sparkles className="w-6 h-6 text-stardust-gold" />
+                  <div className="relative rounded-xl border border-dashed border-stardust-gold/40 bg-gradient-to-br from-stardust-gold/10 via-amber-500/5 to-royal-purple/10 p-5 text-center overflow-hidden">
+                    {/* Shimmer overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-stardust-gold/10 to-transparent animate-shimmer" />
+                    <div className="relative z-10">
+                      <div className="w-12 h-12 rounded-full bg-stardust-gold/20 flex items-center justify-center mx-auto mb-3">
+                        <Sparkles className="w-6 h-6 text-stardust-gold" />
+                      </div>
+                      <p className="text-sm text-foreground/90 font-medium">
+                        Complete this milestone to unlock{" "}
+                        <span className="text-stardust-gold">
+                          {milestone.chapter_number
+                            ? `Chapter ${milestone.chapter_number}`
+                            : "a new chapter"}
+                        </span>
+                        {" "}of your cosmic journey!
+                      </p>
                     </div>
-                    <p className="text-sm text-foreground/90 font-medium">
-                      Complete this milestone to unlock{" "}
-                      <span className="text-stardust-gold">
-                        {milestone.chapter_number
-                          ? `Chapter ${milestone.chapter_number}`
-                          : "a new chapter"}
-                      </span>
-                      {" "}of your cosmic journey!
-                    </p>
                   </div>
                 ) : (
                   // Completed but no postcard generated yet
