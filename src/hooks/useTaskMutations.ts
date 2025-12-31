@@ -10,6 +10,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import React, { useRef, createElement } from "react";
 import { getEffectiveQuestXP } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
+import { format } from "date-fns";
 
 type TaskCategory = 'mind' | 'body' | 'soul';
 const validCategories: TaskCategory[] = ['mind', 'body', 'soul'];
@@ -203,7 +204,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       const { data: existingTask, error: existingError } = await supabase
         .from('daily_tasks')
-        .select('completed_at, task_text')
+        .select('completed_at, task_text, habit_source_id, task_date')
         .eq('id', taskId)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -212,6 +213,8 @@ export const useTaskMutations = (taskDate: string) => {
 
       const wasAlreadyCompleted = existingTask?.completed_at !== null;
       const taskText = existingTask?.task_text || 'Task';
+      const habitSourceId = existingTask?.habit_source_id;
+      const taskDateValue = existingTask?.task_date || format(new Date(), 'yyyy-MM-dd');
 
       // Allow undo if forceUndo is true, otherwise block unchecking
       if (wasAlreadyCompleted && !completed && !forceUndo) {
@@ -233,7 +236,17 @@ export const useTaskMutations = (taskDate: string) => {
           await awardCustomXP(-xpReward, 'task_undo', 'Quest undone', { task_id: taskId });
         }
 
-        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted: true, isUndo: true, taskText };
+        // If this was a habit-sourced task, remove the habit completion
+        if (habitSourceId) {
+          await supabase
+            .from('habit_completions')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('habit_id', habitSourceId)
+            .eq('date', taskDateValue);
+        }
+
+        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted: true, isUndo: true, taskText, habitSourceId };
       }
 
       if (!completed) {
@@ -244,7 +257,18 @@ export const useTaskMutations = (taskDate: string) => {
           .eq('user_id', user.id);
 
         if (error) throw error;
-        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted, isUndo: false, taskText };
+
+        // If this was a habit-sourced task, remove the habit completion
+        if (habitSourceId) {
+          await supabase
+            .from('habit_completions')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('habit_id', habitSourceId)
+            .eq('date', taskDateValue);
+        }
+
+        return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted, isUndo: false, taskText, habitSourceId };
       }
 
       const { bonusXP, toastReason } = await calculateGuildBonus(user.id, xpReward);
@@ -265,11 +289,36 @@ export const useTaskMutations = (taskDate: string) => {
 
       await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
 
-      return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted, isUndo: false, taskText };
+      // If this is a habit-sourced task, sync with habit_completions
+      if (habitSourceId) {
+        const { error: habitError } = await supabase
+          .from('habit_completions')
+          .upsert({
+            user_id: user.id,
+            habit_id: habitSourceId,
+            date: taskDateValue,
+          }, { onConflict: 'user_id,habit_id,date' });
+
+        if (habitError) {
+          console.error('[Task Toggle] Failed to sync habit completion:', habitError);
+        } else {
+          console.log('[Task Toggle] Synced habit completion for habit:', habitSourceId);
+        }
+      }
+
+      return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted, isUndo: false, taskText, habitSourceId };
     },
-    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText }) => {
+    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      // Also invalidate habit-related queries if this was a habit-sourced task
+      if (habitSourceId) {
+        queryClient.invalidateQueries({ queryKey: ['habit-completions'] });
+        queryClient.invalidateQueries({ queryKey: ['habits'] });
+        queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
+        queryClient.invalidateQueries({ queryKey: ['epics'] });
+      }
 
       // Handle undo success
       if (isUndo) {

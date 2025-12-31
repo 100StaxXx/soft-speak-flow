@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export interface SurfacedHabit {
   id: string;
@@ -137,7 +138,12 @@ export function useHabitSurfacing(selectedDate?: Date) {
         h => h.epic_id && !h.task_id
       ) || [];
 
-      if (habitsToSurface.length === 0) return [];
+      console.log('[Habit Surfacing] Habits to surface:', habitsToSurface.length, habitsToSurface);
+
+      if (habitsToSurface.length === 0) {
+        console.log('[Habit Surfacing] No habits need surfacing');
+        return [];
+      }
 
       const tasks = habitsToSurface.map(habit => ({
         user_id: user.id,
@@ -151,19 +157,33 @@ export function useHabitSurfacing(selectedDate?: Date) {
         estimated_duration: habit.estimated_minutes,
       }));
 
+      console.log('[Habit Surfacing] Inserting tasks:', tasks);
+
       const { data, error } = await supabase
         .from('daily_tasks')
         .insert(tasks)
         .select('id');
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Habit Surfacing] Insert error:', error);
+        throw error;
+      }
+
+      console.log('[Habit Surfacing] Successfully surfaced', data?.length, 'habits');
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      if (data && data.length > 0) {
+        toast.success(`${data.length} ritual${data.length > 1 ? 's' : ''} added to today's quests`);
+      }
+    },
+    onError: (error: Error) => {
+      console.error('[Habit Surfacing] Mutation error:', error);
+      toast.error('Failed to surface habits as quests');
     },
   });
 
