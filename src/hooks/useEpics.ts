@@ -573,6 +573,7 @@ export const useEpics = () => {
     error: epicsError,
     createEpic: createEpic.mutate,
     isCreating: createEpic.isPending,
+    isCreateSuccess: createEpic.isSuccess,
     updateEpicStatus: updateEpicStatus.mutate,
     addHabitToEpic: addHabitToEpic.mutate,
     removeHabitFromEpic: removeHabitFromEpic.mutate,

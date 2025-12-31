@@ -105,10 +105,14 @@ export function TodaysAgenda({
       window.removeEventListener('resize', updatePosition);
     };
   }, [tutorialQuest]);
-  // Unified task list - no more separation between rituals and quests
-  const sortedTasks = useMemo(() => {
-    // Sort: incomplete first, then by scheduled time
-    return [...tasks].sort((a, b) => {
+  
+  // Separate ritual tasks (from campaigns) and regular quests
+  const { ritualTasks, questTasks, sortedTasks } = useMemo(() => {
+    const rituals = tasks.filter(t => !!t.habit_source_id);
+    const quests = tasks.filter(t => !t.habit_source_id);
+    
+    // Sort each group: incomplete first, then by scheduled time
+    const sortGroup = (group: Task[]) => [...group].sort((a, b) => {
       if (a.completed !== b.completed) {
         return a.completed ? 1 : -1;
       }
@@ -119,6 +123,12 @@ export function TodaysAgenda({
       if (b.scheduled_time) return 1;
       return 0;
     });
+    
+    return {
+      ritualTasks: sortGroup(rituals),
+      questTasks: sortGroup(quests),
+      sortedTasks: [...sortGroup(rituals), ...sortGroup(quests)],
+    };
   }, [tasks]);
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
@@ -292,11 +302,46 @@ export function TodaysAgenda({
           </div>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {sortedTasks.slice(0, 8).map((task) => renderTaskItem(task))}
-            {sortedTasks.length > 8 && (
-              <p className="text-xs text-muted-foreground text-center py-1">
-                +{sortedTasks.length - 8} more
-              </p>
+            {/* Cosmiq Rituals Section */}
+            {ritualTasks.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 py-1.5 px-1">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
+                    <Sparkles className="w-3 h-3 text-accent" />
+                    <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
+                      Cosmiq Rituals
+                    </span>
+                    <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-accent/20 text-accent border-0">
+                      {ritualTasks.length}
+                    </Badge>
+                  </div>
+                </div>
+                {ritualTasks.slice(0, 4).map((task) => renderTaskItem(task))}
+                {ritualTasks.length > 4 && (
+                  <p className="text-xs text-muted-foreground text-center py-0.5">
+                    +{ritualTasks.length - 4} more rituals
+                  </p>
+                )}
+              </>
+            )}
+            
+            {/* Regular Quests Section */}
+            {questTasks.length > 0 && (
+              <>
+                {ritualTasks.length > 0 && (
+                  <div className="flex items-center gap-2 py-1.5 px-1 mt-2">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      Quests
+                    </span>
+                  </div>
+                )}
+                {questTasks.slice(0, ritualTasks.length > 0 ? 4 : 8).map((task) => renderTaskItem(task))}
+                {questTasks.length > (ritualTasks.length > 0 ? 4 : 8) && (
+                  <p className="text-xs text-muted-foreground text-center py-0.5">
+                    +{questTasks.length - (ritualTasks.length > 0 ? 4 : 8)} more
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
