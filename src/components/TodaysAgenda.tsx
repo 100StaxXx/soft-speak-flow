@@ -13,7 +13,9 @@ import {
   Clock,
   Pencil,
   Repeat,
-  ChevronDown
+  ChevronDown,
+  Target,
+  CheckCircle2
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ interface Task {
   difficulty?: string | null;
   habit_source_id?: string | null;
   epic_id?: string | null;
+  epic_title?: string | null;
 }
 
 interface Journey {
@@ -77,7 +80,19 @@ export function TodaysAgenda({
 }: TodaysAgendaProps) {
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
   const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
-  const [ritualsExpanded, setRitualsExpanded] = useState(true);
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  
+  const toggleCampaign = (campaignId: string) => {
+    setExpandedCampaigns(prev => {
+      const next = new Set(prev);
+      if (next.has(campaignId)) {
+        next.delete(campaignId);
+      } else {
+        next.add(campaignId);
+      }
+      return next;
+    });
+  };
 
   // Find tutorial quest
   const tutorialQuest = tasks.find(t => t.task_text === 'Join Cosmiq' && !t.completed);
@@ -137,6 +152,31 @@ export function TodaysAgenda({
       questTasks: sortGroup(quests),
     };
   }, [tasks]);
+
+  // Group ritual tasks by campaign
+  const ritualsByCampaign = useMemo(() => {
+    const groups = new Map<string, { 
+      title: string; 
+      tasks: Task[];
+      completedCount: number;
+      totalCount: number;
+    }>();
+    
+    ritualTasks.forEach(task => {
+      const key = task.epic_id || 'standalone';
+      const title = task.epic_title || 'Standalone Rituals';
+      
+      if (!groups.has(key)) {
+        groups.set(key, { title, tasks: [], completedCount: 0, totalCount: 0 });
+      }
+      const group = groups.get(key)!;
+      group.tasks.push(task);
+      group.totalCount++;
+      if (task.completed) group.completedCount++;
+    });
+    
+    return groups;
+  }, [ritualTasks]);
 
   const questLimit = ritualTasks.length > 0 ? QUEST_LIMIT_WITH_RITUALS : QUEST_LIMIT_SOLO;
 
@@ -333,35 +373,73 @@ export function TodaysAgenda({
               </>
             )}
             
-            {/* Cosmiq Rituals Section */}
+            {/* Rituals Section - Grouped by Campaign */}
             {ritualTasks.length > 0 && (
-              <Collapsible open={ritualsExpanded} onOpenChange={setRitualsExpanded} className="mt-2">
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between py-1.5 px-1 cursor-pointer hover:bg-muted/30 rounded transition-colors">
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
-                      <Sparkles className="w-3 h-3 text-accent" />
-                      <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
-                        Cosmiq Rituals
-                      </span>
-                      <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-accent/20 text-accent border-0">
-                        {ritualTasks.length}
-                      </Badge>
-                    </div>
-                    <ChevronDown className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                      ritualsExpanded ? "" : "-rotate-90"
-                    )} />
+              <>
+                {/* Simple Rituals header - NOT collapsible */}
+                <div className="flex items-center gap-2 py-1.5 px-1 mt-2">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
+                    <Sparkles className="w-3 h-3 text-accent" />
+                    <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
+                      Rituals
+                    </span>
+                    <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-accent/20 text-accent border-0">
+                      {ritualTasks.length}
+                    </Badge>
                   </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  {ritualTasks.slice(0, RITUAL_LIMIT).map((task) => renderTaskItem(task))}
-                  {ritualTasks.length > RITUAL_LIMIT && (
-                    <p className="text-xs text-muted-foreground text-center py-0.5">
-                      +{ritualTasks.length - RITUAL_LIMIT} more rituals
-                    </p>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
+                </div>
+                
+                {/* Campaign groups - each collapsible */}
+                {Array.from(ritualsByCampaign.entries()).map(([campaignId, group]) => {
+                  const isExpanded = expandedCampaigns.has(campaignId);
+                  const isComplete = group.completedCount === group.totalCount;
+                  
+                  return (
+                    <Collapsible 
+                      key={campaignId} 
+                      open={isExpanded} 
+                      onOpenChange={() => toggleCampaign(campaignId)}
+                    >
+                      <CollapsibleTrigger className="w-full">
+                        <div className={cn(
+                          "flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer transition-colors",
+                          "hover:bg-muted/30",
+                          isComplete && "bg-green-500/10"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            {isComplete ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                            ) : (
+                              <Target className="w-3.5 h-3.5 text-accent/70" />
+                            )}
+                            <span className={cn(
+                              "text-xs font-medium truncate max-w-[160px]",
+                              isComplete && "text-green-500"
+                            )}>
+                              {group.title}
+                            </span>
+                            <Badge variant="outline" className={cn(
+                              "h-4 px-1.5 text-[10px] border-muted-foreground/30",
+                              isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
+                            )}>
+                              {group.completedCount}/{group.totalCount}
+                            </Badge>
+                          </div>
+                          <ChevronDown className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                            isExpanded ? "" : "-rotate-90"
+                          )} />
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="pl-4 border-l border-accent/20 ml-2">
+                          {group.tasks.map((task) => renderTaskItem(task))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </>
             )}
           </div>
         )}

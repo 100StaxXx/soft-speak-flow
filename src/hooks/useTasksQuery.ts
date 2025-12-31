@@ -35,6 +35,9 @@ export interface DailyTask {
   source: string | null;
   // Habit integration
   habit_source_id: string | null;
+  // Epic/Campaign integration
+  epic_id: string | null;
+  epic_title?: string | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {
@@ -54,7 +57,7 @@ export const useTasksQuery = (selectedDate?: Date) => {
       
       const { data, error } = await supabase
         .from('daily_tasks')
-        .select('*')
+        .select('*, epics(title)')
         .eq('user_id', user.id)
         .eq('task_date', taskDate)
         .order('created_at', { ascending: false });
@@ -63,7 +66,12 @@ export const useTasksQuery = (selectedDate?: Date) => {
         console.error('Failed to fetch daily tasks:', error);
         throw error;
       }
-      return (data || []) as DailyTask[];
+      
+      // Flatten epic title from joined data
+      return (data || []).map(task => ({
+        ...task,
+        epic_title: (task.epics as { title: string } | null)?.title || null,
+      })) as DailyTask[];
     },
     enabled: !!user?.id,
     staleTime: 2 * 60 * 1000,
