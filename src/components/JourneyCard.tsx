@@ -28,11 +28,11 @@ import { useMilestones } from "@/hooks/useMilestones";
 type JourneyTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 
 const themeGradients: Record<JourneyTheme, string> = {
-  heroic: "from-epic-heroic/20 to-purple-500/20",
-  warrior: "from-epic-warrior/20 to-orange-500/20",
-  mystic: "from-epic-mystic/20 to-blue-500/20",
-  nature: "from-epic-nature/20 to-emerald-500/20",
-  solar: "from-epic-solar/20 to-amber-500/20"
+  heroic: "from-epic-heroic/10 to-purple-500/10",
+  warrior: "from-epic-warrior/10 to-orange-500/10",
+  mystic: "from-epic-mystic/10 to-blue-500/10",
+  nature: "from-epic-nature/10 to-emerald-500/10",
+  solar: "from-epic-solar/10 to-amber-500/10"
 };
 
 const themeBorders: Record<JourneyTheme, string> = {
@@ -150,8 +150,8 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       transition={{ duration: 0.3 }}
     >
       <Card className={cn(
-        "p-5 bg-gradient-to-br border-2 transition-all",
-        `from-background to-secondary/20 ${themeBorder}`,
+        "p-5 bg-gradient-to-br border-2 transition-all bg-background/40",
+        `${themeBorder}`,
         `bg-gradient-to-br ${themeGradient}`
       )}>
         <div className="flex items-start justify-between mb-3">
