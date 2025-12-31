@@ -221,13 +221,32 @@ const Journeys = () => {
     description?: string;
     target_days: number;
     story_type_slug?: StoryTypeSlug;
+    theme_color?: string;
+    is_public?: boolean;
     habits: Array<{
       title: string;
+      description?: string;
       difficulty: string;
       frequency: string;
       custom_days: number[];
+      estimated_minutes?: number;
+    }>;
+    milestones?: Array<{
+      title: string;
+      description?: string;
+      target_date: string;
+      milestone_percent: number;
+      is_postcard_milestone: boolean;
+    }>;
+    phases?: Array<{
+      name: string;
+      description: string;
+      start_date: string;
+      end_date: string;
+      phase_order: number;
     }>;
   }) => {
+    console.log('[Journeys] Creating journey with milestones:', data.milestones?.length || 0);
     createJourney(data);
     setSmartWizardOpen(false);
   };

@@ -276,25 +276,34 @@ export const useEpics = () => {
 
         // Create milestones with dates if provided
         if (epicData.milestones && epicData.milestones.length > 0) {
-          const { error: milestonesError } = await supabase
+          console.log('[Epic Creation] Inserting milestones:', epicData.milestones.length, epicData.milestones);
+          
+          const { data: insertedMilestones, error: milestonesError } = await supabase
             .from("epic_milestones")
             .insert(
               epicData.milestones.map((milestone, index) => ({
                 epic_id: epic.id,
                 user_id: currentUserId,
                 title: milestone.title,
-                description: milestone.description,
+                description: milestone.description || null,
                 target_date: milestone.target_date,
                 milestone_percent: milestone.milestone_percent,
-                is_postcard_milestone: milestone.is_postcard_milestone,
+                is_postcard_milestone: milestone.is_postcard_milestone ?? false,
                 phase_order: index + 1,
               }))
-            );
+            )
+            .select();
 
           if (milestonesError) {
             console.error("Failed to create milestones:", milestonesError);
-            // Non-blocking - epic still created successfully
+            toast.error("Milestones couldn't be created", {
+              description: "You can add them manually from the campaign settings",
+            });
+          } else {
+            console.log('[Epic Creation] Successfully created milestones:', insertedMilestones?.length);
           }
+        } else {
+          console.log('[Epic Creation] No milestones provided in epicData');
         }
 
         // Trigger narrative seed generation in background if story type selected
