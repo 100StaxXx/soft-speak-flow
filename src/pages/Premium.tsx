@@ -320,6 +320,7 @@ export default function Premium() {
             <div className="flex justify-center gap-4 text-xs">
               <a href="/privacy" className="text-muted-foreground underline hover:text-foreground">Privacy Policy</a>
               <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
+              <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline hover:text-foreground">Apple EULA</a>
             </div>
           </CardContent>
         </Card>

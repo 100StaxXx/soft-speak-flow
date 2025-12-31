@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, Search, ChevronRight, type LucideIcon } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, Search, ChevronRight, ExternalLink, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -447,6 +447,20 @@ const Profile = () => {
                   >
                     <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
                     Privacy Policy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start h-9 text-sm"
+                    asChild
+                  >
+                    <a
+                      href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2 text-muted-foreground" />
+                      Apple End User License Agreement
+                    </a>
                   </Button>
                 </CardContent>
               </Card>
