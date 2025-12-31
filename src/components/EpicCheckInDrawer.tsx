@@ -4,7 +4,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Star, CheckCircle2, Loader2, ChevronDown, Clock, Calendar, Target, Pencil } from "lucide-react";
+import { Sparkles, Star, CheckCircle2, Loader2, ChevronDown, Clock, Calendar, Target, Pencil, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,7 @@ interface Habit {
   difficulty: string;
   frequency?: string;
   estimated_minutes?: number | null;
+  custom_days?: number[] | null;
 }
 
 const formatFrequency = (freq: string): string => {
@@ -30,6 +31,33 @@ const formatFrequency = (freq: string): string => {
     case 'custom': return 'Custom';
     default: return freq;
   }
+};
+
+// Check if a habit is scheduled for today based on frequency and custom_days
+const isScheduledForToday = (habit: Habit): boolean => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  // Convert JS day (0=Sunday) to our system (0=Monday)
+  const ourDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  
+  // Daily habits are always scheduled
+  if (habit.frequency === 'daily' || !habit.custom_days || habit.custom_days.length === 0) {
+    return true;
+  }
+  
+  // Custom frequency - check if today is in custom_days
+  return habit.custom_days.includes(ourDayIndex);
+};
+
+// Get next scheduled day name for upcoming habits
+const getNextScheduledDay = (days: number[]): string => {
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const today = new Date();
+  const currentDay = today.getDay() === 0 ? 6 : today.getDay() - 1;
+  
+  // Find the next day after today
+  const nextDay = days.find(d => d > currentDay) ?? days[0];
+  return dayNames[nextDay];
 };
 
 interface EpicCheckInDrawerProps {
@@ -49,11 +77,28 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const [processingHabits, setProcessingHabits] = useState<Set<string>>(new Set());
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [earlyBirdExpanded, setEarlyBirdExpanded] = useState(false);
   
   // Ref-based guard for rapid click prevention
   const processingRef = useRef(false);
 
   const today = format(new Date(), 'yyyy-MM-dd');
+  
+  // Split habits into today's and upcoming
+  const { todayHabits, upcomingHabits } = useMemo(() => {
+    const todayList: Habit[] = [];
+    const upcomingList: Habit[] = [];
+    
+    habits.forEach(habit => {
+      if (isScheduledForToday(habit)) {
+        todayList.push(habit);
+      } else {
+        upcomingList.push(habit);
+      }
+    });
+    
+    return { todayHabits: todayList, upcomingHabits: upcomingList };
+  }, [habits]);
   
   // Memoize habitIds to create a stable reference
   const habitIds = useMemo(() => habits.map(h => h.id), [habits]);
@@ -154,7 +199,8 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
   const handleCompleteAll = async () => {
     if (!user?.id) return;
     
-    const uncompleted = habits.filter(h => !completedToday.has(h.id));
+    // Only complete today's habits with "Complete All"
+    const uncompleted = todayHabits.filter(h => !completedToday.has(h.id));
     if (uncompleted.length === 0) return;
     
     setSubmitting(true);
@@ -171,7 +217,8 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
       
       if (error) throw error;
       
-      setCompletedToday(new Set(habits.map(h => h.id)));
+      // Mark only today's habits as completed
+      setCompletedToday(prev => new Set([...prev, ...todayHabits.map(h => h.id)]));
       setShowSuccess(true);
       
       // Show success animation then close
@@ -219,8 +266,11 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     queryClient.invalidateQueries({ queryKey: ['epics'] });
   };
 
-  const allCompleted = habits.length > 0 && habits.every(h => completedToday.has(h.id));
-  const completionCount = completedToday.size;
+  // Check completion based on today's habits only
+  const allTodayCompleted = todayHabits.length > 0 && todayHabits.every(h => completedToday.has(h.id));
+  const todayCompletionCount = todayHabits.filter(h => completedToday.has(h.id)).length;
+  const totalTodayCount = todayHabits.length;
+  const upcomingCompletionCount = upcomingHabits.filter(h => completedToday.has(h.id)).length;
 
   if (!isActive || habits.length === 0) return null;
 
@@ -248,12 +298,18 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
           <Sparkles className="w-4 h-4 mr-2 text-primary animate-pulse" />
           
           <span className="relative z-10 font-medium">
-            {allCompleted ? "Today's Rituals Complete ✨" : "Check In Today"}
+            {allTodayCompleted ? "Today's Rituals Complete ✨" : "Check In Today"}
           </span>
           
-          {completionCount > 0 && !allCompleted && (
+          {todayCompletionCount > 0 && !allTodayCompleted && (
             <span className="ml-2 px-2 py-0.5 text-xs bg-celestial-blue/20 text-celestial-blue rounded-full">
-              {completionCount}/{habits.length}
+              {todayCompletionCount}/{totalTodayCount}
+            </span>
+          )}
+          
+          {upcomingCompletionCount > 0 && (
+            <span className="ml-1 px-2 py-0.5 text-xs bg-amber-500/20 text-amber-500 rounded-full">
+              +{upcomingCompletionCount} early
             </span>
           )}
           
@@ -307,7 +363,8 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                   className="space-y-3 overflow-y-auto overscroll-contain max-h-[60vh] -mx-2 px-2"
                   data-vaul-no-drag
                 >
-                  {habits.map((habit, index) => {
+                  {/* Today's Habits */}
+                  {todayHabits.map((habit) => {
                     const isCompleted = completedToday.has(habit.id);
                     const isProcessing = processingHabits.has(habit.id);
                     const isExpanded = expandedHabit === habit.id;
@@ -436,14 +493,190 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                       </Collapsible>
                     );
                   })}
+
+                  {/* Early Bird Mode - Upcoming Habits */}
+                  {upcomingHabits.length > 0 && (
+                    <Collapsible 
+                      open={earlyBirdExpanded} 
+                      onOpenChange={setEarlyBirdExpanded}
+                      className="mt-4"
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all">
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-amber-500" />
+                            <span className="text-sm font-medium text-amber-200">
+                              Early Bird Mode
+                            </span>
+                            <span className="text-xs text-amber-500/70">
+                              Get ahead of the game!
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              {upcomingHabits.length} upcoming
+                            </span>
+                            <ChevronDown className={cn(
+                              "w-4 h-4 text-amber-500 transition-transform",
+                              earlyBirdExpanded && "rotate-180"
+                            )} />
+                          </div>
+                        </button>
+                      </CollapsibleTrigger>
+                      
+                      <CollapsibleContent>
+                        <div className="mt-3 space-y-2 pl-2 border-l-2 border-amber-500/20">
+                          <p className="text-xs text-amber-500/80 italic px-2 pb-2">
+                            These habits are scheduled for later, but feel free to knock them out early! ⚡
+                          </p>
+                          
+                          {upcomingHabits.map((habit) => {
+                            const isCompleted = completedToday.has(habit.id);
+                            const isProcessing = processingHabits.has(habit.id);
+                            const isExpanded = expandedHabit === habit.id;
+                            const hasDetails = habit.description || habit.frequency || habit.estimated_minutes;
+                            
+                            return (
+                              <Collapsible
+                                key={habit.id}
+                                open={isExpanded}
+                                onOpenChange={(open) => setExpandedHabit(open ? habit.id : null)}
+                              >
+                                <div
+                                  className={cn(
+                                    "rounded-xl transition-colors overflow-hidden",
+                                    "bg-amber-500/5 border border-amber-500/20",
+                                    isCompleted && "bg-stardust-gold/10 border-stardust-gold/30",
+                                    isProcessing && "opacity-50 pointer-events-none"
+                                  )}
+                                >
+                                  {/* Main habit row */}
+                                  <div
+                                    className="flex items-center gap-3 p-4 min-h-[60px]"
+                                    style={{ 
+                                      touchAction: 'manipulation',
+                                      WebkitTapHighlightColor: 'transparent',
+                                    }}
+                                  >
+                                    <Checkbox
+                                      id={`habit-upcoming-${habit.id}`}
+                                      checked={isCompleted}
+                                      disabled={submitting || isProcessing}
+                                      onCheckedChange={(checked) => {
+                                        handleToggleHabit(habit.id, Boolean(checked));
+                                      }}
+                                      className={cn(
+                                        "h-6 w-6 rounded-full border-2 touch-manipulation",
+                                        isCompleted ? "border-amber-500 bg-amber-500" : "border-amber-500/30"
+                                      )}
+                                    />
+                                    <label
+                                      htmlFor={`habit-upcoming-${habit.id}`}
+                                      className={cn(
+                                        "flex-1 text-sm font-medium cursor-pointer touch-manipulation select-none",
+                                        isCompleted && "line-through text-muted-foreground"
+                                      )}
+                                    >
+                                      {habit.title}
+                                    </label>
+                                    {/* Day badge showing when scheduled */}
+                                    {habit.custom_days && habit.custom_days.length > 0 && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                        {getNextScheduledDay(habit.custom_days)}
+                                      </span>
+                                    )}
+                                    {isCompleted && (
+                                      <Sparkles className="w-4 h-4 text-amber-500" />
+                                    )}
+                                    {hasDetails && (
+                                      <CollapsibleTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "h-10 w-10 -mr-2 flex items-center justify-center rounded-lg",
+                                            "active:bg-amber-500/20 transition-colors",
+                                            "touch-manipulation",
+                                            "relative z-10"
+                                          )}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                          onTouchEnd={(e) => {
+                                            e.stopPropagation();
+                                          }}
+                                        >
+                                          <ChevronDown 
+                                            className={cn(
+                                              "h-5 w-5 text-amber-500/70 transition-transform duration-200",
+                                              isExpanded && "rotate-180"
+                                            )} 
+                                          />
+                                        </button>
+                                      </CollapsibleTrigger>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Expandable details section */}
+                                  <CollapsibleContent>
+                                    <div 
+                                      className="px-4 pb-4 pt-0 space-y-2 border-t border-amber-500/20"
+                                      data-vaul-no-drag
+                                    >
+                                      {habit.description && (
+                                        <p className="text-sm text-amber-500/70 pt-3">
+                                          {habit.description}
+                                        </p>
+                                      )}
+                                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                                        {habit.frequency && (
+                                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                                            <span>{formatFrequency(habit.frequency)}</span>
+                                          </div>
+                                        )}
+                                        {habit.estimated_minutes && (
+                                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                            <span>~{habit.estimated_minutes} min</span>
+                                          </div>
+                                        )}
+                                        {habit.difficulty && (
+                                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <Target className="w-3.5 h-3.5 text-amber-500" />
+                                            <span className="capitalize">{habit.difficulty}</span>
+                                          </div>
+                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 px-2 ml-auto text-xs text-amber-500/70 hover:text-amber-500"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingHabit(habit);
+                                          }}
+                                        >
+                                          <Pencil className="w-3 h-3 mr-1" />
+                                          Edit
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </CollapsibleContent>
+                                </div>
+                              </Collapsible>
+                            );
+                          })}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
                 </div>
                   
-                {/* Complete All Button */}
-                {!allCompleted && (
+                {/* Complete All Button - only for today's habits */}
+                {todayHabits.length > 0 && !allTodayCompleted && (
                   <div className="pt-4">
                     <Button
                       onClick={handleCompleteAll}
-                      disabled={submitting || allCompleted}
+                      disabled={submitting || allTodayCompleted}
                       className="w-full bg-gradient-to-r from-stardust-gold to-primary hover:from-stardust-gold/90 hover:to-primary/90 text-primary-foreground"
                     >
                       <Star className="w-4 h-4 mr-2" />
@@ -452,9 +685,15 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                   </div>
                 )}
                 
-                {allCompleted && (
+                {allTodayCompleted && todayHabits.length > 0 && (
                   <p className="text-center text-sm text-muted-foreground pt-4">
                     ✨ You've completed all rituals for today!
+                  </p>
+                )}
+                
+                {todayHabits.length === 0 && upcomingHabits.length > 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-4">
+                    No habits scheduled for today. Check the Early Bird section to get ahead! ⚡
                   </p>
                 )}
               </>
