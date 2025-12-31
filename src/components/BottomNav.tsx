@@ -52,7 +52,7 @@ export const BottomNav = memo(() => {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-glow z-50 transition-transform duration-300"
+        className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-background/98 border-t border-border/50 shadow-lg z-50 transition-transform duration-200"
         role="navigation"
         aria-label="Main navigation"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
@@ -60,7 +60,7 @@ export const BottomNav = memo(() => {
         <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-3 sm:py-2.5">
         <NavLink
           to="/mentor"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           onClick={() => haptics.light()}
         >
@@ -89,7 +89,7 @@ export const BottomNav = memo(() => {
 
         <NavLink
           to="/companion"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px] relative"
           activeClassName="bg-gradient-to-br from-stardust-gold/20 to-stardust-gold/5 shadow-soft"
           data-tour="companion-tab"
           onClick={() => haptics.light()}
@@ -114,7 +114,7 @@ export const BottomNav = memo(() => {
         <NavLink
           to="/journeys"
           className={cn(
-            "flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95",
+            "flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]",
             isLongPressing && "scale-95 opacity-70"
           )}
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
@@ -154,7 +154,7 @@ export const BottomNav = memo(() => {
 
         <NavLink
           to="/guilds"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
           activeClassName="bg-gradient-to-br from-celestial-blue/20 to-celestial-blue/5 shadow-soft"
           onClick={() => haptics.light()}
         >
@@ -170,7 +170,7 @@ export const BottomNav = memo(() => {
 
         <NavLink
           to="/profile"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           onClick={() => haptics.light()}
         >
