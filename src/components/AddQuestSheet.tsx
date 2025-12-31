@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QUEST_XP_REWARDS } from "@/config/xpRewards";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
+import { SuggestedTimeSlots } from "@/components/SuggestedTimeSlots";
 import {
   Drawer,
   DrawerClose,
@@ -172,6 +173,20 @@ export function AddQuestSheet({
               <span className="text-xs text-muted-foreground">+{QUEST_XP_REWARDS.HARD}</span>
             </Button>
           </div>
+
+          {/* Smart Time Suggestions - show when no time is set */}
+          {!scheduledTime && (
+            <SuggestedTimeSlots
+              date={selectedDate}
+              duration={estimatedDuration || 30}
+              difficulty={difficulty}
+              onSelectTime={(time) => {
+                setScheduledTime(time);
+                setShowAdvanced(true);
+              }}
+              disabled={isAdding}
+            />
+          )}
 
           {/* Advanced Toggle */}
           <button
