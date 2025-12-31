@@ -302,10 +302,29 @@ export function TodaysAgenda({
           </div>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
+            {/* Regular Quests Section */}
+            {questTasks.length > 0 && (
+              <>
+                {ritualTasks.length > 0 && (
+                  <div className="flex items-center gap-2 py-1.5 px-1">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      Quests
+                    </span>
+                  </div>
+                )}
+                {questTasks.slice(0, ritualTasks.length > 0 ? 4 : 8).map((task) => renderTaskItem(task))}
+                {questTasks.length > (ritualTasks.length > 0 ? 4 : 8) && (
+                  <p className="text-xs text-muted-foreground text-center py-0.5">
+                    +{questTasks.length - (ritualTasks.length > 0 ? 4 : 8)} more
+                  </p>
+                )}
+              </>
+            )}
+            
             {/* Cosmiq Rituals Section */}
             {ritualTasks.length > 0 && (
               <>
-                <div className="flex items-center gap-2 py-1.5 px-1">
+                <div className="flex items-center gap-2 py-1.5 px-1 mt-2">
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30">
                     <Sparkles className="w-3 h-3 text-accent" />
                     <span className="text-[10px] font-semibold text-accent uppercase tracking-wide">
@@ -320,25 +339,6 @@ export function TodaysAgenda({
                 {ritualTasks.length > 4 && (
                   <p className="text-xs text-muted-foreground text-center py-0.5">
                     +{ritualTasks.length - 4} more rituals
-                  </p>
-                )}
-              </>
-            )}
-            
-            {/* Regular Quests Section */}
-            {questTasks.length > 0 && (
-              <>
-                {ritualTasks.length > 0 && (
-                  <div className="flex items-center gap-2 py-1.5 px-1 mt-2">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                      Quests
-                    </span>
-                  </div>
-                )}
-                {questTasks.slice(0, ritualTasks.length > 0 ? 4 : 8).map((task) => renderTaskItem(task))}
-                {questTasks.length > (ritualTasks.length > 0 ? 4 : 8) && (
-                  <p className="text-xs text-muted-foreground text-center py-0.5">
-                    +{questTasks.length - (ritualTasks.length > 0 ? 4 : 8)} more
                   </p>
                 )}
               </>
