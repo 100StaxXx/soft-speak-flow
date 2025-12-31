@@ -45,11 +45,18 @@ Deno.serve(async (req) => {
     const tasksToRemind = tasks?.filter(task => {
       if (!task.scheduled_time || !task.reminder_minutes_before) return false;
       
-      const scheduledDateTime = new Date(`${task.task_date}T${task.scheduled_time}`);
+      // Parse the time properly - scheduled_time is stored as TIME (HH:MM:SS) in UTC
+      // Append 'Z' to ensure JavaScript treats it as UTC
+      const timeStr = task.scheduled_time.split('.')[0]; // Remove microseconds if present
+      const scheduledDateTime = new Date(`${task.task_date}T${timeStr}Z`);
       const reminderTime = new Date(scheduledDateTime.getTime() - task.reminder_minutes_before * 60 * 1000);
       
       const timeDiff = reminderTime.getTime() - now.getTime();
-      return timeDiff >= -30000 && timeDiff <= 30000;
+      
+      console.log(`Task ${task.id}: scheduled=${scheduledDateTime.toISOString()}, reminder=${reminderTime.toISOString()}, now=${now.toISOString()}, diff=${timeDiff}ms`);
+      
+      // Widen the window to 60 seconds to account for cron timing
+      return timeDiff >= -60000 && timeDiff <= 60000;
     }) || [];
     
     console.log(`Sending reminders for ${tasksToRemind.length} tasks`);
