@@ -10,6 +10,7 @@ export interface SurfacedHabit {
   habit_description: string | null;
   frequency: string;
   estimated_minutes: number | null;
+  preferred_time: string | null;
   epic_id: string | null;
   epic_title: string | null;
   task_id: string | null;
@@ -38,6 +39,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           difficulty,
           frequency,
           estimated_minutes,
+          preferred_time,
           epic_habits(epic_id, epics(id, title, status))
         `)
         .eq('user_id', user.id)
@@ -72,6 +74,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           habit_description: habit.description || null,
           frequency: habit.frequency || 'daily',
           estimated_minutes: habit.estimated_minutes || null,
+          preferred_time: habit.preferred_time || null,
           epic_id: epic?.status === 'active' ? epic.id : null,
           epic_title: epic?.status === 'active' ? epic.title : null,
           task_id: existingTask?.id || null,
@@ -108,6 +111,8 @@ export function useHabitSurfacing(selectedDate?: Date) {
           epic_id: habit.epic_id,
           category: habit.category,
           source: 'habit',
+          scheduled_time: habit.preferred_time,
+          estimated_duration: habit.estimated_minutes,
         })
         .select('id')
         .single();
@@ -142,6 +147,8 @@ export function useHabitSurfacing(selectedDate?: Date) {
         epic_id: habit.epic_id,
         category: habit.category,
         source: 'habit',
+        scheduled_time: habit.preferred_time,
+        estimated_duration: habit.estimated_minutes,
       }));
 
       const { data, error } = await supabase

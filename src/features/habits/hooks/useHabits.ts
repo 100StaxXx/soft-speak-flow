@@ -98,11 +98,13 @@ export function useHabits() {
     mutationFn: async ({ 
       title, 
       difficulty, 
-      selectedDays 
+      selectedDays,
+      preferredTime 
     }: { 
       title: string; 
       difficulty: HabitDifficulty; 
-      selectedDays: number[] 
+      selectedDays: number[];
+      preferredTime?: string;
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
       
@@ -123,6 +125,7 @@ export function useHabits() {
         frequency: selectedDays.length === 7 ? 'daily' : 'custom',
         custom_days: selectedDays.length === 7 ? null : selectedDays,
         difficulty,
+        preferred_time: preferredTime || null,
       });
       
       if (error) throw error;
@@ -221,6 +224,7 @@ export function useHabits() {
         frequency?: string;
         estimated_minutes?: number | null;
         difficulty?: string;
+        preferred_time?: string | null;
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');

@@ -21,6 +21,7 @@ interface Habit {
   frequency?: string;
   estimated_minutes?: number | null;
   custom_days?: number[] | null;
+  preferred_time?: string | null;
 }
 
 const formatFrequency = (freq: string): string => {
@@ -247,6 +248,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
     frequency: string;
     estimated_minutes: number | null;
     difficulty: string;
+    preferred_time: string | null;
   }) => {
     if (!user?.id) return;
     
@@ -368,7 +370,7 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                     const isCompleted = completedToday.has(habit.id);
                     const isProcessing = processingHabits.has(habit.id);
                     const isExpanded = expandedHabit === habit.id;
-                    const hasDetails = habit.description || habit.frequency || habit.estimated_minutes;
+                    const hasDetails = habit.description || habit.frequency || habit.estimated_minutes || habit.preferred_time;
                     
                     return (
                       <Collapsible
@@ -413,6 +415,12 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                             >
                               {habit.title}
                             </label>
+                            {habit.preferred_time && !isCompleted && (
+                              <span className="text-xs text-celestial-blue/80 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {habit.preferred_time.slice(0, 5)}
+                              </span>
+                            )}
                             {isCompleted && (
                               <Sparkles className="w-4 h-4 text-stardust-gold" />
                             )}
