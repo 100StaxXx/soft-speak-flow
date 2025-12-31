@@ -340,16 +340,7 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 text-center relative"
         >
-          <div className="absolute right-0 top-0 flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowHourlyModal(true)}
-              className="h-11 w-11 text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 touch-manipulation"
-              title="Calendar View"
-            >
-              <Calendar className="h-5 w-5" />
-            </Button>
+          <div className="absolute right-0 top-0">
             <PageInfoButton 
               onClick={() => setShowPageInfo(true)} 
             />
@@ -374,6 +365,14 @@ const Journeys = () => {
             onDateSelect={setSelectedDate}
             tasksPerDay={tasksPerDay}
           />
+          <Button
+            variant="ghost"
+            onClick={() => setShowHourlyModal(true)}
+            className="w-full mt-3 text-sky-400 hover:text-sky-300 hover:bg-sky-400/10 touch-manipulation"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Calendar View
+          </Button>
         </motion.div>
 
         {/* Smart Natural Language Input */}
