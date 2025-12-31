@@ -21,6 +21,7 @@ import {
   X,
   Check,
   Target,
+  StickyNote,
   Loader2,
   List
 } from 'lucide-react';
@@ -522,11 +523,25 @@ export function SmartTaskInput({
     setInput(newInput.replace(/\s+/g, ' ').trim());
   };
 
+  const clearNotes = () => {
+    tap();
+    const notePatterns = [
+      /\bnotes?:\s*(.+?)(?=\s*(?:!{1,4}|p[1-4]|\bat\s+\d|@|\bremind|\btomorrow|\btoday|$))/gi,
+      /\/\/\s*(.+?)$/gi,
+      /\(([^)]+)\)\s*$/gi,
+      /\s+-\s+(.+?)$/gi,
+    ];
+    let newInput = input;
+    notePatterns.forEach(p => newInput = newInput.replace(p, ''));
+    setInput(newInput.replace(/\s+/g, ' ').trim());
+  };
+
   const showPreview = isFocused && parsed && (
     parsed.scheduledTime ||
     parsed.scheduledDate ||
     parsed.estimatedDuration ||
     parsed.difficulty !== 'medium' ||
+    parsed.notes ||
     parsed.priority ||
     parsed.context ||
     parsed.recurrencePattern ||
@@ -650,6 +665,16 @@ export function SmartTaskInput({
       icon: energyConfig[parsed.energyLevel].icon,
       label: energyConfig[parsed.energyLevel].label,
       color: energyConfig[parsed.energyLevel].color,
+    });
+  }
+
+  if (parsed?.notes) {
+    badges.push({
+      key: 'notes',
+      icon: StickyNote,
+      label: parsed.notes.length > 20 ? parsed.notes.substring(0, 20) + '...' : parsed.notes,
+      color: 'text-amber-500 bg-amber-500/10 border-amber-500/30',
+      onRemove: clearNotes,
     });
   }
 
