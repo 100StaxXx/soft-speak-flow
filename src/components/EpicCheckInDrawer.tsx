@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen } from "lucide-react";
+import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 
@@ -59,9 +59,11 @@ interface EpicCheckInDrawerProps {
   epicId: string;
   habits: Habit[];
   isActive: boolean;
+  onAdjustPlan?: () => void;
+  showAdjustPlan?: boolean;
 }
 
-export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawerProps) => {
+export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan }: EpicCheckInDrawerProps) => {
   const [open, setOpen] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
@@ -419,6 +421,21 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
               </Collapsible>
             )}
           </div>
+          {/* Adjust Plan Button */}
+          {showAdjustPlan && onAdjustPlan && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setOpen(false);
+                onAdjustPlan();
+              }}
+              className="w-full mt-4"
+            >
+              <Settings2 className="h-4 w-4 mr-2" />
+              Adjust My Plan
+            </Button>
+          )}
           
           {/* Guidance note */}
           <p className="text-center text-xs text-muted-foreground pt-4 flex items-center justify-center gap-1.5">

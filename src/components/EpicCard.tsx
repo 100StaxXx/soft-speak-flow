@@ -11,8 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords, Settings2, ChevronDown, ChevronRight, Star } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -101,17 +100,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [bossEncounter, setBossEncounter] = useState<AstralEncounter | null>(null);
   const [bossAdversary, setBossAdversary] = useState<Adversary | null>(null);
   const [bossBattleContext, setBossBattleContext] = useState<BossBattleContext | null>(null);
-  const [milestonesOpen, setMilestonesOpen] = useState(false);
-  const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(new Set());
-
-  const toggleMilestoneExpanded = useCallback((id: string) => {
-    setExpandedMilestones(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -404,181 +392,50 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         <ConstellationTrail 
           progress={epic.progress_percentage} 
           targetDays={epic.target_days}
-          className="mb-4"
+          className="mb-3"
           companionImageUrl={health?.imageUrl || companion?.current_image_url}
           companionMood={health?.moodState}
           showCompanion={true}
           milestones={trailMilestones}
         />
 
-        {/* Expandable Milestones Section */}
-        {milestones && milestones.length > 0 && (
-          <Collapsible open={milestonesOpen} onOpenChange={setMilestonesOpen} className="mb-4">
-            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-background/50 rounded-lg hover:bg-background/70 transition-colors">
-              <div className="flex items-center gap-2">
-                {milestonesOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-                <span className="text-sm font-medium">Journey Milestones</span>
-                <Badge variant="secondary" className="text-xs">
-                  {milestones.filter(m => m.completed_at).length}/{milestones.length}
-                </Badge>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 space-y-1">
-            {milestones.map((milestone, index) => {
-                const isExpanded = expandedMilestones.has(milestone.id);
-                const isCompleted = !!milestone.completed_at;
-                // Find the next incomplete milestone: first one where all previous are completed
-                const isNextMilestone = !isCompleted && milestones.slice(0, index).every(m => m.completed_at);
-                
-                return (
-                  <motion.button
-                    key={milestone.id}
-                    onClick={() => toggleMilestoneExpanded(milestone.id)}
-                    className={cn(
-                      "w-full text-left p-2 rounded-md transition-colors relative",
-                      "bg-background/30 hover:bg-background/50",
-                      isCompleted && "opacity-70",
-                      isNextMilestone && "ring-1 ring-primary/40 bg-primary/5"
-                    )}
-                  >
-                    {isNextMilestone && (
-                      <Badge 
-                        variant="default" 
-                        className="absolute -top-1.5 -right-1.5 h-4 px-1.5 text-[10px] bg-primary text-primary-foreground"
-                      >
-                        Next
-                      </Badge>
-                    )}
-                    <div className="flex items-start gap-2">
-                      {/* Status indicator */}
-                      <div className="flex-shrink-0 mt-0.5">
-                        {isCompleted ? (
-                          <Check className="h-4 w-4 text-stardust-gold" />
-                        ) : milestone.is_postcard_milestone ? (
-                          <Star className="h-4 w-4 text-stardust-gold fill-stardust-gold" />
-                        ) : (
-                          <ChevronRight 
-                            className={cn(
-                              "h-4 w-4 text-muted-foreground transition-transform",
-                              isExpanded && "rotate-90"
-                            )} 
-                          />
-                        )}
-                      </div>
-                      
-                      {/* Title */}
-                      <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          "text-sm",
-                          isExpanded ? "whitespace-normal" : "truncate",
-                          isCompleted && "line-through text-muted-foreground"
-                        )}>
-                          {milestone.title}
-                        </p>
-                        {milestone.is_postcard_milestone && !isCompleted && (
-                          <span className="text-xs text-amber-500">Postcard milestone</span>
-                        )}
-                      </div>
-                      
-                      {/* Progress badge */}
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "text-xs flex-shrink-0",
-                          isCompleted && "border-green-500/30 text-green-500"
-                        )}
-                      >
-                        {milestone.milestone_percent}%
-                      </Badge>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="flex items-center gap-2 bg-background/50 rounded-lg p-2">
-            <Calendar className="w-4 h-4 text-primary" />
-            <div>
-              <div className="text-xs text-muted-foreground">Duration</div>
-              <div className="text-sm font-bold">{epic.target_days} days</div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 bg-background/50 rounded-lg p-2">
-            <Flame className="w-4 h-4 text-orange-500" />
-            <div>
-              <div className="text-xs text-muted-foreground">Remaining</div>
-              <div className="text-sm font-bold">
-                {isCompleted ? "Complete!" : `${daysRemaining}d`}
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 bg-background/50 rounded-lg p-2">
-            <Zap className="w-4 h-4 text-yellow-500" />
-            <div>
-              <div className="text-xs text-muted-foreground">XP Reward</div>
-              <div className="text-sm font-bold">{epic.xp_reward} XP</div>
-            </div>
-          </div>
+        {/* Compact Stats Bar */}
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-3 py-2 px-3 bg-background/30 rounded-lg">
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {epic.target_days}d
+          </span>
+          <span className="text-muted-foreground/30">•</span>
+          <span className="flex items-center gap-1">
+            <Flame className="w-3 h-3 text-orange-500" />
+            {isCompleted ? "Done" : `${daysRemaining}d left`}
+          </span>
+          <span className="text-muted-foreground/30">•</span>
+          <span className="flex items-center gap-1">
+            <Zap className="w-3 h-3 text-yellow-500" />
+            {epic.xp_reward} XP
+          </span>
         </div>
 
-        {/* Check In Button */}
+        {/* Rituals Button */}
         {epic.epic_habits && epic.epic_habits.length > 0 && (
-          <div className="mb-4">
-            <EpicCheckInDrawer
-              epicId={epic.id}
-              habits={epic.epic_habits
-                .filter(eh => eh.habits) // Filter out deleted habits
-                .map(eh => ({
-                  id: eh.habit_id,
-                  title: eh.habits?.title || 'Untitled',
-                  difficulty: eh.habits?.difficulty || 'medium',
-                  description: eh.habits?.description,
-                  frequency: eh.habits?.frequency,
-                  estimated_minutes: eh.habits?.estimated_minutes,
-                  custom_days: eh.habits?.custom_days,
-                }))}
-              isActive={isActive}
-            />
-            
-            {/* Linked Habits as badges */}
-            <div className="mt-3">
-              <div className="text-xs font-medium text-muted-foreground mb-2">
-                Contributing Habits
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {epic.epic_habits
-                  .filter(eh => eh.habits) // Filter out deleted habits
-                  .map((eh) => (
-                    <Badge key={eh.habit_id} variant="outline" className="text-xs">
-                      {eh.habits.title}
-                    </Badge>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Adjust Plan Button */}
-        {isActive && epic.progress_percentage < 100 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAdjustDialog(true)}
-            className="w-full mb-4"
-          >
-            <Settings2 className="h-4 w-4 mr-2" />
-            Adjust My Plan
-          </Button>
+          <EpicCheckInDrawer
+            epicId={epic.id}
+            habits={epic.epic_habits
+              .filter(eh => eh.habits)
+              .map(eh => ({
+                id: eh.habit_id,
+                title: eh.habits?.title || 'Untitled',
+                difficulty: eh.habits?.difficulty || 'medium',
+                description: eh.habits?.description,
+                frequency: eh.habits?.frequency,
+                estimated_minutes: eh.habits?.estimated_minutes,
+                custom_days: eh.habits?.custom_days,
+              }))}
+            isActive={isActive}
+            onAdjustPlan={() => setShowAdjustDialog(true)}
+            showAdjustPlan={isActive && epic.progress_percentage < 100}
+          />
         )}
 
         {/* Action Buttons */}
