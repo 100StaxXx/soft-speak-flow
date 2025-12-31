@@ -417,6 +417,8 @@ export function Pathfinder({
       milestone_percent: m.milestonePercent,
       is_postcard_milestone: m.isPostcardMilestone,
     }));
+    
+    console.log('[Pathfinder] Creating epic with milestones:', milestones?.length || 0, milestones);
 
     // Include phases from schedule
     const phases = schedule?.phases.map(p => ({
