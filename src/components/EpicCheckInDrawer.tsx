@@ -366,13 +366,13 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive }: EpicCheckInDrawe
                                   className={cn(
                                     "h-10 w-10 -mr-2 flex items-center justify-center rounded-lg",
                                     "active:bg-primary/20 transition-colors",
-                                    "touch-manipulation"
+                                    "touch-manipulation",
+                                    "relative z-10"
                                   )}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    e.preventDefault();
                                   }}
-                                  onPointerDown={(e) => {
+                                  onTouchEnd={(e) => {
                                     e.stopPropagation();
                                   }}
                                 >
