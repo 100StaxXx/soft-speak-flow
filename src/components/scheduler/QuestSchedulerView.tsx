@@ -17,6 +17,11 @@ interface Task {
   is_main_quest?: boolean | null;
   difficulty?: string | null;
   category?: string | null;
+  notes?: string | null;
+  priority?: string | null;
+  energy_level?: string | null;
+  is_recurring?: boolean | null;
+  recurrence_pattern?: string | null;
 }
 
 interface QuestSchedulerViewProps {
@@ -157,6 +162,11 @@ export function QuestSchedulerView({
               category={task.category as "mind" | "body" | "soul" | null}
               scheduledTime={task.scheduled_time}
               estimatedDuration={task.estimated_duration}
+              notes={task.notes}
+              priority={task.priority}
+              energyLevel={task.energy_level}
+              isRecurring={task.is_recurring}
+              recurrencePattern={task.recurrence_pattern}
               onToggle={(id, completed) => onToggle(id, completed, task.xp_reward)}
               onEdit={() => onEdit(task)}
             />
@@ -188,6 +198,11 @@ export function QuestSchedulerView({
                 category={task.category as "mind" | "body" | "soul" | null}
                 scheduledTime={task.scheduled_time}
                 estimatedDuration={task.estimated_duration}
+                notes={task.notes}
+                priority={task.priority}
+                energyLevel={task.energy_level}
+                isRecurring={task.is_recurring}
+                recurrencePattern={task.recurrence_pattern}
                 onToggle={(id, completed) => onToggle(id, completed, task.xp_reward)}
                 onEdit={() => onEdit(task)}
               />
