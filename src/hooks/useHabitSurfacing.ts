@@ -110,8 +110,8 @@ export function useHabitSurfacing(selectedDate?: Date) {
           task_date: taskDate,
           habit_source_id: habitId,
           epic_id: habit.epic_id,
-          category: habit.category,
-          source: 'habit',
+          category: null,
+          source: 'recurring',
           scheduled_time: habit.preferred_time,
           estimated_duration: habit.estimated_minutes,
         })
@@ -151,8 +151,8 @@ export function useHabitSurfacing(selectedDate?: Date) {
         task_date: taskDate,
         habit_source_id: habit.habit_id,
         epic_id: habit.epic_id,
-        category: habit.category,
-        source: 'habit',
+        category: null,
+        source: 'recurring',
         scheduled_time: habit.preferred_time,
         estimated_duration: habit.estimated_minutes,
       }));
