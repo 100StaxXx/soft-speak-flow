@@ -1,7 +1,6 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import { Users, Sparkles, User, Compass } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,26 +8,18 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
-import { useLongPress } from "@/hooks/useLongPress";
-import { cn } from "@/lib/utils";
+// HIDDEN: Long press to arcade disabled
+// import { useLongPress } from "@/hooks/useLongPress";
 import { haptics } from "@/utils/haptics";
 
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
-  const navigate = useNavigate();
-  const [isLongPressing, setIsLongPressing] = useState(false);
 
   const resolvedMentorId = getResolvedMentorId(profile);
 
-  // Long press on Quests tab navigates to hidden arcade
-  const longPressHandlers = useLongPress({
-    onLongPress: () => {
-      setIsLongPressing(false);
-      navigate('/arcade');
-    },
-    threshold: 800,
-  });
+  // HIDDEN: Long press arcade navigation disabled
+  // const longPressHandlers = useLongPress({ ... });
 
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],
@@ -113,34 +104,10 @@ export const BottomNav = memo(() => {
 
         <NavLink
           to="/journeys"
-          className={cn(
-            "flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]",
-            isLongPressing && "scale-95 opacity-70"
-          )}
+          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
           activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
           data-tour="tasks-tab"
           onClick={() => haptics.light()}
-          onTouchStart={(e) => {
-            setIsLongPressing(true);
-            longPressHandlers.onTouchStart(e);
-          }}
-          onTouchMove={longPressHandlers.onTouchMove}
-          onTouchEnd={(e) => {
-            setIsLongPressing(false);
-            longPressHandlers.onTouchEnd(e);
-          }}
-          onMouseDown={(e) => {
-            setIsLongPressing(true);
-            longPressHandlers.onMouseDown(e);
-          }}
-          onMouseUp={(e) => {
-            setIsLongPressing(false);
-            longPressHandlers.onMouseUp(e);
-          }}
-          onMouseLeave={() => {
-            setIsLongPressing(false);
-            longPressHandlers.onMouseLeave();
-          }}
         >
           {({ isActive }) => (
             <>

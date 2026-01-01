@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
-import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
+// HIDDEN: Boss battle feature disabled
+// import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
 import { EpicRewardReveal } from "./EpicRewardReveal";
 import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
 import { cn } from "@/lib/utils";
@@ -28,9 +29,10 @@ import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useMilestones } from "@/hooks/useMilestones";
 
 import { useEpicRewards } from "@/hooks/useEpicRewards";
-import { generateAdversary } from "@/utils/adversaryGenerator";
-import type { StorySeed, BossBattleContext } from "@/types/narrativeTypes";
-import type { Adversary, AstralEncounter } from "@/types/astralEncounters";
+// HIDDEN: Boss battle feature disabled
+// import { generateAdversary } from "@/utils/adversaryGenerator";
+// import type { StorySeed, BossBattleContext } from "@/types/narrativeTypes";
+// import type { Adversary, AstralEncounter } from "@/types/astralEncounters";
 import type { RewardRevealData } from "@/types/epicRewards";
 import { STORY_TYPE_BADGES } from "@/types/epicRewards";
 
@@ -94,12 +96,14 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
-  const [showBossBattle, setShowBossBattle] = useState(false);
+  // HIDDEN: Boss battle feature disabled
+  // const [showBossBattle, setShowBossBattle] = useState(false);
   const [showRewardReveal, setShowRewardReveal] = useState(false);
   const [rewardRevealData, setRewardRevealData] = useState<RewardRevealData | null>(null);
-  const [bossEncounter, setBossEncounter] = useState<AstralEncounter | null>(null);
-  const [bossAdversary, setBossAdversary] = useState<Adversary | null>(null);
-  const [bossBattleContext, setBossBattleContext] = useState<BossBattleContext | null>(null);
+  // HIDDEN: Boss battle state disabled
+  // const [bossEncounter, setBossEncounter] = useState<AstralEncounter | null>(null);
+  // const [bossAdversary, setBossAdversary] = useState<Adversary | null>(null);
+  // const [bossBattleContext, setBossBattleContext] = useState<BossBattleContext | null>(null);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -133,117 +137,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
 
-  // Build boss battle context from story_seed
-  const buildBossBattleContext = useCallback((): BossBattleContext | null => {
-    const storySeed = epic.story_seed as StorySeed | null;
-    if (!storySeed?.finale_architecture) return null;
-    
-    const finale = storySeed.finale_architecture;
-    const prophecy = storySeed.the_prophecy;
-    
-    return {
-      bossName: finale.boss_name,
-      bossTheme: finale.boss_theme,
-      bossLore: finale.boss_lore,
-      weaknessHints: [finale.boss_weakness_hint],
-      prophecyLines: prophecy?.line_meanings?.slice(0, 3) || [],
-      epicTitle: epic.title,
-      bookTitle: storySeed.book_title || epic.title,
-    };
-  }, [epic.story_seed, epic.title]);
-
-  // Trigger boss battle when progress reaches 100%
-  const triggerBossBattle = useCallback(async () => {
-    if (!companion?.id) return;
-    
-    const storySeed = epic.story_seed as StorySeed | null;
-    const context = buildBossBattleContext();
-    
-    // Generate boss adversary
-    const bossOverride = storySeed?.finale_architecture ? {
-      name: storySeed.finale_architecture.boss_name,
-      theme: storySeed.finale_architecture.boss_theme,
-      lore: storySeed.finale_architecture.boss_lore,
-    } : undefined;
-    
-    const adversary = generateAdversary('epic_checkpoint', 100, undefined, bossOverride);
-    
-    // Create encounter record
-    const { data: encounterData, error } = await supabase
-      .from('astral_encounters')
-      .insert({
-        user_id: epic.user_id,
-        companion_id: companion.id,
-        adversary_name: adversary.name,
-        adversary_theme: adversary.theme,
-        adversary_tier: adversary.tier,
-        adversary_lore: adversary.lore,
-        mini_game_type: adversary.miniGameType,
-        trigger_type: 'epic_checkpoint',
-        trigger_source_id: epic.id,
-        total_phases: adversary.phases,
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Failed to create boss encounter:', error);
-      toast.error('Failed to start boss battle');
-      return;
-    }
-    
-    setBossEncounter(encounterData as AstralEncounter);
-    setBossAdversary(adversary);
-    setBossBattleContext(context);
-    setShowBossBattle(true);
-  }, [companion?.id, epic, buildBossBattleContext]);
-
-  const handleBossBattleComplete = useCallback(async ({ encounterId, accuracy, phasesCompleted }: { 
-    encounterId: string; 
-    accuracy: number; 
-    phasesCompleted: number;
-  }) => {
-    // Update encounter record with results
-    await supabase
-      .from('astral_encounters')
-      .update({
-        accuracy_score: accuracy,
-        phases_completed: phasesCompleted,
-        result: accuracy >= 50 ? 'victory' : 'defeat',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', encounterId);
-    
-    if (accuracy >= 50) {
-      // Generate and show reward reveal
-      const rewards = await generateRewardReveal(epic.story_type_slug || null, epic.id);
-      setRewardRevealData(rewards);
-      setShowBossBattle(false);
-      setShowRewardReveal(true);
-      
-      // Award the story-type achievement
-      const storyType = epic.story_type_slug || 'treasure_hunt';
-      const badgeInfo = STORY_TYPE_BADGES[storyType];
-      if (badgeInfo) {
-        // Insert achievement (ignore if already exists via unique constraint)
-        await supabase.from('achievements').upsert({
-          user_id: epic.user_id,
-          achievement_type: badgeInfo.achievementType,
-          title: badgeInfo.title,
-          description: badgeInfo.description,
-          icon: badgeInfo.icon,
-          tier: badgeInfo.tier,
-        }, { onConflict: 'user_id,achievement_type', ignoreDuplicates: true });
-      }
-    }
-  }, [epic.id, epic.story_type_slug, epic.user_id, generateRewardReveal]);
-
-  const handleBossBattleCancel = useCallback(() => {
-    setShowBossBattle(false);
-    setBossEncounter(null);
-    setBossAdversary(null);
-    setBossBattleContext(null);
-  }, []);
+  // HIDDEN: Boss battle feature disabled
+  // buildBossBattleContext, triggerBossBattle, handleBossBattleComplete, handleBossBattleCancel
+  // All boss battle logic has been commented out to hide the Astral Encounters feature
 
   // Check for milestone crossings and trigger postcard generation
   useEffect(() => {
@@ -441,6 +337,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         {/* Action Buttons */}
         {isActive && epic.progress_percentage >= 100 && (
           <div className="mt-4 space-y-2">
+            {/* HIDDEN: Boss battle button disabled
             {epic.story_seed && (
               <Button
                 onClick={triggerBossBattle}
@@ -450,6 +347,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                 Face Final Boss
               </Button>
             )}
+            */}
             <Button
               onClick={onComplete}
               className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
@@ -461,7 +359,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         )}
       </Card>
 
-      {/* Boss Battle Modal */}
+      {/* HIDDEN: Boss Battle Modal disabled
       <AstralEncounterModal
         open={showBossBattle}
         onOpenChange={setShowBossBattle}
@@ -472,6 +370,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         bossBattleContext={bossBattleContext || undefined}
         onBossBattleCancel={handleBossBattleCancel}
       />
+      */}
 
       <AlertDialog open={showAbandonDialog} onOpenChange={setShowAbandonDialog}>
         <AlertDialogContent>
