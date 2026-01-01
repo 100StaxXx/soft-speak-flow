@@ -11,15 +11,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
+import { MilestoneProgress } from "./MilestoneProgress";
 import { PhaseProgressCard } from "./journey/PhaseProgressCard";
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
-import { MilestoneProgress } from "./MilestoneProgress";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -84,9 +84,16 @@ interface JourneyCardProps {
 export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
+  const [milestoneExpanded, setMilestoneExpanded] = useState(false);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
+  const { 
+    milestonesByPhase, 
+    getCurrentPhase, 
+    getProgressToNextPostcard,
+    getJourneyHealth,
+  } = useMilestones(journey.id);
   
   const daysRemaining = Math.ceil(
     (new Date(journey.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -96,9 +103,13 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const theme = (journey.theme_color || 'heroic') as JourneyTheme;
   const themeGradient = themeGradients[theme];
   const themeBorder = themeBorders[theme];
+  
+  const currentPhase = getCurrentPhase();
+  const postcardProgress = getProgressToNextPostcard();
+  const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
 
   // Get milestones for the trail
-  const { milestones, milestonesByPhase, getCurrentPhase, nextMilestone } = useMilestones(journey.id);
+  const { milestones } = useMilestones(journey.id);
   
   const trailMilestones = useMemo(() => {
     if (!milestones || milestones.length === 0) return undefined;
@@ -201,57 +212,97 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           milestones={trailMilestones}
         />
 
-        {/* Phase Progress */}
-        {milestonesByPhase && milestonesByPhase.length > 0 && (
+        {/* Phase Progress (compact) */}
+        {milestonesByPhase.length > 0 && isActive && (
           <PhaseProgressCard
             milestonesByPhase={milestonesByPhase}
-            currentPhaseName={getCurrentPhase()}
-            className="mb-3"
+            currentPhaseName={currentPhase}
             compact
+            className="mb-3"
           />
         )}
 
-        {/* Compact Stats Bar */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
-          <span className="flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            {journey.target_days}d
-          </span>
-          <span className="text-muted-foreground/30">•</span>
-          <span className="flex items-center gap-1">
-            <Flame className="w-3 h-3 text-orange-500" />
-            {isCompleted ? "Done!" : `${daysRemaining}d left`}
-          </span>
-          <span className="text-muted-foreground/30">•</span>
-          <span className="flex items-center gap-1 text-stardust-gold">
-            <Zap className="w-3 h-3" />
-            {journey.xp_reward} XP
-          </span>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
+            <Calendar className="w-3.5 h-3.5 text-primary" />
+            <div>
+              <div className="text-[10px] text-muted-foreground">Duration</div>
+              <div className="text-xs font-bold">{journey.target_days}d</div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
+            <Flame className="w-3.5 h-3.5 text-orange-500" />
+            <div>
+              <div className="text-[10px] text-muted-foreground">Left</div>
+              <div className="text-xs font-bold">
+                {isCompleted ? "Done!" : `${daysRemaining}d`}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
+            {journeyHealth ? (
+              <>
+                <div className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                  journeyHealth.score === 'A' && "bg-green-500/20 text-green-500",
+                  journeyHealth.score === 'B' && "bg-celestial-blue/20 text-celestial-blue",
+                  journeyHealth.score === 'C' && "bg-amber-500/20 text-amber-500",
+                  journeyHealth.score === 'D' && "bg-orange-500/20 text-orange-500",
+                  journeyHealth.score === 'F' && "bg-red-500/20 text-red-500",
+                )}>
+                  {journeyHealth.score}
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">Health</div>
+                  <div className="text-xs font-bold">
+                    {journeyHealth.progressDelta > 0 ? '+' : ''}{Math.round(journeyHealth.progressDelta)}%
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 text-stardust-gold" />
+                <div>
+                  <div className="text-[10px] text-muted-foreground">XP</div>
+                  <div className="text-xs font-bold text-stardust-gold">{journey.xp_reward}</div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Milestone Postcard Preview */}
-        {nextMilestone && (
+        {/* Next Postcard Preview - Always visible for active campaigns */}
+        {postcardProgress && isActive && (
           <MilestonePostcardPreview
-            currentProgress={journey.progress_percentage}
-            targetPercent={nextMilestone.milestone_percent}
-            milestoneTitle={nextMilestone.title}
-            chapterNumber={nextMilestone.chapter_number || 1}
-            storySeed={journey.story_seed as any}
+            currentProgress={postcardProgress.current}
+            targetPercent={postcardProgress.target}
+            milestoneTitle={postcardProgress.milestone.title}
+            chapterNumber={postcardProgress.milestone.chapter_number || 1}
+            compact={!milestoneExpanded}
+            isExpanded={milestoneExpanded}
+            onClick={() => setMilestoneExpanded(!milestoneExpanded)}
+            className="mb-3"
+            storySeed={journey.story_seed as import('@/types/narrativeTypes').StorySeed | null}
+            totalChapters={journey.total_chapters}
             companionSpecies={companion?.spirit_animal}
-            compact
           />
         )}
 
-        {/* Milestone Progress */}
-        <MilestoneProgress
-          epicId={journey.id}
-          epicTitle={journey.title}
-          epicGoal={journey.description}
-          currentDeadline={journey.end_date}
-          compact
-        />
+        {/* Milestone Progress Section */}
+        <div className="mb-3">
+          <MilestoneProgress 
+            epicId={journey.id} 
+            epicTitle={journey.title}
+            epicGoal={journey.description}
+            currentDeadline={journey.end_date}
+            compact 
+          />
+        </div>
 
-        {/* View Rituals Button */}
+        {/* Check In Button & Rituals */}
         {journey.epic_habits && ritualCount > 0 && (
           <div className="mb-3">
             <EpicCheckInDrawer
@@ -268,8 +319,29 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                   custom_days: eh.habits?.custom_days,
                 }))}
               isActive={isActive}
-              showAdjustPlan={isActive}
             />
+            
+            {/* Linked Rituals as badges */}
+            <div className="mt-2">
+              <div className="text-[10px] font-medium text-muted-foreground mb-1.5">
+                Rituals ({ritualCount})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {journey.epic_habits
+                  .filter(eh => eh.habits)
+                  .slice(0, 4)
+                  .map((eh) => (
+                    <Badge key={eh.habit_id} variant="outline" className="text-[10px] px-1.5 py-0">
+                      {eh.habits.title}
+                    </Badge>
+                  ))}
+                {ritualCount > 4 && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    +{ritualCount - 4}
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
