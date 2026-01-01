@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { format, addDays, addWeeks, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, setMonth, setDate, getYear } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, setMonth, setDate, getYear, endOfMonth, startOfMonth } from 'date-fns';
 
 export interface ParsedTask {
   text: string;
@@ -15,11 +15,42 @@ export interface ParsedTask {
   reminderEnabled: boolean;
   reminderMinutesBefore: number | null;
   notes: string | null;
+  
   // Clear actions
   clearTime: boolean;
   clearDate: boolean;
   clearDuration: boolean;
   clearRecurrence: boolean;
+  clearAll: boolean;
+  clearCategory: boolean;
+  clearPriority: boolean;
+  clearNotes: boolean;
+  clearReminder: boolean;
+  
+  // Category/Attribute
+  category: 'mind' | 'body' | 'soul' | null;
+  
+  // Frequency
+  frequency: string | null;
+  customDays: number[] | null;
+  
+  // Status control
+  paused: boolean | null;
+  archived: boolean | null;
+  
+  // Special flags
+  isBonus: boolean | null;
+  isMilestone: boolean | null;
+  
+  // XP/Rewards
+  xpReward: number | null;
+  xpMultiplier: number | null;
+  
+  // Rename/Title change
+  newTitle: string | null;
+  
+  // AI triggers
+  triggerDecomposition: boolean;
 }
 
 // Month name to number mapping
@@ -38,15 +69,12 @@ const MONTH_MAP: Record<string, number> = {
   dec: 11, december: 11,
 };
 
-// Smart time inference: "at 4" without am/pm
-// Hours 1-6 default to PM (more likely afternoon meetings/calls)
-// Hours 7-11 default to AM (more likely morning activities)
-// Hour 12 defaults to PM (noon)
+// Smart time inference
 function inferAmPm(hour: number): 'am' | 'pm' {
   if (hour >= 1 && hour <= 6) return 'pm';
   if (hour >= 7 && hour <= 11) return 'am';
   if (hour === 12) return 'pm';
-  return 'am'; // midnight edge case
+  return 'am';
 }
 
 function parseTimeMatch(match: RegExpMatchArray): string {
@@ -54,7 +82,6 @@ function parseTimeMatch(match: RegExpMatchArray): string {
   const minutes = match[2] ? parseInt(match[2]) : 0;
   let period = match[3]?.toLowerCase() as 'am' | 'pm' | undefined;
 
-  // Smart inference when no am/pm specified
   if (!period && hours >= 1 && hours <= 12) {
     period = inferAmPm(hours);
   }
@@ -65,7 +92,6 @@ function parseTimeMatch(match: RegExpMatchArray): string {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
 
-// Parse "Dec 28" or "December 28th"
 function parseMonthDay(match: RegExpMatchArray): string {
   const monthStr = match[1].toLowerCase();
   const day = parseInt(match[2]);
@@ -78,7 +104,6 @@ function parseMonthDay(match: RegExpMatchArray): string {
   let date = setMonth(new Date(), month);
   date = setDate(date, day);
   
-  // If the date is in the past, assume next year
   if (date < new Date()) {
     date = setMonth(new Date(getYear(new Date()) + 1, 0, 1), month);
     date = setDate(date, day);
@@ -87,7 +112,6 @@ function parseMonthDay(match: RegExpMatchArray): string {
   return format(date, 'yyyy-MM-dd');
 }
 
-// Parse "28th Dec" or "28 December"
 function parseDayMonth(match: RegExpMatchArray): string {
   const day = parseInt(match[1]);
   const monthStr = match[2].toLowerCase();
@@ -100,7 +124,6 @@ function parseDayMonth(match: RegExpMatchArray): string {
   let date = setMonth(new Date(), month);
   date = setDate(date, day);
   
-  // If the date is in the past, assume next year
   if (date < new Date()) {
     date = setMonth(new Date(getYear(new Date()) + 1, 0, 1), month);
     date = setDate(date, day);
@@ -109,16 +132,13 @@ function parseDayMonth(match: RegExpMatchArray): string {
   return format(date, 'yyyy-MM-dd');
 }
 
-// Parse "12/28" or "12-28" (MM/DD format)
 function parseNumericDate(match: RegExpMatchArray): string {
   const first = parseInt(match[1]);
   const second = parseInt(match[2]);
   
-  // Assume MM/DD format (US standard)
-  let month = first - 1; // 0-indexed
+  let month = first - 1;
   let day = second;
   
-  // Basic validation
   if (month < 0 || month > 11 || day < 1 || day > 31) {
     return format(new Date(), 'yyyy-MM-dd');
   }
@@ -126,7 +146,6 @@ function parseNumericDate(match: RegExpMatchArray): string {
   let date = setMonth(new Date(), month);
   date = setDate(date, day);
   
-  // If the date is in the past, assume next year
   if (date < new Date()) {
     date = setMonth(new Date(getYear(new Date()) + 1, 0, 1), month);
     date = setDate(date, day);
@@ -135,35 +154,45 @@ function parseNumericDate(match: RegExpMatchArray): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+// Time patterns - enhanced with more natural expressions
 const TIME_PATTERNS = [
   { regex: /\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i, handler: parseTimeMatch },
   { regex: /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i, handler: parseTimeMatch },
+  // Named times - enhanced
+  { regex: /\b(?:first\s*thing|wake\s*up|early\s*morning|dawn|sunrise)\b/i, handler: () => '06:00' },
   { regex: /\bmorning\b/i, handler: () => '09:00' },
+  { regex: /\bmid[- ]?morning\b/i, handler: () => '10:00' },
+  { regex: /\b(?:noon|midday|lunch(?:time)?)\b/i, handler: () => '12:00' },
+  { regex: /\bearly\s*afternoon\b/i, handler: () => '13:00' },
   { regex: /\bafternoon\b/i, handler: () => '14:00' },
+  { regex: /\blate\s*afternoon\b/i, handler: () => '16:00' },
+  { regex: /\b(?:before\s*dinner|pre[- ]?dinner)\b/i, handler: () => '17:00' },
   { regex: /\bevening\b/i, handler: () => '18:00' },
+  { regex: /\b(?:after\s*dinner|post[- ]?dinner)\b/i, handler: () => '19:00' },
   { regex: /\bnight\b/i, handler: () => '21:00' },
-  { regex: /\bnoon\b/i, handler: () => '12:00' },
+  { regex: /\b(?:before\s*bed|bedtime|end\s*of\s*day)\b/i, handler: () => '22:00' },
+  { regex: /\blate\s*night\b/i, handler: () => '23:00' },
   { regex: /\bmidnight\b/i, handler: () => '00:00' },
 ];
 
+// Date patterns - enhanced with more relative dates
 const DATE_PATTERNS = [
-  // Relative dates - "in X days/weeks"
   { regex: /\bin\s+(\d+)\s*days?\b/i, handler: (m: RegExpMatchArray) => format(addDays(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
   { regex: /\bin\s+(\d+)\s*weeks?\b/i, handler: (m: RegExpMatchArray) => format(addWeeks(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
+  { regex: /\bin\s+(\d+)\s*months?\b/i, handler: (m: RegExpMatchArray) => format(addMonths(new Date(), parseInt(m[1])), 'yyyy-MM-dd') },
   { regex: /\bnext\s+week\b/i, handler: () => format(addWeeks(new Date(), 1), 'yyyy-MM-dd') },
-  
-  // Standard relative dates
   { regex: /\btoday\b/i, handler: () => format(new Date(), 'yyyy-MM-dd') },
   { regex: /\btomorrow\b/i, handler: () => format(addDays(new Date(), 1), 'yyyy-MM-dd') },
-  
-  // Specific dates - "Dec 28", "December 28th"
+  { regex: /\bday\s*after\s*tomorrow\b/i, handler: () => format(addDays(new Date(), 2), 'yyyy-MM-dd') },
+  { regex: /\bthis\s*weekend\b/i, handler: () => format(nextSaturday(new Date()), 'yyyy-MM-dd') },
+  { regex: /\b(?:end\s*of\s*week|eow)\b/i, handler: () => format(nextFriday(new Date()), 'yyyy-MM-dd') },
+  { regex: /\b(?:start\s*of\s*(?:next\s*)?week|beginning\s*of\s*week)\b/i, handler: () => format(nextMonday(new Date()), 'yyyy-MM-dd') },
+  { regex: /\b(?:end\s*of\s*month|eom)\b/i, handler: () => format(endOfMonth(new Date()), 'yyyy-MM-dd') },
+  { regex: /\bnext\s*month\b/i, handler: () => format(startOfMonth(addMonths(new Date(), 1)), 'yyyy-MM-dd') },
+  { regex: /\b(?:in\s*a\s*)?fortnight\b/i, handler: () => format(addDays(new Date(), 14), 'yyyy-MM-dd') },
   { regex: /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i, handler: parseMonthDay },
-  // "28th Dec", "28 December"
   { regex: /\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i, handler: parseDayMonth },
-  // Numeric dates - "12/28", "12-28"
   { regex: /\b(\d{1,2})[\/\-](\d{1,2})\b/, handler: parseNumericDate },
-  
-  // Day names
   { regex: /\bnext\s+monday\b/i, handler: () => format(nextMonday(new Date()), 'yyyy-MM-dd') },
   { regex: /\bnext\s+tuesday\b/i, handler: () => format(nextTuesday(new Date()), 'yyyy-MM-dd') },
   { regex: /\bnext\s+wednesday\b/i, handler: () => format(nextWednesday(new Date()), 'yyyy-MM-dd') },
@@ -180,87 +209,100 @@ const DATE_PATTERNS = [
   { regex: /\bsunday\b/i, handler: () => format(nextSunday(new Date()), 'yyyy-MM-dd') },
 ];
 
+// Duration patterns - enhanced
 const DURATION_PATTERNS = [
   { regex: /\bfor\s+(\d+)\s*h(?:ours?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) * 60 },
   { regex: /\bfor\s+(\d+)\s*m(?:in(?:utes?)?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) },
-  { regex: /\b(\d+)\s*h(?:ours?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) * 60 },
+  { regex: /\b(\d+)\s*h(?:ours?)?\s*(?:(\d+)\s*m(?:in)?s?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) * 60 + (m[2] ? parseInt(m[2]) : 0) },
   { regex: /\b(\d+)\s*m(?:in(?:utes?)?)?\b/i, handler: (m: RegExpMatchArray) => parseInt(m[1]) },
+  { regex: /\bhalf\s*(?:an?\s*)?hour\b/i, handler: () => 30 },
+  { regex: /\bquarter\s*(?:of\s*an?\s*)?hour\b/i, handler: () => 15 },
+  { regex: /\b(?:a\s*)?couple\s*(?:of\s*)?hours?\b/i, handler: () => 120 },
+  { regex: /\b(?:a\s*)?few\s*(?:of\s*)?hours?\b/i, handler: () => 180 },
+  { regex: /\b(?:a\s*)?few\s*(?:of\s*)?min(?:ute)?s?\b/i, handler: () => 10 },
+  { regex: /\b(?:all|full)\s*day\b/i, handler: () => 480 },
+  { regex: /\bhalf\s*day\b/i, handler: () => 240 },
   { regex: /\bquick\b/i, handler: () => 15 },
+  { regex: /\bbrief\b/i, handler: () => 5 },
   { regex: /\bpomodoro\b/i, handler: () => 25 },
   { regex: /\bdeep\s*work\b/i, handler: () => 90 },
+  { regex: /\bsprint\b/i, handler: () => 45 },
 ];
 
+// Difficulty patterns
 const DIFFICULTY_PATTERNS = [
   { regex: /\b(super\s+)?easy\b/i, result: 'easy' as const },
   { regex: /\bsimple\b/i, result: 'easy' as const },
-  { regex: /\bquick\b/i, result: 'easy' as const },
+  { regex: /\blight\b/i, result: 'easy' as const },
+  { regex: /\bbasic\b/i, result: 'easy' as const },
+  { regex: /\btrivial\b/i, result: 'easy' as const },
   { regex: /\bhard\b/i, result: 'hard' as const },
   { regex: /\bdifficult\b/i, result: 'hard' as const },
   { regex: /\bchallenging\b/i, result: 'hard' as const },
   { regex: /\bcomplex\b/i, result: 'hard' as const },
-  { regex: /\bdeep\s*work\b/i, result: 'hard' as const },
+  { regex: /\btough\b/i, result: 'hard' as const },
+  { regex: /\bintense\b/i, result: 'hard' as const },
 ];
 
+// Priority patterns
 const PRIORITY_PATTERNS: Array<{ regex: RegExp; priority?: 'low' | 'medium' | 'high' | 'urgent'; isTopThree?: boolean }> = [
-  // Exclamation shortcuts (Todoist-style)
-  { regex: /!{4,}/, priority: 'urgent' },           // !!!! = urgent
-  { regex: /!{3}/, priority: 'high' },              // !!! = high
-  { regex: /!{2}/, priority: 'medium' },            // !! = medium
-  { regex: /!1\b/i, priority: 'urgent' },           // !1 = urgent
-  { regex: /!2\b/i, priority: 'high' },             // !2 = high  
-  { regex: /!3\b/i, priority: 'medium' },           // !3 = medium
-  { regex: /!4\b/i, priority: 'low' },              // !4 = low
-  
-  // P-notation (common in task managers)
-  { regex: /\bp1\b/i, priority: 'urgent' },         // p1 = urgent
-  { regex: /\bp2\b/i, priority: 'high' },           // p2 = high
-  { regex: /\bp3\b/i, priority: 'medium' },         // p3 = medium
-  { regex: /\bp4\b/i, priority: 'low' },            // p4 = low
-  
-  // Natural language - Urgent
+  { regex: /!{4,}/, priority: 'urgent' },
+  { regex: /!{3}/, priority: 'high' },
+  { regex: /!{2}/, priority: 'medium' },
+  { regex: /!1\b/i, priority: 'urgent' },
+  { regex: /!2\b/i, priority: 'high' },
+  { regex: /!3\b/i, priority: 'medium' },
+  { regex: /!4\b/i, priority: 'low' },
+  { regex: /\bp1\b/i, priority: 'urgent' },
+  { regex: /\bp2\b/i, priority: 'high' },
+  { regex: /\bp3\b/i, priority: 'medium' },
+  { regex: /\bp4\b/i, priority: 'low' },
   { regex: /\bURGENT\b/i, priority: 'urgent' },
   { regex: /\bASAP\b/i, priority: 'urgent' },
   { regex: /\bcritical\b/i, priority: 'urgent' },
   { regex: /\bemergency\b/i, priority: 'urgent' },
-  { regex: /\bdue\s+today\b/i, priority: 'urgent' },
-  { regex: /\btime\s*sensitive\b/i, priority: 'urgent' },
-  
-  // Natural language - High
   { regex: /\bhigh\s*priority\b/i, priority: 'high' },
-  { regex: /\bhigh\s*prio\b/i, priority: 'high' },
   { regex: /\bimportant\b/i, priority: 'high' },
   { regex: /\bmust\s+do\b/i, priority: 'high' },
-  
-  // Natural language - Medium  
   { regex: /\bmedium\s*priority\b/i, priority: 'medium' },
-  { regex: /\bmed\s*prio\b/i, priority: 'medium' },
-  { regex: /\bnormal\s*priority\b/i, priority: 'medium' },
-  
-  // Natural language - Low
   { regex: /\blow\s*priority\b/i, priority: 'low' },
-  { regex: /\blow\s*prio\b/i, priority: 'low' },
-  { regex: /\bcould\s+do\b/i, priority: 'low' },
-  { regex: /\bwhen\s+(?:I\s+)?(?:have|get)\s+time\b/i, priority: 'low' },
   { regex: /\bsomeday\b/i, priority: 'low' },
-  { regex: /\bmaybe\b/i, priority: 'low' },
-  { regex: /\boptional\b/i, priority: 'low' },
   { regex: /\bbacklog\b/i, priority: 'low' },
-  
-  // Top 3 detection
+  { regex: /\bwhenever\b/i, priority: 'low' },
   { regex: /\btop\s*3\b/i, isTopThree: true },
   { regex: /\b#1\b/, isTopThree: true },
   { regex: /\bpriority\s*(?:one|1)\b/i, isTopThree: true },
-  { regex: /\btoday'?s?\s*priority\b/i, isTopThree: true },
+  { regex: /\bmost\s*important\b/i, isTopThree: true },
+  { regex: /\bmain\s*focus\b/i, isTopThree: true },
 ];
 
+// Recurrence patterns
 const RECURRENCE_PATTERNS = [
   { regex: /\bevery\s*day\b/i, result: 'daily' },
   { regex: /\bdaily\b/i, result: 'daily' },
   { regex: /\bevery\s*week\b/i, result: 'weekly' },
   { regex: /\bweekly\b/i, result: 'weekly' },
+  { regex: /\bevery\s*month\b/i, result: 'monthly' },
+  { regex: /\bmonthly\b/i, result: 'monthly' },
   { regex: /\bevery\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, result: 'weekly' },
+  { regex: /\b(?:twice\s*(?:a\s*)?(?:day|daily)|2x\s*daily)\b/i, result: 'twice_daily' },
+  { regex: /\b(?:alternate\s*days?|every\s*other\s*day)\b/i, result: 'alternate' },
+  { regex: /\b(?:biweekly|every\s*(?:two|2)\s*weeks?)\b/i, result: 'biweekly' },
 ];
 
+// Frequency/Custom days patterns
+const FREQUENCY_PATTERNS: Array<{ regex: RegExp; days?: number[]; frequency?: string }> = [
+  { regex: /\bweekdays?\s*(?:only)?\b/i, days: [1, 2, 3, 4, 5] },
+  { regex: /\bweekends?\s*(?:only)?\b/i, days: [0, 6] },
+  { regex: /\bMWF\b|mon(?:day)?\s*wed(?:nesday)?\s*fri(?:day)?/i, days: [1, 3, 5] },
+  { regex: /\bTTh?\b|tue(?:sday)?\s*thu(?:rsday)?/i, days: [2, 4] },
+  { regex: /\b(\d)x\s*(?:a\s*)?week\b/i, frequency: 'custom' },
+  { regex: /\b(?:three|3)\s*times?\s*(?:a\s*)?week\b/i, frequency: '3x_week' },
+  { regex: /\b(?:five|5)\s*times?\s*(?:a\s*)?week\b/i, frequency: '5x_week' },
+  { regex: /\b(?:twice|2x?)\s*(?:a\s*)?week\b/i, frequency: '2x_week' },
+];
+
+// Context patterns
 const CONTEXT_PATTERNS = [
   { regex: /@home\b/i, result: 'home' },
   { regex: /@work\b/i, result: 'work' },
@@ -271,63 +313,103 @@ const CONTEXT_PATTERNS = [
   { regex: /@anywhere\b/i, result: 'anywhere' },
   { regex: /@gym\b/i, result: 'gym' },
   { regex: /@outside\b/i, result: 'outside' },
+  { regex: /@online\b/i, result: 'online' },
 ];
 
+// Energy patterns
 const ENERGY_PATTERNS = [
   { regex: /\blow\s*energy\b/i, result: 'low' as const },
-  { regex: /\bhigh\s*energy\b/i, result: 'high' as const },
   { regex: /\btired\b/i, result: 'low' as const },
+  { regex: /\bexhausted\b/i, result: 'low' as const },
+  { regex: /\blazy\b/i, result: 'low' as const },
+  { regex: /\bhigh\s*energy\b/i, result: 'high' as const },
   { regex: /\bfocused\b/i, result: 'high' as const },
+  { regex: /\benergetic\b/i, result: 'high' as const },
+  { regex: /\bpumped\b/i, result: 'high' as const },
+  { regex: /\bpeak\b/i, result: 'high' as const },
 ];
 
-// Reminder patterns - detect phrases like "remind me 30 minutes before"
+// Reminder patterns
 const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => number }> = [
-  // "remind me X minutes before" / "remind me X min early"
   { regex: /remind\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
-  // "remind me X hours before" / "at least X hour before"
   { regex: /remind\s*(?:me\s+)?(?:at\s+least\s+)?(\d+)\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) * 60 },
-  // Word-based: "remind me half an hour before"
   { regex: /remind\s*(?:me\s+)?(?:a\s+)?half\s*(?:an?\s+)?(?:h(?:ou)?r)\s*(?:before|early|prior)/i, handler: () => 30 },
-  // Word-based: "remind me an hour before" / "remind me one hour before"
   { regex: /remind\s*(?:me\s+)?(?:an?\s+|one\s+)(?:h(?:ou)?r)\s*(?:before|early|prior)/i, handler: () => 60 },
-  // Word-based: "remind me two hours before"
-  { regex: /remind\s*(?:me\s+)?two\s*(?:h(?:ou)?rs?)\s*(?:before|early|prior)/i, handler: () => 120 },
-  // "notify me X min before"
-  { regex: /notify\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
-  // "alert me X minutes before"
-  { regex: /alert\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
-  // "remind me" (default 15 min) - must be last as it's the most general
   { regex: /remind\s*me\b/i, handler: () => 15 },
-  // "set reminder" / "with reminder"
   { regex: /(?:set|with)\s*(?:a\s+)?reminder/i, handler: () => 15 },
 ];
 
-// Notes patterns - detect phrases like "note: something" or "(parenthetical notes)"
+// Notes patterns
 const NOTE_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => string }> = [
-  // "note: something" or "notes: something"
   { regex: /\bnotes?:\s*(.+?)(?=\s*(?:!{1,4}|p[1-4]|\bat\s+\d|@|\bremind|\btomorrow|\btoday|$))/i, handler: (m) => m[1].trim() },
-  // "// comment style" at end
   { regex: /\/\/\s*(.+?)$/i, handler: (m) => m[1].trim() },
-  // "(parenthetical notes)" at end
   { regex: /\(([^)]+)\)\s*$/i, handler: (m) => m[1].trim() },
-  // "- additional info" at end
-  { regex: /\s+-\s+(.+?)$/i, handler: (m) => m[1].trim() },
 ];
 
-// Clear/remove patterns - detect phrases like "remove time", "clear schedule"
-const CLEAR_PATTERNS: Array<{ regex: RegExp; clears: 'time' | 'date' | 'duration' | 'recurrence' | 'both' }> = [
-  { regex: /\b(?:remove|clear|delete|no)\s*(?:scheduled?\s*)?time\b/i, clears: 'time' },
-  { regex: /\b(?:remove|clear|delete|no)\s*(?:scheduled?\s*)?date\b/i, clears: 'date' },
-  { regex: /\b(?:remove|clear|delete|no)\s*duration\b/i, clears: 'duration' },
-  { regex: /\b(?:remove|clear|delete|no)\s*(?:recurrence|repeat(?:ing)?)\b/i, clears: 'recurrence' },
+// Clear/remove patterns - enhanced
+const CLEAR_PATTERNS: Array<{ regex: RegExp; clears: string }> = [
+  { regex: /\b(?:remove|clear|delete|no|unset)\s*(?:the\s*)?(?:scheduled?\s*)?time\b/i, clears: 'time' },
+  { regex: /\b(?:remove|clear|delete|no|unset)\s*(?:the\s*)?(?:scheduled?\s*)?date\b/i, clears: 'date' },
+  { regex: /\b(?:remove|clear|delete|no|unset)\s*(?:the\s*)?(?:estimated?\s*)?duration\b/i, clears: 'duration' },
+  { regex: /\b(?:remove|clear|delete|no|unset|stop)\s*(?:the\s*)?(?:recurrence|repeat(?:ing)?)\b/i, clears: 'recurrence' },
   { regex: /\bunschedule\b/i, clears: 'both' },
   { regex: /\bclear\s*(?:all\s*)?schedule\b/i, clears: 'both' },
+  { regex: /\b(?:reset|clear\s*all|start\s*fresh|defaults?)\b/i, clears: 'all' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:the\s*)?category\b/i, clears: 'category' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:the\s*)?(?:attribute|type)\b/i, clears: 'category' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:the\s*)?priority\b/i, clears: 'priority' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:the\s*)?notes?\b/i, clears: 'notes' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:the\s*)?remind(?:er)?\b/i, clears: 'reminder' },
+];
+
+// Category/Attribute patterns
+const CATEGORY_PATTERNS: Array<{ regex: RegExp; category: 'mind' | 'body' | 'soul' }> = [
+  { regex: /\b(?:for\s+)?(?:mind|mental|brain|cognitive|intellectual|thinking|#mind)\b/i, category: 'mind' },
+  { regex: /\b(?:for\s+)?(?:body|physical|fitness|workout|exercise|health|#body)\b/i, category: 'body' },
+  { regex: /\b(?:for\s+)?(?:soul|spirit(?:ual)?|emotional|heart|inner|#soul)\b/i, category: 'soul' },
+];
+
+// Status patterns
+const STATUS_PATTERNS: Array<{ regex: RegExp; paused?: boolean; archived?: boolean }> = [
+  { regex: /\b(?:pause|skip|disable|deactivate|turn\s*off|stop)\s*(?:this)?\b/i, paused: true },
+  { regex: /\b(?:resume|activate|enable|turn\s*on|unpause|start)\s*(?:this)?\b/i, paused: false },
+  { regex: /\b(?:archive|hide)\s*(?:this)?\b/i, archived: true },
+  { regex: /\b(?:unarchive|unhide|restore)\s*(?:this)?\b/i, archived: false },
+];
+
+// Bonus/Optional patterns
+const BONUS_PATTERNS: Array<{ regex: RegExp; isBonus: boolean }> = [
+  { regex: /\b(?:bonus|extra\s*credit|stretch\s*goal|optional|nice\s*to\s*have)\b/i, isBonus: true },
+  { regex: /\b(?:required|mandatory|essential|core)\b/i, isBonus: false },
+];
+
+// Milestone patterns
+const MILESTONE_PATTERNS = [
+  { regex: /\b(?:milestone|checkpoint|key\s*moment|major|significant|big\s*step)\b/i, isMilestone: true },
+];
+
+// XP/Reward patterns
+const XP_PATTERNS: Array<{ regex: RegExp; handler?: (m: RegExpMatchArray) => number; xp?: number; multiplier?: number }> = [
+  { regex: /\b(?:worth\s*)?(\d+)\s*(?:xp|points?|pts?)\b/i, handler: (m) => parseInt(m[1]) },
+  { regex: /\b(?:double|2x)\s*xp\b/i, multiplier: 2 },
+  { regex: /\b(?:triple|3x)\s*xp\b/i, multiplier: 3 },
+  { regex: /\bhigh\s*value\b/i, xp: 100 },
+  { regex: /\bquick\s*win\b/i, xp: 25 },
+];
+
+// Title/Rename patterns
+const RENAME_PATTERNS = [
+  { regex: /\b(?:rename|call\s*it|change\s*(?:name|title)\s*to)\s*[:\s]*["']?(.+?)["']?$/i, handler: (m: RegExpMatchArray) => m[1].trim() },
+];
+
+// AI/Decomposition patterns
+const DECOMPOSITION_PATTERNS = [
+  { regex: /\b(?:break\s*(?:this\s*)?down|decompose|split\s*(?:into\s*)?(?:sub)?tasks?|suggest\s*(?:sub)?steps?|expand)\b/i, trigger: true },
 ];
 
 function cleanTaskText(text: string): string {
   let cleaned = text;
 
-  // Remove matched patterns from the text
   const patternsToRemove = [
     ...TIME_PATTERNS.map(p => p.regex),
     ...DATE_PATTERNS.map(p => p.regex),
@@ -335,17 +417,25 @@ function cleanTaskText(text: string): string {
     ...DIFFICULTY_PATTERNS.map(p => p.regex),
     ...PRIORITY_PATTERNS.map(p => p.regex),
     ...RECURRENCE_PATTERNS.map(p => p.regex),
+    ...FREQUENCY_PATTERNS.map(p => p.regex),
     ...CONTEXT_PATTERNS.map(p => p.regex),
     ...ENERGY_PATTERNS.map(p => p.regex),
     ...REMINDER_PATTERNS.map(p => p.regex),
     ...NOTE_PATTERNS.map(p => p.regex),
+    ...CLEAR_PATTERNS.map(p => p.regex),
+    ...CATEGORY_PATTERNS.map(p => p.regex),
+    ...STATUS_PATTERNS.map(p => p.regex),
+    ...BONUS_PATTERNS.map(p => p.regex),
+    ...MILESTONE_PATTERNS.map(p => p.regex),
+    ...XP_PATTERNS.map(p => p.regex),
+    ...RENAME_PATTERNS.map(p => p.regex),
+    ...DECOMPOSITION_PATTERNS.map(p => p.regex),
   ];
 
   patternsToRemove.forEach(pattern => {
     cleaned = cleaned.replace(pattern, '');
   });
 
-  // Clean up extra spaces and punctuation
   cleaned = cleaned
     .replace(/\s+/g, ' ')
     .replace(/^\s*[-,;:]\s*/, '')
@@ -356,39 +446,54 @@ function cleanTaskText(text: string): string {
 }
 
 export function parseNaturalLanguage(input: string): ParsedTask {
-  let scheduledTime: string | null = null;
-  let scheduledDate: string | null = null;
-  let estimatedDuration: number | null = null;
-  let difficulty: 'easy' | 'medium' | 'hard' = 'medium';
-  let priority: ParsedTask['priority'] = null;
-  let energyLevel: 'low' | 'medium' | 'high' = 'medium';
-  let context: string | null = null;
-  let recurrencePattern: string | null = null;
-  let isTopThree = false;
-  let reminderEnabled = false;
-  let reminderMinutesBefore: number | null = null;
-  let notes: string | null = null;
-  // Clear actions
-  let clearTime = false;
-  let clearDate = false;
-  let clearDuration = false;
-  let clearRecurrence = false;
+  const result: ParsedTask = {
+    text: input,
+    difficulty: 'medium',
+    scheduledTime: null,
+    scheduledDate: null,
+    estimatedDuration: null,
+    recurrencePattern: null,
+    priority: null,
+    energyLevel: 'medium',
+    context: null,
+    isTopThree: false,
+    reminderEnabled: false,
+    reminderMinutesBefore: null,
+    notes: null,
+    clearTime: false,
+    clearDate: false,
+    clearDuration: false,
+    clearRecurrence: false,
+    clearAll: false,
+    clearCategory: false,
+    clearPriority: false,
+    clearNotes: false,
+    clearReminder: false,
+    category: null,
+    frequency: null,
+    customDays: null,
+    paused: null,
+    archived: null,
+    isBonus: null,
+    isMilestone: null,
+    xpReward: null,
+    xpMultiplier: null,
+    newTitle: null,
+    triggerDecomposition: false,
+  };
 
-  // Parse clear/remove actions first
+  // Parse clear patterns first
   for (const pattern of CLEAR_PATTERNS) {
     if (pattern.regex.test(input)) {
-      if (pattern.clears === 'time' || pattern.clears === 'both') {
-        clearTime = true;
-      }
-      if (pattern.clears === 'date' || pattern.clears === 'both') {
-        clearDate = true;
-      }
-      if (pattern.clears === 'duration') {
-        clearDuration = true;
-      }
-      if (pattern.clears === 'recurrence') {
-        clearRecurrence = true;
-      }
+      if (pattern.clears === 'time' || pattern.clears === 'both') result.clearTime = true;
+      if (pattern.clears === 'date' || pattern.clears === 'both') result.clearDate = true;
+      if (pattern.clears === 'duration') result.clearDuration = true;
+      if (pattern.clears === 'recurrence') result.clearRecurrence = true;
+      if (pattern.clears === 'all') result.clearAll = true;
+      if (pattern.clears === 'category') result.clearCategory = true;
+      if (pattern.clears === 'priority') result.clearPriority = true;
+      if (pattern.clears === 'notes') result.clearNotes = true;
+      if (pattern.clears === 'reminder') result.clearReminder = true;
     }
   }
 
@@ -396,7 +501,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of TIME_PATTERNS) {
     const match = input.match(pattern.regex);
     if (match) {
-      scheduledTime = pattern.handler(match);
+      result.scheduledTime = pattern.handler(match);
       break;
     }
   }
@@ -405,7 +510,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of DATE_PATTERNS) {
     const match = input.match(pattern.regex);
     if (match) {
-      scheduledDate = pattern.handler(match);
+      result.scheduledDate = pattern.handler(match);
       break;
     }
   }
@@ -414,7 +519,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of DURATION_PATTERNS) {
     const match = input.match(pattern.regex);
     if (match) {
-      estimatedDuration = pattern.handler(match);
+      result.estimatedDuration = pattern.handler(match);
       break;
     }
   }
@@ -422,26 +527,33 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   // Parse difficulty
   for (const pattern of DIFFICULTY_PATTERNS) {
     if (pattern.regex.test(input)) {
-      difficulty = pattern.result;
+      result.difficulty = pattern.result;
       break;
     }
   }
 
-  // Parse priority - simplified to match database schema
+  // Parse priority
   for (const pattern of PRIORITY_PATTERNS) {
     if (pattern.regex.test(input)) {
-      if (pattern.isTopThree) {
-        isTopThree = true;
-      } else if (pattern.priority && !priority) {
-        priority = pattern.priority;
-      }
+      if (pattern.isTopThree) result.isTopThree = true;
+      else if (pattern.priority && !result.priority) result.priority = pattern.priority;
     }
   }
 
   // Parse recurrence
   for (const pattern of RECURRENCE_PATTERNS) {
     if (pattern.regex.test(input)) {
-      recurrencePattern = pattern.result;
+      result.recurrencePattern = pattern.result;
+      break;
+    }
+  }
+
+  // Parse frequency/custom days
+  for (const pattern of FREQUENCY_PATTERNS) {
+    const match = input.match(pattern.regex);
+    if (match) {
+      if (pattern.days) result.customDays = pattern.days;
+      if (pattern.frequency) result.frequency = pattern.frequency;
       break;
     }
   }
@@ -449,15 +561,15 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   // Parse context
   for (const pattern of CONTEXT_PATTERNS) {
     if (pattern.regex.test(input)) {
-      context = pattern.result;
+      result.context = pattern.result;
       break;
     }
   }
 
-  // Parse energy level
+  // Parse energy
   for (const pattern of ENERGY_PATTERNS) {
     if (pattern.regex.test(input)) {
-      energyLevel = pattern.result;
+      result.energyLevel = pattern.result;
       break;
     }
   }
@@ -466,8 +578,69 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of REMINDER_PATTERNS) {
     const match = input.match(pattern.regex);
     if (match) {
-      reminderEnabled = true;
-      reminderMinutesBefore = pattern.handler(match);
+      result.reminderEnabled = true;
+      result.reminderMinutesBefore = pattern.handler(match);
+      break;
+    }
+  }
+
+  // Parse category
+  for (const pattern of CATEGORY_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      result.category = pattern.category;
+      break;
+    }
+  }
+
+  // Parse status
+  for (const pattern of STATUS_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      if (pattern.paused !== undefined) result.paused = pattern.paused;
+      if (pattern.archived !== undefined) result.archived = pattern.archived;
+      break;
+    }
+  }
+
+  // Parse bonus
+  for (const pattern of BONUS_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      result.isBonus = pattern.isBonus;
+      break;
+    }
+  }
+
+  // Parse milestone
+  for (const pattern of MILESTONE_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      result.isMilestone = pattern.isMilestone;
+      break;
+    }
+  }
+
+  // Parse XP
+  for (const pattern of XP_PATTERNS) {
+    const match = input.match(pattern.regex);
+    if (match) {
+      if (pattern.handler) result.xpReward = pattern.handler(match);
+      else if (pattern.xp) result.xpReward = pattern.xp;
+      else if (pattern.multiplier) result.xpMultiplier = pattern.multiplier;
+      break;
+    }
+  }
+
+  // Parse rename
+  for (const pattern of RENAME_PATTERNS) {
+    const match = input.match(pattern.regex);
+    if (match) {
+      result.newTitle = pattern.handler(match);
+      break;
+    }
+  }
+
+  // Parse decomposition
+  for (const pattern of DECOMPOSITION_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      result.triggerDecomposition = pattern.trigger;
       break;
     }
   }
@@ -476,82 +649,33 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of NOTE_PATTERNS) {
     const match = input.match(pattern.regex);
     if (match) {
-      notes = pattern.handler(match);
+      result.notes = pattern.handler(match);
       break;
     }
   }
 
-  // Infer energy from duration if not explicitly set
-  if (estimatedDuration && estimatedDuration >= 60) {
-    energyLevel = 'high';
-  } else if (estimatedDuration && estimatedDuration <= 15) {
-    energyLevel = 'low';
-  }
+  // Clean text
+  result.text = cleanTaskText(input);
 
-  // Clean the task text
-  const cleanedText = cleanTaskText(input);
-
-  return {
-    text: cleanedText || input,
-    difficulty,
-    scheduledTime,
-    scheduledDate,
-    estimatedDuration,
-    recurrencePattern,
-    priority,
-    energyLevel,
-    context,
-    isTopThree,
-    reminderEnabled,
-    reminderMinutesBefore,
-    clearTime,
-    clearDate,
-    clearDuration,
-    clearRecurrence,
-    notes,
-  };
+  return result;
 }
 
 export function useNaturalLanguageParser() {
   const [input, setInput] = useState('');
   const [parsed, setParsed] = useState<ParsedTask | null>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
 
-  const parse = useCallback((text: string) => {
-    if (!text.trim()) {
-      setParsed(null);
-      return;
-    }
-    setParsed(parseNaturalLanguage(text));
-  }, []);
-
-  // Debounced parsing for real-time preview
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
+    if (input.trim()) {
+      setParsed(parseNaturalLanguage(input));
+    } else {
+      setParsed(null);
     }
-
-    debounceRef.current = setTimeout(() => {
-      parse(input);
-    }, 150);
-
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [input, parse]);
+  }, [input]);
 
   const reset = useCallback(() => {
     setInput('');
     setParsed(null);
   }, []);
 
-  return {
-    input,
-    setInput,
-    parsed,
-    reset,
-    parseImmediate: parse,
-  };
+  return { input, setInput, parsed, reset };
 }
