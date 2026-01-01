@@ -113,33 +113,44 @@ export function EditRitualSheet({
   }, [ritual]);
 
   const handleNaturalLanguageApply = (parsed: ParsedTask) => {
-    if (parsed.text && parsed.text !== title) {
+    // Handle clear all first
+    if (parsed.clearAll) {
+      setPreferredTime('');
+      setEstimatedMinutes(null);
+      setRecurrencePattern(null);
+      setRecurrenceDays([]);
+      setReminderEnabled(false);
+      return;
+    }
+    
+    // Handle title/rename
+    if (parsed.newTitle) {
+      setTitle(parsed.newTitle);
+    } else if (parsed.text && parsed.text !== title) {
       setTitle(parsed.text);
     }
+    
     // Handle setting values
-    if (parsed.scheduledTime) {
-      setPreferredTime(parsed.scheduledTime);
+    if (parsed.scheduledTime) setPreferredTime(parsed.scheduledTime);
+    if (parsed.estimatedDuration) setEstimatedMinutes(parsed.estimatedDuration);
+    if (parsed.difficulty) setDifficulty(parsed.difficulty);
+    if (parsed.recurrencePattern) setRecurrencePattern(parsed.recurrencePattern);
+    if (parsed.category) setCategory(parsed.category);
+    if (parsed.customDays) setRecurrenceDays(parsed.customDays);
+    if (parsed.reminderEnabled) {
+      setReminderEnabled(true);
+      if (parsed.reminderMinutesBefore) setReminderMinutesBefore(parsed.reminderMinutesBefore);
     }
-    if (parsed.estimatedDuration) {
-      setEstimatedMinutes(parsed.estimatedDuration);
-    }
-    if (parsed.difficulty) {
-      setDifficulty(parsed.difficulty);
-    }
-    if (parsed.recurrencePattern) {
-      setRecurrencePattern(parsed.recurrencePattern);
-    }
-    // Handle clearing values
-    if (parsed.clearTime) {
-      setPreferredTime('');
-    }
-    if (parsed.clearDuration) {
-      setEstimatedMinutes(null);
-    }
+    
+    // Handle clearing individual values
+    if (parsed.clearTime) setPreferredTime('');
+    if (parsed.clearDuration) setEstimatedMinutes(null);
     if (parsed.clearRecurrence) {
       setRecurrencePattern(null);
       setRecurrenceDays([]);
     }
+    if (parsed.clearCategory) setCategory('soul');
+    if (parsed.clearReminder) setReminderEnabled(false);
   };
 
   const handleSave = async () => {
