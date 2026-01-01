@@ -90,6 +90,7 @@ export function EditQuestDialog({
     if (parsed.text && parsed.text !== taskText) {
       setTaskText(parsed.text);
     }
+    // Handle setting values
     if (parsed.scheduledTime) {
       setScheduledTime(parsed.scheduledTime);
     }
@@ -101,6 +102,17 @@ export function EditQuestDialog({
     }
     if (parsed.recurrencePattern) {
       setRecurrencePattern(parsed.recurrencePattern);
+    }
+    // Handle clearing values
+    if (parsed.clearTime) {
+      setScheduledTime('');
+    }
+    if (parsed.clearDuration) {
+      setEstimatedDuration(null);
+    }
+    if (parsed.clearRecurrence) {
+      setRecurrencePattern(null);
+      setRecurrenceDays([]);
     }
   };
 

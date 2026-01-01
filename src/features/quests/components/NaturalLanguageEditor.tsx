@@ -27,7 +27,8 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
 
   const hasParsedValues = parsed && (
     parsed.scheduledTime || parsed.scheduledDate || parsed.estimatedDuration || 
-    parsed.difficulty !== "medium" || parsed.recurrencePattern
+    parsed.difficulty !== "medium" || parsed.recurrencePattern ||
+    parsed.clearTime || parsed.clearDate || parsed.clearDuration || parsed.clearRecurrence
   );
 
   const handleApply = () => {
@@ -107,6 +108,26 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
           {parsed.recurrencePattern && (
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/20 text-purple-600 text-xs">
               🔄 {parsed.recurrencePattern}
+            </span>
+          )}
+          {parsed.clearTime && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-xs">
+              🚫 Remove time
+            </span>
+          )}
+          {parsed.clearDate && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-xs">
+              🚫 Remove date
+            </span>
+          )}
+          {parsed.clearDuration && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-xs">
+              🚫 Remove duration
+            </span>
+          )}
+          {parsed.clearRecurrence && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-destructive/20 text-destructive text-xs">
+              🚫 Remove repeat
             </span>
           )}
         </div>

@@ -15,6 +15,11 @@ export interface ParsedTask {
   reminderEnabled: boolean;
   reminderMinutesBefore: number | null;
   notes: string | null;
+  // Clear actions
+  clearTime: boolean;
+  clearDate: boolean;
+  clearDuration: boolean;
+  clearRecurrence: boolean;
 }
 
 // Month name to number mapping
@@ -309,6 +314,16 @@ const NOTE_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => st
   { regex: /\s+-\s+(.+?)$/i, handler: (m) => m[1].trim() },
 ];
 
+// Clear/remove patterns - detect phrases like "remove time", "clear schedule"
+const CLEAR_PATTERNS: Array<{ regex: RegExp; clears: 'time' | 'date' | 'duration' | 'recurrence' | 'both' }> = [
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:scheduled?\s*)?time\b/i, clears: 'time' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:scheduled?\s*)?date\b/i, clears: 'date' },
+  { regex: /\b(?:remove|clear|delete|no)\s*duration\b/i, clears: 'duration' },
+  { regex: /\b(?:remove|clear|delete|no)\s*(?:recurrence|repeat(?:ing)?)\b/i, clears: 'recurrence' },
+  { regex: /\bunschedule\b/i, clears: 'both' },
+  { regex: /\bclear\s*(?:all\s*)?schedule\b/i, clears: 'both' },
+];
+
 function cleanTaskText(text: string): string {
   let cleaned = text;
 
@@ -353,6 +368,29 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   let reminderEnabled = false;
   let reminderMinutesBefore: number | null = null;
   let notes: string | null = null;
+  // Clear actions
+  let clearTime = false;
+  let clearDate = false;
+  let clearDuration = false;
+  let clearRecurrence = false;
+
+  // Parse clear/remove actions first
+  for (const pattern of CLEAR_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      if (pattern.clears === 'time' || pattern.clears === 'both') {
+        clearTime = true;
+      }
+      if (pattern.clears === 'date' || pattern.clears === 'both') {
+        clearDate = true;
+      }
+      if (pattern.clears === 'duration') {
+        clearDuration = true;
+      }
+      if (pattern.clears === 'recurrence') {
+        clearRecurrence = true;
+      }
+    }
+  }
 
   // Parse time
   for (const pattern of TIME_PATTERNS) {
@@ -466,6 +504,10 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     isTopThree,
     reminderEnabled,
     reminderMinutesBefore,
+    clearTime,
+    clearDate,
+    clearDuration,
+    clearRecurrence,
     notes,
   };
 }
