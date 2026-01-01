@@ -239,9 +239,14 @@ export function EditRitualSheet({
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe what this ritual involves..."
+                placeholder="What does this ritual involve? Add details about how to perform it, timing, or any tips..."
                 rows={3}
               />
+              {!description && (
+                <p className="text-xs text-muted-foreground">
+                  Add details about what this ritual involves - this was generated when you created your campaign
+                </p>
+              )}
             </div>
 
             {/* Difficulty */}
