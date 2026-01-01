@@ -596,6 +596,122 @@ All colors MUST be HSL.
     }
   }
 
+  /* Evolution Modal Animations - GPU Accelerated */
+  @keyframes evolution-shake {
+    0%, 100% { transform: translateX(0) translateZ(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px) translateZ(0); }
+    20%, 40%, 60%, 80% { transform: translateX(3px) translateZ(0); }
+  }
+  
+  .animate-evolution-shake {
+    animation: evolution-shake 0.5s ease-in-out;
+  }
+
+  @keyframes evolution-particle {
+    0% {
+      transform: translateY(0) translateZ(0);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translateY(calc(-100vh - 20px)) translateZ(0);
+      opacity: 0;
+    }
+  }
+  
+  .animate-evolution-particle {
+    animation: evolution-particle 4s ease-out infinite;
+  }
+
+  @keyframes evolution-glow {
+    0%, 100% {
+      transform: scale(1) translateZ(0);
+      opacity: 0.2;
+    }
+    50% {
+      transform: scale(1.2) translateZ(0);
+      opacity: 0.4;
+    }
+  }
+  
+  .animate-evolution-glow {
+    animation: evolution-glow 2.5s ease-in-out infinite;
+  }
+
+  @keyframes evolution-pulse {
+    0%, 100% {
+      transform: scale(1) translateZ(0);
+      opacity: 0.3;
+    }
+    50% {
+      transform: scale(1.15) translateZ(0);
+      opacity: 0.6;
+    }
+  }
+  
+  .animate-evolution-pulse {
+    animation: evolution-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes evolution-shimmer {
+    0% {
+      background: linear-gradient(90deg, transparent 0%, transparent 100%);
+    }
+    50% {
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%);
+    }
+    100% {
+      background: linear-gradient(90deg, transparent 0%, transparent 100%);
+    }
+  }
+  
+  .animate-evolution-shimmer {
+    animation: evolution-shimmer 3s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+
+  @keyframes evolution-border-glow {
+    0%, 100% {
+      box-shadow: 0 0 40px hsl(var(--primary) / 0.6), 0 0 80px hsl(var(--accent) / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 60px hsl(var(--primary) / 0.8), 0 0 120px hsl(var(--accent) / 0.5);
+    }
+  }
+  
+  .animate-evolution-border-glow {
+    animation: evolution-border-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes subtle-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+  }
+  
+  .animate-subtle-pulse {
+    animation: subtle-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes gradient-text {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  .animate-gradient-text {
+    animation: gradient-text 3s ease-in-out infinite;
+  }
+
+  /* GPU layer promotion utility */
+  .gpu-layer {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
   @keyframes pulse-slow {
     0%, 100% {
       opacity: 0.5;
