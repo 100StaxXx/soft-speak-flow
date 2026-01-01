@@ -25,7 +25,8 @@ import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
-import { AstralEncounterProvider } from "@/components/astral-encounters";
+// HIDDEN: Astral Encounters feature disabled
+// import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { LevelUpCelebration } from "@/components/LevelUpCelebration";
@@ -64,7 +65,8 @@ const Journeys = lazy(() => import("./pages/Journeys"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
-const AstralArcade = lazy(() => import("./pages/AstralArcade"));
+// HIDDEN: Astral Encounters feature disabled
+// const AstralArcade = lazy(() => import("./pages/AstralArcade"));
 // const Horoscope = lazy(() => import("./pages/Horoscope")); // Shelved
 const Creator = lazy(() => import("./pages/Creator"));
 const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
@@ -218,7 +220,7 @@ const AppContent = memo(() => {
       <ViewModeProvider>
         <XPProvider>
           <WeeklyRecapProvider>
-            <AstralEncounterProvider>
+            {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
               <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
                 <Routes>
@@ -243,7 +245,8 @@ const AppContent = memo(() => {
                 <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
                 <Route path="/join/:code" element={<JoinEpic />} />
                 <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-                <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} />
+                {/* HIDDEN: Arcade route disabled */}
+                {/* <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} /> */}
                 <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
                 <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
                 <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />
@@ -265,7 +268,7 @@ const AppContent = memo(() => {
                 <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
-            </AstralEncounterProvider>
+            {/* HIDDEN: AstralEncounterProvider closing tag removed */}
           </WeeklyRecapProvider>
         </XPProvider>
       </ViewModeProvider>
