@@ -116,6 +116,7 @@ export function EditRitualSheet({
     if (parsed.text && parsed.text !== title) {
       setTitle(parsed.text);
     }
+    // Handle setting values
     if (parsed.scheduledTime) {
       setPreferredTime(parsed.scheduledTime);
     }
@@ -127,6 +128,17 @@ export function EditRitualSheet({
     }
     if (parsed.recurrencePattern) {
       setRecurrencePattern(parsed.recurrencePattern);
+    }
+    // Handle clearing values
+    if (parsed.clearTime) {
+      setPreferredTime('');
+    }
+    if (parsed.clearDuration) {
+      setEstimatedMinutes(null);
+    }
+    if (parsed.clearRecurrence) {
+      setRecurrencePattern(null);
+      setRecurrenceDays([]);
     }
   };
 
