@@ -222,56 +222,38 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           />
         )}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
-            <Calendar className="w-3.5 h-3.5 text-primary" />
-            <div>
-              <div className="text-[10px] text-muted-foreground">Duration</div>
-              <div className="text-xs font-bold">{journey.target_days}d</div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
-            <Flame className="w-3.5 h-3.5 text-orange-500" />
-            <div>
-              <div className="text-[10px] text-muted-foreground">Left</div>
-              <div className="text-xs font-bold">
-                {isCompleted ? "Done!" : `${daysRemaining}d`}
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1.5 bg-background/50 rounded-lg p-2">
-            {journeyHealth ? (
-              <>
-                <div className={cn(
-                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                  journeyHealth.score === 'A' && "bg-green-500/20 text-green-500",
-                  journeyHealth.score === 'B' && "bg-celestial-blue/20 text-celestial-blue",
-                  journeyHealth.score === 'C' && "bg-amber-500/20 text-amber-500",
-                  journeyHealth.score === 'D' && "bg-orange-500/20 text-orange-500",
-                  journeyHealth.score === 'F' && "bg-red-500/20 text-red-500",
-                )}>
-                  {journeyHealth.score}
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground">Health</div>
-                  <div className="text-xs font-bold">
-                    {journeyHealth.progressDelta > 0 ? '+' : ''}{Math.round(journeyHealth.progressDelta)}%
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <Zap className="w-3.5 h-3.5 text-stardust-gold" />
-                <div>
-                  <div className="text-[10px] text-muted-foreground">XP</div>
-                  <div className="text-xs font-bold text-stardust-gold">{journey.xp_reward}</div>
-                </div>
-              </>
-            )}
-          </div>
+        {/* Compact Stats Bar */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {journey.target_days}d total
+          </span>
+          <span className="text-muted-foreground/30">•</span>
+          <span className="flex items-center gap-1">
+            <Flame className="w-3 h-3 text-orange-500" />
+            {isCompleted ? "Done!" : `${daysRemaining}d left`}
+          </span>
+          <span className="text-muted-foreground/30">•</span>
+          {journeyHealth ? (
+            <span className="flex items-center gap-1">
+              <span className={cn(
+                "text-xs font-bold",
+                journeyHealth.score === 'A' && "text-green-500",
+                journeyHealth.score === 'B' && "text-celestial-blue",
+                journeyHealth.score === 'C' && "text-amber-500",
+                journeyHealth.score === 'D' && "text-orange-500",
+                journeyHealth.score === 'F' && "text-red-500",
+              )}>
+                {journeyHealth.score}
+              </span>
+              <span>({journeyHealth.progressDelta > 0 ? '+' : ''}{Math.round(journeyHealth.progressDelta)}%)</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <Zap className="w-3 h-3 text-stardust-gold" />
+              <span className="text-stardust-gold font-medium">{journey.xp_reward} XP</span>
+            </span>
+          )}
         </div>
 
         {/* Next Postcard Preview - Always visible for active campaigns */}
@@ -302,7 +284,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           />
         </div>
 
-        {/* Check In Button & Rituals */}
+        {/* Check In Button */}
         {journey.epic_habits && ritualCount > 0 && (
           <div className="mb-3">
             <EpicCheckInDrawer
@@ -319,29 +301,9 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                   custom_days: eh.habits?.custom_days,
                 }))}
               isActive={isActive}
+              showAdjustPlan={isActive}
+              onAdjustPlan={() => toast.info("Adjust Plan coming soon!")}
             />
-            
-            {/* Linked Rituals as badges */}
-            <div className="mt-2">
-              <div className="text-[10px] font-medium text-muted-foreground mb-1.5">
-                Rituals ({ritualCount})
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {journey.epic_habits
-                  .filter(eh => eh.habits)
-                  .slice(0, 4)
-                  .map((eh) => (
-                    <Badge key={eh.habit_id} variant="outline" className="text-[10px] px-1.5 py-0">
-                      {eh.habits.title}
-                    </Badge>
-                  ))}
-                {ritualCount > 4 && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    +{ritualCount - 4}
-                  </Badge>
-                )}
-              </div>
-            </div>
           </div>
         )}
 
