@@ -41,9 +41,9 @@ export const MoodSelector = ({ onSelect, selected }: MoodSelectorProps) => {
           >
             <div className={cn(
               "w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200",
-              isSelected ? mood.bgColor : "bg-muted/50"
+              mood.bgColor
             )}>
-              <Icon className={cn("h-5 w-5", isSelected ? mood.color : "text-muted-foreground")} />
+              <Icon className={cn("h-5 w-5", mood.color)} />
             </div>
             <span className={cn(
               "text-[10px] font-medium leading-none text-center",
