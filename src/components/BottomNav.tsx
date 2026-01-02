@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Calendar, Sparkles, User, Compass } from "lucide-react";
+import { Target, Sparkles, User, Compass } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -120,16 +120,16 @@ export const BottomNav = memo(() => {
         </NavLink>
 
         <NavLink
-          to="/guilds"
+          to="/campaigns"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-celestial-blue/20 to-celestial-blue/5 shadow-soft"
+          activeClassName="bg-gradient-to-br from-purple-500/20 to-purple-500/5 shadow-soft"
           onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
-              <Calendar className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-celestial-blue drop-shadow-[0_0_8px_hsl(210,80%,50%)]' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/80'}`}>
-                Calendar
+              <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
+                Campaigns
               </span>
             </>
           )}
