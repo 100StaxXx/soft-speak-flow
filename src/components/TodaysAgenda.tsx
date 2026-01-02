@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { 
-  Sparkles, 
   Flame, 
   Trophy, 
   Plus,
@@ -16,8 +15,11 @@ import {
   ChevronUp,
   Rocket,
   CheckCircle2,
-  Target
+  Target,
+  Sparkles
 } from "lucide-react";
+import { MonthViewModal } from "@/components/calendar/MonthViewModal";
+import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -62,6 +64,9 @@ interface TodaysAgendaProps {
   onReorderTasks?: (tasks: Task[]) => void;
   onMoveTaskToSection?: (taskId: string, targetSection: TimeSection) => void;
   hideIndicator?: boolean;
+  calendarTasks?: CalendarTask[];
+  calendarMilestones?: CalendarMilestone[];
+  onDateSelect?: (date: Date) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -87,10 +92,14 @@ export function TodaysAgenda({
   onReorderTasks,
   onMoveTaskToSection,
   hideIndicator = false,
+  calendarTasks = [],
+  calendarMilestones = [],
+  onDateSelect,
 }: TodaysAgendaProps) {
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
+  const [showMonthView, setShowMonthView] = useState(false);
   
   // Track if we've already shown the tooltip this session
   const tooltipShownRef = useRef(false);
@@ -328,13 +337,15 @@ export function TodaysAgenda({
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <button 
+              onClick={() => setShowMonthView(true)}
+              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            >
               <span className="text-lg font-bold">
-                {isToday ? "Quest Log" : format(selectedDate, "MMM d")}
+                {format(selectedDate, "MMM d, yyyy")}
               </span>
-            </div>
-          {currentStreak > 0 && (
+            </button>
+            {currentStreak > 0 && (
               <div className={cn(
                 "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                 currentStreak >= 30 
@@ -349,10 +360,7 @@ export function TodaysAgenda({
             )}
           </div>
 
-          <div className={cn(
-            "flex items-center gap-1.5 text-base px-2.5 py-0.5 rounded-full",
-            allComplete ? "bg-stardust-gold/20" : "bg-stardust-gold/10"
-          )}>
+          <div className="flex items-center gap-1.5 text-base">
             <Trophy className={cn(
               "h-5 w-5",
               allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
@@ -587,6 +595,18 @@ export function TodaysAgenda({
           </p>
         </motion.div>
       )}
+      
+      <MonthViewModal
+        open={showMonthView}
+        onOpenChange={setShowMonthView}
+        selectedDate={selectedDate}
+        onDateSelect={(date) => {
+          if (onDateSelect) onDateSelect(date);
+          setShowMonthView(false);
+        }}
+        tasks={calendarTasks}
+        milestones={calendarMilestones}
+      />
     </div>
   );
 }
