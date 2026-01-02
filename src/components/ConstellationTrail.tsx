@@ -845,7 +845,19 @@ export const ConstellationTrail = ({
   epicId
 }: ConstellationTrailProps) => {
   // Fetch journey path image for this epic
-  const { pathImageUrl, isLoading: isPathLoading, isGenerating } = useJourneyPathImage(epicId);
+  const { 
+    pathImageUrl, 
+    isLoading: isPathLoading, 
+    isGenerating, 
+    generateInitialPath 
+  } = useJourneyPathImage(epicId);
+  
+  // Auto-generate initial path when no image exists for this epic
+  useEffect(() => {
+    if (epicId && !pathImageUrl && !isPathLoading && !isGenerating) {
+      generateInitialPath();
+    }
+  }, [epicId, pathImageUrl, isPathLoading, isGenerating, generateInitialPath]);
   
   // Sort milestones by percentage and include start (0%)
   const sortedMilestones = useMemo(() => {
