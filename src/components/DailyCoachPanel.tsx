@@ -12,10 +12,7 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useDailyPlanOptimization, DailyInsight } from '@/hooks/useDailyPlanOptimization';
 
@@ -72,44 +69,45 @@ export const DailyInsightCard = memo(function DailyInsightCard({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 10 }}
     >
-      <Card className={cn(
-        "p-3 border",
-        config.borderColor,
-        config.bgColor
+      <div className={cn(
+        "rounded-xl backdrop-blur-xl border-l-4 border-t border-r border-b bg-card/80 p-4",
+        config.borderColor.replace('border-', 'border-l-'),
+        "border-t-border/30 border-r-border/30 border-b-border/30"
       )}>
         <div className="flex items-start gap-3">
-          <div className={cn("p-1.5 rounded-md flex-shrink-0", config.bgColor)}>
+          <div className={cn(
+            "p-2 rounded-lg flex-shrink-0",
+            config.bgColor
+          )}>
             <Icon className={cn("h-4 w-4", config.color)} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
-              <p className="text-sm font-medium">{insight.title}</p>
+              <p className="text-sm font-bold text-foreground">{insight.title}</p>
               {onDismiss && insight.priority !== 'high' && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5 opacity-50 hover:opacity-100"
+                  className="h-6 w-6 opacity-50 hover:opacity-100"
                   onClick={() => onDismiss(insight)}
                 >
                   <X className="h-3 w-3" />
                 </Button>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{insight.message}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{insight.message}</p>
             {insight.actionLabel && onAction && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn("mt-2 h-7 text-xs", config.color)}
+              <button
+                className={cn("mt-2 text-xs font-bold uppercase tracking-wide flex items-center gap-1", config.color)}
                 onClick={() => onAction(insight)}
               >
                 {insight.actionLabel}
-                <ChevronRight className="h-3 w-3 ml-1" />
-              </Button>
+                <ChevronRight className="h-3 w-3" />
+              </button>
             )}
           </div>
         </div>
-      </Card>
+      </div>
     </motion.div>
   );
 });
@@ -134,12 +132,12 @@ export const DailyCoachPanel = memo(function DailyCoachPanel({
 
   if (isLoading) {
     return (
-      <Card className="p-4">
+      <div className="rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 p-4">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Sparkles className="h-4 w-4 animate-pulse" />
           <span className="text-sm">Analyzing your day...</span>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -153,47 +151,68 @@ export const DailyCoachPanel = memo(function DailyCoachPanel({
     <div className="space-y-4">
       {/* Readiness & Energy Header */}
       {!compact && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Today's Readiness</span>
+        <div className="rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-border/30 bg-gradient-to-r from-primary/10 to-accent/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="font-bold text-sm">Today's Readiness</span>
+              </div>
+              <div className="px-2.5 py-1 rounded-full bg-primary/20 border border-primary/30">
+                <span className="text-xs font-bold text-primary">{overallReadiness}%</span>
+              </div>
             </div>
-            <Badge variant="outline" className="text-xs">
-              {overallReadiness}%
-            </Badge>
           </div>
-          <Progress value={overallReadiness} className="h-2 mb-4" />
-          
-          {/* Energy forecast */}
-          {energyForecast && (
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5">
-                <Sun className="h-3.5 w-3.5 text-amber-400" />
-                <span className={energyConfig[energyForecast.morning].color}>
-                  {energyConfig[energyForecast.morning].label}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Sunset className="h-3.5 w-3.5 text-orange-400" />
-                <span className={energyConfig[energyForecast.afternoon].color}>
-                  {energyConfig[energyForecast.afternoon].label}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Moon className="h-3.5 w-3.5 text-indigo-400" />
-                <span className={energyConfig[energyForecast.evening].color}>
-                  {energyConfig[energyForecast.evening].label}
-                </span>
-              </div>
+
+          {/* Progress Bar */}
+          <div className="px-4 py-4">
+            <div className="h-3 w-full bg-muted/50 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-primary via-accent to-nebula-pink rounded-full transition-all duration-500"
+                style={{ width: `${overallReadiness}%` }}
+              />
             </div>
-          )}
-        </Card>
+          
+            {/* Energy forecast */}
+            {energyForecast && (
+              <div className="flex items-center justify-between mt-4 px-2">
+                <div className="flex flex-col items-center gap-1">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Sun className="h-4 w-4 text-amber-400" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Morning</span>
+                  <span className={cn("text-xs font-bold", energyConfig[energyForecast.morning].color)}>
+                    {energyConfig[energyForecast.morning].label}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <Sunset className="h-4 w-4 text-orange-400" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Afternoon</span>
+                  <span className={cn("text-xs font-bold", energyConfig[energyForecast.afternoon].color)}>
+                    {energyConfig[energyForecast.afternoon].label}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    <Moon className="h-4 w-4 text-indigo-400" />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">Evening</span>
+                  <span className={cn("text-xs font-bold", energyConfig[energyForecast.evening].color)}>
+                    {energyConfig[energyForecast.evening].label}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Insights */}
       <AnimatePresence mode="popLayout">
-        <div className="space-y-2">
+        <div className="space-y-3">
           {displayedInsights.map((insight, index) => (
             <DailyInsightCard
               key={`${insight.type}-${insight.title}-${index}`}
