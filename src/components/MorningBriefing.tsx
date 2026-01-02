@@ -169,7 +169,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
 
         {/* Content */}
         <div className="p-4 sm:p-5">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col items-center gap-4">
             {personality && (
               <div className="relative flex-shrink-0">
                 <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-red-500 to-pink-500 opacity-70" />
@@ -184,7 +184,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
                 />
               </div>
             )}
-            <div className="flex-1 space-y-4">
+            <div className="w-full space-y-4 text-center">
               <p className="text-sm text-muted-foreground">
                 Get personalized insights from {personality?.name || 'your mentor'} based on your activity
               </p>
