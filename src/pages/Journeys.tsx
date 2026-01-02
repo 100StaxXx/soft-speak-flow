@@ -3,20 +3,13 @@ import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { 
   Compass, 
-  Trophy, 
   Plus, 
-  Sparkles, 
-  Wand2,
-  Target,
-  Loader2
+  Sparkles
 } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
-import { Button } from "@/components/ui/button";
-import { JourneyCard } from "@/components/JourneyCard";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
-import { Pathfinder } from "@/components/Pathfinder";
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -29,8 +22,7 @@ import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
-import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
-import { useEpics } from "@/hooks/useEpics";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
@@ -45,25 +37,15 @@ import { useComboTracker } from "@/hooks/useComboTracker";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { safeLocalStorage } from "@/utils/storage";
-import type { StoryTypeSlug } from "@/types/narrativeTypes";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { SuggestedSubtask } from "@/hooks/useTaskDecomposition";
 
-const MAX_JOURNEYS = 2;
-
 const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [smartWizardOpen, setSmartWizardOpen] = useState(false);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
-  
-  // Campaign creation animation state
-  const [showCampaignAnimation, setShowCampaignAnimation] = useState(false);
-  const [newCampaignData, setNewCampaignData] = useState<{
-    title: string;
-    habits: Array<{ title: string }>;
-  } | null>(null);
+  const [showQAB, setShowQAB] = useState(false);
   
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
@@ -87,23 +69,6 @@ const Journeys = () => {
   const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
   
   const { currentStreak } = useStreakMultiplier();
-  
-  const {
-    activeEpics: activeJourneys,
-    completedEpics: completedJourneys,
-    isLoading: journeysLoading,
-    createEpic: createJourney,
-    isCreating,
-    isCreateSuccess,
-    updateEpicStatus: updateJourneyStatus,
-  } = useEpics();
-  
-  // Trigger animation when campaign is created successfully
-  useEffect(() => {
-    if (isCreateSuccess && newCampaignData) {
-      setShowCampaignAnimation(true);
-    }
-  }, [isCreateSuccess, newCampaignData]);
 
   const { 
     tasks: dailyTasks,
@@ -241,48 +206,6 @@ const Journeys = () => {
     return map;
   }, [allCalendarTasks]);
 
-  const hasReachedLimit = activeJourneys.length >= MAX_JOURNEYS;
-
-  const handleCreateJourney = (data: {
-    title: string;
-    description?: string;
-    target_days: number;
-    story_type_slug?: StoryTypeSlug;
-    theme_color?: string;
-    is_public?: boolean;
-    habits: Array<{
-      title: string;
-      description?: string;
-      difficulty: string;
-      frequency: string;
-      custom_days: number[];
-      estimated_minutes?: number;
-    }>;
-    milestones?: Array<{
-      title: string;
-      description?: string;
-      target_date: string;
-      milestone_percent: number;
-      is_postcard_milestone: boolean;
-    }>;
-    phases?: Array<{
-      name: string;
-      description: string;
-      start_date: string;
-      end_date: string;
-      phase_order: number;
-    }>;
-  }) => {
-    console.log('[Journeys] Creating journey with milestones:', data.milestones?.length || 0);
-    // Store campaign data for animation
-    setNewCampaignData({
-      title: data.title,
-      habits: data.habits.map(h => ({ title: h.title })),
-    });
-    createJourney(data);
-    setSmartWizardOpen(false);
-  };
-
   const handleAddQuest = async (data: AddQuestData) => {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
     await addTask({
@@ -361,7 +284,6 @@ const Journeys = () => {
     await updateTask({ taskId, updates });
     setEditingTask(null);
   };
-  
 
 
   return (
@@ -387,71 +309,17 @@ const Journeys = () => {
           </p>
         </motion.div>
 
-        {/* Date Selector + View Toggle + QAB */}
+        {/* Date Selector */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.05 }}
-          className="mb-4 space-y-3"
+          className="mb-4"
         >
           <DatePillsScroller
             selectedDate={selectedDate}
             onDateSelect={setSelectedDate}
             tasksPerDay={tasksPerDay}
-          />
-          
-          {/* Quick Add Button */}
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              onClick={() => setShowAddSheet(true)}
-              className="h-8 gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Add Quest
-            </Button>
-          </div>
-        </motion.div>
-
-        {/* Smart Natural Language Input */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="mb-4"
-        >
-          <SmartTaskInput
-            onSubmit={async (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => {
-              const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
-              
-              // Create the main task
-              await addTask({
-                taskText: parsed.text,
-                difficulty: parsed.difficulty || 'medium',
-                taskDate,
-                isMainQuest: false,
-                scheduledTime: parsed.scheduledTime,
-                estimatedDuration: parsed.estimatedDuration,
-                recurrencePattern: parsed.recurrencePattern,
-                reminderEnabled: parsed.reminderEnabled,
-                reminderMinutesBefore: parsed.reminderMinutesBefore,
-                notes: parsed.notes,
-              });
-              
-              // If subtasks were generated, create those too
-              if (subtasks?.length) {
-                for (const subtask of subtasks) {
-                  await addTask({
-                    taskText: subtask.title,
-                    difficulty: 'easy',
-                    taskDate,
-                    isMainQuest: false,
-                    estimatedDuration: subtask.durationMinutes,
-                  });
-                }
-              }
-            }}
-            placeholder="Add a quest or ask me anything..."
           />
         </motion.div>
 
@@ -461,132 +329,21 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
         >
-          {/* Today's Agenda Card */}
-          <div className="mb-6">
-            <TodaysAgenda
-              tasks={dailyTasks}
-              selectedDate={selectedDate}
-              onToggle={handleToggleTask}
-              onAddQuest={() => setShowAddSheet(true)}
-              completedCount={completedCount}
-              totalCount={totalCount}
-              currentStreak={currentStreak}
-              activeJourneys={activeJourneys}
-              onUndoToggle={handleUndoToggle}
-              onEditQuest={handleEditQuest}
-              hideIndicator={showTutorial}
-            />
-          </div>
-
-          {/* Active Journeys Section */}
-          <div className="space-y-4 mb-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
-                Active Campaigns
-              </h2>
-            </div>
-            
-            {journeysLoading ? (
-              <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              </div>
-            ) : isCreating ? (
-              <div className="text-center py-12 bg-gradient-to-br from-primary/10 via-purple-500/10 to-primary/5 rounded-2xl border-2 border-primary/30 relative overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none">
-                  <Sparkles className="absolute top-4 left-8 w-4 h-4 text-primary/40 animate-pulse" />
-                  <Sparkles className="absolute top-8 right-12 w-3 h-3 text-purple-400/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                </div>
-                <Loader2 className="w-16 h-16 text-primary mx-auto mb-4 animate-spin" />
-                <h3 className="text-xl font-bold mb-2">Creating Your Campaign...</h3>
-                <p className="text-muted-foreground mb-4 max-w-xs mx-auto">
-                  Setting up rituals, milestones, and your adventure awaits
-                </p>
-              </div>
-            ) : activeJourneys.length === 0 ? (
-              <div className="text-center py-12 bg-gradient-to-br from-primary/10 via-purple-500/10 to-primary/5 rounded-2xl border-2 border-primary/30 relative overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none">
-                  <Sparkles className="absolute top-4 left-8 w-4 h-4 text-primary/40 animate-pulse" />
-                  <Sparkles className="absolute top-8 right-12 w-3 h-3 text-purple-400/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
-                </div>
-                <Wand2 className="w-16 h-16 text-primary mx-auto mb-4" />
-                <h3 className="text-xl font-bold mb-2">Begin Your Journey</h3>
-                <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
-                  Create a campaign with personalized rituals and milestones
-                </p>
-                <div className="relative inline-block">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-xl blur-lg opacity-50 animate-pulse" />
-                  <Button
-                    onClick={() => setSmartWizardOpen(true)}
-                    size="lg"
-                    className="relative h-14 px-8 text-lg font-semibold bg-gradient-to-r from-primary via-purple-500 to-primary bg-[length:200%_100%] hover:bg-[length:100%_100%] transition-all duration-500 shadow-lg hover:shadow-primary/25"
-                  >
-                    <Wand2 className="w-5 h-5 mr-2" />
-                    Start a Campaign
-                    <Sparkles className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeJourneys.map((journey) => (
-                  <JourneyCard
-                    key={journey.id}
-                    journey={journey}
-                    onComplete={() =>
-                      updateJourneyStatus({ epicId: journey.id, status: "completed" })
-                    }
-                    onAbandon={() =>
-                      updateJourneyStatus({ epicId: journey.id, status: "abandoned" })
-                    }
-                  />
-                ))}
-                
-                {!hasReachedLimit && (
-                  <div className="flex justify-center pt-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSmartWizardOpen(true)}
-                      className="h-11 w-11 rounded-full opacity-40 hover:opacity-70 text-muted-foreground touch-manipulation"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {hasReachedLimit && (
-              <p className="text-xs text-amber-500 text-center">
-                Max {MAX_JOURNEYS} active campaigns. Complete one to start another.
-              </p>
-            )}
-          </div>
-
-          {/* Legendary Journeys */}
-          {completedJourneys.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-500" />
-                Legendary Campaigns
-              </h2>
-              <div className="space-y-4">
-                {completedJourneys.map((journey) => (
-                  <JourneyCard key={journey.id} journey={journey} />
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Today's Agenda */}
+          <TodaysAgenda
+            tasks={dailyTasks}
+            selectedDate={selectedDate}
+            onToggle={handleToggleTask}
+            onAddQuest={() => setShowAddSheet(true)}
+            completedCount={completedCount}
+            totalCount={totalCount}
+            currentStreak={currentStreak}
+            activeJourneys={[]}
+            onUndoToggle={handleUndoToggle}
+            onEditQuest={handleEditQuest}
+            hideIndicator={showTutorial}
+          />
         </motion.div>
-
-        {/* Pathfinder */}
-        <Pathfinder
-          open={smartWizardOpen}
-          onOpenChange={setSmartWizardOpen}
-          onCreateEpic={handleCreateJourney}
-          isCreating={isCreating}
-        />
 
         
         {/* Add Quest Sheet */}
@@ -618,17 +375,15 @@ const Journeys = () => {
         <PageInfoModal
           open={showPageInfo}
           onClose={() => setShowPageInfo(false)}
-          title="About Quests & Campaigns"
+          title="About Quests"
           icon={Compass}
-          description="Quests and Campaigns unite your daily tasks and recurring rituals into one powerful view."
+          description="Quests unite your daily tasks and recurring rituals into one powerful view."
           features={[
             "Complete daily quests to earn XP",
             "Rituals repeat automatically to build habits",
-            "Link rituals to campaigns for bonus progress",
-            "Track your streak and maintain momentum",
-            "Join guilds to campaign with others"
+            "Track your streak and maintain momentum"
           ]}
-          tip="Create campaigns to link your daily rituals to bigger goals!"
+          tip="Add quests by tapping the + button in the corner!"
         />
 
         <QuestHubTutorial 
@@ -669,19 +424,59 @@ const Journeys = () => {
           currentStreak={currentStreak}
           onDismiss={dismissPerfectDay}
         />
-        
-        {/* Campaign Created Animation */}
-        <CampaignCreatedAnimation
-          isVisible={showCampaignAnimation}
-          campaignTitle={newCampaignData?.title || ''}
-          habits={newCampaignData?.habits || []}
-          onComplete={() => {
-            setShowCampaignAnimation(false);
-            setNewCampaignData(null);
-          }}
-        />
       </div>
 
+      {/* Floating Action Button */}
+      <motion.button
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setShowQAB(true)}
+        className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full bg-primary shadow-lg shadow-primary/30 flex items-center justify-center"
+      >
+        <Plus className="w-7 h-7 text-primary-foreground" />
+      </motion.button>
+
+      {/* QAB Sheet */}
+      <Sheet open={showQAB} onOpenChange={setShowQAB}>
+        <SheetContent side="bottom" className="rounded-t-3xl pb-8">
+          <div className="pt-4">
+            <SmartTaskInput
+              onSubmit={async (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => {
+                const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
+                
+                await addTask({
+                  taskText: parsed.text,
+                  difficulty: parsed.difficulty || 'medium',
+                  taskDate,
+                  isMainQuest: false,
+                  scheduledTime: parsed.scheduledTime,
+                  estimatedDuration: parsed.estimatedDuration,
+                  recurrencePattern: parsed.recurrencePattern,
+                  reminderEnabled: parsed.reminderEnabled,
+                  reminderMinutesBefore: parsed.reminderMinutesBefore,
+                  notes: parsed.notes,
+                });
+                
+                if (subtasks?.length) {
+                  for (const subtask of subtasks) {
+                    await addTask({
+                      taskText: subtask.title,
+                      difficulty: 'easy',
+                      taskDate,
+                      isMainQuest: false,
+                      estimatedDuration: subtask.durationMinutes,
+                    });
+                  }
+                }
+                
+                setShowQAB(false);
+              }}
+              placeholder="Add a quest or ask me anything..."
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <BottomNav />
     </PageTransition>
