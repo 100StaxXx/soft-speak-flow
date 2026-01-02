@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
 import { MilestoneCalendarCard } from "./MilestoneCalendarCard";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
@@ -37,8 +37,8 @@ export const CalendarDayView = ({
   hideHeader = false
 }: CalendarDayViewProps) => {
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  const [longPressSlot, setLongPressSlot] = useState<{ hour: number; minute: number } | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
 
@@ -78,13 +78,18 @@ export const CalendarDayView = ({
     return { start: earliestHour, end: latestHour };
   };
 
-  const { start: startHour, end: endHour } = calculateTimeRange();
-  const timeSlots = [];
-
-  for (let hour = startHour; hour <= endHour; hour++) {
-    timeSlots.push({ hour, minute: 0 });
-    timeSlots.push({ hour, minute: 30 });
-  }
+  // Memoize time range calculation
+  const { start: startHour, end: endHour } = useMemo(() => calculateTimeRange(), [dayTasks, fullDayMode]);
+  
+  // Memoize time slots
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    for (let hour = startHour; hour <= endHour; hour++) {
+      slots.push({ hour, minute: 0 });
+      slots.push({ hour, minute: 30 });
+    }
+    return slots;
+  }, [startHour, endHour]);
 
   const formatTimeSlot = (hour: number, minute: number) => {
     return format(new Date().setHours(hour, minute, 0), 'h:mm a');
@@ -120,22 +125,41 @@ export const CalendarDayView = ({
     return Math.max(60, (duration / 30) * 60);
   };
 
-  const handleTouchStart = (hour: number, minute: number) => {
-    const timer = setTimeout(() => {
-      setLongPressSlot({ hour, minute });
+  // Optimized touch handlers with proper cleanup
+  const handleTouchStart = useCallback((hour: number, minute: number, e: React.TouchEvent) => {
+    touchStartPos.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+    
+    longPressTimer.current = setTimeout(() => {
       playSound('pop');
       const time24 = formatTime24(hour, minute);
       onTimeSlotLongPress?.(selectedDate, time24);
-    }, 800); // 800ms long press - increased to prevent accidental triggers
-    setLongPressTimer(timer);
-  };
+    }, 600); // Reduced for snappier response
+  }, [selectedDate, onTimeSlotLongPress]);
 
-  const handleTouchEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    // Cancel if moved more than 10px
+    if (touchStartPos.current) {
+      const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
+      const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+      }
     }
-  };
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchStartPos.current = null;
+  }, []);
 
   const unscheduledTasks = getUnscheduledTasks();
   const dayMilestones = getDayMilestones();
@@ -414,10 +438,13 @@ export const CalendarDayView = ({
                   key={`${hour}-${minute}`}
                   data-hour={isHourMark ? hour : undefined}
                   className={cn(
-                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group",
+                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation",
                     isHourMark && "border-t border-border"
                   )}
-                  style={{ minHeight: '60px' }}
+                  style={{ 
+                    minHeight: '60px',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -426,11 +453,10 @@ export const CalendarDayView = ({
                     onTaskDrop(taskId, selectedDate, time24);
                     setDraggedTask(null);
                   }}
-                  onTouchStart={() => handleTouchStart(hour, minute)}
+                  onTouchStart={(e) => handleTouchStart(hour, minute, e)}
+                  onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
-                  onMouseDown={() => handleTouchStart(hour, minute)}
-                  onMouseUp={handleTouchEnd}
-                  onMouseLeave={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
                 >
                   {/* Time Label */}
                   <div className={cn(
@@ -491,10 +517,13 @@ export const CalendarDayView = ({
                 <div
                   key={`${hour}-${minute}`}
                   className={cn(
-                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group",
+                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation",
                     isHourMark && "border-t border-border"
                   )}
-                  style={{ minHeight: '60px' }}
+                  style={{ 
+                    minHeight: '60px',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -503,11 +532,10 @@ export const CalendarDayView = ({
                     onTaskDrop(taskId, selectedDate, time24);
                     setDraggedTask(null);
                   }}
-                  onTouchStart={() => handleTouchStart(hour, minute)}
+                  onTouchStart={(e) => handleTouchStart(hour, minute, e)}
+                  onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
-                  onMouseDown={() => handleTouchStart(hour, minute)}
-                  onMouseUp={handleTouchEnd}
-                  onMouseLeave={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
                 >
                   {/* Time Label */}
                   <div className={cn(
