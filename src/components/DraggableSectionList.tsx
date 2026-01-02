@@ -133,7 +133,7 @@ export function DraggableSectionList({
     // Combine the reordered section with other sections' tasks
     const allTasks: Task[] = [];
     
-    (['morning', 'afternoon', 'evening', 'unscheduled'] as TimeSection[]).forEach(section => {
+    (['unscheduled', 'morning', 'afternoon', 'evening'] as TimeSection[]).forEach(section => {
       if (section === sectionId) {
         allTasks.push(...reorderedTasks);
       } else {
@@ -144,7 +144,7 @@ export function DraggableSectionList({
     onReorderWithinSection(allTasks);
   }, [groupedTasks, onReorderWithinSection]);
 
-  const sections: TimeSection[] = ['morning', 'afternoon', 'evening', 'unscheduled'];
+  const sections: TimeSection[] = ['unscheduled', 'morning', 'afternoon', 'evening'];
   const isAnyDragging = draggingTaskId !== null;
 
   return (
