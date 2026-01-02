@@ -238,40 +238,68 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           )}
         </div>
 
-        {/* Action Buttons Grid - 2 column layout */}
+        {/* Action Buttons Grid - 2 column layout with fun kid-friendly styling */}
         <div className="grid grid-cols-2 gap-3 mb-3">
-          {/* Chapter/Postcard Tile */}
+          {/* Chapter/Postcard Tile - Warm and inviting */}
           {postcardProgress && isActive && (
-            <button
+            <motion.button
               onClick={() => setMilestoneExpanded(!milestoneExpanded)}
-              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-colors min-h-[72px]"
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl 
+                bg-gradient-to-br from-amber-400/25 via-orange-400/20 to-yellow-400/25 
+                border-2 border-amber-400/40 
+                shadow-[0_4px_20px_rgba(251,191,36,0.15)]
+                min-h-[88px] font-fredoka"
+              whileHover={{ scale: 1.05, rotate: 1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
             >
-              <BookOpen className="w-5 h-5 text-amber-500" />
-              <span className="text-xs font-medium">Ch {postcardProgress.milestone.chapter_number || 1}/{journey.total_chapters || 5}</span>
-              <div className="w-full max-w-[60px] h-1 bg-amber-500/20 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-amber-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (postcardProgress.current / postcardProgress.target) * 100)}%` }}
+              <motion.div
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <BookOpen className="w-7 h-7 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
+              </motion.div>
+              <span className="text-sm font-semibold text-amber-100">Ch {postcardProgress.milestone.chapter_number || 1}/{journey.total_chapters || 5}</span>
+              <div className="w-full max-w-[70px] h-1.5 bg-amber-500/30 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-amber-400 to-yellow-300 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (postcardProgress.current / postcardProgress.target) * 100)}%` }}
+                  transition={{ duration: 0.8 }}
                 />
               </div>
-            </button>
+            </motion.button>
           )}
           
-          {/* Milestones Tile */}
+          {/* Milestones Tile - Cool and adventurous */}
           <JourneyDetailDrawer 
             epicId={journey.id} 
             epicTitle={journey.title}
             epicGoal={journey.description}
             currentDeadline={journey.end_date}
           >
-            <button className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-secondary/30 border border-border/30 hover:bg-secondary/50 transition-colors min-h-[72px]">
-              <Flag className="w-5 h-5 text-celestial-blue" />
-              <span className="text-xs font-medium">Milestones</span>
-              <span className="text-[10px] text-muted-foreground">{milestones?.filter(m => m.completed_at).length || 0}/{milestones?.length || 0}</span>
-            </button>
+            <motion.button 
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
+                bg-gradient-to-br from-sky-400/25 via-blue-400/20 to-indigo-400/25
+                border-2 border-celestial-blue/40
+                shadow-[0_4px_20px_rgba(56,189,248,0.15)]
+                min-h-[88px] font-fredoka"
+              whileHover={{ scale: 1.05, rotate: -1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            >
+              <motion.div
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+              >
+                <Flag className="w-7 h-7 text-celestial-blue drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
+              </motion.div>
+              <span className="text-sm font-semibold">Milestones</span>
+              <span className="text-xs text-sky-300/80">✨ {milestones?.filter(m => m.completed_at).length || 0}/{milestones?.length || 0}</span>
+            </motion.button>
           </JourneyDetailDrawer>
           
-          {/* Rituals Tile */}
+          {/* Rituals Tile - Magical and special */}
           {journey.epic_habits && ritualCount > 0 && (
             <EpicCheckInDrawer
               epicId={journey.id}
@@ -290,11 +318,25 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
               showAdjustPlan={isActive}
               onAdjustPlan={() => setShowAdjustDialog(true)}
               renderTrigger={(todayCount) => (
-                <button className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-secondary/30 border border-border/30 hover:bg-secondary/50 transition-colors min-h-[72px]">
-                  <Star className="w-5 h-5 text-primary" />
-                  <span className="text-xs font-medium">Rituals</span>
-                  <span className="text-[10px] text-muted-foreground">{todayCount} today</span>
-                </button>
+                <motion.button 
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
+                    bg-gradient-to-br from-purple-400/25 via-pink-400/20 to-fuchsia-400/25
+                    border-2 border-primary/40
+                    shadow-[0_4px_20px_rgba(168,85,247,0.15)]
+                    min-h-[88px] font-fredoka"
+                  whileHover={{ scale: 1.05, rotate: 1 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+                  >
+                    <Star className="w-7 h-7 text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                  </motion.div>
+                  <span className="text-sm font-semibold">Rituals</span>
+                  <span className="text-xs text-purple-300/80">🌟 {todayCount} today</span>
+                </motion.button>
               )}
             />
           )}
