@@ -84,6 +84,13 @@ const Community = () => {
     }
   }, [formattedTasks, handleTaskClick]);
 
+  const handleTaskReschedule = useCallback(async (taskId: string, newTime: string) => {
+    await updateTask({ 
+      taskId, 
+      updates: { scheduled_time: newTime } 
+    });
+  }, [updateTask]);
+
   const handleAddQuest = async (data: AddQuestData) => {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
     await addTask({
@@ -191,6 +198,7 @@ const Community = () => {
                 onTimeSlotLongPress={handleTimeSlotLongPress}
                 onMilestoneClick={() => {}}
                 onAddClick={() => setShowAddSheet(true)}
+                onTaskReschedule={handleTaskReschedule}
               />
             </motion.div>
           ) : (

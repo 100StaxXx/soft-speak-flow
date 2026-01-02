@@ -441,10 +441,10 @@ export const useTaskMutations = (taskDate: string) => {
     mutationFn: async ({ taskId, updates }: { 
       taskId: string; 
       updates: {
-        task_text: string;
-        difficulty: string;
-        scheduled_time: string | null;
-        estimated_duration: number | null;
+        task_text?: string;
+        difficulty?: string;
+        scheduled_time?: string | null;
+        estimated_duration?: number | null;
         recurrence_pattern?: string | null;
         recurrence_days?: number[];
         reminder_enabled?: boolean;
@@ -454,24 +454,51 @@ export const useTaskMutations = (taskDate: string) => {
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Validate category - must be null or one of the valid values
-      const validatedCategory = updates.category && validCategories.includes(updates.category as TaskCategory)
-        ? updates.category
-        : detectCategory(updates.task_text, updates.category || undefined);
+      // Build update object with only provided fields
+      const updateData: Record<string, unknown> = {};
+      
+      if (updates.task_text !== undefined) {
+        updateData.task_text = updates.task_text;
+      }
+      if (updates.difficulty !== undefined) {
+        updateData.difficulty = updates.difficulty;
+      }
+      if (updates.scheduled_time !== undefined) {
+        updateData.scheduled_time = updates.scheduled_time;
+      }
+      if (updates.estimated_duration !== undefined) {
+        updateData.estimated_duration = updates.estimated_duration;
+      }
+      if (updates.recurrence_pattern !== undefined) {
+        updateData.recurrence_pattern = updates.recurrence_pattern;
+      }
+      if (updates.recurrence_days !== undefined) {
+        updateData.recurrence_days = updates.recurrence_days;
+      }
+      if (updates.reminder_enabled !== undefined) {
+        updateData.reminder_enabled = updates.reminder_enabled;
+      }
+      if (updates.reminder_minutes_before !== undefined) {
+        updateData.reminder_minutes_before = updates.reminder_minutes_before;
+      }
+      
+      // Handle category with validation
+      if (updates.category !== undefined || updates.task_text !== undefined) {
+        const validatedCategory = updates.category && validCategories.includes(updates.category as TaskCategory)
+          ? updates.category
+          : updates.task_text 
+            ? detectCategory(updates.task_text, updates.category || undefined)
+            : updates.category;
+        updateData.category = validatedCategory;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return; // Nothing to update
+      }
 
       const { error } = await supabase
         .from('daily_tasks')
-        .update({
-          task_text: updates.task_text,
-          difficulty: updates.difficulty,
-          scheduled_time: updates.scheduled_time,
-          estimated_duration: updates.estimated_duration,
-          recurrence_pattern: updates.recurrence_pattern,
-          recurrence_days: updates.recurrence_days,
-          reminder_enabled: updates.reminder_enabled,
-          reminder_minutes_before: updates.reminder_minutes_before,
-          category: validatedCategory,
-        })
+        .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id);
 

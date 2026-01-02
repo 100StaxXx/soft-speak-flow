@@ -1,12 +1,18 @@
 import { format, parse } from "date-fns";
+import { useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles } from "lucide-react";
+import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, GripVertical } from "lucide-react";
 import { CalendarTask } from "@/types/quest";
 
 interface TimelineTaskCardProps {
   task: CalendarTask;
   onTaskClick?: (task: CalendarTask) => void;
   onTaskLongPress?: (taskId: string) => void;
+  isDragging?: boolean;
+  previewTime?: string | null;
+  onDragStart?: () => void;
+  onDragMove?: (deltaY: number) => void;
+  onDragEnd?: () => void;
 }
 
 const CATEGORY_CONFIG: Record<string, { icon: typeof Brain; bg: string; iconColor: string }> = {
@@ -30,17 +36,82 @@ function formatTimeRange(startTime: string, durationMinutes: number | null): str
   return `${formattedStart} – ${formattedEnd} (${durationMinutes} min)`;
 }
 
-export function TimelineTaskCard({ task, onTaskClick, onTaskLongPress }: TimelineTaskCardProps) {
+export function TimelineTaskCard({ 
+  task, 
+  onTaskClick, 
+  onTaskLongPress,
+  isDragging,
+  previewTime,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: TimelineTaskCardProps) {
   const categoryConfig = CATEGORY_CONFIG[task.category || "default"] || CATEGORY_CONFIG.default;
   const IconComponent = categoryConfig.icon;
+  
+  // Drag tracking refs
+  const startYRef = useRef<number>(0);
+  const isDraggingRef = useRef(false);
 
   const handleClick = () => {
-    onTaskClick?.(task);
+    if (!isDraggingRef.current) {
+      onTaskClick?.(task);
+    }
   };
 
   const handleLongPress = () => {
     onTaskLongPress?.(task.id);
   };
+
+  // Touch/pointer event handlers for drag
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (task.completed || !onDragStart) return;
+    
+    // Only start drag from the grip handle area (check target)
+    const target = e.target as HTMLElement;
+    if (!target.closest('[data-drag-handle]')) return;
+    
+    e.preventDefault();
+    startYRef.current = e.clientY;
+    isDraggingRef.current = false;
+    
+    const element = e.currentTarget as HTMLElement;
+    element.setPointerCapture(e.pointerId);
+  }, [task.completed, onDragStart]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!startYRef.current || !onDragMove) return;
+    
+    const deltaY = e.clientY - startYRef.current;
+    
+    // Start drag after 5px threshold
+    if (!isDraggingRef.current && Math.abs(deltaY) > 5) {
+      isDraggingRef.current = true;
+      onDragStart?.();
+    }
+    
+    if (isDraggingRef.current) {
+      onDragMove(deltaY);
+    }
+  }, [onDragStart, onDragMove]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const element = e.currentTarget as HTMLElement;
+    element.releasePointerCapture(e.pointerId);
+    
+    if (isDraggingRef.current) {
+      onDragEnd?.();
+    }
+    
+    startYRef.current = 0;
+    // Reset dragging state after a tick to prevent click firing
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 10);
+  }, [onDragEnd]);
+
+  // Display time (show preview if dragging)
+  const displayTime = previewTime || task.scheduled_time;
 
   return (
     <div
@@ -49,15 +120,31 @@ export function TimelineTaskCard({ task, onTaskClick, onTaskLongPress }: Timelin
         e.preventDefault();
         handleLongPress();
       }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       className={cn(
-        "flex items-center gap-3 py-3 cursor-pointer transition-all active:scale-[0.98]",
-        task.completed && "opacity-60"
+        "flex items-center gap-3 py-3 cursor-pointer transition-all select-none",
+        task.completed && "opacity-60",
+        isDragging && "bg-background/95 shadow-lg rounded-xl scale-[1.02] ring-2 ring-primary/30"
       )}
     >
-      {/* Time Marker */}
-      <div className="w-12 text-right">
-        <span className="text-sm font-medium text-muted-foreground">
-          {task.scheduled_time ? format(parse(task.scheduled_time, "HH:mm", new Date()), "h:mm") : ""}
+      {/* Drag Handle + Time Marker */}
+      <div className="w-12 flex items-center gap-1">
+        {!task.completed && onDragStart && (
+          <div 
+            data-drag-handle
+            className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+        )}
+        <span className={cn(
+          "text-sm font-medium text-muted-foreground flex-1 text-right",
+          isDragging && previewTime && "text-primary font-semibold"
+        )}>
+          {displayTime ? format(parse(displayTime, "HH:mm", new Date()), "h:mm") : ""}
         </span>
       </div>
 
@@ -73,8 +160,8 @@ export function TimelineTaskCard({ task, onTaskClick, onTaskLongPress }: Timelin
       <div className="flex-1 min-w-0">
         {/* Time Range */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
-          <span>
-            {task.scheduled_time && formatTimeRange(task.scheduled_time, task.estimated_duration)}
+          <span className={cn(isDragging && previewTime && "text-primary")}>
+            {displayTime && formatTimeRange(displayTime, task.estimated_duration)}
           </span>
           {task.is_main_quest && (
             <RotateCcw className="h-3 w-3" />
