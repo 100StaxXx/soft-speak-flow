@@ -5,7 +5,7 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
-import { Plus, Compass, Sparkles, Map } from "lucide-react";
+import { Plus, Compass, Sparkles, Rocket, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -65,43 +65,73 @@ export function EpicsTab() {
                   ))}
                 </div>
 
-                {/* Icon cluster */}
-                <div className="relative mx-auto w-24 h-24 mb-6">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0"
-                  >
-                    <Map className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 text-primary/60" />
-                    <Sparkles className="absolute bottom-0 left-0 w-5 h-5 text-stardust-gold/60" />
-                    <Sparkles className="absolute bottom-0 right-0 w-5 h-5 text-celestial-blue/60" />
-                  </motion.div>
-                  <motion.div 
-                    className="absolute inset-0 flex items-center justify-center"
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  >
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center backdrop-blur-sm border border-primary/20">
-                      <Compass className="w-8 h-8 text-primary" />
-                    </div>
-                  </motion.div>
-                </div>
+                {/* Cosmic Compass Icon */}
+                <motion.div 
+                  className="relative mx-auto w-20 h-20 mb-6"
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/40 via-purple-500/30 to-pink-500/20 blur-xl" />
+                  <div className="relative w-full h-full rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center backdrop-blur-sm border border-primary/30 shadow-lg shadow-primary/20">
+                    <Compass className="w-9 h-9 text-primary" />
+                  </div>
+                </motion.div>
 
                 <h3 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
                   Your Adventure Awaits
                 </h3>
-                <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                  Start a campaign to transform your goals into an epic journey. Build habits, unlock postcards, and watch your companion grow.
+                <p className="text-muted-foreground mb-5 max-w-sm mx-auto">
+                  Transform your goals into an epic journey. Build habits, unlock postcards, and watch your companion grow.
                 </p>
 
-                <Button
+                {/* Drag-to-Launch CTA */}
+                <div className="relative w-64 mx-auto">
+                  <div className="relative h-12 rounded-full bg-gradient-to-r from-muted/50 via-primary/10 to-primary/30 border border-primary/20 overflow-hidden">
+                    {/* Shimmer hint */}
+                    <motion.div 
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
+                      animate={{ x: ["-100%", "100%"] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    
+                    {/* Draggable rocket */}
+                    <motion.div
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 160 }}
+                      dragElastic={0.1}
+                      onDragEnd={(_, info) => {
+                        if (info.offset.x > 120) handleAddCampaign();
+                      }}
+                      whileDrag={{ scale: 1.15 }}
+                      whileHover={{ scale: 1.05 }}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg shadow-primary/40 z-10"
+                    >
+                      <Rocket className="w-5 h-5 text-white rotate-90" />
+                    </motion.div>
+                    
+                    {/* Destination sparkles */}
+                    <motion.div 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-primary/50"
+                      animate={{ opacity: [0.4, 0.8, 0.4] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4" />
+                    </motion.div>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground/50 text-center mt-2">
+                    Drag to launch your adventure
+                  </p>
+                </div>
+
+                {/* Tap fallback for accessibility */}
+                <button 
                   onClick={handleAddCampaign}
-                  size="lg"
-                  className="gap-2 bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
+                  className="mt-3 text-xs text-muted-foreground/40 hover:text-primary/60 transition-colors"
                 >
-                  <Plus className="w-5 h-5" />
-                  Start Your First Campaign
-                </Button>
+                  or tap here
+                </button>
               </GlassCard>
             </motion.div>
           )}
