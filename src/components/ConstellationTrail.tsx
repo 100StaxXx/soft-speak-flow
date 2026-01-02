@@ -893,12 +893,11 @@ export const ConstellationTrail = ({
   return (
     <div 
       className={cn(
-        "relative w-full h-56 rounded-xl overflow-hidden border-4",
+        "relative w-full h-56 rounded-xl overflow-hidden",
         "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
       style={{
-        borderColor: colors.border,
         boxShadow: `
           0 0 10px ${colors.glowStrong},
           0 0 20px ${colors.glowMedium},
