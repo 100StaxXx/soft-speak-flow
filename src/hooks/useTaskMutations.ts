@@ -514,15 +514,41 @@ export const useTaskMutations = (taskDate: string) => {
     },
   });
 
+  const reorderTasks = useMutation({
+    mutationFn: async (reorderedTasks: { id: string; sort_order: number }[]) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      // Update all tasks with their new sort order
+      for (const task of reorderedTasks) {
+        const { error } = await supabase
+          .from('daily_tasks')
+          .update({ sort_order: task.sort_order })
+          .eq('id', task.id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reorder tasks", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
     deleteTask: deleteTask.mutate,
     setMainQuest: setMainQuest.mutate,
     updateTask: updateTask.mutateAsync,
+    reorderTasks: reorderTasks.mutate,
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
     isDeleting: deleteTask.isPending,
     isUpdating: updateTask.isPending,
+    isReordering: reorderTasks.isPending,
   };
 };

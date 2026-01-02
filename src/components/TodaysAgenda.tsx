@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -25,6 +25,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { SwipeableTaskItem } from "./SwipeableTaskItem";
+import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 
 interface Task {
   id: string;
@@ -56,6 +57,7 @@ interface TodaysAgendaProps {
   activeJourneys?: Journey[];
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
+  onReorderTasks?: (tasks: Task[]) => void;
   hideIndicator?: boolean;
 }
 
@@ -79,6 +81,7 @@ export function TodaysAgenda({
   activeJourneys = [],
   onUndoToggle,
   onEditQuest,
+  onReorderTasks,
   hideIndicator = false,
 }: TodaysAgendaProps) {
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
@@ -217,12 +220,16 @@ export function TodaysAgenda({
     }
   };
 
-  const renderTaskItem = (task: Task) => {
+  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
     const isComplete = !!task.completed;
     const isTutorialQuest = task.task_text === 'Join Cosmiq';
     const isRitual = !!task.habit_source_id;
+    const isDragging = dragProps?.isDragging ?? false;
     
     const handleClick = () => {
+      // Don't allow clicks while dragging
+      if (isDragging) return;
+      
       if (isComplete && onUndoToggle) {
         triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, task.xp_reward);
@@ -233,11 +240,13 @@ export function TodaysAgenda({
     };
 
     const handleSwipeComplete = () => {
+      if (isDragging) return;
       triggerHaptic(ImpactStyle.Medium);
       onToggle(task.id, true, task.xp_reward);
     };
 
     const handleSwipeUndo = () => {
+      if (isDragging) return;
       if (onUndoToggle) {
         triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, task.xp_reward);
@@ -251,7 +260,8 @@ export function TodaysAgenda({
         className={cn(
           "flex items-center gap-3 py-2 transition-all relative group",
           "cursor-pointer select-none",
-          isComplete && "opacity-60"
+          isComplete && "opacity-60",
+          isDragging && "cursor-grabbing"
         )}
         onClick={handleClick}
       >
@@ -268,7 +278,7 @@ export function TodaysAgenda({
                   ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
                   : "border-muted-foreground/30"
             )}
-            whileTap={{ scale: 0.9 }}
+            whileTap={isDragging ? {} : { scale: 0.9 }}
           >
             {isComplete && (
               <motion.div
@@ -304,7 +314,7 @@ export function TodaysAgenda({
         
         <div className="flex items-center gap-2">
           {/* Edit button - shows on hover for incomplete quests with proper 44px touch target */}
-          {onEditQuest && !isComplete && (
+          {onEditQuest && !isComplete && !isDragging && (
             <Button
               variant="ghost"
               size="icon"
@@ -334,11 +344,20 @@ export function TodaysAgenda({
         onSwipeComplete={handleSwipeComplete}
         onSwipeUndo={handleSwipeUndo}
         xpReward={task.xp_reward}
+        disabled={isDragging}
       >
         {taskContent}
       </SwipeableTaskItem>
     );
-  };
+  }, [onToggle, onUndoToggle, onEditQuest, tutorialCheckboxRef]);
+
+  // Handle reordering of quest tasks
+  const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
+    if (onReorderTasks) {
+      // Merge reordered quests with ritual tasks
+      onReorderTasks(reorderedTasks);
+    }
+  }, [onReorderTasks]);
 
   return (
     <div className="relative">
@@ -424,14 +443,17 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 )}
-                {(showAllTasks ? questTasks : questTasks.slice(0, questLimit)).map((task, index, arr) => (
-                  <div key={task.id}>
-                    {renderTaskItem(task)}
-                    {index < arr.length - 1 && (
-                      <div className="mx-8 border-b border-muted-foreground/20" />
-                    )}
-                  </div>
-                ))}
+                <DraggableTaskList
+                  tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
+                  onReorder={handleQuestReorder}
+                  disabled={!onReorderTasks}
+                  renderItem={(task, dragProps) => (
+                    <div>
+                      {renderTaskItem(task, dragProps)}
+                      <div className="mx-8 border-b border-muted-foreground/20 last:hidden" />
+                    </div>
+                  )}
+                />
                 {questTasks.length > questLimit && (
                   <Button
                     variant="ghost"
