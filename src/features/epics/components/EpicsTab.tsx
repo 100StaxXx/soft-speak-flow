@@ -65,6 +65,16 @@ export function EpicsTab() {
                   ))}
                 </div>
 
+                {/* Campaign description */}
+                <div className="mb-4 space-y-1">
+                  <h3 className="text-lg font-semibold text-foreground/90">
+                    Epic Journeys
+                  </h3>
+                  <p className="text-sm text-muted-foreground/70">
+                    Long-term paths that guide you toward meaningful change
+                  </p>
+                </div>
+
                 {/* Sample Journey Path Preview */}
                 <motion.div 
                   className="relative mx-auto w-full max-w-[280px] h-36 mb-6 rounded-2xl overflow-hidden"
@@ -133,13 +143,6 @@ export function EpicsTab() {
                   </p>
                 </div>
 
-                {/* Tap fallback for accessibility */}
-                <button 
-                  onClick={handleAddCampaign}
-                  className="mt-3 text-xs text-muted-foreground/40 hover:text-primary/60 transition-colors"
-                >
-                  or tap here
-                </button>
               </GlassCard>
             </motion.div>
           )}
