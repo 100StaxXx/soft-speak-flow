@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { 
   Swords, 
   Target, 
-  CheckCircle2, 
   Sparkles, 
   Zap,
   MapPin,
   Repeat,
-  Brain
+  Brain,
+  ChevronLeft
 } from "lucide-react";
+import { LucideIcon } from "lucide-react";
 
 interface QuestHubTutorialProps {
   open: boolean;
@@ -19,20 +20,30 @@ interface QuestHubTutorialProps {
   userName?: string;
 }
 
-const STEPS = [
+interface Feature {
+  icon: LucideIcon;
+  text: string;
+}
+
+interface Step {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  features: Feature[];
+}
+
+const STEPS: Step[] = [
   {
     id: "quests",
     icon: Swords,
     title: "Daily Quests",
     subtitle: "Every hero starts somewhere...",
     features: [
-      { icon: Brain, text: "Use the Quick Add Bar to create quests with natural language", color: "text-sky-400" },
-      { icon: CheckCircle2, text: "Complete quests to earn XP and grow your companion", color: "text-green-400" },
-      { icon: Zap, text: "First 3 quests earn full XP, then rewards gradually decrease", color: "text-amber-400" },
-      { icon: Sparkles, text: "Set a Main Quest for 1.5x XP bonus", color: "text-primary" },
+      { icon: Brain, text: "Use the Quick Add Bar to create quests naturally" },
+      { icon: Zap, text: "Complete quests to earn XP and grow your companion" },
+      { icon: Sparkles, text: "Set a Main Quest for 1.5x XP bonus" },
     ],
-    gradient: "from-green-500/20 via-emerald-500/20 to-teal-500/20",
-    iconGlow: "shadow-[0_0_60px_rgba(34,197,94,0.4)]",
   },
   {
     id: "campaigns",
@@ -40,13 +51,10 @@ const STEPS = [
     title: "Epic Campaigns",
     subtitle: "Great journeys need direction...",
     features: [
-      { icon: MapPin, text: "Turn big goals into guided adventures with milestones", color: "text-purple-400" },
-      { icon: Brain, text: "AI Pathfinder creates custom plans just for you", color: "text-sky-400" },
-      { icon: Repeat, text: "Link daily rituals to campaigns for auto-progress", color: "text-pink-400" },
-      { icon: Sparkles, text: "Unlock postcards as your companion reaches milestones", color: "text-amber-400" },
+      { icon: MapPin, text: "Turn big goals into guided adventures" },
+      { icon: Brain, text: "AI Pathfinder creates custom plans for you" },
+      { icon: Repeat, text: "Link rituals to campaigns for auto-progress" },
     ],
-    gradient: "from-purple-500/20 via-pink-500/20 to-rose-500/20",
-    iconGlow: "shadow-[0_0_60px_rgba(168,85,247,0.4)]",
   },
 ];
 
@@ -56,11 +64,11 @@ export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialPr
 
   // Generate stable particle positions
   const particles = useMemo(() => 
-    Array.from({ length: 20 }, (_, i) => ({
+    Array.from({ length: 12 }, (_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      size: Math.random() * 3 + 1,
+      size: Math.random() * 2 + 1,
       duration: Math.random() * 3 + 2,
       delay: Math.random() * 2,
     })), 
@@ -88,7 +96,7 @@ export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialPr
       setTimeout(() => {
         setCurrentStep((prev) => prev + 1);
         setIsAnimating(false);
-      }, 300);
+      }, 250);
     }
   };
 
@@ -98,33 +106,33 @@ export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialPr
     setTimeout(() => {
       setCurrentStep((prev) => prev - 1);
       setIsAnimating(false);
-    }, 300);
+    }, 250);
   };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent 
-        className="sm:max-w-lg p-0 overflow-hidden border-0 bg-transparent shadow-none"
+        className="max-w-sm rounded-3xl bg-background/80 backdrop-blur-2xl border-white/10 shadow-2xl shadow-black/20 p-0 overflow-hidden"
         hideCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          className="relative rounded-2xl overflow-hidden"
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ 
+            type: "spring", 
+            damping: 25, 
+            stiffness: 300 
+          }}
+          className="relative"
         >
-          {/* Background with gradient */}
-          <div className={`absolute inset-0 bg-gradient-to-br ${step.gradient} opacity-50`} />
-          <div className="absolute inset-0 bg-background/95 backdrop-blur-xl" />
-          
           {/* Floating particles */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {particles.map((particle) => (
               <motion.div
                 key={particle.id}
-                className="absolute rounded-full bg-primary/30"
+                className="absolute rounded-full bg-primary/20"
                 style={{
                   left: `${particle.x}%`,
                   top: `${particle.y}%`,
@@ -132,8 +140,8 @@ export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialPr
                   height: particle.size,
                 }}
                 animate={{
-                  y: [0, -20, 0],
-                  opacity: [0.3, 0.7, 0.3],
+                  y: [0, -15, 0],
+                  opacity: [0.2, 0.5, 0.2],
                 }}
                 transition={{
                   duration: particle.duration,
@@ -145,150 +153,140 @@ export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialPr
             ))}
           </div>
 
-          {/* Content */}
-          <div className="relative z-10 p-6 sm:p-8">
-            {/* Progress indicator */}
-            <div className="flex justify-center gap-2 mb-6">
-              {STEPS.map((_, index) => (
-                <motion.div
-                  key={index}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    index === currentStep 
-                      ? "w-8 bg-primary" 
-                      : index < currentStep 
-                        ? "w-4 bg-primary/50" 
-                        : "w-4 bg-muted-foreground/20"
-                  }`}
-                  layoutId={`progress-${index}`}
-                />
-              ))}
-            </div>
-
-            <AnimatePresence mode="wait">
+          {/* Progress indicator */}
+          <div className="flex justify-center gap-2 pt-6 pb-2">
+            {STEPS.map((_, index) => (
               <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="text-center"
-              >
-                {/* Icon with glow */}
+                key={index}
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  index === currentStep 
+                    ? "w-6 bg-primary" 
+                    : index < currentStep 
+                      ? "w-3 bg-primary/40" 
+                      : "w-3 bg-muted-foreground/20"
+                }`}
+                layoutId={`progress-${index}`}
+              />
+            ))}
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+            >
+              {/* Hero section */}
+              <div className="pt-4 pb-4 flex flex-col items-center">
                 <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
+                  initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-                  className="relative mx-auto mb-6"
+                  transition={{ delay: 0.1, type: "spring", damping: 15 }}
+                  className="relative"
                 >
-                  {/* Outer glow ring */}
-                  <motion.div
-                    className={`absolute inset-0 rounded-full ${step.iconGlow} blur-xl`}
-                    animate={{ 
-                      scale: [1, 1.2, 1],
-                      opacity: [0.5, 0.8, 0.5],
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  
-                  {/* Icon container */}
-                  <div className="relative w-20 h-20 mx-auto flex items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 border border-primary/30">
-                    <motion.div
-                      animate={{ rotate: [0, 5, -5, 0] }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      <StepIcon className="w-10 h-10 text-primary" />
-                    </motion.div>
+                  <div className="absolute inset-0 bg-primary/30 rounded-full blur-2xl scale-150" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-white/10 shadow-lg">
+                    <StepIcon className="w-8 h-8 text-primary" />
                   </div>
                 </motion.div>
-
-                {/* Title and subtitle */}
+                
                 <motion.h2
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent"
+                  transition={{ delay: 0.15 }}
+                  className="mt-5 text-xl font-semibold tracking-tight text-foreground"
                 >
                   {step.title}
                 </motion.h2>
-                
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="text-muted-foreground mb-6 italic"
+                  transition={{ delay: 0.2 }}
+                  className="mt-1 text-sm text-muted-foreground italic"
                 >
                   {step.subtitle}
                 </motion.p>
+              </div>
 
-                {/* Features list */}
-                <div className="space-y-3 text-left max-w-sm mx-auto mb-8">
-                  {step.features.map((feature, index) => {
+              {/* Feature list */}
+              <div className="px-5 pb-4">
+                <div className="rounded-2xl bg-card/50 backdrop-blur-sm divide-y divide-border/30 overflow-hidden">
+                  {step.features.map((feature, i) => {
                     const FeatureIcon = feature.icon;
                     return (
                       <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -20 }}
+                        key={i}
+                        initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 + index * 0.1 }}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-card/50 backdrop-blur-sm border border-border/30"
+                        transition={{ delay: 0.25 + i * 0.05 }}
+                        className="flex items-center gap-3 px-4 py-3.5"
                       >
-                        <div className={`mt-0.5 ${feature.color}`}>
-                          <FeatureIcon className="w-5 h-5" />
+                        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <FeatureIcon className="w-4 h-4 text-primary" />
                         </div>
-                        <p className="text-sm text-foreground/90">{feature.text}</p>
+                        <span className="text-sm text-foreground/90">{feature.text}</span>
                       </motion.div>
                     );
                   })}
                 </div>
+              </div>
 
-                {/* Personalized message on last step */}
-                {isLastStep && userName && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.7 }}
-                    className="text-sm text-muted-foreground mb-4"
-                  >
-                    Ready to begin your adventure, <span className="text-primary font-medium">{userName}</span>?
-                  </motion.p>
-                )}
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Navigation buttons */}
-            <div className="flex gap-3">
-              {currentStep > 0 && (
-                <Button
-                  variant="ghost"
-                  onClick={handleBack}
-                  disabled={isAnimating}
-                  className="flex-1"
+              {/* Personalized message on last step */}
+              {isLastStep && userName && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-center text-sm text-muted-foreground pb-2"
                 >
-                  Back
-                </Button>
+                  Ready to begin, <span className="text-primary font-medium">{userName}</span>?
+                </motion.p>
               )}
-              
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Navigation buttons */}
+          <div className="px-5 pb-6 pt-2 flex gap-3">
+            {currentStep > 0 && (
               <motion.div
-                className={currentStep === 0 ? "w-full" : "flex-1"}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
               >
                 <Button
-                  onClick={handleNext}
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBack}
                   disabled={isAnimating}
-                  className="w-full bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90"
+                  className="h-12 w-12 rounded-full"
                 >
-                  {isLastStep ? (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Begin Adventure
-                    </>
-                  ) : (
-                    "Continue"
-                  )}
+                  <ChevronLeft className="w-5 h-5" />
                 </Button>
               </motion.div>
-            </div>
+            )}
+            
+            <motion.div
+              className="flex-1"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+            >
+              <Button
+                onClick={handleNext}
+                disabled={isAnimating}
+                className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 font-medium text-base shadow-lg shadow-primary/25 transition-all duration-200 active:scale-[0.98]"
+              >
+                {isLastStep ? (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Begin Adventure
+                  </>
+                ) : (
+                  "Continue"
+                )}
+              </Button>
+            </motion.div>
           </div>
         </motion.div>
       </DialogContent>
