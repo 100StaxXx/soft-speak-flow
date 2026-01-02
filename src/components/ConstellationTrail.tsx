@@ -827,12 +827,23 @@ export const ConstellationTrail = ({
     }));
   }, []);
 
+  // Calculate progress-based border color (red -> orange -> yellow -> green)
+  const getProgressBorderColor = (p: number) => {
+    const clampedProgress = Math.max(0, Math.min(100, p));
+    // Hue: 0 (red) -> 120 (green)
+    const hue = Math.round((clampedProgress / 100) * 120);
+    return `hsl(${hue}, 70%, 45%)`;
+  };
+
   return (
-    <div className={cn(
-      "relative w-full h-32 rounded-xl overflow-hidden",
-      "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
-      className
-    )}>
+    <div 
+      className={cn(
+        "relative w-full h-44 rounded-xl overflow-hidden border-2",
+        "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        className
+      )}
+      style={{ borderColor: getProgressBorderColor(progress) }}
+    >
       {/* Nebula glow effect */}
       <div className="absolute inset-0 opacity-40">
         <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/30 rounded-full blur-xl" />

@@ -19,7 +19,7 @@ import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { MilestoneProgress } from "./MilestoneProgress";
 import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
-import { PhaseProgressCard } from "./journey/PhaseProgressCard";
+
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -203,15 +203,6 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           milestones={trailMilestones}
         />
 
-        {/* Phase Progress (compact) */}
-        {milestonesByPhase.length > 0 && isActive && (
-          <PhaseProgressCard
-            milestonesByPhase={milestonesByPhase}
-            currentPhaseName={currentPhase}
-            compact
-            className="mb-3"
-          />
-        )}
 
         {/* Compact Stats Bar */}
         <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 px-1">

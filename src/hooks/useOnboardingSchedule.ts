@@ -22,7 +22,7 @@ const ONBOARDING_TASKS = [
     sort_order: 1,
   },
   {
-    task_text: "Listen to Your Mentor 🎧",
+    task_text: "Create Your First Campaign 🚀",
     xp_reward: 3,
     difficulty: "easy",
     sort_order: 2,
