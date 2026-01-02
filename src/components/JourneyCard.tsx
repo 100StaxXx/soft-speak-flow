@@ -36,13 +36,6 @@ const themeGradients: Record<JourneyTheme, string> = {
   solar: "from-epic-solar/15 to-amber-500/15"
 };
 
-const themeBorders: Record<JourneyTheme, string> = {
-  heroic: "border-epic-heroic/20 hover:border-epic-heroic/40",
-  warrior: "border-epic-warrior/20 hover:border-epic-warrior/40",
-  mystic: "border-epic-mystic/20 hover:border-epic-mystic/40",
-  nature: "border-epic-nature/20 hover:border-epic-nature/40",
-  solar: "border-epic-solar/20 hover:border-epic-solar/40"
-};
 
 interface Journey {
   id: string;
@@ -104,7 +97,6 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const isActive = journey.status === "active";
   const theme = (journey.theme_color || 'heroic') as JourneyTheme;
   const themeGradient = themeGradients[theme];
-  const themeBorder = themeBorders[theme];
   
   const currentPhase = getCurrentPhase();
   const postcardProgress = getProgressToNextPostcard();
@@ -152,10 +144,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className={cn(
-        "p-5 border rounded-xl transition-all",
-        themeBorder
-      )}>
+      <div className="space-y-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
