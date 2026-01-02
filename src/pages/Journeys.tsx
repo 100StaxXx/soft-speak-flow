@@ -76,6 +76,7 @@ const Journeys = () => {
     toggleTask,
     updateTask,
     reorderTasks,
+    moveTaskToSection,
     completedCount,
     totalCount,
     isAdding,
@@ -294,6 +295,11 @@ const Journeys = () => {
     }));
     reorderTasks(updates);
   };
+
+  // Handle moving task to different time section
+  const handleMoveTaskToSection = (taskId: string, targetSection: 'morning' | 'afternoon' | 'evening' | 'unscheduled') => {
+    moveTaskToSection({ taskId, targetSection });
+  };
   return (
     <PageTransition>
       <StarfieldBackground />
@@ -350,6 +356,7 @@ const Journeys = () => {
             onUndoToggle={handleUndoToggle}
             onEditQuest={handleEditQuest}
             onReorderTasks={handleReorderTasks}
+            onMoveTaskToSection={handleMoveTaskToSection}
             hideIndicator={showTutorial}
           />
         </motion.div>

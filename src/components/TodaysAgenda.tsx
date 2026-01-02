@@ -25,7 +25,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { SwipeableTaskItem } from "./SwipeableTaskItem";
-import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
+import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
+import { type DragHandleProps } from "./DraggableTaskList";
 
 interface Task {
   id: string;
@@ -38,6 +39,7 @@ interface Task {
   habit_source_id?: string | null;
   epic_id?: string | null;
   epic_title?: string | null;
+  sort_order?: number | null;
 }
 
 interface Journey {
@@ -58,6 +60,7 @@ interface TodaysAgendaProps {
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
   onReorderTasks?: (tasks: Task[]) => void;
+  onMoveTaskToSection?: (taskId: string, targetSection: TimeSection) => void;
   hideIndicator?: boolean;
 }
 
@@ -82,6 +85,7 @@ export function TodaysAgenda({
   onUndoToggle,
   onEditQuest,
   onReorderTasks,
+  onMoveTaskToSection,
   hideIndicator = false,
 }: TodaysAgendaProps) {
   const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
@@ -359,6 +363,13 @@ export function TodaysAgenda({
     }
   }, [onReorderTasks]);
 
+  // Handle moving task to a different section
+  const handleMoveTask = useCallback((taskId: string, targetSection: TimeSection) => {
+    if (onMoveTaskToSection) {
+      onMoveTaskToSection(taskId, targetSection);
+    }
+  }, [onMoveTaskToSection]);
+
   return (
     <div className="relative">
       <div className="relative p-2 overflow-visible">
@@ -443,10 +454,11 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 )}
-                <DraggableTaskList
+                <DraggableSectionList
                   tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
-                  onReorder={handleQuestReorder}
-                  disabled={!onReorderTasks}
+                  onReorderWithinSection={handleQuestReorder}
+                  onMoveTask={handleMoveTask}
+                  disableDrag={!onReorderTasks}
                   renderItem={(task, dragProps) => (
                     <div>
                       {renderTaskItem(task, dragProps)}
