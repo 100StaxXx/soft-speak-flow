@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -152,10 +152,9 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className={cn(
-        "p-5 cosmiq-glass-subtle border-2 transition-all",
-        `${themeBorder}`,
-        `bg-gradient-to-br ${themeGradient}`
+      <div className={cn(
+        "p-5 border rounded-xl transition-all",
+        themeBorder
       )}>
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
@@ -351,7 +350,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           epicId={journey.id}
           epicTitle={journey.title}
         />
-      </Card>
+      </div>
     </motion.div>
   );
 };
