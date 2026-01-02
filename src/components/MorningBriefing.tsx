@@ -100,11 +100,11 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   // Collapsed state - show minimized preview that can be expanded
   if (isCollapsed && briefing) {
     return (
-      <Card 
-        className={cn(
-          "p-4 bg-card/40 backdrop-blur-2xl border-white/[0.08] cursor-pointer hover:border-primary/20 transition-colors",
-          className
-        )}
+        <Card 
+          className={cn(
+            "p-4 bg-card/25 backdrop-blur-2xl border-white/[0.08] cursor-pointer hover:border-primary/20 transition-colors",
+            className
+          )}
         onClick={() => setIsCollapsed(false)}
       >
         <div className="flex items-center gap-3">
@@ -138,7 +138,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   // Loading state
   if (isLoading) {
     return (
-      <Card className={cn("p-6 animate-pulse bg-card/40 backdrop-blur-2xl border-white/[0.08]", className)}>
+      <Card className={cn("p-6 animate-pulse bg-card/25 backdrop-blur-2xl border-white/[0.08]", className)}>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-muted" />
           <div className="space-y-2 flex-1">
@@ -154,7 +154,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   if (!briefing) {
     return (
       <div className={cn(
-        "rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/[0.08] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
+        "rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
         className
       )}>
         {/* Header */}
@@ -222,7 +222,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   // Show briefing
   return (
     <Card className={cn(
-      "overflow-hidden bg-card/40 backdrop-blur-2xl border-white/[0.08]",
+      "overflow-hidden bg-card/25 backdrop-blur-2xl border-white/[0.08]",
       className
     )}>
       {/* Header */}
