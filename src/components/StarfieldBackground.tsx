@@ -66,11 +66,11 @@ const generateDust = (count: number): DustParticle[] => {
   }));
 };
 
-// Generate shooting stars with varied directions
+// Generate shooting stars with varied directions - long cycles so they appear rarely
 const generateShootingStars = (): ShootingStar[] => [
-  { id: 1, delay: 60, duration: 2, startX: 15, startY: 10, angle: 35 },     // Top-left → Bottom-right
-  { id: 2, delay: 120, duration: 1.8, startX: 85, startY: 8, angle: 145 },  // Top-right → Bottom-left
-  { id: 3, delay: 180, duration: 2.2, startX: 50, startY: 5, angle: 80 },   // Top-center → Bottom (near vertical)
+  { id: 1, delay: 5, duration: 90, startX: 15, startY: 10, angle: 35 },     // Top-left → Bottom-right
+  { id: 2, delay: 45, duration: 120, startX: 85, startY: 8, angle: 145 },   // Top-right → Bottom-left
+  { id: 3, delay: 75, duration: 150, startX: 50, startY: 5, angle: 80 },    // Top-center → Bottom (near vertical)
 ];
 
 const getStarColor = (color: Star['color']) => {

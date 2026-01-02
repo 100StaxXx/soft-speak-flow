@@ -1173,44 +1173,56 @@ All colors MUST be HSL.
     }
   }
 
-  /* Enhanced shooting star animations - varied directions */
+  /* Enhanced shooting star animations - rare occurrence (streak only in first ~2% of cycle) */
   
-  /* Shooting star 1: Top-left → Bottom-right (diagonal down-right) */
+  /* Shooting star 1: 90s cycle, streak in first 2% (~1.8s) */
   @keyframes shooting-star-1 {
     0% {
       transform: translateX(0) translateY(0) rotate(35deg);
       opacity: 0;
     }
-    5% { opacity: 1; }
-    95% { opacity: 0.8; }
+    0.5% { opacity: 1; }
+    1.8% { opacity: 0.8; }
+    2% {
+      transform: translateX(60vw) translateY(40vh) rotate(35deg);
+      opacity: 0;
+    }
     100% {
       transform: translateX(60vw) translateY(40vh) rotate(35deg);
       opacity: 0;
     }
   }
 
-  /* Shooting star 2: Top-right → Bottom-left (diagonal down-left) */
+  /* Shooting star 2: 120s cycle, streak in first ~1.5% (~1.8s) */
   @keyframes shooting-star-2 {
     0% {
       transform: translateX(0) translateY(0) rotate(145deg);
       opacity: 0;
     }
-    5% { opacity: 1; }
-    95% { opacity: 0.7; }
+    0.4% { opacity: 1; }
+    1.3% { opacity: 0.7; }
+    1.5% {
+      transform: translateX(-55vw) translateY(45vh) rotate(145deg);
+      opacity: 0;
+    }
     100% {
       transform: translateX(-55vw) translateY(45vh) rotate(145deg);
       opacity: 0;
     }
   }
 
-  /* Shooting star 3: Top-center → Bottom (nearly vertical) */
+  /* Shooting star 3: 150s cycle, streak in first ~1.3% (~2s) */
   @keyframes shooting-star-3 {
     0% {
       transform: translateX(0) translateY(0) rotate(80deg);
       opacity: 0;
     }
-    5% { opacity: 1; }
-    95% { opacity: 0.6; }
+    0.3% { opacity: 1; }
+    1.1% { opacity: 0.6; }
+    1.3% {
+      transform: translateX(12vw) translateY(50vh) rotate(80deg);
+      opacity: 0;
+    }
     100% {
       transform: translateX(12vw) translateY(50vh) rotate(80deg);
       opacity: 0;
