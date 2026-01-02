@@ -225,6 +225,18 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
     }
   };
 
+  const handleCompleteEpic = async () => {
+    try {
+      const rewardData = await generateRewardReveal(epic.story_type_slug || null, epic.id);
+      setRewardRevealData(rewardData);
+      setShowRewardReveal(true);
+    } catch (error) {
+      console.error('Failed to generate rewards:', error);
+      // Fall back to direct completion if reward generation fails
+      onComplete?.();
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -350,7 +362,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             )}
             */}
             <Button
-              onClick={onComplete}
+              onClick={handleCompleteEpic}
               className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
             >
               <Trophy className="w-4 h-4 mr-2" />
@@ -399,8 +411,9 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         onOpenChange={setShowRewardReveal}
         rewardData={rewardRevealData}
         onClaim={() => {
-          toast.success('Boss Defeated!', {
-            description: 'Rewards claimed! Check your collection.',
+          onComplete?.();
+          toast.success('Campaign Complete!', {
+            description: 'Your rewards have been added to your collection.',
           });
         }}
       />
