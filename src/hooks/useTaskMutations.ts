@@ -538,6 +538,44 @@ export const useTaskMutations = (taskDate: string) => {
     },
   });
 
+  // Move task to a different time section
+  const moveTaskToSection = useMutation({
+    mutationFn: async ({ taskId, targetSection }: {
+      taskId: string;
+      targetSection: 'morning' | 'afternoon' | 'evening' | 'unscheduled';
+    }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      // Map section to scheduled_time
+      const sectionTimeMap: Record<string, string | null> = {
+        morning: '09:00',
+        afternoon: '14:00',
+        evening: '19:00',
+        unscheduled: null,
+      };
+
+      const newTime = sectionTimeMap[targetSection];
+
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({ 
+          scheduled_time: newTime,
+          sort_order: 0, // Place at top of new section
+        })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks', taskDate] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to move task", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
@@ -545,10 +583,12 @@ export const useTaskMutations = (taskDate: string) => {
     setMainQuest: setMainQuest.mutate,
     updateTask: updateTask.mutateAsync,
     reorderTasks: reorderTasks.mutate,
+    moveTaskToSection: moveTaskToSection.mutate,
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
     isDeleting: deleteTask.isPending,
     isUpdating: updateTask.isPending,
     isReordering: reorderTasks.isPending,
+    isMoving: moveTaskToSection.isPending,
   };
 };

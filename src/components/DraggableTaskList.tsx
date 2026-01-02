@@ -8,8 +8,10 @@ import { useLongPress } from "@/hooks/useLongPress";
 interface DraggableTaskListProps<T extends { id: string }> {
   tasks: T[];
   onReorder: (tasks: T[]) => void;
-  renderItem: (task: T, dragHandleProps: DragHandleProps) => ReactNode;
+  renderItem: (task: T, dragHandleProps?: DragHandleProps) => ReactNode;
   disabled?: boolean;
+  onDragStart?: (taskId: string) => void;
+  onDragEnd?: () => void;
 }
 
 export interface DragHandleProps {
@@ -32,20 +34,24 @@ export function DraggableTaskList<T extends { id: string }>({
   onReorder,
   renderItem,
   disabled = false,
+  onDragStart: onExternalDragStart,
+  onDragEnd: onExternalDragEnd,
 }: DraggableTaskListProps<T>) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const handleDragStart = useCallback((id: string) => {
     setDraggingId(id);
     triggerHaptic(ImpactStyle.Medium);
-  }, []);
+    onExternalDragStart?.(id);
+  }, [onExternalDragStart]);
 
   const handleDragEnd = useCallback(() => {
     if (draggingId) {
       triggerHaptic(ImpactStyle.Light);
     }
     setDraggingId(null);
-  }, [draggingId]);
+    onExternalDragEnd?.();
+  }, [draggingId, onExternalDragEnd]);
 
   if (disabled || tasks.length <= 1) {
     // Render without drag functionality
