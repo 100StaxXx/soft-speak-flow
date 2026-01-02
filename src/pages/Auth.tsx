@@ -721,7 +721,7 @@ const Auth = () => {
         className="snap-start min-h-screen relative flex items-center justify-center py-20"
       >
         {/* Dark overlay */}
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/40 to-background/60" />
         <div className="relative z-10 w-full max-w-md px-6 space-y-8">
           <div className="space-y-6">
             {isForgotPassword ? (

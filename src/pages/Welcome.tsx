@@ -54,7 +54,7 @@ const Welcome = () => {
         }}
       />
       {/* Dark overlay for text readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background/90" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/40 to-background/70" />
       {/* Hero Section */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
         {/* Animated Logo/Brand */}
