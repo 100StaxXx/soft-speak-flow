@@ -5,10 +5,10 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
-import { Plus, Compass, Sparkles, Rocket, ChevronRight } from "lucide-react";
+import { Plus, Sparkles, Rocket, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Button } from "@/components/ui/button";
+import sampleCosmicPath from "@/assets/sample-cosmic-path.webp";
 
 export function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
@@ -65,28 +65,36 @@ export function EpicsTab() {
                   ))}
                 </div>
 
-                {/* Cosmic Compass Icon */}
+                {/* Sample Journey Path Preview */}
                 <motion.div 
-                  className="relative mx-auto w-20 h-20 mb-6"
-                  animate={{ scale: [1, 1.08, 1] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative mx-auto w-full max-w-[280px] h-36 mb-6 rounded-2xl overflow-hidden"
+                  animate={{ scale: [1, 1.02, 1] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 >
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/40 via-purple-500/30 to-pink-500/20 blur-xl" />
-                  <div className="relative w-full h-full rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center backdrop-blur-sm border border-primary/30 shadow-lg shadow-primary/20">
-                    <Compass className="w-9 h-9 text-primary" />
+                  {/* Glow effect behind */}
+                  <div className="absolute -inset-2 rounded-3xl bg-gradient-to-br from-primary/30 via-purple-500/20 to-pink-500/20 blur-xl -z-10" />
+                  
+                  {/* AI-generated sample path image */}
+                  <img 
+                    src={sampleCosmicPath}
+                    alt="Sample journey path"
+                    className="w-full h-full object-cover rounded-2xl border border-primary/20"
+                  />
+                  
+                  {/* Overlay gradient for depth */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/40 rounded-2xl" />
+                  
+                  {/* Preview badge */}
+                  <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/50 backdrop-blur-sm rounded-full text-xs text-white/80 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    Your path awaits
                   </div>
                 </motion.div>
 
-                <h3 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-                  Your Adventure Awaits
-                </h3>
-                <p className="text-muted-foreground mb-5 max-w-sm mx-auto">
-                  Transform your goals into an epic journey. Build habits, unlock postcards, and watch your companion grow.
-                </p>
 
                 {/* Drag-to-Launch CTA */}
                 <div className="relative w-64 mx-auto">
-                  <div className="relative h-12 rounded-full bg-gradient-to-r from-muted/50 via-primary/10 to-primary/30 border border-primary/20 overflow-hidden">
+                  <div className="relative h-14 rounded-full bg-gradient-to-r from-muted/50 via-primary/10 to-primary/30 border border-primary/20 overflow-hidden flex items-center px-1">
                     {/* Shimmer hint */}
                     <motion.div 
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
@@ -104,14 +112,14 @@ export function EpicsTab() {
                       }}
                       whileDrag={{ scale: 1.15 }}
                       whileHover={{ scale: 1.05 }}
-                      className="absolute left-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg shadow-primary/40 z-10"
+                      className="relative w-11 h-11 rounded-full bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg shadow-primary/40 z-10"
                     >
                       <Rocket className="w-5 h-5 text-white rotate-90" />
                     </motion.div>
                     
                     {/* Destination sparkles */}
                     <motion.div 
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-primary/50"
+                      className="ml-auto pr-2 flex items-center gap-1 text-primary/50"
                       animate={{ opacity: [0.4, 0.8, 0.4] }}
                       transition={{ duration: 1.5, repeat: Infinity }}
                     >
