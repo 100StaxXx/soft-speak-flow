@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, LogIn, Play, Star, Zap, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { PageLoader } from "@/components/PageLoader";
 
 const Welcome = () => {
   const navigate = useNavigate();
@@ -26,11 +27,7 @@ const Welcome = () => {
   ];
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
+    return <PageLoader message="Preparing your journey..." />;
   }
 
   return (
