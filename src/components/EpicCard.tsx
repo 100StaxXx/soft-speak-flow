@@ -293,6 +293,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           companionMood={health?.moodState}
           showCompanion={true}
           milestones={trailMilestones}
+          epicId={epic.id}
         />
 
         {/* Compact Stats Bar */}

@@ -201,6 +201,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           companionMood={health?.moodState}
           showCompanion={true}
           milestones={trailMilestones}
+          epicId={journey.id}
         />
 
 

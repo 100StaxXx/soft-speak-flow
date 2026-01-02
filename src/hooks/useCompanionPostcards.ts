@@ -99,7 +99,7 @@ export const useCompanionPostcards = () => {
       
       return { ...data, milestoneTitle };
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (!data?.existing) {
         queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
         
@@ -113,6 +113,25 @@ export const useCompanionPostcards = () => {
         toast.success("📸 New cosmic postcard unlocked!", {
           description: `Your companion visited ${data?.postcard?.location_name}!`,
         });
+
+        // Trigger journey path regeneration for the new milestone
+        // The chapter_number becomes the milestoneIndex for the path
+        if (data?.postcard?.chapter_number && data?.postcard?.epic_id && user?.id) {
+          try {
+            await supabase.functions.invoke("generate-journey-path", {
+              body: {
+                epicId: data.postcard.epic_id,
+                milestoneIndex: data.postcard.chapter_number,
+                userId: user.id,
+              },
+            });
+            // Invalidate journey path cache to show new image
+            queryClient.invalidateQueries({ queryKey: ["journey-path", data.postcard.epic_id] });
+          } catch (err) {
+            console.error("Failed to regenerate journey path:", err);
+            // Silent fail - path regeneration is a nice-to-have
+          }
+        }
       }
     },
     onError: (error) => {

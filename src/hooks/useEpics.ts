@@ -364,6 +364,18 @@ export const useEpics = () => {
             console.error('Narrative seed generation failed:', err);
             // Non-blocking - epic still created successfully
           });
+
+          // Generate initial journey path background (milestone 0 = start of journey)
+          supabase.functions.invoke('generate-journey-path', {
+            body: {
+              epicId: epic.id,
+              milestoneIndex: 0,
+              userId: currentUserId,
+            },
+          }).catch(err => {
+            console.error('Initial journey path generation failed:', err);
+            // Non-blocking - path can be generated later
+          });
         }
 
         return epic;
