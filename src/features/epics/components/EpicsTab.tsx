@@ -5,6 +5,8 @@ import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { Plus } from "lucide-react";
+import { motion } from "framer-motion";
 
 export function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
@@ -35,6 +37,22 @@ export function EpicsTab() {
           {completedEpics.map((epic) => (
             <JourneyCard key={epic.id} journey={epic} />
           ))}
+          {/* Subtle Add Campaign Button */}
+          {activeEpics.length < 2 && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setShowTemplatesFirst(false);
+                setWizardOpen(true);
+              }}
+              className="w-full py-3 rounded-xl bg-muted/40 backdrop-blur-sm border border-border/30 flex items-center justify-center gap-2 text-muted-foreground hover:bg-muted/60 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm">Add Campaign</span>
+            </motion.button>
+          )}
         </>
       )}
 
