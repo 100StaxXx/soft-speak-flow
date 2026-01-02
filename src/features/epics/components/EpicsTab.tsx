@@ -96,8 +96,8 @@ export function EpicsTab() {
                 animate={{ opacity: 1 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={handleAddCampaign}
-                className="mx-auto flex items-center justify-center w-10 h-10 rounded-full bg-muted/30 border border-border/20 text-muted-foreground/60 hover:bg-muted/50 hover:text-muted-foreground transition-all"
+              onClick={handleAddCampaign}
+                className="mx-auto flex items-center justify-center w-10 h-10 text-muted-foreground/50 hover:text-muted-foreground transition-all"
               >
                 <Plus className="w-4 h-4" />
               </motion.button>
