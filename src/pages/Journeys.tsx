@@ -303,6 +303,9 @@ const Journeys = () => {
             onReorderTasks={handleReorderTasks}
             onMoveTaskToSection={handleMoveTaskToSection}
             hideIndicator={showTutorial}
+            calendarTasks={allCalendarTasks}
+            calendarMilestones={[]}
+            onDateSelect={setSelectedDate}
           />
         </motion.div>
 
