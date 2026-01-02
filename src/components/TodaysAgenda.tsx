@@ -249,8 +249,8 @@ export function TodaysAgenda({
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
-          "flex items-center gap-5 p-4 rounded-xl transition-all relative group",
-          "hover:bg-muted/30 cursor-pointer select-none",
+          "flex items-center gap-3 py-2 transition-all relative group",
+          "cursor-pointer select-none",
           isComplete && "opacity-60"
         )}
         onClick={handleClick}
@@ -261,7 +261,7 @@ export function TodaysAgenda({
         >
           <motion.div 
             className={cn(
-              "flex-shrink-0 w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all",
+              "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all",
               isComplete 
                 ? "bg-primary border-primary" 
                 : isTutorialQuest 
@@ -276,7 +276,7 @@ export function TodaysAgenda({
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
               >
-                <Check className="w-5 h-5 text-primary-foreground" />
+                <Check className="w-4 h-4 text-primary-foreground" />
               </motion.div>
             )}
           </motion.div>
@@ -285,44 +285,44 @@ export function TodaysAgenda({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {isRitual && (
-              <Repeat className="w-5 h-5 text-accent flex-shrink-0" />
+              <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
             )}
             <p className={cn(
-              "text-xl truncate",
+              "text-base truncate",
               isComplete && "line-through text-muted-foreground"
             )}>
               {task.task_text}
             </p>
           </div>
           {task.scheduled_time && (
-            <span className="text-base text-muted-foreground flex items-center gap-1.5 mt-1">
-              <Clock className="w-5 h-5" />
+            <span className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Clock className="w-4 h-4" />
               {formatTime(task.scheduled_time)}
             </span>
           )}
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Edit button - shows on hover for incomplete quests with proper 44px touch target */}
           {onEditQuest && !isComplete && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-11 w-11 -m-2.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
+              className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
               onClick={(e) => {
                 e.stopPropagation();
                 onEditQuest(task);
               }}
             >
-              <Pencil className="w-5 h-5" />
+              <Pencil className="w-4 h-4" />
             </Button>
           )}
           {task.is_main_quest && (
-            <Badge variant="outline" className="text-sm px-2 py-0.5 h-6 bg-primary/10 border-primary/30">
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
               Main
             </Badge>
           )}
-          <span className="text-lg font-bold text-stardust-gold/80">+{task.xp_reward}</span>
+          <span className="text-sm font-bold text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
       </motion.div>
     );
@@ -344,35 +344,35 @@ export function TodaysAgenda({
     <div className="relative">
       <div className="relative p-2 overflow-visible">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span className="text-lg font-bold">
                 {isToday ? "Quest Log" : format(selectedDate, "MMM d")}
               </span>
             </div>
           {currentStreak > 0 && (
               <div className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium",
+                "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                 currentStreak >= 30 
                   ? "bg-stardust-gold/20 text-stardust-gold" 
                   : currentStreak >= 14 
                     ? "bg-celestial-blue/20 text-celestial-blue" 
                     : "bg-orange-500/10 text-orange-400"
               )}>
-                <Flame className="h-4 w-4" />
+                <Flame className="h-3.5 w-3.5" />
                 {currentStreak}
               </div>
             )}
           </div>
 
           <div className={cn(
-            "flex items-center gap-2 text-xl px-3 py-1 rounded-full",
+            "flex items-center gap-1.5 text-base px-2.5 py-0.5 rounded-full",
             allComplete ? "bg-stardust-gold/20" : "bg-stardust-gold/10"
           )}>
             <Trophy className={cn(
-              "h-6 w-6",
+              "h-5 w-5",
               allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
             )} />
             <span className="font-semibold text-stardust-gold">{totalXP} XP</span>
@@ -380,7 +380,7 @@ export function TodaysAgenda({
         </div>
 
         {/* Progress bar */}
-        <div className="relative h-4 bg-muted/50 rounded-full overflow-hidden mb-4">
+        <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden mb-3">
           <motion.div
             className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
             initial={{ width: 0 }}
@@ -392,7 +392,7 @@ export function TodaysAgenda({
           )}
         </div>
 
-        <div className="flex justify-between mb-5 text-base text-muted-foreground">
+        <div className="flex justify-between mb-4 text-sm text-muted-foreground">
           <span>{completedCount} of {totalCount} completed</span>
           <span>{Math.round(progressPercent)}%</span>
         </div>
