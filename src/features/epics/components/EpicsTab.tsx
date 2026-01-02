@@ -3,7 +3,7 @@ import { Target, Trophy, Users, Castle, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EpicCard } from "@/components/EpicCard";
+import { JourneyCard } from "@/components/JourneyCard";
 import { Pathfinder } from "@/components/Pathfinder";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -105,9 +105,9 @@ export function EpicsTab() {
             <EpicSectionTooltip />
           </div>
           {activeEpics.map((epic) => (
-            <EpicCard
+            <JourneyCard
               key={epic.id}
-              epic={epic}
+              journey={epic}
               onComplete={() => updateEpicStatus({ epicId: epic.id, status: "completed" })}
               onAbandon={() => updateEpicStatus({ epicId: epic.id, status: "abandoned" })}
             />
@@ -123,7 +123,7 @@ export function EpicsTab() {
             Legendary Epics
           </h3>
           {completedEpics.map((epic) => (
-            <EpicCard key={epic.id} epic={epic} />
+            <JourneyCard key={epic.id} journey={epic} />
           ))}
         </div>
       )}

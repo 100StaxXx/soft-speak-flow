@@ -18,6 +18,7 @@ import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { MilestoneProgress } from "./MilestoneProgress";
+import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
 import { PhaseProgressCard } from "./journey/PhaseProgressCard";
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
 import { cn } from "@/lib/utils";
@@ -85,6 +86,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
   const [milestoneExpanded, setMilestoneExpanded] = useState(false);
+  const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
@@ -302,7 +304,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
                 }))}
               isActive={isActive}
               showAdjustPlan={isActive}
-              onAdjustPlan={() => toast.info("Adjust Plan coming soon!")}
+              onAdjustPlan={() => setShowAdjustDialog(true)}
             />
           </div>
         )}
@@ -341,6 +343,14 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Adjust Epic Plan Dialog */}
+        <AdjustEpicPlanDialog
+          open={showAdjustDialog}
+          onOpenChange={setShowAdjustDialog}
+          epicId={journey.id}
+          epicTitle={journey.title}
+        />
       </Card>
     </motion.div>
   );
