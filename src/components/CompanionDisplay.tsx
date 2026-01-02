@@ -339,7 +339,7 @@ export const CompanionDisplay = memo(() => {
         }}
       />
 
-      <Card className="relative overflow-hidden cosmiq-glass-ultra border-celestial-blue/40 hover:border-nebula-pink/60 transition-all duration-500 animate-scale-in">
+      <Card className="relative overflow-hidden bg-card/40 backdrop-blur-2xl border-celestial-blue/20 hover:border-nebula-pink/40 transition-all duration-500 animate-scale-in">
         {/* Equipped background or default nebula gradients */}
         {equippedBackgroundStyle ? (
           <div 

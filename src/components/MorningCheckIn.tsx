@@ -169,7 +169,7 @@ const MorningCheckInContent = () => {
 
   if (existingCheckIn?.completed_at) {
     return (
-      <Card data-tour="morning-checkin" className="p-6 bg-gradient-to-br from-stardust-gold/10 via-primary/5 to-celestial-blue/10 border-celestial-blue/20">
+      <Card data-tour="morning-checkin" className="p-6 bg-card/40 backdrop-blur-2xl border-celestial-blue/20">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-full bg-stardust-gold/20 flex items-center justify-center flex-shrink-0 ring-2 ring-stardust-gold/30">
             <Sunrise className="h-6 w-6 text-stardust-gold" />
@@ -182,7 +182,7 @@ const MorningCheckInContent = () => {
             
             {/* Mentor Response Section */}
             {personality && (
-              <div className="bg-gradient-to-br from-secondary/50 to-accent/5 rounded-lg p-4 border border-primary/10">
+              <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl p-4 border border-white/[0.08]">
                 <div className="flex items-start gap-3">
                   <MentorAvatar
                     mentorSlug={(personality.slug || '').toLowerCase()}
@@ -222,9 +222,9 @@ const MorningCheckInContent = () => {
   }
 
   return (
-    <div data-tour="morning-checkin" className="rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 overflow-hidden animate-scale-in">
+    <div data-tour="morning-checkin" className="rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/[0.08] overflow-hidden animate-scale-in shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border/30 bg-gradient-to-r from-orange-500/10 to-amber-500/5">
+      <div className="px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-orange-500/5 to-amber-500/[0.02]">
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center border border-orange-500/30">
             <Sunrise className="h-5 w-5 text-orange-500" />
