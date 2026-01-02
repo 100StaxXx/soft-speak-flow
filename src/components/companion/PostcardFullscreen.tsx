@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { X, MapPin, Calendar, Share2, Sparkles, BookOpen, Search, Quote, Users } from "lucide-react";
+import { X, MapPin, Calendar, Share2, Sparkles, BookOpen, Search, Quote, Users, Crown, Trophy, Star } from "lucide-react";
 import { CompanionPostcard } from "@/hooks/useCompanionPostcards";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import { useNarrativeEpic } from "@/hooks/useCosmicLibrary";
 
 interface PostcardFullscreenProps {
   postcard: CompanionPostcard;
@@ -17,6 +18,11 @@ interface PostcardFullscreenProps {
 
 export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProps) => {
   const hasNarrativeContent = !!(postcard.chapter_title || postcard.story_content || postcard.clue_text || postcard.prophecy_line);
+  const isFinale = postcard.is_finale;
+  
+  // Fetch epic data for finale info
+  const { epic } = useNarrativeEpic(isFinale ? postcard.epic_id || undefined : undefined);
+  const storySeed = epic?.story_seed;
 
   const handleShare = async () => {
     const shareText = postcard.chapter_title 
@@ -93,8 +99,17 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
               className="text-center mb-4"
             >
               <div className="flex items-center justify-center gap-2 text-primary mb-1">
-                <BookOpen className="w-4 h-4" />
-                <span className="text-sm font-medium">Chapter {postcard.chapter_number}</span>
+                {isFinale ? (
+                  <>
+                    <Crown className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm font-medium text-yellow-400">Finale</span>
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="w-4 h-4" />
+                    <span className="text-sm font-medium">Chapter {postcard.chapter_number}</span>
+                  </>
+                )}
               </div>
               <h2 className="text-xl font-bold text-white">{postcard.chapter_title}</h2>
             </motion.div>
@@ -108,7 +123,7 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
             className="relative w-full max-w-md"
           >
             {/* Postcard Frame */}
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white/20">
+            <div className={`relative rounded-2xl overflow-hidden shadow-2xl border-4 ${isFinale ? 'border-yellow-400/40' : 'border-white/20'}`}>
               <img
                 src={postcard.image_url}
                 alt={postcard.location_name}
@@ -124,9 +139,10 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
               </div>
 
               {/* Finale Badge */}
-              {postcard.is_finale && (
-                <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-yellow-500/80 backdrop-blur-sm">
-                  <span className="text-sm font-bold text-black">✨ FINALE</span>
+              {isFinale && (
+                <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-yellow-500/80 backdrop-blur-sm flex items-center gap-1">
+                  <Crown className="w-4 h-4 text-yellow-900" />
+                  <span className="text-sm font-bold text-yellow-900">FINALE</span>
                 </div>
               )}
             </div>
@@ -234,6 +250,92 @@ export const PostcardFullscreen = ({ postcard, onClose }: PostcardFullscreenProp
                   ))}
                 </div>
               </motion.div>
+            )}
+
+            {/* === FINALE SPECIAL SECTIONS === */}
+            {isFinale && (
+              <>
+                {/* Boss Victory Section */}
+                {storySeed?.finale_architecture?.boss_name && (
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    <Card className="mt-4 p-5 bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/40">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Trophy className="w-5 h-5 text-yellow-400" />
+                        <span className="text-base font-bold text-yellow-300">Victory!</span>
+                      </div>
+                      <p className="text-lg font-semibold text-white mb-2">
+                        {storySeed.finale_architecture.boss_name} Defeated
+                      </p>
+                      {storySeed.finale_architecture.boss_lore && (
+                        <p className="text-sm text-white/70 italic">
+                          {storySeed.finale_architecture.boss_lore}
+                        </p>
+                      )}
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Final Wisdom Section */}
+                {storySeed?.finale_architecture?.the_resolution && (
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.8 }}
+                  >
+                    <Card className="mt-4 p-5 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border-purple-500/40">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Star className="w-5 h-5 text-purple-400" />
+                        <span className="text-base font-bold text-purple-300">Final Wisdom</span>
+                      </div>
+                      <p className="text-sm text-white/90 leading-relaxed">
+                        {storySeed.finale_architecture.the_resolution}
+                      </p>
+                      {storySeed.mentor_arc?.mentor_name && (
+                        <p className="text-xs text-purple-300/70 mt-3 text-right">
+                          — {storySeed.mentor_arc.mentor_name}
+                        </p>
+                      )}
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* New Beginning Teaser */}
+                {storySeed?.finale_architecture?.the_new_beginning && (
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.9 }}
+                  >
+                    <Card className="mt-4 p-4 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border-emerald-500/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                        <span className="text-sm font-medium text-emerald-300">A New Beginning</span>
+                      </div>
+                      <p className="text-sm text-white/80 italic">
+                        {storySeed.finale_architecture.the_new_beginning}
+                      </p>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Journey Complete Banner */}
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 1.0 }}
+                  className="mt-6 text-center"
+                >
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 border border-yellow-500/40">
+                    <Crown className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm font-bold text-yellow-300">Journey Complete</span>
+                    <Crown className="w-4 h-4 text-yellow-400" />
+                  </div>
+                </motion.div>
+              </>
             )}
 
             {/* Caption (legacy support) */}
