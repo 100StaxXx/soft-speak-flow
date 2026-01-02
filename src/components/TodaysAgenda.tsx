@@ -261,7 +261,7 @@ export function TodaysAgenda({
         >
           <motion.div 
             className={cn(
-              "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all",
+              "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
               isComplete 
                 ? "bg-primary border-primary" 
                 : isTutorialQuest 
@@ -276,7 +276,7 @@ export function TodaysAgenda({
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
               >
-                <Check className="w-4 h-4 text-primary-foreground" />
+                <Check className="w-3 h-3 text-primary-foreground" />
               </motion.div>
             )}
           </motion.div>
@@ -424,7 +424,14 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 )}
-                {(showAllTasks ? questTasks : questTasks.slice(0, questLimit)).map((task) => renderTaskItem(task))}
+                {(showAllTasks ? questTasks : questTasks.slice(0, questLimit)).map((task, index, arr) => (
+                  <div key={task.id}>
+                    {renderTaskItem(task)}
+                    {index < arr.length - 1 && (
+                      <div className="mx-8 border-b border-muted-foreground/20" />
+                    )}
+                  </div>
+                ))}
                 {questTasks.length > questLimit && (
                   <Button
                     variant="ghost"

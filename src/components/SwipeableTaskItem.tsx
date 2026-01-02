@@ -79,7 +79,7 @@ export function SwipeableTaskItem({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative overflow-hidden">
       {/* Complete action background (right swipe) - Green */}
       <motion.div
         className="absolute inset-0 flex items-center pl-5"
@@ -128,7 +128,7 @@ export function SwipeableTaskItem({
         style={{ x }}
         onDragEnd={handleDragEnd}
         className={cn(
-          "relative bg-background touch-pan-y",
+          "relative touch-pan-y",
           !disabled && "cursor-grab active:cursor-grabbing"
         )}
         whileTap={disabled ? {} : { scale: 0.99 }}
