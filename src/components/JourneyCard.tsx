@@ -11,14 +11,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles, Flag, BookOpen, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
-import { MilestoneProgress } from "./MilestoneProgress";
 import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
+import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
 
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
 import { cn } from "@/lib/utils";
@@ -238,37 +238,41 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           )}
         </div>
 
-        {/* Next Postcard Preview - Always visible for active campaigns */}
-        {postcardProgress && isActive && (
-          <MilestonePostcardPreview
-            currentProgress={postcardProgress.current}
-            targetPercent={postcardProgress.target}
-            milestoneTitle={postcardProgress.milestone.title}
-            chapterNumber={postcardProgress.milestone.chapter_number || 1}
-            compact={!milestoneExpanded}
-            isExpanded={milestoneExpanded}
-            onClick={() => setMilestoneExpanded(!milestoneExpanded)}
-            className="mb-3"
-            storySeed={journey.story_seed as import('@/types/narrativeTypes').StorySeed | null}
-            totalChapters={journey.total_chapters}
-            companionSpecies={companion?.spirit_animal}
-          />
-        )}
-
-        {/* Milestone Progress Section */}
-        <div className="mb-3">
-          <MilestoneProgress 
+        {/* Action Buttons Grid - 2 column layout */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          {/* Chapter/Postcard Tile */}
+          {postcardProgress && isActive && (
+            <button
+              onClick={() => setMilestoneExpanded(!milestoneExpanded)}
+              className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-colors min-h-[72px]"
+            >
+              <BookOpen className="w-5 h-5 text-amber-500" />
+              <span className="text-xs font-medium">Ch {postcardProgress.milestone.chapter_number || 1}/{journey.total_chapters || 5}</span>
+              <div className="w-full max-w-[60px] h-1 bg-amber-500/20 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-amber-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (postcardProgress.current / postcardProgress.target) * 100)}%` }}
+                />
+              </div>
+            </button>
+          )}
+          
+          {/* Milestones Tile */}
+          <JourneyDetailDrawer 
             epicId={journey.id} 
             epicTitle={journey.title}
             epicGoal={journey.description}
             currentDeadline={journey.end_date}
-            compact 
-          />
-        </div>
-
-        {/* Check In Button */}
-        {journey.epic_habits && ritualCount > 0 && (
-          <div className="mb-3">
+          >
+            <button className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-secondary/30 border border-border/30 hover:bg-secondary/50 transition-colors min-h-[72px]">
+              <Flag className="w-5 h-5 text-celestial-blue" />
+              <span className="text-xs font-medium">Milestones</span>
+              <span className="text-[10px] text-muted-foreground">{milestones?.filter(m => m.completed_at).length || 0}/{milestones?.length || 0}</span>
+            </button>
+          </JourneyDetailDrawer>
+          
+          {/* Rituals Tile */}
+          {journey.epic_habits && ritualCount > 0 && (
             <EpicCheckInDrawer
               epicId={journey.id}
               habits={journey.epic_habits
@@ -285,9 +289,16 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
               isActive={isActive}
               showAdjustPlan={isActive}
               onAdjustPlan={() => setShowAdjustDialog(true)}
+              renderTrigger={(todayCount) => (
+                <button className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-secondary/30 border border-border/30 hover:bg-secondary/50 transition-colors min-h-[72px]">
+                  <Star className="w-5 h-5 text-primary" />
+                  <span className="text-xs font-medium">Rituals</span>
+                  <span className="text-[10px] text-muted-foreground">{todayCount} today</span>
+                </button>
+              )}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Complete Button (only at 100%) */}
         {isActive && journey.progress_percentage >= 100 && onComplete && (

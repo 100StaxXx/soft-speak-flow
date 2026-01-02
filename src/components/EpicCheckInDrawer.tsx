@@ -61,9 +61,10 @@ interface EpicCheckInDrawerProps {
   isActive: boolean;
   onAdjustPlan?: () => void;
   showAdjustPlan?: boolean;
+  renderTrigger?: (todayCount: number) => React.ReactNode;
 }
 
-export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan }: EpicCheckInDrawerProps) => {
+export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) => {
   const [open, setOpen] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
@@ -110,31 +111,35 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, show
       handleOnly={true}
     >
       <DrawerTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "w-full relative overflow-hidden group",
-            "bg-gradient-to-r from-primary/10 to-accent/10",
-            "border-primary/30 hover:border-primary/60",
-            "transition-all duration-300"
-          )}
-        >
-          {/* Glowing effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 opacity-0 group-hover:opacity-100 animate-pulse transition-opacity" />
-          
-          {/* Icon */}
-          <BookOpen className="w-4 h-4 mr-2 text-primary" />
-          
-          <span className="relative z-10 font-medium">
-            View Rituals
-          </span>
-          
-          <span className="ml-2 px-2 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
-            {todayHabits.length} today
-          </span>
-          
-          <Star className="w-4 h-4 ml-2 text-accent" />
-        </Button>
+        {renderTrigger ? (
+          renderTrigger(todayHabits.length)
+        ) : (
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full relative overflow-hidden group",
+              "bg-gradient-to-r from-primary/10 to-accent/10",
+              "border-primary/30 hover:border-primary/60",
+              "transition-all duration-300"
+            )}
+          >
+            {/* Glowing effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/20 to-primary/20 opacity-0 group-hover:opacity-100 animate-pulse transition-opacity" />
+            
+            {/* Icon */}
+            <BookOpen className="w-4 h-4 mr-2 text-primary" />
+            
+            <span className="relative z-10 font-medium">
+              Rituals
+            </span>
+            
+            <span className="ml-2 px-2 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
+              {todayHabits.length} today
+            </span>
+            
+            <Star className="w-4 h-4 ml-2 text-accent" />
+          </Button>
+        )}
       </DrawerTrigger>
       
       <DrawerContent className="bg-background border-t border-primary/20">

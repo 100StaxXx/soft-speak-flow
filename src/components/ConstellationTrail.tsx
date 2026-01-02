@@ -30,17 +30,20 @@ interface ConstellationTrailProps {
   milestones?: TrailMilestone[]; // Actual milestones from database
 }
 
-// Fixed constellation pattern - zigzag Y positions for visual interest
-const CONSTELLATION_Y_PATTERN = [45, 65, 35, 55, 40, 60, 50];
+// Fixed constellation pattern - wave with more vertical variation for taller container
+const CONSTELLATION_Y_PATTERN = [70, 40, 60, 25, 75, 35, 55, 45];
 
-// Generate star positions along a constellation-like zigzag path
+// Generate star positions along a constellation-like path with wave pattern
 const generateStarPositions = (count: number) => {
   const positions: { x: number; y: number; size: number }[] = [];
   
   for (let i = 0; i < count; i++) {
     const t = count === 1 ? 0.5 : i / (count - 1);
-    const x = 10 + t * 80;
-    const y = CONSTELLATION_Y_PATTERN[i % CONSTELLATION_Y_PATTERN.length];
+    const x = 8 + t * 84;
+    // Add sine wave variation for more organic feel
+    const baseY = CONSTELLATION_Y_PATTERN[i % CONSTELLATION_Y_PATTERN.length];
+    const waveOffset = Math.sin(t * Math.PI * 2) * 8;
+    const y = baseY + waveOffset;
     const size = i === 0 || i === count - 1 ? 10 : 6 + Math.random() * 4;
     positions.push({ x, y, size });
   }
@@ -48,7 +51,7 @@ const generateStarPositions = (count: number) => {
   return positions;
 };
 
-// Calculate position along the constellation path
+// Calculate position along the smooth curved path
 const getPositionOnPath = (progress: number, starPositions: { x: number; y: number }[]) => {
   if (starPositions.length < 2) return { x: 10, y: 50 };
   
@@ -61,21 +64,50 @@ const getPositionOnPath = (progress: number, starPositions: { x: number; y: numb
   const start = starPositions[currentSegment];
   const end = starPositions[currentSegment + 1];
   
-  return {
-    x: start.x + (end.x - start.x) * segmentT,
-    y: start.y + (end.y - start.y) * segmentT,
-  };
+  // Use smooth interpolation with control point
+  const midX = (start.x + end.x) / 2;
+  const controlY = (start.y + end.y) / 2 + (currentSegment % 2 === 0 ? -10 : 10);
+  
+  // Quadratic bezier interpolation
+  const oneMinusT = 1 - segmentT;
+  const x = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * segmentT * midX + segmentT * segmentT * end.x;
+  const y = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * segmentT * controlY + segmentT * segmentT * end.y;
+  
+  return { x, y };
 };
 
-// Generate SVG path string connecting all stars
+// Generate smooth curved SVG path with Bezier curves and a decorative loop
 const generateFullPathString = (starPositions: { x: number; y: number }[]) => {
   if (starPositions.length < 2) return "";
-  return starPositions.map((pos, i) => 
-    i === 0 ? `M ${pos.x} ${pos.y}` : `L ${pos.x} ${pos.y}`
-  ).join(' ');
+  
+  let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
+  
+  for (let i = 1; i < starPositions.length; i++) {
+    const prev = starPositions[i - 1];
+    const curr = starPositions[i];
+    const midX = (prev.x + curr.x) / 2;
+    const controlY = (prev.y + curr.y) / 2 + (i % 2 === 0 ? -12 : 12);
+    
+    // Add a small decorative loop at ~40% of the journey
+    if (i === Math.max(1, Math.floor(starPositions.length * 0.4))) {
+      const loopX = midX;
+      const loopY = (prev.y + curr.y) / 2;
+      // Curve to loop start
+      path += ` Q ${midX - 5} ${controlY} ${loopX - 4} ${loopY}`;
+      // The loop - a small arc
+      path += ` C ${loopX - 8} ${loopY - 12} ${loopX + 8} ${loopY - 12} ${loopX + 4} ${loopY}`;
+      // Continue to current point
+      path += ` Q ${midX + 5} ${controlY} ${curr.x} ${curr.y}`;
+    } else {
+      // Smooth quadratic curve
+      path += ` Q ${midX} ${controlY} ${curr.x} ${curr.y}`;
+    }
+  }
+  
+  return path;
 };
 
-// Generate partial path up to a certain progress percentage
+// Generate partial smooth curved path up to a certain progress percentage
 const generatePartialPathString = (starPositions: { x: number; y: number }[], progress: number) => {
   if (starPositions.length < 2 || progress <= 0) return "";
   
@@ -87,10 +119,26 @@ const generatePartialPathString = (starPositions: { x: number; y: number }[], pr
   
   let path = `M ${starPositions[0].x} ${starPositions[0].y}`;
   
+  // Draw curved segments up to completed segments
   for (let i = 1; i <= completedSegments && i < starPositions.length; i++) {
-    path += ` L ${starPositions[i].x} ${starPositions[i].y}`;
+    const prev = starPositions[i - 1];
+    const curr = starPositions[i];
+    const midX = (prev.x + curr.x) / 2;
+    const controlY = (prev.y + curr.y) / 2 + (i % 2 === 0 ? -12 : 12);
+    
+    // Handle the loop segment
+    if (i === Math.max(1, Math.floor(starPositions.length * 0.4))) {
+      const loopX = midX;
+      const loopY = (prev.y + curr.y) / 2;
+      path += ` Q ${midX - 5} ${controlY} ${loopX - 4} ${loopY}`;
+      path += ` C ${loopX - 8} ${loopY - 12} ${loopX + 8} ${loopY - 12} ${loopX + 4} ${loopY}`;
+      path += ` Q ${midX + 5} ${controlY} ${curr.x} ${curr.y}`;
+    } else {
+      path += ` Q ${midX} ${controlY} ${curr.x} ${curr.y}`;
+    }
   }
   
+  // Draw partial segment to current progress position
   if (completedSegments < totalSegments) {
     path += ` L ${endPos.x} ${endPos.y}`;
   }
@@ -838,7 +886,7 @@ export const ConstellationTrail = ({
   return (
     <div 
       className={cn(
-        "relative w-full h-44 rounded-xl overflow-hidden border-2",
+        "relative w-full h-56 rounded-xl overflow-hidden border-2",
         "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
