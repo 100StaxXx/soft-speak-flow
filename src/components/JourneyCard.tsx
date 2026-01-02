@@ -143,6 +143,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      className="bg-card/30 backdrop-blur-sm border border-border/30 rounded-2xl p-4"
     >
       <div className="space-y-4">
         <div className="flex items-start justify-between mb-3">
