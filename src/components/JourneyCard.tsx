@@ -11,8 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles, Flag, BookOpen, Star, ChevronDown } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles, Flag, Star } from "lucide-react";
 import type { StorySeed } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -80,7 +79,7 @@ interface JourneyCardProps {
 export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps) => {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
-  const [milestoneExpanded, setMilestoneExpanded] = useState(false);
+  
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   
   const { companion } = useCompanion();
@@ -245,67 +244,22 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
         <div className="grid grid-cols-2 gap-3 mb-3">
           {/* Chapter/Postcard Tile - Expandable */}
           {postcardProgress && isActive && (
-            <Collapsible 
-              open={milestoneExpanded} 
-              onOpenChange={setMilestoneExpanded}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
               className="col-span-2"
             >
-              <CollapsibleTrigger asChild>
-                <motion.button
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-2 p-4 rounded-2xl",
-                    "bg-gradient-to-br from-amber-400/25 via-orange-400/20 to-yellow-400/25",
-                    "border-2 border-amber-400/40",
-                    "shadow-[0_4px_20px_rgba(251,191,36,0.15)]",
-                    "min-h-[88px] font-fredoka w-full",
-                    (postcardProgress.current / postcardProgress.target) >= 0.95 && "animate-pulse"
-                  )}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <motion.div
-                    animate={{ y: [0, -3, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    <BookOpen className="w-7 h-7 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
-                  </motion.div>
-                  <span className="text-sm font-semibold text-amber-100">
-                    Ch {postcardProgress.milestone.chapter_number || 1}/{journey.total_chapters || 5}
-                  </span>
-                  <div className="w-full max-w-[120px] h-1.5 bg-amber-500/30 rounded-full overflow-hidden">
-                    <motion.div 
-                      className="h-full bg-gradient-to-r from-amber-400 to-yellow-300 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(100, (postcardProgress.current / postcardProgress.target) * 100)}%` }}
-                      transition={{ duration: 0.8 }}
-                    />
-                  </div>
-                  <ChevronDown className={cn(
-                    "w-4 h-4 text-amber-400/60 transition-transform duration-200",
-                    milestoneExpanded && "rotate-180"
-                  )} />
-                </motion.button>
-              </CollapsibleTrigger>
-              
-              <CollapsibleContent>
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-3"
-                >
-                  <MilestonePostcardPreview
-                    currentProgress={journey.progress_percentage}
-                    targetPercent={postcardProgress.target}
-                    milestoneTitle={postcardProgress.milestone.title}
-                    chapterNumber={postcardProgress.milestone.chapter_number || 1}
-                    storySeed={journey.story_seed as StorySeed | null}
-                    totalChapters={journey.total_chapters}
-                    companionSpecies={companion?.spirit_animal}
-                    isExpanded={true}
-                  />
-                </motion.div>
-              </CollapsibleContent>
-            </Collapsible>
+              <MilestonePostcardPreview
+                currentProgress={journey.progress_percentage}
+                targetPercent={postcardProgress.target}
+                milestoneTitle={postcardProgress.milestone.title}
+                chapterNumber={postcardProgress.milestone.chapter_number || 1}
+                storySeed={journey.story_seed as StorySeed | null}
+                totalChapters={journey.total_chapters}
+                companionSpecies={companion?.spirit_animal}
+                isExpanded={true}
+              />
+            </motion.div>
           )}
           
           {/* Milestones Tile - Cool and adventurous */}
