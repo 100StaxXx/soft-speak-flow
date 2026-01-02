@@ -387,15 +387,15 @@ const Journeys = () => {
         />
       </div>
 
-      {/* Floating Action Button */}
+      {/* Floating Action Button - Subtle */}
       <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setShowQAB(true)}
-        className="fixed bottom-24 right-4 z-50 w-14 h-14 rounded-full bg-primary shadow-lg shadow-primary/30 flex items-center justify-center"
+        className="fixed bottom-24 right-4 z-50 w-11 h-11 rounded-full bg-muted/60 backdrop-blur-sm border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors"
       >
-        <Plus className="w-7 h-7 text-primary-foreground" />
+        <Plus className="w-5 h-5 text-muted-foreground" />
       </motion.button>
 
       {/* QAB Sheet */}
