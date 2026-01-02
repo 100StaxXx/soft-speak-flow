@@ -19,6 +19,7 @@ import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
 import { MentorTutorialModal } from "@/components/MentorTutorialModal";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { ParallaxCard } from "@/components/ui/parallax-card";
 
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
@@ -303,57 +304,71 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
               </div>
             )}
             
-            <ErrorBoundary>
-              <MorningCheckIn />
-            </ErrorBoundary>
+            <ParallaxCard offset={28}>
+              <ErrorBoundary>
+                <MorningCheckIn />
+              </ErrorBoundary>
+            </ParallaxCard>
 
-            <ErrorBoundary>
-              <MorningBriefing className="animate-scale-in" />
-            </ErrorBoundary>
+            <ParallaxCard offset={24}>
+              <ErrorBoundary>
+                <MorningBriefing className="animate-scale-in" />
+              </ErrorBoundary>
+            </ParallaxCard>
 
-            <ErrorBoundary>
-              <EveningReflectionBanner />
-            </ErrorBoundary>
+            <ParallaxCard offset={20}>
+              <ErrorBoundary>
+                <EveningReflectionBanner />
+              </ErrorBoundary>
+            </ParallaxCard>
 
-            <ErrorBoundary>
-              <WeeklyRecapCard />
-            </ErrorBoundary>
+            <ParallaxCard offset={18}>
+              <ErrorBoundary>
+                <WeeklyRecapCard />
+              </ErrorBoundary>
+            </ParallaxCard>
 
             {/* Daily Coach Panel - AI-powered insights */}
-            <ErrorBoundary>
-              <DailyCoachPanel 
-                maxInsights={3} 
-                onInsightAction={(insight) => {
-                  // Route actions to appropriate behavior based on actionType
-                  switch (insight.actionType) {
-                    case 'reschedule':
-                    case 'add_break':
-                    case 'simplify':
-                      navigate('/journeys');
-                      break;
-                    case 'celebrate':
-                      // Could show celebration modal, for now navigate to journeys
-                      navigate('/journeys');
-                      break;
-                    default:
-                      navigate('/journeys');
-                  }
-                }}
-              />
-            </ErrorBoundary>
+            <ParallaxCard offset={16}>
+              <ErrorBoundary>
+                <DailyCoachPanel 
+                  maxInsights={3} 
+                  onInsightAction={(insight) => {
+                    // Route actions to appropriate behavior based on actionType
+                    switch (insight.actionType) {
+                      case 'reschedule':
+                      case 'add_break':
+                      case 'simplify':
+                        navigate('/journeys');
+                        break;
+                      case 'celebrate':
+                        // Could show celebration modal, for now navigate to journeys
+                        navigate('/journeys');
+                        break;
+                      default:
+                        navigate('/journeys');
+                    }
+                  }}
+                />
+              </ErrorBoundary>
+            </ParallaxCard>
           
-            <ErrorBoundary>
-              <TodaysPepTalk />
-            </ErrorBoundary>
+            <ParallaxCard offset={14}>
+              <ErrorBoundary>
+                <TodaysPepTalk />
+              </ErrorBoundary>
+            </ParallaxCard>
 
             {/* Ask Mentor Section */}
-            <CompanionErrorBoundary>
-              <ErrorBoundary>
-                <div className="cosmiq-glass-ultra rounded-2xl">
-                  <MentorQuickChat />
-                </div>
-              </ErrorBoundary>
-            </CompanionErrorBoundary>
+            <ParallaxCard offset={12}>
+              <CompanionErrorBoundary>
+                <ErrorBoundary>
+                  <div className="cosmiq-glass-ultra rounded-2xl">
+                    <MentorQuickChat />
+                  </div>
+                </ErrorBoundary>
+              </CompanionErrorBoundary>
+            </ParallaxCard>
 
           </div>
         </div>
