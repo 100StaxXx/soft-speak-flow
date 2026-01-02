@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { safeLocalStorage } from "@/utils/storage";
 import { useAuth } from "@/hooks/useAuth";
+
+// Module-level cache to track which modals have been checked this session
+const checkedModals = new Set<string>();
 
 /**
  * Hook to manage first-time modal display per tab/section
@@ -8,33 +11,26 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export function useFirstTimeModal(tabName: string) {
   const { user } = useAuth();
-  const hasCheckedRef = useRef(false);
-  
   const userId = user?.id;
   const storageKey = userId ? `tab_intro_${tabName}_${userId}` : null;
   
-  // Initialize to false - let useEffect determine if modal should show
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    // Skip if no user or already checked this mount cycle
-    if (!userId || hasCheckedRef.current) return;
+    if (!userId) return;
     
-    hasCheckedRef.current = true;
+    const cacheKey = `${tabName}_${userId}`;
     
-    const key = `tab_intro_${tabName}_${userId}`;
-    const hasSeenModal = safeLocalStorage.getItem(key);
+    // Skip if already checked this session
+    if (checkedModals.has(cacheKey)) return;
+    
+    checkedModals.add(cacheKey);
+    
+    const hasSeenModal = safeLocalStorage.getItem(`tab_intro_${tabName}_${userId}`);
     if (!hasSeenModal) {
       setShowModal(true);
     }
   }, [userId, tabName]);
-
-  // Reset check flag when component unmounts
-  useEffect(() => {
-    return () => {
-      hasCheckedRef.current = false;
-    };
-  }, []);
 
   const dismissModal = () => {
     setShowModal(false);
