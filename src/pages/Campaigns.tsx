@@ -19,7 +19,7 @@ const Campaigns = () => {
             Campaigns
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Epic journeys. Long-term transformation.
+            Chart your course. One step at a time.
           </p>
         </motion.div>
 
