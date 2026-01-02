@@ -42,7 +42,7 @@ const Welcome = () => {
     <div ref={containerRef} className="min-h-screen flex flex-col relative overflow-hidden">
       {/* Parallax Background */}
       <motion.div 
-        className="absolute inset-0 -z-10"
+        className="fixed inset-0 -z-10"
         style={{
           backgroundImage: `url(${backgroundImage})`,
           backgroundSize: 'cover',
@@ -53,8 +53,8 @@ const Welcome = () => {
       />
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />
-      {/* Hero Section */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
+      {/* Hero Section with iOS safe areas */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 pt-safe-top pb-safe-bottom text-center">
         {/* Animated Logo/Brand */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -85,7 +85,7 @@ const Welcome = () => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
-          className="text-lg text-muted-foreground mb-8 max-w-sm"
+          className="text-lg text-muted-foreground mb-8 px-2 md:max-w-md"
         >
           Transform your daily habits into an epic adventure with AI mentors and a companion that grows with you
         </motion.p>
@@ -116,7 +116,7 @@ const Welcome = () => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.6, duration: 0.5 }}
-          className="flex flex-col gap-4 w-full max-w-xs"
+          className="flex flex-col gap-4 w-full px-4 md:max-w-sm"
         >
           <Button
             size="lg"
@@ -139,12 +139,12 @@ const Welcome = () => {
         </motion.div>
       </div>
 
-      {/* Footer */}
+      {/* Footer with iOS safe area */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8, duration: 0.5 }}
-        className="relative z-10 pb-8 text-center"
+        className="relative z-10 pb-safe-bottom text-center"
       >
         <p className="text-xs text-muted-foreground">
           By continuing, you agree to our{" "}
