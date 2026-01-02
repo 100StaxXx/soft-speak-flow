@@ -17,6 +17,7 @@ import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { useAuth } from "@/hooks/useAuth";
 import { getRandomBackground } from "@/assets/backgrounds";
+import { motion, useScroll, useTransform } from "framer-motion";
 
 const authSchema = z.object({
   email: z.string()
@@ -57,6 +58,14 @@ const Auth = () => {
   const { session: authSession } = useAuth();
   
   const backgroundImage = useMemo(() => getRandomBackground(), []);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end start"]
+  });
+  
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
     const startTime = Date.now();
@@ -692,14 +701,20 @@ const Auth = () => {
 
   return (
     <div 
-      className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-      style={{
-        backgroundImage: `url(${backgroundImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-      }}
+      ref={containerRef}
+      className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide relative"
     >
+      {/* Parallax Background */}
+      <motion.div 
+        className="fixed inset-0 -z-10"
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          y: backgroundY,
+          scale: 1.1,
+        }}
+      />
       {/* Auth Form Section */}
       <section
         id="auth-form"
