@@ -91,9 +91,9 @@ serve(async (req) => {
    - Examples: "buy groceries", "call mom", "finish report", "clean room"
    
 2. **epic** - A long-term goal requiring multiple steps, habits, or milestones over days/weeks/months
-   - Examples: "get my real estate license", "run a marathon", "learn Spanish", "lose 20 pounds", "prepare for the bar exam", "study for MCAT"
-   - Key indicators: timeframes like "by June", "in 3 months", certifications, exams, learning goals, fitness transformations
-   - **COMPLEX EPICS that need clarification**: exams (bar, CPA, MCAT, etc.), certifications, multi-subject learning, fitness goals with specific targets
+   - Examples: "get my real estate license", "run a marathon", "learn Spanish", "lose 20 pounds", "prepare for the bar exam", "study for MCAT", "make the varsity basketball team", "become starting quarterback", "qualify for state championships", "improve my vertical jump"
+   - Key indicators: timeframes like "by June", "in 3 months", certifications, exams, learning goals, fitness transformations, sports/athletic goals, team tryouts, making varsity/JV, starting position, athletic performance targets
+   - **COMPLEX EPICS that need clarification**: exams (bar, CPA, MCAT, etc.), certifications, multi-subject learning, fitness goals with specific targets, sports/athletic goals (making teams, improving skills, competition prep)
    
 3. **habit** - A recurring action to be done regularly
    - Examples: "meditate daily", "drink 8 glasses of water", "read for 30 minutes every day"
@@ -117,6 +117,10 @@ TYPICAL TIMELINES (use these as benchmarks):
 - Lose 20 pounds: 10-20 weeks (1-2 lbs/week healthy rate)
 - Learn coding basics: 2-3 months
 - Write a book: 3-12 months
+- Making varsity team: 3-6 months (depends on off-season vs in-season)
+- Improving specific athletic skill: 4-8 weeks for noticeable gains
+- Tournament/championship prep: 6-12 weeks
+- Athletic conditioning: 6-12 weeks for significant improvement
 
 TIMELINE ANALYSIS RULES:
 1. Calculate stated days vs typical days for the goal type
@@ -232,6 +236,20 @@ For "prepare for the bar exam" (no specific timeline - normal flow):
     { "id": "current_level", "question": "Current preparation status:", "type": "select", "options": ["Just starting fresh", "Some study done", "In review phase", "Final cramming"], "required": true },
     { "id": "subjects", "question": "Which subjects do you need to focus on?", "type": "select", "options": ["All MBE subjects", "Essays & PT", "State-specific", "Full review"], "required": true },
     { "id": "hours_per_day", "question": "How many hours per day can you study?", "type": "text", "placeholder": "e.g., 4-6 hours", "required": true }
+  ]
+}
+
+For "make varsity basketball team" or similar sports goals:
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "sports_goal",
+  "epicClarifyingQuestions": [
+    { "id": "current_level", "question": "What's your current playing level?", "type": "select", "options": ["JV starter", "JV bench", "Club/recreational", "New to organized play"], "required": true },
+    { "id": "position", "question": "What position do you play?", "type": "text", "placeholder": "e.g., Point guard, Forward, Center", "required": true },
+    { "id": "weak_areas", "question": "What skills need the most work?", "type": "select", "options": ["Shooting", "Ball handling", "Defense", "Conditioning", "Game IQ"], "multiSelect": true, "required": true },
+    { "id": "practice_time", "question": "How much time can you practice daily?", "type": "text", "placeholder": "e.g., 2 hours after school", "required": true },
+    { "id": "tryout_date", "question": "When are tryouts?", "type": "text", "placeholder": "e.g., August, next month", "required": false }
   ]
 }
 

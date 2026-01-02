@@ -350,6 +350,16 @@ export function Pathfinder({
     // Classify the goal to check if clarification is needed
     const result = await classify(goalInput);
     
+    // Debug logging for classification results
+    console.log('[Pathfinder] Classification result:', {
+      input: goalInput,
+      type: result?.type,
+      confidence: result?.confidence,
+      needsClarification: result?.needsClarification,
+      questionsCount: result?.epicClarifyingQuestions?.length,
+      epicContext: result?.epicContext,
+    });
+    
     // For epics, ALWAYS show clarification - use AI questions or fallback defaults
     if (result?.type === 'epic') {
       const questions = result.epicClarifyingQuestions?.length 
