@@ -9,16 +9,15 @@ import {
   Plus,
   Check,
   Circle,
-  ArrowDown,
   Clock,
   Pencil,
   Repeat,
   ChevronDown,
   ChevronUp,
-  Target,
-  CheckCircle2
+  ArrowDown,
+  CheckCircle2,
+  Target
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -228,7 +227,7 @@ export function TodaysAgenda({
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
-          "flex items-center gap-3 p-2 rounded-lg transition-all relative group",
+          "flex items-center gap-4 p-3 rounded-xl transition-all relative group",
           "hover:bg-muted/30 cursor-pointer",
           isComplete && "opacity-60"
         )}
@@ -239,38 +238,38 @@ export function TodaysAgenda({
           className="relative"
         >
           <div className={cn(
-            "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+            "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all",
             isComplete 
               ? "bg-primary border-primary" 
               : isTutorialQuest 
                 ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
                 : "border-muted-foreground/30"
           )}>
-            {isComplete && <Check className="w-3 h-3 text-primary-foreground" />}
+            {isComplete && <Check className="w-4 h-4 text-primary-foreground" />}
           </div>
         </div>
         
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {isRitual && (
-              <Repeat className="w-3 h-3 text-accent flex-shrink-0" />
+              <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
             )}
             <p className={cn(
-              "text-sm truncate",
+              "text-base truncate",
               isComplete && "line-through text-muted-foreground"
             )}>
               {task.task_text}
             </p>
           </div>
           {task.scheduled_time && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Clock className="w-3 h-3" />
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+              <Clock className="w-4 h-4" />
               {formatTime(task.scheduled_time)}
             </span>
           )}
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {/* Edit button - shows on hover for incomplete quests with proper 44px touch target */}
           {onEditQuest && !isComplete && (
             <Button
@@ -282,67 +281,61 @@ export function TodaysAgenda({
                 onEditQuest(task);
               }}
             >
-              <Pencil className="w-4 h-4" />
+              <Pencil className="w-5 h-5" />
             </Button>
           )}
           {task.is_main_quest && (
-            <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-primary/10 border-primary/30">
+            <Badge variant="outline" className="text-sm px-2 py-0.5 h-6 bg-primary/10 border-primary/30">
               Main
             </Badge>
           )}
-          <span className="text-xs text-stardust-gold/80">+{task.xp_reward}</span>
+          <span className="text-sm font-medium text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
       </motion.div>
     );
   };
 
   return (
-    <Card className={cn(
-      "relative cosmiq-glass-ultra",
-      "border-primary/30"
-    )}>
-      {/* Background glow */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none" />
-      
-      <div className="relative p-4 overflow-visible">
+    <div className="relative">
+      <div className="relative p-2 overflow-visible">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span className="text-lg font-semibold">
                 {isToday ? "Today's Agenda" : format(selectedDate, "MMM d")}
               </span>
             </div>
           {currentStreak > 0 && (
               <div className={cn(
-                "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs",
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium",
                 currentStreak >= 30 
                   ? "bg-stardust-gold/20 text-stardust-gold" 
                   : currentStreak >= 14 
                     ? "bg-celestial-blue/20 text-celestial-blue" 
                     : "bg-orange-500/10 text-orange-400"
               )}>
-                <Flame className="h-3 w-3" />
+                <Flame className="h-4 w-4" />
                 {currentStreak}
               </div>
             )}
           </div>
 
           <div className={cn(
-            "flex items-center gap-1.5 text-sm px-2 py-0.5 rounded-full",
+            "flex items-center gap-2 text-lg px-3 py-1 rounded-full",
             allComplete ? "bg-stardust-gold/20" : "bg-stardust-gold/10"
           )}>
             <Trophy className={cn(
-              "h-4 w-4",
+              "h-5 w-5",
               allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
             )} />
-            <span className="font-medium text-stardust-gold">{totalXP} XP</span>
+            <span className="font-semibold text-stardust-gold">{totalXP} XP</span>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden mb-3">
+        <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden mb-4">
           <motion.div
             className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
             initial={{ width: 0 }}
@@ -354,7 +347,7 @@ export function TodaysAgenda({
           )}
         </div>
 
-        <div className="flex justify-between mb-4 text-xs text-muted-foreground">
+        <div className="flex justify-between mb-5 text-sm text-muted-foreground">
           <span>{completedCount} of {totalCount} completed</span>
           <span>{Math.round(progressPercent)}%</span>
         </div>
@@ -550,6 +543,6 @@ export function TodaysAgenda({
         </div>,
         document.body
       )}
-    </Card>
+    </div>
   );
 }
