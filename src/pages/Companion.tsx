@@ -20,6 +20,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
+import { CompanionPageSkeleton } from "@/components/skeletons/CompanionPageSkeleton";
 import { useState, memo } from "react";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
@@ -88,12 +89,8 @@ const Companion = () => {
   if (isLoading) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-            <p className="text-muted-foreground">Loading your companion...</p>
-          </div>
-        </div>
+        <StarfieldBackground />
+        <CompanionPageSkeleton />
         <BottomNav />
       </PageTransition>
     );

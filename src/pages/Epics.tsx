@@ -10,13 +10,14 @@ import { useEpics } from "@/hooks/useEpics";
 import { useAuth } from "@/hooks/useAuth";
 import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight, Wand2 } from "lucide-react";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { EpicTemplate } from "@/hooks/useEpicTemplates";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { EpicsPageSkeleton } from "@/components/skeletons/EpicsPageSkeleton";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,16 @@ const Epics = () => {
     setTemplatesDialogOpen(false);
     setCreateDialogOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <PageTransition>
+        <StarfieldBackground />
+        <EpicsPageSkeleton />
+        <BottomNav />
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
@@ -171,11 +182,7 @@ const Epics = () => {
           </TabsList>
 
           <TabsContent value="active" className="space-y-4">
-            {isLoading ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              </div>
-            ) : activeEpics.length === 0 ? (
+            {activeEpics.length === 0 ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

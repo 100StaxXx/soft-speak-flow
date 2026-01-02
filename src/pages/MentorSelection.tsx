@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MentorGrid } from "@/components/MentorGrid";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { MentorSelectionSkeleton } from "@/components/skeletons/MentorSelectionSkeleton";
 
 const MentorSelection = () => {
   const { user } = useAuth();
@@ -106,11 +106,7 @@ const MentorSelection = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-obsidian flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-royal-gold" />
-      </div>
-    );
+    return <MentorSelectionSkeleton />;
   }
 
   return (
