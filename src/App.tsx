@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { useEffect, Suspense, lazy, memo, useState } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
@@ -223,50 +224,52 @@ const AppContent = memo(() => {
             {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
               <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
-                <Routes>
-                <Route path="/welcome" element={<Welcome />} />
-                <Route path="/preview" element={<Preview />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/reset-password" element={<ResetPassword />} />
-                <Route path="/creator" element={<Creator />} />
-                <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
-                <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
-                <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
-                
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
-                <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
-                <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
-                <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
-                <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
-                <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
-                <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
-                <Route path="/join/:code" element={<JoinEpic />} />
-                <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-                {/* HIDDEN: Arcade route disabled */}
-                {/* <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} /> */}
-                <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
-                <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
-                <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />
-                <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
-                <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
-                <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-                <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
-                <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
-                <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-                <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
-                <Route path="/partners" element={<Partners />} />
-                <Route path="/account-deletion" element={<AccountDeletionHelp />} />
-                <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
-                <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
-                <Route path="/guilds" element={<ProtectedRoute><Community /></ProtectedRoute>} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
-                <Route path="/test-scroll" element={<TestScroll />} />
-                <Route path="*" element={<NotFound />} />
-                </Routes>
+                <AnimatePresence mode="wait">
+                  <Routes location={location} key={location.pathname}>
+                  <Route path="/welcome" element={<Welcome />} />
+                  <Route path="/preview" element={<Preview />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/reset-password" element={<ResetPassword />} />
+                  <Route path="/creator" element={<Creator />} />
+                  <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
+                  <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
+                  <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                  <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
+                  
+                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+                  <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
+                  <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />
+                  <Route path="/mentor-selection" element={<ProtectedRoute><MentorSelection /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
+                  <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
+                  <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
+                  <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
+                  <Route path="/join/:code" element={<JoinEpic />} />
+                  <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
+                  {/* HIDDEN: Arcade route disabled */}
+                  {/* <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} /> */}
+                  <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
+                  <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
+                  <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />
+                  <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+                  <Route path="/reflection" element={<ProtectedRoute><Reflection /></ProtectedRoute>} />
+                  <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+                  <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
+                  <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
+                  <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+                  <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
+                  <Route path="/partners" element={<Partners />} />
+                  <Route path="/account-deletion" element={<AccountDeletionHelp />} />
+                  <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
+                  <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
+                  <Route path="/guilds" element={<ProtectedRoute><Community /></ProtectedRoute>} />
+                  <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/test-scroll" element={<TestScroll />} />
+                  <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </AnimatePresence>
               </Suspense>
             {/* HIDDEN: AstralEncounterProvider closing tag removed */}
           </WeeklyRecapProvider>
