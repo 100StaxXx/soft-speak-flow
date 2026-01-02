@@ -227,7 +227,7 @@ export function TodaysAgenda({
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
-          "flex items-center gap-4 p-3 rounded-xl transition-all relative group",
+          "flex items-center gap-5 p-4 rounded-xl transition-all relative group",
           "hover:bg-muted/30 cursor-pointer",
           isComplete && "opacity-60"
         )}
@@ -238,32 +238,32 @@ export function TodaysAgenda({
           className="relative"
         >
           <div className={cn(
-            "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all",
+            "flex-shrink-0 w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all",
             isComplete 
               ? "bg-primary border-primary" 
               : isTutorialQuest 
                 ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
                 : "border-muted-foreground/30"
           )}>
-            {isComplete && <Check className="w-4 h-4 text-primary-foreground" />}
+            {isComplete && <Check className="w-5 h-5 text-primary-foreground" />}
           </div>
         </div>
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             {isRitual && (
-              <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
+              <Repeat className="w-5 h-5 text-accent flex-shrink-0" />
             )}
             <p className={cn(
-              "text-base truncate",
+              "text-xl truncate",
               isComplete && "line-through text-muted-foreground"
             )}>
               {task.task_text}
             </p>
           </div>
           {task.scheduled_time && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
-              <Clock className="w-4 h-4" />
+            <span className="text-base text-muted-foreground flex items-center gap-1.5 mt-1">
+              <Clock className="w-5 h-5" />
               {formatTime(task.scheduled_time)}
             </span>
           )}
@@ -289,7 +289,7 @@ export function TodaysAgenda({
               Main
             </Badge>
           )}
-          <span className="text-sm font-medium text-stardust-gold/80">+{task.xp_reward}</span>
+          <span className="text-lg font-bold text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
       </motion.div>
     );
@@ -302,9 +302,9 @@ export function TodaysAgenda({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="text-lg font-semibold">
-                {isToday ? "Today's Agenda" : format(selectedDate, "MMM d")}
+              <Sparkles className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold">
+                {isToday ? "Quest Log" : format(selectedDate, "MMM d")}
               </span>
             </div>
           {currentStreak > 0 && (
@@ -323,11 +323,11 @@ export function TodaysAgenda({
           </div>
 
           <div className={cn(
-            "flex items-center gap-2 text-lg px-3 py-1 rounded-full",
+            "flex items-center gap-2 text-xl px-3 py-1 rounded-full",
             allComplete ? "bg-stardust-gold/20" : "bg-stardust-gold/10"
           )}>
             <Trophy className={cn(
-              "h-5 w-5",
+              "h-6 w-6",
               allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
             )} />
             <span className="font-semibold text-stardust-gold">{totalXP} XP</span>
@@ -335,7 +335,7 @@ export function TodaysAgenda({
         </div>
 
         {/* Progress bar */}
-        <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden mb-4">
+        <div className="relative h-4 bg-muted/50 rounded-full overflow-hidden mb-4">
           <motion.div
             className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
             initial={{ width: 0 }}
@@ -347,7 +347,7 @@ export function TodaysAgenda({
           )}
         </div>
 
-        <div className="flex justify-between mb-5 text-sm text-muted-foreground">
+        <div className="flex justify-between mb-5 text-base text-muted-foreground">
           <span>{completedCount} of {totalCount} completed</span>
           <span>{Math.round(progressPercent)}%</span>
         </div>
@@ -371,10 +371,10 @@ export function TodaysAgenda({
               <>
                 {ritualTasks.length > 0 && (
                   <div className="flex items-center gap-2 py-1.5 px-1">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                       Quests
                     </span>
-                    <Badge variant="secondary" className="h-4 px-1.5 text-xs bg-muted text-muted-foreground border-0">
+                    <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
                       {questTasks.length}
                     </Badge>
                   </div>
@@ -420,17 +420,17 @@ export function TodaysAgenda({
                         }}
                       >
                         <motion.div 
-                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30"
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/15 border border-accent/30"
                           animate={showRitualsTooltip ? { 
                             boxShadow: ['0 0 0 0 hsl(var(--accent) / 0.4)', '0 0 0 6px hsl(var(--accent) / 0)', '0 0 0 0 hsl(var(--accent) / 0.4)']
                           } : {}}
                           transition={{ duration: 1.5, repeat: showRitualsTooltip ? Infinity : 0 }}
                         >
-                          <Sparkles className="w-3 h-3 text-accent" />
-                          <span className="text-xs font-semibold text-accent uppercase tracking-wide">
+                          <Sparkles className="w-4 h-4 text-accent" />
+                          <span className="text-sm font-semibold text-accent uppercase tracking-wide">
                             Rituals
                           </span>
-                          <Badge variant="secondary" className="h-4 px-1.5 text-xs bg-accent/20 text-accent border-0">
+                          <Badge variant="secondary" className="h-5 px-2 text-sm bg-accent/20 text-accent border-0">
                             {ritualTasks.length}
                           </Badge>
                           {showRitualsTooltip && (
