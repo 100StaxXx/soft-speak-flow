@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { format } from 'date-fns';
+import { format, getDay } from 'date-fns';
 import { toast } from 'sonner';
 import { categorizeQuest } from '@/utils/questCategorization';
 
@@ -18,12 +18,57 @@ export interface SurfacedHabit {
   task_id: string | null;
   is_completed: boolean;
   category: string | null;
+  custom_days: number[] | null;
+}
+
+/**
+ * Determine if a habit should surface today based on its frequency
+ */
+function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number): boolean {
+  const frequency = habit.frequency?.toLowerCase();
+  
+  switch (frequency) {
+    case 'daily':
+      return true;
+      
+    case 'weekly':
+      // If custom_days is set, check if today is in the list
+      if (habit.custom_days && habit.custom_days.length > 0) {
+        return habit.custom_days.includes(dayOfWeek);
+      }
+      // Default: surface on Mondays for weekly habits without specific days
+      return dayOfWeek === 1;
+      
+    case 'weekdays':
+      return dayOfWeek >= 1 && dayOfWeek <= 5;
+      
+    case 'weekends':
+      return dayOfWeek === 0 || dayOfWeek === 6;
+      
+    case '3x_week':
+      // Monday, Wednesday, Friday
+      if (habit.custom_days && habit.custom_days.length > 0) {
+        return habit.custom_days.includes(dayOfWeek);
+      }
+      return [1, 3, 5].includes(dayOfWeek);
+      
+    case 'custom':
+      if (habit.custom_days && habit.custom_days.length > 0) {
+        return habit.custom_days.includes(dayOfWeek);
+      }
+      return false;
+      
+    default:
+      // Default to daily if frequency is unknown
+      return true;
+  }
 }
 
 export function useHabitSurfacing(selectedDate?: Date) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const taskDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
+  const dayOfWeek = getDay(selectedDate || new Date()); // 0 = Sunday, 1 = Monday, etc.
 
   // Fetch habits that should be surfaced as tasks today
   const { data: surfacedHabits, isLoading, error } = useQuery({
@@ -43,6 +88,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           frequency,
           estimated_minutes,
           preferred_time,
+          custom_days,
           epic_habits(epic_id, epics(id, title, status))
         `)
         .eq('user_id', user.id)
@@ -83,6 +129,7 @@ export function useHabitSurfacing(selectedDate?: Date) {
           task_id: existingTask?.id || null,
           is_completed: existingTask?.completed || false,
           category: categorizeQuest(habit.title),
+          custom_days: habit.custom_days || null,
         };
       });
 
@@ -131,13 +178,16 @@ export function useHabitSurfacing(selectedDate?: Date) {
     },
   });
 
-  // Surface all habits linked to active epics
-  const surfaceAllEpicHabits = useMutation({
+  // Surface all habits that should appear today (epic-linked OR standalone daily)
+  const surfaceAllHabits = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error('Not authenticated');
 
+      // Filter habits that:
+      // 1. Don't already have a task for today
+      // 2. Should surface based on their frequency
       const habitsToSurface = surfacedHabits?.filter(
-        h => h.epic_id && !h.task_id
+        h => !h.task_id && shouldSurfaceToday(h, dayOfWeek)
       ) || [];
 
       console.log('[Habit Surfacing] Habits to surface:', habitsToSurface.length, habitsToSurface);
@@ -189,12 +239,19 @@ export function useHabitSurfacing(selectedDate?: Date) {
     },
   });
 
+  // Count habits that should surface today but haven't yet
+  const unsurfacedCount = surfacedHabits?.filter(
+    h => !h.task_id && shouldSurfaceToday(h, dayOfWeek)
+  ).length || 0;
+
   return {
     surfacedHabits: surfacedHabits || [],
     isLoading,
     error,
     surfaceHabit: surfaceHabitMutation.mutate,
-    surfaceAllEpicHabits: surfaceAllEpicHabits.mutate,
-    unsurfacedEpicHabitsCount: surfacedHabits?.filter(h => h.epic_id && !h.task_id).length || 0,
+    surfaceAllEpicHabits: surfaceAllHabits.mutate, // Keep old name for compatibility
+    surfaceAllHabits: surfaceAllHabits.mutate,
+    unsurfacedEpicHabitsCount: unsurfacedCount, // Keep old name for compatibility
+    unsurfacedHabitsCount: unsurfacedCount,
   };
 }

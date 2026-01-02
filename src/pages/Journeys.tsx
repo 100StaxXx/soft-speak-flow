@@ -39,6 +39,7 @@ import { useCalendarMilestones } from "@/hooks/useCalendarMilestones";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
+import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
@@ -143,11 +144,15 @@ const Journeys = () => {
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
   const { milestones: calendarMilestones } = useCalendarMilestones(selectedDate);
   
-  // Habit surfacing - auto-surface active epic habits as daily tasks
+  // Habit surfacing - auto-surface ALL active habits (not just epic-linked) as daily tasks
   const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
   
-  // Auto-surface habits when there are unsurfaced ones (with ref to prevent infinite loop)
+  // Recurring task spawner - auto-spawn tasks with is_recurring = true
+  const { pendingRecurringCount, spawnRecurringTasks } = useRecurringTaskSpawner(selectedDate);
+  
+  // Auto-surface habits and spawn recurring tasks (with ref to prevent infinite loop)
   const hasSurfacedRef = useRef(false);
+  const hasSpawnedRecurringRef = useRef(false);
   const dateKeyRef = useRef(format(selectedDate, 'yyyy-MM-dd'));
 
   useEffect(() => {
@@ -157,14 +162,21 @@ const Journeys = () => {
     if (dateKeyRef.current !== currentDateKey) {
       dateKeyRef.current = currentDateKey;
       hasSurfacedRef.current = false;
+      hasSpawnedRecurringRef.current = false;
     }
     
-    // Only surface once per date
+    // Surface habits once per date
     if (unsurfacedEpicHabitsCount > 0 && !hasSurfacedRef.current) {
       hasSurfacedRef.current = true;
       surfaceAllEpicHabits();
     }
-  }, [unsurfacedEpicHabitsCount, selectedDate, surfaceAllEpicHabits]);
+    
+    // Spawn recurring tasks once per date
+    if (pendingRecurringCount > 0 && !hasSpawnedRecurringRef.current) {
+      hasSpawnedRecurringRef.current = true;
+      spawnRecurringTasks();
+    }
+  }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
   // Tutorial quest creation for new users - "Join Cosmiq" quest
   useEffect(() => {
