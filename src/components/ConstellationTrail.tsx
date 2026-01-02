@@ -875,37 +875,24 @@ export const ConstellationTrail = ({
     }));
   }, []);
 
-  // Calculate progress-based gradient colors (red -> orange -> yellow -> green)
-  const getProgressGradient = (p: number) => {
+  // Calculate progress-based border color (red -> orange -> yellow -> green)
+  const getProgressBorderColor = (p: number) => {
     const clampedProgress = Math.max(0, Math.min(100, p));
     const hue = Math.round((clampedProgress / 100) * 120);
-    const color1 = `hsl(${hue}, 80%, 50%)`;
-    const color2 = `hsl(${(hue + 30) % 360}, 90%, 60%)`;
-    const color3 = `hsl(${(hue + 60) % 360}, 70%, 45%)`;
-    return `conic-gradient(from 0deg, ${color1}, ${color2}, ${color3}, ${color1})`;
+    return `hsl(${hue}, 70%, 50%)`;
   };
 
   return (
-    <div className={cn("relative p-1 rounded-2xl", className)}>
-      {/* Animated gradient border */}
-      <div 
-        className="absolute inset-0 rounded-2xl animate-gradient-spin"
-        style={{ 
-          background: getProgressGradient(progress),
-          filter: "blur(1px)",
-        }}
-      />
-      {/* Glow layer */}
-      <div 
-        className="absolute inset-0 rounded-2xl opacity-50"
-        style={{ 
-          background: getProgressGradient(progress),
-          filter: "blur(8px)",
-        }}
-      />
-      
-      {/* Inner content container */}
-      <div className="relative w-full h-56 rounded-xl overflow-hidden bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950">
+    <div 
+      className={cn(
+        "relative w-full h-56 rounded-xl overflow-hidden border-4",
+        "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        className
+      )}
+      style={{
+        borderColor: getProgressBorderColor(progress),
+      }}
+    >
         {/* Nebula glow effect */}
         <div className="absolute inset-0 opacity-40">
           <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/30 rounded-full blur-xl" />
@@ -1079,7 +1066,6 @@ export const ConstellationTrail = ({
         <div className="absolute top-2 left-3 text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
           Star Path Journey
         </div>
-      </div>
     </div>
   );
 };
