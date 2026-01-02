@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -16,6 +16,7 @@ import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { useAuth } from "@/hooks/useAuth";
+import { getRandomBackground } from "@/assets/backgrounds";
 
 const authSchema = z.object({
   email: z.string()
@@ -54,6 +55,8 @@ const Auth = () => {
   const location = useLocation();
   const { toast } = useToast();
   const { session: authSession } = useAuth();
+  
+  const backgroundImage = useMemo(() => getRandomBackground(), []);
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
     const startTime = Date.now();
@@ -688,16 +691,23 @@ const Auth = () => {
   };
 
   return (
-    <div className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
+    <div 
+      className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
+    >
       {/* Auth Form Section */}
       <section
         id="auth-form"
         className="snap-start min-h-screen relative flex items-center justify-center py-20"
-        style={{
-          background: `linear-gradient(180deg, hsl(0 0% 7%), hsl(270 50% 35% / 0.05))`,
-        }}
       >
-        <div className="w-full max-w-md px-6 space-y-8">
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+        <div className="relative z-10 w-full max-w-md px-6 space-y-8">
           <div className="space-y-6">
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
