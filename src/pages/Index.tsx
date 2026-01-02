@@ -349,7 +349,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             {/* Ask Mentor Section */}
             <CompanionErrorBoundary>
               <ErrorBoundary>
-                <div className="cosmiq-glass rounded-2xl">
+                <div className="cosmiq-glass-ultra rounded-2xl">
                   <MentorQuickChat />
                 </div>
               </ErrorBoundary>

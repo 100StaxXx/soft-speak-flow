@@ -131,11 +131,11 @@ const Community = () => {
         <StarfieldBackground />
         
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 pt-[env(safe-area-inset-top)]">
+      <div className="sticky top-0 z-40 cosmiq-glass-header pt-[env(safe-area-inset-top)]">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             {/* View Mode Toggle */}
-            <div className="flex bg-muted/50 rounded-lg p-1">
+            <div className="flex cosmiq-glass-subtle rounded-lg p-1">
               <Button
                 variant="ghost"
                 size="sm"

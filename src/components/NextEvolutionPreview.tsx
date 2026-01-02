@@ -32,7 +32,7 @@ export const NextEvolutionPreview = ({
 
   if (isMaxStage) {
     return (
-      <Card className="p-5 bg-gradient-to-br from-accent/10 via-card to-primary/10 border-accent/30">
+      <Card className="p-5 cosmiq-glass-ultra border-accent/30">
         <div className="flex items-center gap-3 mb-3">
           <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-accent" />
@@ -49,7 +49,7 @@ export const NextEvolutionPreview = ({
   }
 
   return (
-    <Card className="p-5 bg-gradient-to-br from-primary/10 via-card to-accent/10 border-primary/30 hover:border-primary/50 transition-all duration-300">
+    <Card className="p-5 cosmiq-glass-ultra border-primary/30 hover:border-primary/50 transition-all duration-300">
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">

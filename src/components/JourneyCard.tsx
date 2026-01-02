@@ -151,7 +151,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       transition={{ duration: 0.3 }}
     >
       <Card className={cn(
-        "p-5 bg-gradient-to-br border-2 transition-all bg-background/50",
+        "p-5 cosmiq-glass-subtle border-2 transition-all",
         `${themeBorder}`,
         `bg-gradient-to-br ${themeGradient}`
       )}>

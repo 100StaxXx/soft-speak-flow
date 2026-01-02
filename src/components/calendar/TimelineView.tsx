@@ -116,7 +116,7 @@ export function TimelineView({
   return (
     <div className="flex flex-col h-full">
       {/* Header with Week Strip */}
-      <div className="px-4 pt-2 pb-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
+      <div className="px-4 pt-2 pb-4 border-b border-border/30 cosmiq-glass-subtle">
         <WeekStrip selectedDate={selectedDate} onDateSelect={onDateSelect} />
         
         {/* Stats Row */}

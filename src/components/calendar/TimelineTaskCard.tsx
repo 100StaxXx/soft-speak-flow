@@ -127,7 +127,7 @@ export function TimelineTaskCard({
       className={cn(
         "flex items-center gap-3 py-3 cursor-pointer transition-all select-none",
         task.completed && "opacity-60",
-        isDragging && "bg-background/95 shadow-lg rounded-xl scale-[1.02] ring-2 ring-primary/30"
+        isDragging && "cosmiq-glass-subtle shadow-lg rounded-xl scale-[1.02] ring-2 ring-primary/30"
       )}
     >
       {/* Drag Handle + Time Marker */}

@@ -165,8 +165,8 @@ const DailyMissionsContent = () => {
   };
 
   return (
-    <Card className="p-4 sm:p-5 md:p-6 bg-gradient-to-br from-accent/10 via-card to-primary/10 border-accent/30 hover:border-accent/50 transition-all duration-500 hover:shadow-glow shadow-medium relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    <Card className="p-4 sm:p-5 md:p-6 cosmiq-glass-ultra border-accent/30 hover:border-accent/50 transition-all duration-500 hover:shadow-glow shadow-medium relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-primary/10 pointer-events-none" />
       <div className="relative space-y-3 sm:space-y-4 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">

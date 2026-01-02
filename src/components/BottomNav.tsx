@@ -43,7 +43,7 @@ export const BottomNav = memo(() => {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-background/98 border-t border-border/50 shadow-lg z-50 transition-transform duration-200"
+        className="fixed bottom-0 left-0 right-0 cosmiq-glass-nav z-50 transition-transform duration-200"
         role="navigation"
         aria-label="Main navigation"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}

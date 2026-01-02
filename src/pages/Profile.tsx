@@ -278,7 +278,7 @@ const Profile = () => {
       
       <div className="min-h-screen pb-nav-safe relative">
         {/* Header */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 safe-area-top">
+        <div className="sticky top-0 z-40 cosmiq-glass-header safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -329,7 +329,7 @@ const Profile = () => {
 
           {/* Settings Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1 cosmiq-glass-subtle border border-cosmiq-glow/20">
               <TabsTrigger value="account" className="text-xs sm:text-sm py-2">Account</TabsTrigger>
               <TabsTrigger value="rewards" className="text-xs sm:text-sm py-2">Rewards</TabsTrigger>
               <TabsTrigger value="notifications" className="text-xs sm:text-sm py-2">Alerts</TabsTrigger>

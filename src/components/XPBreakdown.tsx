@@ -54,7 +54,7 @@ export const XPBreakdown = () => {
   };
 
   return (
-    <Card className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5">
+    <Card className="p-5 md:p-6 cosmiq-glass-ultra border-primary/20">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
