@@ -90,11 +90,6 @@ export function EpicsTab() {
                   {/* Overlay gradient for depth */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/40 rounded-2xl" />
                   
-                  {/* Preview badge */}
-                  <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/50 backdrop-blur-sm rounded-full text-xs text-white/80 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    Your path awaits
-                  </div>
                 </motion.div>
 
 
