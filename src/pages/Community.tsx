@@ -14,6 +14,7 @@ import { useCalendarMilestones } from "@/hooks/useCalendarMilestones";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { cn } from "@/lib/utils";
 import { CalendarTask } from "@/types/quest";
+import { PageTransition } from "@/components/PageTransition";
 
 type ViewMode = 'day' | 'month';
 
@@ -125,9 +126,10 @@ const Community = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-nav-safe relative overflow-hidden flex flex-col">
-      <StarfieldBackground />
-      
+    <PageTransition>
+      <div className="min-h-screen bg-background pb-nav-safe relative overflow-hidden flex flex-col">
+        <StarfieldBackground />
+        
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50 pt-[env(safe-area-inset-top)]">
         <div className="max-w-2xl mx-auto px-4 py-3">
@@ -246,7 +248,8 @@ const Community = () => {
       />
 
       <BottomNav />
-    </div>
+      </div>
+    </PageTransition>
   );
 };
 
