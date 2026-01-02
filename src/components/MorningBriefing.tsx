@@ -153,52 +153,64 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   // No briefing yet - show generate button
   if (!briefing) {
     return (
-      <Card className={cn(
-        "p-6 bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 border-primary/20",
+      <div className={cn(
+        "rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 overflow-hidden",
         className
       )}>
-        <div className="flex items-start gap-4">
-          {personality && (
-            <MentorAvatar
-              mentorSlug={(personality.slug || '').toLowerCase()}
-              mentorName={personality.name}
-              primaryColor={personality.primary_color || '#000'}
-              avatarUrl={personality.avatar_url || undefined}
-              size="md"
-              showBorder={true}
-            />
-          )}
-          <div className="flex-1 space-y-3">
-            <div>
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <Brain className="h-5 w-5 text-primary" />
-                Morning Briefing
-              </h3>
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-border/30 bg-gradient-to-r from-primary/10 to-accent/5">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
+              <Brain className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="font-heading font-black text-2xl tracking-wide text-primary">MORNING BRIEFING</h3>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-5">
+          <div className="flex items-start gap-4">
+            {personality && (
+              <div className="relative flex-shrink-0">
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-red-500 to-pink-500 opacity-70" />
+                <MentorAvatar
+                  mentorSlug={(personality.slug || '').toLowerCase()}
+                  mentorName={personality.name}
+                  primaryColor={personality.primary_color || '#000'}
+                  avatarUrl={personality.avatar_url || undefined}
+                  size="md"
+                  showBorder={false}
+                  className="relative"
+                />
+              </div>
+            )}
+            <div className="flex-1 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Get personalized insights from {personality?.name || 'your mentor'} based on your activity
               </p>
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                variant="cta"
+                className="w-full h-12"
+                size="lg"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing your progress...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-5 w-5" />
+                    Generate My Briefing
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              variant="default"
-              className="w-full sm:w-auto"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing your progress...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate My Briefing
-                </>
-              )}
-            </Button>
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 

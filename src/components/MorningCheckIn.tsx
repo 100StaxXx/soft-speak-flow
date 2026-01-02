@@ -222,59 +222,62 @@ const MorningCheckInContent = () => {
   }
 
   return (
-    <Card data-tour="morning-checkin" className="p-5 md:p-6 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 hover:border-primary/30 transition-all duration-300 animate-scale-in">
-      <div className="space-y-4">
+    <div data-tour="morning-checkin" className="rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 overflow-hidden animate-scale-in">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-border/30 bg-gradient-to-r from-orange-500/10 to-amber-500/5">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 flex items-center justify-center border border-orange-500/30">
             <Sunrise className="h-5 w-5 text-orange-500" />
           </div>
-          <div>
-            <h3 className="font-heading font-black text-2xl md:text-3xl text-[hsl(30,100%,60%)]">CHECK-IN</h3>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div data-tour="checkin-mood">
-            <label className="text-sm font-bold mb-2 block">How are you feeling?</label>
-            <MoodSelector selected={mood} onSelect={setMood} />
-          </div>
-
-          <div data-tour="checkin-intention">
-            <label className="text-sm font-bold mb-2 flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              What's your main focus today?
-            </label>
-            <Textarea
-              placeholder="I will..."
-              value={intention}
-              onChange={(e) => setIntention(e.target.value)}
-              rows={3}
-              className="resize-none transition-all duration-200 focus:shadow-glow"
-            />
-          </div>
-
-          <Button 
-            onClick={submitCheckIn} 
-            disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
-            variant="cta"
-            className="w-full h-12"
-            size="lg"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2" />
-                Setting Intention...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                {personality?.buttonText("Start My Day") || "Start My Day"} (+{XP_REWARDS.CHECK_IN} XP)
-              </>
-            )}
-          </Button>
+          <h3 className="font-heading font-black text-2xl tracking-wide text-orange-500">CHECK-IN</h3>
         </div>
       </div>
-    </Card>
+
+      {/* Content */}
+      <div className="p-5 space-y-5">
+        <div data-tour="checkin-mood" className="space-y-3">
+          <label className="text-sm font-bold text-foreground">How are you feeling?</label>
+          <MoodSelector selected={mood} onSelect={setMood} />
+        </div>
+
+        <div className="h-px bg-border/30" />
+
+        <div data-tour="checkin-intention" className="space-y-3">
+          <label className="text-sm font-bold flex items-center gap-2 text-foreground">
+            <Target className="h-4 w-4 text-primary" />
+            What's your main focus today?
+          </label>
+          <Textarea
+            placeholder="I will..."
+            value={intention}
+            onChange={(e) => setIntention(e.target.value)}
+            rows={3}
+            className="resize-none transition-all duration-200 focus:shadow-glow bg-muted/30 border-border/50"
+          />
+        </div>
+
+        <Button 
+          onClick={submitCheckIn} 
+          disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
+          variant="cta"
+          className="w-full h-13 text-base"
+          size="lg"
+        >
+          {isSubmitting ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+              Setting Intention...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-5 w-5" />
+              {personality?.buttonText("Start My Day") || "Start My Day"}
+              <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">+{XP_REWARDS.CHECK_IN} XP</span>
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
   );
 };
 
