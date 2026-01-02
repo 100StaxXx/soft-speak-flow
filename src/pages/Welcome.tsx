@@ -29,10 +29,8 @@ const Welcome = () => {
   const backgroundImage = useMemo(() => getRandomBackground(), []);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end start"]
-  });
+  // Use scroll without target to avoid hydration error when ref isn't mounted yet
+  const { scrollYProgress } = useScroll();
   
   const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
