@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { format, addDays, subDays } from "date-fns";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, LayoutList, Grid3X3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/BottomNav";
@@ -22,6 +22,7 @@ const Community = () => {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   
   // Edit quest state
   const [editingTask, setEditingTask] = useState<{
@@ -39,7 +40,7 @@ const Community = () => {
   // Daily tasks for updates
   const { addTask, updateTask, isAdding, isUpdating } = useDailyTasks(selectedDate);
 
-  // Format tasks for calendar components
+  // Format tasks for calendar components - memoized for performance
   const formattedTasks = useMemo(() => 
     allCalendarTasks.map(task => ({
       id: task.id,
@@ -54,37 +55,40 @@ const Community = () => {
       category: task.category,
     })), [allCalendarTasks]);
 
-  // Auto-scroll to current hour when opening day view
+  // Auto-scroll to current hour when opening day view - optimized with requestAnimationFrame
   useEffect(() => {
     if (viewMode === 'day' && scrollRef.current) {
       const currentHour = new Date().getHours();
       const scrollPosition = Math.max(0, (currentHour - 1) * 60);
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({ top: scrollPosition, behavior: 'smooth' });
-      }, 100);
+      });
     }
   }, [viewMode]);
 
-  const handleDateSelect = (date: Date) => {
+  const handleDateSelect = useCallback((date: Date) => {
     setSelectedDate(date);
     if (viewMode === 'month') {
       setViewMode('day');
     }
-  };
+  }, [viewMode]);
 
-  const navigateDate = (direction: 'prev' | 'next') => {
+  const navigateDate = useCallback((direction: 'prev' | 'next') => {
+    setSwipeDirection(direction === 'prev' ? 'right' : 'left');
     setSelectedDate(current => 
       direction === 'prev' ? subDays(current, 1) : addDays(current, 1)
     );
-  };
+    // Reset swipe direction after animation
+    setTimeout(() => setSwipeDirection(null), 300);
+  }, []);
 
-  const handleTimeSlotLongPress = (date: Date, time: string) => {
+  const handleTimeSlotLongPress = useCallback((date: Date, time: string) => {
     setSelectedDate(date);
     setPrefilledTime(time);
     setShowAddSheet(true);
-  };
+  }, []);
 
-  const handleTaskClick = (task: { id: string; task_text: string; difficulty?: string | null; scheduled_time?: string | null; estimated_duration?: number | null }) => {
+  const handleTaskClick = useCallback((task: { id: string; task_text: string; difficulty?: string | null; scheduled_time?: string | null; estimated_duration?: number | null }) => {
     setEditingTask({
       id: task.id,
       task_text: task.task_text,
@@ -92,14 +96,14 @@ const Community = () => {
       scheduled_time: task.scheduled_time,
       estimated_duration: task.estimated_duration,
     });
-  };
+  }, []);
 
-  const handleTaskLongPress = (taskId: string) => {
+  const handleTaskLongPress = useCallback((taskId: string) => {
     const task = formattedTasks.find(t => t.id === taskId);
     if (task) {
       handleTaskClick(task);
     }
-  };
+  }, [formattedTasks, handleTaskClick]);
 
   const handleAddQuest = async (data: AddQuestData) => {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
@@ -135,6 +139,28 @@ const Community = () => {
   };
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+
+  // Swipe gesture handling for iOS
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+  
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 50; // Minimum swipe distance
+    
+    if (Math.abs(diff) > threshold && viewMode === 'day') {
+      if (diff > 0) {
+        navigateDate('next');
+      } else {
+        navigateDate('prev');
+      }
+    }
+  }, [viewMode, navigateDate]);
 
   return (
     <div className="min-h-screen bg-background pb-nav-safe relative overflow-hidden">
@@ -197,33 +223,43 @@ const Community = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => navigateDate('prev')}
-                className="h-9 w-9"
+                className="h-9 w-9 active:scale-90 transition-transform touch-manipulation"
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               
-              <motion.div
-                key={format(selectedDate, 'yyyy-MM-dd')}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center"
-              >
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-primary" />
-                  <span className="font-semibold">
-                    {isToday ? "Today" : format(selectedDate, 'EEEE')}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {format(selectedDate, 'MMMM d, yyyy')}
-                </p>
-              </motion.div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={format(selectedDate, 'yyyy-MM-dd')}
+                  initial={{ 
+                    opacity: 0, 
+                    x: swipeDirection === 'left' ? 20 : swipeDirection === 'right' ? -20 : 0 
+                  }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ 
+                    opacity: 0, 
+                    x: swipeDirection === 'left' ? -20 : swipeDirection === 'right' ? 20 : 0 
+                  }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="text-center min-w-[140px]"
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-primary" />
+                    <span className="font-semibold">
+                      {isToday ? "Today" : format(selectedDate, 'EEEE')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {format(selectedDate, 'MMMM d, yyyy')}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
               
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigateDate('next')}
-                className="h-9 w-9"
+                className="h-9 w-9 active:scale-90 transition-transform touch-manipulation"
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
@@ -233,33 +269,56 @@ const Community = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-2xl mx-auto relative z-10">
-        {viewMode === 'day' ? (
-          <div ref={scrollRef} className="h-[calc(100vh-180px)] overflow-y-auto">
-            <CalendarDayView
-              selectedDate={selectedDate}
-              tasks={formattedTasks}
-              milestones={calendarMilestones}
-              onDateSelect={handleDateSelect}
-              onTaskDrop={() => {}}
-              onTimeSlotLongPress={handleTimeSlotLongPress}
-              onTaskLongPress={handleTaskLongPress}
-              onMilestoneClick={() => {}}
-            />
-          </div>
-        ) : (
-          <div className="p-4">
-            <CalendarMonthView
-              selectedDate={selectedDate}
-              onDateSelect={handleDateSelect}
-              onMonthChange={setSelectedDate}
-              tasks={formattedTasks}
-              milestones={calendarMilestones}
-              onTaskClick={handleTaskClick}
-              onMilestoneClick={() => {}}
-            />
-          </div>
-        )}
+      <div 
+        className="max-w-2xl mx-auto relative z-10"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <AnimatePresence mode="wait">
+          {viewMode === 'day' ? (
+            <motion.div 
+              key={`day-${format(selectedDate, 'yyyy-MM-dd')}`}
+              ref={scrollRef} 
+              className="h-[calc(100vh-180px)] overflow-y-auto overscroll-contain scroll-smooth"
+              style={{ 
+                WebkitOverflowScrolling: 'touch',
+                willChange: 'scroll-position'
+              }}
+              initial={{ opacity: 0.8 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15 }}
+            >
+              <CalendarDayView
+                selectedDate={selectedDate}
+                tasks={formattedTasks}
+                milestones={calendarMilestones}
+                onDateSelect={handleDateSelect}
+                onTaskDrop={() => {}}
+                onTimeSlotLongPress={handleTimeSlotLongPress}
+                onTaskLongPress={handleTaskLongPress}
+                onMilestoneClick={() => {}}
+              />
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="month"
+              className="p-4"
+              initial={{ opacity: 0.8, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <CalendarMonthView
+                selectedDate={selectedDate}
+                onDateSelect={handleDateSelect}
+                onMonthChange={setSelectedDate}
+                tasks={formattedTasks}
+                milestones={calendarMilestones}
+                onTaskClick={handleTaskClick}
+                onMilestoneClick={() => {}}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Add Quest Sheet */}

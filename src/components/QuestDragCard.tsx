@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
-import { Clock, Zap, Flame, Mountain, Star, Sparkles, Brain, Dumbbell, Heart } from "lucide-react";
+import { Clock, Zap, Flame, Mountain, Star, Brain, Dumbbell, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DragTask, isValidCategory } from "@/types/quest";
+import { playSound } from "@/utils/soundEffects";
 
 interface QuestDragCardProps {
   task: DragTask;
@@ -60,31 +61,58 @@ const difficultyConfig = {
   },
 };
 
-export const QuestDragCard = ({ task, isDragging, onDragStart, onLongPress, compact = false, showTime = true }: QuestDragCardProps) => {
+export const QuestDragCard = React.memo(({ 
+  task, 
+  isDragging, 
+  onDragStart, 
+  onLongPress, 
+  compact = false, 
+  showTime = true 
+}: QuestDragCardProps) => {
   const [isHovering, setIsHovering] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggered = useRef(false);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
-  const handleTouchStart = () => {
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (!onLongPress) return;
+    
+    // Store initial touch position
+    touchStartPos.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+    
     longPressTriggered.current = false;
+    setIsPressed(true);
+    
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true;
+      playSound('pop');
       onLongPress();
-    }, 600);
-  };
+      setIsPressed(false);
+    }, 500); // Reduced from 600ms for snappier feel
+  }, [onLongPress]);
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = useCallback(() => {
+    setIsPressed(false);
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-  };
+  }, []);
 
-  const handleTouchMove = () => {
-    // Cancel long press if user moves finger
-    handleTouchEnd();
-  };
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    // Cancel long press if user moves finger more than 10px
+    if (touchStartPos.current) {
+      const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
+      const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        handleTouchEnd();
+      }
+    }
+  }, [handleTouchEnd]);
 
   const difficulty = task.difficulty?.toLowerCase() as 'easy' | 'medium' | 'hard' | undefined;
   const config = difficulty ? difficultyConfig[difficulty] : null;
@@ -112,9 +140,12 @@ export const QuestDragCard = ({ task, isDragging, onDragStart, onLongPress, comp
         draggable
         onDragStart={onDragStart}
         className={cn(
-          "cursor-grab active:cursor-grabbing transition-all duration-300 overflow-hidden group relative",
+          "cursor-grab active:cursor-grabbing overflow-hidden group relative touch-manipulation",
+          // Hardware-accelerated transforms for smooth animations
+          "transform-gpu transition-all duration-200 ease-out",
           isDragging && "opacity-50 scale-95",
-          !isDragging && "hover:scale-[1.02]",
+          !isDragging && "hover:scale-[1.02] active:scale-[0.98]",
+          isPressed && !isDragging && "scale-[0.97] opacity-90",
           task.completed && "opacity-60",
           // Main Quest - gold styling
           task.is_main_quest && "border-2 border-[hsl(45,100%,60%)] shadow-[0_0_20px_hsl(45,100%,60%/0.3)]",
@@ -125,11 +156,16 @@ export const QuestDragCard = ({ task, isDragging, onDragStart, onLongPress, comp
           !task.is_main_quest && isHovering && config?.glow,
           !task.is_main_quest && isHovering && categoryInfo?.glow
         )}
+        style={{ 
+          willChange: isDragging ? 'transform, opacity' : 'auto',
+          WebkitTapHighlightColor: 'transparent'
+        }}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchMove={handleTouchMove}
+        onTouchCancel={handleTouchEnd}
       >
         {/* Main Quest Gold Shimmer */}
         {task.is_main_quest && !task.completed && (
@@ -209,4 +245,4 @@ export const QuestDragCard = ({ task, isDragging, onDragStart, onLongPress, comp
       </Card>
     </div>
   );
-};
+});
