@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Sunrise, Sun, Moon, Inbox } from "lucide-react";
+import { Sunrise, Sun, Moon, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
@@ -135,12 +135,6 @@ export function DroppableSection({
               <span className="text-sm font-medium">
                 Drop in {config.title}
               </span>
-              {config.defaultTime && (
-                <span className="text-xs opacity-70 flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {config.defaultTime}
-                </span>
-              )}
             </motion.div>
           </motion.div>
         )}
@@ -156,11 +150,6 @@ export function DroppableSection({
           <span className="text-xs font-medium uppercase tracking-wide">
             {config.title}
           </span>
-          {config.defaultTime && (
-            <span className="text-xs opacity-50">
-              ({config.defaultTime})
-            </span>
-          )}
         </div>
       )}
 
