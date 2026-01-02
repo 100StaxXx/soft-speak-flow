@@ -1697,6 +1697,7 @@ export type Database = {
           reminder_minutes_before: number | null
           reminder_sent: boolean | null
           scheduled_time: string | null
+          sort_order: number | null
           source: string | null
           task_date: string
           task_text: string
@@ -1731,6 +1732,7 @@ export type Database = {
           reminder_minutes_before?: number | null
           reminder_sent?: boolean | null
           scheduled_time?: string | null
+          sort_order?: number | null
           source?: string | null
           task_date?: string
           task_text: string
@@ -1765,6 +1767,7 @@ export type Database = {
           reminder_minutes_before?: number | null
           reminder_sent?: boolean | null
           scheduled_time?: string | null
+          sort_order?: number | null
           source?: string | null
           task_date?: string
           task_text?: string

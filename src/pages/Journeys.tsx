@@ -75,6 +75,7 @@ const Journeys = () => {
     addTask,
     toggleTask,
     updateTask,
+    reorderTasks,
     completedCount,
     totalCount,
     isAdding,
@@ -285,7 +286,14 @@ const Journeys = () => {
     setEditingTask(null);
   };
 
-
+  // Handle task reordering from drag and drop
+  const handleReorderTasks = (reorderedTasks: typeof dailyTasks) => {
+    const updates = reorderedTasks.map((task, index) => ({
+      id: task.id,
+      sort_order: index,
+    }));
+    reorderTasks(updates);
+  };
   return (
     <PageTransition>
       <StarfieldBackground />
@@ -341,6 +349,7 @@ const Journeys = () => {
             activeJourneys={[]}
             onUndoToggle={handleUndoToggle}
             onEditQuest={handleEditQuest}
+            onReorderTasks={handleReorderTasks}
             hideIndicator={showTutorial}
           />
         </motion.div>

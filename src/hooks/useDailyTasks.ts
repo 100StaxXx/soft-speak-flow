@@ -20,9 +20,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
     deleteTask, 
     setMainQuest,
     updateTask,
+    reorderTasks,
     isAdding, 
     isToggling,
-    isUpdating 
+    isUpdating,
+    isReordering,
   } = useTaskMutations(taskDate);
 
   return {
@@ -33,9 +35,11 @@ export const useDailyTasks = (selectedDate?: Date) => {
     deleteTask,
     setMainQuest,
     updateTask,
+    reorderTasks,
     isAdding,
     isToggling,
     isUpdating,
+    isReordering,
     completedCount,
     totalCount,
   };

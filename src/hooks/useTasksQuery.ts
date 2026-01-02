@@ -38,6 +38,8 @@ export interface DailyTask {
   // Epic/Campaign integration
   epic_id: string | null;
   epic_title?: string | null;
+  // Sort order for drag reordering
+  sort_order?: number | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {
@@ -60,6 +62,7 @@ export const useTasksQuery = (selectedDate?: Date) => {
         .select('*, epics(title)')
         .eq('user_id', user.id)
         .eq('task_date', taskDate)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
 
       if (error) {
