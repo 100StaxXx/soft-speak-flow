@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -15,7 +14,7 @@ import {
   Repeat,
   ChevronDown,
   ChevronUp,
-  ArrowDown,
+  Rocket,
   CheckCircle2,
   Target
 } from "lucide-react";
@@ -24,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 
 import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
 import { type DragHandleProps } from "./DraggableTaskList";
@@ -88,8 +88,6 @@ export function TodaysAgenda({
   onMoveTaskToSection,
   hideIndicator = false,
 }: TodaysAgendaProps) {
-  const tutorialCheckboxRef = useRef<HTMLDivElement>(null);
-  const [indicatorPosition, setIndicatorPosition] = useState<{ top: number; left: number } | null>(null);
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
@@ -109,35 +107,15 @@ export function TodaysAgenda({
     });
   };
 
-  // Find tutorial quest
-  const tutorialQuest = tasks.find(t => t.task_text === 'Join Cosmiq' && !t.completed);
-
-  // Update indicator position when tutorial quest is visible
-  useEffect(() => {
-    if (!tutorialQuest || !tutorialCheckboxRef.current) {
-      setIndicatorPosition(null);
-      return;
-    }
-
-    const updatePosition = () => {
-      if (tutorialCheckboxRef.current) {
-        const rect = tutorialCheckboxRef.current.getBoundingClientRect();
-        setIndicatorPosition({
-          top: rect.top - 44,
-          left: rect.left + rect.width / 2,
-        });
-      }
-    };
-
-    updatePosition();
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
-
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true);
-      window.removeEventListener('resize', updatePosition);
-    };
-  }, [tutorialQuest]);
+  // Find onboarding tasks
+  const onboardingTasks = useMemo(() => 
+    tasks.filter(t => isOnboardingTask(t.task_text)),
+    [tasks]
+  );
+  
+  const hasOnboardingTasks = onboardingTasks.length > 0;
+  const onboardingComplete = onboardingTasks.filter(t => t.completed).length;
+  const onboardingTotal = onboardingTasks.length;
   
 // Display limits
   const QUEST_LIMIT_WITH_RITUALS = 6;
@@ -226,7 +204,7 @@ export function TodaysAgenda({
 
   const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
     const isComplete = !!task.completed;
-    const isTutorialQuest = task.task_text === 'Join Cosmiq';
+    const isOnboarding = isOnboardingTask(task.task_text);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
     
@@ -252,21 +230,19 @@ export function TodaysAgenda({
           "flex items-center gap-3 py-2 transition-all relative group",
           "cursor-pointer select-none",
           isComplete && "opacity-60",
-          isDragging && "cursor-grabbing"
+          isDragging && "cursor-grabbing",
+          isOnboarding && !isComplete && "bg-primary/5 -mx-2 px-2 rounded-lg"
         )}
         onClick={handleClick}
       >
-        <div 
-          ref={isTutorialQuest && !isComplete ? tutorialCheckboxRef : undefined}
-          className="relative"
-        >
+        <div className="relative">
           <motion.div 
             className={cn(
               "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
               isComplete 
                 ? "bg-primary border-primary" 
-                : isTutorialQuest 
-                  ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
+                : isOnboarding
+                  ? "border-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
                   : "border-muted-foreground/30"
             )}
             whileTap={isDragging ? {} : { scale: 0.9 }}
@@ -329,7 +305,7 @@ export function TodaysAgenda({
     );
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, tutorialCheckboxRef]);
+  }, [onToggle, onUndoToggle, onEditQuest]);
 
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
@@ -584,26 +560,32 @@ export function TodaysAgenda({
         )}
       </div>
 
-      {/* Portal: Tutorial indicator floats above everything */}
-      {indicatorPosition && !hideIndicator && createPortal(
-        <div
-          className="fixed pointer-events-none z-[9999] flex flex-col items-center gap-0.5"
-          style={{ 
-            top: indicatorPosition.top,
-            left: indicatorPosition.left,
-            transform: 'translateX(-50%)',
-            animation: 'bounceDown 1.2s ease-in-out infinite'
-          }}
+      {/* Onboarding Progress Banner */}
+      {hasOnboardingTasks && onboardingComplete < onboardingTotal && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
         >
-          <div
-            className="text-[10px] font-bold text-yellow-400 bg-yellow-400/20 px-2 py-0.5 rounded-full border border-yellow-400 shadow-lg whitespace-nowrap"
-            style={{ animation: 'clickHerePulse 1.5s ease-in-out infinite' }}
-          >
-            Click here!
+          <div className="flex items-center gap-2 mb-2">
+            <Rocket className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Getting Started</span>
+            <Badge variant="secondary" className="ml-auto text-xs">
+              {onboardingComplete}/{onboardingTotal}
+            </Badge>
           </div>
-          <ArrowDown className="h-4 w-4 text-yellow-400 drop-shadow-[0_0_8px_#facc15]" strokeWidth={3} />
-        </div>,
-        document.body
+          <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${(onboardingComplete / onboardingTotal) * 100}%` }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Complete all tasks to evolve your companion! ✨
+          </p>
+        </motion.div>
       )}
     </div>
   );

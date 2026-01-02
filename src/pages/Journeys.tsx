@@ -34,9 +34,8 @@ import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 import { usePerfectDayTracker } from "@/hooks/usePerfectDayTracker";
 import { useComboTracker } from "@/hooks/useComboTracker";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { safeLocalStorage } from "@/utils/storage";
+import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { SuggestedSubtask } from "@/hooks/useTaskDecomposition";
 
@@ -49,11 +48,9 @@ const Journeys = () => {
   
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
-  // Auth and profile for tutorial quest
+  // Auth and profile for onboarding
   const { user } = useAuth();
   const { profile } = useProfile();
-  const queryClient = useQueryClient();
-  const tutorialCheckRef = useRef(false);
   
   // Streak freeze
   const { 
@@ -139,65 +136,13 @@ const Journeys = () => {
     }
   }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
-  // Tutorial quest creation for new users - "Join Cosmiq" quest
-  useEffect(() => {
-    if (!user?.id || !profile) return;
-    
-    const tutorialSeen = safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`) === 'true';
-    const onboardingData = (profile.onboarding_data as Record<string, unknown>) || {};
-    const profileTutorialSeen = onboardingData.quests_tutorial_seen === true;
-    
-    if ((tutorialSeen || profileTutorialSeen) || tutorialCheckRef.current) return;
-    
-    tutorialCheckRef.current = true;
-    
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const questCreationKey = `tutorial_quest_created_${user.id}`;
-    const questAlreadyCreated = safeLocalStorage.getItem(questCreationKey) === 'true';
-    
-    if (questAlreadyCreated) {
-      tutorialCheckRef.current = false;
-      return;
-    }
-    
-    safeLocalStorage.setItem(questCreationKey, 'true');
-    
-    const checkAndCreateQuest = async () => {
-      try {
-        const { data: existingQuest } = await supabase
-          .from('daily_tasks')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('task_text', 'Join Cosmiq')
-          .maybeSingle();
-        
-        if (!existingQuest) {
-          const { error: insertError } = await supabase
-            .from('daily_tasks')
-            .insert({
-              user_id: user.id,
-              task_text: 'Join Cosmiq',
-              difficulty: 'easy',
-              xp_reward: 10,
-              task_date: today,
-              is_main_quest: false,
-            });
-          
-          if (insertError) {
-            safeLocalStorage.removeItem(questCreationKey);
-          } else {
-            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-          }
-        }
-      } catch {
-        safeLocalStorage.removeItem(questCreationKey);
-      } finally {
-        tutorialCheckRef.current = false;
-      }
-    };
-    
-    checkAndCreateQuest();
-  }, [user?.id, profile, queryClient]);
+  // Onboarding schedule creation for new users
+  const tutorialSeen = user?.id 
+    ? safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`) === 'true' ||
+      ((profile?.onboarding_data as Record<string, unknown>)?.quests_tutorial_seen === true)
+    : true;
+  
+  useOnboardingSchedule(user?.id, tutorialSeen);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
