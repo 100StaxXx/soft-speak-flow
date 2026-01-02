@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { format, isSameDay } from "date-fns";
+import { useMemo, useState, useCallback } from "react";
+import { format, isSameDay, parse } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Clock, Plus } from "lucide-react";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
@@ -19,6 +19,22 @@ interface TimelineViewProps {
   onTimeSlotLongPress?: (date: Date, time: string) => void;
   onMilestoneClick?: (milestone: CalendarMilestone) => void;
   onAddClick?: () => void;
+  onTaskReschedule?: (taskId: string, newTime: string) => void;
+}
+
+// Calculate new time based on drag offset
+function calculateNewTime(originalTime: string, deltaY: number): string {
+  const minutesPerPixel = 0.75; // ~15 min per 20px drag
+  const deltaMinutes = Math.round((deltaY * minutesPerPixel) / 15) * 15; // Round to 15-min intervals
+  
+  const original = parse(originalTime, "HH:mm", new Date());
+  const newTime = new Date(original.getTime() + deltaMinutes * 60000);
+  
+  // Clamp to valid hours (6:00 - 23:45)
+  const hours = Math.max(6, Math.min(23, newTime.getHours()));
+  const minutes = Math.min(45, Math.max(0, Math.floor(newTime.getMinutes() / 15) * 15));
+  
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
 export function TimelineView({
@@ -31,9 +47,14 @@ export function TimelineView({
   onTimeSlotLongPress,
   onMilestoneClick,
   onAddClick,
+  onTaskReschedule,
 }: TimelineViewProps) {
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const isToday = isSameDay(selectedDate, new Date());
+
+  // Drag state
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
 
   // Filter and sort tasks for the selected day
   const dayTasks = useMemo(() => {
@@ -59,6 +80,38 @@ export function TimelineView({
   const completedCount = completedTasks.length;
   const totalCount = dayTasks.length;
   const totalXP = dayTasks.reduce((sum, t) => sum + (t.completed ? t.xp_reward : 0), 0);
+
+  // Drag handlers
+  const handleDragStart = useCallback((taskId: string) => {
+    setDraggingTaskId(taskId);
+    setDragOffset(0);
+  }, []);
+
+  const handleDragMove = useCallback((deltaY: number) => {
+    setDragOffset(deltaY);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (draggingTaskId && dragOffset !== 0 && onTaskReschedule) {
+      const task = scheduledTasks.find(t => t.id === draggingTaskId);
+      if (task?.scheduled_time) {
+        const newTime = calculateNewTime(task.scheduled_time, dragOffset);
+        if (newTime !== task.scheduled_time) {
+          onTaskReschedule(draggingTaskId, newTime);
+        }
+      }
+    }
+    setDraggingTaskId(null);
+    setDragOffset(0);
+  }, [draggingTaskId, dragOffset, scheduledTasks, onTaskReschedule]);
+
+  // Get preview time for dragging task
+  const getDragPreviewTime = (task: CalendarTask) => {
+    if (task.id === draggingTaskId && task.scheduled_time && dragOffset !== 0) {
+      return calculateNewTime(task.scheduled_time, dragOffset);
+    }
+    return null;
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -105,9 +158,18 @@ export function TimelineView({
         {scheduledTasks.length > 0 && (
           <div className="py-4">
             {scheduledTasks.map((task, index) => (
-              <div key={task.id} className="relative">
+              <div 
+                key={task.id} 
+                className={cn(
+                  "relative transition-transform duration-75",
+                  task.id === draggingTaskId && "z-10"
+                )}
+                style={{
+                  transform: task.id === draggingTaskId ? `translateY(${dragOffset}px)` : undefined,
+                }}
+              >
                 {/* Timeline Pill Connector */}
-                {index < scheduledTasks.length - 1 && (
+                {index < scheduledTasks.length - 1 && task.id !== draggingTaskId && (
                   <div className="absolute left-[4.25rem] top-14 z-0">
                     <TimelinePill
                       duration={task.estimated_duration || 30}
@@ -121,6 +183,11 @@ export function TimelineView({
                   task={task}
                   onTaskClick={onTaskClick}
                   onTaskLongPress={onTaskLongPress}
+                  isDragging={task.id === draggingTaskId}
+                  previewTime={getDragPreviewTime(task)}
+                  onDragStart={() => handleDragStart(task.id)}
+                  onDragMove={handleDragMove}
+                  onDragEnd={handleDragEnd}
                 />
               </div>
             ))}
