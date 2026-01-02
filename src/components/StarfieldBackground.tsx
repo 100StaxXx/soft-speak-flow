@@ -93,13 +93,13 @@ const getStarGlow = (color: Star['color'], opacity: number) => {
 
 // Parallax multipliers for each layer (deeper = slower)
 const PARALLAX = {
-  deepNebulae: 5,
-  dust: 10,
-  backgroundStars: 15,
-  midNebulae: 18,
-  midStars: 22,
-  foregroundNebulae: 25,
-  brightStars: 30,
+  deepNebulae: 1,
+  dust: 2,
+  backgroundStars: 3,
+  midNebulae: 4,
+  midStars: 5,
+  foregroundNebulae: 6,
+  brightStars: 8,
 };
 
 export const StarfieldBackground = () => {
