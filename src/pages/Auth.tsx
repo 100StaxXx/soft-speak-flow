@@ -715,14 +715,14 @@ const Auth = () => {
           scale: 1.1,
         }}
       />
-      {/* Auth Form Section */}
+      {/* Auth Form Section with iOS safe areas */}
       <section
         id="auth-form"
-        className="snap-start min-h-screen relative flex items-center justify-center py-20"
+        className="snap-start min-h-screen relative flex items-center justify-center pt-safe-top pb-safe-bottom"
       >
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />
-        <div className="relative z-10 w-full max-w-md px-6 space-y-8">
+        <div className="relative z-10 w-full px-6 md:max-w-md space-y-8">
           <div className="space-y-6">
             {isForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-5">
