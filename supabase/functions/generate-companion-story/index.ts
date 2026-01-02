@@ -325,8 +325,8 @@ STRUCTURE FOR EACH CHAPTER:
 2. **Intro Line (1–2 sentences)**
    A bold opening that instantly sets the mood and tone for this chapter.
 
-3. **Main Story (250–400 words)**
-   The chapter must:
+3. **Main Story (80–120 words)**
+   A concise but powerful chapter that captures the essence of this evolution stage. Focus on ONE key moment. The chapter must:
    • reflect the evolution stage theme (${EVOLUTION_THEMES[stage]})
    ${stage === 0 ? '• CRITICAL: The companion is an EGG at this stage - NOT a formed creature yet\n   • Describe the egg itself: its appearance, colors, warmth, subtle movements or energy\n   • The user discovers/receives this mysterious egg - their first meeting with their future companion\n   • The egg should feel alive with potential, humming with dormant power\n   • Refer to it as "the egg" or similar - NEVER as the fully-formed creature\n   • Set the tone for an epic journey about to hatch into existence' : ''}
    ${stage === 1 ? '• THE HATCHING: The creature emerges for the first time - small, vulnerable, but clearly showing its species traits' : ''}
@@ -415,7 +415,7 @@ Generate now:`;
           }
         ],
         temperature: 0.85,
-        max_tokens: 2500,
+        max_tokens: 1200,
       }),
     });
 
@@ -462,13 +462,13 @@ Generate now:`;
       throw new Error('Invalid story data: missing required fields');
     }
 
-    // Validate main story length (250-600 words approximately = 1250-3600 chars)
+    // Validate main story length (80-150 words approximately = 400-900 chars)
     const mainStoryLength = (storyData.main_story || '').length;
-    if (mainStoryLength < 250) {
+    if (mainStoryLength < 100) {
       console.warn(`Story too short: ${mainStoryLength} chars`);
       throw new Error('Generated story is too short. Please try again.');
     }
-    if (mainStoryLength > 4000) {
+    if (mainStoryLength > 1500) {
       console.warn(`Story too long: ${mainStoryLength} chars`);
       throw new Error('Generated story is too long. Please try again.');
     }

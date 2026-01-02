@@ -317,7 +317,6 @@ export const CompanionStoryJournal = () => {
 
             {/* Main Story */}
             <div>
-              <h3 className="text-sm font-semibold mb-3">The Story</h3>
               <p className="text-foreground leading-relaxed whitespace-pre-wrap">{story.main_story}</p>
             </div>
 
@@ -325,32 +324,6 @@ export const CompanionStoryJournal = () => {
             <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
               <h3 className="text-sm font-semibold mb-2 text-primary">Bond Moment</h3>
               <p className="text-sm text-foreground/90">{story.bond_moment}</p>
-            </div>
-
-            {/* Life Lesson */}
-            <div className="bg-accent/5 p-4 rounded-lg border border-accent/20">
-              <h3 className="text-sm font-semibold mb-2 text-accent">Life Lesson</h3>
-              <p className="text-sm text-foreground/90">{story.life_lesson}</p>
-            </div>
-
-            {/* Lore Expansion */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Lore & Legends</h3>
-              <ul className="space-y-2">
-                {(Array.isArray(story.lore_expansion) ? story.lore_expansion : []).map((lore, i) => (
-                  <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                    <span className="text-primary">•</span>
-                    <span>{lore}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Next Hook */}
-            <div className="text-center p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg">
-              <p className="text-sm font-medium text-foreground/80 italic">
-                {story.next_hook}
-              </p>
             </div>
           </div>
         ) : isStageUnlocked ? (
