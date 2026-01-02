@@ -154,17 +154,11 @@ export function QuestAgenda({
     const theme = sectionThemes[key];
     
     return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{theme.emoji}</span>
-          <h4 className={cn("text-sm font-semibold", theme.color)}>
-            {theme.title}
-          </h4>
-          <span className="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-            {questList.length}
-          </span>
-        </div>
-        <div className="space-y-2 pl-6">
+      <div className="space-y-1">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 py-2">
+          {theme.title}
+        </h4>
+        <div className="divide-y divide-border/20">
           {questList.map(task => renderTaskCard(task))}
         </div>
       </div>
@@ -234,15 +228,18 @@ export function QuestAgenda({
           <>
             {/* Main Quest */}
             {mainQuest && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">⚔️</span>
-                  <h4 className="font-semibold text-foreground">Main Quest</h4>
-                  <span className="ml-auto text-xs font-bold text-stardust-gold bg-stardust-gold/10 px-2 py-1 rounded-full border border-stardust-gold/30">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between py-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+                    Main Quest
+                  </h4>
+                  <span className="text-xs font-medium text-stardust-gold">
                     {MAIN_QUEST_MULTIPLIER}x XP
                   </span>
                 </div>
-                {renderTaskCard(mainQuest, true)}
+                <div className="divide-y divide-border/20">
+                  {renderTaskCard(mainQuest, true)}
+                </div>
               </div>
             )}
 
