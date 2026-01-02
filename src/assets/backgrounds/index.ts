@@ -1,9 +1,9 @@
 import cosmicPath1 from './cosmic-path-1.png';
 import cosmicPath2 from './cosmic-path-2.png';
+import cosmicGalaxyPortal from './cosmic-galaxy-portal.png';
 
 export const cosmicPathBackgrounds = [
-  cosmicPath1,
-  cosmicPath2,
+  cosmicGalaxyPortal, // Stunning cosmic portal as primary background
 ];
 
 export const getRandomBackground = () => {
