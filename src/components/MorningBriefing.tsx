@@ -158,17 +158,17 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
         className
       )}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-border/30 bg-gradient-to-r from-primary/10 to-accent/5">
+        <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-border/30 bg-gradient-to-r from-primary/10 to-accent/5">
           <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
-              <Brain className="h-5 w-5 text-primary" />
+            <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
+              <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
-            <h3 className="font-heading font-black text-2xl tracking-wide text-primary">MORNING BRIEFING</h3>
+            <h3 className="font-heading font-black text-lg sm:text-2xl tracking-wide text-primary">MORNING BRIEFING</h3>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           <div className="flex items-start gap-4">
             {personality && (
               <div className="relative flex-shrink-0">
@@ -192,7 +192,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
                 onClick={handleGenerate}
                 disabled={isGenerating}
                 variant="cta"
-                className="w-full h-12"
+                className="w-full h-10 sm:h-12"
                 size="lg"
               >
                 {isGenerating ? (
@@ -241,7 +241,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-bold text-lg truncate">
+              <h3 className="font-bold text-base sm:text-lg truncate">
                 {personality?.name || 'Your Mentor'}'s Briefing
               </h3>
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
