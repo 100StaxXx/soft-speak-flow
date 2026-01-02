@@ -270,8 +270,7 @@ const MorningCheckInContent = () => {
             </>
           ) : (
             <>
-              <Sparkles className="h-5 w-5" />
-              {personality?.buttonText("Start My Day") || "Start My Day"}
+              Check in
               <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">+{XP_REWARDS.CHECK_IN} XP</span>
             </>
           )}
