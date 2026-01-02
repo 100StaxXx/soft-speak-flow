@@ -104,7 +104,7 @@ export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateMo
             
             {/* Drag-to-Launch slider */}
             <motion.div 
-              className="flex-shrink-0 px-6 pb-12"
+              className="flex-shrink-0 px-6 pb-28"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.5 }}
