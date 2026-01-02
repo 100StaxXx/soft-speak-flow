@@ -52,7 +52,7 @@ export const BottomNav = memo(() => {
         <NavLink
           to="/mentor"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          activeClassName="bg-gradient-to-br from-orange-500/20 to-orange-500/5 shadow-soft"
           onClick={() => haptics.light()}
         >
           {({ isActive }) => (
@@ -69,9 +69,9 @@ export const BottomNav = memo(() => {
                   showBorder={false}
                 />
               ) : (
-                <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+                <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-orange-400 drop-shadow-[0_0_8px_hsl(25,95%,55%)]' : 'text-muted-foreground'}`} />
               )}
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-orange-400' : 'text-muted-foreground/80'}`}>
                 Mentor
               </span>
             </>
@@ -105,14 +105,14 @@ export const BottomNav = memo(() => {
         <NavLink
           to="/journeys"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+          activeClassName="bg-gradient-to-br from-purple-500/20 to-purple-500/5 shadow-soft"
           data-tour="tasks-tab"
           onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
-              <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+              <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
                 Quests
               </span>
             </>
@@ -122,13 +122,13 @@ export const BottomNav = memo(() => {
         <NavLink
           to="/campaigns"
           className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-purple-500/20 to-purple-500/5 shadow-soft"
+          activeClassName="bg-gradient-to-br from-sky-500/20 to-sky-500/5 shadow-soft"
           onClick={() => haptics.light()}
         >
           {({ isActive }) => (
             <>
-              <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
+              <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-sky-400 drop-shadow-[0_0_8px_hsl(200,90%,60%)]' : 'text-muted-foreground'}`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-sky-400' : 'text-muted-foreground/80'}`}>
                 Campaigns
               </span>
             </>
