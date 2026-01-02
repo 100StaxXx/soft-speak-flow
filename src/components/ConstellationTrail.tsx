@@ -881,8 +881,10 @@ export const ConstellationTrail = ({
     const hue = Math.round((clampedProgress / 100) * 120);
     return {
       border: `hsl(${hue}, 70%, 50%)`,
-      glow: `hsl(${hue}, 80%, 60%)`,
-      glowFaint: `hsl(${hue}, 70%, 40%)`
+      glowStrong: `hsla(${hue}, 80%, 60%, 0.4)`,
+      glowMedium: `hsla(${hue}, 80%, 60%, 0.3)`,
+      glowSoft: `hsla(${hue}, 70%, 40%, 0.2)`,
+      glowInner: `hsla(${hue}, 80%, 60%, 0.1)`
     };
   };
 
@@ -898,10 +900,10 @@ export const ConstellationTrail = ({
       style={{
         borderColor: colors.border,
         boxShadow: `
-          0 0 10px ${colors.glow}40,
-          0 0 20px ${colors.glow}30,
-          0 0 40px ${colors.glowFaint}20,
-          inset 0 0 15px ${colors.glow}10
+          0 0 10px ${colors.glowStrong},
+          0 0 20px ${colors.glowMedium},
+          0 0 40px ${colors.glowSoft},
+          inset 0 0 15px ${colors.glowInner}
         `
       }}
     >
