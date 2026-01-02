@@ -59,17 +59,17 @@ const generateDust = (count: number): DustParticle[] => {
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: Math.random() * 0.5 + 0.5,
-    opacity: Math.random() * 0.2 + 0.15,
+    opacity: Math.random() * 0.15 + 0.1,
     driftDuration: Math.random() * 60 + 60,
     driftDelay: Math.random() * 30,
   }));
 };
 
-// Generate shooting stars
+// Generate shooting stars with varied directions
 const generateShootingStars = (): ShootingStar[] => [
-  { id: 1, delay: 45, duration: 2, startX: 20, startY: 5, angle: 35 },
-  { id: 2, delay: 90, duration: 1.5, startX: 70, startY: 10, angle: 45 },
-  { id: 3, delay: 180, duration: 2.5, startX: 10, startY: 20, angle: 30 },
+  { id: 1, delay: 60, duration: 2, startX: 15, startY: 10, angle: 35 },     // Top-left → Bottom-right
+  { id: 2, delay: 120, duration: 1.8, startX: 85, startY: 8, angle: 145 },  // Top-right → Bottom-left
+  { id: 3, delay: 180, duration: 2.2, startX: 50, startY: 5, angle: 80 },   // Top-center → Bottom (near vertical)
 ];
 
 const getStarColor = (color: Star['color']) => {
@@ -101,11 +101,11 @@ export const StarfieldBackground = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Memoize all generated elements
-  const dustParticles = useMemo(() => generateDust(40), []);
-  const backgroundStars = useMemo(() => generateStars(35, 0.8, 1.5, 0.3, 0.5), []);
-  const midLayerStars = useMemo(() => generateStars(18, 1.5, 2.5, 0.4, 0.7), []);
-  const brightStars = useMemo(() => generateStars(8, 2.5, 4, 0.7, 1), []);
+  // Memoize all generated elements - reduced counts for calmer effect
+  const dustParticles = useMemo(() => generateDust(20), []);
+  const backgroundStars = useMemo(() => generateStars(20, 0.8, 1.5, 0.3, 0.5), []);
+  const midLayerStars = useMemo(() => generateStars(10, 1.5, 2.5, 0.4, 0.7), []);
+  const brightStars = useMemo(() => generateStars(5, 2.5, 4, 0.7, 1), []);
   const shootingStars = useMemo(() => generateShootingStars(), []);
 
   return (
@@ -135,7 +135,7 @@ export const StarfieldBackground = () => {
         />
       </div>
 
-      {/* Layer 3: Cosmic dust particles (very subtle drift) */}
+      {/* Layer 3: Cosmic dust particles (static - no animation) */}
       {dustParticles.map((particle) => (
         <div
           key={`dust-${particle.id}`}
@@ -146,10 +146,7 @@ export const StarfieldBackground = () => {
             width: `${particle.size}px`,
             height: `${particle.size}px`,
             opacity: particle.opacity,
-            backgroundColor: 'hsla(210, 30%, 80%, 0.6)',
-            animation: prefersReducedMotion 
-              ? 'none' 
-              : `stellar-drift ${particle.driftDuration}s ease-in-out ${particle.driftDelay}s infinite`,
+            backgroundColor: 'hsla(210, 30%, 80%, 0.5)',
           }}
         />
       ))}
@@ -174,15 +171,14 @@ export const StarfieldBackground = () => {
         />
       ))}
 
-      {/* Layer 5: Mid-layer nebula wisps (diagonal flow) */}
-      <div className="absolute inset-0 opacity-30">
+      {/* Layer 5: Mid-layer nebula wisps (static - no animation) */}
+      <div className="absolute inset-0 opacity-25">
         <div 
           className="absolute w-[600px] h-[300px] blur-[100px] -rotate-12"
           style={{
             top: '10%',
             right: '5%',
-            background: 'linear-gradient(135deg, hsla(330, 70%, 50%, 0.4), hsla(280, 60%, 45%, 0.2), transparent)',
-            animation: prefersReducedMotion ? 'none' : 'nebula-breathe 35s ease-in-out infinite',
+            background: 'linear-gradient(135deg, hsla(330, 70%, 50%, 0.3), hsla(280, 60%, 45%, 0.15), transparent)',
           }}
         />
         <div 
@@ -190,22 +186,12 @@ export const StarfieldBackground = () => {
           style={{
             bottom: '15%',
             left: '10%',
-            background: 'linear-gradient(135deg, hsla(195, 80%, 50%, 0.35), hsla(210, 70%, 45%, 0.2), transparent)',
-            animation: prefersReducedMotion ? 'none' : 'nebula-breathe 40s ease-in-out 5s infinite reverse',
-          }}
-        />
-        <div 
-          className="absolute w-[400px] h-[200px] blur-[80px] -rotate-6"
-          style={{
-            top: '50%',
-            left: '30%',
-            background: 'linear-gradient(135deg, hsla(var(--cosmiq-glow), 0.3), transparent)',
-            animation: prefersReducedMotion ? 'none' : 'nebula-breathe 45s ease-in-out 10s infinite',
+            background: 'linear-gradient(135deg, hsla(195, 80%, 50%, 0.25), hsla(210, 70%, 45%, 0.15), transparent)',
           }}
         />
       </div>
 
-      {/* Layer 6: Mid-layer stars (pulse + glow) */}
+      {/* Layer 6: Mid-layer stars (static glow - no animation) */}
       {midLayerStars.map((star) => (
         <div
           key={`mid-star-${star.id}`}
@@ -218,9 +204,6 @@ export const StarfieldBackground = () => {
             opacity: star.opacity,
             backgroundColor: getStarColor(star.color),
             boxShadow: getStarGlow(star.color, star.opacity),
-            animation: prefersReducedMotion 
-              ? 'none' 
-              : `star-pulse ${star.animationDuration + 2}s ease-in-out ${star.animationDelay}s infinite`,
           }}
         />
       ))}
@@ -247,34 +230,23 @@ export const StarfieldBackground = () => {
         />
       </div>
 
-      {/* Layer 8: Bright stars with cross-sparkle effect */}
+      {/* Layer 8: Bright stars (static glow - no sparkle animation) */}
       {brightStars.map((star) => (
         <div
           key={`bright-star-${star.id}`}
-          className="absolute star-cross"
+          className="absolute rounded-full"
           style={{
             left: `${star.x}%`,
             top: `${star.y}%`,
             width: `${star.size}px`,
             height: `${star.size}px`,
-            '--star-color': getStarColor(star.color),
-            '--star-size': `${star.size}px`,
-            animation: prefersReducedMotion 
-              ? 'none' 
-              : `star-sparkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`,
-          } as React.CSSProperties}
-        >
-          <div 
-            className="absolute inset-0 rounded-full"
-            style={{
-              backgroundColor: getStarColor(star.color),
-              boxShadow: `${getStarGlow(star.color, 1)}, 0 0 24px ${getStarColor(star.color)}`,
-            }}
-          />
-        </div>
+            backgroundColor: getStarColor(star.color),
+            boxShadow: `${getStarGlow(star.color, 1)}, 0 0 20px ${getStarColor(star.color)}`,
+          }}
+        />
       ))}
 
-      {/* Layer 9: Shooting stars */}
+      {/* Layer 9: Shooting stars with varied directions */}
       {!prefersReducedMotion && shootingStars.map((shootingStar) => (
         <div
           key={`shooting-${shootingStar.id}`}
@@ -285,24 +257,9 @@ export const StarfieldBackground = () => {
             background: 'linear-gradient(to right, transparent, white, white)',
             boxShadow: '0 0 6px 2px rgba(255, 255, 255, 0.9), -20px 0 15px rgba(255, 255, 255, 0.4), -40px 0 25px rgba(255, 255, 255, 0.2)',
             animation: `shooting-star-${shootingStar.id} ${shootingStar.duration}s ease-out ${shootingStar.delay}s infinite`,
-            transform: `rotate(${shootingStar.angle}deg)`,
           }}
         />
       ))}
-
-      {/* Rare star flare (one star occasionally flares dramatically) */}
-      {!prefersReducedMotion && (
-        <div
-          className="absolute w-[4px] h-[4px] rounded-full"
-          style={{
-            left: '65%',
-            top: '35%',
-            backgroundColor: 'hsl(200, 85%, 70%)',
-            boxShadow: '0 0 10px hsl(200, 85%, 70%), 0 0 20px hsl(200, 85%, 70%)',
-            animation: 'star-flare 45s ease-in-out infinite',
-          }}
-        />
-      )}
     </div>
   );
 };

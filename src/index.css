@@ -1173,7 +1173,9 @@ All colors MUST be HSL.
     }
   }
 
-  /* Enhanced shooting star animations */
+  /* Enhanced shooting star animations - varied directions */
+  
+  /* Shooting star 1: Top-left → Bottom-right (diagonal down-right) */
   @keyframes shooting-star-1 {
     0% {
       transform: translateX(0) translateY(0) rotate(35deg);
@@ -1182,33 +1184,35 @@ All colors MUST be HSL.
     5% { opacity: 1; }
     95% { opacity: 0.8; }
     100% {
-      transform: translateX(80vw) translateY(50vh) rotate(35deg);
+      transform: translateX(60vw) translateY(40vh) rotate(35deg);
       opacity: 0;
     }
   }
 
+  /* Shooting star 2: Top-right → Bottom-left (diagonal down-left) */
   @keyframes shooting-star-2 {
     0% {
-      transform: translateX(0) translateY(0) rotate(45deg);
+      transform: translateX(0) translateY(0) rotate(145deg);
       opacity: 0;
     }
     5% { opacity: 1; }
     95% { opacity: 0.7; }
     100% {
-      transform: translateX(70vw) translateY(60vh) rotate(45deg);
+      transform: translateX(-55vw) translateY(45vh) rotate(145deg);
       opacity: 0;
     }
   }
 
+  /* Shooting star 3: Top-center → Bottom (nearly vertical) */
   @keyframes shooting-star-3 {
     0% {
-      transform: translateX(0) translateY(0) rotate(30deg);
+      transform: translateX(0) translateY(0) rotate(80deg);
       opacity: 0;
     }
     5% { opacity: 1; }
     95% { opacity: 0.6; }
     100% {
-      transform: translateX(90vw) translateY(45vh) rotate(30deg);
+      transform: translateX(12vw) translateY(50vh) rotate(80deg);
       opacity: 0;
     }
   }
