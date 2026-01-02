@@ -21,7 +21,7 @@ export const WeeklyRecapCard = () => {
     >
       <button
         onClick={() => openRecap(currentRecap)}
-        className="w-full p-4 rounded-2xl bg-gradient-to-r from-stardust-gold/20 via-amber-500/15 to-celestial-blue/15 border border-stardust-gold/30 backdrop-blur-sm hover:border-stardust-gold/50 transition-all group"
+        className="w-full p-4 rounded-2xl bg-gradient-to-r from-stardust-gold/10 via-amber-500/5 to-celestial-blue/5 border border-white/[0.08] backdrop-blur-2xl hover:border-stardust-gold/30 transition-all group shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
       >
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-stardust-gold/20 group-hover:bg-stardust-gold/30 transition-colors">

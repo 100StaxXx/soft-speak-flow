@@ -45,9 +45,9 @@ export const MentorQuickChat = memo(() => {
   };
 
   return (
-    <Card className="p-6 space-y-5 rounded-3xl border-2 border-primary/20 relative overflow-hidden">
+    <Card className="p-6 space-y-5 rounded-3xl bg-card/40 backdrop-blur-2xl border-white/[0.08] relative overflow-hidden">
       {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 animate-gradient-shift" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       
       <div className="relative z-10 space-y-5">
         <div className="flex items-center justify-center gap-2">
@@ -66,9 +66,8 @@ export const MentorQuickChat = memo(() => {
             <button
               key={index}
               onClick={() => handleQuestionClick(question)}
-              className="group relative w-full text-center px-6 py-4 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30 border-2 border-primary/30 hover:border-primary/50 transition-all text-sm font-medium text-foreground hover:scale-105 hover:shadow-glow active:scale-95"
+              className="group relative w-full text-center px-6 py-4 rounded-full bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.06] border border-white/[0.08] hover:border-primary/30 transition-all text-sm font-medium text-foreground hover:scale-[1.02] active:scale-[0.98]"
             >
-              <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/0 to-accent/0 group-hover:from-primary/10 group-hover:to-accent/10 transition-all" />
               <span className="relative">{question}</span>
             </button>
           ))}

@@ -102,7 +102,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
     return (
       <Card 
         className={cn(
-          "p-4 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20 cursor-pointer hover:border-primary/40 transition-colors",
+          "p-4 bg-card/40 backdrop-blur-2xl border-white/[0.08] cursor-pointer hover:border-primary/20 transition-colors",
           className
         )}
         onClick={() => setIsCollapsed(false)}
@@ -138,7 +138,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   // Loading state
   if (isLoading) {
     return (
-      <Card className={cn("p-6 animate-pulse", className)}>
+      <Card className={cn("p-6 animate-pulse bg-card/40 backdrop-blur-2xl border-white/[0.08]", className)}>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-muted" />
           <div className="space-y-2 flex-1">
@@ -154,11 +154,11 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   if (!briefing) {
     return (
       <div className={cn(
-        "rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 overflow-hidden",
+        "rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/[0.08] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
         className
       )}>
         {/* Header */}
-        <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-border/30 bg-gradient-to-r from-primary/10 to-accent/5">
+        <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-white/[0.06] bg-gradient-to-r from-primary/5 to-accent/[0.02]">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center border border-primary/30">
               <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -222,11 +222,11 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
   // Show briefing
   return (
     <Card className={cn(
-      "overflow-hidden bg-gradient-to-br from-primary/5 via-accent/5 to-secondary/5 border-primary/20",
+      "overflow-hidden bg-card/40 backdrop-blur-2xl border-white/[0.08]",
       className
     )}>
       {/* Header */}
-      <div className="p-4 sm:p-6 border-b border-border/50">
+      <div className="p-4 sm:p-6 border-b border-white/[0.06]">
         <div className="flex items-start gap-4">
           {personality && (
             <MentorAvatar
@@ -255,7 +255,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
 
       {/* Inferred Goals */}
       {inferredGoals.length > 0 && (
-        <div className="px-4 sm:px-6 py-3 bg-secondary/30 border-b border-border/50">
+        <div className="px-4 sm:px-6 py-3 bg-white/[0.02] border-b border-white/[0.06]">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -298,7 +298,7 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
 
         {/* Today's Focus */}
         {briefing.todays_focus && (
-          <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
+          <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl p-4 border border-white/[0.08]">
             <div className="flex items-start gap-3">
               <Target className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
               <div>
