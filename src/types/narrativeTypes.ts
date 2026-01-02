@@ -112,24 +112,6 @@ export interface MentorTransition {
   farewell_narrative?: string;
 }
 
-// Completed Book (Cosmic Library)
-export interface CompletedBook {
-  id: string;
-  user_id: string;
-  epic_id: string;
-  book_title: string;
-  story_type_slug: StoryTypeSlug | null;
-  total_chapters: number;
-  boss_defeated_name: string | null;
-  boss_defeated_at: string | null;
-  companion_name: string | null;
-  companion_species: string | null;
-  mentor_name: string | null;
-  final_wisdom: string | null;
-  completed_at: string;
-  created_at: string;
-}
-
 // Story Seed (generated at epic creation)
 export interface StorySeed {
   book_title: string;

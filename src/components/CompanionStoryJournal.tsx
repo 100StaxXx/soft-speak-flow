@@ -2,23 +2,18 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionStory } from "@/hooks/useCompanionStory";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Users, Library } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3 } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
 import { GuildStoriesSection } from "./companion/GuildStoriesSection";
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
-import { CosmicLibrary } from "./narrative/CosmicLibrary";
 
 export const CompanionStoryJournal = () => {
-  const { user } = useAuth();
   const { companion, isLoading: companionLoading } = useCompanion();
-  const [activeTab, setActiveTab] = useState<"chapters" | "library">("chapters");
   const [viewingStage, setViewingStage] = useState(0);
   const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
@@ -129,24 +124,6 @@ export const CompanionStoryJournal = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto p-4">
-      {/* Tab Navigation */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "chapters" | "library")} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="chapters" className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4" />
-            Chapters
-          </TabsTrigger>
-          <TabsTrigger value="library" className="flex items-center gap-2">
-            <Library className="w-4 h-4" />
-            Adventure Books
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="library">
-          <CosmicLibrary userId={user?.id} />
-        </TabsContent>
-
-        <TabsContent value="chapters">
       {showGallery && (
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -196,6 +173,7 @@ export const CompanionStoryJournal = () => {
           </div>
         </Card>
       )}
+
       {/* Header */}
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-2">
@@ -362,8 +340,6 @@ export const CompanionStoryJournal = () => {
 
       {/* Guild Stories Section */}
       <GuildStoriesSection />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };
