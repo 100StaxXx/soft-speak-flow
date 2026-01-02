@@ -89,7 +89,7 @@ export const BottomNav = memo(() => {
           {({ isActive }) => (
             <>
               <div className="relative">
-                <PawPrint className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]' : 'text-muted-foreground'}`} />
+                <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-all duration-300 ${isActive ? 'text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]' : 'text-muted-foreground'}`} />
                 {companion && progressToNext > 90 && (
                   <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-stardust-gold text-black animate-pulse">
                     !
