@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Target, Zap, TrendingUp, Sparkles } from "lucide-react";
+import { CheckCircle2, Target, Zap, TrendingUp, Sparkles } from "lucide-react";
 import { useDailyMissions } from "@/hooks/useDailyMissions";
 import { useMissionAutoComplete } from "@/hooks/useMissionAutoComplete";
 import { Progress } from "@/components/ui/progress";
@@ -104,10 +104,8 @@ const DailyMissionsContent = () => {
         } ${mission.is_bonus ? "border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-orange-500/5" : ""}`}
       >
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-          {mission.completed ? (
+          {mission.completed && (
             <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-accent flex-shrink-0" />
-          ) : (
-            <Circle className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground flex-shrink-0" />
           )}
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
