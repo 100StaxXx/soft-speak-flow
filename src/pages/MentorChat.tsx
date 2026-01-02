@@ -15,6 +15,7 @@ import { MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { PageTransition } from "@/components/PageTransition";
 
 
 export default function MentorChat() {
@@ -78,7 +79,8 @@ export default function MentorChat() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <PageTransition>
+      <div className="min-h-screen bg-background pb-nav-safe pt-safe relative z-10">
         {/* Hero Banner - Pokemon TCG Pocket Style */}
         <div className="relative h-48 md:h-64 overflow-hidden">
           {/* Animated gradient background */}
@@ -143,24 +145,26 @@ export default function MentorChat() {
             comprehensiveMode={comprehensiveMode}
           />
         </div>
-        <BottomNav />
-        
-        <PageInfoModal
-          open={showPageInfo}
-          onClose={() => setShowPageInfo(false)}
-          title="About Your Mentor"
-          icon={MessageCircle}
-          description="Your personal motivator is here to guide and support you on your journey."
-          features={[
-            "Ask questions and get personalized advice",
-            "Receive guidance tailored to your goals",
-            "Get encouragement when you need it most",
-            "Chat anytime for instant motivation"
-          ]}
-          tip="Your mentor's tone and style match your preferences from onboarding."
-        />
-        
-        <MentorTutorialModal open={showTutorial} onClose={dismissTutorial} />
       </div>
+      
+      <BottomNav />
+      
+      <PageInfoModal
+        open={showPageInfo}
+        onClose={() => setShowPageInfo(false)}
+        title="About Your Mentor"
+        icon={MessageCircle}
+        description="Your personal motivator is here to guide and support you on your journey."
+        features={[
+          "Ask questions and get personalized advice",
+          "Receive guidance tailored to your goals",
+          "Get encouragement when you need it most",
+          "Chat anytime for instant motivation"
+        ]}
+        tip="Your mentor's tone and style match your preferences from onboarding."
+      />
+      
+      <MentorTutorialModal open={showTutorial} onClose={dismissTutorial} />
+    </PageTransition>
   );
 }

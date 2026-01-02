@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { Target, TrendingUp, Calendar, CheckCircle2, Circle, ArrowLeft, Trophy, Dumbbell, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { PageTransition } from "@/components/PageTransition";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 type ChallengeTab = "active" | "available";
 
@@ -113,8 +115,10 @@ export default function Challenges() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-nav-safe">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <PageTransition>
+      <StarfieldBackground />
+      <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
+        <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
@@ -275,9 +279,10 @@ export default function Challenges() {
             )}
           </TabsContent>
         </Tabs>
+        </div>
       </div>
 
       <BottomNav />
-    </div>
+    </PageTransition>
   );
 }

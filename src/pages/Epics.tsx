@@ -16,6 +16,7 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { StarPathsBrowser } from "@/components/StarPathsBrowser";
 import { EpicTemplate } from "@/hooks/useEpicTemplates";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 import {
   Dialog,
   DialogContent,
@@ -68,7 +69,8 @@ const Epics = () => {
 
   return (
     <PageTransition>
-      <div className="min-h-screen pb-nav-safe pt-safe px-4">
+      <StarfieldBackground />
+      <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         {/* Hero Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

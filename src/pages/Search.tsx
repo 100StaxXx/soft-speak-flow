@@ -52,7 +52,7 @@ const Search = () => {
     <PageTransition>
       <StarfieldBackground />
 
-      <div className="relative min-h-screen pb-24">
+      <div className="relative min-h-screen pb-nav-safe pt-safe">
         <div className="relative z-10 max-w-6xl mx-auto px-4 py-10 space-y-12">
           <SearchHero
             searchQuery={searchQuery}

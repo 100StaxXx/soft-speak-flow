@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
 import { toast } from "sonner";
+import { PageTransition } from "@/components/PageTransition";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 type LibraryTab = "favorites" | "downloads" | "history";
 
@@ -121,8 +123,10 @@ export default function Library() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-24">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <PageTransition>
+      <StarfieldBackground />
+      <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
+        <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Button
@@ -280,9 +284,10 @@ export default function Library() {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
 
       <BottomNav />
-    </div>
+    </PageTransition>
   );
 }
