@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Users, Sparkles, User, Compass } from "lucide-react";
+import { Calendar, Sparkles, User, Compass } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -127,9 +127,9 @@ export const BottomNav = memo(() => {
         >
           {({ isActive }) => (
             <>
-              <Users className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-celestial-blue drop-shadow-[0_0_8px_hsl(210,80%,50%)]' : 'text-muted-foreground'}`} />
+              <Calendar className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-celestial-blue drop-shadow-[0_0_8px_hsl(210,80%,50%)]' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/80'}`}>
-                Guilds
+                Calendar
               </span>
             </>
           )}
