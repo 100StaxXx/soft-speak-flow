@@ -5,6 +5,7 @@ import { HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
+import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -28,6 +29,7 @@ interface ConstellationTrailProps {
   companionMood?: string;
   showCompanion?: boolean;
   milestones?: TrailMilestone[]; // Actual milestones from database
+  epicId?: string; // For fetching journey path background
 }
 
 // Fixed constellation pattern - wave with more vertical variation for taller container
@@ -839,8 +841,12 @@ export const ConstellationTrail = ({
   companionImageUrl,
   companionMood,
   showCompanion = true,
-  milestones: propMilestones
+  milestones: propMilestones,
+  epicId
 }: ConstellationTrailProps) => {
+  // Fetch journey path image for this epic
+  const { pathImageUrl, isLoading: isPathLoading, isGenerating } = useJourneyPathImage(epicId);
+  
   // Sort milestones by percentage and include start (0%)
   const sortedMilestones = useMemo(() => {
     if (!propMilestones || propMilestones.length === 0) {
@@ -894,7 +900,7 @@ export const ConstellationTrail = ({
     <div 
       className={cn(
         "relative w-full h-56 rounded-xl overflow-hidden",
-        "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        !pathImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
       style={{
@@ -906,11 +912,41 @@ export const ConstellationTrail = ({
         `
       }}
     >
-        {/* Nebula glow effect */}
+      {/* AI-generated journey path background */}
+      {pathImageUrl && (
+        <div className="absolute inset-0">
+          <img 
+            src={pathImageUrl} 
+            alt="Journey path"
+            className="w-full h-full object-cover"
+          />
+          {/* Overlay gradient for star/companion visibility */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70" />
+        </div>
+      )}
+      
+      {/* Loading state for path generation */}
+      {isGenerating && !pathImageUrl && (
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950">
+          <motion.div 
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
+            animate={{ x: ["-100%", "100%"] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          />
+          <div className="absolute bottom-2 left-2 text-xs text-primary/60 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 animate-pulse" />
+            <span>Mapping your path...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Nebula glow effect - show when no path image */}
+      {!pathImageUrl && (
         <div className="absolute inset-0 opacity-40">
           <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/30 rounded-full blur-xl" />
           <div className="absolute top-1/3 right-1/4 w-16 h-16 bg-purple-500/20 rounded-full blur-lg" />
         </div>
+      )}
 
       {/* Background twinkling stars */}
       {bgStars.map((star, i) => (

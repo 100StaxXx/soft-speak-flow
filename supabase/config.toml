@@ -254,3 +254,6 @@ verify_jwt = true
 
 [functions.suggest-task-times]
 verify_jwt = true
+
+[functions.generate-journey-path]
+verify_jwt = true

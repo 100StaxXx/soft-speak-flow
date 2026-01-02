@@ -1935,6 +1935,47 @@ export type Database = {
           },
         ]
       }
+      epic_journey_paths: {
+        Row: {
+          created_at: string | null
+          epic_id: string
+          generated_at: string | null
+          id: string
+          image_url: string
+          milestone_index: number
+          prompt_context: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          epic_id: string
+          generated_at?: string | null
+          id?: string
+          image_url: string
+          milestone_index?: number
+          prompt_context?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          epic_id?: string
+          generated_at?: string | null
+          id?: string
+          image_url?: string
+          milestone_index?: number
+          prompt_context?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epic_journey_paths_epic_id_fkey"
+            columns: ["epic_id"]
+            isOneToOne: false
+            referencedRelation: "epics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epic_members: {
         Row: {
           epic_id: string
