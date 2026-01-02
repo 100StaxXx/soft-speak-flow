@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, LogIn, Play, Star, Zap, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,9 +7,12 @@ import { getAuthRedirectPath } from "@/utils/authRedirect";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { PageLoader } from "@/components/PageLoader";
 import { welcomeBackground } from "@/assets/backgrounds";
+import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
+
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { gamma, beta, permitted, available, requestPermission } = useDeviceOrientation();
 
   // If user is already logged in, redirect them appropriately
   useEffect(() => {
@@ -20,6 +23,13 @@ const Welcome = () => {
     }
   }, [user, loading, navigate]);
 
+  // Request gyroscope permission on first interaction (iOS requirement)
+  const handleInteraction = useCallback(() => {
+    if (available && !permitted) {
+      requestPermission();
+    }
+  }, [available, permitted, requestPermission]);
+
   const features = [
     { icon: Star, text: "AI-Powered Mentors", delay: 0.1 },
     { icon: Zap, text: "Daily Quests & XP", delay: 0.2 },
@@ -29,18 +39,27 @@ const Welcome = () => {
   const backgroundImage = welcomeBackground;
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Use scroll without target to avoid hydration error when ref isn't mounted yet
+  // Scroll-based parallax
   const { scrollYProgress } = useScroll();
-  
   const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+
+  // Device motion parallax - subtle movement based on device tilt
+  // gamma: left/right tilt (-90 to 90), beta: front/back tilt (-180 to 180)
+  const gyroX = permitted ? (gamma / 45) * 15 : 0; // Max 15px movement
+  const gyroY = permitted ? ((beta - 45) / 45) * 10 : 0; // Offset beta for natural holding angle
 
   if (loading) {
     return <PageLoader message="Preparing your journey..." />;
   }
 
   return (
-    <div ref={containerRef} className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Parallax Background */}
+    <div 
+      ref={containerRef} 
+      className="min-h-screen flex flex-col relative overflow-hidden"
+      onTouchStart={handleInteraction}
+      onClick={handleInteraction}
+    >
+      {/* Parallax Background with Gyroscope */}
       <motion.div 
         className="fixed inset-0 -z-10"
         style={{
@@ -48,7 +67,17 @@ const Welcome = () => {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           y: backgroundY,
-          scale: 1.1,
+          scale: 1.15,
+        }}
+        animate={{
+          x: gyroX,
+          y: gyroY,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 100,
+          damping: 30,
+          mass: 0.5,
         }}
       />
       {/* Dark overlay for text readability */}
