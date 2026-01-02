@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { SwipeableTaskItem } from "./SwipeableTaskItem";
+
 import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
 import { type DragHandleProps } from "./DraggableTaskList";
 
@@ -243,19 +243,6 @@ export function TodaysAgenda({
       }
     };
 
-    const handleSwipeComplete = () => {
-      if (isDragging) return;
-      triggerHaptic(ImpactStyle.Medium);
-      onToggle(task.id, true, task.xp_reward);
-    };
-
-    const handleSwipeUndo = () => {
-      if (isDragging) return;
-      if (onUndoToggle) {
-        triggerHaptic(ImpactStyle.Light);
-        onUndoToggle(task.id, task.xp_reward);
-      }
-    };
     
     const taskContent = (
       <motion.div
@@ -341,18 +328,7 @@ export function TodaysAgenda({
       </motion.div>
     );
 
-    return (
-      <SwipeableTaskItem
-        key={task.id}
-        isComplete={isComplete}
-        onSwipeComplete={handleSwipeComplete}
-        onSwipeUndo={handleSwipeUndo}
-        xpReward={task.xp_reward}
-        disabled={isDragging}
-      >
-        {taskContent}
-      </SwipeableTaskItem>
-    );
+    return taskContent;
   }, [onToggle, onUndoToggle, onEditQuest, tutorialCheckboxRef]);
 
   // Handle reordering of quest tasks
