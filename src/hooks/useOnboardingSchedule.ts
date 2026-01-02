@@ -35,19 +35,36 @@ const ONBOARDING_TASKS = [
   },
 ];
 
-export function useOnboardingSchedule(userId: string | undefined, hasSeenTutorial: boolean) {
+/**
+ * Hook to create onboarding tasks for new users
+ * @param userId - The user's ID
+ * @param hasCompletedWalkthrough - Whether the user completed the main onboarding walkthrough
+ */
+export function useOnboardingSchedule(userId: string | undefined, hasCompletedWalkthrough: boolean) {
   const queryClient = useQueryClient();
   const creationRef = useRef(false);
 
   useEffect(() => {
-    if (!userId || hasSeenTutorial || creationRef.current) return;
+    // Only create tasks for authenticated users who completed the walkthrough
+    if (!userId || !hasCompletedWalkthrough || creationRef.current) {
+      console.log("[Onboarding] Skipping schedule creation:", {
+        hasUserId: !!userId,
+        hasCompletedWalkthrough,
+        alreadyCreating: creationRef.current,
+      });
+      return;
+    }
 
     const scheduleKey = `onboarding_schedule_created_${userId}`;
     const alreadyCreated = safeLocalStorage.getItem(scheduleKey) === "true";
 
-    if (alreadyCreated) return;
+    if (alreadyCreated) {
+      console.log("[Onboarding] Schedule already created for user");
+      return;
+    }
 
     creationRef.current = true;
+    console.log("[Onboarding] Creating onboarding schedule for new user");
 
     const createOnboardingSchedule = async () => {
       try {
@@ -59,12 +76,13 @@ export function useOnboardingSchedule(userId: string | undefined, hasSeenTutoria
           .in("task_text", ONBOARDING_TASKS.map((t) => t.task_text));
 
         if (existingTasks && existingTasks.length > 0) {
+          console.log("[Onboarding] Onboarding tasks already exist, marking as created");
           safeLocalStorage.setItem(scheduleKey, "true");
           creationRef.current = false;
           return;
         }
 
-        // Also check for old "Join Cosmiq" quest and skip if found
+        // Also check for old "Join Cosmiq" quest and skip if found (legacy users)
         const { data: legacyTask } = await supabase
           .from("daily_tasks")
           .select("id")
@@ -73,6 +91,7 @@ export function useOnboardingSchedule(userId: string | undefined, hasSeenTutoria
           .maybeSingle();
 
         if (legacyTask) {
+          console.log("[Onboarding] Legacy user detected, skipping onboarding tasks");
           safeLocalStorage.setItem(scheduleKey, "true");
           creationRef.current = false;
           return;
@@ -97,22 +116,23 @@ export function useOnboardingSchedule(userId: string | undefined, hasSeenTutoria
           .insert(tasksToInsert);
 
         if (error) {
-          console.error("Failed to create onboarding schedule:", error);
+          console.error("[Onboarding] Failed to create onboarding schedule:", error);
           creationRef.current = false;
           return;
         }
 
+        console.log("[Onboarding] Successfully created", tasksToInsert.length, "onboarding tasks");
         safeLocalStorage.setItem(scheduleKey, "true");
         queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       } catch (error) {
-        console.error("Error creating onboarding schedule:", error);
+        console.error("[Onboarding] Error creating onboarding schedule:", error);
       } finally {
         creationRef.current = false;
       }
     };
 
     createOnboardingSchedule();
-  }, [userId, hasSeenTutorial, queryClient]);
+  }, [userId, hasCompletedWalkthrough, queryClient]);
 }
 
 /**
