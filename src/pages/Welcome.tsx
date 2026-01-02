@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { PageLoader } from "@/components/PageLoader";
-import { getRandomBackground } from "@/assets/backgrounds";
+import { welcomeBackground } from "@/assets/backgrounds";
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
@@ -26,7 +26,7 @@ const Welcome = () => {
     { icon: Heart, text: "Evolving Companion", delay: 0.3 },
   ];
 
-  const backgroundImage = useMemo(() => getRandomBackground(), []);
+  const backgroundImage = welcomeBackground;
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Use scroll without target to avoid hydration error when ref isn't mounted yet

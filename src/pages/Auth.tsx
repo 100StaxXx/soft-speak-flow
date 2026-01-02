@@ -16,7 +16,7 @@ import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { useAuth } from "@/hooks/useAuth";
-import { getRandomBackground } from "@/assets/backgrounds";
+import { signinBackground } from "@/assets/backgrounds";
 import { motion, useScroll, useTransform } from "framer-motion";
 
 const authSchema = z.object({
@@ -57,7 +57,7 @@ const Auth = () => {
   const { toast } = useToast();
   const { session: authSession } = useAuth();
   
-  const backgroundImage = useMemo(() => getRandomBackground(), []);
+  const backgroundImage = signinBackground;
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { scrollYProgress } = useScroll({
