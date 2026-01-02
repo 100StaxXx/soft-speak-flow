@@ -257,3 +257,6 @@ verify_jwt = true
 
 [functions.generate-journey-path]
 verify_jwt = true
+
+[functions.generate-campaign-welcome-image]
+verify_jwt = true

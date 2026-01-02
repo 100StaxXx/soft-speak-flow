@@ -6297,6 +6297,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_welcome_images: {
+        Row: {
+          created_at: string | null
+          generated_at: string | null
+          id: string
+          image_url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          generated_at?: string | null
+          id?: string
+          image_url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          generated_at?: string | null
+          id?: string
+          image_url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
           category: string | null
