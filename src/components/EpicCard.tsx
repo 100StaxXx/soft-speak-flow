@@ -20,7 +20,7 @@ import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 // HIDDEN: Boss battle feature disabled
 // import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
 import { EpicRewardReveal } from "./EpicRewardReveal";
-import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
+import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -405,12 +405,21 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         }}
       />
 
-      {/* Adjust Epic Plan Dialog */}
-      <AdjustEpicPlanDialog
+      {/* Smart Adjust Plan Drawer */}
+      <SmartAdjustPlanDrawer
         open={showAdjustDialog}
         onOpenChange={setShowAdjustDialog}
         epicId={epic.id}
         epicTitle={epic.title}
+        habits={epic.epic_habits
+          ?.filter(eh => eh.habits)
+          .map(eh => ({
+            id: eh.habit_id,
+            title: eh.habits?.title || 'Untitled',
+            difficulty: eh.habits?.difficulty,
+            frequency: eh.habits?.frequency,
+            estimated_minutes: eh.habits?.estimated_minutes,
+          })) || []}
       />
     </motion.div>
   );
