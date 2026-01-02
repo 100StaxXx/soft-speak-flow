@@ -74,18 +74,20 @@ export function PermissionRequestDialog({
             <AlertDialogTitle className="text-center">
               Microphone Access Blocked
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-center space-y-3">
-              <p>
-                You've previously denied microphone access. To use voice input, you'll need to enable it in your device settings.
-              </p>
-              <div className="bg-muted rounded-lg p-3 text-left text-sm">
-                <p className="font-medium mb-1">How to enable:</p>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  <li>Go to your device Settings</li>
-                  <li>Find Privacy & Security</li>
-                  <li>Select Microphone</li>
-                  <li>Enable access for this app</li>
-                </ul>
+            <AlertDialogDescription asChild>
+              <div className="text-center space-y-3 text-sm text-muted-foreground">
+                <p>
+                  You've previously denied microphone access. To use voice input, you'll need to enable it in your device settings.
+                </p>
+                <div className="bg-muted rounded-lg p-3 text-left text-sm">
+                  <span className="font-medium block mb-1">How to enable:</span>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Go to your device Settings</li>
+                    <li>Find Privacy & Security</li>
+                    <li>Select Microphone</li>
+                    <li>Enable access for this app</li>
+                  </ul>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
