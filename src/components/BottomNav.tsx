@@ -1,5 +1,6 @@
 import { memo } from "react";
-import { Target, Sparkles, User, Compass } from "lucide-react";
+import { Sparkles, User, Compass } from "lucide-react";
+import { NorthStar } from "@/components/icons/NorthStar";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -127,7 +128,7 @@ export const BottomNav = memo(() => {
         >
           {({ isActive }) => (
             <>
-              <Target className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-sky-400 drop-shadow-[0_0_8px_hsl(200,90%,60%)]' : 'text-muted-foreground'}`} />
+              <NorthStar size={24} className={`transition-all duration-300 ${isActive ? 'text-sky-400 drop-shadow-[0_0_8px_hsl(200,90%,60%)]' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-sky-400' : 'text-muted-foreground/80'}`}>
                 Campaigns
               </span>
