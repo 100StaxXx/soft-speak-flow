@@ -252,11 +252,14 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             >
               <CollapsibleTrigger asChild>
                 <motion.button
-                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl 
-                    bg-gradient-to-br from-amber-400/25 via-orange-400/20 to-yellow-400/25 
-                    border-2 border-amber-400/40 
-                    shadow-[0_4px_20px_rgba(251,191,36,0.15)]
-                    min-h-[88px] font-fredoka w-full"
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 p-4 rounded-2xl",
+                    "bg-gradient-to-br from-amber-400/25 via-orange-400/20 to-yellow-400/25",
+                    "border-2 border-amber-400/40",
+                    "shadow-[0_4px_20px_rgba(251,191,36,0.15)]",
+                    "min-h-[88px] font-fredoka w-full",
+                    (postcardProgress.current / postcardProgress.target) >= 0.95 && "animate-pulse"
+                  )}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
