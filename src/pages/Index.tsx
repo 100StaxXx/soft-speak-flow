@@ -265,119 +265,118 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const ComponentLoader = () => <div className="h-20" />;
 
   return (
-    <>
-      <PageTransition>
-        {/* Cosmiq Starfield Background */}
-        <StarfieldBackground />
-        
-        {/* Fixed Background Image */}
-        {mentorImage && (
-          <div className="fixed inset-0 z-0 pointer-events-none">
-            <img
-              src={mentorImage}
-              alt="Mentor background"
-              className="w-full h-full object-cover object-center"
-              loading="eager"
-              decoding="async"
-            />
-            <div className="absolute inset-0 bg-background/85" />
-          </div>
-        )}
-
-        {/* Scrollable Content */}
-        <div className="relative z-10 min-h-screen pb-24 sm:pb-24">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-48 sm:pt-32 md:pt-24 space-y-4 sm:space-y-6 md:space-y-8">
-
-            {/* Quote of the Day */}
-            {todaysQuote && (
-              <div className="text-right px-4 sm:px-6">
-                <blockquote className="max-w-2xl ml-auto">
-                  <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-orange-400 leading-relaxed">
-                    "{todaysQuote.text}"
-                  </p>
-                  {todaysQuote.author && (
-                    <footer className="mt-2 font-serif italic text-sm sm:text-base text-orange-300/70">
-                      — {todaysQuote.author}
-                    </footer>
-                  )}
-                </blockquote>
-              </div>
-            )}
-            
-            <ParallaxCard offset={28}>
-              <ErrorBoundary>
-                <MorningCheckIn />
-              </ErrorBoundary>
-            </ParallaxCard>
-
-            <ParallaxCard offset={24}>
-              <ErrorBoundary>
-                <MorningBriefing className="animate-scale-in" />
-              </ErrorBoundary>
-            </ParallaxCard>
-
-            <ParallaxCard offset={20}>
-              <ErrorBoundary>
-                <EveningReflectionBanner />
-              </ErrorBoundary>
-            </ParallaxCard>
-
-            <ParallaxCard offset={18}>
-              <ErrorBoundary>
-                <WeeklyRecapCard />
-              </ErrorBoundary>
-            </ParallaxCard>
-
-            {/* Daily Coach Panel - AI-powered insights */}
-            <ParallaxCard offset={16}>
-              <ErrorBoundary>
-                <DailyCoachPanel 
-                  maxInsights={3} 
-                  onInsightAction={(insight) => {
-                    // Route actions to appropriate behavior based on actionType
-                    switch (insight.actionType) {
-                      case 'reschedule':
-                      case 'add_break':
-                      case 'simplify':
-                        navigate('/journeys');
-                        break;
-                      case 'celebrate':
-                        // Could show celebration modal, for now navigate to journeys
-                        navigate('/journeys');
-                        break;
-                      default:
-                        navigate('/journeys');
-                    }
-                  }}
-                />
-              </ErrorBoundary>
-            </ParallaxCard>
-          
-            <ParallaxCard offset={14}>
-              <ErrorBoundary>
-                <TodaysPepTalk />
-              </ErrorBoundary>
-            </ParallaxCard>
-
-            {/* Ask Mentor Section */}
-            <ParallaxCard offset={12}>
-              <CompanionErrorBoundary>
-                <ErrorBoundary>
-                  <div className="cosmiq-glass-ultra rounded-2xl">
-                    <MentorQuickChat />
-                  </div>
-                </ErrorBoundary>
-              </CompanionErrorBoundary>
-            </ParallaxCard>
-
-          </div>
+    <PageTransition>
+      {/* Cosmiq Starfield Background */}
+      <StarfieldBackground />
+      
+      {/* Fixed Background Image */}
+      {mentorImage && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <img
+            src={mentorImage}
+            alt="Mentor background"
+            className="w-full h-full object-cover object-center"
+            loading="eager"
+            decoding="async"
+          />
+          <div className="absolute inset-0 bg-background/85" />
         </div>
-      </PageTransition>
+      )}
+
+      {/* Scrollable Content */}
+      <div className="relative z-10 min-h-screen pb-nav-safe pt-safe">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-48 sm:pt-32 md:pt-24 space-y-4 sm:space-y-6 md:space-y-8">
+
+          {/* Quote of the Day */}
+          {todaysQuote && (
+            <div className="text-right px-4 sm:px-6">
+              <blockquote className="max-w-2xl ml-auto">
+                <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-orange-400 leading-relaxed">
+                  "{todaysQuote.text}"
+                </p>
+                {todaysQuote.author && (
+                  <footer className="mt-2 font-serif italic text-sm sm:text-base text-orange-300/70">
+                    — {todaysQuote.author}
+                  </footer>
+                )}
+              </blockquote>
+            </div>
+          )}
+          
+          <ParallaxCard offset={28}>
+            <ErrorBoundary>
+              <MorningCheckIn />
+            </ErrorBoundary>
+          </ParallaxCard>
+
+          <ParallaxCard offset={24}>
+            <ErrorBoundary>
+              <MorningBriefing className="animate-scale-in" />
+            </ErrorBoundary>
+          </ParallaxCard>
+
+          <ParallaxCard offset={20}>
+            <ErrorBoundary>
+              <EveningReflectionBanner />
+            </ErrorBoundary>
+          </ParallaxCard>
+
+          <ParallaxCard offset={18}>
+            <ErrorBoundary>
+              <WeeklyRecapCard />
+            </ErrorBoundary>
+          </ParallaxCard>
+
+          {/* Daily Coach Panel - AI-powered insights */}
+          <ParallaxCard offset={16}>
+            <ErrorBoundary>
+              <DailyCoachPanel 
+                maxInsights={3} 
+                onInsightAction={(insight) => {
+                  // Route actions to appropriate behavior based on actionType
+                  switch (insight.actionType) {
+                    case 'reschedule':
+                    case 'add_break':
+                    case 'simplify':
+                      navigate('/journeys');
+                      break;
+                    case 'celebrate':
+                      // Could show celebration modal, for now navigate to journeys
+                      navigate('/journeys');
+                      break;
+                    default:
+                      navigate('/journeys');
+                  }
+                }}
+              />
+            </ErrorBoundary>
+          </ParallaxCard>
+        
+          <ParallaxCard offset={14}>
+            <ErrorBoundary>
+              <TodaysPepTalk />
+            </ErrorBoundary>
+          </ParallaxCard>
+
+          {/* Ask Mentor Section */}
+          <ParallaxCard offset={12}>
+            <CompanionErrorBoundary>
+              <ErrorBoundary>
+                <div className="cosmiq-glass-ultra rounded-2xl">
+                  <MentorQuickChat />
+                </div>
+              </ErrorBoundary>
+            </CompanionErrorBoundary>
+          </ParallaxCard>
+
+        </div>
+      </div>
+      
       <ErrorBoundary>
         <BottomNav />
       </ErrorBoundary>
       <MentorTutorialModal open={showModal} onClose={dismissModal} />
-    </>
+    </PageTransition>
   );
 };
 

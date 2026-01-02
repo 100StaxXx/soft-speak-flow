@@ -12,6 +12,8 @@ import { EMOTIONAL_TRIGGERS, TOPIC_CATEGORIES } from "@/config/categories";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { Mic } from "lucide-react";
+import { PageTransition } from "@/components/PageTransition";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 export default function PepTalks() {
   const navigate = useNavigate();
@@ -53,8 +55,10 @@ export default function PepTalks() {
   const hasFilters = selectedCategory || selectedTrigger;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/10 pb-nav-safe">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <PageTransition>
+      <StarfieldBackground />
+      <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
+        <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Button
@@ -209,9 +213,10 @@ export default function PepTalks() {
           "Save favorites to revisit when you need them"
         ]}
         tip="Listen to a pep talk each morning to start your day with the right energy!"
-      />
-      
-      <BottomNav />
-    </div>
+        />
+        
+        <BottomNav />
+      </div>
+    </PageTransition>
   );
 }

@@ -83,7 +83,7 @@ const Recaps = () => {
     <PageTransition>
       <StarfieldBackground />
       
-      <div className="min-h-screen pb-24 relative">
+      <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-xl border-b border-border/50 safe-area-top">
           <div className="max-w-4xl mx-auto px-4 py-4">

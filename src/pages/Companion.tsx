@@ -126,8 +126,8 @@ const Companion = () => {
   return (
     <PageTransition>
       <CompanionErrorBoundary>
-        <div className="min-h-screen pb-nav-safe relative">
-          <StarfieldBackground />
+        <StarfieldBackground />
+        <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
           
           <header className="sticky top-0 z-40 w-full cosmiq-glass-header safe-area-top">
             <div className="container flex items-center justify-between py-4">
