@@ -149,67 +149,6 @@ export const DailyCoachPanel = memo(function DailyCoachPanel({
 
   return (
     <div className="space-y-4">
-      {/* Readiness & Energy Header */}
-      {!compact && (
-        <div className="rounded-2xl bg-card/80 backdrop-blur-xl border border-border/50 overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-border/30 bg-gradient-to-r from-primary/10 to-accent/5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="font-bold text-sm">Today's Readiness</span>
-              </div>
-              <div className="px-2.5 py-1 rounded-full bg-primary/20 border border-primary/30">
-                <span className="text-xs font-bold text-primary">{overallReadiness}%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="px-4 py-4">
-            <div className="h-3 w-full bg-muted/50 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-primary via-accent to-nebula-pink rounded-full transition-all duration-500"
-                style={{ width: `${overallReadiness}%` }}
-              />
-            </div>
-          
-            {/* Energy forecast */}
-            {energyForecast && (
-              <div className="flex items-center justify-between mt-4 px-2">
-                <div className="flex flex-col items-center gap-1">
-                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                    <Sun className="h-4 w-4 text-amber-400" />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">Morning</span>
-                  <span className={cn("text-xs font-bold", energyConfig[energyForecast.morning].color)}>
-                    {energyConfig[energyForecast.morning].label}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                    <Sunset className="h-4 w-4 text-orange-400" />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">Afternoon</span>
-                  <span className={cn("text-xs font-bold", energyConfig[energyForecast.afternoon].color)}>
-                    {energyConfig[energyForecast.afternoon].label}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  <div className="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                    <Moon className="h-4 w-4 text-indigo-400" />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">Evening</span>
-                  <span className={cn("text-xs font-bold", energyConfig[energyForecast.evening].color)}>
-                    {energyConfig[energyForecast.evening].label}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Insights */}
       <AnimatePresence mode="popLayout">
         <div className="space-y-3">
