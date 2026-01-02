@@ -444,10 +444,10 @@ const Journeys = () => {
             />
           </div>
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
-            Quests & Campaigns
+            Quests
           </h1>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Daily quests. Epic campaigns. All in one place.
+            Daily quests. Your path to progress.
           </p>
         </motion.div>
 
