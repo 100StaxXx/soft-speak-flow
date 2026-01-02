@@ -199,6 +199,18 @@ export default {
           "0%, 100%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.03)" },
         },
+        "gradient-spin": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        "wiggle": {
+          "0%, 100%": { transform: "rotate(-2deg)" },
+          "50%": { transform: "rotate(2deg)" },
+        },
+        "bounce-pop": {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.08)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -212,6 +224,9 @@ export default {
         "bounce-subtle": "bounce-subtle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
         "bounce-slow": "bounce-slow 1.5s ease-in-out infinite",
         "breathe": "breathe 4s ease-in-out infinite",
+        "gradient-spin": "gradient-spin 3s linear infinite",
+        "wiggle": "wiggle 0.3s ease-in-out",
+        "bounce-pop": "bounce-pop 0.6s ease-in-out infinite",
       },
       perspective: {
         "1000": "1000px",
