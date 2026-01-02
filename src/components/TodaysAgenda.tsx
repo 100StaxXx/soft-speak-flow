@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { 
   Sparkles, 
   Flame, 
@@ -23,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { SwipeableTaskItem } from "./SwipeableTaskItem";
 
 interface Task {
   id: string;
@@ -207,6 +209,14 @@ export function TodaysAgenda({
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
   const allComplete = totalCount > 0 && completedCount === totalCount;
 
+  const triggerHaptic = async (style: ImpactStyle) => {
+    try {
+      await Haptics.impact({ style });
+    } catch (e) {
+      // Haptics not available on web
+    }
+  };
+
   const renderTaskItem = (task: Task) => {
     const isComplete = !!task.completed;
     const isTutorialQuest = task.task_text === 'Join Cosmiq';
@@ -214,21 +224,33 @@ export function TodaysAgenda({
     
     const handleClick = () => {
       if (isComplete && onUndoToggle) {
-        // Untoggle completed quest - revert XP
+        triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, task.xp_reward);
       } else {
+        triggerHaptic(ImpactStyle.Medium);
         onToggle(task.id, !isComplete, task.xp_reward);
       }
     };
+
+    const handleSwipeComplete = () => {
+      triggerHaptic(ImpactStyle.Medium);
+      onToggle(task.id, true, task.xp_reward);
+    };
+
+    const handleSwipeUndo = () => {
+      if (onUndoToggle) {
+        triggerHaptic(ImpactStyle.Light);
+        onUndoToggle(task.id, task.xp_reward);
+      }
+    };
     
-    return (
+    const taskContent = (
       <motion.div
-        key={task.id}
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
           "flex items-center gap-5 p-4 rounded-xl transition-all relative group",
-          "hover:bg-muted/30 cursor-pointer",
+          "hover:bg-muted/30 cursor-pointer select-none",
           isComplete && "opacity-60"
         )}
         onClick={handleClick}
@@ -237,16 +259,27 @@ export function TodaysAgenda({
           ref={isTutorialQuest && !isComplete ? tutorialCheckboxRef : undefined}
           className="relative"
         >
-          <div className={cn(
-            "flex-shrink-0 w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all",
-            isComplete 
-              ? "bg-primary border-primary" 
-              : isTutorialQuest 
-                ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
-                : "border-muted-foreground/30"
-          )}>
-            {isComplete && <Check className="w-5 h-5 text-primary-foreground" />}
-          </div>
+          <motion.div 
+            className={cn(
+              "flex-shrink-0 w-9 h-9 rounded-full border-2 flex items-center justify-center transition-all",
+              isComplete 
+                ? "bg-primary border-primary" 
+                : isTutorialQuest 
+                  ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
+                  : "border-muted-foreground/30"
+            )}
+            whileTap={{ scale: 0.9 }}
+          >
+            {isComplete && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+              >
+                <Check className="w-5 h-5 text-primary-foreground" />
+              </motion.div>
+            )}
+          </motion.div>
         </div>
         
         <div className="flex-1 min-w-0">
@@ -292,6 +325,18 @@ export function TodaysAgenda({
           <span className="text-lg font-bold text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
       </motion.div>
+    );
+
+    return (
+      <SwipeableTaskItem
+        key={task.id}
+        isComplete={isComplete}
+        onSwipeComplete={handleSwipeComplete}
+        onSwipeUndo={handleSwipeUndo}
+        xpReward={task.xp_reward}
+      >
+        {taskContent}
+      </SwipeableTaskItem>
     );
   };
 
