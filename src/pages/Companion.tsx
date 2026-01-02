@@ -21,6 +21,7 @@ import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
 import { useState, memo } from "react";
+import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 // Memoized tab content to prevent unnecessary re-renders
@@ -30,15 +31,23 @@ const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: {
   progressToNext: number;
 }) => (
   <div className="space-y-6 mt-6">
-    <CompanionDisplay />
-    <NextEvolutionPreview 
-      currentXP={companion?.current_xp || 0}
-      nextEvolutionXP={nextEvolutionXP || 0}
-      currentStage={companion?.current_stage || 0}
-      progressPercent={progressToNext}
-    />
-    <DailyMissions />
-    <XPBreakdown />
+    <ParallaxCard offset={30}>
+      <CompanionDisplay />
+    </ParallaxCard>
+    <ParallaxCard offset={22}>
+      <NextEvolutionPreview 
+        currentXP={companion?.current_xp || 0}
+        nextEvolutionXP={nextEvolutionXP || 0}
+        currentStage={companion?.current_stage || 0}
+        progressPercent={progressToNext}
+      />
+    </ParallaxCard>
+    <ParallaxCard offset={16}>
+      <DailyMissions />
+    </ParallaxCard>
+    <ParallaxCard offset={12}>
+      <XPBreakdown />
+    </ParallaxCard>
   </div>
 ));
 OverviewTab.displayName = 'OverviewTab';
