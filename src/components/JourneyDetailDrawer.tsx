@@ -30,6 +30,7 @@ import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
+import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
 import { MilestoneDetailDrawer } from "./journey/MilestoneDetailDrawer";
@@ -72,6 +73,7 @@ export const JourneyDetailDrawer = ({
   const { companion } = useCompanion();
   const { awardMilestoneComplete, awardPhaseComplete, awardEpicComplete } = useXPRewards();
   const { multiplier: streakMultiplier } = useStreakMultiplier();
+  const { regeneratePathForMilestone } = useJourneyPathImage(epicId);
 
   const currentPhase = getCurrentPhase();
   const phaseStats = getPhaseStats();
@@ -114,6 +116,9 @@ export const JourneyDetailDrawer = ({
   };
 
   const handleMilestoneComplete = async (milestone: Milestone) => {
+    // Get the milestone index for path regeneration
+    const milestoneIndex = milestones.findIndex(m => m.id === milestone.id);
+    
     completeMilestone.mutate({
       milestoneId: milestone.id,
       epicId,
@@ -127,6 +132,11 @@ export const JourneyDetailDrawer = ({
         });
       },
     });
+    
+    // Regenerate journey path image to reflect new location
+    if (milestoneIndex >= 0) {
+      regeneratePathForMilestone(milestoneIndex + 1); // +1 because 0 is initial
+    }
     
     // Award XP
     awardMilestoneComplete(milestone.is_postcard_milestone || false);
