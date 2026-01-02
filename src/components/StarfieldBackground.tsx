@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 
 interface Star {
   id: number;
@@ -90,8 +91,21 @@ const getStarGlow = (color: Star['color'], opacity: number) => {
   }
 };
 
+// Parallax multipliers for each layer (deeper = slower)
+const PARALLAX = {
+  deepNebulae: 5,
+  dust: 10,
+  backgroundStars: 15,
+  midNebulae: 18,
+  midStars: 22,
+  foregroundNebulae: 25,
+  brightStars: 30,
+};
+
 export const StarfieldBackground = () => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const { gamma, beta, permitted } = useDeviceOrientation();
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -100,6 +114,41 @@ export const StarfieldBackground = () => {
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  // Mouse movement handler for desktop
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      // Calculate offset from center (-1 to 1)
+      const x = (e.clientX / window.innerWidth - 0.5) * 2;
+      const y = (e.clientY / window.innerHeight - 0.5) * 2;
+      setMousePosition({ x, y });
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [prefersReducedMotion]);
+
+  // Use device orientation for mobile (from hook)
+  useEffect(() => {
+    if (prefersReducedMotion || !permitted) return;
+    
+    // Map gamma/beta to -1 to 1 range
+    const x = Math.max(-1, Math.min(1, gamma / 30));
+    const y = Math.max(-1, Math.min(1, (beta - 45) / 30));
+    setMousePosition({ x, y });
+  }, [gamma, beta, permitted, prefersReducedMotion]);
+
+  // Get transform style for a layer
+  const getParallaxStyle = useCallback((multiplier: number) => {
+    if (prefersReducedMotion) return {};
+    return {
+      transform: `translate(${mousePosition.x * multiplier}px, ${mousePosition.y * multiplier}px)`,
+      transition: 'transform 0.3s ease-out',
+      willChange: 'transform' as const,
+    };
+  }, [mousePosition, prefersReducedMotion]);
 
   // Memoize all generated elements - reduced counts for calmer effect
   const dustParticles = useMemo(() => generateDust(20), []);
@@ -110,11 +159,11 @@ export const StarfieldBackground = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-      {/* Layer 1: Deep space gradient */}
+      {/* Layer 1: Deep space gradient (no parallax - static base) */}
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--deep-space))] via-[hsl(var(--midnight))] to-[hsl(var(--obsidian))]" />
 
-      {/* Layer 2: Deep background nebulae (largest, slowest) */}
-      <div className="absolute inset-0">
+      {/* Layer 2: Deep background nebulae (slowest parallax) */}
+      <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.deepNebulae)}>
         <div 
           className="absolute w-[900px] h-[900px] rounded-full blur-[150px]"
           style={{
@@ -135,44 +184,48 @@ export const StarfieldBackground = () => {
         />
       </div>
 
-      {/* Layer 3: Cosmic dust particles (static - no animation) */}
-      {dustParticles.map((particle) => (
-        <div
-          key={`dust-${particle.id}`}
-          className="absolute rounded-full"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: `${particle.size}px`,
-            height: `${particle.size}px`,
-            opacity: particle.opacity,
-            backgroundColor: 'hsla(210, 30%, 80%, 0.5)',
-          }}
-        />
-      ))}
+      {/* Layer 3: Cosmic dust particles */}
+      <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.dust)}>
+        {dustParticles.map((particle) => (
+          <div
+            key={`dust-${particle.id}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${particle.x}%`,
+              top: `${particle.y}%`,
+              width: `${particle.size}px`,
+              height: `${particle.size}px`,
+              opacity: particle.opacity,
+              backgroundColor: 'hsla(210, 30%, 80%, 0.5)',
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Layer 4: Background stars (gentle twinkle) */}
-      {backgroundStars.map((star) => (
-        <div
-          key={`bg-star-${star.id}`}
-          className="absolute rounded-full"
-          style={{
-            left: `${star.x}%`,
-            top: `${star.y}%`,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            opacity: star.opacity,
-            backgroundColor: getStarColor(star.color),
-            boxShadow: getStarGlow(star.color, star.opacity * 0.5),
-            animation: prefersReducedMotion 
-              ? 'none' 
-              : `twinkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`,
-          }}
-        />
-      ))}
+      {/* Layer 4: Background stars */}
+      <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.backgroundStars)}>
+        {backgroundStars.map((star) => (
+          <div
+            key={`bg-star-${star.id}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              backgroundColor: getStarColor(star.color),
+              boxShadow: getStarGlow(star.color, star.opacity * 0.5),
+              animation: prefersReducedMotion 
+                ? 'none' 
+                : `twinkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`,
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Layer 5: Mid-layer nebula wisps (static - no animation) */}
-      <div className="absolute inset-0 opacity-25">
+      {/* Layer 5: Mid-layer nebula wisps */}
+      <div className="absolute inset-0 opacity-25" style={getParallaxStyle(PARALLAX.midNebulae)}>
         <div 
           className="absolute w-[600px] h-[300px] blur-[100px] -rotate-12"
           style={{
@@ -191,25 +244,27 @@ export const StarfieldBackground = () => {
         />
       </div>
 
-      {/* Layer 6: Mid-layer stars (static glow - no animation) */}
-      {midLayerStars.map((star) => (
-        <div
-          key={`mid-star-${star.id}`}
-          className="absolute rounded-full"
-          style={{
-            left: `${star.x}%`,
-            top: `${star.y}%`,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            opacity: star.opacity,
-            backgroundColor: getStarColor(star.color),
-            boxShadow: getStarGlow(star.color, star.opacity),
-          }}
-        />
-      ))}
+      {/* Layer 6: Mid-layer stars */}
+      <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.midStars)}>
+        {midLayerStars.map((star) => (
+          <div
+            key={`mid-star-${star.id}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              opacity: star.opacity,
+              backgroundColor: getStarColor(star.color),
+              boxShadow: getStarGlow(star.color, star.opacity),
+            }}
+          />
+        ))}
+      </div>
 
       {/* Layer 7: Foreground nebula highlights */}
-      <div className="absolute inset-0 opacity-25">
+      <div className="absolute inset-0 opacity-25" style={getParallaxStyle(PARALLAX.foregroundNebulae)}>
         <div 
           className="absolute w-[350px] h-[350px] rounded-full blur-[70px]"
           style={{
@@ -230,23 +285,25 @@ export const StarfieldBackground = () => {
         />
       </div>
 
-      {/* Layer 8: Bright stars (static glow - no sparkle animation) */}
-      {brightStars.map((star) => (
-        <div
-          key={`bright-star-${star.id}`}
-          className="absolute rounded-full"
-          style={{
-            left: `${star.x}%`,
-            top: `${star.y}%`,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            backgroundColor: getStarColor(star.color),
-            boxShadow: `${getStarGlow(star.color, 1)}, 0 0 20px ${getStarColor(star.color)}`,
-          }}
-        />
-      ))}
+      {/* Layer 8: Bright stars (fastest parallax) */}
+      <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.brightStars)}>
+        {brightStars.map((star) => (
+          <div
+            key={`bright-star-${star.id}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              backgroundColor: getStarColor(star.color),
+              boxShadow: `${getStarGlow(star.color, 1)}, 0 0 20px ${getStarColor(star.color)}`,
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Layer 9: Shooting stars with varied directions */}
+      {/* Layer 9: Shooting stars (no parallax - they move on their own) */}
       {!prefersReducedMotion && shootingStars.map((shootingStar) => (
         <div
           key={`shooting-${shootingStar.id}`}
