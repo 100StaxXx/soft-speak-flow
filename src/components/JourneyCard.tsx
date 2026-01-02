@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
-import { AdjustEpicPlanDialog } from "./AdjustEpicPlanDialog";
+import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";
 import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
 
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
@@ -368,12 +368,21 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Adjust Epic Plan Dialog */}
-        <AdjustEpicPlanDialog
+        {/* Smart Adjust Plan Drawer */}
+        <SmartAdjustPlanDrawer
           open={showAdjustDialog}
           onOpenChange={setShowAdjustDialog}
           epicId={journey.id}
           epicTitle={journey.title}
+          habits={journey.epic_habits
+            ?.filter(eh => eh.habits)
+            .map(eh => ({
+              id: eh.habit_id,
+              title: eh.habits?.title || 'Untitled',
+              difficulty: eh.habits?.difficulty,
+              frequency: eh.habits?.frequency,
+              estimated_minutes: eh.habits?.estimated_minutes,
+            })) || []}
         />
       </div>
     </motion.div>
