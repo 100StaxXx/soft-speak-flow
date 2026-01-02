@@ -132,7 +132,7 @@ export const MilestoneProgress = ({
         {/* View All Link */}
         <JourneyDetailDrawer epicId={epicId} epicTitle={epicTitle} epicGoal={epicGoal} currentDeadline={currentDeadline}>
           <Button variant="ghost" size="sm" className="w-full text-xs h-7 text-muted-foreground">
-            View all milestones
+            Milestones
             <ChevronRight className="w-3 h-3 ml-1" />
           </Button>
         </JourneyDetailDrawer>
