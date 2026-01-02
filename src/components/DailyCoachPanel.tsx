@@ -70,7 +70,7 @@ export const DailyInsightCard = memo(function DailyInsightCard({
       exit={{ opacity: 0, x: 10 }}
     >
       <div className={cn(
-        "rounded-2xl backdrop-blur-2xl border-l-4 border-t border-r border-b bg-card/40 p-4",
+        "rounded-2xl backdrop-blur-2xl border-l-4 border-t border-r border-b bg-card/25 p-4",
         config.borderColor.replace('border-', 'border-l-'),
         "border-t-white/[0.08] border-r-white/[0.08] border-b-white/[0.08]"
       )}>
@@ -132,7 +132,7 @@ export const DailyCoachPanel = memo(function DailyCoachPanel({
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/[0.08] p-4">
+      <div className="rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] p-4">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Sparkles className="h-4 w-4 animate-pulse" />
           <span className="text-sm">Analyzing your day...</span>

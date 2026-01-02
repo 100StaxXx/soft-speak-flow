@@ -2,6 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== iOS-STYLE ULTRA GLASS UTILITIES ===== */
+
+/* Maximum transparency glass - for hero cards */
+.glass-ios-ultra {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0.01)
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Elevated glass with more presence */
+.glass-ios-elevated {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Subtle shimmer animation */
+@keyframes glass-shimmer {
+  0%, 100% { 
+    background-position: 0% 50%; 
+  }
+  50% { 
+    background-position: 100% 50%; 
+  }
+}
+
+.glass-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.03),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: glass-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Parallax-ready card base */
+.parallax-glass-card {
+  @apply rounded-2xl border transition-all duration-300;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card) / 0.25),
+    hsl(var(--card) / 0.15)
+  );
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid hsl(var(--cosmiq-glow) / 0.15);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 hsl(var(--pure-white) / 0.08);
+}
+
 /* ============================================
    STELLAR BEATS ENHANCED ANIMATIONS
    ============================================ */

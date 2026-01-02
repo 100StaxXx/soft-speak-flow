@@ -32,6 +32,11 @@ const glassCardVariants = cva(
           "border-white/[0.04]",
           "shadow-[0_4px_16px_rgba(0,0,0,0.08)]",
         ],
+        ultra: [
+          "bg-white/[0.02] backdrop-blur-2xl",
+          "border-white/[0.06]",
+          "shadow-[0_8px_32px_rgba(0,0,0,0.15)]",
+        ],
       },
       glow: {
         none: "",

@@ -169,7 +169,7 @@ const MorningCheckInContent = () => {
 
   if (existingCheckIn?.completed_at) {
     return (
-      <Card data-tour="morning-checkin" className="p-6 bg-card/40 backdrop-blur-2xl border-celestial-blue/20">
+      <Card data-tour="morning-checkin" className="p-6 bg-card/25 backdrop-blur-2xl border-celestial-blue/20">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-full bg-stardust-gold/20 flex items-center justify-center flex-shrink-0 ring-2 ring-stardust-gold/30">
             <Sunrise className="h-6 w-6 text-stardust-gold" />
@@ -222,7 +222,7 @@ const MorningCheckInContent = () => {
   }
 
   return (
-    <div data-tour="morning-checkin" className="rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/[0.08] overflow-hidden animate-scale-in shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
+    <div data-tour="morning-checkin" className="rounded-2xl bg-card/25 backdrop-blur-2xl border border-white/[0.08] overflow-hidden animate-scale-in shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       {/* Header */}
       <div className="px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-orange-500/5 to-amber-500/[0.02]">
         <div className="flex items-center gap-3">
