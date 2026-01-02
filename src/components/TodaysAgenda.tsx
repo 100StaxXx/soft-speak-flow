@@ -215,6 +215,7 @@ export function TodaysAgenda({
     
     const handleClick = () => {
       if (isComplete && onUndoToggle) {
+        // Untoggle completed quest - revert XP
         onUndoToggle(task.id, task.xp_reward);
       } else {
         onToggle(task.id, !isComplete, task.xp_reward);
@@ -227,7 +228,8 @@ export function TodaysAgenda({
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className={cn(
-          "flex items-center gap-4 py-4 border-b border-border/20 last:border-b-0 transition-all relative group cursor-pointer",
+          "flex items-center gap-3 p-2 rounded-lg transition-all relative group",
+          "hover:bg-muted/30 cursor-pointer",
           isComplete && "opacity-60"
         )}
         onClick={handleClick}
@@ -237,38 +239,39 @@ export function TodaysAgenda({
           className="relative"
         >
           <div className={cn(
-            "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+            "flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
             isComplete 
-              ? "bg-green-500 border-green-500" 
+              ? "bg-primary border-primary" 
               : isTutorialQuest 
                 ? "border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 ring-offset-background"
-                : "border-muted-foreground/40"
+                : "border-muted-foreground/30"
           )}>
-            {isComplete && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
+            {isComplete && <Check className="w-3 h-3 text-primary-foreground" />}
           </div>
         </div>
         
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {isRitual && (
-              <Repeat className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+              <Repeat className="w-3 h-3 text-accent flex-shrink-0" />
             )}
             <p className={cn(
-              "text-lg font-medium truncate leading-tight",
+              "text-sm truncate",
               isComplete && "line-through text-muted-foreground"
             )}>
               {task.task_text}
             </p>
           </div>
           {task.scheduled_time && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-              <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Clock className="w-3 h-3" />
               {formatTime(task.scheduled_time)}
             </span>
           )}
         </div>
         
         <div className="flex items-center gap-2">
+          {/* Edit button - shows on hover for incomplete quests with proper 44px touch target */}
           {onEditQuest && !isComplete && (
             <Button
               variant="ghost"
@@ -283,9 +286,11 @@ export function TodaysAgenda({
             </Button>
           )}
           {task.is_main_quest && (
-            <span className="text-xs font-medium text-stardust-gold">Main</span>
+            <Badge variant="outline" className="text-xs px-1.5 py-0 h-5 bg-primary/10 border-primary/30">
+              Main
+            </Badge>
           )}
-          <span className="text-sm text-stardust-gold">+{task.xp_reward}</span>
+          <span className="text-xs text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
       </motion.div>
     );
@@ -372,9 +377,14 @@ export function TodaysAgenda({
             {questTasks.length > 0 && (
               <>
                 {ritualTasks.length > 0 && (
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 py-2">
-                    Quests
-                  </h4>
+                  <div className="flex items-center gap-2 py-1.5 px-1">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Quests
+                    </span>
+                    <Badge variant="secondary" className="h-4 px-1.5 text-xs bg-muted text-muted-foreground border-0">
+                      {questTasks.length}
+                    </Badge>
+                  </div>
                 )}
                 {(showAllTasks ? questTasks : questTasks.slice(0, questLimit)).map((task) => renderTaskItem(task))}
                 {questTasks.length > questLimit && (

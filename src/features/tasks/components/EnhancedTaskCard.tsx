@@ -96,85 +96,100 @@ export function EnhancedTaskCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       className={cn(
-        "group relative border-b border-border/20 last:border-b-0 transition-all duration-200",
-        task.completed && "opacity-60",
-        isBlocked && "opacity-40",
-        justCompleted && "bg-green-500/5"
+        "group relative rounded-xl border transition-all duration-300",
+        task.completed 
+          ? "bg-muted/30 border-border/50" 
+          : "bg-card border-border hover:border-primary/30 hover:shadow-md",
+        task.is_top_three && !task.completed && "border-primary/50 bg-primary/5 shadow-sm",
+        isBlocked && "opacity-60",
+        justCompleted && "ring-2 ring-green-500/50"
       )}
     >
-      <div className={cn("py-4", compact && "py-3")}>
+      <div className={cn("p-3", compact && "p-2")}>
         {/* Main Row */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-start gap-3">
           {/* Expand Button (if has subtasks) */}
           {hasSubtasks && showSubtasks && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+              className="mt-0.5 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               {isExpanded ? (
-                <ChevronDown className="w-5 h-5" />
+                <ChevronDown className="w-4 h-4" />
               ) : (
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4" />
               )}
             </button>
           )}
 
           {/* Checkbox or Progress Ring */}
           {hasSubtasks ? (
-            <ProgressRing 
-              percent={progressPercent} 
-              size={24} 
-              strokeWidth={2.5}
-            />
+            <div className="mt-0.5">
+              <ProgressRing 
+                percent={progressPercent} 
+                size={20} 
+                strokeWidth={2}
+              />
+            </div>
           ) : (
             <Checkbox
               checked={task.completed}
               onCheckedChange={(checked) => handleToggleComplete(checked as boolean)}
               disabled={isBlocked}
+              className={cn(
+                "mt-0.5 transition-transform hover:scale-110",
+                task.completed && "data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+              )}
             />
           )}
 
           {/* Task Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {/* Task Text */}
               <span className={cn(
-                "text-lg font-medium leading-tight",
+                "text-sm font-medium",
                 task.completed && "line-through text-muted-foreground"
               )}>
                 {task.task_text}
               </span>
 
-              {/* Top 3 Star */}
+              {/* Badges */}
               {task.is_top_three && !task.completed && (
-                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+              )}
+              {isBlocked && (
+                <BlockedBadge blockerCount={incompleteBlockers.length} blockerNames={blockerNames} />
               )}
             </div>
 
-            {/* Meta Row - simplified */}
-            {(task.estimated_duration || task.scheduled_time || hasSubtasks || isBlocked) && (
-              <div className="flex items-center gap-3 mt-1">
-                {task.scheduled_time && (
-                  <span className="text-sm text-muted-foreground">
-                    {task.scheduled_time}
-                  </span>
-                )}
-                {task.estimated_duration && (
-                  <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                    <Clock className="w-3.5 h-3.5" />
-                    {task.estimated_duration}m
-                  </span>
-                )}
-                {hasSubtasks && (
-                  <span className="text-sm text-muted-foreground">
-                    {subtasks.filter(s => s.completed).length}/{subtasks.length}
-                  </span>
-                )}
-                {isBlocked && (
-                  <BlockedBadge blockerCount={incompleteBlockers.length} blockerNames={blockerNames} />
-                )}
-              </div>
-            )}
+            {/* Meta Row */}
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {task.priority && (
+                <PriorityBadge
+                  priority={task.priority}
+                  onChange={onUpdatePriority ? (p) => onUpdatePriority(task.id, p) : undefined}
+                  readonly={!onUpdatePriority}
+                />
+              )}
+              {task.energy_level && <EnergyBadge level={task.energy_level} />}
+              {task.estimated_duration && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  {task.estimated_duration}m
+                </span>
+              )}
+              {task.scheduled_time && (
+                <span className="text-xs text-muted-foreground">
+                  @ {task.scheduled_time}
+                </span>
+              )}
+              {hasSubtasks && (
+                <span className="text-xs text-muted-foreground">
+                  {subtasks.filter(s => s.completed).length}/{subtasks.length} subtasks
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Actions */}

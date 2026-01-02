@@ -158,23 +158,23 @@ export function TimelineTaskCard({
 
       {/* Task Content */}
       <div className="flex-1 min-w-0">
-        {/* Task Title */}
-        <p className={cn(
-          "text-lg font-medium text-foreground truncate leading-tight",
-          task.completed && "line-through text-muted-foreground"
-        )}>
-          {task.task_text}
-        </p>
-        
         {/* Time Range */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
           <span className={cn(isDragging && previewTime && "text-primary")}>
             {displayTime && formatTimeRange(displayTime, task.estimated_duration)}
           </span>
           {task.is_main_quest && (
-            <RotateCcw className="h-3.5 w-3.5" />
+            <RotateCcw className="h-3 w-3" />
           )}
         </div>
+        
+        {/* Task Title */}
+        <p className={cn(
+          "font-medium text-foreground truncate",
+          task.completed && "line-through text-muted-foreground"
+        )}>
+          {task.task_text}
+        </p>
       </div>
 
       {/* Checkbox */}
@@ -186,11 +186,11 @@ export function TimelineTaskCard({
         className={cn(
           "flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all",
           task.completed
-            ? "bg-green-500 border-green-500"
-            : "border-muted-foreground/40 hover:border-green-500"
+            ? "bg-primary border-primary"
+            : "border-muted-foreground/40 hover:border-primary"
         )}
       >
-        {task.completed && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
+        {task.completed && <Check className="h-4 w-4 text-primary-foreground" />}
       </button>
     </div>
   );
