@@ -298,9 +298,8 @@ export function TodaysAgenda({
 
   return (
     <Card className={cn(
-      "relative",
-      "bg-gradient-to-br from-card via-card to-primary/5",
-      "border-primary/20"
+      "relative cosmiq-glass-ultra",
+      "border-primary/30"
     )}>
       {/* Background glow */}
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none" />

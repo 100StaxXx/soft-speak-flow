@@ -1120,12 +1120,67 @@ All colors MUST be HSL.
 
   /* ========== COSMIQ GLASS-MORPHISM UTILITIES ========== */
   
-  /* Base cosmiq glass effect */
+  /* Ultra transparent glass - for main containers (most see-through) */
+  .cosmiq-glass-ultra {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card) / 0.25),
+      hsl(var(--card) / 0.15)
+    );
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(var(--cosmiq-glow) / 0.3);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 hsl(var(--pure-white) / 0.08);
+  }
+  
+  /* Subtle glass - for secondary elements */
+  .cosmiq-glass-subtle {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card) / 0.4),
+      hsl(var(--card) / 0.25)
+    );
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--cosmiq-glow) / 0.25);
+    box-shadow: 
+      0 4px 16px rgba(0, 0, 0, 0.25),
+      inset 0 1px 0 hsl(var(--pure-white) / 0.06);
+  }
+  
+  /* Navigation glass - for bottom nav and headers */
+  .cosmiq-glass-nav {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background) / 0.6),
+      hsl(var(--background) / 0.4)
+    );
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid hsl(var(--cosmiq-glow) / 0.15);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Header glass - for sticky headers */
+  .cosmiq-glass-header {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background) / 0.5),
+      hsl(var(--background) / 0.3)
+    );
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid hsl(var(--cosmiq-glow) / 0.15);
+  }
+  
+  /* Base cosmiq glass effect (updated for more transparency) */
   .cosmiq-glass {
     background: linear-gradient(
       135deg,
-      hsl(var(--card) / 0.7),
-      hsl(var(--card) / 0.5)
+      hsl(var(--card) / 0.5),
+      hsl(var(--card) / 0.35)
     );
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);

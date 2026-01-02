@@ -120,7 +120,7 @@ const Companion = () => {
         <div className="min-h-screen pb-nav-safe relative">
           <StarfieldBackground />
           
-          <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-top">
+          <header className="sticky top-0 z-40 w-full cosmiq-glass-header safe-area-top">
             <div className="container flex items-center justify-between py-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
@@ -143,7 +143,7 @@ const Companion = () => {
           </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-5 cosmiq-glass-subtle border border-cosmiq-glow/20">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
