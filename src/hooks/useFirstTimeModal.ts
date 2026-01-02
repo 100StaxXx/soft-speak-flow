@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { safeLocalStorage } from "@/utils/storage";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -12,32 +12,37 @@ const checkedModals = new Set<string>();
 export function useFirstTimeModal(tabName: string) {
   const { user } = useAuth();
   const userId = user?.id;
-  const storageKey = userId ? `tab_intro_${tabName}_${userId}` : null;
   
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
+    // Don't do anything until we have a userId
     if (!userId) return;
     
     const cacheKey = `${tabName}_${userId}`;
+    const storageKey = `tab_intro_${tabName}_${userId}`;
     
     // Skip if already checked this session
     if (checkedModals.has(cacheKey)) return;
     
     checkedModals.add(cacheKey);
     
-    const hasSeenModal = safeLocalStorage.getItem(`tab_intro_${tabName}_${userId}`);
+    const hasSeenModal = safeLocalStorage.getItem(storageKey);
     if (!hasSeenModal) {
       setShowModal(true);
     }
   }, [userId, tabName]);
 
-  const dismissModal = () => {
+  // Use useCallback to ensure we always get the current userId
+  const dismissModal = useCallback(() => {
     setShowModal(false);
-    if (storageKey) {
+    
+    // Recalculate storage key with current userId to avoid stale closure
+    if (userId) {
+      const storageKey = `tab_intro_${tabName}_${userId}`;
       safeLocalStorage.setItem(storageKey, 'true');
     }
-  };
+  }, [userId, tabName]);
 
   return { showModal, dismissModal };
 }
