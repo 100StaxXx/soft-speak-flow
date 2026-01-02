@@ -1,12 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, LogIn, Play, Star, Zap, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageLoader } from "@/components/PageLoader";
-
+import { getRandomBackground } from "@/assets/backgrounds";
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
@@ -26,14 +26,25 @@ const Welcome = () => {
     { icon: Heart, text: "Evolving Companion", delay: 0.3 },
   ];
 
+  const backgroundImage = useMemo(() => getRandomBackground(), []);
+
   if (loading) {
     return <PageLoader message="Preparing your journey..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5 flex flex-col">
+    <div 
+      className="min-h-screen flex flex-col relative"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      {/* Dark overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/70 to-background/90" />
       {/* Hero Section */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
         {/* Animated Logo/Brand */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -123,7 +134,7 @@ const Welcome = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8, duration: 0.5 }}
-        className="pb-8 text-center"
+        className="relative z-10 pb-8 text-center"
       >
         <p className="text-xs text-muted-foreground">
           By continuing, you agree to our{" "}
