@@ -8,6 +8,7 @@ import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Plus, Sparkles, Rocket, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import sampleCosmicPath from "@/assets/sample-cosmic-path.webp";
 
 export function EpicsTab() {
@@ -65,15 +66,10 @@ export function EpicsTab() {
                   ))}
                 </div>
 
-                {/* Campaign description */}
-                <div className="mb-4 space-y-1">
-                  <h3 className="text-lg font-semibold text-foreground/90">
-                    Epic Journeys
-                  </h3>
-                  <p className="text-sm text-muted-foreground/70">
-                    Long-term paths that guide you toward meaningful change
-                  </p>
-                </div>
+                {/* Teaser text */}
+                <p className="text-sm text-muted-foreground/70 mb-4">
+                  Your Journey Awaits...
+                </p>
 
                 {/* Sample Journey Path Preview */}
                 <motion.div 
@@ -117,8 +113,14 @@ export function EpicsTab() {
                       drag="x"
                       dragConstraints={{ left: 0, right: 160 }}
                       dragElastic={0.1}
+                      onDragStart={() => {
+                        Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+                      }}
                       onDragEnd={(_, info) => {
-                        if (info.offset.x > 120) handleAddCampaign();
+                        if (info.offset.x > 120) {
+                          Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => {});
+                          handleAddCampaign();
+                        }
                       }}
                       whileDrag={{ scale: 1.15 }}
                       whileHover={{ scale: 1.05 }}
