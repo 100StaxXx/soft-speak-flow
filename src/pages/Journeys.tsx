@@ -136,13 +136,10 @@ const Journeys = () => {
     }
   }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
-  // Onboarding schedule creation for new users
-  const tutorialSeen = user?.id 
-    ? safeLocalStorage.getItem(`tutorial_dismissed_${user.id}`) === 'true' ||
-      ((profile?.onboarding_data as Record<string, unknown>)?.quests_tutorial_seen === true)
-    : true;
+  // Onboarding schedule creation for new users who completed the main walkthrough
+  const hasCompletedWalkthrough = (profile?.onboarding_data as Record<string, unknown>)?.walkthrough_completed === true;
   
-  useOnboardingSchedule(user?.id, tutorialSeen);
+  useOnboardingSchedule(user?.id, hasCompletedWalkthrough);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
