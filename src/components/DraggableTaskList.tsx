@@ -125,6 +125,10 @@ export function DraggableTaskList<T extends { id: string }>({
       // Trigger light haptic on swap
       triggerHaptic(ImpactStyle.Light);
       
+      // Adjust dragStartY to compensate for position change (prevents jumping)
+      const indexDelta = newIndex - currentIndexRef.current;
+      dragStartYRef.current += indexDelta * ROW_HEIGHT;
+      
       // Reorder visual array
       const newOrder = [...visualOrderRef.current];
       const [removed] = newOrder.splice(currentIndexRef.current, 1);
@@ -159,6 +163,10 @@ export function DraggableTaskList<T extends { id: string }>({
     
     if (newIndex !== currentIndexRef.current) {
       triggerHaptic(ImpactStyle.Light);
+      
+      // Adjust dragStartY to compensate for position change (prevents jumping)
+      const indexDelta = newIndex - currentIndexRef.current;
+      dragStartYRef.current += indexDelta * ROW_HEIGHT;
       
       const newOrder = [...visualOrderRef.current];
       const [removed] = newOrder.splice(currentIndexRef.current, 1);
