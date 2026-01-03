@@ -36,6 +36,7 @@ import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 
 import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
 import { type DragHandleProps } from "./DraggableTaskList";
+import { DraggableTimeTask } from "./DraggableTimeTask";
 
 interface Task {
   id: string;
@@ -79,6 +80,7 @@ interface TodaysAgendaProps {
   onEditQuest?: (task: Task) => void;
   onReorderTasks?: (tasks: Task[]) => void;
   onMoveTaskToSection?: (taskId: string, targetSection: TimeSection) => void;
+  onTaskReschedule?: (taskId: string, newTime: string) => void;
   hideIndicator?: boolean;
   calendarTasks?: CalendarTask[];
   calendarMilestones?: CalendarMilestone[];
@@ -107,6 +109,7 @@ export function TodaysAgenda({
   onEditQuest,
   onReorderTasks,
   onMoveTaskToSection,
+  onTaskReschedule,
   hideIndicator = false,
   calendarTasks = [],
   calendarMilestones = [],
@@ -303,11 +306,11 @@ export function TodaysAgenda({
     const isExpanded = expandedTasks.has(task.id);
     const hasDetails = hasExpandableDetails(task);
     
-    const handleClick = (e: React.MouseEvent) => {
+    const handleCheckboxClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
       // Don't allow clicks while dragging or during long press
       if (isDragging || isActivated || isPressed) {
         e.preventDefault();
-        e.stopPropagation();
         return;
       }
       
@@ -321,6 +324,12 @@ export function TodaysAgenda({
     };
 
     const CategoryIcon = getCategoryIcon(task.category);
+    
+    const handleReschedule = (taskId: string, newTime: string) => {
+      if (onTaskReschedule) {
+        onTaskReschedule(taskId, newTime);
+      }
+    };
 
     const taskContent = (
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
@@ -333,9 +342,13 @@ export function TodaysAgenda({
             isActivated && !isDragging && "bg-muted/30 rounded-lg -mx-1 px-1",
             isOnboarding && !isComplete && "bg-primary/5 -mx-2 px-2 rounded-lg"
           )}
-          onClick={handleClick}
         >
-          <div className="relative">
+          {/* Checkbox - only this toggles completion */}
+          <button
+            onClick={handleCheckboxClick}
+            className="relative touch-manipulation active:scale-95 transition-transform"
+            aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+          >
             <motion.div 
               className={cn(
                 "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
@@ -343,7 +356,7 @@ export function TodaysAgenda({
                   ? "bg-primary border-primary" 
                   : isOnboarding
                     ? "border-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
-                    : "border-muted-foreground/30"
+                    : "border-muted-foreground/30 hover:border-primary"
               )}
               whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
             >
@@ -357,7 +370,7 @@ export function TodaysAgenda({
                 </motion.div>
               )}
             </motion.div>
-          </div>
+          </button>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -498,8 +511,22 @@ export function TodaysAgenda({
       </Collapsible>
     );
 
+    // Wrap with draggable time wrapper for rescheduling via vertical drag
+    if (onTaskReschedule && !isRitual && !isComplete) {
+      return (
+        <DraggableTimeTask
+          taskId={task.id}
+          currentTime={task.scheduled_time ?? null}
+          onReschedule={handleReschedule}
+          disabled={isDragging || isActivated}
+        >
+          {taskContent}
+        </DraggableTimeTask>
+      );
+    }
+
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded]);
+  }, [onToggle, onUndoToggle, onEditQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded, onTaskReschedule]);
 
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
