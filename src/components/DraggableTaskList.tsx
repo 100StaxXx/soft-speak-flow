@@ -1,11 +1,11 @@
-import { useState, useCallback, ReactNode, useRef } from "react";
-import { Reorder, motion } from "framer-motion";
+import { useState, useCallback, ReactNode, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTaskDragOptional } from "@/contexts/TaskDragContext";
+import { useAutoscroll } from "@/hooks/useAutoscroll";
 
-interface DraggableTaskListProps<T extends { id: string; task_text?: string; xp_reward?: number; task_date?: string }> {
+interface DraggableTaskListProps<T extends { id: string }> {
   tasks: T[];
   onReorder: (tasks: T[]) => void;
   renderItem: (task: T, dragHandleProps?: DragHandleProps) => ReactNode;
@@ -31,7 +31,19 @@ const triggerHaptic = async (style: ImpactStyle) => {
   }
 };
 
-export function DraggableTaskList<T extends { id: string; task_text?: string; xp_reward?: number; task_date?: string }>({
+// Spring configuration for neighboring items
+const neighborSpring = {
+  type: "spring" as const,
+  stiffness: 400,
+  damping: 35,
+  mass: 0.8,
+};
+
+const ROW_HEIGHT = 56; // Fixed row height for calculations
+const LONG_PRESS_DURATION = 300;
+const SWAP_THRESHOLD = 0.6; // 60% hysteresis
+
+export function DraggableTaskList<T extends { id: string }>({
   tasks,
   onReorder,
   renderItem,
@@ -39,36 +51,189 @@ export function DraggableTaskList<T extends { id: string; task_text?: string; xp
   onDragStart: onExternalDragStart,
   onDragEnd: onExternalDragEnd,
 }: DraggableTaskListProps<T>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  
+  // Drag state
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const dragContext = useTaskDragOptional();
+  const [visualOrder, setVisualOrder] = useState<T[]>(tasks);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+  // Refs for drag tracking (no re-renders)
+  const dragStartYRef = useRef(0);
+  const currentYRef = useRef(0);
+  const originalIndexRef = useRef(0);
+  const currentIndexRef = useRef(0);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressActiveRef = useRef(false);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const visualOrderRef = useRef<T[]>(tasks);
+  const lastSwapIndexRef = useRef<number | null>(null);
 
-  const handleDragStart = useCallback((id: string, task: T) => {
-    setDraggingId(id);
-    triggerHaptic(ImpactStyle.Medium);
-    onExternalDragStart?.(id);
-    
-    // Broadcast to global drag context for cross-day dragging
-    if (dragContext && task.task_text && task.xp_reward !== undefined && task.task_date) {
-      dragContext.startDrag({
-        id: task.id,
-        task_text: task.task_text,
-        xp_reward: task.xp_reward,
-        task_date: task.task_date,
-      });
+  // Autoscroll hook
+  const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
+    containerRef,
+    enabled: draggingId !== null,
+    edgeThreshold: 80,
+    scrollSpeed: 8,
+  });
+
+  // Sync visual order with tasks when not dragging
+  useEffect(() => {
+    if (!draggingId) {
+      setVisualOrder(tasks);
+      visualOrderRef.current = tasks;
     }
-  }, [onExternalDragStart, dragContext]);
+  }, [tasks, draggingId]);
 
-  const handleDragEnd = useCallback(() => {
-    if (draggingId) {
+  // Calculate target index based on Y position with hysteresis
+  const calculateTargetIndex = useCallback((currentY: number): number => {
+    const deltaY = currentY - dragStartYRef.current;
+    const rowsMoved = deltaY / ROW_HEIGHT;
+    
+    // Apply hysteresis
+    const threshold = SWAP_THRESHOLD;
+    let targetIndex: number;
+    
+    if (rowsMoved > 0) {
+      // Moving down
+      targetIndex = originalIndexRef.current + Math.floor(rowsMoved + (1 - threshold));
+    } else {
+      // Moving up
+      targetIndex = originalIndexRef.current + Math.ceil(rowsMoved - (1 - threshold));
+    }
+    
+    // Clamp to valid range
+    return Math.max(0, Math.min(targetIndex, visualOrderRef.current.length - 1));
+  }, []);
+
+  // Handle pointer move during drag
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    if (!draggingId) return;
+    
+    currentYRef.current = e.clientY;
+    setDragOffset({ x: 0, y: e.clientY - dragStartYRef.current });
+    
+    // Update autoscroll
+    updateAutoscroll(e.clientY);
+    
+    // Calculate new index
+    const newIndex = calculateTargetIndex(e.clientY);
+    
+    // Only update if index changed and different from last swap
+    if (newIndex !== currentIndexRef.current) {
+      // Trigger light haptic on swap
       triggerHaptic(ImpactStyle.Light);
+      
+      // Reorder visual array
+      const newOrder = [...visualOrderRef.current];
+      const [removed] = newOrder.splice(currentIndexRef.current, 1);
+      newOrder.splice(newIndex, 0, removed);
+      
+      visualOrderRef.current = newOrder;
+      currentIndexRef.current = newIndex;
+      lastSwapIndexRef.current = newIndex;
+      
+      // Update visual state (minimal re-render)
+      setVisualOrder(newOrder);
     }
-    setDraggingId(null);
-    onExternalDragEnd?.();
-    
-    // End global drag
-    dragContext?.endDrag();
-  }, [draggingId, onExternalDragEnd, dragContext]);
+  }, [draggingId, calculateTargetIndex, updateAutoscroll]);
 
+  // Handle pointer up - commit order
+  const handlePointerUp = useCallback(() => {
+    if (draggingId) {
+      triggerHaptic(ImpactStyle.Medium);
+      
+      // Commit final order
+      onReorder(visualOrderRef.current);
+      onExternalDragEnd?.();
+    }
+    
+    // Cleanup
+    setDraggingId(null);
+    setDragOffset({ x: 0, y: 0 });
+    isLongPressActiveRef.current = false;
+    lastSwapIndexRef.current = null;
+    stopScroll();
+    
+    // Remove global listeners
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointercancel', handlePointerUp);
+  }, [draggingId, onReorder, onExternalDragEnd, stopScroll, handlePointerMove]);
+
+  // Start drag after long press
+  const startDrag = useCallback((taskId: string, index: number, startY: number) => {
+    setDraggingId(taskId);
+    dragStartYRef.current = startY;
+    currentYRef.current = startY;
+    originalIndexRef.current = index;
+    currentIndexRef.current = index;
+    visualOrderRef.current = [...tasks];
+    setVisualOrder([...tasks]);
+    
+    triggerHaptic(ImpactStyle.Medium);
+    onExternalDragStart?.(taskId);
+    
+    // Add global listeners for drag
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+  }, [tasks, onExternalDragStart, handlePointerMove, handlePointerUp]);
+
+  // Long press handlers
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent, taskId: string, index: number) => {
+    if (disabled || draggingId) return;
+    
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressActiveRef.current = true;
+      startDrag(taskId, index, touch.clientY);
+    }, LONG_PRESS_DURATION);
+  }, [disabled, draggingId, startDrag]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isLongPressActiveRef.current || draggingId) return;
+    
+    if (!touchStartPosRef.current) return;
+    
+    const touch = e.touches[0];
+    const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    
+    // Cancel long press if user scrolls before it triggers
+    if (deltaY > 10) {
+      clearLongPress();
+    }
+  }, [draggingId, clearLongPress]);
+
+  const handleTouchEnd = useCallback(() => {
+    clearLongPress();
+    isLongPressActiveRef.current = false;
+  }, [clearLongPress]);
+
+  // Pointer events for mouse (desktop)
+  const handlePointerDown = useCallback((e: React.PointerEvent, taskId: string, index: number) => {
+    if (disabled || draggingId || e.pointerType === 'touch') return;
+    
+    touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+    
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressActiveRef.current = true;
+      startDrag(taskId, index, e.clientY);
+    }, LONG_PRESS_DURATION);
+  }, [disabled, draggingId, startDrag]);
+
+  // Disabled or single item - no drag
   if (disabled || tasks.length <= 1) {
     return (
       <div className="space-y-0">
@@ -88,202 +253,94 @@ export function DraggableTaskList<T extends { id: string; task_text?: string; xp
     );
   }
 
-  const isAnyDragging = draggingId !== null;
+  const isDragging = draggingId !== null;
 
   return (
-    <Reorder.Group
-      axis="y"
-      values={tasks}
-      onReorder={onReorder}
-      className="space-y-0"
-    >
-      {tasks.map((task) => (
-        <DraggableItem
-          key={task.id}
-          task={task}
-          isDragging={draggingId === task.id}
-          isAnyDragging={isAnyDragging}
-          onDragStart={() => handleDragStart(task.id, task)}
-          onDragEnd={handleDragEnd}
-          renderItem={renderItem}
-        />
-      ))}
-    </Reorder.Group>
-  );
-}
-
-interface DraggableItemProps<T extends { id: string }> {
-  task: T;
-  isDragging: boolean;
-  isAnyDragging: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
-  renderItem: (task: T, dragHandleProps: DragHandleProps) => ReactNode;
-}
-
-function DraggableItem<T extends { id: string }>({
-  task,
-  isDragging,
-  isAnyDragging,
-  onDragStart,
-  onDragEnd,
-  renderItem,
-}: DraggableItemProps<T>) {
-  const dragHandleRef = useRef<HTMLDivElement | null>(null);
-  const [isSettling, setIsSettling] = useState(false);
-  const [isLongPressActive, setIsLongPressActive] = useState(false);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  // Clear long press timer
-  const clearLongPress = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    touchStartPosRef.current = null;
-  }, []);
-
-  // Handle touch start - start long press timer
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (isDragging || isAnyDragging) return;
-    
-    const touch = e.touches[0];
-    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-    
-    longPressTimerRef.current = setTimeout(async () => {
-      setIsLongPressActive(true);
-      try {
-        await Haptics.impact({ style: ImpactStyle.Medium });
-      } catch {}
-      onDragStart();
-    }, 300);
-  }, [isDragging, isAnyDragging, onDragStart]);
-
-  // Handle touch move - cancel if moved too much before long press
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (isLongPressActive || isDragging) return; // Let framer-motion handle it during drag
-    
-    if (!touchStartPosRef.current) return;
-    
-    const touch = e.touches[0];
-    const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
-    
-    // Cancel long press if user scrolls
-    if (deltaY > 10) {
-      clearLongPress();
-    }
-  }, [isLongPressActive, isDragging, clearLongPress]);
-
-  // Handle touch end
-  const handleTouchEnd = useCallback(() => {
-    clearLongPress();
-    if (!isDragging) {
-      setIsLongPressActive(false);
-    }
-  }, [clearLongPress, isDragging]);
-
-  const handleDragEnd = async () => {
-    setIsSettling(true);
-    setIsLongPressActive(false);
-    clearLongPress();
-    
-    try {
-      await Haptics.impact({ style: ImpactStyle.Light });
-    } catch {}
-    
-    setTimeout(() => {
-      setIsSettling(false);
-    }, 250);
-    
-    onDragEnd();
-  };
-
-  // Determine current visual state
-  const getScale = () => {
-    if (isDragging) return 1.03;
-    if (isSettling) return 1.01;
-    if (isLongPressActive && !isDragging) return 0.97;
-    return 1;
-  };
-
-  const getBoxShadow = () => {
-    if (isDragging) {
-      return "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)";
-    }
-    if (isSettling) {
-      return "0 5px 15px -3px rgba(0, 0, 0, 0.15), 0 3px 6px -2px rgba(0, 0, 0, 0.1)";
-    }
-    return "none";
-  };
-
-  const shouldBlockPointerEvents = isAnyDragging && !isDragging;
-
-  return (
-    <Reorder.Item
-      value={task}
-      // KEY FIX: Use native dragListener when long press is active
-      // This lets framer-motion handle touch events natively on iOS
-      dragListener={isLongPressActive}
-      onDragStart={() => {
-        onDragStart();
-      }}
-      onDragEnd={handleDragEnd}
-      drag="y"
-      className={cn(
-        "relative",
-        isDragging && "z-50"
-      )}
-      style={{
-        cursor: isDragging ? 'grabbing' : isLongPressActive ? 'grab' : 'default',
-        WebkitUserSelect: 'none',
-        userSelect: 'none',
-        WebkitTouchCallout: 'none',
-        touchAction: isLongPressActive || isDragging ? 'none' : 'pan-y',
-        pointerEvents: shouldBlockPointerEvents ? 'none' : 'auto',
-      }}
-      initial={false}
-      animate={{
-        scale: getScale(),
-        boxShadow: getBoxShadow(),
-        opacity: shouldBlockPointerEvents ? 0.6 : 1,
-        backgroundColor: isDragging || isSettling ? "hsl(var(--background))" : "transparent",
-        borderRadius: isDragging || isSettling ? 12 : 0,
-      }}
-      transition={{
-        scale: { type: "spring", stiffness: 300, damping: 22 },
-        boxShadow: { duration: 0.2, ease: "easeOut" },
-        opacity: { duration: 0.15 },
-        backgroundColor: { duration: 0.2 },
-        borderRadius: { duration: 0.2 },
-      }}
-      // Native touch handlers for long-press detection only
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-    >
-      {renderItem(task, {
-        isDragging,
-        isPressed: isLongPressActive && !isDragging,
-        isActivated: isLongPressActive,
-        dragHandleRef,
-        onDragStart,
-        onDragEnd: handleDragEnd,
+    <div ref={containerRef} className="space-y-0 relative">
+      {visualOrder.map((task, index) => {
+        const isThisDragging = draggingId === task.id;
+        const isAnyDragging = isDragging;
+        
+        // Calculate offset for non-dragging items
+        let yOffset = 0;
+        if (isAnyDragging && !isThisDragging) {
+          // Find where this item was originally and where it is now
+          const originalPosition = tasks.findIndex(t => t.id === task.id);
+          const currentPosition = index;
+          yOffset = (currentPosition - originalPosition) * 0; // Let CSS handle this
+        }
+        
+        return (
+          <motion.div
+            key={task.id}
+            ref={(el) => {
+              if (el) itemRefsMap.current.set(task.id, el);
+            }}
+            className={cn(
+              "relative",
+              isThisDragging && "z-50"
+            )}
+            style={{
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+              WebkitTouchCallout: 'none',
+              touchAction: isThisDragging ? 'none' : 'pan-y',
+              pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+            }}
+            // Touch handlers
+            onTouchStart={(e) => handleTouchStart(e, task.id, index)}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            // Pointer handlers (mouse)
+            onPointerDown={(e) => handlePointerDown(e, task.id, index)}
+            onPointerUp={() => {
+              if (!isLongPressActiveRef.current) {
+                clearLongPress();
+              }
+            }}
+            onPointerCancel={() => {
+              clearLongPress();
+            }}
+            layout={!isThisDragging}
+            animate={{
+              y: isThisDragging ? dragOffset.y : 0,
+              scale: isThisDragging ? 1.03 : 1,
+              boxShadow: isThisDragging 
+                ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                : "none",
+              opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+              backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
+              borderRadius: isThisDragging ? 12 : 0,
+            }}
+            transition={isThisDragging ? { duration: 0 } : neighborSpring}
+          >
+            {renderItem(task, {
+              isDragging: isThisDragging,
+              isPressed: false,
+              isActivated: isThisDragging,
+              dragHandleRef: { current: null },
+              onDragStart: () => startDrag(task.id, index, currentYRef.current),
+              onDragEnd: handlePointerUp,
+            })}
+            
+            {/* Grip indicator */}
+            <AnimatePresence>
+              {isThisDragging && (
+                <motion.div 
+                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1"
+                  initial={{ opacity: 0, x: 4 }}
+                  animate={{ opacity: 0.7, x: 0 }}
+                  exit={{ opacity: 0, x: 4 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                >
+                  <GripVertical className="w-4 h-4 text-muted-foreground" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        );
       })}
-      
-      {/* Grip indicator */}
-      <motion.div 
-        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1"
-        initial={{ opacity: 0, x: 4 }}
-        animate={{ 
-          opacity: isLongPressActive || isDragging ? 0.7 : 0,
-          x: isLongPressActive || isDragging ? 0 : 4,
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      >
-        <GripVertical className="w-4 h-4 text-muted-foreground" />
-      </motion.div>
-    </Reorder.Item>
+    </div>
   );
 }
