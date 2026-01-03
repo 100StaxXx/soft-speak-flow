@@ -17,6 +17,9 @@ import { PageInfoModal } from "@/components/PageInfoModal";
 import { QuestHubTutorial } from "@/components/QuestHubTutorial";
 import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
@@ -50,6 +53,7 @@ const Journeys = () => {
   
   // Auth and profile for onboarding
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { profile } = useProfile();
   
   // Streak freeze
@@ -72,12 +76,14 @@ const Journeys = () => {
     addTask,
     toggleTask,
     updateTask,
+    deleteTask,
     reorderTasks,
     moveTaskToSection,
     completedCount,
     totalCount,
     isAdding,
-    isUpdating
+    isUpdating,
+    isDeleting
   } = useDailyTasks(selectedDate);
   
   // Perfect Day celebration tracking
@@ -229,6 +235,48 @@ const Journeys = () => {
     setEditingTask(null);
   };
 
+  const handleDeleteQuest = async (taskId: string) => {
+    await deleteTask(taskId);
+    setEditingTask(null);
+  };
+
+  const handleDeleteRitual = async (habitId: string) => {
+    if (!user?.id) return;
+    try {
+      // Delete the habit template
+      const { error: habitError } = await supabase
+        .from('habits')
+        .delete()
+        .eq('id', habitId)
+        .eq('user_id', user.id);
+      
+      if (habitError) throw habitError;
+
+      // Delete all incomplete tasks linked to this habit
+      const { error: tasksError } = await supabase
+        .from('daily_tasks')
+        .delete()
+        .eq('habit_source_id', habitId)
+        .eq('user_id', user.id)
+        .eq('completed', false);
+
+      if (tasksError) {
+        console.error('Error deleting linked tasks:', tasksError);
+      }
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      
+      toast.success('Ritual deleted');
+    } catch (error) {
+      console.error('Error deleting ritual:', error);
+      toast.error('Failed to delete ritual');
+    }
+    setEditingRitual(null);
+  };
+
   // Handle task reordering from drag and drop
   const handleReorderTasks = (reorderedTasks: typeof dailyTasks) => {
     const updates = reorderedTasks.map((task, index) => ({
@@ -324,6 +372,8 @@ const Journeys = () => {
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
+          onDelete={handleDeleteQuest}
+          isDeleting={isDeleting}
         />
         
         {/* Edit Ritual Sheet (for habits/rituals with two-way sync) */}
@@ -331,6 +381,7 @@ const Journeys = () => {
           ritual={editingRitual}
           open={!!editingRitual}
           onOpenChange={(open) => !open && setEditingRitual(null)}
+          onDelete={handleDeleteRitual}
         />
 
         <PageInfoModal

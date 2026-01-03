@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Repeat, Loader2, Brain, Dumbbell, Flame } from "lucide-react";
+import { Repeat, Loader2, Brain, Dumbbell, Flame, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,16 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
@@ -57,6 +67,8 @@ interface EditRitualSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaveComplete?: () => void;
+  onDelete?: (habitId: string) => Promise<void>;
+  isDeleting?: boolean;
 }
 
 const categoryConfig: Record<HabitCategory, { icon: typeof Brain; label: string; color: string }> = {
@@ -70,6 +82,8 @@ export function EditRitualSheet({
   open,
   onOpenChange,
   onSaveComplete,
+  onDelete,
+  isDeleting,
 }: EditRitualSheetProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -88,6 +102,7 @@ export function EditRitualSheet({
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Reset form when ritual changes
   useEffect(() => {
@@ -224,6 +239,13 @@ export function EditRitualSheet({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!ritual || !onDelete) return;
+    await onDelete(ritual.habitId);
+    setShowDeleteConfirm(false);
+    onOpenChange(false);
   };
 
   return (
@@ -387,22 +409,58 @@ export function EditRitualSheet({
           </div>
         </ScrollArea>
 
-        <SheetFooter className="pt-4 gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !title.trim()}>
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save Changes"
+        <SheetFooter className="pt-4 flex justify-between">
+          <div>
+            {onDelete && (
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting || saving}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
             )}
-          </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !title.trim()}>
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this ritual?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{ritual?.title}" and remove all future instances. Completed tasks will remain in your history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
