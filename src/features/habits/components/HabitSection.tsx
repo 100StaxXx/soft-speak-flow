@@ -157,30 +157,35 @@ export function HabitSection({
                 </div>
               )}
               
-              <button
-                onClick={() => onToggleHabit({ habitId: habit.id, isCompleted: completed })}
+              <div
                 className={cn(
                   "flex-1 flex items-center gap-3 p-3 rounded-lg border transition-all",
                   completed 
                     ? "bg-primary/10 border-primary/30" 
-                    : "bg-card hover:bg-accent/50"
+                    : "bg-card"
                 )}
               >
-                <div className={cn(
-                  "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
-                  completed 
-                    ? "bg-primary border-primary" 
-                    : "border-muted-foreground/30"
-                )}>
-                  {completed && <Check className="h-4 w-4 text-primary-foreground" />}
-                </div>
+                <button
+                  onClick={() => onToggleHabit({ habitId: habit.id, isCompleted: completed })}
+                  className="touch-manipulation active:scale-95 transition-transform"
+                  aria-label={completed ? "Mark habit as incomplete" : "Mark habit as complete"}
+                >
+                  <div className={cn(
+                    "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+                    completed 
+                      ? "bg-primary border-primary" 
+                      : "border-muted-foreground/30 hover:border-primary"
+                  )}>
+                    {completed && <Check className="h-4 w-4 text-primary-foreground" />}
+                  </div>
+                </button>
                 <span className={cn(
                   "font-medium",
                   completed && "line-through text-muted-foreground"
                 )}>
                   {habit.title}
                 </span>
-              </button>
+              </div>
             </div>
           );
         })}
