@@ -270,23 +270,21 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             currentDeadline={journey.end_date}
           >
             <motion.button 
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
-                bg-gradient-to-br from-sky-400/25 via-blue-400/20 to-indigo-400/25
-                border-2 border-celestial-blue/40
-                shadow-[0_4px_20px_rgba(56,189,248,0.15)]
-                min-h-[88px] font-fredoka"
-              whileHover={{ scale: 1.05, rotate: -1 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              className="group flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
+                bg-white/[0.05] backdrop-blur-xl
+                border border-white/[0.08]
+                hover:bg-white/[0.08] hover:border-white/[0.12]
+                transition-all duration-300 ease-out
+                min-h-[88px]"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "tween", duration: 0.2 }}
             >
-              <motion.div
-                animate={{ y: [0, -3, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
-              >
-                <Flag className="w-7 h-7 text-celestial-blue drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
-              </motion.div>
-              <span className="text-sm font-semibold">Milestones</span>
-              <span className="text-xs text-sky-300/80">✨ {milestones?.filter(m => m.completed_at).length || 0}/{milestones?.length || 0}</span>
+              <div className="p-2.5 rounded-xl bg-sky-500/10 group-hover:bg-sky-500/15 transition-colors">
+                <Flag className="w-5 h-5 text-sky-400" />
+              </div>
+              <span className="text-sm font-medium text-white/90">Milestones</span>
+              <span className="text-xs text-white/50">{milestones?.filter(m => m.completed_at).length || 0} of {milestones?.length || 0}</span>
             </motion.button>
           </JourneyDetailDrawer>
           
@@ -310,23 +308,21 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
               onAdjustPlan={() => setShowAdjustDialog(true)}
               renderTrigger={(todayCount) => (
                 <motion.button 
-                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
-                    bg-gradient-to-br from-purple-400/25 via-pink-400/20 to-fuchsia-400/25
-                    border-2 border-primary/40
-                    shadow-[0_4px_20px_rgba(168,85,247,0.15)]
-                    min-h-[88px] font-fredoka"
-                  whileHover={{ scale: 1.05, rotate: 1 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className="group flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
+                    bg-white/[0.05] backdrop-blur-xl
+                    border border-white/[0.08]
+                    hover:bg-white/[0.08] hover:border-white/[0.12]
+                    transition-all duration-300 ease-out
+                    min-h-[88px]"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "tween", duration: 0.2 }}
                 >
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
-                  >
-                    <Star className="w-7 h-7 text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
-                  </motion.div>
-                  <span className="text-sm font-semibold">Rituals</span>
-                  <span className="text-xs text-purple-300/80">🌟 {todayCount} today</span>
+                  <div className="p-2.5 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/15 transition-colors">
+                    <Star className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <span className="text-sm font-medium text-white/90">Rituals</span>
+                  <span className="text-xs text-white/50">{todayCount} today</span>
                 </motion.button>
               )}
             />
