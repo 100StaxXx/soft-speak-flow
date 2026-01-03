@@ -106,8 +106,7 @@ export function DraggableTaskList<T extends { id: string }>({
     // Clamp to valid range
     return Math.max(0, Math.min(targetIndex, visualOrderRef.current.length - 1));
   }, []);
-
-  // Handle pointer move during drag
+  // Handle pointer move during drag (desktop)
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!draggingId) return;
     
@@ -139,6 +138,63 @@ export function DraggableTaskList<T extends { id: string }>({
     }
   }, [draggingId, calculateTargetIndex, updateAutoscroll]);
 
+  // Handle touch move during drag (iOS compatible)
+  const handleTouchMoveWhileDragging = useCallback((e: TouchEvent) => {
+    if (!draggingId) return;
+    
+    e.preventDefault(); // Prevent page scroll while dragging
+    
+    const touch = e.touches[0];
+    if (!touch) return;
+    
+    currentYRef.current = touch.clientY;
+    setDragOffset({ x: 0, y: touch.clientY - dragStartYRef.current });
+    
+    // Update autoscroll
+    updateAutoscroll(touch.clientY);
+    
+    // Calculate new index with hysteresis
+    const newIndex = calculateTargetIndex(touch.clientY);
+    
+    if (newIndex !== currentIndexRef.current) {
+      triggerHaptic(ImpactStyle.Light);
+      
+      const newOrder = [...visualOrderRef.current];
+      const [removed] = newOrder.splice(currentIndexRef.current, 1);
+      newOrder.splice(newIndex, 0, removed);
+      
+      visualOrderRef.current = newOrder;
+      currentIndexRef.current = newIndex;
+      setVisualOrder(newOrder);
+    }
+  }, [draggingId, calculateTargetIndex, updateAutoscroll]);
+
+  // Cleanup function for all drag listeners
+  const cleanupDragListeners = useCallback(() => {
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointercancel', handlePointerUp);
+    window.removeEventListener('touchmove', handleTouchMoveWhileDragging);
+    window.removeEventListener('touchend', handleTouchEndWhileDragging);
+    window.removeEventListener('touchcancel', handleTouchEndWhileDragging);
+  }, []);
+
+  // Handle touch end during drag (iOS)
+  const handleTouchEndWhileDragging = useCallback(() => {
+    if (draggingId) {
+      triggerHaptic(ImpactStyle.Medium);
+      onReorder(visualOrderRef.current);
+      onExternalDragEnd?.();
+    }
+    
+    setDraggingId(null);
+    setDragOffset({ x: 0, y: 0 });
+    isLongPressActiveRef.current = false;
+    lastSwapIndexRef.current = null;
+    stopScroll();
+    cleanupDragListeners();
+  }, [draggingId, onReorder, onExternalDragEnd, stopScroll, cleanupDragListeners]);
+
   // Handle pointer up - commit order
   const handlePointerUp = useCallback(() => {
     if (draggingId) {
@@ -155,12 +211,8 @@ export function DraggableTaskList<T extends { id: string }>({
     isLongPressActiveRef.current = false;
     lastSwapIndexRef.current = null;
     stopScroll();
-    
-    // Remove global listeners
-    window.removeEventListener('pointermove', handlePointerMove);
-    window.removeEventListener('pointerup', handlePointerUp);
-    window.removeEventListener('pointercancel', handlePointerUp);
-  }, [draggingId, onReorder, onExternalDragEnd, stopScroll, handlePointerMove]);
+    cleanupDragListeners();
+  }, [draggingId, onReorder, onExternalDragEnd, stopScroll, cleanupDragListeners]);
 
   // Start drag after long press
   const startDrag = useCallback((taskId: string, index: number, startY: number) => {
@@ -175,11 +227,14 @@ export function DraggableTaskList<T extends { id: string }>({
     triggerHaptic(ImpactStyle.Medium);
     onExternalDragStart?.(taskId);
     
-    // Add global listeners for drag
+    // Add BOTH pointer (desktop) AND touch (iOS) listeners
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
-  }, [tasks, onExternalDragStart, handlePointerMove, handlePointerUp]);
+    window.addEventListener('touchmove', handleTouchMoveWhileDragging, { passive: false });
+    window.addEventListener('touchend', handleTouchEndWhileDragging);
+    window.addEventListener('touchcancel', handleTouchEndWhileDragging);
+  }, [tasks, onExternalDragStart, handlePointerMove, handlePointerUp, handleTouchMoveWhileDragging, handleTouchEndWhileDragging]);
 
   // Long press handlers
   const clearLongPress = useCallback(() => {
