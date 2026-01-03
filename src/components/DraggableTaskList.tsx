@@ -50,6 +50,7 @@ export function DraggableTaskList<T extends { id: string }>({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [visualOrder, setVisualOrder] = useState<T[]>(tasks);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
   
   // Refs for drag tracking (no re-renders)
   const draggingIdRef = useRef<string | null>(null); // Sync ref for closures
@@ -188,10 +189,15 @@ export function DraggableTaskList<T extends { id: string }>({
 
   // Handle touch end during drag (iOS)
   const handleTouchEndWhileDragging = useCallback(() => {
-    if (draggingIdRef.current) { // Use ref for closure
+    const droppedId = draggingIdRef.current;
+    if (droppedId) { // Use ref for closure
       triggerHaptic(ImpactStyle.Medium);
       onReorder(visualOrderRef.current);
       onExternalDragEnd?.();
+      
+      // Trigger bounce animation
+      setJustDroppedId(droppedId);
+      setTimeout(() => setJustDroppedId(null), 300);
     }
     
     draggingIdRef.current = null;
@@ -205,12 +211,17 @@ export function DraggableTaskList<T extends { id: string }>({
 
   // Handle pointer up - commit order
   const handlePointerUp = useCallback(() => {
-    if (draggingIdRef.current) { // Use ref for closure
+    const droppedId = draggingIdRef.current;
+    if (droppedId) { // Use ref for closure
       triggerHaptic(ImpactStyle.Medium);
       
       // Commit final order
       onReorder(visualOrderRef.current);
       onExternalDragEnd?.();
+      
+      // Trigger bounce animation
+      setJustDroppedId(droppedId);
+      setTimeout(() => setJustDroppedId(null), 300);
     }
     
     // Cleanup
@@ -326,9 +337,10 @@ export function DraggableTaskList<T extends { id: string }>({
       {visualOrder.map((task, index) => {
         const isThisDragging = draggingId === task.id;
         const isAnyDragging = isDragging;
+        const isJustDropped = justDroppedId === task.id;
         
         return (
-          <div
+          <motion.div
             key={task.id}
             ref={(el) => {
               if (el) itemRefsMap.current.set(task.id, el);
@@ -337,6 +349,20 @@ export function DraggableTaskList<T extends { id: string }>({
               "relative",
               isThisDragging && "z-50"
             )}
+            // Bounce animation on drop
+            animate={isJustDropped ? {
+              scale: [1, 1.02, 0.98, 1],
+              y: [0, -2, 1, 0],
+            } : {
+              scale: 1,
+              y: 0,
+            }}
+            transition={isJustDropped ? {
+              duration: 0.25,
+              ease: [0.25, 0.1, 0.25, 1],
+            } : {
+              duration: 0,
+            }}
             style={{
               WebkitUserSelect: 'none',
               userSelect: 'none',
@@ -344,12 +370,9 @@ export function DraggableTaskList<T extends { id: string }>({
               touchAction: isThisDragging ? 'none' : 'pan-y',
               pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
               // Direct CSS transform for dragged item (instant, no animation lag)
-              // Non-dragging items get translateY(0) so CSS transition has something to animate
               transform: isThisDragging 
                 ? `translateY(${dragOffset.y}px) scale(1.03)` 
-                : 'translateY(0)',
-                // No transition - instant repositioning
-                transition: 'none',
+                : undefined,
               opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
               boxShadow: isThisDragging 
                 ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
@@ -396,7 +419,7 @@ export function DraggableTaskList<T extends { id: string }>({
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </motion.div>
         );
       })}
     </div>
