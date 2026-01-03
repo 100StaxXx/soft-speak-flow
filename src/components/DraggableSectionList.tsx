@@ -162,7 +162,12 @@ export function DraggableSectionList({
             sectionId={sectionId}
             isActive={isAnyDragging && draggingTaskSection !== sectionId}
             isDraggedOver={hoveredSection === sectionId && draggingTaskSection !== sectionId}
-            onDragEnter={() => setHoveredSection(sectionId)}
+            onDragEnter={() => {
+              if (draggingTaskId && draggingTaskSection !== sectionId) {
+                triggerHaptic(ImpactStyle.Light);
+              }
+              setHoveredSection(sectionId);
+            }}
             onDragLeave={() => setHoveredSection(prev => prev === sectionId ? null : prev)}
             onDrop={() => handleSectionDrop(sectionId)}
             isEmpty={sectionTasks.length === 0}

@@ -136,28 +136,38 @@ function DraggableItem<T extends { id: string }>({
       dragListener={false}
       dragControls={dragControls}
       onDragEnd={handleDragEnd}
+      layout
+      layoutId={task.id}
       className={cn(
-        "relative touch-none",
-        isDragging && "z-50"
+        "relative",
+        isDragging ? "z-50 touch-none" : "touch-pan-x"
       )}
       style={{
         cursor: isDragging ? 'grabbing' : isActivated ? 'grab' : 'default',
       }}
+      transition={{
+        layout: { type: "spring", stiffness: 350, damping: 35 }
+      }}
       whileDrag={{
-        scale: 1.02,
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.1)",
+        scale: 1.03,
+        boxShadow: "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)",
         backgroundColor: "hsl(var(--background))",
         borderRadius: "12px",
       }}
       {...handlers}
     >
-      {/* Visual feedback wrapper */}
+      {/* Visual feedback wrapper with lift animation */}
       <motion.div
         animate={{
-          scale: isPressed && !isDragging ? 0.98 : isActivated && !isDragging ? 1.01 : 1,
-          opacity: isPressed && !isDragging ? 0.9 : 1,
+          scale: isPressed && !isDragging ? 0.97 : isActivated && !isDragging ? 1.02 : 1,
+          opacity: isPressed && !isDragging ? 0.85 : 1,
+          y: isActivated && !isDragging ? -2 : 0,
         }}
-        transition={{ duration: 0.15 }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 500, 
+          damping: 30 
+        }}
       >
         {renderItem(task, {
           isDragging,
@@ -177,7 +187,7 @@ function DraggableItem<T extends { id: string }>({
           opacity: isActivated || isDragging ? 0.7 : 0,
           x: isActivated || isDragging ? 0 : 4,
         }}
-        transition={{ duration: 0.15 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
       >
         <GripVertical className="w-4 h-4 text-muted-foreground" />
       </motion.div>
