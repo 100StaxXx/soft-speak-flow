@@ -636,40 +636,33 @@ export function TodaysAgenda({
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                        <ArrowUpDown className="w-3.5 h-3.5" />
-                        {sortBy === 'custom' && 'Custom'}
-                        {sortBy === 'time' && 'Time'}
-                        {sortBy === 'priority' && 'Priority'}
-                        {sortBy === 'xp' && 'XP'}
-                      </Button>
+                      <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity">
+                        <ArrowUpDown className="w-3 h-3" />
+                      </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-32">
+                    <DropdownMenuContent align="end" className="w-28">
                       <DropdownMenuItem 
                         onClick={() => setSortBy('custom')}
-                        className={cn(sortBy === 'custom' && 'bg-accent/10')}
+                        className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
                       >
                         Custom
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => setSortBy('time')}
-                        className={cn(sortBy === 'time' && 'bg-accent/10')}
+                        className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
                       >
-                        <Clock className="w-3.5 h-3.5 mr-2" />
                         Time
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => setSortBy('priority')}
-                        className={cn(sortBy === 'priority' && 'bg-accent/10')}
+                        className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
                       >
-                        <Zap className="w-3.5 h-3.5 mr-2" />
                         Priority
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => setSortBy('xp')}
-                        className={cn(sortBy === 'xp' && 'bg-accent/10')}
+                        className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
                       >
-                        <Trophy className="w-3.5 h-3.5 mr-2" />
                         XP
                       </DropdownMenuItem>
                     </DropdownMenuContent>
