@@ -262,7 +262,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             </motion.div>
           )}
           
-          {/* Milestones Tile - Floating Pill Card */}
+          {/* Milestones Tile - Cool and adventurous */}
           <JourneyDetailDrawer 
             epicId={journey.id} 
             epicTitle={journey.title}
@@ -270,23 +270,27 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
             currentDeadline={journey.end_date}
           >
             <motion.button 
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl
-                bg-slate-800/80 backdrop-blur-sm
-                border border-white/10
-                shadow-lg shadow-black/20
-                hover:shadow-xl hover:shadow-sky-500/10
-                min-h-[88px] transition-shadow duration-300"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
+                bg-gradient-to-br from-sky-400/25 via-blue-400/20 to-indigo-400/25
+                border-2 border-celestial-blue/40
+                shadow-[0_4px_20px_rgba(56,189,248,0.15)]
+                min-h-[88px] font-fredoka"
+              whileHover={{ scale: 1.05, rotate: -1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
             >
-              <Flag className="w-6 h-6 text-slate-300" />
-              <span className="text-sm font-medium text-foreground">Milestones</span>
-              <span className="text-xs text-muted-foreground">{milestones?.filter(m => m.completed_at).length || 0} of {milestones?.length || 0} complete</span>
+              <motion.div
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+              >
+                <Flag className="w-7 h-7 text-celestial-blue drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
+              </motion.div>
+              <span className="text-sm font-semibold">Milestones</span>
+              <span className="text-xs text-sky-300/80">✨ {milestones?.filter(m => m.completed_at).length || 0}/{milestones?.length || 0}</span>
             </motion.button>
           </JourneyDetailDrawer>
           
-          {/* Rituals Tile - Floating Pill Card */}
+          {/* Rituals Tile - Magical and special */}
           {journey.epic_habits && ritualCount > 0 && (
             <EpicCheckInDrawer
               epicId={journey.id}
@@ -306,19 +310,23 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
               onAdjustPlan={() => setShowAdjustDialog(true)}
               renderTrigger={(todayCount) => (
                 <motion.button 
-                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-3xl
-                    bg-slate-800/80 backdrop-blur-sm
-                    border border-white/10
-                    shadow-lg shadow-black/20
-                    hover:shadow-xl hover:shadow-purple-500/10
-                    min-h-[88px] transition-shadow duration-300"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl
+                    bg-gradient-to-br from-purple-400/25 via-pink-400/20 to-fuchsia-400/25
+                    border-2 border-primary/40
+                    shadow-[0_4px_20px_rgba(168,85,247,0.15)]
+                    min-h-[88px] font-fredoka"
+                  whileHover={{ scale: 1.05, rotate: 1 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 >
-                  <Star className="w-6 h-6 text-slate-300" />
-                  <span className="text-sm font-medium text-foreground">Rituals</span>
-                  <span className="text-xs text-muted-foreground">{todayCount} due today</span>
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+                  >
+                    <Star className="w-7 h-7 text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                  </motion.div>
+                  <span className="text-sm font-semibold">Rituals</span>
+                  <span className="text-xs text-purple-300/80">🌟 {todayCount} today</span>
                 </motion.button>
               )}
             />
