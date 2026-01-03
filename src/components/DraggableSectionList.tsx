@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { motion, LayoutGroup } from "framer-motion";
+import { motion } from "framer-motion";
 import { DroppableSection, TimeSection, sectionConfig } from "./DroppableSection";
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -148,9 +148,8 @@ export function DraggableSectionList({
   const isAnyDragging = draggingTaskId !== null;
 
   return (
-    <LayoutGroup>
-      <div className="space-y-3">
-        {sections.map(sectionId => {
+    <div className="space-y-3">
+      {sections.map(sectionId => {
           const sectionTasks = groupedTasks[sectionId];
           // Only show sections with tasks, OR all sections when dragging (to allow cross-section drops)
           const shouldShow = sectionTasks.length > 0 || isAnyDragging;
@@ -194,8 +193,7 @@ export function DraggableSectionList({
             </DroppableSection>
           );
         })}
-      </div>
-    </LayoutGroup>
+    </div>
   );
 }
 
