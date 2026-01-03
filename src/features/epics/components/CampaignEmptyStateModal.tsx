@@ -82,7 +82,7 @@ export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateMo
           <div className="relative flex flex-col h-full pt-safe-top pb-safe-bottom">
             {/* Header text */}
             <motion.div 
-              className="flex-shrink-0 pt-16 px-6 text-center"
+              className="flex-shrink-0 pt-24 px-6 text-center"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
@@ -104,7 +104,7 @@ export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateMo
             
             {/* Drag-to-Launch slider */}
             <motion.div 
-              className="flex-shrink-0 px-6 pb-28"
+              className="flex-shrink-0 px-6 pb-40"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.5 }}
