@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, setMonth, setYear } from "date-fns";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 
@@ -28,8 +31,13 @@ export function YearView({
   tasks,
   milestones = []
 }: YearViewProps) {
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
   const currentYear = selectedDate.getFullYear();
   const today = new Date();
+  
+  // Generate years from current year - 5 to current year + 10
+  const thisYear = new Date().getFullYear();
+  const years = Array.from({ length: 16 }, (_, i) => thisYear - 5 + i);
 
   const handlePrevYear = () => {
     onYearChange(currentYear - 1);
@@ -37,6 +45,11 @@ export function YearView({
 
   const handleNextYear = () => {
     onYearChange(currentYear + 1);
+  };
+
+  const handleQuickYearSelect = (year: number) => {
+    onYearChange(year);
+    setShowYearDropdown(false);
   };
 
   const handleMonthClick = (monthIndex: number) => {
@@ -83,13 +96,44 @@ export function YearView({
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <button 
+          
+          {/* Year Dropdown */}
+          <Popover open={showYearDropdown} onOpenChange={setShowYearDropdown}>
+            <PopoverTrigger asChild>
+              <button className="text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
+                {currentYear}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-32 p-2 bg-background border border-border z-[70]" align="start">
+              <ScrollArea className="h-64">
+                <div className="space-y-1">
+                  {years.map(year => (
+                    <button
+                      key={year}
+                      onClick={() => handleQuickYearSelect(year)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        year === currentYear 
+                          ? "bg-primary text-primary-foreground" 
+                          : "hover:bg-muted"
+                      )}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+          
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleNextYear}
-            className="text-2xl font-bold flex items-center gap-1"
+            className="h-8 w-8"
           >
-            <span className="text-primary">{currentYear}</span>
-            <ChevronRight className="h-5 w-5 text-primary" />
-          </button>
+            <ChevronRight className="h-5 w-5" />
+          </Button>
         </div>
         <Button
           variant="ghost"
