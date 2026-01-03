@@ -55,12 +55,10 @@ function groupTasksBySection(tasks: Task[]): Record<TimeSection, Task[]> {
 
   // Sort each group by sort_order, then by scheduled_time
   const sortTasks = (a: Task, b: Task) => {
-    // First by sort_order
     const aOrder = a.sort_order ?? 999;
     const bOrder = b.sort_order ?? 999;
     if (aOrder !== bOrder) return aOrder - bOrder;
     
-    // Then by scheduled_time
     if (a.scheduled_time && b.scheduled_time) {
       return a.scheduled_time.localeCompare(b.scheduled_time);
     }
@@ -151,49 +149,49 @@ export function DraggableSectionList({
   return (
     <div className="space-y-3">
       {sections.map(sectionId => {
-          const sectionTasks = groupedTasks[sectionId];
-          // Only show sections with tasks, OR all sections when dragging (to allow cross-section drops)
-          const shouldShow = sectionTasks.length > 0 || isAnyDragging;
-          
-          if (!shouldShow) return null;
+        const sectionTasks = groupedTasks[sectionId];
+        // Only show sections with tasks, OR all sections when dragging (for cross-section drops)
+        const shouldShow = sectionTasks.length > 0 || isAnyDragging;
+        
+        if (!shouldShow) return null;
 
-          return (
-            <DroppableSection
-              key={sectionId}
-              sectionId={sectionId}
-              isActive={isAnyDragging && draggingTaskSection !== sectionId}
-              isDraggedOver={hoveredSection === sectionId && draggingTaskSection !== sectionId}
-              onDragEnter={() => {
-                if (draggingTaskId && draggingTaskSection !== sectionId) {
-                  triggerHaptic(ImpactStyle.Light);
-                }
-                setHoveredSection(sectionId);
-              }}
-              onDragLeave={() => setHoveredSection(prev => prev === sectionId ? null : prev)}
-              onDrop={() => handleSectionDrop(sectionId)}
-              isEmpty={sectionTasks.length === 0}
-            >
-              {sectionTasks.length > 0 ? (
-                <DraggableTaskList
-                  tasks={sectionTasks}
-                  onReorder={(reordered) => handleReorder(sectionId, reordered)}
-                  disabled={disableDrag}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  renderItem={renderItem}
-                />
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.5 }}
-                  className="text-center py-4 text-xs text-muted-foreground"
-                >
-                  Drop tasks here
-                </motion.div>
-              )}
-            </DroppableSection>
-          );
-        })}
+        return (
+          <DroppableSection
+            key={sectionId}
+            sectionId={sectionId}
+            isActive={isAnyDragging && draggingTaskSection !== sectionId}
+            isDraggedOver={hoveredSection === sectionId && draggingTaskSection !== sectionId}
+            onDragEnter={() => {
+              if (draggingTaskId && draggingTaskSection !== sectionId) {
+                triggerHaptic(ImpactStyle.Light);
+              }
+              setHoveredSection(sectionId);
+            }}
+            onDragLeave={() => setHoveredSection(prev => prev === sectionId ? null : prev)}
+            onDrop={() => handleSectionDrop(sectionId)}
+            isEmpty={sectionTasks.length === 0}
+          >
+            {sectionTasks.length > 0 ? (
+              <DraggableTaskList
+                tasks={sectionTasks}
+                onReorder={(reordered) => handleReorder(sectionId, reordered)}
+                disabled={disableDrag}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                renderItem={renderItem}
+              />
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                className="text-center py-4 text-xs text-muted-foreground"
+              >
+                Drop tasks here
+              </motion.div>
+            )}
+          </DroppableSection>
+        );
+      })}
     </div>
   );
 }
