@@ -144,6 +144,9 @@ function DraggableItem<T extends { id: string }>({
       )}
       style={{
         cursor: isDragging ? 'grabbing' : isActivated ? 'grab' : 'default',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        WebkitTouchCallout: 'none',
       }}
       transition={{
         layout: { type: "spring", stiffness: 350, damping: 35 }
