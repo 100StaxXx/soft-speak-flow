@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { PawPrint, User, Compass } from "lucide-react";
+import { PawPrint, User, Compass, Command } from "lucide-react";
 import { NorthStar } from "@/components/icons/NorthStar";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
@@ -144,7 +144,7 @@ export const BottomNav = memo(() => {
         >
           {({ isActive }) => (
             <>
-              <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+              <Command className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
                 Command
               </span>
