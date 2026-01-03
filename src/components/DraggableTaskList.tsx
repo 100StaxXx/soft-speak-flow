@@ -190,6 +190,10 @@ function DraggableItem<T extends { id: string }>({
       value={task}
       dragListener={false}
       dragControls={dragControls}
+      onDragStart={() => {
+        // Defensive guard: ensure dragging state is set immediately when framer-motion takes over
+        isDraggingRef.current = true;
+      }}
       onDragEnd={handleDragEnd}
       drag="y"
       className={cn(
