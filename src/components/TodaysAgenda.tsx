@@ -32,6 +32,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
+import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 
 import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
 import { type DragHandleProps } from "./DraggableTaskList";
@@ -120,6 +121,9 @@ export function TodaysAgenda({
   // Track if we've already shown the tooltip this session
   const tooltipShownRef = useRef(false);
   
+  // Native task list container ref
+  const nativeContainerRef = useRef<HTMLDivElement>(null);
+  
   const toggleCampaign = (campaignId: string) => {
     setExpandedCampaigns(prev => {
       const next = new Set(prev);
@@ -170,6 +174,33 @@ export function TodaysAgenda({
       questTasks: sortGroup(quests),
     };
   }, [tasks]);
+  
+  // Handle native task list reorder callback
+  const handleNativeReorder = useCallback((taskIds: string[]) => {
+    if (!onReorderTasks) return;
+    // Reconstruct tasks in the new order from IDs
+    const taskMap = new Map(questTasks.map(t => [t.id, t]));
+    const reorderedTasks = taskIds
+      .map(id => taskMap.get(id))
+      .filter((t): t is Task => !!t);
+    onReorderTasks(reorderedTasks);
+  }, [onReorderTasks, questTasks]);
+  
+  // Handle native task toggle callback  
+  const handleNativeToggle = useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      onToggle(taskId, !task.completed, task.xp_reward);
+    }
+  }, [tasks, onToggle]);
+  
+  // Use native task list on iOS
+  const { isNative } = useNativeTaskList({
+    tasks: questTasks,
+    containerRef: nativeContainerRef,
+    onReorder: handleNativeReorder,
+    onToggle: handleNativeToggle,
+  });
 
   // Show first-time tooltip for rituals grouping feature
   useEffect(() => {
@@ -568,18 +599,27 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 )}
-                <DraggableSectionList
-                  tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
-                  onReorderWithinSection={handleQuestReorder}
-                  onMoveTask={handleMoveTask}
-                  disableDrag={!onReorderTasks}
-                  renderItem={(task, dragProps) => (
-                    <div>
-                      {renderTaskItem(task, dragProps)}
-                      <div className="mx-8 border-b border-muted-foreground/20 last:hidden" />
-                    </div>
-                  )}
-                />
+                {/* Native iOS task list placeholder or web fallback */}
+                {isNative ? (
+                  <div 
+                    ref={nativeContainerRef}
+                    className="min-h-[200px]"
+                    style={{ height: Math.max(200, (showAllTasks ? questTasks.length : Math.min(questTasks.length, questLimit)) * 64) }}
+                  />
+                ) : (
+                  <DraggableSectionList
+                    tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
+                    onReorderWithinSection={handleQuestReorder}
+                    onMoveTask={handleMoveTask}
+                    disableDrag={!onReorderTasks}
+                    renderItem={(task, dragProps) => (
+                      <div>
+                        {renderTaskItem(task, dragProps)}
+                        <div className="mx-8 border-b border-muted-foreground/20 last:hidden" />
+                      </div>
+                    )}
+                  />
+                )}
                 {questTasks.length > questLimit && (
                   <Button
                     variant="ghost"
