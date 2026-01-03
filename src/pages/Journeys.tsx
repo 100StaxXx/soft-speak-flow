@@ -444,7 +444,7 @@ const Journeys = () => {
         animate={{ scale: 1, opacity: 1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setShowQAB(true)}
-        className="fixed bottom-28 right-4 z-50 w-11 h-11 rounded-full bg-muted/60 backdrop-blur-sm border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors"
+        className="fixed bottom-36 right-4 z-50 w-11 h-11 rounded-full bg-muted/60 backdrop-blur-sm border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors"
       >
         <Plus className="w-5 h-5 text-muted-foreground" />
       </motion.button>
