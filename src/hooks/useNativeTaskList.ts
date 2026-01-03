@@ -29,26 +29,29 @@ export function useNativeTaskList({
   onToggle,
   onDelete,
 }: UseNativeTaskListOptions) {
+  // Early return for non-iOS native platforms - no hooks called after this check
+  const isNativePlatform = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  
   const [isNativeAvailable, setIsNativeAvailable] = useState(false);
   const [isNativeActive, setIsNativeActive] = useState(false);
   const listenersRef = useRef<Array<{ remove: () => void }>>([]);
   const isInitializedRef = useRef(false);
   
-  // Check if native plugin is available
+  // Check if native plugin is available (only runs on iOS)
   useEffect(() => {
+    if (!isNativePlatform) return;
+    
     const checkAvailability = async () => {
-      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-        try {
-          const result = await NativeTaskList.isAvailable();
-          setIsNativeAvailable(result.available);
-        } catch {
-          setIsNativeAvailable(false);
-        }
+      try {
+        const result = await NativeTaskList.isAvailable();
+        setIsNativeAvailable(result.available);
+      } catch {
+        setIsNativeAvailable(false);
       }
     };
     
     checkAvailability();
-  }, []);
+  }, [isNativePlatform]);
   
   // Convert tasks to native format
   const convertToNativeTasks = useCallback((tasks: Task[]): NativeTaskItem[] => {

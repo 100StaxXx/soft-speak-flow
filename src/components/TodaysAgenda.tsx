@@ -599,31 +599,27 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 )}
-                {/* Native iOS task list container - always rendered for iOS, native overlays on top */}
-                <div 
-                  ref={nativeContainerRef}
-                  className={cn("min-h-[200px]", isNative && "pointer-events-none")}
-                  style={{ 
-                    height: isNative 
-                      ? Math.max(200, questTasks.length * 72)
-                      : undefined
-                  }}
-                >
-                  {!isNative && (
-                    <DraggableSectionList
-                      tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
-                      onReorderWithinSection={handleQuestReorder}
-                      onMoveTask={handleMoveTask}
-                      disableDrag={!onReorderTasks}
-                      renderItem={(task, dragProps) => (
-                        <div>
-                          {renderTaskItem(task, dragProps)}
-                          <div className="mx-8 border-b border-muted-foreground/20 last:hidden" />
-                        </div>
-                      )}
-                    />
-                  )}
-                </div>
+                {/* Native iOS uses overlay, web uses DraggableSectionList directly */}
+                {isNative ? (
+                  <div 
+                    ref={nativeContainerRef}
+                    className="min-h-[200px] pointer-events-none"
+                    style={{ height: Math.max(200, questTasks.length * 72) }}
+                  />
+                ) : (
+                  <DraggableSectionList
+                    tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
+                    onReorderWithinSection={handleQuestReorder}
+                    onMoveTask={handleMoveTask}
+                    disableDrag={false}
+                    renderItem={(task, dragProps) => (
+                      <div>
+                        {renderTaskItem(task, dragProps)}
+                        <div className="mx-8 border-b border-muted-foreground/20 last:hidden" />
+                      </div>
+                    )}
+                  />
+                )}
                 {questTasks.length > questLimit && (
                   <Button
                     variant="ghost"
