@@ -54,7 +54,7 @@ const Journeys = () => {
   // Auth and profile for onboarding
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   
   // Streak freeze
   const { 
@@ -143,9 +143,11 @@ const Journeys = () => {
   }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
   // Onboarding schedule creation for new users who completed the main walkthrough
-  const hasCompletedWalkthrough = (profile?.onboarding_data as Record<string, unknown>)?.walkthrough_completed === true;
+  // Wait for profile to load before evaluating walkthrough status
+  const hasCompletedWalkthrough = !profileLoading && 
+    (profile?.onboarding_data as Record<string, unknown>)?.walkthrough_completed === true;
   
-  useOnboardingSchedule(user?.id, hasCompletedWalkthrough);
+  useOnboardingSchedule(user?.id, hasCompletedWalkthrough, profileLoading);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
