@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,7 @@ import { safeLocalStorage } from "@/utils/storage";
  * First-day onboarding schedule for new users
  * Total: 10 XP (triggers first companion evolution)
  */
-const ONBOARDING_TASKS = [
+export const ONBOARDING_TASKS = [
   {
     task_text: "Meet Your Companion ✨",
     xp_reward: 2,
@@ -39,19 +39,36 @@ const ONBOARDING_TASKS = [
  * Hook to create onboarding tasks for new users
  * @param userId - The user's ID
  * @param hasCompletedWalkthrough - Whether the user completed the main onboarding walkthrough
+ * @param isProfileLoading - Whether the profile is still loading
  */
-export function useOnboardingSchedule(userId: string | undefined, hasCompletedWalkthrough: boolean) {
+export function useOnboardingSchedule(
+  userId: string | undefined,
+  hasCompletedWalkthrough: boolean,
+  isProfileLoading: boolean = false
+) {
   const queryClient = useQueryClient();
-  const creationRef = useRef(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
+    // Wait for profile to load before making any decisions
+    if (isProfileLoading) {
+      console.log("[Onboarding] Waiting for profile to load...");
+      return;
+    }
+
     // Only create tasks for authenticated users who completed the walkthrough
-    if (!userId || !hasCompletedWalkthrough || creationRef.current) {
+    if (!userId || !hasCompletedWalkthrough) {
       console.log("[Onboarding] Skipping schedule creation:", {
         hasUserId: !!userId,
         hasCompletedWalkthrough,
-        alreadyCreating: creationRef.current,
+        isProfileLoading,
       });
+      return;
+    }
+
+    // Prevent concurrent creation attempts
+    if (isCreating) {
+      console.log("[Onboarding] Already creating tasks, skipping...");
       return;
     }
 
@@ -59,14 +76,15 @@ export function useOnboardingSchedule(userId: string | undefined, hasCompletedWa
     const alreadyCreated = safeLocalStorage.getItem(scheduleKey) === "true";
 
     if (alreadyCreated) {
-      console.log("[Onboarding] Schedule already created for user");
+      console.log("[Onboarding] Schedule already created for user (localStorage)");
       return;
     }
 
-    creationRef.current = true;
     console.log("[Onboarding] Creating onboarding schedule for new user");
 
     const createOnboardingSchedule = async () => {
+      setIsCreating(true);
+      
       try {
         // Check if any onboarding tasks already exist
         const { data: existingTasks } = await supabase
@@ -78,7 +96,7 @@ export function useOnboardingSchedule(userId: string | undefined, hasCompletedWa
         if (existingTasks && existingTasks.length > 0) {
           console.log("[Onboarding] Onboarding tasks already exist, marking as created");
           safeLocalStorage.setItem(scheduleKey, "true");
-          creationRef.current = false;
+          setIsCreating(false);
           return;
         }
 
@@ -93,7 +111,7 @@ export function useOnboardingSchedule(userId: string | undefined, hasCompletedWa
         if (legacyTask) {
           console.log("[Onboarding] Legacy user detected, skipping onboarding tasks");
           safeLocalStorage.setItem(scheduleKey, "true");
-          creationRef.current = false;
+          setIsCreating(false);
           return;
         }
 
@@ -117,7 +135,7 @@ export function useOnboardingSchedule(userId: string | undefined, hasCompletedWa
 
         if (error) {
           console.error("[Onboarding] Failed to create onboarding schedule:", error);
-          creationRef.current = false;
+          setIsCreating(false);
           return;
         }
 
@@ -127,12 +145,12 @@ export function useOnboardingSchedule(userId: string | undefined, hasCompletedWa
       } catch (error) {
         console.error("[Onboarding] Error creating onboarding schedule:", error);
       } finally {
-        creationRef.current = false;
+        setIsCreating(false);
       }
     };
 
     createOnboardingSchedule();
-  }, [userId, hasCompletedWalkthrough, queryClient]);
+  }, [userId, hasCompletedWalkthrough, isProfileLoading, queryClient, isCreating]);
 }
 
 /**
