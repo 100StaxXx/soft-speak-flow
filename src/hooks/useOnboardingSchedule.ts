@@ -73,18 +73,31 @@ export function useOnboardingSchedule(
     }
 
     const scheduleKey = `onboarding_schedule_created_${userId}`;
-    const alreadyCreated = safeLocalStorage.getItem(scheduleKey) === "true";
-
-    if (alreadyCreated) {
-      console.log("[Onboarding] Schedule already created for user (localStorage)");
-      return;
-    }
-
-    console.log("[Onboarding] Creating onboarding schedule for new user");
 
     const createOnboardingSchedule = async () => {
+      const alreadyCreated = safeLocalStorage.getItem(scheduleKey) === "true";
+
+      // Recovery: verify tasks actually exist if flag is set
+      if (alreadyCreated) {
+        const { data: verification } = await supabase
+          .from("daily_tasks")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("source", "onboarding")
+          .limit(1);
+
+        if (verification?.length) {
+          console.log("[Onboarding] Schedule already created (verified)");
+          return;
+        }
+        // Stale flag - clear and continue to create tasks
+        console.log("[Onboarding] Stale flag detected - clearing for retry");
+        safeLocalStorage.removeItem(scheduleKey);
+      }
+
       setIsCreating(true);
-      
+      console.log("[Onboarding] Creating onboarding schedule for new user");
+
       try {
         // Check if any onboarding tasks already exist
         const { data: existingTasks } = await supabase
@@ -129,17 +142,19 @@ export function useOnboardingSchedule(
           source: "onboarding",
         }));
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("daily_tasks")
-          .insert(tasksToInsert);
+          .insert(tasksToInsert)
+          .select();
 
-        if (error) {
+        if (error || !data?.length) {
           console.error("[Onboarding] Failed to create onboarding schedule:", error);
+          // DON'T set localStorage - allow retry on next load
           setIsCreating(false);
           return;
         }
 
-        console.log("[Onboarding] Successfully created", tasksToInsert.length, "onboarding tasks");
+        console.log("[Onboarding] Successfully created", data.length, "onboarding tasks");
         safeLocalStorage.setItem(scheduleKey, "true");
         queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       } catch (error) {
