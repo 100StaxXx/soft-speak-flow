@@ -91,9 +91,9 @@ serve(async (req) => {
    - Examples: "buy groceries", "call mom", "finish report", "clean room"
    
 2. **epic** - A long-term goal requiring multiple steps, habits, or milestones over days/weeks/months
-   - Examples: "get my real estate license", "run a marathon", "learn Spanish", "lose 20 pounds", "prepare for the bar exam", "study for MCAT", "make the varsity basketball team", "become starting quarterback", "qualify for state championships", "improve my vertical jump"
-   - Key indicators: timeframes like "by June", "in 3 months", certifications, exams, learning goals, fitness transformations, sports/athletic goals, team tryouts, making varsity/JV, starting position, athletic performance targets
-   - **COMPLEX EPICS that need clarification**: exams (bar, CPA, MCAT, etc.), certifications, multi-subject learning, fitness goals with specific targets, sports/athletic goals (making teams, improving skills, competition prep)
+   - Examples: "get my real estate license", "run a marathon", "learn Spanish", "lose 20 pounds", "prepare for the bar exam", "study for MCAT", "make the varsity basketball team", "become starting quarterback", "qualify for state championships", "improve my vertical jump", "learn guitar", "prepare for audition", "improve my painting skills", "learn piano", "record an album", "prepare for art exhibition"
+   - Key indicators: timeframes like "by June", "in 3 months", certifications, exams, learning goals, fitness transformations, sports/athletic goals, team tryouts, making varsity/JV, starting position, athletic performance targets, music/instrument learning, auditions, art skills, creative projects
+   - **COMPLEX EPICS that need clarification**: exams (bar, CPA, MCAT, etc.), certifications, multi-subject learning, fitness goals with specific targets, sports/athletic goals (making teams, improving skills, competition prep), music/instrument goals (learning, auditions, performances), art goals (skill improvement, exhibitions, portfolios)
    
 3. **habit** - A recurring action to be done regularly
    - Examples: "meditate daily", "drink 8 glasses of water", "read for 30 minutes every day"
@@ -121,6 +121,12 @@ TYPICAL TIMELINES (use these as benchmarks):
 - Improving specific athletic skill: 4-8 weeks for noticeable gains
 - Tournament/championship prep: 6-12 weeks
 - Athletic conditioning: 6-12 weeks for significant improvement
+- Learning instrument basics: 3-6 months
+- Preparing for music audition: 4-12 weeks depending on complexity
+- Recording/producing music: 2-6 months
+- Improving art technique: 2-4 months for noticeable improvement
+- Building art portfolio: 2-6 months
+- Preparing for art exhibition: 2-4 months
 
 TIMELINE ANALYSIS RULES:
 1. Calculate stated days vs typical days for the goal type
@@ -250,6 +256,48 @@ For "make varsity basketball team" or similar sports goals:
     { "id": "weak_areas", "question": "What skills need the most work?", "type": "select", "options": ["Shooting", "Ball handling", "Defense", "Conditioning", "Game IQ"], "multiSelect": true, "required": true },
     { "id": "practice_time", "question": "How much time can you practice daily?", "type": "text", "placeholder": "e.g., 2 hours after school", "required": true },
     { "id": "tryout_date", "question": "When are tryouts?", "type": "text", "placeholder": "e.g., August, next month", "required": false }
+  ]
+}
+
+For "learn guitar", "learn piano" or similar music/instrument goals:
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "music_goal",
+  "epicClarifyingQuestions": [
+    { "id": "current_level", "question": "What's your current skill level?", "type": "select", "options": ["Complete beginner", "Know basics", "Intermediate", "Advanced seeking mastery"], "required": true },
+    { "id": "genre", "question": "What style/genre interests you most?", "type": "text", "placeholder": "e.g., Rock, Classical, Jazz, Pop", "required": true },
+    { "id": "goals", "question": "What do you want to achieve?", "type": "select", "options": ["Play songs for fun", "Perform live", "Join a band", "Write original music", "Pass a grade/exam"], "multiSelect": true, "required": true },
+    { "id": "practice_time", "question": "How much time can you practice daily?", "type": "text", "placeholder": "e.g., 30 minutes, 1 hour", "required": true },
+    { "id": "have_instrument", "question": "Do you have access to the instrument?", "type": "select", "options": ["Yes, I own one", "Planning to buy/rent", "Will use at school/studio"], "required": true }
+  ]
+}
+
+For "prepare for audition" or performance-related music goals:
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "audition_goal",
+  "epicClarifyingQuestions": [
+    { "id": "audition_type", "question": "What type of audition is this?", "type": "select", "options": ["School band/orchestra", "Music school admission", "Professional ensemble", "Theater/musical", "Talent show/competition"], "required": true },
+    { "id": "instrument_voice", "question": "What instrument or voice type?", "type": "text", "placeholder": "e.g., Violin, Piano, Soprano, Drums", "required": true },
+    { "id": "pieces", "question": "Do you know what pieces you need to prepare?", "type": "select", "options": ["Yes, I have the list", "Partially known", "Not yet assigned", "I can choose freely"], "required": true },
+    { "id": "current_level", "question": "How prepared do you feel right now?", "type": "select", "options": ["Haven't started", "Know the basics", "Mostly prepared, need polish", "Almost ready"], "required": true },
+    { "id": "audition_date", "question": "When is your audition?", "type": "text", "placeholder": "e.g., March 15, in 2 months", "required": true }
+  ]
+}
+
+For "improve my painting", "learn to draw", or art skill goals:
+{
+  "type": "epic",
+  "needsClarification": true,
+  "epicContext": "art_goal",
+  "epicClarifyingQuestions": [
+    { "id": "current_level", "question": "What's your current skill level?", "type": "select", "options": ["Complete beginner", "Hobby artist", "Intermediate", "Advanced seeking refinement"], "required": true },
+    { "id": "medium", "question": "What medium(s) do you want to focus on?", "type": "select", "options": ["Pencil/Drawing", "Watercolor", "Acrylic", "Oil painting", "Digital art", "Mixed media"], "multiSelect": true, "required": true },
+    { "id": "style", "question": "What style interests you?", "type": "text", "placeholder": "e.g., Realistic portraits, Abstract, Landscapes, Anime", "required": true },
+    { "id": "goals", "question": "What do you want to achieve?", "type": "select", "options": ["Personal enjoyment", "Build a portfolio", "Sell artwork", "Art school prep", "Commissions"], "multiSelect": true, "required": true },
+    { "id": "practice_time", "question": "How much time can you dedicate weekly?", "type": "text", "placeholder": "e.g., 5 hours, 1 hour daily", "required": true }
   ]
 }
 
