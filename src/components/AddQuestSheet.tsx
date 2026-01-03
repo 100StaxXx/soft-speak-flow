@@ -55,10 +55,23 @@ export function AddQuestSheet({
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
 
+  // Input ref for delayed focus
+  const inputRef = useRef<HTMLInputElement>(null);
+
   // Update scheduled time when prefilledTime changes
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
   }, [prefilledTime]);
+
+  // Focus input after drawer animation completes
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
   // Swipe-up gesture tracking
   const touchStartY = useRef<number>(0);
@@ -130,12 +143,12 @@ export function AddQuestSheet({
         >
           <div data-vaul-no-drag>
             <Input
+              ref={inputRef}
               placeholder="What's your quest?"
               value={taskText}
               onChange={(e) => setTaskText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleSubmit()}
               disabled={isAdding}
-              autoFocus
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             />
           </div>
