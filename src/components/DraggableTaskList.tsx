@@ -32,7 +32,7 @@ const triggerHaptic = async (style: ImpactStyle) => {
 };
 
 const ROW_HEIGHT = 56; // Fixed row height for calculations
-const LONG_PRESS_DURATION = 300;
+const LONG_PRESS_DURATION = 500;
 const SWAP_THRESHOLD = 0.6; // 60% hysteresis
 
 export function DraggableTaskList<T extends { id: string }>({

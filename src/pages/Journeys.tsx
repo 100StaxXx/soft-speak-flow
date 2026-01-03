@@ -301,11 +301,6 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: targetDateStr });
   }, [moveTaskToDate]);
 
-  // Handle task time rescheduling via vertical drag
-  const handleTaskReschedule = useCallback((taskId: string, newTime: string) => {
-    updateTask({ taskId, updates: { scheduled_time: newTime } });
-  }, [updateTask]);
-
   return (
     <TaskDragProvider>
     <PageTransition>
@@ -365,7 +360,6 @@ const Journeys = () => {
             onEditQuest={handleEditQuest}
             onReorderTasks={handleReorderTasks}
             onMoveTaskToSection={handleMoveTaskToSection}
-            onTaskReschedule={handleTaskReschedule}
             hideIndicator={showTutorial}
             calendarTasks={allCalendarTasks}
             calendarMilestones={[]}

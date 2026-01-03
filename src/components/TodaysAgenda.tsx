@@ -36,7 +36,6 @@ import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 
 import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
 import { type DragHandleProps } from "./DraggableTaskList";
-import { DraggableTimeTask } from "./DraggableTimeTask";
 
 interface Task {
   id: string;
@@ -80,7 +79,6 @@ interface TodaysAgendaProps {
   onEditQuest?: (task: Task) => void;
   onReorderTasks?: (tasks: Task[]) => void;
   onMoveTaskToSection?: (taskId: string, targetSection: TimeSection) => void;
-  onTaskReschedule?: (taskId: string, newTime: string) => void;
   hideIndicator?: boolean;
   calendarTasks?: CalendarTask[];
   calendarMilestones?: CalendarMilestone[];
@@ -109,7 +107,6 @@ export function TodaysAgenda({
   onEditQuest,
   onReorderTasks,
   onMoveTaskToSection,
-  onTaskReschedule,
   hideIndicator = false,
   calendarTasks = [],
   calendarMilestones = [],
@@ -324,12 +321,6 @@ export function TodaysAgenda({
     };
 
     const CategoryIcon = getCategoryIcon(task.category);
-    
-    const handleReschedule = (taskId: string, newTime: string) => {
-      if (onTaskReschedule) {
-        onTaskReschedule(taskId, newTime);
-      }
-    };
 
     const taskContent = (
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
@@ -511,22 +502,8 @@ export function TodaysAgenda({
       </Collapsible>
     );
 
-    // Wrap with draggable time wrapper for rescheduling via vertical drag
-    if (onTaskReschedule && !isRitual && !isComplete) {
-      return (
-        <DraggableTimeTask
-          taskId={task.id}
-          currentTime={task.scheduled_time ?? null}
-          onReschedule={handleReschedule}
-          disabled={isDragging || isActivated}
-        >
-          {taskContent}
-        </DraggableTimeTask>
-      );
-    }
-
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded, onTaskReschedule]);
+  }, [onToggle, onUndoToggle, onEditQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded]);
 
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {

@@ -14,7 +14,7 @@ export const useLongPress = ({
   onLongPress,
   onPressStart,
   onPressEnd,
-  threshold = 300,
+  threshold = 500,
   moveThreshold = 12, // Increased from 6 for more tolerance
 }: UseLongPressOptions) => {
   const [isPressed, setIsPressed] = useState(false);
