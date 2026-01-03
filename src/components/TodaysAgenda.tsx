@@ -16,7 +16,13 @@ import {
   Rocket,
   CheckCircle2,
   Target,
-  Sparkles
+  Sparkles,
+  Zap,
+  FileText,
+  Timer,
+  Brain,
+  Heart,
+  Dumbbell
 } from "lucide-react";
 import { MonthViewModal } from "@/components/calendar/MonthViewModal";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
@@ -42,6 +48,14 @@ interface Task {
   epic_id?: string | null;
   epic_title?: string | null;
   sort_order?: number | null;
+  // Expandable detail fields
+  notes?: string | null;
+  priority?: string | null;
+  energy_level?: string | null;
+  estimated_duration?: number | null;
+  is_recurring?: boolean | null;
+  recurrence_pattern?: string | null;
+  category?: string | null;
 }
 
 interface Journey {
@@ -97,6 +111,7 @@ export function TodaysAgenda({
   onDateSelect,
 }: TodaysAgendaProps) {
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
@@ -211,6 +226,41 @@ export function TodaysAgenda({
     }
   };
 
+  // Check if a task has expandable details
+  const hasExpandableDetails = useCallback((task: Task) => {
+    return !!(
+      task.notes || 
+      task.priority || 
+      task.energy_level || 
+      task.estimated_duration || 
+      (task.is_recurring && task.recurrence_pattern) || 
+      task.difficulty ||
+      task.category
+    );
+  }, []);
+
+  const toggleTaskExpanded = useCallback((taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  }, []);
+
+  const getCategoryIcon = (category: string | null | undefined) => {
+    switch (category) {
+      case 'mind': return Brain;
+      case 'body': return Dumbbell;
+      case 'soul': return Heart;
+      default: return null;
+    }
+  };
+
   const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
     const isComplete = !!task.completed;
     const isOnboarding = isOnboardingTask(task.task_text);
@@ -218,6 +268,8 @@ export function TodaysAgenda({
     const isDragging = dragProps?.isDragging ?? false;
     const isPressed = dragProps?.isPressed ?? false;
     const isActivated = dragProps?.isActivated ?? false;
+    const isExpanded = expandedTasks.has(task.id);
+    const hasDetails = hasExpandableDetails(task);
     
     const handleClick = (e: React.MouseEvent) => {
       // Don't allow clicks while dragging or during long press
@@ -236,89 +288,186 @@ export function TodaysAgenda({
       }
     };
 
+    const CategoryIcon = getCategoryIcon(task.category);
+
     const taskContent = (
-      <div
-        className={cn(
-          "flex items-center gap-3 py-2 transition-all relative group",
-          "select-none",
-          isComplete && "opacity-60",
-          isDragging && "cursor-grabbing",
-          isActivated && !isDragging && "bg-muted/30 rounded-lg -mx-1 px-1",
-          isOnboarding && !isComplete && "bg-primary/5 -mx-2 px-2 rounded-lg"
-        )}
-        onClick={handleClick}
-      >
-        <div className="relative">
-          <motion.div 
-            className={cn(
-              "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
-              isComplete 
-                ? "bg-primary border-primary" 
-                : isOnboarding
-                  ? "border-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
-                  : "border-muted-foreground/30"
-            )}
-            whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
-          >
-            {isComplete && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 25 }}
-              >
-                <Check className="w-3 h-3 text-primary-foreground" />
-              </motion.div>
-            )}
-          </motion.div>
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            {isRitual && (
-              <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
-            )}
-            <p className={cn(
-              "text-base truncate",
-              isComplete && "line-through text-muted-foreground"
-            )}>
-              {task.task_text}
-            </p>
-          </div>
-          {task.scheduled_time && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Clock className="w-4 h-4" />
-              {formatTime(task.scheduled_time)}
-            </span>
+      <Collapsible open={isExpanded} onOpenChange={() => {}}>
+        <div
+          className={cn(
+            "flex items-center gap-3 py-2 transition-all relative group",
+            "select-none",
+            isComplete && "opacity-60",
+            isDragging && "cursor-grabbing",
+            isActivated && !isDragging && "bg-muted/30 rounded-lg -mx-1 px-1",
+            isOnboarding && !isComplete && "bg-primary/5 -mx-2 px-2 rounded-lg"
           )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {/* Edit button - shows on hover for incomplete quests */}
-          {onEditQuest && !isComplete && !isDragging && !isActivated && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditQuest(task);
-              }}
+          onClick={handleClick}
+        >
+          <div className="relative">
+            <motion.div 
+              className={cn(
+                "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
+                isComplete 
+                  ? "bg-primary border-primary" 
+                  : isOnboarding
+                    ? "border-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
+                    : "border-muted-foreground/30"
+              )}
+              whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
             >
-              <Pencil className="w-4 h-4" />
-            </Button>
-          )}
-          {task.is_main_quest && (
-            <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
-              Main
-            </Badge>
-          )}
-          <span className="text-sm font-bold text-stardust-gold/80">+{task.xp_reward}</span>
+              {isComplete && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                >
+                  <Check className="w-3 h-3 text-primary-foreground" />
+                </motion.div>
+              )}
+            </motion.div>
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              {isRitual && (
+                <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
+              )}
+              <p className={cn(
+                "text-base truncate",
+                isComplete && "line-through text-muted-foreground"
+              )}>
+                {task.task_text}
+              </p>
+            </div>
+            {task.scheduled_time && (
+              <span className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Clock className="w-4 h-4" />
+                {formatTime(task.scheduled_time)}
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Edit button - shows on hover for incomplete quests */}
+            {onEditQuest && !isComplete && !isDragging && !isActivated && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditQuest(task);
+                }}
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            )}
+            {task.is_main_quest && (
+              <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
+                Main
+              </Badge>
+            )}
+            <span className="text-sm font-bold text-stardust-gold/80">+{task.xp_reward}</span>
+            
+            {/* Chevron for expandable details - only shown if task has details */}
+            {hasDetails && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 -m-1 flex-shrink-0"
+                onClick={(e) => toggleTaskExpanded(task.id, e)}
+              >
+                <ChevronDown className={cn(
+                  "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                  isExpanded && "rotate-180"
+                )} />
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+
+        {/* Expandable details section */}
+        <CollapsibleContent>
+          <div className="pl-8 pr-2 pb-2 space-y-2">
+            {/* Notes */}
+            {task.notes && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <p className="text-xs">{task.notes}</p>
+              </div>
+            )}
+            
+            {/* Badges row */}
+            <div className="flex flex-wrap gap-1.5">
+              {/* Category */}
+              {CategoryIcon && task.category && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                  <CategoryIcon className="w-3 h-3" />
+                  {task.category}
+                </Badge>
+              )}
+              
+              {/* Difficulty */}
+              {task.difficulty && (
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-xs px-1.5 py-0.5 h-5",
+                    task.difficulty === 'easy' && "bg-green-500/10 text-green-500 border-green-500/30",
+                    task.difficulty === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                    task.difficulty === 'hard' && "bg-red-500/10 text-red-500 border-red-500/30"
+                  )}
+                >
+                  {task.difficulty}
+                </Badge>
+              )}
+              
+              {/* Priority */}
+              {task.priority && (
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-xs px-1.5 py-0.5 h-5",
+                    task.priority === 'high' && "bg-red-500/10 text-red-500 border-red-500/30",
+                    task.priority === 'medium' && "bg-yellow-500/10 text-yellow-500 border-yellow-500/30",
+                    task.priority === 'low' && "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                  )}
+                >
+                  {task.priority} priority
+                </Badge>
+              )}
+              
+              {/* Energy level */}
+              {task.energy_level && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                  <Zap className="w-3 h-3" />
+                  {task.energy_level}
+                </Badge>
+              )}
+              
+              {/* Duration */}
+              {task.estimated_duration && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
+                  <Timer className="w-3 h-3" />
+                  {task.estimated_duration}m
+                </Badge>
+              )}
+              
+              {/* Recurrence */}
+              {task.is_recurring && task.recurrence_pattern && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
+                  <Repeat className="w-3 h-3" />
+                  {task.recurrence_pattern}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     );
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest]);
+  }, [onToggle, onUndoToggle, onEditQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded]);
 
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
