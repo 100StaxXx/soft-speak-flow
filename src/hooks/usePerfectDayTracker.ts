@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { format } from "date-fns";
 import { safeLocalStorage } from "@/utils/storage";
 
@@ -25,6 +25,9 @@ export function usePerfectDayTracker(
     totalXP: 0,
     tasksCompleted: 0,
   });
+  
+  // Track if we have a pending perfect day celebration waiting for evolution to finish
+  const pendingPerfectDayRef = useRef<{ totalXP: number; completedCount: number } | null>(null);
 
   const dateKey = format(selectedDate, "yyyy-MM-dd");
   const storageKey = `perfect_day_shown_${dateKey}`;
@@ -44,6 +47,29 @@ export function usePerfectDayTracker(
     };
   }, [tasks, dateKey]);
 
+  // Listen for evolution completion to show deferred perfect day
+  useEffect(() => {
+    const handleEvolutionComplete = () => {
+      // Check if we have a pending perfect day celebration
+      if (pendingPerfectDayRef.current) {
+        const { totalXP, completedCount } = pendingPerfectDayRef.current;
+        pendingPerfectDayRef.current = null;
+        
+        // Small delay to let evolution modal fully close
+        setTimeout(() => {
+          setState({
+            showPerfectDay: true,
+            totalXP,
+            tasksCompleted: completedCount,
+          });
+        }, 500);
+      }
+    };
+
+    window.addEventListener('evolution-modal-closed', handleEvolutionComplete);
+    return () => window.removeEventListener('evolution-modal-closed', handleEvolutionComplete);
+  }, []);
+
   // Check if Perfect Day should trigger
   useEffect(() => {
     // Need at least 1 task to qualify
@@ -55,14 +81,25 @@ export function usePerfectDayTracker(
 
     // Trigger if all complete
     if (allComplete) {
-      setState({
-        showPerfectDay: true,
-        totalXP,
-        tasksCompleted: completedCount,
-      });
+      // Check if evolution is currently in progress (check for existing modal)
+      const evolutionModalActive = document.querySelector('[aria-labelledby="evolution-title"]');
       
-      // Mark as shown
-      safeLocalStorage.setItem(storageKey, "true");
+      if (evolutionModalActive) {
+        // Defer the perfect day celebration until evolution completes
+        pendingPerfectDayRef.current = { totalXP, completedCount };
+        // Mark as shown so we don't trigger again
+        safeLocalStorage.setItem(storageKey, "true");
+      } else {
+        // No evolution in progress, show immediately
+        setState({
+          showPerfectDay: true,
+          totalXP,
+          tasksCompleted: completedCount,
+        });
+        
+        // Mark as shown
+        safeLocalStorage.setItem(storageKey, "true");
+      }
     }
   }, [allComplete, totalXP, completedCount, totalCount, storageKey]);
 

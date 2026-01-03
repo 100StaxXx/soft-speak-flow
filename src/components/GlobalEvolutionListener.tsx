@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useEvolution } from "@/contexts/EvolutionContext";
-import { createReconnectionHandler } from "@/hooks/useRealtimeSubscription";
+import { useCelebration } from "@/contexts/CelebrationContext";
 import { logger } from "@/utils/logger";
 
 export const GlobalEvolutionListener = () => {
@@ -13,6 +13,7 @@ export const GlobalEvolutionListener = () => {
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
+  const { setEvolutionInProgress } = useCelebration();
   const [isEvolving, setIsEvolving] = useState(false);
   const [evolutionData, setEvolutionData] = useState<{ 
     stage: number; 
@@ -95,6 +96,7 @@ export const GlobalEvolutionListener = () => {
               mentorSlug,
             });
             setIsEvolving(true);
+            setEvolutionInProgress(true); // Mark evolution in progress for celebration queue
             
             // Notify walkthrough that evolution is starting
             window.dispatchEvent(new CustomEvent('evolution-loading-start'));
@@ -136,6 +138,7 @@ export const GlobalEvolutionListener = () => {
         setPreviousStage(null);
         // Hide overlay after evolution animation completes
         setIsEvolvingLoading(false);
+        setEvolutionInProgress(false); // Mark evolution complete for celebration queue
         
         // Call the walkthrough callback if one was set
         if (onEvolutionComplete) {

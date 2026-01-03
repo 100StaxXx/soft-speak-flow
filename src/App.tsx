@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
+import { CelebrationProvider } from "@/contexts/CelebrationContext";
 import { useProfile } from "@/hooks/useProfile";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,7 +19,6 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
-import { CompanionEvolvingOverlay } from "@/components/CompanionEvolvingOverlay";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
@@ -142,12 +142,9 @@ LevelUpHandler.displayName = 'LevelUpHandler';
 
 // Separate component for evolution-aware features
 const EvolutionAwareContent = memo(() => {
-  const { isEvolvingLoading } = useEvolution();
-  
   return (
     <>
       <GlobalEvolutionListener />
-      <CompanionEvolvingOverlay isVisible={isEvolvingLoading} />
       <SubscriptionGate />
       <WeeklyRecapModal />
       <LevelUpHandler />
@@ -293,16 +290,18 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <EvolutionProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <InstallPWA />
-            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <AmbientMusicPlayer />
-              <ScrollToTop />
-              <AppContent />
-            </BrowserRouter>
-          </TooltipProvider>
+          <CelebrationProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <InstallPWA />
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                <AmbientMusicPlayer />
+                <ScrollToTop />
+                <AppContent />
+              </BrowserRouter>
+            </TooltipProvider>
+          </CelebrationProvider>
         </EvolutionProvider>
       </QueryClientProvider>
     </ErrorBoundary>
