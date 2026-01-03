@@ -216,10 +216,16 @@ export function TodaysAgenda({
     const isOnboarding = isOnboardingTask(task.task_text);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
+    const isPressed = dragProps?.isPressed ?? false;
+    const isActivated = dragProps?.isActivated ?? false;
     
-    const handleClick = () => {
-      // Don't allow clicks while dragging
-      if (isDragging) return;
+    const handleClick = (e: React.MouseEvent) => {
+      // Don't allow clicks while dragging or during long press
+      if (isDragging || isActivated || isPressed) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       
       if (isComplete && onUndoToggle) {
         triggerHaptic(ImpactStyle.Light);
@@ -230,16 +236,14 @@ export function TodaysAgenda({
       }
     };
 
-    
     const taskContent = (
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
+      <div
         className={cn(
           "flex items-center gap-3 py-2 transition-all relative group",
-          "cursor-pointer select-none",
+          "select-none",
           isComplete && "opacity-60",
           isDragging && "cursor-grabbing",
+          isActivated && !isDragging && "bg-muted/30 rounded-lg -mx-1 px-1",
           isOnboarding && !isComplete && "bg-primary/5 -mx-2 px-2 rounded-lg"
         )}
         onClick={handleClick}
@@ -254,7 +258,7 @@ export function TodaysAgenda({
                   ? "border-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
                   : "border-muted-foreground/30"
             )}
-            whileTap={isDragging ? {} : { scale: 0.9 }}
+            whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
           >
             {isComplete && (
               <motion.div
@@ -289,8 +293,8 @@ export function TodaysAgenda({
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Edit button - shows on hover for incomplete quests with proper 44px touch target */}
-          {onEditQuest && !isComplete && !isDragging && (
+          {/* Edit button - shows on hover for incomplete quests */}
+          {onEditQuest && !isComplete && !isDragging && !isActivated && (
             <Button
               variant="ghost"
               size="icon"
@@ -310,7 +314,7 @@ export function TodaysAgenda({
           )}
           <span className="text-sm font-bold text-stardust-gold/80">+{task.xp_reward}</span>
         </div>
-      </motion.div>
+      </div>
     );
 
     return taskContent;

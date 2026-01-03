@@ -1,5 +1,5 @@
-import { useState, useCallback, ReactNode } from "react";
-import { Reorder, useDragControls } from "framer-motion";
+import { useState, useCallback, ReactNode, useRef } from "react";
+import { Reorder, useDragControls, motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,8 @@ interface DraggableTaskListProps<T extends { id: string }> {
 
 export interface DragHandleProps {
   isDragging: boolean;
+  isPressed: boolean;
+  isActivated: boolean;
   dragHandleRef: React.RefObject<HTMLDivElement | null>;
   onDragStart: () => void;
   onDragEnd: () => void;
@@ -54,13 +56,14 @@ export function DraggableTaskList<T extends { id: string }>({
   }, [draggingId, onExternalDragEnd]);
 
   if (disabled || tasks.length <= 1) {
-    // Render without drag functionality
     return (
       <div className="space-y-0">
         {tasks.map((task) => (
           <div key={task.id}>
             {renderItem(task, {
               isDragging: false,
+              isPressed: false,
+              isActivated: false,
               dragHandleRef: { current: null },
               onDragStart: () => {},
               onDragEnd: () => {},
@@ -107,58 +110,77 @@ function DraggableItem<T extends { id: string }>({
   onDragEnd,
   renderItem,
 }: DraggableItemProps<T>) {
-  const [canDrag, setCanDrag] = useState(false);
   const dragControls = useDragControls();
-  const dragHandleRef = { current: null } as React.RefObject<HTMLDivElement | null>;
+  const dragHandleRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
 
-  const longPressProps = useLongPress({
-    onLongPress: () => {
-      setCanDrag(true);
+  const { isPressed, isActivated, handlers } = useLongPress({
+    onLongPress: (e) => {
+      isDraggingRef.current = true;
       onDragStart();
+      // Start drag programmatically using the pointer event
+      dragControls.start(e as unknown as PointerEvent);
     },
-    threshold: 400,
-    moveThreshold: 10,
+    threshold: 300,
+    moveThreshold: 8,
   });
 
   const handleDragEnd = () => {
-    setCanDrag(false);
+    isDraggingRef.current = false;
     onDragEnd();
   };
 
   return (
     <Reorder.Item
       value={task}
-      dragListener={canDrag}
+      dragListener={false}
       dragControls={dragControls}
       onDragEnd={handleDragEnd}
       className={cn(
-        "relative transition-transform",
+        "relative touch-none",
         isDragging && "z-50"
       )}
       style={{
-        cursor: canDrag ? 'grabbing' : 'default',
+        cursor: isDragging ? 'grabbing' : isActivated ? 'grab' : 'default',
       }}
       whileDrag={{
         scale: 1.02,
-        boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.3)",
+        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.1)",
         backgroundColor: "hsl(var(--background))",
         borderRadius: "12px",
       }}
-      {...longPressProps}
+      {...handlers}
     >
-      {renderItem(task, {
-        isDragging,
-        dragHandleRef,
-        onDragStart,
-        onDragEnd: handleDragEnd,
-      })}
+      {/* Visual feedback wrapper */}
+      <motion.div
+        animate={{
+          scale: isPressed && !isDragging ? 0.98 : isActivated && !isDragging ? 1.01 : 1,
+          opacity: isPressed && !isDragging ? 0.9 : 1,
+        }}
+        transition={{ duration: 0.15 }}
+      >
+        {renderItem(task, {
+          isDragging,
+          isPressed,
+          isActivated,
+          dragHandleRef,
+          onDragStart,
+          onDragEnd: handleDragEnd,
+        })}
+      </motion.div>
       
-      {/* Grip indicator that appears during drag */}
-      {isDragging && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 opacity-60">
-          <GripVertical className="w-4 h-4 text-muted-foreground" />
-        </div>
-      )}
+      {/* Grip indicator */}
+      <motion.div 
+        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1"
+        initial={{ opacity: 0, x: 4 }}
+        animate={{ 
+          opacity: isActivated || isDragging ? 0.7 : 0,
+          x: isActivated || isDragging ? 0 : 4,
+        }}
+        transition={{ duration: 0.15 }}
+      >
+        <GripVertical className="w-4 h-4 text-muted-foreground" />
+      </motion.div>
     </Reorder.Item>
   );
 }
