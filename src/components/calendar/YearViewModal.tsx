@@ -104,26 +104,33 @@ export function YearView({
                 {currentYear}
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-32 p-2 bg-background border border-border z-[70]" align="start">
-              <ScrollArea className="h-64">
-                <div className="space-y-1">
-                  {years.map(year => (
-                    <button
-                      key={year}
-                      onClick={() => handleQuickYearSelect(year)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                        year === currentYear 
-                          ? "bg-primary text-primary-foreground" 
-                          : "hover:bg-muted"
-                      )}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
+          <PopoverContent 
+            className="w-32 p-0 bg-background border border-border z-[70]" 
+            align="start"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            <div 
+              className="h-64 overflow-y-auto overscroll-contain p-2"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <div className="space-y-1">
+                {years.map(year => (
+                  <button
+                    key={year}
+                    onClick={() => handleQuickYearSelect(year)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      year === currentYear 
+                        ? "bg-primary text-primary-foreground" 
+                        : "hover:bg-muted"
+                    )}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
           </Popover>
           
           <Button
