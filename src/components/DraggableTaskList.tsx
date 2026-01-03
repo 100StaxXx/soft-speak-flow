@@ -60,6 +60,7 @@ export function DraggableTaskList<T extends { id: string }>({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   // Refs for drag tracking (no re-renders)
+  const draggingIdRef = useRef<string | null>(null); // Sync ref for closures
   const dragStartYRef = useRef(0);
   const currentYRef = useRef(0);
   const originalIndexRef = useRef(0);
@@ -108,7 +109,7 @@ export function DraggableTaskList<T extends { id: string }>({
   }, []);
   // Handle pointer move during drag (desktop)
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (!draggingId) return;
+    if (!draggingIdRef.current) return; // Use ref for closure
     
     currentYRef.current = e.clientY;
     setDragOffset({ x: 0, y: e.clientY - dragStartYRef.current });
@@ -136,11 +137,11 @@ export function DraggableTaskList<T extends { id: string }>({
       // Update visual state (minimal re-render)
       setVisualOrder(newOrder);
     }
-  }, [draggingId, calculateTargetIndex, updateAutoscroll]);
+  }, [calculateTargetIndex, updateAutoscroll]);
 
   // Handle touch move during drag (iOS compatible)
   const handleTouchMoveWhileDragging = useCallback((e: TouchEvent) => {
-    if (!draggingId) return;
+    if (!draggingIdRef.current) return; // Use ref for closure
     
     e.preventDefault(); // Prevent page scroll while dragging
     
@@ -167,7 +168,7 @@ export function DraggableTaskList<T extends { id: string }>({
       currentIndexRef.current = newIndex;
       setVisualOrder(newOrder);
     }
-  }, [draggingId, calculateTargetIndex, updateAutoscroll]);
+  }, [calculateTargetIndex, updateAutoscroll]);
 
   // Cleanup function for all drag listeners
   const cleanupDragListeners = useCallback(() => {
@@ -181,23 +182,24 @@ export function DraggableTaskList<T extends { id: string }>({
 
   // Handle touch end during drag (iOS)
   const handleTouchEndWhileDragging = useCallback(() => {
-    if (draggingId) {
+    if (draggingIdRef.current) { // Use ref for closure
       triggerHaptic(ImpactStyle.Medium);
       onReorder(visualOrderRef.current);
       onExternalDragEnd?.();
     }
     
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDragOffset({ x: 0, y: 0 });
     isLongPressActiveRef.current = false;
     lastSwapIndexRef.current = null;
     stopScroll();
     cleanupDragListeners();
-  }, [draggingId, onReorder, onExternalDragEnd, stopScroll, cleanupDragListeners]);
+  }, [onReorder, onExternalDragEnd, stopScroll, cleanupDragListeners]);
 
   // Handle pointer up - commit order
   const handlePointerUp = useCallback(() => {
-    if (draggingId) {
+    if (draggingIdRef.current) { // Use ref for closure
       triggerHaptic(ImpactStyle.Medium);
       
       // Commit final order
@@ -206,16 +208,19 @@ export function DraggableTaskList<T extends { id: string }>({
     }
     
     // Cleanup
+    draggingIdRef.current = null;
     setDraggingId(null);
     setDragOffset({ x: 0, y: 0 });
     isLongPressActiveRef.current = false;
     lastSwapIndexRef.current = null;
     stopScroll();
     cleanupDragListeners();
-  }, [draggingId, onReorder, onExternalDragEnd, stopScroll, cleanupDragListeners]);
+  }, [onReorder, onExternalDragEnd, stopScroll, cleanupDragListeners]);
 
   // Start drag after long press
   const startDrag = useCallback((taskId: string, index: number, startY: number) => {
+    // Set ref FIRST (synchronous) for closures
+    draggingIdRef.current = taskId;
     setDraggingId(taskId);
     dragStartYRef.current = startY;
     currentYRef.current = startY;
