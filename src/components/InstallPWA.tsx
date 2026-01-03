@@ -48,7 +48,7 @@ export const InstallPWA = () => {
   }
 
   return (
-    <Card className="fixed bottom-20 left-4 right-4 p-4 z-50 bg-card border-border shadow-lg md:left-auto md:right-4 md:max-w-sm">
+    <Card className="fixed bottom-36 left-4 right-4 p-4 z-50 bg-card border-border shadow-lg md:left-auto md:right-4 md:max-w-sm">
       <button
         onClick={handleDismiss}
         className="absolute top-2 right-2 p-1 hover:bg-muted rounded-full transition-colors"

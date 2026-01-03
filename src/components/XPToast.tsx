@@ -75,7 +75,7 @@ export const XPToast = ({ xp, reason, show, onComplete }: XPToastProps) => {
             scale: 0.8,
             transition: { duration: 0.2 }
           }}
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50"
+          className="fixed bottom-36 left-1/2 -translate-x-1/2 z-50"
         >
           <motion.div 
             className="relative bg-gradient-to-r from-stardust-gold via-amber-400 to-stardust-gold text-black px-8 py-4 rounded-full shadow-neon border-2 border-stardust-gold/50"
