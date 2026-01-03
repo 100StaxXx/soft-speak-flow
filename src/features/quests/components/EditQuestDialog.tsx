@@ -160,8 +160,8 @@ export function EditQuestDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-xl">
-        <SheetHeader className="pb-2">
+      <SheetContent side="bottom" className="h-[85vh] rounded-t-xl flex flex-col">
+        <SheetHeader className="pb-2 flex-shrink-0">
           <SheetTitle className="flex items-center gap-2">
             {isRitual ? (
               <>
@@ -182,7 +182,7 @@ export function EditQuestDialog({
           )}
         </SheetHeader>
         
-        <ScrollArea className="h-[calc(85vh-140px)] pr-4">
+        <ScrollArea className="flex-1 pr-4">
           <div className="space-y-6 py-4">
             {/* Natural Language Quick Edit */}
             <NaturalLanguageEditor onApply={handleNaturalLanguageApply} />
@@ -261,28 +261,26 @@ export function EditQuestDialog({
           </div>
         </ScrollArea>
 
-        <SheetFooter className="pt-4 flex justify-between">
-          <div>
-            {onDelete && (
-              <Button 
-                variant="ghost" 
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={isDeleting}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <SheetFooter className="pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t">
+          <div className="flex gap-2 w-full">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving || !taskText.trim()}>
+            <Button onClick={handleSave} disabled={isSaving || !taskText.trim()} className="flex-1">
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
+          {onDelete && (
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          )}
         </SheetFooter>
       </SheetContent>
 
