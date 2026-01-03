@@ -165,8 +165,7 @@ function DraggableItem<T extends { id: string }>({
       dragListener={false}
       dragControls={dragControls}
       onDragEnd={handleDragEnd}
-      layout="position"
-      layoutId={task.id}
+      drag="y"
       className={cn(
         "relative",
         isDragging && "z-50"
@@ -182,21 +181,13 @@ function DraggableItem<T extends { id: string }>({
       animate={{
         scale: getScale(),
         boxShadow: getBoxShadow(),
-        y: isActivated && !isDragging ? -2 : 0,
         opacity: isPressed && !isDragging ? 0.85 : 1,
         backgroundColor: isDragging || isSettling ? "hsl(var(--background))" : "transparent",
         borderRadius: isDragging || isSettling ? 12 : 0,
       }}
       transition={{
-        layout: { 
-          type: "spring", 
-          stiffness: 200, 
-          damping: 25,
-          mass: 0.9
-        },
         scale: { type: "spring", stiffness: 300, damping: 22 },
         boxShadow: { duration: 0.2, ease: "easeOut" },
-        y: { type: "spring", stiffness: 400, damping: 25 },
         opacity: { duration: 0.15 },
         backgroundColor: { duration: 0.2 },
         borderRadius: { duration: 0.2 },

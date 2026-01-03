@@ -127,7 +127,12 @@ export const useLongPress = ({
       onPointerMove: move,
       onPointerUp: end,
       onPointerCancel: cancel,
-      onPointerLeave: cancel,
+      onPointerLeave: () => {
+        // Only cancel if drag hasn't started yet
+        if (!isLongPressRef.current) {
+          cancel();
+        }
+      },
     },
   };
 };
