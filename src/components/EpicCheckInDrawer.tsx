@@ -5,6 +5,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 interface Habit {
   id: string;
@@ -65,10 +69,13 @@ interface EpicCheckInDrawerProps {
 }
 
 export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
   const [earlyBirdExpanded, setEarlyBirdExpanded] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Convert habit to RitualData for the unified editor
   const handleEditHabit = (habit: Habit) => {
@@ -83,6 +90,46 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, show
       category: habit.category,
       custom_days: habit.custom_days,
     });
+  };
+
+  const handleDeleteRitual = async (habitId: string) => {
+    if (!user?.id) return;
+    setIsDeleting(true);
+    try {
+      // Delete the habit template
+      const { error: habitError } = await supabase
+        .from('habits')
+        .delete()
+        .eq('id', habitId)
+        .eq('user_id', user.id);
+      
+      if (habitError) throw habitError;
+
+      // Delete all incomplete tasks linked to this habit
+      const { error: tasksError } = await supabase
+        .from('daily_tasks')
+        .delete()
+        .eq('habit_source_id', habitId)
+        .eq('user_id', user.id)
+        .eq('completed', false);
+
+      if (tasksError) {
+        console.error('Error deleting linked tasks:', tasksError);
+      }
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      
+      toast.success('Ritual deleted');
+    } catch (error) {
+      console.error('Error deleting ritual:', error);
+      toast.error('Failed to delete ritual');
+    } finally {
+      setIsDeleting(false);
+    }
+    setEditingRitual(null);
   };
   
   // Split habits into today's and upcoming
@@ -459,6 +506,8 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, show
           ritual={editingRitual}
           open={!!editingRitual}
           onOpenChange={(open) => !open && setEditingRitual(null)}
+          onDelete={handleDeleteRitual}
+          isDeleting={isDeleting}
         />
       </DrawerContent>
     </Drawer>

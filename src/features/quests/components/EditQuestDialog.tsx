@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Pencil, Repeat } from "lucide-react";
+import { Pencil, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +9,16 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
@@ -46,6 +56,8 @@ interface EditQuestDialogProps {
     category: string | null;
   }) => Promise<void>;
   isSaving: boolean;
+  onDelete?: (taskId: string) => Promise<void>;
+  isDeleting?: boolean;
 }
 
 export function EditQuestDialog({
@@ -54,6 +66,8 @@ export function EditQuestDialog({
   onOpenChange,
   onSave,
   isSaving,
+  onDelete,
+  isDeleting,
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
   const [difficulty, setDifficulty] = useState<QuestDifficulty>("medium");
@@ -65,6 +79,7 @@ export function EditQuestDialog({
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -131,6 +146,13 @@ export function EditQuestDialog({
       category: moreInformation,
     });
     
+    onOpenChange(false);
+  };
+
+  const handleDelete = async () => {
+    if (!task || !onDelete) return;
+    await onDelete(task.id);
+    setShowDeleteConfirm(false);
     onOpenChange(false);
   };
 
@@ -239,15 +261,51 @@ export function EditQuestDialog({
           </div>
         </ScrollArea>
 
-        <SheetFooter className="pt-4 gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving || !taskText.trim()}>
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
+        <SheetFooter className="pt-4 flex justify-between">
+          <div>
+            {onDelete && (
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || !taskText.trim()}>
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
         </SheetFooter>
       </SheetContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this quest?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete "{task?.task_text}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

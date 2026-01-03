@@ -32,7 +32,7 @@ const Community = () => {
   const { milestones: calendarMilestones } = useCalendarMilestones(selectedDate);
   
   // Daily tasks for updates
-  const { addTask, updateTask, isAdding, isUpdating } = useDailyTasks(selectedDate);
+  const { addTask, updateTask, deleteTask, isAdding, isUpdating, isDeleting } = useDailyTasks(selectedDate);
 
   // Format tasks for calendar components
   const formattedTasks = useMemo(() => 
@@ -116,6 +116,11 @@ const Community = () => {
     setEditingTask(null);
   };
 
+  const handleDeleteQuest = async (taskId: string) => {
+    await deleteTask(taskId);
+    setEditingTask(null);
+  };
+
   return (
     <PageTransition>
       <div className="min-h-screen bg-background pb-nav-safe relative overflow-hidden flex flex-col">
@@ -171,6 +176,8 @@ const Community = () => {
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
+          onDelete={handleDeleteQuest}
+          isDeleting={isDeleting}
         />
 
         <BottomNav />
