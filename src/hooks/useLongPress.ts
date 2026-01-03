@@ -56,6 +56,13 @@ export const useLongPress = ({
       setIsPressed(true);
       onPressStart?.();
       
+      // Capture pointer for smoother tracking
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        // Pointer capture not available
+      }
+      
       // Store the pointer event for drag initiation
       pointerEventRef.current = e;
       

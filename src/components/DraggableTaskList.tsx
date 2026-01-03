@@ -108,11 +108,11 @@ function DraggableItem<T extends { id: string }>({
   isDragging,
   onDragStart,
   onDragEnd,
-  renderItem,
 }: DraggableItemProps<T>) {
   const dragControls = useDragControls();
   const dragHandleRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
+  const [isSettling, setIsSettling] = useState(false);
 
   const { isPressed, isActivated, handlers } = useLongPress({
     onLongPress: (e) => {
@@ -125,9 +125,38 @@ function DraggableItem<T extends { id: string }>({
     moveThreshold: 8,
   });
 
-  const handleDragEnd = () => {
+  const handleDragEnd = async () => {
     isDraggingRef.current = false;
+    setIsSettling(true);
+    
+    // Light haptic on release
+    await triggerHaptic(ImpactStyle.Light);
+    
+    // Clear settling state after animation completes
+    setTimeout(() => {
+      setIsSettling(false);
+    }, 250);
+    
     onDragEnd();
+  };
+
+  // Determine current visual state
+  const getScale = () => {
+    if (isDragging) return 1.03;
+    if (isSettling) return 1.01;
+    if (isPressed) return 0.97;
+    if (isActivated) return 1.02;
+    return 1;
+  };
+
+  const getBoxShadow = () => {
+    if (isDragging) {
+      return "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)";
+    }
+    if (isSettling) {
+      return "0 5px 15px -3px rgba(0, 0, 0, 0.15), 0 3px 6px -2px rgba(0, 0, 0, 0.1)";
+    }
+    return "none";
   };
 
   return (
@@ -136,51 +165,52 @@ function DraggableItem<T extends { id: string }>({
       dragListener={false}
       dragControls={dragControls}
       onDragEnd={handleDragEnd}
-      layout
+      layout="position"
       layoutId={task.id}
       className={cn(
         "relative",
-        isDragging ? "z-50 touch-none" : "touch-pan-x"
+        isDragging && "z-50"
       )}
       style={{
         cursor: isDragging ? 'grabbing' : isActivated ? 'grab' : 'default',
         WebkitUserSelect: 'none',
         userSelect: 'none',
         WebkitTouchCallout: 'none',
+        touchAction: isDragging ? 'none' : 'auto',
+      }}
+      initial={false}
+      animate={{
+        scale: getScale(),
+        boxShadow: getBoxShadow(),
+        y: isActivated && !isDragging ? -2 : 0,
+        opacity: isPressed && !isDragging ? 0.85 : 1,
+        backgroundColor: isDragging || isSettling ? "hsl(var(--background))" : "transparent",
+        borderRadius: isDragging || isSettling ? 12 : 0,
       }}
       transition={{
-        layout: { type: "spring", stiffness: 350, damping: 35 }
-      }}
-      whileDrag={{
-        scale: 1.03,
-        boxShadow: "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)",
-        backgroundColor: "hsl(var(--background))",
-        borderRadius: "12px",
+        layout: { 
+          type: "spring", 
+          stiffness: 200, 
+          damping: 25,
+          mass: 0.9
+        },
+        scale: { type: "spring", stiffness: 300, damping: 22 },
+        boxShadow: { duration: 0.2, ease: "easeOut" },
+        y: { type: "spring", stiffness: 400, damping: 25 },
+        opacity: { duration: 0.15 },
+        backgroundColor: { duration: 0.2 },
+        borderRadius: { duration: 0.2 },
       }}
       {...handlers}
     >
-      {/* Visual feedback wrapper with lift animation */}
-      <motion.div
-        animate={{
-          scale: isPressed && !isDragging ? 0.97 : isActivated && !isDragging ? 1.02 : 1,
-          opacity: isPressed && !isDragging ? 0.85 : 1,
-          y: isActivated && !isDragging ? -2 : 0,
-        }}
-        transition={{ 
-          type: "spring", 
-          stiffness: 500, 
-          damping: 30 
-        }}
-      >
-        {renderItem(task, {
-          isDragging,
-          isPressed,
-          isActivated,
-          dragHandleRef,
-          onDragStart,
-          onDragEnd: handleDragEnd,
-        })}
-      </motion.div>
+      {arguments[0].renderItem(task, {
+        isDragging,
+        isPressed,
+        isActivated,
+        dragHandleRef,
+        onDragStart,
+        onDragEnd: handleDragEnd,
+      })}
       
       {/* Grip indicator */}
       <motion.div 
