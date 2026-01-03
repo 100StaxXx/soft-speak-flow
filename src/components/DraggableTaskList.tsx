@@ -74,6 +74,8 @@ export function DraggableTaskList<T extends { id: string }>({
     );
   }
 
+  const isAnyDragging = draggingId !== null;
+
   return (
     <Reorder.Group
       axis="y"
@@ -86,6 +88,7 @@ export function DraggableTaskList<T extends { id: string }>({
           key={task.id}
           task={task}
           isDragging={draggingId === task.id}
+          isAnyDragging={isAnyDragging}
           onDragStart={() => handleDragStart(task.id)}
           onDragEnd={handleDragEnd}
           renderItem={renderItem}
@@ -98,6 +101,7 @@ export function DraggableTaskList<T extends { id: string }>({
 interface DraggableItemProps<T extends { id: string }> {
   task: T;
   isDragging: boolean;
+  isAnyDragging: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
   renderItem: (task: T, dragHandleProps: DragHandleProps) => ReactNode;
@@ -106,15 +110,17 @@ interface DraggableItemProps<T extends { id: string }> {
 function DraggableItem<T extends { id: string }>({
   task,
   isDragging,
+  isAnyDragging,
   onDragStart,
   onDragEnd,
+  renderItem,
 }: DraggableItemProps<T>) {
   const dragControls = useDragControls();
   const dragHandleRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
   const [isSettling, setIsSettling] = useState(false);
 
-  const { isPressed, isActivated, handlers } = useLongPress({
+  const { isPressed, isActivated, handlers, reset } = useLongPress({
     onLongPress: (e) => {
       isDraggingRef.current = true;
       onDragStart();
@@ -122,12 +128,13 @@ function DraggableItem<T extends { id: string }>({
       dragControls.start(e as unknown as PointerEvent);
     },
     threshold: 300,
-    moveThreshold: 8,
+    moveThreshold: 12,
   });
 
   const handleDragEnd = async () => {
     isDraggingRef.current = false;
     setIsSettling(true);
+    reset(); // Reset long press state
     
     // Light haptic on release
     await triggerHaptic(ImpactStyle.Light);
@@ -159,6 +166,10 @@ function DraggableItem<T extends { id: string }>({
     return "none";
   };
 
+  // Determine if this item should block pointer events
+  // When another item is dragging, this item should not receive pointer events
+  const shouldBlockPointerEvents = isAnyDragging && !isDragging;
+
   return (
     <Reorder.Item
       value={task}
@@ -175,13 +186,16 @@ function DraggableItem<T extends { id: string }>({
         WebkitUserSelect: 'none',
         userSelect: 'none',
         WebkitTouchCallout: 'none',
-        touchAction: isDragging ? 'none' : 'auto',
+        // Keep touchAction none during any interaction to prevent mid-gesture browser interference
+        touchAction: isPressed || isActivated || isDragging ? 'none' : 'auto',
+        // Block pointer events on non-dragging siblings to prevent interference
+        pointerEvents: shouldBlockPointerEvents ? 'none' : 'auto',
       }}
       initial={false}
       animate={{
         scale: getScale(),
         boxShadow: getBoxShadow(),
-        opacity: isPressed && !isDragging ? 0.85 : 1,
+        opacity: shouldBlockPointerEvents ? 0.6 : (isPressed && !isDragging ? 0.85 : 1),
         backgroundColor: isDragging || isSettling ? "hsl(var(--background))" : "transparent",
         borderRadius: isDragging || isSettling ? 12 : 0,
       }}
@@ -192,9 +206,13 @@ function DraggableItem<T extends { id: string }>({
         backgroundColor: { duration: 0.2 },
         borderRadius: { duration: 0.2 },
       }}
-      {...handlers}
+      // Only apply long press handlers - framer-motion handles the rest during drag
+      onPointerDown={handlers.onPointerDown}
+      onPointerMove={handlers.onPointerMove}
+      onPointerUp={handlers.onPointerUp}
+      onPointerCancel={handlers.onPointerCancel}
     >
-      {arguments[0].renderItem(task, {
+      {renderItem(task, {
         isDragging,
         isPressed,
         isActivated,
