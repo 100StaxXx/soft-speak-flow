@@ -290,11 +290,6 @@ const Journeys = () => {
     reorderTasks(updates);
   };
 
-  // Handle moving task to different time section
-  const handleMoveTaskToSection = (taskId: string, targetSection: 'morning' | 'afternoon' | 'evening' | 'unscheduled') => {
-    moveTaskToSection({ taskId, targetSection });
-  };
-
   // Handle moving task to a different date (cross-day drag)
   const handleMoveTaskToDate = useCallback((taskId: string, targetDate: Date) => {
     const targetDateStr = format(targetDate, 'yyyy-MM-dd');
@@ -359,7 +354,6 @@ const Journeys = () => {
             onUndoToggle={handleUndoToggle}
             onEditQuest={handleEditQuest}
             onReorderTasks={handleReorderTasks}
-            onMoveTaskToSection={handleMoveTaskToSection}
             hideIndicator={showTutorial}
             calendarTasks={allCalendarTasks}
             calendarMilestones={[]}

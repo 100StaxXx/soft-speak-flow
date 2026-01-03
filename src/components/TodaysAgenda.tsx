@@ -34,8 +34,7 @@ import { cn } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 
-import { DraggableSectionList, type TimeSection } from "./DraggableSectionList";
-import { type DragHandleProps } from "./DraggableTaskList";
+import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 
 interface Task {
   id: string;
@@ -78,7 +77,6 @@ interface TodaysAgendaProps {
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
   onReorderTasks?: (tasks: Task[]) => void;
-  onMoveTaskToSection?: (taskId: string, targetSection: TimeSection) => void;
   hideIndicator?: boolean;
   calendarTasks?: CalendarTask[];
   calendarMilestones?: CalendarMilestone[];
@@ -106,7 +104,6 @@ export function TodaysAgenda({
   onUndoToggle,
   onEditQuest,
   onReorderTasks,
-  onMoveTaskToSection,
   hideIndicator = false,
   calendarTasks = [],
   calendarMilestones = [],
@@ -508,17 +505,9 @@ export function TodaysAgenda({
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
     if (onReorderTasks) {
-      // Merge reordered quests with ritual tasks
       onReorderTasks(reorderedTasks);
     }
   }, [onReorderTasks]);
-
-  // Handle moving task to a different section
-  const handleMoveTask = useCallback((taskId: string, targetSection: TimeSection) => {
-    if (onMoveTaskToSection) {
-      onMoveTaskToSection(taskId, targetSection);
-    }
-  }, [onMoveTaskToSection]);
 
   return (
     <div className="relative">
@@ -603,7 +592,7 @@ export function TodaysAgenda({
                     </Badge>
                   </div>
                 )}
-                {/* Native iOS uses overlay, web uses DraggableSectionList directly */}
+                {/* Native iOS uses overlay, web uses DraggableTaskList directly */}
                 {isNative ? (
                   <div 
                     ref={nativeContainerRef}
@@ -611,11 +600,10 @@ export function TodaysAgenda({
                     style={{ height: Math.max(200, questTasks.length * 72) }}
                   />
                 ) : (
-                  <DraggableSectionList
+                  <DraggableTaskList
                     tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
-                    onReorderWithinSection={handleQuestReorder}
-                    onMoveTask={handleMoveTask}
-                    disableDrag={false}
+                    onReorder={handleQuestReorder}
+                    disabled={false}
                     renderItem={(task, dragProps) => (
                       <div>
                         {renderTaskItem(task, dragProps)}
