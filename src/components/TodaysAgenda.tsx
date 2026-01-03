@@ -22,8 +22,15 @@ import {
   Timer,
   Brain,
   Heart,
-  Dumbbell
+  Dumbbell,
+  ArrowUpDown
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MonthViewModal } from "@/components/calendar/MonthViewModal";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
@@ -114,6 +121,7 @@ export function TodaysAgenda({
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
+  const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   
   // Track if we've already shown the tooltip this session
   const tooltipShownRef = useRef(false);
@@ -148,29 +156,60 @@ export function TodaysAgenda({
   const QUEST_LIMIT_SOLO = 6;
   const RITUAL_LIMIT = 6;
 
+  // Priority weight for sorting
+  const getPriorityWeight = (priority: string | null | undefined) => {
+    switch (priority) {
+      case 'high': return 0;
+      case 'medium': return 1;
+      case 'low': return 2;
+      default: return 3;
+    }
+  };
+
   // Separate ritual tasks (from campaigns) and regular quests
   const { ritualTasks, questTasks } = useMemo(() => {
     const rituals = tasks.filter(t => !!t.habit_source_id);
     const quests = tasks.filter(t => !t.habit_source_id);
     
-    // Sort each group: incomplete first, then by scheduled time
+    // Sort based on selected sort option
     const sortGroup = (group: Task[]) => [...group].sort((a, b) => {
+      // Always put completed tasks at the bottom
       if (a.completed !== b.completed) {
         return a.completed ? 1 : -1;
       }
-      if (a.scheduled_time && b.scheduled_time) {
-        return a.scheduled_time.localeCompare(b.scheduled_time);
+      
+      switch (sortBy) {
+        case 'time':
+          if (a.scheduled_time && b.scheduled_time) {
+            return a.scheduled_time.localeCompare(b.scheduled_time);
+          }
+          if (a.scheduled_time) return -1;
+          if (b.scheduled_time) return 1;
+          return 0;
+        case 'priority':
+          return getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
+        case 'xp':
+          return b.xp_reward - a.xp_reward; // Higher XP first
+        case 'custom':
+        default:
+          // Sort by sort_order, then by scheduled time
+          const orderA = a.sort_order ?? 9999;
+          const orderB = b.sort_order ?? 9999;
+          if (orderA !== orderB) return orderA - orderB;
+          if (a.scheduled_time && b.scheduled_time) {
+            return a.scheduled_time.localeCompare(b.scheduled_time);
+          }
+          if (a.scheduled_time) return -1;
+          if (b.scheduled_time) return 1;
+          return 0;
       }
-      if (a.scheduled_time) return -1;
-      if (b.scheduled_time) return 1;
-      return 0;
     });
     
     return {
       ritualTasks: sortGroup(rituals),
       questTasks: sortGroup(quests),
     };
-  }, [tasks]);
+  }, [tasks, sortBy]);
   
   // Handle native task list reorder callback
   const handleNativeReorder = useCallback((taskIds: string[]) => {
@@ -582,16 +621,60 @@ export function TodaysAgenda({
             {/* Quests Section */}
             {questTasks.length > 0 && (
               <>
-                {ritualTasks.length > 0 && (
-                  <div className="flex items-center gap-2 py-1.5 px-1">
-                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                      Quests
-                    </span>
-                    <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
-                      {questTasks.length}
-                    </Badge>
+                <div className="flex items-center justify-between py-1.5 px-1">
+                  <div className="flex items-center gap-2">
+                    {ritualTasks.length > 0 && (
+                      <>
+                        <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                          Quests
+                        </span>
+                        <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
+                          {questTasks.length}
+                        </Badge>
+                      </>
+                    )}
                   </div>
-                )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                        <ArrowUpDown className="w-3.5 h-3.5" />
+                        {sortBy === 'custom' && 'Custom'}
+                        {sortBy === 'time' && 'Time'}
+                        {sortBy === 'priority' && 'Priority'}
+                        {sortBy === 'xp' && 'XP'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-32">
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('custom')}
+                        className={cn(sortBy === 'custom' && 'bg-accent/10')}
+                      >
+                        Custom
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('time')}
+                        className={cn(sortBy === 'time' && 'bg-accent/10')}
+                      >
+                        <Clock className="w-3.5 h-3.5 mr-2" />
+                        Time
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('priority')}
+                        className={cn(sortBy === 'priority' && 'bg-accent/10')}
+                      >
+                        <Zap className="w-3.5 h-3.5 mr-2" />
+                        Priority
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('xp')}
+                        className={cn(sortBy === 'xp' && 'bg-accent/10')}
+                      >
+                        <Trophy className="w-3.5 h-3.5 mr-2" />
+                        XP
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 {/* Native iOS uses overlay, web uses DraggableTaskList directly */}
                 {isNative ? (
                   <div 
