@@ -1,6 +1,5 @@
 import { memo } from "react";
-import { PawPrint, User } from "lucide-react";
-import { TreasureMap } from "@/components/icons/TreasureMap";
+import { PawPrint, User, Compass } from "lucide-react";
 import { NorthStar } from "@/components/icons/NorthStar";
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
@@ -113,7 +112,7 @@ export const BottomNav = memo(() => {
         >
           {({ isActive }) => (
             <>
-              <TreasureMap size={24} className={`transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
+              <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
               <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
                 Quests
               </span>
