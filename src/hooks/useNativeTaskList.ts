@@ -71,56 +71,77 @@ export function useNativeTaskList({
     
     const setupNativeList = async () => {
       try {
-        // Get container position
+        // Wait for container to be in DOM
         const container = containerRef.current;
-        if (!container) return;
+        if (!container) {
+          // Retry after a short delay if container not ready
+          const timer = setTimeout(setupNativeList, 100);
+          return () => clearTimeout(timer);
+        }
         
         const rect = container.getBoundingClientRect();
-        const safeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0', 10);
         
-        // Setup event listeners
+        // Get safe area inset from CSS variables or fallback
+        const computedStyle = getComputedStyle(document.documentElement);
+        const safeAreaTop = parseInt(computedStyle.getPropertyValue('--sat') || '0', 10);
+        
+        // Setup event listeners first
         const reorderListener = await NativeTaskList.addListener('tasksReordered', (event) => {
+          console.log('[NativeTaskList] Reorder event:', event.taskIds);
           onReorder(event.taskIds);
         });
         
         const toggleListener = await NativeTaskList.addListener('taskToggled', (event) => {
+          console.log('[NativeTaskList] Toggle event:', event.taskId);
           onToggle(event.taskId);
         });
         
         const deleteListener = await NativeTaskList.addListener('taskDeleted', (event) => {
+          console.log('[NativeTaskList] Delete event:', event.taskId);
           onDelete?.(event.taskId);
         });
         
         listenersRef.current = [reorderListener, toggleListener, deleteListener];
         
-        // Show native list
+        console.log('[NativeTaskList] Showing native list with frame:', {
+          x: rect.left,
+          y: rect.top + safeAreaTop,
+          width: rect.width,
+          height: Math.max(rect.height, 200),
+        });
+        
+        // Show native list overlaying the container
         await NativeTaskList.showTaskList({
           tasks: convertToNativeTasks(tasks),
           frame: {
             x: rect.left,
             y: rect.top + safeAreaTop,
             width: rect.width,
-            height: rect.height,
+            height: Math.max(rect.height, 200),
           },
         });
         
         setIsNativeActive(true);
         isInitializedRef.current = true;
+        console.log('[NativeTaskList] Native list active');
       } catch (error) {
         console.error('[NativeTaskList] Failed to setup:', error);
         setIsNativeAvailable(false);
       }
     };
     
-    setupNativeList();
+    // Small delay to ensure container is mounted
+    const initTimer = setTimeout(setupNativeList, 50);
     
     return () => {
+      clearTimeout(initTimer);
       // Cleanup on unmount
       if (isInitializedRef.current) {
         NativeTaskList.hideTaskList().catch(() => {});
         listenersRef.current.forEach(l => l.remove());
         listenersRef.current = [];
         isInitializedRef.current = false;
+        setIsNativeActive(false);
       }
     };
   }, [isNativeAvailable, containerRef, convertToNativeTasks, onReorder, onToggle, onDelete, tasks]);
