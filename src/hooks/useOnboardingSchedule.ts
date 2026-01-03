@@ -14,24 +14,36 @@ export const ONBOARDING_TASKS = [
     xp_reward: 2,
     difficulty: "easy",
     sort_order: 0,
+    category: "soul",
+    estimated_duration: 2,
+    notes: "Your companion grows stronger as you complete quests! Tap the floating orb on your home screen to say hello and check your progress.",
   },
   {
     task_text: "Morning Check-in 🌅",
     xp_reward: 3,
     difficulty: "easy",
     sort_order: 1,
+    category: "mind",
+    estimated_duration: 3,
+    notes: "Start each day with intention. A quick morning check-in helps you prioritize what matters most and sets you up for success.",
   },
   {
     task_text: "Create Your First Campaign 🚀",
     xp_reward: 3,
     difficulty: "easy",
     sort_order: 2,
+    category: "mind",
+    estimated_duration: 5,
+    notes: "Campaigns are your big-picture goals (like learning a skill or building a habit). They organize your quests and track your journey toward meaningful achievements.",
   },
   {
     task_text: "Create Your First Quest 🎯",
     xp_reward: 2,
     difficulty: "easy",
     sort_order: 3,
+    category: "mind",
+    estimated_duration: 2,
+    notes: "Quests are daily actions that move you forward. Start small - even 5 minutes counts! Completing quests earns XP and helps your companion evolve.",
   },
 ];
 
@@ -140,6 +152,9 @@ export function useOnboardingSchedule(
           is_main_quest: false,
           sort_order: task.sort_order,
           source: "onboarding",
+          notes: task.notes,
+          category: task.category,
+          estimated_duration: task.estimated_duration,
         }));
 
         const { data, error } = await supabase
