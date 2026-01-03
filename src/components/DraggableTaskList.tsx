@@ -81,21 +81,18 @@ export function DraggableTaskList<T extends { id: string }>({
     }
   }, [tasks, draggingId]);
 
-  // Calculate target index based on Y position with hysteresis
+  // Calculate target index - only allow one position swap at a time
   const calculateTargetIndex = useCallback((currentY: number): number => {
     const deltaY = currentY - dragStartYRef.current;
-    const rowsMoved = deltaY / ROW_HEIGHT;
+    const threshold = ROW_HEIGHT * SWAP_THRESHOLD;
     
-    // Apply hysteresis
-    const threshold = SWAP_THRESHOLD;
-    let targetIndex: number;
+    let targetIndex = currentIndexRef.current;
     
-    if (rowsMoved > 0) {
-      // Moving down
-      targetIndex = originalIndexRef.current + Math.floor(rowsMoved + (1 - threshold));
-    } else {
-      // Moving up
-      targetIndex = originalIndexRef.current + Math.ceil(rowsMoved - (1 - threshold));
+    // Only move one position when threshold exceeded
+    if (deltaY > threshold) {
+      targetIndex = currentIndexRef.current + 1;
+    } else if (deltaY < -threshold) {
+      targetIndex = currentIndexRef.current - 1;
     }
     
     // Clamp to valid range
@@ -123,9 +120,6 @@ export function DraggableTaskList<T extends { id: string }>({
     if (newIndex !== currentIndexRef.current) {
       triggerHaptic(ImpactStyle.Light);
       
-      const indexDelta = newIndex - currentIndexRef.current;
-      dragStartYRef.current += indexDelta * ROW_HEIGHT;
-      
       const newOrder = [...visualOrderRef.current];
       const [removed] = newOrder.splice(currentIndexRef.current, 1);
       newOrder.splice(newIndex, 0, removed);
@@ -133,6 +127,10 @@ export function DraggableTaskList<T extends { id: string }>({
       visualOrderRef.current = newOrder;
       currentIndexRef.current = newIndex;
       lastSwapIndexRef.current = newIndex;
+      
+      // Reset drag start to current Y so next swap starts fresh
+      dragStartYRef.current = currentYRef.current;
+      
       setVisualOrder(newOrder);
     }
   }, [calculateTargetIndex, updateAutoscroll]);
@@ -164,15 +162,16 @@ export function DraggableTaskList<T extends { id: string }>({
     if (newIndex !== currentIndexRef.current) {
       triggerHaptic(ImpactStyle.Light);
       
-      const indexDelta = newIndex - currentIndexRef.current;
-      dragStartYRef.current += indexDelta * ROW_HEIGHT;
-      
       const newOrder = [...visualOrderRef.current];
       const [removed] = newOrder.splice(currentIndexRef.current, 1);
       newOrder.splice(newIndex, 0, removed);
       
       visualOrderRef.current = newOrder;
       currentIndexRef.current = newIndex;
+      
+      // Reset drag start to current Y so next swap starts fresh
+      dragStartYRef.current = currentYRef.current;
+      
       setVisualOrder(newOrder);
     }
   }, [calculateTargetIndex, updateAutoscroll]);
@@ -345,12 +344,13 @@ export function DraggableTaskList<T extends { id: string }>({
               touchAction: isThisDragging ? 'none' : 'pan-y',
               pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
               // Direct CSS transform for dragged item (instant, no animation lag)
+              // Non-dragging items get translateY(0) so CSS transition has something to animate
               transform: isThisDragging 
                 ? `translateY(${dragOffset.y}px) scale(1.03)` 
-                : undefined,
+                : 'translateY(0)',
               // CSS transition for non-dragging items (smooth repositioning)
               transition: !isThisDragging && isAnyDragging 
-                ? 'transform 150ms ease-out' 
+                ? 'transform 150ms ease-out, opacity 150ms ease-out' 
                 : 'none',
               opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
               boxShadow: isThisDragging 
