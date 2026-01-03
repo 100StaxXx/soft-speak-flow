@@ -41,6 +41,7 @@ interface Task {
   task_text: string;
   completed: boolean | null;
   xp_reward: number;
+  task_date?: string;
   scheduled_time?: string | null;
   is_main_quest?: boolean | null;
   difficulty?: string | null;
