@@ -15,7 +15,7 @@ export const useLongPress = ({
   onPressStart,
   onPressEnd,
   threshold = 300,
-  moveThreshold = 10,
+  moveThreshold = 6,
 }: UseLongPressOptions) => {
   const [isPressed, setIsPressed] = useState(false);
   const [isActivated, setIsActivated] = useState(false);
@@ -80,11 +80,10 @@ export const useLongPress = ({
     (e: React.PointerEvent) => {
       if (!startPosRef.current || !timerRef.current) return;
 
-      const deltaX = Math.abs(e.clientX - startPosRef.current.x);
       const deltaY = Math.abs(e.clientY - startPosRef.current.y);
 
-      // Cancel if moved too much before activation
-      if (!isLongPressRef.current && (deltaX > moveThreshold || deltaY > moveThreshold)) {
+      // Only cancel on vertical movement (allow horizontal swipes)
+      if (!isLongPressRef.current && deltaY > moveThreshold) {
         clear();
       }
     },
