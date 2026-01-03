@@ -6,8 +6,8 @@ interface UseLongPressOptions {
   onLongPress: (event: React.PointerEvent) => void;
   onPressStart?: () => void;
   onPressEnd?: () => void;
-  threshold?: number; // ms - reduced to 300ms for iOS-like feel
-  moveThreshold?: number; // px
+  threshold?: number;
+  moveThreshold?: number;
 }
 
 export const useLongPress = ({
@@ -15,7 +15,7 @@ export const useLongPress = ({
   onPressStart,
   onPressEnd,
   threshold = 300,
-  moveThreshold = 6,
+  moveThreshold = 12, // Increased from 6 for more tolerance
 }: UseLongPressOptions) => {
   const [isPressed, setIsPressed] = useState(false);
   const [isActivated, setIsActivated] = useState(false);
@@ -23,6 +23,7 @@ export const useLongPress = ({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
   const isLongPressRef = useRef(false);
+  const isDraggingRef = useRef(false); // Track when drag control is handed off
   const pointerEventRef = useRef<React.PointerEvent | null>(null);
 
   const triggerHaptic = async () => {
@@ -47,11 +48,20 @@ export const useLongPress = ({
     onPressEnd?.();
   }, [onPressEnd]);
 
+  // Reset everything including drag state
+  const fullReset = useCallback(() => {
+    isDraggingRef.current = false;
+    isLongPressRef.current = false;
+    clear();
+  }, [clear]);
+
   const start = useCallback(
     (e: React.PointerEvent) => {
       // Only handle primary pointer (touch or mouse button)
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       
+      // Reset drag state on new press
+      isDraggingRef.current = false;
       isLongPressRef.current = false;
       setIsPressed(true);
       onPressStart?.();
@@ -73,6 +83,7 @@ export const useLongPress = ({
 
       timerRef.current = setTimeout(() => {
         isLongPressRef.current = true;
+        isDraggingRef.current = true; // Mark as dragging - handlers should now no-op
         setIsActivated(true);
         triggerHaptic();
         if (pointerEventRef.current) {
@@ -85,11 +96,14 @@ export const useLongPress = ({
 
   const move = useCallback(
     (e: React.PointerEvent) => {
+      // If drag has started, let framer-motion handle everything
+      if (isDraggingRef.current) return;
+      
       if (!startPosRef.current || !timerRef.current) return;
 
       const deltaY = Math.abs(e.clientY - startPosRef.current.y);
 
-      // Only cancel on vertical movement (allow horizontal swipes)
+      // Only cancel on vertical movement before long press triggers
       if (!isLongPressRef.current && deltaY > moveThreshold) {
         clear();
       }
@@ -99,6 +113,12 @@ export const useLongPress = ({
 
   const end = useCallback(
     (e: React.PointerEvent) => {
+      // If drag was active, just reset - framer-motion handles the drag end
+      if (isDraggingRef.current) {
+        fullReset();
+        return false;
+      }
+      
       const wasLongPress = isLongPressRef.current;
       
       // Prevent default click if long press was triggered
@@ -107,14 +127,17 @@ export const useLongPress = ({
         e.stopPropagation();
       }
       
-      clear();
+      fullReset();
       
       return wasLongPress;
     },
-    [clear]
+    [fullReset]
   );
 
   const cancel = useCallback(() => {
+    // If drag is active, don't cancel - let framer-motion handle it
+    if (isDraggingRef.current) return;
+    
     isLongPressRef.current = false;
     clear();
   }, [clear]);
@@ -126,13 +149,14 @@ export const useLongPress = ({
       onPointerDown: start,
       onPointerMove: move,
       onPointerUp: end,
-      onPointerCancel: cancel,
-      onPointerLeave: () => {
-        // Only cancel if drag hasn't started yet
-        if (!isLongPressRef.current) {
+      onPointerCancel: () => {
+        // Only cancel if not dragging
+        if (!isDraggingRef.current) {
           cancel();
         }
       },
     },
+    // Expose reset for external cleanup
+    reset: fullReset,
   };
 };
