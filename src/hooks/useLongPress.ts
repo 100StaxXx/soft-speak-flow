@@ -1,21 +1,29 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 
 interface UseLongPressOptions {
-  onLongPress: () => void;
-  threshold?: number; // ms
+  onLongPress: (event: React.PointerEvent) => void;
+  onPressStart?: () => void;
+  onPressEnd?: () => void;
+  threshold?: number; // ms - reduced to 300ms for iOS-like feel
   moveThreshold?: number; // px
 }
 
 export const useLongPress = ({
   onLongPress,
-  threshold = 800,
-  moveThreshold = 12,
+  onPressStart,
+  onPressEnd,
+  threshold = 300,
+  moveThreshold = 10,
 }: UseLongPressOptions) => {
+  const [isPressed, setIsPressed] = useState(false);
+  const [isActivated, setIsActivated] = useState(false);
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
   const isLongPressRef = useRef(false);
+  const pointerEventRef = useRef<React.PointerEvent | null>(null);
 
   const triggerHaptic = async () => {
     if (Capacitor.isNativePlatform()) {
@@ -33,45 +41,50 @@ export const useLongPress = ({
       timerRef.current = null;
     }
     startPosRef.current = null;
-  }, []);
+    pointerEventRef.current = null;
+    setIsPressed(false);
+    setIsActivated(false);
+    onPressEnd?.();
+  }, [onPressEnd]);
 
   const start = useCallback(
-    (e: React.TouchEvent | React.MouseEvent) => {
-      isLongPressRef.current = false;
+    (e: React.PointerEvent) => {
+      // Only handle primary pointer (touch or mouse button)
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
       
-      // Get starting position
-      if ('touches' in e) {
-        startPosRef.current = {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY,
-        };
-      } else {
-        startPosRef.current = {
-          x: e.clientX,
-          y: e.clientY,
-        };
-      }
+      isLongPressRef.current = false;
+      setIsPressed(true);
+      onPressStart?.();
+      
+      // Store the pointer event for drag initiation
+      pointerEventRef.current = e;
+      
+      startPosRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+      };
 
       timerRef.current = setTimeout(() => {
         isLongPressRef.current = true;
+        setIsActivated(true);
         triggerHaptic();
-        onLongPress();
+        if (pointerEventRef.current) {
+          onLongPress(pointerEventRef.current);
+        }
       }, threshold);
     },
-    [onLongPress, threshold]
+    [onLongPress, onPressStart, threshold]
   );
 
   const move = useCallback(
-    (e: React.TouchEvent) => {
+    (e: React.PointerEvent) => {
       if (!startPosRef.current || !timerRef.current) return;
 
-      const currentX = e.touches[0].clientX;
-      const currentY = e.touches[0].clientY;
-      const deltaX = Math.abs(currentX - startPosRef.current.x);
-      const deltaY = Math.abs(currentY - startPosRef.current.y);
+      const deltaX = Math.abs(e.clientX - startPosRef.current.x);
+      const deltaY = Math.abs(e.clientY - startPosRef.current.y);
 
-      // Cancel if moved too much
-      if (deltaX > moveThreshold || deltaY > moveThreshold) {
+      // Cancel if moved too much before activation
+      if (!isLongPressRef.current && (deltaX > moveThreshold || deltaY > moveThreshold)) {
         clear();
       }
     },
@@ -79,23 +92,36 @@ export const useLongPress = ({
   );
 
   const end = useCallback(
-    (e: React.TouchEvent | React.MouseEvent) => {
+    (e: React.PointerEvent) => {
+      const wasLongPress = isLongPressRef.current;
+      
       // Prevent default click if long press was triggered
-      if (isLongPressRef.current) {
+      if (wasLongPress) {
         e.preventDefault();
         e.stopPropagation();
       }
+      
       clear();
+      
+      return wasLongPress;
     },
     [clear]
   );
 
+  const cancel = useCallback(() => {
+    isLongPressRef.current = false;
+    clear();
+  }, [clear]);
+
   return {
-    onTouchStart: start,
-    onTouchMove: move,
-    onTouchEnd: end,
-    onMouseDown: start,
-    onMouseUp: end,
-    onMouseLeave: clear,
+    isPressed,
+    isActivated,
+    handlers: {
+      onPointerDown: start,
+      onPointerMove: move,
+      onPointerUp: end,
+      onPointerCancel: cancel,
+      onPointerLeave: cancel,
+    },
   };
 };
