@@ -31,14 +31,6 @@ const triggerHaptic = async (style: ImpactStyle) => {
   }
 };
 
-// Spring configuration for neighboring items
-const neighborSpring = {
-  type: "spring" as const,
-  stiffness: 400,
-  damping: 35,
-  mass: 0.8,
-};
-
 const ROW_HEIGHT = 56; // Fixed row height for calculations
 const LONG_PRESS_DURATION = 300;
 const SWAP_THRESHOLD = 0.6; // 60% hysteresis
@@ -70,6 +62,8 @@ export function DraggableTaskList<T extends { id: string }>({
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const visualOrderRef = useRef<T[]>(tasks);
   const lastSwapIndexRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const pendingOffsetRef = useRef({ x: 0, y: 0 });
 
   // Autoscroll hook
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -109,27 +103,29 @@ export function DraggableTaskList<T extends { id: string }>({
   }, []);
   // Handle pointer move during drag (desktop)
   const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (!draggingIdRef.current) return; // Use ref for closure
+    if (!draggingIdRef.current) return;
     
     currentYRef.current = e.clientY;
-    setDragOffset({ x: 0, y: e.clientY - dragStartYRef.current });
     
-    // Update autoscroll
+    // Throttle offset updates with RAF
+    pendingOffsetRef.current = { x: 0, y: e.clientY - dragStartYRef.current };
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        setDragOffset(pendingOffsetRef.current);
+        rafRef.current = null;
+      });
+    }
+    
     updateAutoscroll(e.clientY);
     
-    // Calculate new index
     const newIndex = calculateTargetIndex(e.clientY);
     
-    // Only update if index changed and different from last swap
     if (newIndex !== currentIndexRef.current) {
-      // Trigger light haptic on swap
       triggerHaptic(ImpactStyle.Light);
       
-      // Adjust dragStartY to compensate for position change (prevents jumping)
       const indexDelta = newIndex - currentIndexRef.current;
       dragStartYRef.current += indexDelta * ROW_HEIGHT;
       
-      // Reorder visual array
       const newOrder = [...visualOrderRef.current];
       const [removed] = newOrder.splice(currentIndexRef.current, 1);
       newOrder.splice(newIndex, 0, removed);
@@ -137,34 +133,37 @@ export function DraggableTaskList<T extends { id: string }>({
       visualOrderRef.current = newOrder;
       currentIndexRef.current = newIndex;
       lastSwapIndexRef.current = newIndex;
-      
-      // Update visual state (minimal re-render)
       setVisualOrder(newOrder);
     }
   }, [calculateTargetIndex, updateAutoscroll]);
 
   // Handle touch move during drag (iOS compatible)
   const handleTouchMoveWhileDragging = useCallback((e: TouchEvent) => {
-    if (!draggingIdRef.current) return; // Use ref for closure
+    if (!draggingIdRef.current) return;
     
-    e.preventDefault(); // Prevent page scroll while dragging
+    e.preventDefault();
     
     const touch = e.touches[0];
     if (!touch) return;
     
     currentYRef.current = touch.clientY;
-    setDragOffset({ x: 0, y: touch.clientY - dragStartYRef.current });
     
-    // Update autoscroll
+    // Throttle offset updates with RAF
+    pendingOffsetRef.current = { x: 0, y: touch.clientY - dragStartYRef.current };
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        setDragOffset(pendingOffsetRef.current);
+        rafRef.current = null;
+      });
+    }
+    
     updateAutoscroll(touch.clientY);
     
-    // Calculate new index with hysteresis
     const newIndex = calculateTargetIndex(touch.clientY);
     
     if (newIndex !== currentIndexRef.current) {
       triggerHaptic(ImpactStyle.Light);
       
-      // Adjust dragStartY to compensate for position change (prevents jumping)
       const indexDelta = newIndex - currentIndexRef.current;
       dragStartYRef.current += indexDelta * ROW_HEIGHT;
       
@@ -329,17 +328,8 @@ export function DraggableTaskList<T extends { id: string }>({
         const isThisDragging = draggingId === task.id;
         const isAnyDragging = isDragging;
         
-        // Calculate offset for non-dragging items
-        let yOffset = 0;
-        if (isAnyDragging && !isThisDragging) {
-          // Find where this item was originally and where it is now
-          const originalPosition = tasks.findIndex(t => t.id === task.id);
-          const currentPosition = index;
-          yOffset = (currentPosition - originalPosition) * 0; // Let CSS handle this
-        }
-        
         return (
-          <motion.div
+          <div
             key={task.id}
             ref={(el) => {
               if (el) itemRefsMap.current.set(task.id, el);
@@ -354,6 +344,20 @@ export function DraggableTaskList<T extends { id: string }>({
               WebkitTouchCallout: 'none',
               touchAction: isThisDragging ? 'none' : 'pan-y',
               pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+              // Direct CSS transform for dragged item (instant, no animation lag)
+              transform: isThisDragging 
+                ? `translateY(${dragOffset.y}px) scale(1.03)` 
+                : undefined,
+              // CSS transition for non-dragging items (smooth repositioning)
+              transition: !isThisDragging && isAnyDragging 
+                ? 'transform 150ms ease-out' 
+                : 'none',
+              opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+              boxShadow: isThisDragging 
+                ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                : "none",
+              backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
+              borderRadius: isThisDragging ? 12 : 0,
             }}
             // Touch handlers
             onTouchStart={(e) => handleTouchStart(e, task.id, index)}
@@ -370,18 +374,6 @@ export function DraggableTaskList<T extends { id: string }>({
             onPointerCancel={() => {
               clearLongPress();
             }}
-            layout={!isThisDragging}
-            animate={{
-              y: isThisDragging ? dragOffset.y : 0,
-              scale: isThisDragging ? 1.03 : 1,
-              boxShadow: isThisDragging 
-                ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                : "none",
-              opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
-              backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
-              borderRadius: isThisDragging ? 12 : 0,
-            }}
-            transition={isThisDragging ? { duration: 0 } : neighborSpring}
           >
             {renderItem(task, {
               isDragging: isThisDragging,
@@ -406,7 +398,7 @@ export function DraggableTaskList<T extends { id: string }>({
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </div>
         );
       })}
     </div>
