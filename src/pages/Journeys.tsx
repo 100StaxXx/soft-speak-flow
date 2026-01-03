@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { 
@@ -26,6 +26,7 @@ import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { TaskDragProvider } from "@/contexts/TaskDragContext";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
@@ -79,6 +80,7 @@ const Journeys = () => {
     deleteTask,
     reorderTasks,
     moveTaskToSection,
+    moveTaskToDate,
     completedCount,
     totalCount,
     isAdding,
@@ -292,7 +294,15 @@ const Journeys = () => {
   const handleMoveTaskToSection = (taskId: string, targetSection: 'morning' | 'afternoon' | 'evening' | 'unscheduled') => {
     moveTaskToSection({ taskId, targetSection });
   };
+
+  // Handle moving task to a different date (cross-day drag)
+  const handleMoveTaskToDate = useCallback((taskId: string, targetDate: Date) => {
+    const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+    moveTaskToDate({ taskId, targetDate: targetDateStr });
+  }, [moveTaskToDate]);
+
   return (
+    <TaskDragProvider>
     <PageTransition>
       <StarfieldBackground />
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
@@ -326,6 +336,7 @@ const Journeys = () => {
             selectedDate={selectedDate}
             onDateSelect={setSelectedDate}
             tasksPerDay={tasksPerDay}
+            onTaskDrop={handleMoveTaskToDate}
           />
         </motion.div>
 
@@ -494,6 +505,7 @@ const Journeys = () => {
 
       <BottomNav />
     </PageTransition>
+    </TaskDragProvider>
   );
 };
 

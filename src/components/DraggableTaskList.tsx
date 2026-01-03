@@ -4,8 +4,9 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLongPress } from "@/hooks/useLongPress";
+import { useTaskDragOptional } from "@/contexts/TaskDragContext";
 
-interface DraggableTaskListProps<T extends { id: string }> {
+interface DraggableTaskListProps<T extends { id: string; task_text?: string; xp_reward?: number; task_date?: string }> {
   tasks: T[];
   onReorder: (tasks: T[]) => void;
   renderItem: (task: T, dragHandleProps?: DragHandleProps) => ReactNode;
@@ -31,7 +32,7 @@ const triggerHaptic = async (style: ImpactStyle) => {
   }
 };
 
-export function DraggableTaskList<T extends { id: string }>({
+export function DraggableTaskList<T extends { id: string; task_text?: string; xp_reward?: number; task_date?: string }>({
   tasks,
   onReorder,
   renderItem,
@@ -40,12 +41,23 @@ export function DraggableTaskList<T extends { id: string }>({
   onDragEnd: onExternalDragEnd,
 }: DraggableTaskListProps<T>) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragContext = useTaskDragOptional();
 
-  const handleDragStart = useCallback((id: string) => {
+  const handleDragStart = useCallback((id: string, task: T) => {
     setDraggingId(id);
     triggerHaptic(ImpactStyle.Medium);
     onExternalDragStart?.(id);
-  }, [onExternalDragStart]);
+    
+    // Broadcast to global drag context for cross-day dragging
+    if (dragContext && task.task_text && task.xp_reward !== undefined && task.task_date) {
+      dragContext.startDrag({
+        id: task.id,
+        task_text: task.task_text,
+        xp_reward: task.xp_reward,
+        task_date: task.task_date,
+      });
+    }
+  }, [onExternalDragStart, dragContext]);
 
   const handleDragEnd = useCallback(() => {
     if (draggingId) {
@@ -53,7 +65,10 @@ export function DraggableTaskList<T extends { id: string }>({
     }
     setDraggingId(null);
     onExternalDragEnd?.();
-  }, [draggingId, onExternalDragEnd]);
+    
+    // End global drag
+    dragContext?.endDrag();
+  }, [draggingId, onExternalDragEnd, dragContext]);
 
   if (disabled || tasks.length <= 1) {
     return (
@@ -89,7 +104,7 @@ export function DraggableTaskList<T extends { id: string }>({
           task={task}
           isDragging={draggingId === task.id}
           isAnyDragging={isAnyDragging}
-          onDragStart={() => handleDragStart(task.id)}
+          onDragStart={() => handleDragStart(task.id, task)}
           onDragEnd={handleDragEnd}
           renderItem={renderItem}
         />

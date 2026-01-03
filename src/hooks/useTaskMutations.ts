@@ -576,6 +576,35 @@ export const useTaskMutations = (taskDate: string) => {
     },
   });
 
+  // Move task to a different date (cross-day drag)
+  const moveTaskToDate = useMutation({
+    mutationFn: async ({ taskId, targetDate }: {
+      taskId: string;
+      targetDate: string;
+    }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({ 
+          task_date: targetDate,
+          sort_order: 0, // Place at top of new day
+        })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      toast({ title: `Task moved to ${format(new Date(variables.targetDate + 'T00:00:00'), 'MMM d')}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to move task", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
@@ -584,11 +613,13 @@ export const useTaskMutations = (taskDate: string) => {
     updateTask: updateTask.mutateAsync,
     reorderTasks: reorderTasks.mutate,
     moveTaskToSection: moveTaskToSection.mutate,
+    moveTaskToDate: moveTaskToDate.mutate,
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
     isDeleting: deleteTask.isPending,
     isUpdating: updateTask.isPending,
     isReordering: reorderTasks.isPending,
     isMoving: moveTaskToSection.isPending,
+    isMovingDate: moveTaskToDate.isPending,
   };
 };
