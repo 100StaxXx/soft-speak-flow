@@ -25,6 +25,8 @@ export const useLongPress = ({
   const isLongPressRef = useRef(false);
   const isDraggingRef = useRef(false); // Track when drag control is handed off
   const pointerEventRef = useRef<React.PointerEvent | null>(null);
+  const pointerIdRef = useRef<number | null>(null);
+  const targetElementRef = useRef<HTMLElement | null>(null);
 
   const triggerHaptic = async () => {
     if (Capacitor.isNativePlatform()) {
@@ -36,6 +38,18 @@ export const useLongPress = ({
     }
   };
 
+  // Release pointer capture to hand control to framer-motion
+  const releaseCapture = useCallback(() => {
+    if (pointerIdRef.current !== null && targetElementRef.current) {
+      try {
+        targetElementRef.current.releasePointerCapture?.(pointerIdRef.current);
+      } catch {
+        // Already released or not captured
+      }
+      pointerIdRef.current = null;
+    }
+  }, []);
+
   const clear = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -43,6 +57,8 @@ export const useLongPress = ({
     }
     startPosRef.current = null;
     pointerEventRef.current = null;
+    targetElementRef.current = null;
+    pointerIdRef.current = null;
     setIsPressed(false);
     setIsActivated(false);
     onPressEnd?.();
@@ -52,8 +68,9 @@ export const useLongPress = ({
   const fullReset = useCallback(() => {
     isDraggingRef.current = false;
     isLongPressRef.current = false;
+    releaseCapture();
     clear();
-  }, [clear]);
+  }, [clear, releaseCapture]);
 
   const start = useCallback(
     (e: React.PointerEvent) => {
@@ -66,7 +83,11 @@ export const useLongPress = ({
       setIsPressed(true);
       onPressStart?.();
       
-      // Capture pointer for smoother tracking
+      // Store pointer info for later release
+      pointerIdRef.current = e.pointerId;
+      targetElementRef.current = e.target as HTMLElement;
+      
+      // Capture pointer for smoother tracking during long-press detection
       try {
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
       } catch {
@@ -85,13 +106,18 @@ export const useLongPress = ({
         isLongPressRef.current = true;
         isDraggingRef.current = true; // Mark as dragging - handlers should now no-op
         setIsActivated(true);
+        
+        // CRITICAL: Release pointer capture BEFORE handing to framer-motion
+        // This prevents pointercancel events when dragging over other elements
+        releaseCapture();
+        
         triggerHaptic();
         if (pointerEventRef.current) {
           onLongPress(pointerEventRef.current);
         }
       }, threshold);
     },
-    [onLongPress, onPressStart, threshold]
+    [onLongPress, onPressStart, threshold, releaseCapture]
   );
 
   const move = useCallback(
