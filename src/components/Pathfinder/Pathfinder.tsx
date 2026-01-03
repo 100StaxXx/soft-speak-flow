@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { differenceInDays, parseISO, format, addDays } from 'date-fns';
 import {
@@ -324,7 +325,7 @@ export function Pathfinder({
   const handleAdjustSchedule = useCallback(async (feedback: string) => {
     if (!schedule || !deadline) return;
     
-    await adjustSchedule({
+    const result = await adjustSchedule({
       goal: goalInput,
       deadline: format(deadline, 'yyyy-MM-dd'),
       adjustmentRequest: feedback,
@@ -334,7 +335,23 @@ export function Pathfinder({
         rituals: schedule.rituals,
       },
     });
-  }, [schedule, deadline, goalInput, adjustSchedule]);
+    
+    if (result) {
+      success();
+      toast.success('Schedule updated!', {
+        description: feedback.toLowerCase().includes('intensive') 
+          ? 'Made your plan more intensive'
+          : feedback.toLowerCase().includes('less') || feedback.toLowerCase().includes('breathing')
+          ? 'Made your plan more relaxed'
+          : 'Adjusted based on your feedback'
+      });
+    } else {
+      light();
+      toast.error('Failed to adjust schedule', {
+        description: 'Please try again'
+      });
+    }
+  }, [schedule, deadline, goalInput, adjustSchedule, success, light]);
 
   const handleProceedToSuggestions = useCallback(() => {
     if (!schedule) return;
