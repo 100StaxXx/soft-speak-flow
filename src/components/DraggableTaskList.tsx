@@ -348,10 +348,8 @@ export function DraggableTaskList<T extends { id: string }>({
               transform: isThisDragging 
                 ? `translateY(${dragOffset.y}px) scale(1.03)` 
                 : 'translateY(0)',
-              // CSS transition for non-dragging items (smooth repositioning)
-              transition: !isThisDragging && isAnyDragging 
-                ? 'transform 150ms ease-out, opacity 150ms ease-out' 
-                : 'none',
+                // No transition - instant repositioning
+                transition: 'none',
               opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
               boxShadow: isThisDragging 
                 ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
