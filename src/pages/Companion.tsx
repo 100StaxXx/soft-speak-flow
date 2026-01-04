@@ -5,7 +5,6 @@ import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
-import { EvolveButton } from "@/components/companion/EvolveButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer } from "lucide-react";
 import { CollectionTab } from "@/components/companion/CollectionTab";
@@ -81,7 +80,7 @@ const OverviewSkeleton = () => (
 );
 
 const Companion = () => {
-  const { companion, nextEvolutionXP, progressToNext, isLoading, error, canEvolve, triggerManualEvolution, evolveCompanion } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
@@ -225,16 +224,6 @@ const Companion = () => {
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </header>
-
-          {/* Rainbow Evolve Button - shows when evolution is ready */}
-          <AnimatePresence>
-            {canEvolve && !isLoading && (
-              <EvolveButton 
-                onEvolve={triggerManualEvolution}
-                isEvolving={evolveCompanion.isPending}
-              />
-            )}
-          </AnimatePresence>
 
           {renderContent()}
         </div>

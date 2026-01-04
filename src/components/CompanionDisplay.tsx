@@ -15,6 +15,8 @@ import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { WelcomeBackModal } from "@/components/WelcomeBackModal";
 import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
+import { EvolveButton } from "@/components/companion/EvolveButton";
+import { AnimatePresence } from "framer-motion";
 import {
   useState,
   useEffect,
@@ -85,7 +87,7 @@ const getColorName = (hexColor: string): string => {
 export const CompanionDisplay = memo(() => {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error, canEvolve, triggerManualEvolution } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
@@ -498,6 +500,16 @@ export const CompanionDisplay = memo(() => {
             mind: companion.mind,
             soul: companion.soul
           }} />
+
+          {/* Evolve Button - shows when ready */}
+          <AnimatePresence>
+            {canEvolve && (
+              <EvolveButton 
+                onEvolve={triggerManualEvolution}
+                isEvolving={evolveCompanion.isPending}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </Card>
 
