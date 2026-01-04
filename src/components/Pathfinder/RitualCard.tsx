@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   GripVertical, 
@@ -42,7 +42,7 @@ const frequencyLabels: Record<string, string> = {
   custom: 'Custom',
 };
 
-export function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditing = false }: RitualCardProps) {
+export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditing = false }: RitualCardProps) {
   const [isEditing, setIsEditing] = useState(initialEditing);
   const [editedRitual, setEditedRitual] = useState(ritual);
 
@@ -195,4 +195,4 @@ export function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditi
       </div>
     </motion.div>
   );
-}
+});

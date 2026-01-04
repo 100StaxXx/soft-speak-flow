@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -47,7 +47,7 @@ interface SmartAdjustPlanDrawerProps {
   }>;
 }
 
-export function SmartAdjustPlanDrawer({ 
+export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({ 
   open, 
   onOpenChange, 
   epicId, 
@@ -376,4 +376,4 @@ export function SmartAdjustPlanDrawer({
       </DrawerContent>
     </Drawer>
   );
-}
+});

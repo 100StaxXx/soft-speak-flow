@@ -76,6 +76,7 @@ export const useMilestones = (epicId?: string) => {
       return data as Milestone[];
     },
     enabled: !!user && !!epicId,
+    staleTime: 3 * 60 * 1000, // 3 minutes
   });
 
   // Group milestones by phase

@@ -1,4 +1,4 @@
-
+import { memo, useState, useMemo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,16 +11,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Sparkles, Flag, Star } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Flag, Star } from "lucide-react";
 import type { StorySeed } from "@/types/narrativeTypes";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";
 import { JourneyDetailDrawer } from "./JourneyDetailDrawer";
-
 import { MilestonePostcardPreview } from "./journey/MilestonePostcardPreview";
 import { cn } from "@/lib/utils";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -76,17 +74,15 @@ interface JourneyCardProps {
   onAbandon?: () => void;
 }
 
-export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps) => {
+export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAbandon }: JourneyCardProps) {
   const [copied, setCopied] = useState(false);
   const [showAbandonDialog, setShowAbandonDialog] = useState(false);
-  
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   
   const { companion } = useCompanion();
   const { health } = useCompanionHealth();
   const { 
-    milestonesByPhase, 
-    getCurrentPhase, 
+    milestones,
     getProgressToNextPostcard,
     getJourneyHealth,
   } = useMilestones(journey.id);
@@ -99,12 +95,8 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
   const theme = (journey.theme_color || 'heroic') as JourneyTheme;
   const themeGradient = themeGradients[theme];
   
-  const currentPhase = getCurrentPhase();
   const postcardProgress = getProgressToNextPostcard();
   const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
-
-  // Get milestones for the trail
-  const { milestones } = useMilestones(journey.id);
   
   const trailMilestones = useMemo(() => {
     if (!milestones || milestones.length === 0) return undefined;
@@ -121,7 +113,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
     }));
   }, [milestones]);
 
-  const handleShareJourney = async () => {
+  const handleShareJourney = useCallback(async () => {
     if (!journey.invite_code) return;
     
     try {
@@ -134,7 +126,7 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
     } catch {
       toast.error("Failed to copy code");
     }
-  };
+  }, [journey.invite_code]);
 
   // Count valid rituals (habits linked to journey)
   const ritualCount = journey.epic_habits?.filter(eh => eh.habits)?.length || 0;
@@ -387,4 +379,4 @@ export const JourneyCard = ({ journey, onComplete, onAbandon }: JourneyCardProps
       </div>
     </motion.div>
   );
-};
+});

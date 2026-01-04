@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ interface JoinEpicDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
+export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange }: JoinEpicDialogProps) {
   const [inviteCode, setInviteCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [epicLimitReached, setEpicLimitReached] = useState(false);
@@ -208,4 +208,4 @@ export const JoinEpicDialog = ({ open, onOpenChange }: JoinEpicDialogProps) => {
       </DialogContent>
     </Dialog>
   );
-};
+});

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Rocket, Sparkles, ChevronRight } from 'lucide-react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -9,7 +10,7 @@ interface CampaignEmptyStateModalProps {
   onLaunch: () => void;
 }
 
-export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateModalProps) {
+export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateModalProps) {
   const { imageUrl, isLoading } = useWelcomeImage();
   
   const backgroundImage = imageUrl || campaignWelcomeFallback;
@@ -53,14 +54,14 @@ export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateMo
             <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-background via-background/80 to-transparent" />
           </div>
           
-          {/* Floating particles */}
+          {/* Floating particles - reduced from 12 to 6 */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(12)].map((_, i) => (
+            {[...Array(6)].map((_, i) => (
               <motion.div
                 key={i}
                 className="absolute w-2 h-2 rounded-full bg-primary/40"
                 initial={{ 
-                  x: `${Math.random() * 100}%`, 
+                  x: `${(i * 16.66) + 8}%`, 
                   y: '110%',
                   opacity: 0 
                 }}
@@ -69,9 +70,9 @@ export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateMo
                   opacity: [0, 0.7, 0],
                 }}
                 transition={{
-                  duration: 5 + Math.random() * 3,
+                  duration: 6 + (i % 3),
                   repeat: Infinity,
-                  delay: i * 0.6,
+                  delay: i * 1.2,
                   ease: 'easeOut'
                 }}
               />
@@ -165,4 +166,4 @@ export function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateMo
       )}
     </AnimatePresence>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { memo, useState, useMemo } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -68,7 +68,7 @@ interface EpicCheckInDrawerProps {
   renderTrigger?: (todayCount: number) => React.ReactNode;
 }
 
-export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) => {
+export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habits, isActive, onAdjustPlan, showAdjustPlan, renderTrigger }: EpicCheckInDrawerProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -511,4 +511,4 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, show
       </DrawerContent>
     </Drawer>
   );
-};
+});
