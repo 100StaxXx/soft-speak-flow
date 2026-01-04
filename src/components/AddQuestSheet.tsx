@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { QUEST_XP_REWARDS } from "@/config/xpRewards";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { SuggestedTimeSlots } from "@/components/SuggestedTimeSlots";
+import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import {
   Drawer,
   DrawerClose,
@@ -61,20 +62,17 @@ export function AddQuestSheet({
   // Input ref for delayed focus
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Keyboard height for positioning drawer above keyboard
+  const keyboardHeight = useKeyboardHeight();
+
   // Update scheduled time when prefilledTime changes
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
   }, [prefilledTime]);
 
-  // Focus input after drawer animation completes
+  // Reset expanded state when drawer closes (no auto-focus to avoid race condition)
   useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 350);
-      return () => clearTimeout(timer);
-    } else {
-      // Reset expanded state when drawer closes
+    if (!open) {
       setIsExpanded(false);
     }
   }, [open]);
@@ -136,9 +134,13 @@ export function AddQuestSheet({
   // Minimal mode: just input + quick submit
   if (!isExpanded) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={true}>
+      <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
         <DrawerContent 
           className="max-h-[200px]"
+          style={{ 
+            transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : undefined,
+            transition: 'transform 0.15s ease-out'
+          }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
