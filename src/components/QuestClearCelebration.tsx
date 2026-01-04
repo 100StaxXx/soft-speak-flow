@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Trophy, Sparkles, Flame, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ interface QuestClearCelebrationProps {
   onDismiss: () => void;
 }
 
-export function QuestClearCelebration({ 
+export const QuestClearCelebration = memo(function QuestClearCelebration({ 
   show, 
   totalXP, 
   currentStreak, 
@@ -162,4 +162,4 @@ export function QuestClearCelebration({
       </div>
     </div>
   );
-}
+});

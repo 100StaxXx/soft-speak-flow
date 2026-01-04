@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ const STEPS: Step[] = [
   },
 ];
 
-export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialProps) {
+export const QuestHubTutorial = memo(function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -292,4 +292,4 @@ export function QuestHubTutorial({ open, onClose, userName }: QuestHubTutorialPr
       </DialogContent>
     </Dialog>
   );
-}
+});

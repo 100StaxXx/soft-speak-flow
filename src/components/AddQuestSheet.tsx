@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,7 @@ interface AddQuestSheetProps {
   isAdding?: boolean;
 }
 
-export function AddQuestSheet({
+export const AddQuestSheet = memo(function AddQuestSheet({
   open,
   onOpenChange,
   selectedDate,
@@ -311,4 +311,4 @@ export function AddQuestSheet({
       </DrawerContent>
     </Drawer>
   );
-}
+});

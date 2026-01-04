@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Star, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ interface PerfectDayCelebrationProps {
   onDismiss: () => void;
 }
 
-export function PerfectDayCelebration({
+export const PerfectDayCelebration = memo(function PerfectDayCelebration({
   show,
   totalXP,
   tasksCompleted,
@@ -212,4 +212,4 @@ export function PerfectDayCelebration({
       </motion.div>
     </AnimatePresence>
   );
-}
+});

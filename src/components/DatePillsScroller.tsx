@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, memo } from "react";
 import { cn } from "@/lib/utils";
 import { format, addDays, subDays, isSameDay, isToday } from "date-fns";
 import { motion } from "framer-motion";
@@ -21,7 +21,7 @@ const triggerHaptic = async (style: ImpactStyle) => {
   }
 };
 
-export function DatePillsScroller({
+export const DatePillsScroller = memo(function DatePillsScroller({
   selectedDate,
   onDateSelect,
   tasksPerDay = {},
@@ -185,4 +185,4 @@ export function DatePillsScroller({
       })}
     </div>
   );
-}
+});
