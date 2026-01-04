@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, MapPin, Book, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ interface PostcardPreviewProps {
   className?: string;
 }
 
-export function PostcardPreview({ milestones, storyType, className }: PostcardPreviewProps) {
+export const PostcardPreview = memo(function PostcardPreview({ milestones, storyType, className }: PostcardPreviewProps) {
   const postcardMilestones = useMemo(() => 
     milestones.filter(m => m.isPostcardMilestone),
     [milestones]
@@ -73,4 +73,4 @@ export function PostcardPreview({ milestones, storyType, className }: PostcardPr
       </p>
     </div>
   );
-}
+});

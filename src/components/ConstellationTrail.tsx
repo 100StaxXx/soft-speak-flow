@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { memo, useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "lucide-react";
@@ -834,7 +834,7 @@ const getMoodStyles = (mood?: string) => {
   }
 };
 
-export const ConstellationTrail = ({ 
+export const ConstellationTrail = memo(function ConstellationTrail({ 
   progress, 
   targetDays,
   className,
@@ -843,7 +843,7 @@ export const ConstellationTrail = ({
   showCompanion = true,
   milestones: propMilestones,
   epicId
-}: ConstellationTrailProps) => {
+}: ConstellationTrailProps) {
   // Fetch journey path image for this epic
   const { 
     pathImageUrl, 
@@ -1129,4 +1129,4 @@ export const ConstellationTrail = ({
         </div>
     </div>
   );
-};
+});

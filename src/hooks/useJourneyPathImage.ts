@@ -39,7 +39,7 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
       return data as JourneyPath | null;
     },
     enabled: !!epicId && !!user?.id,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - journey path images rarely change
   });
 
   // Generate a new journey path

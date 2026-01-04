@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { memo, useState, useCallback } from "react";
 import { JourneyCard } from "@/components/JourneyCard";
 import { Pathfinder } from "@/components/Pathfinder";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { CampaignEmptyStateModal } from "./CampaignEmptyStateModal";
-import { CampaignsPageSkeleton } from "@/components/skeletons/CampaignsPageSkeleton";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export function EpicsTab() {
+export const EpicsTab = memo(function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showTemplatesFirst, setShowTemplatesFirst] = useState(false);
@@ -19,10 +18,10 @@ export function EpicsTab() {
 
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
 
-  const handleAddCampaign = () => {
+  const handleAddCampaign = useCallback(() => {
     setShowTemplatesFirst(false);
     setWizardOpen(true);
-  };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -128,4 +127,4 @@ export function EpicsTab() {
       <EpicsTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </div>
   );
-}
+});
