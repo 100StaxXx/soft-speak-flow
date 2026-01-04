@@ -25,7 +25,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn, stripMarkdown } from "@/lib/utils";
 import { useAdjustEpicPlan, type AdjustmentSuggestion } from "@/hooks/useAdjustEpicPlan";
 import { SmartRitualAdvisor } from "@/components/journey/SmartRitualAdvisor";
 
@@ -279,7 +279,7 @@ export const SmartAdjustPlanDrawer = memo(function SmartAdjustPlanDrawer({
                                 </Badge>
                               </div>
                               <p className="text-xs text-muted-foreground">
-                                {suggestion.description}
+                                {stripMarkdown(suggestion.description)}
                               </p>
                             </div>
                           </div>

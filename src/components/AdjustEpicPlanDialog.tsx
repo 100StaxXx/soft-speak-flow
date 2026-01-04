@@ -25,7 +25,7 @@ import {
   Loader2,
   type LucideIcon
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, stripMarkdown } from '@/lib/utils';
 import { useAdjustEpicPlan, type AdjustmentType, type AdjustmentSuggestion } from '@/hooks/useAdjustEpicPlan';
 
 interface AdjustEpicPlanDialogProps {
@@ -274,7 +274,7 @@ export function AdjustEpicPlanDialog({ open, onOpenChange, epicId, epicTitle }: 
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {suggestion.description}
+                          {stripMarkdown(suggestion.description)}
                         </p>
                       </div>
                     </div>

@@ -1,7 +1,7 @@
 import { CheckCircle2, Circle, Trash2, Star, Sparkles, Clock, Repeat, ArrowDown, Pencil, Shield, Sword, Crown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, stripMarkdown } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { haptics } from "@/utils/haptics";
 import { playHabitComplete } from "@/utils/soundEffects";
@@ -289,7 +289,7 @@ export const TaskCard = ({
 
             {task.notes && (
               <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words">
-                {task.notes}
+                {stripMarkdown(task.notes)}
               </p>
             )}
 

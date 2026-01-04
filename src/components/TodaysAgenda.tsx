@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, stripMarkdown } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 
@@ -478,7 +478,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {task.notes && (
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <p className="text-xs">{task.notes}</p>
+                <p className="text-xs">{stripMarkdown(task.notes)}</p>
               </div>
             )}
             
