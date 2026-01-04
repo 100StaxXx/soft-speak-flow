@@ -527,38 +527,6 @@ const Profile = () => {
               <SoundSettings />
               <AstrologySettings />
               
-              <Card className="border-border/50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Gameplay</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="astral-encounters" className="text-sm">Astral Encounters</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Mini-game boss battles when completing quests
-                      </p>
-                    </div>
-                    <Switch
-                      id="astral-encounters"
-                      checked={profile?.astral_encounters_enabled !== false}
-                      onCheckedChange={async (checked) => {
-                        if (!user?.id) return;
-                        const { error } = await supabase
-                          .from('profiles')
-                          .update({ astral_encounters_enabled: checked })
-                          .eq('id', user.id);
-                        if (error) {
-                          sonnerToast.error('Failed to update setting');
-                        } else {
-                          queryClient.invalidateQueries({ queryKey: ['profile'] });
-                          sonnerToast.success(checked ? 'Astral Encounters enabled' : 'Astral Encounters disabled');
-                        }
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
 
