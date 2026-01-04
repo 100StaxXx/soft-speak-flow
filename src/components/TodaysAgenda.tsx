@@ -40,6 +40,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { cn, stripMarkdown } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 import { useNativeTaskList } from "@/hooks/useNativeTaskList";
+import { playStrikethrough } from "@/utils/soundEffects";
 
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
@@ -375,6 +376,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         onUndoToggle(task.id, task.xp_reward);
       } else {
         triggerHaptic(ImpactStyle.Medium);
+        playStrikethrough();
         // Track for strikethrough animation
         setJustCompletedTasks(prev => new Set(prev).add(task.id));
         setTimeout(() => {

@@ -397,6 +397,33 @@ class SoundManager {
     });
   }
 
+  // Strikethrough sound - quick descending swoosh like a pen striking through text
+  playStrikethrough() {
+    if (!this.audioContext || this.shouldMute()) return;
+
+    // Quick descending swoosh - like a pen striking through text
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    
+    osc.type = 'sine';
+    // Start high, sweep down quickly (like a pen stroke)
+    osc.frequency.setValueAtTime(1200, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, this.audioContext.currentTime + 0.15);
+    
+    gain.gain.setValueAtTime(this.masterVolume * 0.25, this.audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.18);
+    
+    osc.connect(gain);
+    gain.connect(this.audioContext.destination);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.2);
+    
+    // Add a subtle "pop" at the end for satisfaction
+    setTimeout(() => {
+      this.createOscillator(800, 0.08, 'triangle');
+    }, 100);
+  }
+
 }
 
 export const soundManager = new SoundManager();
@@ -419,6 +446,7 @@ export const playArcadeEntrance = () => soundManager.playArcadeEntrance();
 export const playArcadeSelect = () => soundManager.playArcadeSelect();
 export const playArcadeHighScore = () => soundManager.playArcadeHighScore();
 export const playEncounterTrigger = () => soundManager.playEncounterTrigger();
+export const playStrikethrough = () => soundManager.playStrikethrough();
 
 // Generic sound aliases for UI
 export const playSound = (type: 'complete' | 'error' | 'pop' | 'success') => {
