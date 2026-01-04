@@ -2,7 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, MicOff, Send, Calendar, Clock, Timer, Zap, Flame, Mountain,
-  AlertTriangle, Star, Repeat, Battery, BatteryLow, BatteryFull, StickyNote
+  AlertTriangle, Star, Repeat, Battery, BatteryLow, BatteryFull, StickyNote,
+  Sparkles
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,21 +17,28 @@ import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
 import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
+import { PlanMyDayClarification, PlanMyDayAnswers } from './PlanMyDayClarification';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 interface CompactSmartInputProps {
   onSubmit: (parsed: ParsedTask) => void;
+  onPlanMyDay?: (answers: PlanMyDayAnswers) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
+  habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
 }
 
 export function CompactSmartInput({
   onSubmit,
+  onPlanMyDay,
   placeholder = "Add quest...",
   disabled = false,
   className,
+  activeEpics = [],
+  habitsAtRisk = [],
 }: CompactSmartInputProps) {
   const { input, setInput, parsed, reset } = useNaturalLanguageParser();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +46,8 @@ export function CompactSmartInput({
   const [interimText, setInterimText] = useState('');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showPlanClarification, setShowPlanClarification] = useState(false);
+  const [isPlanLoading, setIsPlanLoading] = useState(false);
 
   const { medium, success, light, tap } = useHapticFeedback();
 
@@ -80,9 +90,40 @@ export function CompactSmartInput({
   const showTypewriter = isFocused && !displayText && !isRecording;
 
   const handleSubmit = () => {
+    // Check for plan my day trigger first
+    if (parsed?.triggerPlanMyDay) {
+      success();
+      setShowPlanClarification(true);
+      return;
+    }
+    
     if (!parsed || !parsed.text.trim()) return;
     success();
     setShowPreview(true);
+  };
+
+  const handlePlanComplete = async (answers: PlanMyDayAnswers) => {
+    setIsPlanLoading(true);
+    try {
+      await onPlanMyDay?.(answers);
+      reset();
+      setInterimText('');
+      setShowPlanClarification(false);
+    } finally {
+      setIsPlanLoading(false);
+    }
+  };
+
+  const handlePlanSkip = async () => {
+    setIsPlanLoading(true);
+    try {
+      await onPlanMyDay?.({ energyLevel: 'medium' });
+      reset();
+      setInterimText('');
+      setShowPlanClarification(false);
+    } finally {
+      setIsPlanLoading(false);
+    }
   };
 
   const handlePreviewConfirm = () => {
@@ -204,6 +245,14 @@ export function CompactSmartInput({
       color: 'text-amber-500 bg-amber-500/10 border-amber-500/30' 
     });
   }
+  if (parsed?.triggerPlanMyDay) {
+    badges.push({ 
+      key: 'planmyday', 
+      icon: Sparkles, 
+      label: 'Plan My Day', 
+      color: 'text-violet-500 bg-violet-500/10 border-violet-500/30' 
+    });
+  }
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
@@ -311,13 +360,26 @@ export function CompactSmartInput({
         )}
       </AnimatePresence>
 
-      {/* Quick suggestion chips - shown when focused and no preview */}
+      {/* Quick suggestion chips - shown when focused and no preview or clarification */}
       <AnimatePresence>
-        {isFocused && !showPreview && (
+        {isFocused && !showPreview && !showPlanClarification && (
           <QuickSuggestionChips
             onSuggestionClick={handleSuggestionClick}
             currentInput={displayText}
             className="px-1"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Plan My Day Clarification */}
+      <AnimatePresence>
+        {showPlanClarification && (
+          <PlanMyDayClarification
+            onComplete={handlePlanComplete}
+            onSkip={handlePlanSkip}
+            isLoading={isPlanLoading}
+            activeEpics={activeEpics}
+            habitsAtRisk={habitsAtRisk}
           />
         )}
       </AnimatePresence>

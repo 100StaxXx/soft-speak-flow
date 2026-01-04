@@ -44,6 +44,7 @@ import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
 
 interface Task {
   id: string;
@@ -91,6 +92,9 @@ interface TodaysAgendaProps {
   calendarMilestones?: CalendarMilestone[];
   onDateSelect?: (date: Date) => void;
   onQuickAdd?: (parsed: ParsedTask) => void;
+  onPlanMyDay?: (answers: PlanMyDayAnswers) => void;
+  activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
+  habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
 }
 
 // Helper to format time in 12-hour format
@@ -119,6 +123,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   calendarMilestones = [],
   onDateSelect,
   onQuickAdd,
+  onPlanMyDay,
+  activeEpics = [],
+  habitsAtRisk = [],
 }: TodaysAgendaProps) {
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('expanded_ritual_campaigns');
@@ -686,6 +693,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <div className="flex-1 min-w-0">
                       <CompactSmartInput
                         onSubmit={onQuickAdd}
+                        onPlanMyDay={onPlanMyDay}
+                        activeEpics={activeEpics}
+                        habitsAtRisk={habitsAtRisk}
                         placeholder="Add quest..."
                       />
                     </div>
