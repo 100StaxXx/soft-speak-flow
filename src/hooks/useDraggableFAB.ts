@@ -127,6 +127,9 @@ export const useDraggableFAB = ({
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Prevent default to stop iOS text selection
+    e.preventDefault();
+    
     // Store initial button position for drag calculation
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     buttonRef.current = {

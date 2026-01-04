@@ -22,6 +22,11 @@ export const DraggableFAB = ({ onTap }: DraggableFABProps) => {
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Prevent iOS text selection callout
+    e.preventDefault();
+  };
+
   return (
     <motion.button
       initial={{ scale: 0, opacity: 0 }}
@@ -34,12 +39,16 @@ export const DraggableFAB = ({ onTap }: DraggableFABProps) => {
       }}
       whileTap={!isLongPressing ? { scale: 0.9 } : undefined}
       onClick={handleClick}
+      onTouchStart={handleTouchStart}
       style={{
         position: 'fixed',
         zIndex: 50,
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
         ...positionStyles,
       }}
-      className="w-11 h-11 rounded-full bg-muted/60 backdrop-blur-sm border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors touch-none"
+      className="w-11 h-11 rounded-full bg-muted/60 backdrop-blur-sm border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors touch-none select-none"
       {...dragControls}
       {...longPressHandlers}
     >
