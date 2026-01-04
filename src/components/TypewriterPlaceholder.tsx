@@ -5,6 +5,8 @@ const EXAMPLES = [
   // Dates + Times
   "Call mom tomorrow at 3pm",
   "Meeting next Monday at 9am",
+  // Plan My Day
+  "Plan my day",
   "Submit report by Friday",
   // Duration
   "Deep work session for 2h",
