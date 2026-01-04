@@ -463,25 +463,25 @@ All colors MUST be HSL.
 @layer base {
   * {
     @apply border-border;
+    /* Prevent text selection app-wide for mobile experience */
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent;
   }
 
-    body {
-      @apply bg-background text-foreground;
-      font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      transition: background-color 0.3s ease, color 0.3s ease;
-      
-      /* Prevent text selection app-wide for mobile game experience */
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-touch-callout: none;
-      -webkit-tap-highlight-color: transparent;
-    }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
     
-    /* Allow text selection in input fields */
-    input, textarea, [contenteditable="true"] {
-      -webkit-user-select: text;
-      user-select: text;
-    }
+  /* Allow text selection ONLY in input fields */
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
 
     html.walkthrough-scroll-locked,
     body.walkthrough-scroll-locked {
