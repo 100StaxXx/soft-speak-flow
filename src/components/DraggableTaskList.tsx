@@ -342,6 +342,7 @@ function DraggableTaskListInner<T extends { id: string }>({
         return (
           <motion.div
             key={task.id}
+            layout={false}
             ref={(el) => {
               if (el) itemRefsMap.current.set(task.id, el);
             }}
@@ -379,6 +380,7 @@ function DraggableTaskListInner<T extends { id: string }>({
                 : "none",
               backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
               borderRadius: isThisDragging ? 12 : 0,
+              transition: 'none',
             }}
             // Touch handlers
             onTouchStart={(e) => handleTouchStart(e, task.id, index)}
