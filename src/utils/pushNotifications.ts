@@ -71,7 +71,7 @@ function setupNativePushListeners(): void {
   hasInitializedNativeListeners = true;
 
   PushNotifications.addListener('registration', async (token: Token) => {
-    logger.log('Native push token received:', token.value);
+    logger.log('Native push token received');
     if (currentNativePushUserId) {
       await saveNativePushToken(currentNativePushUserId, token.value);
     } else {
