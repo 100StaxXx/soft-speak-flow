@@ -35,6 +35,16 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+/* Rainbow slide animation for evolve button */
+@keyframes rainbow-slide {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
 /* Subtle shimmer animation */
 @keyframes glass-shimmer {
   0%, 100% { 

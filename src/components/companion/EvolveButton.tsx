@@ -36,19 +36,25 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           border border-white/20
         "
         style={{
-          background: `linear-gradient(135deg, 
-            rgba(255,0,0,0.15), 
-            rgba(255,128,0,0.15), 
-            rgba(255,255,0,0.15), 
-            rgba(0,255,0,0.15), 
-            rgba(0,255,255,0.15), 
-            rgba(0,128,255,0.15), 
-            rgba(128,0,255,0.15), 
-            rgba(255,0,128,0.15), 
-            rgba(255,0,0,0.15)
+          background: `linear-gradient(90deg, 
+            rgba(255,0,0,0.2), 
+            rgba(255,64,0,0.2),
+            rgba(255,128,0,0.2), 
+            rgba(255,192,0,0.2),
+            rgba(255,255,0,0.2), 
+            rgba(128,255,0,0.2),
+            rgba(0,255,0,0.2), 
+            rgba(0,255,128,0.2),
+            rgba(0,255,255,0.2), 
+            rgba(0,128,255,0.2), 
+            rgba(0,0,255,0.2),
+            rgba(128,0,255,0.2), 
+            rgba(255,0,255,0.2),
+            rgba(255,0,128,0.2), 
+            rgba(255,0,0,0.2)
           )`,
-          backgroundSize: "400% 400%",
-          animation: "rainbow-shift 4s ease infinite",
+          backgroundSize: "300% 100%",
+          animation: "rainbow-slide 3s linear infinite",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
         }}
@@ -65,9 +71,9 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
         <div 
           className="absolute inset-0 -z-10 rounded-xl opacity-60"
           style={{
-            background: "linear-gradient(135deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0080ff, #8000ff, #ff0080, #ff0000)",
-            backgroundSize: "400% 400%",
-            animation: "rainbow-shift 4s ease infinite",
+            background: "linear-gradient(90deg, #ff0000, #ff4000, #ff8000, #ffc000, #ffff00, #80ff00, #00ff00, #00ff80, #00ffff, #0080ff, #0000ff, #8000ff, #ff00ff, #ff0080, #ff0000)",
+            backgroundSize: "300% 100%",
+            animation: "rainbow-slide 3s linear infinite",
             filter: "blur(8px)",
             transform: "scale(1.02)",
           }}
