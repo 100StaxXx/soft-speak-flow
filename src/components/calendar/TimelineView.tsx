@@ -70,9 +70,8 @@ export function TimelineView({
       });
   }, [tasks, dateStr]);
 
-  const scheduledTasks = dayTasks.filter((t) => t.scheduled_time && !t.completed);
-  const unscheduledTasks = dayTasks.filter((t) => !t.scheduled_time && !t.completed);
-  const completedTasks = dayTasks.filter((t) => t.completed);
+  const scheduledTasks = dayTasks.filter((t) => t.scheduled_time);
+  const unscheduledTasks = dayTasks.filter((t) => !t.scheduled_time);
   const dayMilestones = milestones.filter((m) => m.target_date === dateStr);
 
   // Drag handlers
@@ -228,23 +227,6 @@ export function TimelineView({
             </div>
           )}
 
-          {/* Completed Tasks */}
-          {completedTasks.length > 0 && (
-            <div className="py-4 border-t border-border/30">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 pl-16">
-                Completed ({completedTasks.length})
-              </h3>
-              <div className="space-y-1 opacity-50">
-                {completedTasks.map((task) => (
-                  <TimelineTaskCard
-                    key={task.id}
-                    task={task}
-                    onTaskClick={onTaskClick}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Empty State */}
           {dayTasks.length === 0 && (

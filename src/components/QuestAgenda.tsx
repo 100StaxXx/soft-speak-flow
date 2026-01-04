@@ -81,14 +81,8 @@ export function QuestAgenda({
     const afternoon: DailyTask[] = [];
     const evening: DailyTask[] = [];
     const unscheduled: DailyTask[] = [];
-    const completed: DailyTask[] = [];
 
     sideQuests.forEach(task => {
-      if (task.completed) {
-        completed.push(task);
-        return;
-      }
-
       if (!task.scheduled_time) {
         unscheduled.push(task);
         return;
@@ -115,7 +109,7 @@ export function QuestAgenda({
     afternoon.sort(sortByTime);
     evening.sort(sortByTime);
 
-    return { morning, afternoon, evening, unscheduled, completed };
+    return { morning, afternoon, evening, unscheduled };
   }, [sideQuests]);
 
   // Map DailyTask to TaskCardTask interface
@@ -251,7 +245,6 @@ export function QuestAgenda({
             {renderSection("afternoon", groupedQuests.afternoon)}
             {renderSection("evening", groupedQuests.evening)}
             {renderSection("unscheduled", groupedQuests.unscheduled)}
-            {renderSection("completed", groupedQuests.completed)}
           </>
         )}
       </div>

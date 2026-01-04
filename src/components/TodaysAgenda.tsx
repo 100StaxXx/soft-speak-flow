@@ -197,11 +197,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     
     // Sort based on selected sort option
     const sortGroup = (group: Task[]) => [...group].sort((a, b) => {
-      // Always put completed tasks at the bottom
-      if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1;
-      }
-      
       switch (sortBy) {
         case 'time':
           if (a.scheduled_time && b.scheduled_time) {
