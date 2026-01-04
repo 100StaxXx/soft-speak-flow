@@ -17,7 +17,6 @@ import {
   Shield,
   Bell,
   ChevronRight,
-  Gamepad2,
   Map,
   Heart,
   TrendingUp,
@@ -77,7 +76,7 @@ const HelpCenter = () => {
         },
         {
           title: "Earning XP",
-          content: "Gain XP through: completing daily quests (10-50 XP each), maintaining habit streaks (bonus XP per day), completing your Main Quest (3x XP multiplier), winning Astral Encounters (bonus XP rewards), and engaging with your mentor. Consistency is key—daily engagement compounds your growth!"
+          content: "Gain XP through: completing daily quests (10-50 XP each), maintaining habit streaks (bonus XP per day), completing your Main Quest (3x XP multiplier), and engaging with your mentor. Consistency is key—daily engagement compounds your growth!"
         },
         {
           title: "Companion Skins",
@@ -194,34 +193,6 @@ const HelpCenter = () => {
         {
           title: "Switching Mentors",
           content: "Change your mentor anytime in Command Center. Your conversation history and progress are preserved—only the mentor's voice and personality change. Experiment to find the mentor that best supports your current needs."
-        }
-      ]
-    },
-    {
-      id: "encounters",
-      title: "Astral Encounters",
-      icon: Gamepad2,
-      color: "text-red-400",
-      items: [
-        {
-          title: "What are Astral Encounters?",
-          content: "Astral Encounters are mini-game boss battles that appear as you complete quests. Your companion faces cosmic adversaries in skill-based challenges. Win to earn bonus XP and absorb the adversary's essence for stat boosts."
-        },
-        {
-          title: "Cosmiq Dash",
-          content: "The signature Astral Encounter game. Guide your companion through an endless runner, dodging obstacles and collecting power-ups. Distance traveled damages the adversary. Reach distance milestones to deal bonus damage!"
-        },
-        {
-          title: "Adversary Essences",
-          content: "Defeating adversaries grants their essence—permanent stat boosts for your companion. Different adversary themes grant different stat types. Build your companion's power by collecting essences from varied encounters."
-        },
-        {
-          title: "Cosmic Codex",
-          content: "Track all adversaries you've defeated in the Cosmic Codex. Each entry shows the adversary's lore, times defeated, and when you first conquered them. Complete the codex by facing all adversary types!"
-        },
-        {
-          title: "Enabling/Disabling Encounters",
-          content: "Toggle Astral Encounters on or off in Command Center → Preferences. Some users prefer focused productivity without mini-games. Your choice—encounters are optional but offer bonus XP and engagement."
         }
       ]
     },
