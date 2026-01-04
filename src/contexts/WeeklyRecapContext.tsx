@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 import { WeeklyRecap } from "@/hooks/useWeeklyRecap";
 
 interface WeeklyRecapContextType {
@@ -14,18 +14,25 @@ export const WeeklyRecapProvider = ({ children }: { children: ReactNode }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecap, setSelectedRecap] = useState<WeeklyRecap | null>(null);
 
-  const openRecap = (recap: WeeklyRecap) => {
+  const openRecap = useCallback((recap: WeeklyRecap) => {
     setSelectedRecap(recap);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const closeRecap = () => {
+  const closeRecap = useCallback(() => {
     setIsModalOpen(false);
     setSelectedRecap(null);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    isModalOpen,
+    selectedRecap,
+    openRecap,
+    closeRecap,
+  }), [isModalOpen, selectedRecap, openRecap, closeRecap]);
 
   return (
-    <WeeklyRecapContext.Provider value={{ isModalOpen, selectedRecap, openRecap, closeRecap }}>
+    <WeeklyRecapContext.Provider value={value}>
       {children}
     </WeeklyRecapContext.Provider>
   );

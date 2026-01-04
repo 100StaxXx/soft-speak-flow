@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -45,12 +45,13 @@ export default function PepTalks() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSelectedCategory(null);
     setSelectedTrigger(null);
-  };
+  }, []);
 
   const hasFilters = selectedCategory || selectedTrigger;
 

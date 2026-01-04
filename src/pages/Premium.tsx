@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +44,7 @@ export default function Premium() {
 
   const selectedProduct = productMap[selectedProductId];
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = useCallback(async () => {
     if (!selectedProduct) {
       toast({
         title: "Almost ready",
@@ -61,9 +61,9 @@ export default function Premium() {
     if (success) {
       navigate('/premium-success');
     }
-  };
+  }, [selectedProduct, selectedPlan, handlePurchase, navigate, toast]);
 
-  const plans = {
+  const plans = useMemo(() => ({
     monthly: {
       fallbackPrice: "$9.99",
       period: "/month",
@@ -76,7 +76,7 @@ export default function Premium() {
       savings: "Save 50%",
       description: "Just $4.99/month",
     },
-  };
+  }), []);
 
   // Show premium user view
   if (isActive) {
