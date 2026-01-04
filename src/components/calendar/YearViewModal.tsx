@@ -3,7 +3,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, setMonth, setYear 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { cn } from "@/lib/utils";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 
@@ -105,19 +105,25 @@ export function YearView({
               </button>
             </PopoverTrigger>
           <PopoverContent 
-            className="w-32 p-0 bg-background border border-border z-[70]" 
+            className="w-32 p-0 bg-background border border-border z-[70] pointer-events-auto" 
             align="start"
             onOpenAutoFocus={(e) => e.preventDefault()}
+            onPointerDownOutside={(e) => e.preventDefault()}
           >
             <div 
               className="h-64 overflow-y-auto overscroll-contain p-2"
-              style={{ WebkitOverflowScrolling: 'touch' }}
+              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+              onTouchMove={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               <div className="space-y-1">
                 {years.map(year => (
                   <button
                     key={year}
-                    onClick={() => handleQuickYearSelect(year)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuickYearSelect(year);
+                    }}
                     className={cn(
                       "w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                       year === currentYear 
