@@ -52,7 +52,12 @@ function scoreSlot(
   task: Task, 
   peakTimes: number[], 
   workStyle: string | null,
-  schedulingPatterns: Record<string, unknown> | null
+  schedulingPatterns: Record<string, unknown> | null,
+  mentorLearning?: {
+    energyByHour?: Record<string, { low: number; high: number }>;
+    overwhelmSignals?: number;
+    engagementHours?: number[];
+  }
 ): { score: number; reason: string } {
   let score = 50;
   let reasons: string[] = [];
@@ -67,6 +72,39 @@ function scoreSlot(
       score += learningBonus;
       reasons.push('Matches your patterns');
     }
+  }
+
+  // Apply energy patterns learned from mentor chat
+  if (mentorLearning?.energyByHour) {
+    const energyData = mentorLearning.energyByHour[String(hour)];
+    if (energyData) {
+      const totalMentions = (energyData.low || 0) + (energyData.high || 0);
+      if (totalMentions >= 2) {
+        const energyRatio = (energyData.high || 0) / totalMentions;
+        
+        if (task.difficulty === 'hard') {
+          // Hard tasks need high energy - boost/penalize based on learned energy
+          const energyBonus = Math.round((energyRatio - 0.5) * 40); // -20 to +20 range
+          score += energyBonus;
+          if (energyRatio > 0.6) {
+            reasons.push('High energy hour for you');
+          }
+        }
+      }
+    }
+  }
+
+  // Penalize if user recently mentioned overwhelm (be more conservative)
+  if (mentorLearning?.overwhelmSignals && mentorLearning.overwhelmSignals > 3) {
+    if (task.difficulty === 'hard') {
+      score -= 10; // More conservative with hard tasks when overwhelmed
+    }
+  }
+
+  // Boost engagement hours (when user naturally uses app)
+  if (mentorLearning?.engagementHours?.includes(hour)) {
+    score += 8;
+    if (reasons.length === 0) reasons.push('You\'re usually active now');
   }
 
   // Work style specific adjustments
@@ -269,10 +307,10 @@ serve(async (req) => {
         .eq('user_id', userId)
         .gte('task_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
       
-      // AI learning profile with scheduling patterns
+      // AI learning profile with scheduling patterns + mentor chat signals
       supabase
         .from('user_ai_learning')
-        .select('preferred_habit_difficulty, successful_patterns, failed_patterns, peak_productivity_times, inferred_work_style, work_style_confidence, scheduling_patterns, day_of_week_patterns')
+        .select('preferred_habit_difficulty, successful_patterns, failed_patterns, peak_productivity_times, inferred_work_style, work_style_confidence, scheduling_patterns, day_of_week_patterns, energy_by_hour, overwhelm_signals, engagement_hours')
         .eq('user_id', userId)
         .maybeSingle(),
     ]);
@@ -496,7 +534,14 @@ serve(async (req) => {
       // Get user's peak productivity times or use defaults
       const peakTimes: number[] = (learning?.peak_productivity_times as number[]) || [9, 10, 14];
       
-      console.log(`Found ${unscheduledTasks.length} unscheduled tasks, ${availableHours.length} available hours, workStyle: ${workStyle}`);
+      // Extract mentor learning signals for enhanced slot scoring
+      const mentorLearning = {
+        energyByHour: (learning as any)?.energy_by_hour as Record<string, { low: number; high: number }> | undefined,
+        overwhelmSignals: (learning as any)?.overwhelm_signals as number | undefined,
+        engagementHours: (learning as any)?.engagement_hours as number[] | undefined,
+      };
+      
+      console.log(`Found ${unscheduledTasks.length} unscheduled tasks, ${availableHours.length} available hours, workStyle: ${workStyle}, mentorSignals: ${JSON.stringify(mentorLearning)}`);
 
       // Score and sort tasks by priority (apply modifiers too)
       const sortedUnscheduled = [...unscheduledTasks].sort((a, b) => {
@@ -514,12 +559,12 @@ serve(async (req) => {
       const usedHours = new Set<number>();
 
       for (const task of sortedUnscheduled.slice(0, 5)) {
-        // Score each available hour for this task with work style awareness
+        // Score each available hour for this task with work style awareness + mentor learning
         const scoredSlots = availableHours
           .filter(h => !usedHours.has(h))
           .map(hour => ({
             hour,
-            ...scoreSlot(hour, task, peakTimes, workStyle, schedulingPatterns),
+            ...scoreSlot(hour, task, peakTimes, workStyle, schedulingPatterns, mentorLearning),
           }))
           .sort((a, b) => b.score - a.score);
 
