@@ -1,20 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface AdjustmentRequest {
-  epicId: string;
-  adjustmentType: 'extend_deadline' | 'reduce_scope' | 'add_habits' | 'remove_habits' | 'reschedule' | 'custom';
-  reason?: string;
-  newDeadline?: string;
-  daysToAdd?: number;
-  habitsToRemove?: string[];
-  customRequest?: string;
-}
+// UUID regex for validation
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Input validation schema
+const AdjustEpicPlanSchema = z.object({
+  epicId: z.string().regex(uuidRegex, "Invalid epicId format"),
+  adjustmentType: z.enum(['extend_deadline', 'reduce_scope', 'add_habits', 'remove_habits', 'reschedule', 'custom']),
+  reason: z.string().max(1000).optional(),
+  newDeadline: z.string().optional(),
+  daysToAdd: z.number().int().min(1).max(365).optional(),
+  habitsToRemove: z.array(z.string().regex(uuidRegex)).max(50).optional(),
+  customRequest: z.string().max(2000).optional(),
+});
 
 interface AdjustmentSuggestion {
   id: string;
@@ -31,14 +36,19 @@ serve(async (req) => {
   }
 
   try {
-    const { epicId, adjustmentType, reason, newDeadline, daysToAdd, habitsToRemove, customRequest } = await req.json() as AdjustmentRequest;
-
-    if (!epicId) {
+    // Parse and validate input
+    const rawInput = await req.json();
+    const parseResult = AdjustEpicPlanSchema.safeParse(rawInput);
+    
+    if (!parseResult.success) {
+      console.error("[adjust-epic-plan] Validation error:", parseResult.error.errors);
       return new Response(
-        JSON.stringify({ error: 'Epic ID is required' }),
+        JSON.stringify({ error: 'Invalid input', details: parseResult.error.errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { epicId, adjustmentType, reason, newDeadline, daysToAdd, habitsToRemove, customRequest } = parseResult.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {

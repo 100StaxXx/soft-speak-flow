@@ -1,9 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// UUID regex for validation
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Input validation schema
+const DealBossDamageSchema = z.object({
+  userId: z.string().regex(uuidRegex, "Invalid userId format"),
+  epicId: z.string().regex(uuidRegex, "Invalid epicId format").optional().nullable(),
+  communityId: z.string().regex(uuidRegex, "Invalid communityId format").optional().nullable(),
+  damageSource: z.enum(["habit_completion", "quest_completion", "streak_milestone", "blessing_attack", "critical_hit"]),
+  sourceId: z.string().regex(uuidRegex, "Invalid sourceId format").optional().nullable(),
+  bonusDamageMultiplier: z.number().min(0.1).max(10).default(1),
+}).refine(data => data.epicId || data.communityId, {
+  message: "Either epicId or communityId is required"
+});
 
 // Base damage values by source
 const DAMAGE_VALUES = {
@@ -30,27 +46,70 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { 
-      userId, 
-      epicId, 
-      communityId, 
-      damageSource, 
-      sourceId,
-      bonusDamageMultiplier = 1 
-    } = await req.json();
-
-    if (!userId) {
+    // Parse and validate input
+    const rawInput = await req.json();
+    const parseResult = DealBossDamageSchema.safeParse(rawInput);
+    
+    if (!parseResult.success) {
+      console.error("[deal-boss-damage] Validation error:", parseResult.error.errors);
       return new Response(
-        JSON.stringify({ error: "userId is required" }),
+        JSON.stringify({ error: "Invalid input", details: parseResult.error.errors }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    const { userId, epicId, communityId, damageSource, sourceId, bonusDamageMultiplier } = parseResult.data;
 
-    if (!epicId && !communityId) {
-      return new Response(
-        JSON.stringify({ error: "Either epicId or communityId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Verify user is actually a member of the epic or community
+    if (epicId) {
+      const { data: membership, error: memberError } = await supabase
+        .from("epic_members")
+        .select("user_id")
+        .eq("epic_id", epicId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      
+      if (memberError) {
+        console.error("[deal-boss-damage] Membership check error:", memberError);
+        throw memberError;
+      }
+      
+      if (!membership) {
+        // Also check if user is the epic owner
+        const { data: epic, error: epicError } = await supabase
+          .from("epics")
+          .select("user_id")
+          .eq("id", epicId)
+          .single();
+        
+        if (epicError || !epic || epic.user_id !== userId) {
+          console.log(`[deal-boss-damage] User ${userId} is not a member of epic ${epicId}`);
+          return new Response(
+            JSON.stringify({ error: "Not a member of this epic" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    } else if (communityId) {
+      const { data: membership, error: memberError } = await supabase
+        .from("community_members")
+        .select("user_id")
+        .eq("community_id", communityId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      
+      if (memberError) {
+        console.error("[deal-boss-damage] Community membership check error:", memberError);
+        throw memberError;
+      }
+      
+      if (!membership) {
+        console.log(`[deal-boss-damage] User ${userId} is not a member of community ${communityId}`);
+        return new Response(
+          JSON.stringify({ error: "Not a member of this community" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     console.log(`[deal-boss-damage] User ${userId} dealing damage from ${damageSource}`);
