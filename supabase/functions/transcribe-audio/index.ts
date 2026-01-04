@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 
 serve(async (req) => {
@@ -11,7 +12,7 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
-    const { audioUrl } = await req.json();
+    const { audioUrl, pepTalkId } = await req.json();
 
     if (!audioUrl) {
       throw new Error('Audio URL is required');
@@ -71,6 +72,30 @@ serve(async (req) => {
     }));
 
     console.log(`Successfully transcribed ${transcript.length} words`);
+
+    // If pepTalkId is provided, save transcript to database using service role
+    if (pepTalkId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error('Supabase configuration missing');
+      }
+
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      
+      const { error: updateError } = await supabaseAdmin
+        .from('pep_talks')
+        .update({ transcript })
+        .eq('id', pepTalkId);
+
+      if (updateError) {
+        console.error('Failed to save transcript to database:', updateError);
+        throw new Error(`Failed to save transcript: ${updateError.message}`);
+      }
+
+      console.log(`Transcript saved to pep_talk ${pepTalkId}`);
+    }
 
     return new Response(
       JSON.stringify({
