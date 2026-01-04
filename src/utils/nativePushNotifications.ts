@@ -85,8 +85,8 @@ export async function initializeNativePush(userId: string): Promise<void> {
     // Listen for registration success
     await PushNotifications.addListener('registration', async (token) => {
       console.log('[NativePush] ✅ REGISTRATION SUCCESS');
-      console.log('[NativePush] Device token received:', token.value);
-      logger.log('Push registration success, token:', token.value);
+      console.log('[NativePush] Device token received');
+      logger.log('Push registration success');
       
       // Save device token to database
       try {
