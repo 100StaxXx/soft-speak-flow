@@ -1,7 +1,6 @@
 import { useState, useCallback, ReactNode, useRef, useEffect, memo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutoscroll } from "@/hooks/useAutoscroll";
 
@@ -406,21 +405,6 @@ function DraggableTaskListInner<T extends { id: string }>({
               onDragStart: () => startDrag(task.id, index, currentYRef.current),
               onDragEnd: handlePointerUp,
             })}
-            
-            {/* Grip indicator */}
-            <AnimatePresence>
-              {isThisDragging && (
-                <motion.div 
-                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1"
-                  initial={{ opacity: 0, x: 4 }}
-                  animate={{ opacity: 0.7, x: 0 }}
-                  exit={{ opacity: 0, x: 4 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                >
-                  <GripVertical className="w-4 h-4 text-muted-foreground" />
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.div>
         );
       })}

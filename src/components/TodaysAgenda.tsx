@@ -42,6 +42,8 @@ import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 import { useNativeTaskList } from "@/hooks/useNativeTaskList";
 
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
+import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
+import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 
 interface Task {
   id: string;
@@ -88,6 +90,7 @@ interface TodaysAgendaProps {
   calendarTasks?: CalendarTask[];
   calendarMilestones?: CalendarMilestone[];
   onDateSelect?: (date: Date) => void;
+  onQuickAdd?: (parsed: ParsedTask) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -115,6 +118,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   calendarTasks = [],
   calendarMilestones = [],
   onDateSelect,
+  onQuickAdd,
 }: TodaysAgendaProps) {
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('expanded_ritual_campaigns');
@@ -630,22 +634,31 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {/* Quests Section */}
             {questTasks.length > 0 && (
               <>
-                <div className="flex items-center justify-between py-1.5 px-1">
-                  <div className="flex items-center gap-2">
-                    {ritualTasks.length > 0 && (
-                      <>
-                        <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                          Quests
-                        </span>
-                        <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
-                          {questTasks.length}
-                        </Badge>
-                      </>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 py-1.5 px-1">
+                  {ritualTasks.length > 0 && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                        Quests
+                      </span>
+                      <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
+                        {questTasks.length}
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {/* Compact Smart Input */}
+                  {onQuickAdd && (
+                    <div className="flex-1 min-w-0">
+                      <CompactSmartInput
+                        onSubmit={onQuickAdd}
+                        placeholder="Add quest..."
+                      />
+                    </div>
+                  )}
+                  
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity">
+                      <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
                         <ArrowUpDown className="w-3 h-3" />
                       </button>
                     </DropdownMenuTrigger>

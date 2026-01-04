@@ -1,11 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { 
-  Compass, 
-  Plus, 
-  Sparkles
-} from "lucide-react";
+import { Compass } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
@@ -15,7 +11,7 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { QuestHubTutorial } from "@/components/QuestHubTutorial";
-import { SmartTaskInput } from "@/features/tasks/components/SmartTaskInput";
+
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,9 +21,7 @@ import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { TaskDragProvider } from "@/contexts/TaskDragContext";
-import { DraggableFAB } from "@/components/DraggableFAB";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
@@ -42,14 +36,12 @@ import { useComboTracker } from "@/hooks/useComboTracker";
 import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
-import type { SuggestedSubtask } from "@/hooks/useTaskDecomposition";
 
 const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
-  const [showQAB, setShowQAB] = useState(false);
   
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
@@ -359,6 +351,21 @@ const Journeys = () => {
             calendarTasks={allCalendarTasks}
             calendarMilestones={[]}
             onDateSelect={setSelectedDate}
+            onQuickAdd={async (parsed) => {
+              const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
+              await addTask({
+                taskText: parsed.text,
+                difficulty: parsed.difficulty || 'medium',
+                taskDate,
+                isMainQuest: false,
+                scheduledTime: parsed.scheduledTime,
+                estimatedDuration: parsed.estimatedDuration,
+                recurrencePattern: parsed.recurrencePattern,
+                reminderEnabled: parsed.reminderEnabled,
+                reminderMinutesBefore: parsed.reminderMinutesBefore,
+                notes: parsed.notes,
+              });
+            }}
           />
         </motion.div>
 
@@ -445,50 +452,6 @@ const Journeys = () => {
           onDismiss={dismissPerfectDay}
         />
       </div>
-
-      {/* Floating Action Button - Draggable with long-press */}
-      <DraggableFAB onTap={() => setShowQAB(true)} />
-
-      {/* QAB Sheet */}
-      <Sheet open={showQAB} onOpenChange={setShowQAB}>
-        <SheetContent side="bottom" className="rounded-t-3xl pb-8">
-          <div className="pt-4">
-            <SmartTaskInput
-              onSubmit={async (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => {
-                const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
-                
-                await addTask({
-                  taskText: parsed.text,
-                  difficulty: parsed.difficulty || 'medium',
-                  taskDate,
-                  isMainQuest: false,
-                  scheduledTime: parsed.scheduledTime,
-                  estimatedDuration: parsed.estimatedDuration,
-                  recurrencePattern: parsed.recurrencePattern,
-                  reminderEnabled: parsed.reminderEnabled,
-                  reminderMinutesBefore: parsed.reminderMinutesBefore,
-                  notes: parsed.notes,
-                });
-                
-                if (subtasks?.length) {
-                  for (const subtask of subtasks) {
-                    await addTask({
-                      taskText: subtask.title,
-                      difficulty: 'easy',
-                      taskDate,
-                      isMainQuest: false,
-                      estimatedDuration: subtask.durationMinutes,
-                    });
-                  }
-                }
-                
-                setShowQAB(false);
-              }}
-              placeholder="Add a quest or ask me anything..."
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
 
       <BottomNav />
     </PageTransition>
