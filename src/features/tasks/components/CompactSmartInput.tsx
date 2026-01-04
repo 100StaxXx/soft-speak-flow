@@ -10,6 +10,7 @@ import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
 import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
+import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { toast } from 'sonner';
 
 interface CompactSmartInputProps {
@@ -69,6 +70,7 @@ export function CompactSmartInput({
   }, [isRecording, success, medium, toggleRecording]);
 
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
+  const showTypewriter = isFocused && !displayText && !isRecording;
 
   const handleSubmit = () => {
     if (!parsed || !parsed.text.trim()) return;
@@ -112,15 +114,22 @@ export function CompactSmartInput({
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setTimeout(() => setIsFocused(false), 150)}
-            placeholder={placeholder}
+            placeholder={isRecording ? "Listening..." : (showTypewriter ? '' : placeholder)}
             disabled={disabled || isRecording}
             className={cn(
-              "h-9 text-sm pl-3 pr-20 rounded-full bg-muted/50 border-muted-foreground/20",
+              "h-7 text-xs pl-3 pr-14 rounded-full bg-muted/50 border-muted-foreground/20",
               "focus:ring-1 focus:ring-primary/30 focus:border-primary/50",
               "placeholder:text-muted-foreground/50",
               isRecording && "border-primary/50 bg-primary/5"
             )}
           />
+          
+          {/* Typewriter placeholder overlay */}
+          {showTypewriter && (
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-xs">
+              <TypewriterPlaceholder isActive={showTypewriter} prefix="try '" />
+            </div>
+          )}
           
           {/* Recording waveform overlay */}
           <AnimatePresence>
@@ -131,7 +140,7 @@ export function CompactSmartInput({
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 flex items-center justify-center pointer-events-none"
               >
-                <AudioReactiveWaveform isActive={isRecording} className="w-24 h-6" />
+                <AudioReactiveWaveform isActive={isRecording} className="w-20 h-5" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -147,14 +156,14 @@ export function CompactSmartInput({
                 onClick={handleVoiceToggle}
                 disabled={disabled}
                 className={cn(
-                  "h-7 w-7 rounded-full",
+                  "h-5 w-5 rounded-full",
                   isRecording && "bg-primary/20 text-primary"
                 )}
               >
                 {isRecording ? (
-                  <MicOff className="h-4 w-4" />
+                  <MicOff className="h-3 w-3" />
                 ) : (
-                  <Mic className="h-4 w-4 text-muted-foreground" />
+                  <Mic className="h-3 w-3 text-muted-foreground" />
                 )}
               </Button>
             )}
@@ -167,11 +176,11 @@ export function CompactSmartInput({
               onClick={handleSubmit}
               disabled={disabled || !hasContent}
               className={cn(
-                "h-7 w-7 rounded-full",
+                "h-5 w-5 rounded-full",
                 hasContent && "text-primary hover:bg-primary/20"
               )}
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-3 w-3" />
             </Button>
           </div>
         </div>
