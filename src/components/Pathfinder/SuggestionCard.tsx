@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Repeat, Flag, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, stripMarkdown } from '@/lib/utils';
 import type { EpicSuggestion } from '@/hooks/useEpicSuggestions';
 
 interface SuggestionCardProps {
@@ -72,7 +72,7 @@ export const SuggestionCard = memo(function SuggestionCard({
 
           {/* Description */}
           <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-            {suggestion.description}
+            {stripMarkdown(suggestion.description)}
           </p>
 
           {/* Badges */}

@@ -21,7 +21,7 @@ import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 // import { AstralEncounterModal } from "./astral-encounters/AstralEncounterModal";
 import { EpicRewardReveal } from "./EpicRewardReveal";
 import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";
-import { cn } from "@/lib/utils";
+import { cn, stripMarkdown } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -274,7 +274,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
             </div>
             {epic.description && (
               <p className="text-sm text-muted-foreground mb-3">
-                {epic.description}
+                {stripMarkdown(epic.description)}
               </p>
             )}
           </div>
