@@ -1,7 +1,8 @@
 import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sparkles, TrendingUp, Loader2 } from "lucide-react";
 import { getStageName } from "@/config/companionStages";
 
 interface NextEvolutionPreviewProps {
@@ -9,6 +10,9 @@ interface NextEvolutionPreviewProps {
   currentXP: number;
   nextEvolutionXP: number;
   progressPercent: number;
+  canEvolve?: boolean;
+  onEvolve?: () => void;
+  isEvolving?: boolean;
 }
 
 const XP_TIPS = [
@@ -25,6 +29,9 @@ export const NextEvolutionPreview = memo(({
   currentXP,
   nextEvolutionXP,
   progressPercent,
+  canEvolve = false,
+  onEvolve,
+  isEvolving = false,
 }: NextEvolutionPreviewProps) => {
   const nextStage = Math.min(currentStage + 1, 20); // Max stage is 20 in 21-stage system (0-20)
   const nextStageName = getStageName(nextStage);
@@ -65,35 +72,66 @@ export const NextEvolutionPreview = memo(({
           </div>
         </div>
 
-        {/* Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-medium text-primary">
-              {xpNeeded} XP needed
-            </span>
+        {/* Evolution Ready State */}
+        {canEvolve ? (
+          <div className="space-y-3">
+            <div className="text-center py-2">
+              <p className="text-sm font-medium text-primary animate-pulse">
+                ✨ Ready to evolve!
+              </p>
+            </div>
+            <Button 
+              onClick={onEvolve}
+              disabled={isEvolving}
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+              size="lg"
+            >
+              {isEvolving ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Evolving...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  Evolve Now!
+                </>
+              )}
+            </Button>
           </div>
-          <Progress value={progressPercent} className="h-2" />
-          <p className="text-xs text-muted-foreground">
-            {currentXP} / {nextEvolutionXP} XP
-          </p>
-        </div>
-
-        {/* XP Tips */}
-        <div className="space-y-2 pt-2 border-t border-border/50">
-          <p className="text-xs font-medium text-muted-foreground">Quick XP Tips:</p>
-          <div className="space-y-1.5">
-            {XP_TIPS.slice(0, 3).map((tip, index) => (
-              <div key={index} className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <span>{tip.icon}</span>
-                  {tip.action}
+        ) : (
+          <>
+            {/* Progress */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-medium text-primary">
+                  {xpNeeded} XP needed
                 </span>
-                <span className="font-medium text-primary">{tip.xp}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <Progress value={progressPercent} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                {currentXP} / {nextEvolutionXP} XP
+              </p>
+            </div>
+
+            {/* XP Tips */}
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <p className="text-xs font-medium text-muted-foreground">Quick XP Tips:</p>
+              <div className="space-y-1.5">
+                {XP_TIPS.slice(0, 3).map((tip, index) => (
+                  <div key={index} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <span>{tip.icon}</span>
+                      {tip.action}
+                    </span>
+                    <span className="font-medium text-primary">{tip.xp}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Card>
   );

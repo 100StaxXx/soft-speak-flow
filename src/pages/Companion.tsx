@@ -23,10 +23,20 @@ import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Memoized tab content to prevent unnecessary re-renders
-const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: { 
+const OverviewTab = memo(({ 
+  companion, 
+  nextEvolutionXP, 
+  progressToNext,
+  canEvolve,
+  onEvolve,
+  isEvolving,
+}: { 
   companion: any; 
   nextEvolutionXP: number; 
   progressToNext: number;
+  canEvolve: boolean;
+  onEvolve: () => void;
+  isEvolving: boolean;
 }) => (
   <div className="space-y-6 mt-6">
     <ParallaxCard offset={30}>
@@ -38,6 +48,9 @@ const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: {
         nextEvolutionXP={nextEvolutionXP || 0}
         currentStage={companion?.current_stage || 0}
         progressPercent={progressToNext}
+        canEvolve={canEvolve}
+        onEvolve={onEvolve}
+        isEvolving={isEvolving}
       />
     </ParallaxCard>
     <ParallaxCard offset={16}>
@@ -63,7 +76,7 @@ const TabLoadingFallback = () => (
 );
 
 const Companion = () => {
-  const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, isLoading, error, canEvolve, triggerManualEvolution, evolveCompanion } = useCompanion();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
@@ -169,7 +182,10 @@ const Companion = () => {
                 <OverviewTab 
                   companion={companion} 
                   nextEvolutionXP={nextEvolutionXP} 
-                  progressToNext={progressToNext} 
+                  progressToNext={progressToNext}
+                  canEvolve={canEvolve}
+                  onEvolve={triggerManualEvolution}
+                  isEvolving={evolveCompanion.isPending}
                 />
               )}
             </TabsContent>

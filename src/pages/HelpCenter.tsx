@@ -72,7 +72,7 @@ const HelpCenter = () => {
       items: [
         {
           title: "Evolution Stages",
-          content: "Your companion evolves through 21 distinct stages, from a tiny spark to a majestic cosmic being. Each stage has unique artwork that's generated based on your companion's species and personality. Evolution happens automatically when your companion reaches the required XP threshold for the next stage."
+          content: "Your companion evolves through 21 distinct stages, from a tiny spark to a majestic cosmic being. Each stage has unique artwork that's generated based on your companion's species and personality. When your companion reaches the required XP threshold, an 'Evolve Now' button appears on the Companion page—tap it when you're ready to witness the transformation!"
         },
         {
           title: "Earning XP",
