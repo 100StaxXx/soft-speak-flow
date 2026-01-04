@@ -67,7 +67,7 @@ const Journeys = () => {
   const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
   
   // Daily plan optimization
-  const { refetch: refetchPlan, suggestedSchedule, isLoading: isPlanLoading } = useDailyPlanOptimization();
+  const { refetch: refetchPlan, suggestedSchedule, isLoading: isPlanLoading, optimizeWithAnswers } = useDailyPlanOptimization();
   
   // Epics for plan my day questions
   const { epics } = useEpics();
@@ -302,16 +302,19 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: targetDateStr });
   }, [moveTaskToDate]);
 
-  // Handle Plan My Day command
+  // Handle Plan My Day command with clarification answers
   const handlePlanMyDay = useCallback(async (answers: PlanMyDayAnswers) => {
     try {
-      const result = await refetchPlan();
-      const schedule = result.data?.suggestedSchedule;
+      // Use optimizeWithAnswers to pass clarification answers to edge function
+      const result = await optimizeWithAnswers(answers);
+      const schedule = result?.suggestedSchedule;
       
       if (schedule && schedule.length > 0) {
         toast.success(`Found optimal times for ${schedule.length} tasks!`, {
           description: "Check your daily insights for suggestions",
         });
+        // Refetch to update the UI with new suggestions
+        refetchPlan();
       } else {
         toast.info("Your schedule looks good! No changes suggested.");
       }
@@ -319,7 +322,7 @@ const Journeys = () => {
       console.error('Plan optimization failed:', error);
       toast.error("Couldn't generate plan. Try again later.");
     }
-  }, [refetchPlan]);
+  }, [optimizeWithAnswers, refetchPlan]);
 
   return (
     <TaskDragProvider>

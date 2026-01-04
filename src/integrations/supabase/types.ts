@@ -5668,8 +5668,10 @@ export type Database = {
           acceptance_rate: number | null
           common_contexts: string[] | null
           created_at: string
+          day_of_week_patterns: Json | null
           failed_patterns: Json | null
           id: string
+          inferred_work_style: string | null
           interaction_count: number | null
           last_interaction_at: string | null
           modification_rate: number | null
@@ -5678,16 +5680,21 @@ export type Database = {
           preferred_epic_duration: number | null
           preferred_habit_difficulty: string | null
           preferred_habit_frequency: string | null
+          scheduling_patterns: Json | null
           successful_patterns: Json | null
+          task_completion_times: Json | null
           updated_at: string
           user_id: string
+          work_style_confidence: number | null
         }
         Insert: {
           acceptance_rate?: number | null
           common_contexts?: string[] | null
           created_at?: string
+          day_of_week_patterns?: Json | null
           failed_patterns?: Json | null
           id?: string
+          inferred_work_style?: string | null
           interaction_count?: number | null
           last_interaction_at?: string | null
           modification_rate?: number | null
@@ -5696,16 +5703,21 @@ export type Database = {
           preferred_epic_duration?: number | null
           preferred_habit_difficulty?: string | null
           preferred_habit_frequency?: string | null
+          scheduling_patterns?: Json | null
           successful_patterns?: Json | null
+          task_completion_times?: Json | null
           updated_at?: string
           user_id: string
+          work_style_confidence?: number | null
         }
         Update: {
           acceptance_rate?: number | null
           common_contexts?: string[] | null
           created_at?: string
+          day_of_week_patterns?: Json | null
           failed_patterns?: Json | null
           id?: string
+          inferred_work_style?: string | null
           interaction_count?: number | null
           last_interaction_at?: string | null
           modification_rate?: number | null
@@ -5714,9 +5726,12 @@ export type Database = {
           preferred_epic_duration?: number | null
           preferred_habit_difficulty?: string | null
           preferred_habit_frequency?: string | null
+          scheduling_patterns?: Json | null
           successful_patterns?: Json | null
+          task_completion_times?: Json | null
           updated_at?: string
           user_id?: string
+          work_style_confidence?: number | null
         }
         Relationships: [
           {

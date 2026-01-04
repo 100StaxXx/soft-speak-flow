@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { PlanMyDayAnswers } from '@/features/tasks/components/PlanMyDayClarification';
 
 interface DailyInsight {
   type: 'optimization' | 'warning' | 'encouragement' | 'suggestion';
@@ -55,6 +57,31 @@ export function useDailyPlanOptimization() {
     refetchOnWindowFocus: false,
   });
 
+  /**
+   * Optimize with clarification answers from Plan My Day flow
+   */
+  const optimizeWithAnswers = useCallback(async (answers?: PlanMyDayAnswers): Promise<DailyPlanOptimization | null> => {
+    if (!user) return null;
+
+    // Map PlanMyDayAnswers to edge function format
+    const body = answers ? {
+      energyLevel: answers.energyLevel,
+      prioritizedEpicId: answers.prioritizedEpicId,
+      protectStreaks: answers.protectStreaks,
+    } : {};
+
+    const { data, error } = await supabase.functions.invoke('optimize-daily-plan', {
+      body,
+    });
+
+    if (error) {
+      console.error('Error fetching daily plan optimization with answers:', error);
+      throw error;
+    }
+
+    return data as DailyPlanOptimization;
+  }, [user]);
+
   const insights = data?.insights ?? [];
   const highPriorityInsights = insights.filter(i => i.priority === 'high');
   const hasWarnings = insights.some(i => i.type === 'warning');
@@ -71,6 +98,7 @@ export function useDailyPlanOptimization() {
     isLoading,
     error: error instanceof Error ? error.message : null,
     refetch,
+    optimizeWithAnswers,
   };
 }
 
