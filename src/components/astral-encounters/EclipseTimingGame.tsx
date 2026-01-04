@@ -5,7 +5,7 @@ import { triggerHaptic, useStaticStars } from './gameUtils';
 import { TrackRatingUI } from './TrackRatingUI';
 import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
 import { Moon, Star, Sun, Music, Sparkles } from 'lucide-react';
-import { stopEncounterMusic } from '@/utils/soundEffects';
+
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
 
@@ -424,7 +424,7 @@ export const EclipseTimingGame = ({
   
   const { track, isLoading, isGenerating, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
 
-  useEffect(() => { stopEncounterMusic(); }, []);
+  
 
   // Load track and initialize notes
   useEffect(() => {

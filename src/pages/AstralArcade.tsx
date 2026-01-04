@@ -20,8 +20,7 @@ import { useAdversaryImage } from '@/hooks/useAdversaryImage';
 import { MiniGameType, MiniGameResult, Adversary } from '@/types/astralEncounters';
 import { DamageEvent } from '@/types/battleSystem';
 import { generateArcadeAdversary } from '@/utils/adversaryGenerator';
-import { playEncounterTrigger, playEncounterMusic, stopEncounterMusic, playArcadeHighScore } from '@/utils/soundEffects';
-import { pauseAmbientForEvent, resumeAmbientAfterEvent } from '@/utils/ambientMusic';
+import { playEncounterTrigger, playArcadeHighScore } from '@/utils/soundEffects';
 import { toast } from 'sonner';
 import { PracticeRoundWrapper } from '@/components/astral-encounters';
 import { GameSummaryModal } from '@/components/astral-encounters/GameSummaryModal';
@@ -518,18 +517,7 @@ export default function AstralArcade() {
       hasTriggeredDiscovery.current = true;
       checkArcadeDiscovery();
     }
-    pauseAmbientForEvent();
     playEncounterTrigger();
-    
-    const musicTimeout = setTimeout(() => {
-      playEncounterMusic();
-    }, 500);
-    
-    return () => {
-      clearTimeout(musicTimeout);
-      stopEncounterMusic();
-      resumeAmbientAfterEvent();
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
