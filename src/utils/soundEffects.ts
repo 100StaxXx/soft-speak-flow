@@ -12,38 +12,19 @@ class SoundManager {
   private activeIntervals: Set<NodeJS.Timeout> = new Set();
   private globalMuteUnsubscribe: (() => void) | null = null;
 
-  private encounterMusicVolume = 0.4;
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.audioContext = getSharedAudioContext();
       this.loadSoundPreferences();
-      this.loadEncounterMusicVolume();
       
       this.isGloballyMuted = globalAudio.getMuted();
       this.globalMuteUnsubscribe = globalAudio.subscribe((muted) => {
         this.isGloballyMuted = muted;
         if (muted) {
           this.stopAllAmbientSounds();
-          // Also mute encounter music when globally muted
-          if (this.encounterMusicAudio) {
-            this.encounterMusicAudio.muted = true;
-          }
-        } else {
-          // Unmute encounter music if playing
-          if (this.encounterMusicAudio) {
-            this.encounterMusicAudio.muted = false;
-          }
         }
       });
-      
-      window.addEventListener('encounter-music-volume-change', ((e: CustomEvent) => {
-        this.encounterMusicVolume = e.detail;
-        // Only apply volume if not muted
-        if (this.encounterMusicAudio && !this.shouldMute()) {
-          this.encounterMusicAudio.volume = this.encounterMusicVolume;
-        }
-      }) as EventListener);
       
       window.addEventListener('beforeunload', () => {
         this.stopAllAmbientSounds();
@@ -51,16 +32,6 @@ class SoundManager {
           this.globalMuteUnsubscribe();
         }
       });
-    }
-  }
-
-  private loadEncounterMusicVolume() {
-    const savedVolume = safeLocalStorage.getItem('encounter_music_volume');
-    if (savedVolume) {
-      const parsed = parseFloat(savedVolume);
-      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
-        this.encounterMusicVolume = parsed;
-      }
     }
   }
 
@@ -426,51 +397,6 @@ class SoundManager {
     });
   }
 
-  // Background music player for encounters/arcade
-  private encounterMusicAudio: HTMLAudioElement | null = null;
-
-  async playEncounterMusic(): Promise<HTMLAudioElement | null> {
-    if (this.shouldMute()) {
-      console.log('[Encounter Music] Skipped - audio is muted');
-      return null;
-    }
-    
-    // Ensure audio context is ready (critical for iOS)
-    await this.ensureAudioContext();
-    
-    this.stopEncounterMusic();
-    
-    // Use iOS-optimized audio creation
-    this.encounterMusicAudio = createIOSOptimizedAudio('/sounds/encounter-music.mp3');
-    this.encounterMusicAudio.volume = this.encounterMusicVolume;
-    this.encounterMusicAudio.loop = true;
-    
-    // Register with iOS audio manager for coordinated control
-    if (isIOS) {
-      iosAudioManager.registerAudio(this.encounterMusicAudio);
-    }
-    
-    try {
-      await this.encounterMusicAudio.play();
-      console.log('[Encounter Music] Playing successfully');
-    } catch (error) {
-      console.error('[Encounter Music] Failed to play:', error);
-    }
-    
-    return this.encounterMusicAudio;
-  }
-
-  stopEncounterMusic() {
-    if (this.encounterMusicAudio) {
-      // Unregister from iOS audio manager before cleanup
-      if (isIOS) {
-        iosAudioManager.unregisterAudio(this.encounterMusicAudio);
-      }
-      this.encounterMusicAudio.pause();
-      this.encounterMusicAudio.currentTime = 0;
-      this.encounterMusicAudio = null;
-    }
-  }
 }
 
 export const soundManager = new SoundManager();
@@ -493,8 +419,6 @@ export const playArcadeEntrance = () => soundManager.playArcadeEntrance();
 export const playArcadeSelect = () => soundManager.playArcadeSelect();
 export const playArcadeHighScore = () => soundManager.playArcadeHighScore();
 export const playEncounterTrigger = () => soundManager.playEncounterTrigger();
-export const playEncounterMusic = () => soundManager.playEncounterMusic();
-export const stopEncounterMusic = () => soundManager.stopEncounterMusic();
 
 // Generic sound aliases for UI
 export const playSound = (type: 'complete' | 'error' | 'pop' | 'success') => {

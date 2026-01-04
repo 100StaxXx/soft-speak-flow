@@ -53,7 +53,7 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { Leaf } from 'lucide-react';
 import { parseNaturalLanguage } from '../hooks/useNaturalLanguageParser';
-import { pauseAmbientForEvent, resumeAmbientAfterEvent } from '@/utils/ambientMusic';
+
 
 interface SmartTaskInputProps {
   onSubmit: (parsed: ParsedTask, subtasks?: SuggestedSubtask[]) => void;
@@ -228,25 +228,14 @@ export function SmartTaskInput({
 
   const handleVoiceToggle = useCallback(() => {
     if (isRecording) {
-      // Stopping recording - resume ambient music
+      // Stopping recording
       success();
-      resumeAmbientAfterEvent();
     } else {
-      // Starting recording - pause ambient music
+      // Starting recording
       medium();
-      pauseAmbientForEvent();
     }
     toggleRecording();
   }, [isRecording, success, medium, toggleRecording]);
-
-  // Cleanup: resume music if component unmounts while recording
-  useEffect(() => {
-    return () => {
-      if (isRecording) {
-        resumeAmbientAfterEvent();
-      }
-    };
-  }, [isRecording]);
 
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
 

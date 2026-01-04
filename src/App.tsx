@@ -22,7 +22,7 @@ import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
-import { AmbientMusicPlayer } from "@/components/AmbientMusicPlayer";
+
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
@@ -296,7 +296,6 @@ const App = () => {
               <Sonner />
               <InstallPWA />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                <AmbientMusicPlayer />
                 <ScrollToTop />
                 <AppContent />
               </BrowserRouter>

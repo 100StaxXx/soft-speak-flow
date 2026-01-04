@@ -5,7 +5,7 @@ import { haptics } from "@/utils/haptics";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { playEvolutionStart, playEvolutionSuccess } from "@/utils/soundEffects";
-import { pauseAmbientForEvent, resumeAmbientAfterEvent } from "@/utils/ambientMusic";
+
 import { globalAudio } from "@/utils/globalAudio";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
@@ -182,7 +182,6 @@ const CompanionEvolutionContent = ({
 
     let isMounted = true;
 
-    pauseAmbientForEvent();
     playEvolutionStart();
 
     // Screen shake effect - use CSS class
@@ -341,7 +340,6 @@ const CompanionEvolutionContent = ({
         emergencyTimeoutRef.current = null;
       }
       cleanupAudio();
-      resumeAmbientAfterEvent();
     };
   }, [isEvolving, isLoadingVoice, mentorSlug, userId, newStage, cleanupAudio, prefersReducedMotion, isFirstEvolution]);
 
@@ -355,7 +353,6 @@ const CompanionEvolutionContent = ({
     setAnimationStage(0);
     setCanDismiss(false);
     cleanupAudio();
-    resumeAmbientAfterEvent();
     
     console.log('[CompanionEvolution] Dispatching evolution events and closing modal');
     window.dispatchEvent(new CustomEvent('companion-evolved'));
@@ -388,7 +385,6 @@ const CompanionEvolutionContent = ({
     setAnimationStage(0);
     setCanDismiss(false);
     setShowEmergencyExit(false);
-    resumeAmbientAfterEvent();
     window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
     onComplete();
   };

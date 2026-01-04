@@ -11,7 +11,7 @@ import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, W
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
+
 import { globalAudio } from "@/utils/globalAudio";
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -87,21 +87,6 @@ export const TodaysPepTalk = memo(() => {
 
   // Removed walkthrough tracking - was causing play button to be permanently disabled
 
-  // Duck ambient music when playing pep talk
-  useEffect(() => {
-    if (isPlaying) {
-      duckAmbient();
-    } else {
-      unduckAmbient();
-    }
-
-    return () => {
-      // Only unduck if we were actually playing (and thus ducked the music)
-      if (isPlaying) {
-        unduckAmbient();
-      }
-    };
-  }, [isPlaying]);
 
   useEffect(() => {
     const fetchDailyPepTalk = async () => {

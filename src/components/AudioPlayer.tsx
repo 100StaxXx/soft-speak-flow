@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { duckAmbient, unduckAmbient } from "@/utils/ambientMusic";
+
 import { globalAudio } from "@/utils/globalAudio";
 import { safePlay, createIOSOptimizedAudio, isIOS, iosAudioManager } from "@/utils/iosAudio";
 import { setupMediaSession, updateMediaSession, clearMediaSession } from "@/utils/mediaSession";
@@ -62,21 +62,6 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     };
   }, [audioUrl, title]);
 
-  // Duck ambient music when playing
-  useEffect(() => {
-    if (isPlaying) {
-      duckAmbient();
-    } else {
-      unduckAmbient();
-    }
-
-    return () => {
-      // Only unduck if we were actually playing (and thus ducked the music)
-      if (isPlaying) {
-        unduckAmbient();
-      }
-    };
-  }, [isPlaying]);
 
   // Listen for global mute changes
   useEffect(() => {
