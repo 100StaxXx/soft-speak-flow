@@ -28,6 +28,8 @@ export interface FocusTimerState {
   sessionType: 'pomodoro' | 'short_break' | 'long_break' | 'custom';
   currentSessionId: string | null;
   distractionsCount: number;
+  isCooldown: boolean;
+  cooldownTimeRemaining: number; // seconds
 }
 
 const DURATION_PRESETS = {
@@ -37,11 +39,14 @@ const DURATION_PRESETS = {
   custom: 30,
 };
 
+const COOLDOWN_DURATION = 5 * 60; // 5 minutes in seconds
+
 export function useFocusSession() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [timerState, setTimerState] = useState<FocusTimerState>({
     isRunning: false,
@@ -51,6 +56,8 @@ export function useFocusSession() {
     sessionType: 'pomodoro',
     currentSessionId: null,
     distractionsCount: 0,
+    isCooldown: false,
+    cooldownTimeRemaining: 0,
   });
 
   // Fetch today's sessions
@@ -116,6 +123,8 @@ export function useFocusSession() {
         sessionType: session.duration_type as FocusTimerState['sessionType'],
         currentSessionId: session.id,
         distractionsCount: 0,
+        isCooldown: false,
+        cooldownTimeRemaining: 0,
       }));
     },
     onError: (error) => {
@@ -163,9 +172,10 @@ export function useFocusSession() {
       queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
       toast({
         title: "Focus session complete! 🎯",
-        description: `+${session.xp_earned} XP earned`,
+        description: `+${session.xp_earned} XP earned. Take a 5-minute break!`,
       });
-      resetTimer();
+      // Start cooldown instead of resetting
+      startCooldown();
     },
   });
 
@@ -233,6 +243,36 @@ export function useFocusSession() {
     },
   });
 
+  // Start cooldown after focus session completes
+  const startCooldown = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    setTimerState(prev => ({
+      ...prev,
+      isRunning: false,
+      isPaused: false,
+      isCooldown: true,
+      cooldownTimeRemaining: COOLDOWN_DURATION,
+      currentSessionId: null,
+      distractionsCount: 0,
+    }));
+  }, []);
+
+  // Skip cooldown
+  const skipCooldown = useCallback(() => {
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
+    setTimerState(prev => ({
+      ...prev,
+      isCooldown: false,
+      cooldownTimeRemaining: 0,
+      timeRemaining: DURATION_PRESETS.pomodoro * 60,
+      totalTime: DURATION_PRESETS.pomodoro * 60,
+    }));
+  }, []);
+
   // Log distraction
   const logDistraction = useCallback(() => {
     setTimerState(prev => ({
@@ -240,6 +280,33 @@ export function useFocusSession() {
       distractionsCount: prev.distractionsCount + 1,
     }));
   }, []);
+
+  // Cooldown tick effect
+  useEffect(() => {
+    if (timerState.isCooldown && timerState.cooldownTimeRemaining > 0) {
+      cooldownIntervalRef.current = setInterval(() => {
+        setTimerState(prev => {
+          if (prev.cooldownTimeRemaining <= 1) {
+            // Cooldown complete
+            return {
+              ...prev,
+              isCooldown: false,
+              cooldownTimeRemaining: 0,
+              timeRemaining: DURATION_PRESETS.pomodoro * 60,
+              totalTime: DURATION_PRESETS.pomodoro * 60,
+            };
+          }
+          return { ...prev, cooldownTimeRemaining: prev.cooldownTimeRemaining - 1 };
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, [timerState.isCooldown, timerState.cooldownTimeRemaining > 0]);
 
   // Timer tick effect
   useEffect(() => {
@@ -302,6 +369,9 @@ export function useFocusSession() {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
     setTimerState({
       isRunning: false,
       isPaused: false,
@@ -310,6 +380,8 @@ export function useFocusSession() {
       sessionType: 'pomodoro',
       currentSessionId: null,
       distractionsCount: 0,
+      isCooldown: false,
+      cooldownTimeRemaining: 0,
     });
   }, []);
 
@@ -343,6 +415,7 @@ export function useFocusSession() {
     resetTimer,
     setSessionType,
     logDistraction,
+    skipCooldown,
     stats: {
       completedToday,
       totalFocusMinutes,

@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Square, RotateCcw, Zap, Coffee, Brain, Clock } from 'lucide-react';
+import { Play, Pause, Square, Zap, Brain, Coffee, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { useFocusSession, FocusTimerState } from '../hooks/useFocusSession';
+import { useFocusSession } from '../hooks/useFocusSession';
 
 interface FocusTimerProps {
   taskId?: string;
@@ -13,17 +13,6 @@ interface FocusTimerProps {
   onComplete?: () => void;
 }
 
-const SESSION_TYPES: { 
-  type: FocusTimerState['sessionType']; 
-  label: string; 
-  icon: React.ReactNode;
-  color: string;
-}[] = [
-  { type: 'pomodoro', label: 'Focus', icon: <Brain className="w-4 h-4" />, color: 'text-primary' },
-  { type: 'short_break', label: 'Short Break', icon: <Coffee className="w-4 h-4" />, color: 'text-green-500' },
-  { type: 'long_break', label: 'Long Break', icon: <Zap className="w-4 h-4" />, color: 'text-blue-500' },
-];
-
 export function FocusTimer({ taskId, taskName, compact = false, onComplete }: FocusTimerProps) {
   const {
     timerState,
@@ -31,11 +20,9 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
     pauseSession,
     resumeSession,
     cancelSession,
-    resetTimer,
-    setSessionType,
     logDistraction,
+    skipCooldown,
     stats,
-    DURATION_PRESETS,
   } = useFocusSession();
 
   const formatTime = (seconds: number) => {
@@ -44,12 +31,19 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = timerState.totalTime > 0 
-    ? ((timerState.totalTime - timerState.timeRemaining) / timerState.totalTime) * 100 
-    : 0;
+  // Calculate progress for focus or cooldown
+  const progress = timerState.isCooldown
+    ? ((300 - timerState.cooldownTimeRemaining) / 300) * 100 // 5 min cooldown
+    : timerState.totalTime > 0 
+      ? ((timerState.totalTime - timerState.timeRemaining) / timerState.totalTime) * 100 
+      : 0;
+
+  const displayTime = timerState.isCooldown 
+    ? timerState.cooldownTimeRemaining 
+    : timerState.timeRemaining;
 
   const handleStart = () => {
-    startSession(taskId, timerState.sessionType);
+    startSession(taskId, 'pomodoro');
   };
 
   const handleToggle = () => {
@@ -64,11 +58,15 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
     return (
       <div className="flex items-center gap-2">
         <div className="text-lg font-mono font-bold text-foreground">
-          {formatTime(timerState.timeRemaining)}
+          {formatTime(displayTime)}
         </div>
-        {!timerState.isRunning ? (
+        {!timerState.isRunning && !timerState.isCooldown ? (
           <Button size="sm" variant="ghost" onClick={handleStart}>
             <Play className="w-4 h-4" />
+          </Button>
+        ) : timerState.isCooldown ? (
+          <Button size="sm" variant="ghost" onClick={skipCooldown}>
+            <SkipForward className="w-4 h-4" />
           </Button>
         ) : (
           <Button size="sm" variant="ghost" onClick={handleToggle}>
@@ -82,47 +80,24 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6">
-        {/* Session Type Selector */}
-        {!timerState.isRunning && (
-          <div className="flex flex-col items-center gap-2 mb-6">
-            {/* Top: Focus button */}
-            <Button
-              variant={timerState.sessionType === 'pomodoro' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSessionType('pomodoro')}
-              className="gap-2 uppercase text-xs font-semibold min-w-[100px]"
-            >
-              <span className={cn(timerState.sessionType !== 'pomodoro' && 'text-primary')}>
-                <Brain className="w-4 h-4" />
-              </span>
-              Focus
-            </Button>
-            
-            {/* Bottom: Break buttons side by side */}
-            <div className="flex gap-2">
-              <Button
-                variant={timerState.sessionType === 'short_break' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSessionType('short_break')}
-                className="gap-2 uppercase text-xs font-semibold"
-              >
-                <span className={cn(timerState.sessionType !== 'short_break' && 'text-green-500')}>
-                  <Coffee className="w-4 h-4" />
-                </span>
-                Short Break
-              </Button>
-              <Button
-                variant={timerState.sessionType === 'long_break' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSessionType('long_break')}
-                className="gap-2 uppercase text-xs font-semibold"
-              >
-                <span className={cn(timerState.sessionType !== 'long_break' && 'text-blue-500')}>
-                  <Zap className="w-4 h-4" />
-                </span>
-                Long Break
-              </Button>
-            </div>
+        {/* Pomodoro Explanation - Show when not running and not in cooldown */}
+        {!timerState.isRunning && !timerState.isCooldown && (
+          <div className="flex items-start gap-3 mb-6 p-3 rounded-lg bg-muted/50">
+            <Brain className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Pomodoro Technique:</span>{' '}
+              Focus for 25 minutes, then take a 5-minute break. This helps maintain concentration and avoid burnout.
+            </p>
+          </div>
+        )}
+
+        {/* Cooldown Message */}
+        {timerState.isCooldown && (
+          <div className="flex items-center justify-center gap-2 mb-6 p-3 rounded-lg bg-green-500/10">
+            <Coffee className="w-5 h-5 text-green-500" />
+            <p className="text-sm font-medium text-green-600 dark:text-green-400">
+              Take a break! Stretch, hydrate, rest your eyes.
+            </p>
           </div>
         )}
 
@@ -149,9 +124,7 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
                 strokeWidth="8"
                 strokeLinecap="round"
                 className={cn(
-                  timerState.sessionType === 'pomodoro' && 'text-primary',
-                  timerState.sessionType === 'short_break' && 'text-green-500',
-                  timerState.sessionType === 'long_break' && 'text-blue-500'
+                  timerState.isCooldown ? 'text-green-500' : 'text-primary'
                 )}
                 strokeDasharray={553}
                 strokeDashoffset={553 - (553 * progress) / 100}
@@ -165,25 +138,27 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={timerState.timeRemaining}
+                  key={displayTime}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="text-4xl font-mono font-bold text-foreground"
                 >
-                  {formatTime(timerState.timeRemaining)}
+                  {formatTime(displayTime)}
                 </motion.div>
               </AnimatePresence>
-              <span className="text-sm text-muted-foreground mt-1">
-                {timerState.sessionType === 'pomodoro' ? 'Focus Time' : 
-                 timerState.sessionType === 'short_break' ? 'Short Break' : 'Long Break'}
+              <span className={cn(
+                "text-sm mt-1",
+                timerState.isCooldown ? "text-green-500 font-medium" : "text-muted-foreground"
+              )}>
+                {timerState.isCooldown ? 'Cooldown' : 'Focus Time'}
               </span>
             </div>
           </div>
         </div>
 
         {/* Task Name */}
-        {taskName && (
+        {taskName && !timerState.isCooldown && (
           <div className="text-center mb-4">
             <span className="text-sm text-muted-foreground">Working on:</span>
             <p className="font-medium text-foreground truncate">{taskName}</p>
@@ -192,7 +167,12 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
 
         {/* Controls */}
         <div className="flex justify-center gap-3">
-          {!timerState.isRunning ? (
+          {timerState.isCooldown ? (
+            <Button onClick={skipCooldown} variant="outline" size="lg" className="gap-2">
+              <SkipForward className="w-5 h-5" />
+              Skip Break
+            </Button>
+          ) : !timerState.isRunning ? (
             <Button onClick={handleStart} size="lg" className="gap-2">
               <Play className="w-5 h-5" />
               Start Focus
