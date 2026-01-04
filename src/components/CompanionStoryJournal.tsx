@@ -9,7 +9,7 @@ import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, 
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
-import { GuildStoriesSection } from "./companion/GuildStoriesSection";
+
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
 
 export const CompanionStoryJournal = () => {
@@ -383,8 +383,6 @@ export const CompanionStoryJournal = () => {
         ) : null}
       </Card>
 
-      {/* Guild Stories Section */}
-      <GuildStoriesSection />
     </div>
   );
 };
