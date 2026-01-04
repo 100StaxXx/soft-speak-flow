@@ -139,6 +139,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
+  const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   
   // Track if we've already shown the tooltip this session
   const tooltipShownRef = useRef(false);
@@ -374,6 +375,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         onUndoToggle(task.id, task.xp_reward);
       } else {
         triggerHaptic(ImpactStyle.Medium);
+        // Track for strikethrough animation
+        setJustCompletedTasks(prev => new Set(prev).add(task.id));
+        setTimeout(() => {
+          setJustCompletedTasks(prev => {
+            const next = new Set(prev);
+            next.delete(task.id);
+            return next;
+          });
+        }, 600);
         onToggle(task.id, !isComplete, task.xp_reward);
       }
     };
@@ -429,7 +439,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               )}
               <p className={cn(
                 "text-base truncate",
-                isComplete && "line-through text-muted-foreground"
+                isComplete && "text-muted-foreground",
+                isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
               )}>
                 {task.task_text}
               </p>
