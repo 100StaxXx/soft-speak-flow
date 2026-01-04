@@ -151,6 +151,18 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     setIsReady(ready);
   }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId]);
 
+  // Memoized insight action handler - MUST be before early returns
+  const onInsightAction = useCallback((insight: { actionType?: string }) => {
+    switch (insight.actionType) {
+      case 'reschedule':
+      case 'add_break':
+      case 'simplify':
+      case 'celebrate':
+      default:
+        navigate('/journeys');
+    }
+  }, [navigate]);
+
   // Check for incomplete onboarding pieces and redirect (only after data is ready)
   useEffect(() => {
     if (!enableOnboardingGuard) return;
@@ -223,19 +235,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       </div>
     );
   }
-
-  // Memoized insight action handler
-  const onInsightAction = useCallback((insight: { actionType?: string }) => {
-    switch (insight.actionType) {
-      case 'reschedule':
-      case 'add_break':
-      case 'simplify':
-      case 'celebrate':
-      default:
-        navigate('/journeys');
-    }
-  }, [navigate]);
-
   return (
     <PageTransition>
       {/* Cosmiq Starfield Background */}
