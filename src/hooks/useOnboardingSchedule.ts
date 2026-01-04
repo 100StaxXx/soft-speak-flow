@@ -16,7 +16,7 @@ export const ONBOARDING_TASKS = [
     sort_order: 0,
     category: "soul",
     estimated_duration: 2,
-    notes: "Your companion grows stronger as you complete quests! Tap **COMPANION** in the bottom navigation bar to meet your companion and check your progress.",
+    notes: "Your companion grows stronger as you complete quests! Tap COMPANION in the bottom navigation bar to meet your companion and check your progress.",
   },
   {
     task_text: "Morning Check-in 🌅",
@@ -25,7 +25,7 @@ export const ONBOARDING_TASKS = [
     sort_order: 1,
     category: "mind",
     estimated_duration: 3,
-    notes: "Start each day with intention. Tap **MENTOR** in the bottom navigation bar, then look for the morning check-in option to reflect on your day ahead.",
+    notes: "Start each day with intention. Tap MENTOR in the bottom navigation bar, then look for the morning check-in option to reflect on your day ahead.",
   },
   {
     task_text: "Create Your First Campaign 🚀",
@@ -34,7 +34,7 @@ export const ONBOARDING_TASKS = [
     sort_order: 2,
     category: "mind",
     estimated_duration: 5,
-    notes: "Campaigns are your big-picture goals! Tap **CAMPAIGNS** in the bottom navigation bar, then tap the + button to create your first campaign.",
+    notes: "Campaigns are your big-picture goals! Tap CAMPAIGNS in the bottom navigation bar, then tap the + button to create your first campaign.",
   },
   {
     task_text: "Create Your First Quest 🎯",
@@ -43,7 +43,7 @@ export const ONBOARDING_TASKS = [
     sort_order: 3,
     category: "mind",
     estimated_duration: 2,
-    notes: "Quests are daily actions that move you forward! From the **QUESTS** tab (you're here now!), tap the + button in the bottom-right corner to create your first quest.",
+    notes: "Quests are daily actions that move you forward! From the QUESTS tab (you're here now!), tap the + button in the bottom-right corner to create your first quest.",
   },
 ];
 
