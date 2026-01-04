@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ interface MorningBriefingProps {
   className?: string;
 }
 
-export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) => {
+export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const personality = useMentorPersonality();
@@ -334,4 +334,6 @@ export const MorningBriefing = ({ onAskMore, className }: MorningBriefingProps) 
       </div>
     </Card>
   );
-};
+});
+
+MorningBriefing.displayName = 'MorningBriefing';

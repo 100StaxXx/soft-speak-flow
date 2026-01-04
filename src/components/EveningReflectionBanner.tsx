@@ -1,9 +1,10 @@
+import { memo } from "react";
 import { Moon, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEveningReflection } from "@/hooks/useEveningReflection";
 import { EveningReflectionDrawer } from "./EveningReflectionDrawer";
 
-export const EveningReflectionBanner = () => {
+export const EveningReflectionBanner = memo(() => {
   const { shouldShowBanner, isDrawerOpen, setIsDrawerOpen } = useEveningReflection();
 
   if (!shouldShowBanner) return null;
@@ -96,4 +97,6 @@ export const EveningReflectionBanner = () => {
       />
     </>
   );
-};
+});
+
+EveningReflectionBanner.displayName = 'EveningReflectionBanner';

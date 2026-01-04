@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 
 interface Star {
@@ -102,7 +102,7 @@ const PARALLAX = {
   brightStars: 8,
 };
 
-export const StarfieldBackground = () => {
+export const StarfieldBackground = memo(() => {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { gamma, beta, permitted } = useDeviceOrientation();
@@ -319,4 +319,6 @@ export const StarfieldBackground = () => {
       ))}
     </div>
   );
-};
+});
+
+StarfieldBackground.displayName = 'StarfieldBackground';
