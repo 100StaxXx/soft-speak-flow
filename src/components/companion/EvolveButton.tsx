@@ -59,6 +59,9 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           animation: "rainbow-slide 3s linear infinite",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
         }}
       >
         {/* Metallic sheen overlay */}
