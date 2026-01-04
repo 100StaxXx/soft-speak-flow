@@ -126,10 +126,19 @@ export const useEvolveLongPress = ({
   }, [disabled]);
 
   const handlers = {
-    onPointerDown: start,
-    onPointerUp: stop,
+    onPointerDown: (e: React.PointerEvent) => {
+      e.preventDefault();
+      start();
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      e.preventDefault();
+      stop();
+    },
     onPointerLeave: stop,
     onPointerCancel: stop,
+    onContextMenu: (e: React.SyntheticEvent) => {
+      e.preventDefault();
+    },
   };
 
   return {
