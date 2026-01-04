@@ -16,6 +16,13 @@ interface UserPreferences {
   avoid_topics: string[];
   preferred_length: string;
   response_style: string;
+  // Learned communication preferences
+  avg_message_length?: number;
+  message_count?: number;
+  uses_emojis?: boolean | null;
+  prefers_formal_language?: boolean | null;
+  prefers_direct_answers?: boolean | null;
+  engagement_patterns?: Record<string, number>;
 }
 
 interface PromptContext {
@@ -64,7 +71,13 @@ export class PromptBuilder {
       formality: 'casual',
       avoid_topics: [],
       preferred_length: 'concise',
-      response_style: 'encouraging'
+      response_style: 'encouraging',
+      avg_message_length: 0,
+      message_count: 0,
+      uses_emojis: null,
+      prefers_formal_language: null,
+      prefers_direct_answers: null,
+      engagement_patterns: {},
     };
   }
 
@@ -114,6 +127,12 @@ export class PromptBuilder {
       modifiers.push(`Avoid mentioning: ${this.userPrefs.avoid_topics.join(', ')}.`);
     }
 
+    // Apply learned communication style adjustments
+    const learnedModifiers = this.getLearnedCommunicationModifiers();
+    if (learnedModifiers.length > 0) {
+      modifiers.push(...learnedModifiers);
+    }
+
     if (modifiers.length > 0) {
       enhanced = enhanced.replace(/\{\{personalityAdjustments\}\}/g, modifiers.join('\n'));
       enhanced = enhanced.replace(/\{\{personalityModifiers\}\}/g, modifiers.join(' '));
@@ -129,6 +148,44 @@ export class PromptBuilder {
     enhanced = enhanced.replace(/\{\{responseLength\}\}/g, this.userPrefs.preferred_length || 'concise');
 
     return enhanced;
+  }
+
+  // Generate communication style hints based on learned patterns
+  private getLearnedCommunicationModifiers(): string[] {
+    if (!this.userPrefs || !this.userPrefs.message_count || this.userPrefs.message_count < 5) {
+      return []; // Not enough data to make recommendations
+    }
+
+    const hints: string[] = [];
+    const avgLength = this.userPrefs.avg_message_length || 0;
+
+    // Length-based adjustments
+    if (avgLength < 50) {
+      hints.push('This user prefers brief exchanges. Keep responses under 3 sentences.');
+    } else if (avgLength > 150) {
+      hints.push('This user writes detailed messages. You can provide more thorough responses.');
+    }
+
+    // Emoji usage
+    if (this.userPrefs.uses_emojis === true) {
+      hints.push('This user uses emojis - you may include 1-2 relevant emojis occasionally.');
+    } else if (this.userPrefs.uses_emojis === false) {
+      hints.push('This user does not use emojis. Keep responses text-only.');
+    }
+
+    // Formality
+    if (this.userPrefs.prefers_formal_language === true) {
+      hints.push('This user communicates formally. Avoid slang and maintain professional tone.');
+    } else if (this.userPrefs.prefers_formal_language === false) {
+      hints.push('This user prefers casual conversation. Use a relaxed, friendly tone.');
+    }
+
+    // Direct answers preference
+    if (this.userPrefs.prefers_direct_answers === true) {
+      hints.push('This user asks direct questions. Lead with the answer, then explain if needed.');
+    }
+
+    return hints;
   }
 
   async build(context: PromptContext): Promise<{ 

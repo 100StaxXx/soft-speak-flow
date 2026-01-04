@@ -19,6 +19,98 @@ const ChatSchema = z.object({
 
 const DAILY_MESSAGE_LIMIT = 20;
 
+// Analyze user communication patterns for adaptive learning
+interface CommunicationAnalysis {
+  length: number;
+  wordCount: number;
+  hasEmoji: boolean;
+  isQuestion: boolean;
+  isFormal: boolean;
+  isDetailed: boolean;
+  hasExclamation: boolean;
+}
+
+function analyzeUserCommunication(message: string): CommunicationAnalysis {
+  const words = message.trim().split(/\s+/);
+  const informalPatterns = /\b(hey|yeah|nah|gonna|wanna|lol|haha|omg|btw|idk|tbh|rn|u|ur|pls|thx)\b/i;
+  
+  return {
+    length: message.length,
+    wordCount: words.length,
+    hasEmoji: /\p{Emoji}/u.test(message),
+    isQuestion: message.includes('?'),
+    isFormal: !informalPatterns.test(message) && /^[A-Z]/.test(message),
+    isDetailed: words.length > 20 || message.includes(','),
+    hasExclamation: message.includes('!'),
+  };
+}
+
+// Update user communication preferences based on message analysis
+async function updateCommunicationLearning(
+  supabaseUrl: string,
+  supabaseKey: string,
+  userId: string,
+  analysis: CommunicationAnalysis
+): Promise<void> {
+  try {
+    // Create a service role client for updating preferences
+    const adminClient = createClient(supabaseUrl, supabaseKey);
+    
+    // Fetch existing preferences
+    const { data: existing } = await adminClient
+      .from('user_ai_preferences')
+      .select('avg_message_length, message_count, uses_emojis, prefers_formal_language, prefers_direct_answers, engagement_patterns')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const currentCount = (existing as any)?.message_count || 0;
+    const newCount = currentCount + 1;
+    
+    // Calculate rolling averages
+    const currentAvgLength = (existing as any)?.avg_message_length || 0;
+    const newAvgLength = Math.round((currentAvgLength * currentCount + analysis.length) / newCount);
+    
+    // Determine preferences with confidence thresholds (only update after enough data)
+    const engagementPatterns = (existing as any)?.engagement_patterns || {};
+    const emojiCount = (engagementPatterns.emoji_messages || 0) + (analysis.hasEmoji ? 1 : 0);
+    const formalCount = (engagementPatterns.formal_messages || 0) + (analysis.isFormal ? 1 : 0);
+    const questionCount = (engagementPatterns.question_messages || 0) + (analysis.isQuestion ? 1 : 0);
+    const detailedCount = (engagementPatterns.detailed_messages || 0) + (analysis.isDetailed ? 1 : 0);
+    
+    const updatedPatterns = {
+      ...engagementPatterns,
+      emoji_messages: emojiCount,
+      formal_messages: formalCount,
+      question_messages: questionCount,
+      detailed_messages: detailedCount,
+    };
+
+    // Only set preferences after 5+ messages for confidence
+    const usesEmojis = newCount >= 5 ? (emojiCount / newCount) > 0.3 : null;
+    const prefersFormal = newCount >= 5 ? (formalCount / newCount) > 0.5 : null;
+    const prefersDirectAnswers = newCount >= 5 ? (questionCount / newCount) > 0.6 : null;
+
+    // Upsert preferences
+    await adminClient
+      .from('user_ai_preferences')
+      .upsert({
+        user_id: userId,
+        avg_message_length: newAvgLength,
+        message_count: newCount,
+        uses_emojis: usesEmojis,
+        prefers_formal_language: prefersFormal,
+        prefers_direct_answers: prefersDirectAnswers,
+        engagement_patterns: updatedPatterns,
+        learning_updated_at: new Date().toISOString(),
+      } as any, { onConflict: 'user_id' });
+
+    console.log(`Updated communication learning for user ${userId}: avg_length=${newAvgLength}, count=${newCount}`);
+  } catch (error) {
+    // Non-blocking - don't fail the chat if learning update fails
+    console.error('Failed to update communication learning:', error);
+  }
+}
+
 /**
  * Sanitize error messages for client responses
  * Logs full error server-side, returns generic message to client
@@ -92,6 +184,9 @@ Deno.serve(async (req) => {
 
     const { message, conversationHistory, mentorName, mentorTone, comprehensiveMode, briefingContext } = validation.data;
 
+    // Analyze user communication for learning (non-blocking)
+    const communicationAnalysis = analyzeUserCommunication(message);
+    
     // Build additional context for comprehensive mode
     let additionalContext = '';
     if (briefingContext) {
@@ -232,6 +327,14 @@ Deno.serve(async (req) => {
     if (!validationResult.isValid) {
       console.warn('Validation failed:', validator.getValidationSummary(validationResult));
     }
+
+    // Update communication learning in background (non-blocking)
+    updateCommunicationLearning(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      user.id,
+      communicationAnalysis
+    );
 
     return new Response(
       JSON.stringify({ 
