@@ -335,15 +335,10 @@ export const useCompanion = () => {
         // Check for companion stage achievements
         await checkCompanionAchievements(newStage);
         
-        // Show overlay immediately BEFORE toast
-        setIsEvolvingLoading(true);
-        
-        // Notify walkthrough that evolution loading has started (for hiding tooltips)
-        window.dispatchEvent(new CustomEvent('evolution-loading-start'));
-        
-        toast.success("🎉 Your companion is ready to evolve!");
-        // Trigger evolution
-        evolveCompanion.mutate({ newStage, currentXP: newXP });
+        // Show notification that evolution is available - but DON'T auto-trigger
+        toast.success("✨ Your companion is ready to evolve! Visit your companion page.", {
+          duration: 5000,
+        });
       }
     },
     onError: (error) => {
@@ -709,6 +704,29 @@ export const useCompanion = () => {
     return ((companion.current_xp / nextEvolutionXP) * 100);
   }, [companion, nextEvolutionXP]);
 
+  // Check if companion can evolve (XP meets threshold for next stage)
+  const canEvolve = useMemo(() => {
+    if (!companion) return false;
+    return shouldEvolve(companion.current_stage, companion.current_xp);
+  }, [companion, shouldEvolve]);
+
+  // Manual evolution trigger function
+  const triggerManualEvolution = useCallback(() => {
+    if (!companion || !canEvolve) return;
+    
+    const nextStage = companion.current_stage + 1;
+    
+    // Show loading overlay
+    setIsEvolvingLoading(true);
+    window.dispatchEvent(new CustomEvent('evolution-loading-start'));
+    
+    toast.success("🎉 Let's evolve!");
+    evolveCompanion.mutate({ 
+      newStage: nextStage, 
+      currentXP: companion.current_xp 
+    });
+  }, [companion, canEvolve, setIsEvolvingLoading, evolveCompanion]);
+
   return {
     companion,
     isLoading,
@@ -720,5 +738,7 @@ export const useCompanion = () => {
     nextEvolutionXP,
     progressToNext,
     isEvolvingLoading,
+    canEvolve,
+    triggerManualEvolution,
   };
 };
