@@ -14,6 +14,9 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
   const { imageUrl, isLoading } = useWelcomeImage();
   
   const backgroundImage = imageUrl || campaignWelcomeFallback;
+  
+  // Skip animation if image is already cached (instant load)
+  const isCached = !isLoading && !!imageUrl;
 
   return (
     <AnimatePresence>
@@ -37,12 +40,12 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
               />
             )}
             
-            {/* Background image */}
+            {/* Background image - skip animation if cached */}
             <motion.img
               src={backgroundImage}
               alt="Your journey awaits"
               className="w-full h-full object-cover"
-              initial={{ scale: 1.1, opacity: 0 }}
+              initial={isCached ? false : { scale: 1.1, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
             />

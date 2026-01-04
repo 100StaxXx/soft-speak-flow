@@ -89,6 +89,7 @@ export const queryKeys = {
     all: ['epics'] as const,
     byUser: (userId: string) => ['epics', userId] as const,
     templates: () => ['epic-templates'] as const,
+    welcomeImage: (userId?: string) => ['welcome-image', userId] as const,
   },
 
   guild: {
