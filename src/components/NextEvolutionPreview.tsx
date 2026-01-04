@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
@@ -19,7 +20,7 @@ const XP_TIPS = [
   { action: "Weekly challenge complete", xp: "60 XP", icon: "🏆" },
 ];
 
-export const NextEvolutionPreview = ({
+export const NextEvolutionPreview = memo(({
   currentStage,
   currentXP,
   nextEvolutionXP,
@@ -96,4 +97,6 @@ export const NextEvolutionPreview = ({
       </div>
     </Card>
   );
-};
+});
+
+NextEvolutionPreview.displayName = 'NextEvolutionPreview';

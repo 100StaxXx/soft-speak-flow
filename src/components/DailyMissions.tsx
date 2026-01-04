@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Target, Zap, TrendingUp, Sparkles } from "lucide-react";
@@ -14,7 +15,7 @@ import { DailyMissionsInfoTooltip } from "@/components/DailyMissionsInfoTooltip"
 import { MissionCardSkeleton } from "@/components/SkeletonLoader";
 import { getTodaysTheme } from "@/config/missionTemplates";
 
-const DailyMissionsContent = () => {
+const DailyMissionsContent = memo(() => {
   const { 
     missions, 
     isLoading,
@@ -215,10 +216,14 @@ const DailyMissionsContent = () => {
       </div>
     </Card>
   );
-};
+});
 
-export const DailyMissions = () => (
+DailyMissionsContent.displayName = 'DailyMissionsContent';
+
+export const DailyMissions = memo(() => (
   <ErrorBoundary fallback={<MissionErrorFallback />}>
     <DailyMissionsContent />
   </ErrorBoundary>
-);
+));
+
+DailyMissions.displayName = 'DailyMissions';
