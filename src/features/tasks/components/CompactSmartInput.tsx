@@ -249,7 +249,7 @@ export function CompactSmartInput({
           </AnimatePresence>
           
           {/* Action buttons inside input */}
-          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
             {/* Mic button */}
             {isSupported && (
               <Button
