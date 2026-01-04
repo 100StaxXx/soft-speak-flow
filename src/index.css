@@ -298,6 +298,33 @@
   }
 }
 
+/* Animated strikethrough - sweeps left to right */
+@keyframes strikethrough-sweep {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-strikethrough {
+  position: relative;
+  text-decoration: none !important;
+}
+
+.animate-strikethrough::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  transform: translateY(-50%);
+  animation: strikethrough-sweep 0.4s ease-out forwards;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

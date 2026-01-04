@@ -278,7 +278,8 @@ export const TaskCard = ({
               <p
                 className={cn(
                   "text-sm font-medium leading-relaxed break-words",
-                  task.completed && "line-through text-muted-foreground",
+                  task.completed && "text-muted-foreground",
+                  task.completed && (justCompleted ? "animate-strikethrough" : "line-through"),
                   isMainQuest && "text-base font-semibold text-foreground"
                 )}
               >
