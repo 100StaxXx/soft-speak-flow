@@ -8,21 +8,19 @@ import { PageTransition } from "@/components/PageTransition";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer } from "lucide-react";
-import { CompanionStoryJournal } from "@/components/CompanionStoryJournal";
-import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { useCompanion } from "@/hooks/useCompanion";
-import { useProfile } from "@/hooks/useProfile";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
 import { CompanionPageSkeleton } from "@/components/skeletons/CompanionPageSkeleton";
-import { useState, memo } from "react";
+import { useState, memo, lazy, Suspense } from "react";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Memoized tab content to prevent unnecessary re-renders
 const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: { 
@@ -52,9 +50,20 @@ const OverviewTab = memo(({ companion, nextEvolutionXP, progressToNext }: {
 ));
 OverviewTab.displayName = 'OverviewTab';
 
+// Lazy load heavy tab content
+const LazyCompanionStoryJournal = lazy(() => import("@/components/CompanionStoryJournal").then(m => ({ default: m.CompanionStoryJournal })));
+const LazyCompanionPostcards = lazy(() => import("@/components/companion/CompanionPostcards").then(m => ({ default: m.CompanionPostcards })));
+
+// Tab content loading fallback
+const TabLoadingFallback = () => (
+  <div className="space-y-4 mt-6">
+    <Skeleton className="h-48 w-full rounded-xl" />
+    <Skeleton className="h-32 w-full rounded-xl" />
+  </div>
+);
+
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
-  const { profile } = useProfile();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
@@ -170,11 +179,19 @@ const Companion = () => {
             </TabsContent>
 
             <TabsContent value="stories">
-              {activeTab === "stories" && <CompanionStoryJournal />}
+              {activeTab === "stories" && (
+                <Suspense fallback={<TabLoadingFallback />}>
+                  <LazyCompanionStoryJournal />
+                </Suspense>
+              )}
             </TabsContent>
 
             <TabsContent value="postcards">
-              {activeTab === "postcards" && <CompanionPostcards />}
+              {activeTab === "postcards" && (
+                <Suspense fallback={<TabLoadingFallback />}>
+                  <LazyCompanionPostcards />
+                </Suspense>
+              )}
             </TabsContent>
 
             <TabsContent value="collection">

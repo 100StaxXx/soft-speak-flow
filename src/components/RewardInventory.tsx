@@ -3,7 +3,7 @@
  * View and equip earned epic rewards
  */
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -33,7 +33,7 @@ const REWARD_TYPE_LABELS: Record<RewardType, string> = {
   artifact: 'Artifacts',
 };
 
-export const RewardInventory = ({ className }: RewardInventoryProps) => {
+export const RewardInventory = memo(({ className }: RewardInventoryProps) => {
   const { allRewards, userRewards, equippedRewards, equipReward, isEquipping, isLoading } = useEpicRewards();
   const [activeTab, setActiveTab] = useState<RewardType>('background');
 
@@ -140,7 +140,9 @@ export const RewardInventory = ({ className }: RewardInventoryProps) => {
       </Tabs>
     </Card>
   );
-};
+});
+
+RewardInventory.displayName = 'RewardInventory';
 
 interface RewardCardProps {
   userReward: UserEpicReward;

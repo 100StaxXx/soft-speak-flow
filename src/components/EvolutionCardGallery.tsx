@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +23,7 @@ interface EvolutionCard {
   bond_level?: number | null;
 }
 
-export const EvolutionCardGallery = () => {
+export const EvolutionCardGallery = memo(() => {
   const { user } = useAuth();
 
   const { data: cards, isLoading } = useQuery({
@@ -82,6 +83,7 @@ export const EvolutionCardGallery = () => {
       return mappedCards;
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes - cards don't change often
   });
 
   if (isLoading) {
@@ -118,4 +120,6 @@ export const EvolutionCardGallery = () => {
       </div>
     </div>
   );
-};
+});
+
+EvolutionCardGallery.displayName = 'EvolutionCardGallery';

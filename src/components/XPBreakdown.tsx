@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +7,7 @@ import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { XPBreakdownInfoTooltip } from "./XPBreakdownInfoTooltip";
 
-export const XPBreakdown = () => {
+export const XPBreakdown = memo(() => {
   const { user } = useAuth();
   const { currentStreak = 0, multiplier = 1, nextMilestone } = useStreakMultiplier();
   const now = new Date();
@@ -37,6 +38,7 @@ export const XPBreakdown = () => {
       return { total, byType, events: data };
     },
     enabled: !!user,
+    staleTime: 60 * 1000, // 1 minute - XP data should be relatively fresh
   });
 
   const typeLabels: Record<string, string> = {
@@ -111,4 +113,6 @@ export const XPBreakdown = () => {
       </div>
     </Card>
   );
-};
+});
+
+XPBreakdown.displayName = 'XPBreakdown';

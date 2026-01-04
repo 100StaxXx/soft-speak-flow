@@ -43,7 +43,12 @@ export const ParallaxCard = ({
   return (
     <motion.div
       ref={ref}
-      style={{ y, scale: scaleSpring, opacity }}
+      style={{ 
+        y, 
+        scale: scaleSpring, 
+        opacity,
+        willChange: 'transform, opacity',
+      }}
       className={cn(className)}
     >
       {children}
