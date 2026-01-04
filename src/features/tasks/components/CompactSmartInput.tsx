@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, MicOff, Send, Calendar, Clock, Timer, Zap, Flame, Mountain,
   AlertTriangle, Star, Repeat, Battery, BatteryLow, BatteryFull, StickyNote,
-  Sparkles
+  Sparkles, CalendarDays
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,14 @@ import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
 import { PlanMyDayClarification, PlanMyDayAnswers } from './PlanMyDayClarification';
+import { PlanMyWeekClarification, PlanMyWeekAnswers } from './PlanMyWeekClarification';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 interface CompactSmartInputProps {
   onSubmit: (parsed: ParsedTask) => void;
   onPlanMyDay?: (answers: PlanMyDayAnswers) => void;
+  onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -34,6 +36,7 @@ interface CompactSmartInputProps {
 export function CompactSmartInput({
   onSubmit,
   onPlanMyDay,
+  onPlanMyWeek,
   placeholder = "Add quest...",
   disabled = false,
   className,
@@ -47,6 +50,7 @@ export function CompactSmartInput({
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showPlanClarification, setShowPlanClarification] = useState(false);
+  const [showWeekClarification, setShowWeekClarification] = useState(false);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
 
   const { medium, success, light, tap } = useHapticFeedback();
@@ -90,7 +94,14 @@ export function CompactSmartInput({
   const showTypewriter = isFocused && !displayText && !isRecording;
 
   const handleSubmit = () => {
-    // Check for plan my day trigger first
+    // Check for plan my week trigger first (more specific)
+    if (parsed?.triggerPlanMyWeek) {
+      success();
+      setShowWeekClarification(true);
+      return;
+    }
+    
+    // Check for plan my day trigger
     if (parsed?.triggerPlanMyDay) {
       success();
       setShowPlanClarification(true);
@@ -121,6 +132,30 @@ export function CompactSmartInput({
       reset();
       setInterimText('');
       setShowPlanClarification(false);
+    } finally {
+      setIsPlanLoading(false);
+    }
+  };
+
+  const handleWeekComplete = async (answers: PlanMyWeekAnswers) => {
+    setIsPlanLoading(true);
+    try {
+      await onPlanMyWeek?.(answers);
+      reset();
+      setInterimText('');
+      setShowWeekClarification(false);
+    } finally {
+      setIsPlanLoading(false);
+    }
+  };
+
+  const handleWeekSkip = async () => {
+    setIsPlanLoading(true);
+    try {
+      await onPlanMyWeek?.({ energyLevel: 'medium' });
+      reset();
+      setInterimText('');
+      setShowWeekClarification(false);
     } finally {
       setIsPlanLoading(false);
     }
@@ -245,7 +280,14 @@ export function CompactSmartInput({
       color: 'text-amber-500 bg-amber-500/10 border-amber-500/30' 
     });
   }
-  if (parsed?.triggerPlanMyDay) {
+  if (parsed?.triggerPlanMyWeek) {
+    badges.push({ 
+      key: 'planmyweek', 
+      icon: CalendarDays, 
+      label: 'Plan My Week', 
+      color: 'text-blue-500 bg-blue-500/10 border-blue-500/30' 
+    });
+  } else if (parsed?.triggerPlanMyDay) {
     badges.push({ 
       key: 'planmyday', 
       icon: Sparkles, 
@@ -362,7 +404,7 @@ export function CompactSmartInput({
 
       {/* Quick suggestion chips - shown when focused and no preview or clarification */}
       <AnimatePresence>
-        {isFocused && !showPreview && !showPlanClarification && (
+        {isFocused && !showPreview && !showPlanClarification && !showWeekClarification && (
           <QuickSuggestionChips
             onSuggestionClick={handleSuggestionClick}
             currentInput={displayText}
@@ -377,6 +419,19 @@ export function CompactSmartInput({
           <PlanMyDayClarification
             onComplete={handlePlanComplete}
             onSkip={handlePlanSkip}
+            isLoading={isPlanLoading}
+            activeEpics={activeEpics}
+            habitsAtRisk={habitsAtRisk}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Plan My Week Clarification */}
+      <AnimatePresence>
+        {showWeekClarification && (
+          <PlanMyWeekClarification
+            onComplete={handleWeekComplete}
+            onSkip={handleWeekSkip}
             isLoading={isPlanLoading}
             activeEpics={activeEpics}
             habitsAtRisk={habitsAtRisk}

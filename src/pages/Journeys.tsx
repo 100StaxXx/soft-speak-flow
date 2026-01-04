@@ -36,9 +36,11 @@ import { useComboTracker } from "@/hooks/useComboTracker";
 import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
 import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
+import { useWeeklyPlanOptimization } from "@/hooks/useWeeklyPlanOptimization";
 import { useEpics } from "@/hooks/useEpics";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
+import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -68,6 +70,9 @@ const Journeys = () => {
   
   // Daily plan optimization
   const { refetch: refetchPlan, suggestedSchedule, isLoading: isPlanLoading, optimizeWithAnswers } = useDailyPlanOptimization();
+  
+  // Weekly plan optimization
+  const { refetch: refetchWeeklyPlan, optimizeWithAnswers: optimizeWeekWithAnswers } = useWeeklyPlanOptimization();
   
   // Epics for plan my day questions
   const { epics } = useEpics();
@@ -324,6 +329,28 @@ const Journeys = () => {
     }
   }, [optimizeWithAnswers, refetchPlan]);
 
+  // Handle Plan My Week command with clarification answers
+  const handlePlanMyWeek = useCallback(async (answers: PlanMyWeekAnswers) => {
+    try {
+      const result = await optimizeWeekWithAnswers(answers);
+      const dailyPlans = result?.dailyPlans;
+      
+      if (dailyPlans && dailyPlans.length > 0) {
+        const totalTasks = dailyPlans.reduce((sum, d) => sum + d.tasks.length, 0);
+        toast.success(`Week planned! ${totalTasks} tasks across ${dailyPlans.length} days`, {
+          description: `Balance score: ${result?.balanceScore || 0}%`,
+        });
+        refetchWeeklyPlan();
+        refetchPlan();
+      } else {
+        toast.info("Your week looks open. Add some tasks to optimize!");
+      }
+    } catch (error) {
+      console.error('Weekly plan optimization failed:', error);
+      toast.error("Couldn't generate weekly plan. Try again later.");
+    }
+  }, [optimizeWeekWithAnswers, refetchWeeklyPlan, refetchPlan]);
+
   return (
     <TaskDragProvider>
     <PageTransition>
@@ -402,6 +429,7 @@ const Journeys = () => {
               });
             }}
             onPlanMyDay={handlePlanMyDay}
+            onPlanMyWeek={handlePlanMyWeek}
             activeEpics={activeEpics}
           />
         </motion.div>

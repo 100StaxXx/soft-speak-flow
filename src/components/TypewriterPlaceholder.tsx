@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PLAN_MY_DAY = "Plan my day";
+const PLAN_MY_WEEK = "Plan my week";
 
 const OTHER_EXAMPLES = [
   // Dates + Times
@@ -49,16 +50,19 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-// Build example list with "Plan my day" appearing more frequently
+// Build example list with "Plan my day" and "Plan my week" appearing more frequently
 function buildExampleList(): string[] {
   const shuffled = shuffleArray(OTHER_EXAMPLES);
+  const featured = [PLAN_MY_DAY, PLAN_MY_WEEK];
   const result: string[] = [PLAN_MY_DAY]; // Always start with Plan my day
   
-  // Insert "Plan my day" every ~5 examples
+  // Insert featured phrases every ~5 examples, alternating between them
+  let featuredIndex = 0;
   for (let i = 0; i < shuffled.length; i++) {
     result.push(shuffled[i]);
     if ((i + 1) % 5 === 0 && i < shuffled.length - 1) {
-      result.push(PLAN_MY_DAY);
+      result.push(featured[featuredIndex % featured.length]);
+      featuredIndex++;
     }
   }
   
