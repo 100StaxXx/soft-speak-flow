@@ -3895,6 +3895,30 @@ export type Database = {
           },
         ]
       }
+      mentor_chat_feedback: {
+        Row: {
+          created_at: string | null
+          feedback_type: string
+          id: string
+          message_content: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          feedback_type: string
+          id?: string
+          message_content?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          feedback_type?: string
+          id?: string
+          message_content?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       mentor_chats: {
         Row: {
           content: string
@@ -5706,40 +5730,61 @@ export type Database = {
       }
       user_ai_preferences: {
         Row: {
+          avg_message_length: number | null
           avoid_topics: string[] | null
           created_at: string | null
           detail_level: string | null
+          engagement_patterns: Json | null
           formality: string | null
           id: string
+          learning_updated_at: string | null
+          message_count: number | null
           preferred_length: string | null
+          prefers_direct_answers: boolean | null
+          prefers_formal_language: boolean | null
           response_style: string | null
           tone_preference: string | null
           updated_at: string | null
           user_id: string
+          uses_emojis: boolean | null
         }
         Insert: {
+          avg_message_length?: number | null
           avoid_topics?: string[] | null
           created_at?: string | null
           detail_level?: string | null
+          engagement_patterns?: Json | null
           formality?: string | null
           id?: string
+          learning_updated_at?: string | null
+          message_count?: number | null
           preferred_length?: string | null
+          prefers_direct_answers?: boolean | null
+          prefers_formal_language?: boolean | null
           response_style?: string | null
           tone_preference?: string | null
           updated_at?: string | null
           user_id: string
+          uses_emojis?: boolean | null
         }
         Update: {
+          avg_message_length?: number | null
           avoid_topics?: string[] | null
           created_at?: string | null
           detail_level?: string | null
+          engagement_patterns?: Json | null
           formality?: string | null
           id?: string
+          learning_updated_at?: string | null
+          message_count?: number | null
           preferred_length?: string | null
+          prefers_direct_answers?: boolean | null
+          prefers_formal_language?: boolean | null
           response_style?: string | null
           tone_preference?: string | null
           updated_at?: string | null
           user_id?: string
+          uses_emojis?: boolean | null
         }
         Relationships: [
           {

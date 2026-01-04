@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
+import { MentorChatFeedback } from "./MentorChatFeedback";
 
 interface Message {
   role: "user" | "assistant";
@@ -330,6 +331,10 @@ export const AskMentorChat = ({
               )}
             </div>
             <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+            {/* Feedback buttons for assistant messages */}
+            {msg.role === 'assistant' && !msg.isFallback && (
+              <MentorChatFeedback messageContent={msg.content} />
+            )}
           </Card>
         ))}
 
