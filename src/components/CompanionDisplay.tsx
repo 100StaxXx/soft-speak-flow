@@ -8,7 +8,7 @@ import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
-import { CompanionEvolution } from "@/components/CompanionEvolution";
+import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
@@ -92,8 +92,7 @@ export const CompanionDisplay = memo(() => {
   const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
-  const [isEvolving, setIsEvolving] = useState(false);
-  const [evolutionData, setEvolutionData] = useState<{ stage: number; imageUrl: string } | null>(null);
+  const { isEvolvingLoading } = useEvolution();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0); // Force image reload
@@ -251,29 +250,6 @@ export const CompanionDisplay = memo(() => {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
-  useEffect(() => {
-    if (!evolveCompanion.isSuccess || !evolveCompanion.data) return;
-    
-    // The evolveCompanion mutation returns just the image URL string
-    // The companion query will be invalidated and refetched with new data
-    // For the evolution animation, we use the image URL from the mutation
-    // and the stage from the companion data after refetch
-    const imageUrl = typeof evolveCompanion.data === 'string' 
-      ? evolveCompanion.data 
-      : (evolveCompanion.data as { current_image_url?: string } | undefined)?.current_image_url || "";
-    
-    // Use companion's current stage + 1 since mutation triggers after XP threshold
-    const newStage = companion ? companion.current_stage : 0;
-    
-    if (imageUrl) {
-      setEvolutionData({
-        stage: newStage,
-        imageUrl,
-      });
-      setIsEvolving(true);
-    }
-  }, [evolveCompanion.isSuccess, evolveCompanion.data, companion]);
-
   // Show welcome back modal if user has been inactive
   useEffect(() => {
     if (needsWelcomeBack && !welcomeBackDismissed && companion) {
@@ -329,18 +305,6 @@ export const CompanionDisplay = memo(() => {
 
   return (
     <>
-      <CompanionEvolution
-        isEvolving={isEvolving}
-        newStage={evolutionData?.stage || 0}
-        newImageUrl={evolutionData?.imageUrl || ""}
-        mentorSlug={profile?.selected_mentor_id}
-        userId={user?.id}
-        onComplete={() => {
-          setIsEvolving(false);
-          setEvolutionData(null);
-        }}
-      />
-
       <Card className="relative overflow-hidden bg-card/25 backdrop-blur-2xl border-celestial-blue/20 hover:border-nebula-pink/40 transition-all duration-500 animate-scale-in">
         {/* Equipped background or default nebula gradients */}
         {equippedBackgroundStyle ? (

@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { useEvolveLongPress } from "@/hooks/useEvolveLongPress";
+import { useEvolution } from "@/contexts/EvolutionContext";
 
 interface EvolveButtonProps {
   onEvolve: () => void;
@@ -8,10 +9,11 @@ interface EvolveButtonProps {
 }
 
 export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) => {
+  const { isEvolvingLoading } = useEvolution();
   const { progress, isHolding, handlers } = useEvolveLongPress({
     onComplete: onEvolve,
     duration: 1500,
-    disabled: isEvolving,
+    disabled: isEvolving || isEvolvingLoading,
   });
 
   return (
@@ -116,14 +118,27 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
         
         {/* Content */}
         <div className="relative z-10 h-[1.2em]">
-          <span 
-            className="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
-            style={{
-              textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
-            }}
-          >
-            EVOLVE
-          </span>
+          {isEvolvingLoading ? (
+            <motion.span 
+              className="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+              style={{
+                textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
+              }}
+              animate={{ opacity: [1, 0.5, 1] }}
+              transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+            >
+              PREPARING...
+            </motion.span>
+          ) : (
+            <span 
+              className="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+              style={{
+                textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
+              }}
+            >
+              EVOLVE
+            </span>
+          )}
         </div>
       </button>
     </motion.div>
