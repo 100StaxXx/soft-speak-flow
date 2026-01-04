@@ -5,7 +5,7 @@ import { useCompanionStory } from "@/hooks/useCompanionStory";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3 } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Heart, Lightbulb, Compass } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
@@ -280,10 +280,10 @@ export const CompanionStoryJournal = () => {
           </Card>
         )}
 
-        {/* Story Display */}
+        {/* Story Display - 5 Sections */}
         {isStageUnlocked && story ? (
           <div className="space-y-6">
-            {/* Chapter Title */}
+            {/* Section 1: Chapter Header */}
             <div className="space-y-2 text-center">
               <h2 className="text-2xl font-bold">
                 {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}: {story.chapter_title}
@@ -293,16 +293,61 @@ export const CompanionStoryJournal = () => {
 
             <Separator />
 
-            {/* Main Story */}
-            <div>
+            {/* Section 2: The Journey (Main Story) */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <BookOpen className="w-4 h-4" />
+                <span>The Journey</span>
+              </div>
               <p className="text-foreground leading-relaxed whitespace-pre-wrap">{story.main_story}</p>
             </div>
 
-            {/* Bond Moment */}
+            {/* Section 3: Bond Moment */}
             <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
-              <h3 className="text-sm font-semibold mb-2 text-primary">Bond Moment</h3>
+              <div className="flex items-center gap-2 text-sm font-semibold mb-2 text-primary">
+                <Heart className="w-4 h-4" />
+                <span>Bond Moment</span>
+              </div>
               <p className="text-sm text-foreground/90">{story.bond_moment}</p>
             </div>
+
+            {/* Section 4: Wisdom Gained */}
+            {story.life_lesson && (
+              <div className="bg-amber-500/10 p-4 rounded-lg border border-amber-500/20">
+                <div className="flex items-center gap-2 text-sm font-semibold mb-2 text-amber-600 dark:text-amber-400">
+                  <Lightbulb className="w-4 h-4" />
+                  <span>Wisdom Gained</span>
+                </div>
+                <p className="text-sm text-foreground/90">{story.life_lesson}</p>
+              </div>
+            )}
+
+            {/* Section 5: Looking Ahead */}
+            {(story.lore_expansion || story.next_hook) && (
+              <div className="bg-muted/30 p-4 rounded-lg border border-border">
+                <div className="flex items-center gap-2 text-sm font-semibold mb-3 text-muted-foreground">
+                  <Compass className="w-4 h-4" />
+                  <span>Looking Ahead</span>
+                </div>
+                
+                {story.lore_expansion && typeof story.lore_expansion === 'object' && (
+                  <div className="space-y-1 mb-3">
+                    {Object.entries(story.lore_expansion).map(([key, value], idx) => (
+                      <p key={idx} className="text-xs text-muted-foreground flex items-start gap-2">
+                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary/50" />
+                        <span><span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+                
+                {story.next_hook && (
+                  <p className="text-sm italic text-foreground/70 border-t border-border pt-3 mt-3">
+                    {story.next_hook}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ) : isStageUnlocked ? (
           <Card className="p-8 text-center space-y-4">
