@@ -5,7 +5,7 @@ import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
 import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
-import { CompanionBadge } from "@/components/CompanionBadge";
+import { EvolveButton } from "@/components/companion/EvolveButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer } from "lucide-react";
 import { CollectionTab } from "@/components/companion/CollectionTab";
@@ -28,16 +28,10 @@ const OverviewTab = memo(({
   companion, 
   nextEvolutionXP, 
   progressToNext,
-  canEvolve,
-  onEvolve,
-  isEvolving,
 }: { 
   companion: any; 
   nextEvolutionXP: number; 
   progressToNext: number;
-  canEvolve: boolean;
-  onEvolve: () => void;
-  isEvolving: boolean;
 }) => (
   <div className="space-y-6 mt-6">
     <ParallaxCard offset={30}>
@@ -49,9 +43,6 @@ const OverviewTab = memo(({
         nextEvolutionXP={nextEvolutionXP || 0}
         currentStage={companion?.current_stage || 0}
         progressPercent={progressToNext}
-        canEvolve={canEvolve}
-        onEvolve={onEvolve}
-        isEvolving={isEvolving}
       />
     </ParallaxCard>
     <ParallaxCard offset={16}>
@@ -141,7 +132,7 @@ const Companion = () => {
 
     // Loading or loaded content with tabs
     return (
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="container pb-6">
         <TabsList className="grid w-full grid-cols-5 cosmiq-glass-subtle border border-cosmiq-glow/20">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -188,9 +179,6 @@ const Companion = () => {
                     companion={companion} 
                     nextEvolutionXP={nextEvolutionXP} 
                     progressToNext={progressToNext}
-                    canEvolve={canEvolve}
-                    onEvolve={triggerManualEvolution}
-                    isEvolving={evolveCompanion.isPending}
                   />
                 )}
               </TabsContent>
@@ -237,6 +225,16 @@ const Companion = () => {
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </header>
+
+          {/* Rainbow Evolve Button - shows when evolution is ready */}
+          <AnimatePresence>
+            {canEvolve && !isLoading && (
+              <EvolveButton 
+                onEvolve={triggerManualEvolution}
+                isEvolving={evolveCompanion.isPending}
+              />
+            )}
+          </AnimatePresence>
 
           {renderContent()}
         </div>

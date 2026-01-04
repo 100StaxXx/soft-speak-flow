@@ -211,6 +211,20 @@ export default {
           "0%, 100%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.08)" },
         },
+        "rainbow-shift": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { 
+            transform: "scale(1)",
+            boxShadow: "0 0 20px rgba(255, 0, 128, 0.5), 0 0 40px rgba(128, 0, 255, 0.3), 0 0 60px rgba(0, 128, 255, 0.2)",
+          },
+          "50%": { 
+            transform: "scale(1.02)",
+            boxShadow: "0 0 30px rgba(255, 0, 128, 0.6), 0 0 60px rgba(128, 0, 255, 0.4), 0 0 90px rgba(0, 128, 255, 0.3)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -227,6 +241,8 @@ export default {
         "gradient-spin": "gradient-spin 3s linear infinite",
         "wiggle": "wiggle 0.3s ease-in-out",
         "bounce-pop": "bounce-pop 0.6s ease-in-out infinite",
+        "rainbow-shift": "rainbow-shift 3s ease infinite",
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
       perspective: {
         "1000": "1000px",
