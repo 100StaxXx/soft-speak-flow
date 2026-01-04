@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 
-import { globalAudio } from "@/utils/globalAudio";
+
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
 
@@ -61,29 +61,13 @@ export const TodaysPepTalk = memo(() => {
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const seekDebounceRef = useRef<number | null>(null);
-  const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
+  
 
   // Reset audio ready state when audio URL changes
   useEffect(() => {
     setIsAudioReady(false);
   }, [pepTalk?.audio_url]);
 
-  // Listen for global mute changes
-  useEffect(() => {
-    const unsubscribe = globalAudio.subscribe((muted) => {
-      setIsGloballyMuted(muted);
-      // Pause playback if globally muted
-      if (muted && isPlaying) {
-        const audio = audioRef.current;
-        if (audio) {
-          audio.pause();
-          setIsPlaying(false);
-        }
-      }
-    });
-
-    return unsubscribe;
-  }, [isPlaying]);
 
   // Removed walkthrough tracking - was causing play button to be permanently disabled
 
@@ -403,10 +387,6 @@ export const TodaysPepTalk = memo(() => {
       audio.pause();
       setIsPlaying(false);
     } else {
-      // Don't play if globally muted
-      if (globalAudio.getMuted()) {
-        return;
-      }
       try {
         console.log('Attempting to play audio from:', pepTalk?.audio_url);
         await audio.play();
