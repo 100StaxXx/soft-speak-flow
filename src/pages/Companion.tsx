@@ -21,6 +21,7 @@ import { useState, memo, lazy, Suspense } from "react";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Memoized tab content to prevent unnecessary re-renders
 const OverviewTab = memo(({ 
@@ -75,17 +76,31 @@ const TabLoadingFallback = () => (
   </div>
 );
 
+// Inline skeleton for overview tab - matches layout to prevent shift
+const OverviewSkeleton = () => (
+  <div className="space-y-6 mt-6">
+    <div className="rounded-xl border border-cosmiq-glow/10 p-6">
+      <Skeleton className="h-48 w-48 rounded-full mx-auto" />
+      <Skeleton className="h-6 w-32 mx-auto mt-4" />
+    </div>
+    <Skeleton className="h-32 w-full rounded-xl" />
+    <Skeleton className="h-40 w-full rounded-xl" />
+    <Skeleton className="h-24 w-full rounded-xl" />
+  </div>
+);
+
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error, canEvolve, triggerManualEvolution, evolveCompanion } = useCompanion();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
 
-  // Show error state if query failed
-  if (error) {
-    return (
-      <PageTransition>
-      <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
+  // Render persistent layout - header/nav always visible, content swaps smoothly
+  const renderContent = () => {
+    // Error state
+    if (error) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center space-y-4 p-6">
             <Sparkles className="h-16 w-16 mx-auto text-destructive" />
             <h2 className="text-2xl font-bold">Error Loading Companion</h2>
@@ -100,27 +115,13 @@ const Companion = () => {
             </button>
           </div>
         </div>
-        <BottomNav />
-      </PageTransition>
-    );
-  }
+      );
+    }
 
-  // Show loading state while companion is being fetched
-  if (isLoading) {
-    return (
-      <PageTransition>
-        <StarfieldBackground />
-        <CompanionPageSkeleton />
-        <BottomNav />
-      </PageTransition>
-    );
-  }
-
-  // If companion doesn't exist after loading, redirect to onboarding
-  if (!companion) {
-    return (
-      <PageTransition>
-        <div className="min-h-screen bg-background pb-nav-safe flex items-center justify-center">
+    // No companion state
+    if (!isLoading && !companion) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center space-y-4 p-6">
             <Sparkles className="h-16 w-16 mx-auto text-primary" />
             <h2 className="text-2xl font-bold">No Companion Found</h2>
@@ -135,10 +136,94 @@ const Companion = () => {
             </button>
           </div>
         </div>
-        <BottomNav />
-      </PageTransition>
+      );
+    }
+
+    // Loading or loaded content with tabs
+    return (
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
+        <TabsList className="grid w-full grid-cols-5 cosmiq-glass-subtle border border-cosmiq-glow/20">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="focus" className="flex items-center gap-2">
+            <Timer className="h-4 w-4" />
+            <span className="hidden sm:inline">Focus</span>
+          </TabsTrigger>
+          <TabsTrigger value="stories" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            <span className="hidden sm:inline">Stories</span>
+          </TabsTrigger>
+          <TabsTrigger value="postcards" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            <span className="hidden sm:inline">Postcards</span>
+          </TabsTrigger>
+          <TabsTrigger value="collection" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span className="hidden sm:inline">Collection</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <AnimatePresence mode="wait">
+          {isLoading ? (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <OverviewSkeleton />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <TabsContent value="overview">
+                {activeTab === "overview" && (
+                  <OverviewTab 
+                    companion={companion} 
+                    nextEvolutionXP={nextEvolutionXP} 
+                    progressToNext={progressToNext}
+                    canEvolve={canEvolve}
+                    onEvolve={triggerManualEvolution}
+                    isEvolving={evolveCompanion.isPending}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="focus">
+                {activeTab === "focus" && <FocusTab />}
+              </TabsContent>
+
+              <TabsContent value="stories">
+                {activeTab === "stories" && (
+                  <Suspense fallback={<TabLoadingFallback />}>
+                    <LazyCompanionStoryJournal />
+                  </Suspense>
+                )}
+              </TabsContent>
+
+              <TabsContent value="postcards">
+                {activeTab === "postcards" && (
+                  <Suspense fallback={<TabLoadingFallback />}>
+                    <LazyCompanionPostcards />
+                  </Suspense>
+                )}
+              </TabsContent>
+
+              <TabsContent value="collection">
+                {activeTab === "collection" && <CollectionTab />}
+              </TabsContent>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Tabs>
     );
-  }
+  };
 
   return (
     <PageTransition>
@@ -153,67 +238,7 @@ const Companion = () => {
             </div>
           </header>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="container py-6">
-            <TabsList className="grid w-full grid-cols-5 cosmiq-glass-subtle border border-cosmiq-glow/20">
-              <TabsTrigger value="overview" className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Overview</span>
-              </TabsTrigger>
-              <TabsTrigger value="focus" className="flex items-center gap-2">
-                <Timer className="h-4 w-4" />
-                <span className="hidden sm:inline">Focus</span>
-              </TabsTrigger>
-              <TabsTrigger value="stories" className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Stories</span>
-              </TabsTrigger>
-              <TabsTrigger value="postcards" className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                <span className="hidden sm:inline">Postcards</span>
-              </TabsTrigger>
-              <TabsTrigger value="collection" className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                <span className="hidden sm:inline">Collection</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview">
-              {activeTab === "overview" && (
-                <OverviewTab 
-                  companion={companion} 
-                  nextEvolutionXP={nextEvolutionXP} 
-                  progressToNext={progressToNext}
-                  canEvolve={canEvolve}
-                  onEvolve={triggerManualEvolution}
-                  isEvolving={evolveCompanion.isPending}
-                />
-              )}
-            </TabsContent>
-
-            <TabsContent value="focus">
-              {activeTab === "focus" && <FocusTab />}
-            </TabsContent>
-
-            <TabsContent value="stories">
-              {activeTab === "stories" && (
-                <Suspense fallback={<TabLoadingFallback />}>
-                  <LazyCompanionStoryJournal />
-                </Suspense>
-              )}
-            </TabsContent>
-
-            <TabsContent value="postcards">
-              {activeTab === "postcards" && (
-                <Suspense fallback={<TabLoadingFallback />}>
-                  <LazyCompanionPostcards />
-                </Suspense>
-              )}
-            </TabsContent>
-
-            <TabsContent value="collection">
-              {activeTab === "collection" && <CollectionTab />}
-            </TabsContent>
-          </Tabs>
+          {renderContent()}
         </div>
       </CompanionErrorBoundary>
       <BottomNav />
