@@ -572,12 +572,64 @@ export const useTaskMutations = (taskDate: string) => {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onMutate: async (reorderedTasks: { id: string; sort_order: number }[]) => {
+      // Cancel outgoing refetches to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
+
+      // Snapshot previous values for rollback
+      const previousDailyTasks = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
+      const previousCalendarTasks = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
+
+      // Create a map of new sort orders
+      const sortOrderMap = new Map(reorderedTasks.map(t => [t.id, t.sort_order]));
+
+      // Optimistically update all daily-tasks queries
+      queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return [...old]
+          .map(task => ({
+            ...task,
+            sort_order: sortOrderMap.has(task.id) 
+              ? sortOrderMap.get(task.id) 
+              : task.sort_order
+          }))
+          .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+      });
+
+      // Optimistically update all calendar-tasks queries
+      queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return [...old]
+          .map(task => ({
+            ...task,
+            sort_order: sortOrderMap.has(task.id) 
+              ? sortOrderMap.get(task.id) 
+              : task.sort_order
+          }))
+          .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+      });
+
+      return { previousDailyTasks, previousCalendarTasks };
+    },
+    onError: (error: Error, _params, context) => {
+      // Rollback to previous state on error
+      if (context?.previousDailyTasks) {
+        context.previousDailyTasks.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousCalendarTasks) {
+        context.previousCalendarTasks.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      toast({ title: "Failed to reorder tasks", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      // Sync with server after mutation settles
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to reorder tasks", description: error.message, variant: "destructive" });
     },
   });
 
