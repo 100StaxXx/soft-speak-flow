@@ -116,7 +116,10 @@ export function TodaysAgenda({
   calendarMilestones = [],
   onDateSelect,
 }: TodaysAgendaProps) {
-  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('expanded_ritual_campaigns');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
@@ -128,6 +131,11 @@ export function TodaysAgenda({
   
   // Native task list container ref
   const nativeContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Persist expanded campaigns to localStorage
+  useEffect(() => {
+    localStorage.setItem('expanded_ritual_campaigns', JSON.stringify([...expandedCampaigns]));
+  }, [expandedCampaigns]);
   
   const toggleCampaign = (campaignId: string) => {
     setExpandedCampaigns(prev => {
