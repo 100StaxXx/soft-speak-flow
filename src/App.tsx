@@ -33,6 +33,7 @@ import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { LevelUpCelebration } from "@/components/LevelUpCelebration";
 import { useLevelUpTracker } from "@/hooks/useLevelUpTracker";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useAuthSync } from "@/hooks/useAuthSync";
 import { safeSessionStorage } from "@/utils/storage";
 
 // Lazy load pages for code splitting
@@ -160,6 +161,9 @@ const AppContent = memo(() => {
   const [splashHidden, setSplashHidden] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Sync auth state changes with query cache to prevent stale profile data
+  useAuthSync();
   
   // Ensure first app load starts on the Quests (Tasks) tab
   useEffect(() => {

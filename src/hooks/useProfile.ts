@@ -91,7 +91,7 @@ export const useProfile = () => {
       return data;
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes - cache profile data longer for better performance
+    staleTime: 2 * 60 * 1000, // 2 minutes - balance between performance and freshness
     refetchOnWindowFocus: false, // Prevent unnecessary refetches on tab switch
   });
 
