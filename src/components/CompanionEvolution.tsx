@@ -65,7 +65,7 @@ const EggCrackOverlay = ({ stage }: { stage: number }) => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: stage >= 2 ? 1 : 0 }}
-      className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center"
+      className="absolute inset-0 pointer-events-none z-5 flex items-center justify-center"
     >
       {/* Crack lines radiating from center */}
       <svg className="w-full h-full absolute" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
