@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ReactNode } from "react";
+import { ReactNode, memo } from "react";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -8,7 +8,7 @@ interface PageTransitionProps {
 // iOS-like easing curve
 const iosEasing = [0.25, 0.1, 0.25, 1] as const;
 
-export const PageTransition = ({ children }: PageTransitionProps) => {
+export const PageTransition = memo(({ children }: PageTransitionProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -20,9 +20,10 @@ export const PageTransition = ({ children }: PageTransitionProps) => {
       {children}
     </motion.div>
   );
-};
+});
+PageTransition.displayName = "PageTransition";
 
-export const FadeIn = ({ children, delay = 0 }: { children: ReactNode; delay?: number }) => {
+export const FadeIn = memo(({ children, delay = 0 }: { children: ReactNode; delay?: number }) => {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -32,9 +33,10 @@ export const FadeIn = ({ children, delay = 0 }: { children: ReactNode; delay?: n
       {children}
     </motion.div>
   );
-};
+});
+FadeIn.displayName = "FadeIn";
 
-export const ScaleIn = ({ children, delay = 0 }: { children: ReactNode; delay?: number }) => {
+export const ScaleIn = memo(({ children, delay = 0 }: { children: ReactNode; delay?: number }) => {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -44,9 +46,10 @@ export const ScaleIn = ({ children, delay = 0 }: { children: ReactNode; delay?: 
       {children}
     </motion.div>
   );
-};
+});
+ScaleIn.displayName = "ScaleIn";
 
-export const SlideUp = ({ children, delay = 0 }: { children: ReactNode; delay?: number }) => {
+export const SlideUp = memo(({ children, delay = 0 }: { children: ReactNode; delay?: number }) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -56,4 +59,5 @@ export const SlideUp = ({ children, delay = 0 }: { children: ReactNode; delay?: 
       {children}
     </motion.div>
   );
-};
+});
+SlideUp.displayName = "SlideUp";

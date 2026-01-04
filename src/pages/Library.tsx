@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,6 +44,7 @@ export default function Library() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch downloads
@@ -69,6 +70,7 @@ export default function Library() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch quote favorites with quote details
@@ -87,6 +89,7 @@ export default function Library() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch pep talk favorites with details
@@ -105,9 +108,10 @@ export default function Library() {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
-  const handleRemoveFavorite = async (favoriteId: string) => {
+  const handleRemoveFavorite = useCallback(async (favoriteId: string) => {
     try {
       const { error } = await supabase
         .from("favorites")
@@ -120,7 +124,7 @@ export default function Library() {
       toast.error("Failed to remove favorite");
       console.error(error);
     }
-  };
+  }, []);
 
   return (
     <PageTransition>

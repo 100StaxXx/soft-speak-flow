@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -224,8 +224,21 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     );
   }
 
-  // Simple loading fallback
-  const ComponentLoader = () => <div className="h-20" />;
+  // Simple loading fallback - memoized
+  const ComponentLoader = memo(() => <div className="h-20" />);
+  ComponentLoader.displayName = "ComponentLoader";
+
+  // Memoized insight action handler
+  const onInsightAction = useCallback((insight: { actionType?: string }) => {
+    switch (insight.actionType) {
+      case 'reschedule':
+      case 'add_break':
+      case 'simplify':
+      case 'celebrate':
+      default:
+        navigate('/journeys');
+    }
+  }, [navigate]);
 
   return (
     <PageTransition>
@@ -295,22 +308,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             <ErrorBoundary>
               <DailyCoachPanel 
                 maxInsights={3} 
-                onInsightAction={(insight) => {
-                  // Route actions to appropriate behavior based on actionType
-                  switch (insight.actionType) {
-                    case 'reschedule':
-                    case 'add_break':
-                    case 'simplify':
-                      navigate('/journeys');
-                      break;
-                    case 'celebrate':
-                      // Could show celebration modal, for now navigate to journeys
-                      navigate('/journeys');
-                      break;
-                    default:
-                      navigate('/journeys');
-                  }
-                }}
+                onInsightAction={onInsightAction}
               />
             </ErrorBoundary>
           </ParallaxCard>
