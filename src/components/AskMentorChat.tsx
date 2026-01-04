@@ -3,7 +3,8 @@ import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2, WifiOff, AlertCircle } from "lucide-react";
+import { Send, WifiOff, AlertCircle } from "lucide-react";
+import { MentorResponseLoader } from "./MentorResponseLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -340,8 +341,7 @@ export const AskMentorChat = ({
 
         {isLoading && (
           <Card className="p-4 mr-8">
-            <div className="font-semibold mb-1 text-sm">{mentorName}</div>
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <MentorResponseLoader mentorName={mentorName} />
           </Card>
         )}
         
