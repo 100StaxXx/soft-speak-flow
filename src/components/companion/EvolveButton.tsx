@@ -26,8 +26,8 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
         {...handlers}
         disabled={isEvolving}
         className="
-          relative w-full py-4 rounded-xl
-          font-heading font-black text-xl sm:text-2xl tracking-[0.2em]
+          relative w-full py-5 rounded-xl
+          font-heading font-black text-3xl sm:text-4xl tracking-[0.35em]
           uppercase overflow-hidden
           transition-all duration-300
           hover:scale-[1.02] active:scale-[0.98]
@@ -66,6 +66,28 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
             background: "linear-gradient(135deg, rgba(255,255,255,0.3) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.15) 100%)",
           }}
         />
+
+        {/* Shimmer sweep effect */}
+        <div 
+          className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden"
+        >
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+              animation: "shimmer-sweep 2s ease-in-out infinite",
+            }}
+          />
+        </div>
+
+        {/* Sparkle particles */}
+        <div className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden">
+          <div className="absolute w-1 h-1 bg-white rounded-full animate-sparkle-1" style={{ top: '20%', left: '15%' }} />
+          <div className="absolute w-1.5 h-1.5 bg-white rounded-full animate-sparkle-2" style={{ top: '60%', left: '75%' }} />
+          <div className="absolute w-1 h-1 bg-white rounded-full animate-sparkle-3" style={{ top: '40%', left: '45%' }} />
+          <div className="absolute w-0.5 h-0.5 bg-white rounded-full animate-sparkle-4" style={{ top: '70%', left: '25%' }} />
+          <div className="absolute w-1 h-1 bg-white rounded-full animate-sparkle-5" style={{ top: '30%', left: '85%' }} />
+        </div>
 
         {/* Rainbow border glow */}
         <div 
