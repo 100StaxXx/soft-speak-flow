@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,7 +11,7 @@ import { User, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
-export const DisplayNameSetting = () => {
+export const DisplayNameSetting = memo(() => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
@@ -150,4 +150,5 @@ export const DisplayNameSetting = () => {
       </CardContent>
     </Card>
   );
-};
+});
+DisplayNameSetting.displayName = 'DisplayNameSetting';

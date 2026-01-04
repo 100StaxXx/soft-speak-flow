@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Bell, Sparkles, Target, TrendingUp, MessageCircle } from "lucide-react";
 
@@ -40,7 +41,7 @@ const exampleNotifications: NotificationExample[] = [
   }
 ];
 
-export const NotificationPreview = () => {
+export const NotificationPreview = memo(() => {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -90,4 +91,5 @@ export const NotificationPreview = () => {
       </div>
     </div>
   );
-};
+});
+NotificationPreview.displayName = 'NotificationPreview';

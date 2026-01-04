@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 
-export const DailyQuoteSettings = () => {
+export const DailyQuoteSettings = memo(() => {
   const { user } = useAuth();
   const { profile } = useProfile();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -154,4 +154,5 @@ export const DailyQuoteSettings = () => {
       </div>
     </Card>
   );
-};
+});
+DailyQuoteSettings.displayName = 'DailyQuoteSettings';
