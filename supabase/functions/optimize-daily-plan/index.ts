@@ -46,49 +46,96 @@ interface Task {
   category: string | null;
 }
 
-// Score a time slot for a given task
-function scoreSlot(hour: number, task: Task, peakTimes: number[]): { score: number; reason: string } {
+// Score a time slot for a given task with learned patterns
+function scoreSlot(
+  hour: number, 
+  task: Task, 
+  peakTimes: number[], 
+  workStyle: string | null,
+  schedulingPatterns: Record<string, unknown> | null
+): { score: number; reason: string } {
   let score = 50;
   let reasons: string[] = [];
 
-  // Hard tasks in morning get bonus
-  if (task.difficulty === 'hard' && hour < 12) {
-    score += 25;
-    reasons.push('Morning focus for hard task');
-  } else if (task.difficulty === 'hard' && hour >= 14) {
-    score -= 10;
+  // Use learned average completion hours by difficulty
+  const avgHours = (schedulingPatterns?.avgCompletionHour as Record<string, number>) || {};
+  if (avgHours[task.difficulty || 'medium']) {
+    const optimalHour = avgHours[task.difficulty || 'medium'];
+    const distance = Math.abs(hour - optimalHour);
+    const learningBonus = Math.max(0, 25 - distance * 4);
+    if (learningBonus > 0) {
+      score += learningBonus;
+      reasons.push('Matches your patterns');
+    }
   }
 
-  // Easy tasks can go in afternoon
-  if (task.difficulty === 'easy' && hour >= 14) {
-    score += 10;
-    reasons.push('Afternoon slot for easy task');
+  // Work style specific adjustments
+  if (workStyle === 'traditional') {
+    // 9-5 workers: protect lunch, end by 5pm
+    if (hour === 12 || hour === 13) {
+      score -= 30;
+      // Don't add reason for penalty
+    }
+    if (hour >= 17) {
+      score -= 20;
+    }
+    if (task.difficulty === 'hard' && hour >= 9 && hour <= 11) {
+      score += 25;
+      reasons.push('Morning focus for deep work');
+    }
+  } else if (workStyle === 'entrepreneur') {
+    // Entrepreneurs: heavily weight personal peak times
+    if (peakTimes.includes(hour)) {
+      score += 35;
+      reasons.push('Your peak productivity time');
+    }
+    // Evening work is okay for entrepreneurs
+    if (hour >= 19 && hour <= 22) {
+      score += 5; // Small bonus instead of penalty
+    }
+  } else if (workStyle === 'hybrid') {
+    // Hybrid: balanced approach
+    if (peakTimes.includes(hour)) {
+      score += 25;
+      reasons.push('Peak productivity time');
+    }
   }
 
-  // Peak productivity match
-  if (peakTimes.includes(hour)) {
+  // Fallback: Default difficulty-based scoring
+  if (reasons.length === 0) {
+    if (task.difficulty === 'hard' && hour < 12) {
+      score += 20;
+      reasons.push('Morning focus for hard task');
+    } else if (task.difficulty === 'hard' && hour >= 14) {
+      score -= 10;
+    }
+
+    if (task.difficulty === 'easy' && hour >= 14) {
+      score += 10;
+      reasons.push('Afternoon slot for easy task');
+    }
+  }
+
+  // Peak productivity match (if not already added by work style)
+  if (peakTimes.includes(hour) && !reasons.some(r => r.includes('peak'))) {
     score += 20;
-    reasons.push('Peak productivity time');
+    if (reasons.length === 0) reasons.push('Peak productivity time');
   }
 
   // Prime morning hours
-  if (hour >= 9 && hour <= 11) {
+  if (hour >= 9 && hour <= 11 && reasons.length === 0) {
     score += 15;
-    if (!reasons.includes('Peak productivity time')) {
-      reasons.push('Prime morning hours');
-    }
+    reasons.push('Prime morning hours');
   }
 
   // Afternoon focus window
-  if (hour >= 14 && hour <= 16) {
+  if (hour >= 14 && hour <= 16 && reasons.length === 0) {
     score += 5;
-    if (reasons.length === 0) {
-      reasons.push('Afternoon focus window');
-    }
+    reasons.push('Afternoon focus window');
   }
 
-  // Avoid late evening for hard tasks
-  if (hour >= 20 && task.difficulty === 'hard') {
+  // Avoid late evening for hard tasks (unless entrepreneur)
+  if (hour >= 20 && task.difficulty === 'hard' && workStyle !== 'entrepreneur') {
     score -= 15;
   }
 
@@ -127,6 +174,13 @@ function findAvailableSlots(
   return available;
 }
 
+// Clarification answers from Plan My Day flow
+interface ClarificationAnswers {
+  energyLevel?: 'low' | 'medium' | 'high';
+  prioritizedEpicId?: string | null;
+  protectStreaks?: boolean;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -156,11 +210,20 @@ serve(async (req) => {
       );
     }
 
+    // Parse optional clarification answers from request body
+    let clarification: ClarificationAnswers = {};
+    try {
+      const body = await req.json();
+      clarification = body || {};
+    } catch {
+      // No body = use defaults
+    }
+
     const userId = user.id;
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    console.log(`Generating daily plan optimization for user: ${userId}`);
+    console.log(`Generating daily plan optimization for user: ${userId}, clarification:`, clarification);
 
     // Fetch today's data in parallel
     const [
@@ -206,10 +269,10 @@ serve(async (req) => {
         .eq('user_id', userId)
         .gte('task_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
       
-      // AI learning profile
+      // AI learning profile with scheduling patterns
       supabase
         .from('user_ai_learning')
-        .select('preferred_habit_difficulty, successful_patterns, failed_patterns, peak_productivity_times')
+        .select('preferred_habit_difficulty, successful_patterns, failed_patterns, peak_productivity_times, inferred_work_style, work_style_confidence, scheduling_patterns, day_of_week_patterns')
         .eq('user_id', userId)
         .maybeSingle(),
     ]);
@@ -384,20 +447,66 @@ serve(async (req) => {
     const suggestedSchedule: SuggestedScheduleItem[] = [];
     const unscheduledTasks = todayTasks.filter(t => !t.scheduled_time && !t.completed);
     
+    // Get inferred work style and patterns
+    const workStyle = (learning?.inferred_work_style as string) || null;
+    const schedulingPatterns = (learning?.scheduling_patterns as Record<string, unknown>) || null;
+    
+    // Apply clarification answers to task scoring
+    const taskScoreModifiers: Record<string, number> = {};
+    
+    if (clarification.energyLevel === 'low') {
+      // Low energy: prioritize easy tasks, limit hard ones
+      todayTasks.forEach(t => {
+        if (t.difficulty === 'hard') taskScoreModifiers[t.id] = -30;
+        if (t.difficulty === 'easy') taskScoreModifiers[t.id] = 20;
+      });
+    } else if (clarification.energyLevel === 'high') {
+      // High energy: tackle hard stuff
+      todayTasks.forEach(t => {
+        if (t.difficulty === 'hard') taskScoreModifiers[t.id] = 25;
+      });
+    }
+    
+    // Prioritize specific epic's tasks
+    if (clarification.prioritizedEpicId) {
+      const epicTasks = todayTasks.filter(t => (t as any).epic_id === clarification.prioritizedEpicId);
+      epicTasks.forEach(t => {
+        taskScoreModifiers[t.id] = (taskScoreModifiers[t.id] || 0) + 30;
+      });
+    }
+    
+    // Protect streaks - boost habit-sourced tasks
+    if (clarification.protectStreaks) {
+      const habitTasks = todayTasks.filter(t => (t as any).habit_source_id);
+      habitTasks.forEach(t => {
+        taskScoreModifiers[t.id] = (taskScoreModifiers[t.id] || 0) + 40;
+      });
+    }
+    
     if (unscheduledTasks.length > 0) {
       const scheduledTasks = todayTasks.filter(t => t.scheduled_time);
-      const availableHours = findAvailableSlots(scheduledTasks);
+      let availableHours = findAvailableSlots(scheduledTasks);
+      
+      // Work style adjustments to available hours
+      if (workStyle === 'traditional') {
+        // Block lunch hour for 9-5 workers
+        availableHours = availableHours.filter(h => h !== 12 && h !== 13);
+      }
       
       // Get user's peak productivity times or use defaults
       const peakTimes: number[] = (learning?.peak_productivity_times as number[]) || [9, 10, 14];
       
-      console.log(`Found ${unscheduledTasks.length} unscheduled tasks, ${availableHours.length} available hours`);
+      console.log(`Found ${unscheduledTasks.length} unscheduled tasks, ${availableHours.length} available hours, workStyle: ${workStyle}`);
 
-      // Score and sort tasks by priority (hard first, then by category)
+      // Score and sort tasks by priority (apply modifiers too)
       const sortedUnscheduled = [...unscheduledTasks].sort((a, b) => {
         const difficultyOrder: Record<string, number> = { hard: 0, medium: 1, easy: 2 };
         const aDiff = difficultyOrder[a.difficulty || 'medium'] ?? 1;
         const bDiff = difficultyOrder[b.difficulty || 'medium'] ?? 1;
+        const aModifier = taskScoreModifiers[a.id] || 0;
+        const bModifier = taskScoreModifiers[b.id] || 0;
+        // Higher modifier = higher priority (comes first)
+        if (bModifier !== aModifier) return bModifier - aModifier;
         return aDiff - bDiff;
       });
 
@@ -405,12 +514,12 @@ serve(async (req) => {
       const usedHours = new Set<number>();
 
       for (const task of sortedUnscheduled.slice(0, 5)) {
-        // Score each available hour for this task
+        // Score each available hour for this task with work style awareness
         const scoredSlots = availableHours
           .filter(h => !usedHours.has(h))
           .map(hour => ({
             hour,
-            ...scoreSlot(hour, task, peakTimes),
+            ...scoreSlot(hour, task, peakTimes, workStyle, schedulingPatterns),
           }))
           .sort((a, b) => b.score - a.score);
 

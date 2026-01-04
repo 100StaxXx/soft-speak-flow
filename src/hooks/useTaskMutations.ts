@@ -7,6 +7,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import React, { useRef, createElement } from "react";
 import { getEffectiveQuestXP } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
@@ -58,6 +59,7 @@ export const useTaskMutations = (taskDate: string) => {
   const { updateBodyFromActivity } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
+  const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
 
   const addInProgress = useRef(false);
 
@@ -182,9 +184,18 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({ title: "Task added successfully!" });
       window.dispatchEvent(new CustomEvent('task-added'));
+      
+      // Track task creation for learning
+      if (data) {
+        trackTaskCreation(
+          data.scheduled_time,
+          data.difficulty || 'medium',
+          data.category
+        );
+      }
     },
   });
 
@@ -204,7 +215,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       const { data: existingTask, error: existingError } = await supabase
         .from('daily_tasks')
-        .select('completed_at, task_text, habit_source_id, task_date')
+        .select('completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category')
         .eq('id', taskId)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -306,9 +317,26 @@ export const useTaskMutations = (taskDate: string) => {
         }
       }
 
-      return { taskId, completed: true, xpAwarded: totalXP, bonusXP, toastReason, wasAlreadyCompleted, isUndo: false, taskText, habitSourceId };
+      const taskDifficulty = existingTask?.difficulty || 'medium';
+      const taskScheduledTime = existingTask?.scheduled_time || null;
+      const taskCategory = existingTask?.category || null;
+
+      return { 
+        taskId, 
+        completed: true, 
+        xpAwarded: totalXP, 
+        bonusXP, 
+        toastReason, 
+        wasAlreadyCompleted, 
+        isUndo: false, 
+        taskText, 
+        habitSourceId,
+        taskDifficulty,
+        taskScheduledTime,
+        taskCategory,
+      };
     },
-    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId }) => {
+    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId, taskDifficulty, taskScheduledTime, taskCategory }) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
 
@@ -338,6 +366,21 @@ export const useTaskMutations = (taskDate: string) => {
         }
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));
+
+        // Track completion for scheduling learner
+        const now = new Date();
+        trackTaskCompletion({
+          taskId,
+          completedAt: now.toISOString(),
+          difficulty: taskDifficulty || 'medium',
+          scheduledTime: taskScheduledTime,
+          actualCompletionHour: now.getHours(),
+          dayOfWeek: now.getDay(),
+          wasOnTime: taskScheduledTime 
+            ? Math.abs(parseInt(taskScheduledTime.split(':')[0]) - now.getHours()) <= 1 
+            : null,
+          category: taskCategory || undefined,
+        });
 
         // Show undo toast with 5-second window
         toast({
