@@ -52,6 +52,7 @@ export interface ParsedTask {
   // AI triggers
   triggerDecomposition: boolean;
   triggerPlanMyDay: boolean;
+  triggerPlanMyWeek: boolean;
 }
 
 // Month name to number mapping
@@ -417,6 +418,16 @@ const PLAN_MY_DAY_PATTERNS = [
   { regex: /\bauto[- ]?schedule\b/i, trigger: true },
 ];
 
+// Plan My Week patterns
+const PLAN_MY_WEEK_PATTERNS = [
+  { regex: /\b(?:plan|schedule|organize|optimise|optimize)\s*(?:my|the|this)?\s*week\b/i, trigger: true },
+  { regex: /\bweekly\s*(?:plan|planning|schedule)\b/i, trigger: true },
+  { regex: /\bwhat\s*should\s*I\s*do\s*this\s*week\b/i, trigger: true },
+  { regex: /\b(?:build|create|make)\s*(?:my|a)?\s*weekly\s*(?:plan|schedule)\b/i, trigger: true },
+  { regex: /\bplan\s*(?:out\s*)?(?:the\s*)?(?:next\s*)?(?:7|seven)\s*days?\b/i, trigger: true },
+  { regex: /\bweek\s*ahead\b/i, trigger: true },
+];
+
 function cleanTaskText(text: string): string {
   let cleaned = text;
 
@@ -441,6 +452,7 @@ function cleanTaskText(text: string): string {
     ...RENAME_PATTERNS.map(p => p.regex),
     ...DECOMPOSITION_PATTERNS.map(p => p.regex),
     ...PLAN_MY_DAY_PATTERNS.map(p => p.regex),
+    ...PLAN_MY_WEEK_PATTERNS.map(p => p.regex),
   ];
 
   patternsToRemove.forEach(pattern => {
@@ -492,6 +504,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     newTitle: null,
     triggerDecomposition: false,
     triggerPlanMyDay: false,
+    triggerPlanMyWeek: false,
   };
 
   // Parse clear patterns first
@@ -657,11 +670,21 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     }
   }
 
-  // Parse plan my day
-  for (const pattern of PLAN_MY_DAY_PATTERNS) {
+  // Parse plan my week (check first, more specific)
+  for (const pattern of PLAN_MY_WEEK_PATTERNS) {
     if (pattern.regex.test(input)) {
-      result.triggerPlanMyDay = pattern.trigger;
+      result.triggerPlanMyWeek = pattern.trigger;
       break;
+    }
+  }
+
+  // Parse plan my day (only if not already week)
+  if (!result.triggerPlanMyWeek) {
+    for (const pattern of PLAN_MY_DAY_PATTERNS) {
+      if (pattern.regex.test(input)) {
+        result.triggerPlanMyDay = pattern.trigger;
+        break;
+      }
     }
   }
 

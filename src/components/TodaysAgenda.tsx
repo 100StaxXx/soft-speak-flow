@@ -45,6 +45,7 @@ import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
+import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 interface Task {
   id: string;
@@ -93,6 +94,7 @@ interface TodaysAgendaProps {
   onDateSelect?: (date: Date) => void;
   onQuickAdd?: (parsed: ParsedTask) => void;
   onPlanMyDay?: (answers: PlanMyDayAnswers) => void;
+  onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
   activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
   habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
 }
@@ -124,6 +126,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onDateSelect,
   onQuickAdd,
   onPlanMyDay,
+  onPlanMyWeek,
   activeEpics = [],
   habitsAtRisk = [],
 }: TodaysAgendaProps) {
@@ -694,6 +697,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       <CompactSmartInput
                         onSubmit={onQuickAdd}
                         onPlanMyDay={onPlanMyDay}
+                        onPlanMyWeek={onPlanMyWeek}
                         activeEpics={activeEpics}
                         habitsAtRisk={habitsAtRisk}
                         placeholder="Add quest..."

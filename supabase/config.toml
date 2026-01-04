@@ -263,3 +263,6 @@ verify_jwt = true
 
 [functions.analyze-user-patterns]
 verify_jwt = true
+
+[functions.optimize-weekly-plan]
+verify_jwt = true
