@@ -32,7 +32,7 @@ export const TimedCaptions = ({ transcript, currentTime, className }: TimedCapti
   }, [currentTime, transcript, activeWordIndex]);
 
   useEffect(() => {
-    // Auto-scroll to active word
+    // Auto-scroll to keep active word in upper portion of container
     if (activeWordRef.current && containerRef.current) {
       const container = containerRef.current;
       const activeWord = activeWordRef.current;
@@ -40,11 +40,19 @@ export const TimedCaptions = ({ transcript, currentTime, className }: TimedCapti
       const containerRect = container.getBoundingClientRect();
       const wordRect = activeWord.getBoundingClientRect();
       
-      // Check if word is out of view
-      if (wordRect.top < containerRect.top || wordRect.bottom > containerRect.bottom) {
-        activeWord.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
+      // Calculate the word's position relative to the container
+      const wordOffsetTop = wordRect.top - containerRect.top;
+      const containerHeight = containerRect.height;
+      
+      // Keep active word in the top third of the container
+      const targetPosition = containerHeight * 0.3;
+      
+      // If word is below the target position or out of view, scroll
+      if (wordOffsetTop > targetPosition || wordRect.bottom > containerRect.bottom || wordRect.top < containerRect.top) {
+        const scrollOffset = activeWord.offsetTop - container.offsetTop - targetPosition;
+        container.scrollTo({
+          top: Math.max(0, scrollOffset),
+          behavior: 'smooth'
         });
       }
     }
