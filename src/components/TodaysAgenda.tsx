@@ -370,8 +370,9 @@ export function TodaysAgenda({
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
         <div
           className={cn(
-            "flex items-center gap-3 py-2 transition-all relative group",
+            "flex items-center gap-3 transition-all relative group",
             "select-none",
+            isRitual ? "py-3.5" : "py-2",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
             isActivated && !isDragging && "bg-muted/30 rounded-lg -mx-1 px-1",
@@ -806,13 +807,15 @@ export function TodaysAgenda({
                         </div>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="pl-4 border-l border-accent/20 ml-2">
+                        <div className="pl-4 border-l border-accent/20 ml-2 pb-2">
                           {group.tasks.map((task) => renderTaskItem(task))}
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
                   );
                 })}
+                {/* Safe area for bottom navigation */}
+                <div className="h-4" />
               </>
             )}
           </div>
