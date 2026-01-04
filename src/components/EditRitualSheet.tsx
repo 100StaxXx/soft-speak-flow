@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Repeat, Loader2, Brain, Dumbbell, Flame, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +77,7 @@ const categoryConfig: Record<HabitCategory, { icon: typeof Brain; label: string;
   soul: { icon: Flame, label: 'Soul', color: 'text-orange-500 border-orange-500/50 bg-orange-500/10' },
 };
 
-export function EditRitualSheet({
+export const EditRitualSheet = memo(function EditRitualSheet({
   ritual,
   open,
   onOpenChange,
@@ -463,4 +463,4 @@ export function EditRitualSheet({
       </AlertDialog>
     </Sheet>
   );
-}
+});

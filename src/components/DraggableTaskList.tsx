@@ -1,4 +1,4 @@
-import { useState, useCallback, ReactNode, useRef, useEffect } from "react";
+import { useState, useCallback, ReactNode, useRef, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { GripVertical } from "lucide-react";
@@ -35,7 +35,7 @@ const ROW_HEIGHT = 56; // Fixed row height for calculations
 const LONG_PRESS_DURATION = 500;
 const SWAP_THRESHOLD = 0.6; // 60% hysteresis
 
-export function DraggableTaskList<T extends { id: string }>({
+function DraggableTaskListInner<T extends { id: string }>({
   tasks,
   onReorder,
   renderItem,
@@ -425,3 +425,6 @@ export function DraggableTaskList<T extends { id: string }>({
     </div>
   );
 }
+
+// Memoized export
+export const DraggableTaskList = memo(DraggableTaskListInner) as typeof DraggableTaskListInner;

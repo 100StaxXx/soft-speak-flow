@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Snowflake, Flame, AlertTriangle, Sparkles } from "lucide-react";
@@ -13,7 +13,7 @@ interface StreakFreezePromptModalProps {
   isResolving: boolean;
 }
 
-export function StreakFreezePromptModal({
+export const StreakFreezePromptModal = memo(function StreakFreezePromptModal({
   open,
   currentStreak,
   freezesAvailable,
@@ -146,4 +146,4 @@ export function StreakFreezePromptModal({
       </DialogContent>
     </Dialog>
   );
-}
+});

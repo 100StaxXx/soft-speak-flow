@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback, memo } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -99,7 +99,7 @@ const formatTime = (time: string) => {
   return `${displayHour}:${minutes} ${ampm}`;
 };
 
-export function TodaysAgenda({
+export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
   onToggle,
@@ -882,4 +882,4 @@ export function TodaysAgenda({
       />
     </div>
   );
-}
+});

@@ -160,7 +160,7 @@ const Journeys = () => {
     return map;
   }, [allCalendarTasks]);
 
-  const handleAddQuest = async (data: AddQuestData) => {
+  const handleAddQuest = useCallback(async (data: AddQuestData) => {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
     await addTask({
       taskText: data.text,
@@ -175,20 +175,20 @@ const Journeys = () => {
       reminderMinutesBefore: data.reminderMinutesBefore,
     });
     setShowAddSheet(false);
-  };
+  }, [selectedDate, addTask]);
 
-  const handleToggleTask = (taskId: string, completed: boolean, xpReward: number) => {
+  const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number) => {
     if (completed) {
       recordCompletion(); // Track combo for consecutive completions
     }
     toggleTask({ taskId, completed, xpReward });
-  };
+  }, [recordCompletion, toggleTask]);
   
-  const handleUndoToggle = (taskId: string, xpReward: number) => {
+  const handleUndoToggle = useCallback((taskId: string, xpReward: number) => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
-  };
+  }, [toggleTask]);
   
-  const handleEditQuest = (task: {
+  const handleEditQuest = useCallback((task: {
     id: string;
     task_text: string;
     difficulty?: string | null;
@@ -222,9 +222,9 @@ const Journeys = () => {
       // Regular quest - use the standard edit dialog
       setEditingTask(task);
     }
-  };
+  }, []);
   
-  const handleSaveEdit = async (taskId: string, updates: {
+  const handleSaveEdit = useCallback(async (taskId: string, updates: {
     task_text: string;
     difficulty: string;
     scheduled_time: string | null;
@@ -237,14 +237,14 @@ const Journeys = () => {
   }) => {
     await updateTask({ taskId, updates });
     setEditingTask(null);
-  };
+  }, [updateTask]);
 
-  const handleDeleteQuest = async (taskId: string) => {
+  const handleDeleteQuest = useCallback(async (taskId: string) => {
     await deleteTask(taskId);
     setEditingTask(null);
-  };
+  }, [deleteTask]);
 
-  const handleDeleteRitual = async (habitId: string) => {
+  const handleDeleteRitual = useCallback(async (habitId: string) => {
     if (!user?.id) return;
     try {
       // Delete the habit template
@@ -279,16 +279,16 @@ const Journeys = () => {
       toast.error('Failed to delete ritual');
     }
     setEditingRitual(null);
-  };
+  }, [user?.id, queryClient]);
 
   // Handle task reordering from drag and drop
-  const handleReorderTasks = (reorderedTasks: typeof dailyTasks) => {
+  const handleReorderTasks = useCallback((reorderedTasks: typeof dailyTasks) => {
     const updates = reorderedTasks.map((task, index) => ({
       id: task.id,
       sort_order: index,
     }));
     reorderTasks(updates);
-  };
+  }, [reorderTasks]);
 
   // Handle moving task to a different date (cross-day drag)
   const handleMoveTaskToDate = useCallback((taskId: string, targetDate: Date) => {

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Flame, Zap, Star } from "lucide-react";
 import confetti from "canvas-confetti";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { haptics } from "@/utils/haptics";
 
 interface ComboCounterProps {
@@ -45,7 +45,7 @@ const tierStyles: Record<ComboTier, { bg: string; text: string; glow: string; ic
   },
 };
 
-export function ComboCounter({ count, show, bonusXP }: ComboCounterProps) {
+export const ComboCounter = memo(function ComboCounter({ count, show, bonusXP }: ComboCounterProps) {
   const lastMilestoneRef = useRef(0);
   const tier = getComboTier(count);
   const styles = tierStyles[tier];
@@ -160,4 +160,4 @@ export function ComboCounter({ count, show, bonusXP }: ComboCounterProps) {
       </div>
     </div>
   );
-}
+});
