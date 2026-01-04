@@ -1,6 +1,6 @@
 import { memo } from "react";
-import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEvolveLongPress } from "@/hooks/useEvolveLongPress";
 
 interface EvolveButtonProps {
   onEvolve: () => void;
@@ -8,6 +8,12 @@ interface EvolveButtonProps {
 }
 
 export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) => {
+  const { progress, isHolding, handlers } = useEvolveLongPress({
+    onComplete: onEvolve,
+    duration: 1500,
+    disabled: isEvolving,
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -20, scale: 0.95 }}
@@ -17,7 +23,7 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
       className="container py-4"
     >
       <button
-        onClick={onEvolve}
+        {...handlers}
         disabled={isEvolving}
         className="
           relative w-full py-5 rounded-2xl
@@ -28,6 +34,7 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           hover:scale-[1.02] active:scale-[0.98]
           disabled:cursor-not-allowed disabled:opacity-80
           evolve-button-rainbow
+          touch-none select-none
         "
         style={{
           background: "linear-gradient(135deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0080ff, #8000ff, #ff0080, #ff0000)",
@@ -35,14 +42,28 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           animation: "rainbow-shift 3s ease infinite, pulse-glow 2s ease-in-out infinite",
         }}
       >
-        {/* Underglow effect */}
+        {/* Fill overlay - rises from bottom */}
+        <motion.div
+          className="absolute inset-0 rounded-2xl pointer-events-none"
+          style={{
+            background: "linear-gradient(to top, rgba(255,255,255,0.5), rgba(255,255,255,0.9))",
+            clipPath: `inset(${100 - progress}% 0 0 0)`,
+          }}
+          animate={{
+            opacity: isHolding ? 1 : 0,
+          }}
+          transition={{ duration: 0.1 }}
+        />
+
+        {/* Underglow effect - intensifies with progress */}
         <div 
-          className="absolute inset-0 -z-10 blur-xl opacity-70 rounded-2xl"
+          className="absolute inset-0 -z-10 blur-xl rounded-2xl transition-opacity duration-100"
           style={{
             background: "linear-gradient(135deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0080ff, #8000ff, #ff0080, #ff0000)",
             backgroundSize: "400% 400%",
             animation: "rainbow-shift 3s ease infinite",
             transform: "translateY(8px) scaleX(0.95)",
+            opacity: 0.7 + (progress / 100) * 0.3,
           }}
         />
         
@@ -51,18 +72,9 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
         
         {/* Content */}
         <span className="relative z-10 flex items-center justify-center gap-3">
-          {isEvolving ? (
-            <>
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <span>EVOLVING...</span>
-            </>
-          ) : (
-            <>
-              <span className="text-2xl">✨</span>
-              <span>EVOLVE</span>
-              <span className="text-2xl">✨</span>
-            </>
-          )}
+          <span className="text-2xl">✨</span>
+          <span>{isHolding ? "HOLD TO EVOLVE" : "EVOLVE"}</span>
+          <span className="text-2xl">✨</span>
         </span>
       </button>
     </motion.div>
