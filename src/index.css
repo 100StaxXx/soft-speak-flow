@@ -45,6 +45,39 @@
   }
 }
 
+/* Sparkle animations for evolve button */
+@keyframes evolve-sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-sparkle-1 {
+  animation: evolve-sparkle 1.5s ease-in-out infinite;
+  animation-delay: 0s;
+}
+.animate-sparkle-2 {
+  animation: evolve-sparkle 1.8s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+.animate-sparkle-3 {
+  animation: evolve-sparkle 1.4s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+.animate-sparkle-4 {
+  animation: evolve-sparkle 2s ease-in-out infinite;
+  animation-delay: 0.9s;
+}
+.animate-sparkle-5 {
+  animation: evolve-sparkle 1.6s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
 /* Subtle shimmer animation */
 @keyframes glass-shimmer {
   0%, 100% { 
