@@ -48,7 +48,7 @@ const HelpCenter = () => {
       items: [
         {
           title: "What is Cosmiq?",
-          content: "Cosmiq is your personal growth companion app that combines AI mentorship, habit tracking, and a gamified companion system. Your journey is guided by AI mentors who provide personalized wisdom, while your companion evolves as you complete daily quests and build positive habits. Think of it as having a wise mentor and a loyal sidekick helping you become your best self."
+          content: "Cosmiq is your personal growth companion app that combines mentorship, habit tracking, and a gamified companion system. Your journey is guided by mentors who provide personalized wisdom, while your companion evolves as you complete daily quests and build positive habits. Think of it as having a wise mentor and a loyal sidekick helping you become your best self."
         },
         {
           title: "How does my Companion work?",
@@ -170,13 +170,13 @@ const HelpCenter = () => {
     },
     {
       id: "mentors",
-      title: "AI Mentors",
+      title: "Mentors",
       icon: MessageCircle,
       color: "text-blue-400",
       items: [
         {
           title: "Choosing a Mentor",
-          content: "Cosmiq offers multiple AI mentors, each with unique personalities and wisdom styles. From stoic philosophers to motivational coaches, find a mentor whose voice resonates with you. Browse all mentors in Command Center or retake the mentor quiz for a new recommendation."
+          content: "Cosmiq offers multiple mentors, each with unique personalities and wisdom styles. From stoic philosophers to motivational coaches, find a mentor whose voice resonates with you. Browse all mentors in Command Center or retake the mentor quiz for a new recommendation."
         },
         {
           title: "Mentor Chat",

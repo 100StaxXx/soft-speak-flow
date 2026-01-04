@@ -203,7 +203,7 @@ export default function Premium() {
                 },
                 {
                   icon: Zap,
-                  title: "AI Mentor Chat",
+                  title: "Mentor Chat",
                   description: "Unlimited personalized guidance from your chosen mentor"
                 },
                 {
