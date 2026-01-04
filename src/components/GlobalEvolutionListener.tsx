@@ -19,6 +19,7 @@ export const GlobalEvolutionListener = () => {
     stage: number; 
     imageUrl: string;
     mentorSlug?: string;
+    element?: string;
   } | null>(null);
   const [previousStage, setPreviousStage] = useState<number | null>(null);
 
@@ -64,18 +65,26 @@ export const GlobalEvolutionListener = () => {
               return;
             }
 
-            // Fetch the latest evolution record to ensure we have the correct image
-            const { data: evolutionRecord } = await supabase
-              .from('companion_evolutions')
-              .select('image_url')
-              .eq('companion_id', companionId)
-              .eq('stage', newStage)
-              .order('evolved_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
+            // Fetch the latest evolution record and companion data for element
+            const [evolutionResult, companionResult] = await Promise.all([
+              supabase
+                .from('companion_evolutions')
+                .select('image_url')
+                .eq('companion_id', companionId)
+                .eq('stage', newStage)
+                .order('evolved_at', { ascending: false })
+                .limit(1)
+                .maybeSingle(),
+              supabase
+                .from('user_companion')
+                .select('core_element')
+                .eq('id', companionId)
+                .maybeSingle()
+            ]);
 
             const currentImageUrl = typeof newData.current_image_url === 'string' ? newData.current_image_url : "";
-            const imageUrl = evolutionRecord?.image_url || currentImageUrl;
+            const imageUrl = evolutionResult.data?.image_url || currentImageUrl;
+            const element = companionResult.data?.core_element || undefined;
 
             // Fetch mentor slug if we have a selected mentor
             let mentorSlug: string | undefined;
@@ -94,6 +103,7 @@ export const GlobalEvolutionListener = () => {
               stage: newStage,
               imageUrl,
               mentorSlug,
+              element,
             });
             setIsEvolving(true);
             setEvolutionInProgress(true); // Mark evolution in progress for celebration queue
@@ -131,6 +141,7 @@ export const GlobalEvolutionListener = () => {
       newStage={evolutionData.stage}
       newImageUrl={evolutionData.imageUrl}
       mentorSlug={evolutionData.mentorSlug}
+      element={evolutionData.element}
       userId={user?.id}
       onComplete={() => {
         setIsEvolving(false);
