@@ -18,7 +18,7 @@ const narrativeLines = [
 ];
 
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
-  const [currentLine, setCurrentLine] = useState(1);
+  const [currentLine, setCurrentLine] = useState(0);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
   const [showButton, setShowButton] = useState(false);
 
