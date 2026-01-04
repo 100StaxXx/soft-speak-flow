@@ -51,6 +51,7 @@ export interface ParsedTask {
   
   // AI triggers
   triggerDecomposition: boolean;
+  triggerPlanMyDay: boolean;
 }
 
 // Month name to number mapping
@@ -407,6 +408,15 @@ const DECOMPOSITION_PATTERNS = [
   { regex: /\b(?:break\s*(?:this\s*)?down|decompose|split\s*(?:into\s*)?(?:sub)?tasks?|suggest\s*(?:sub)?steps?|expand)\b/i, trigger: true },
 ];
 
+// Plan My Day patterns
+const PLAN_MY_DAY_PATTERNS = [
+  { regex: /\b(?:plan|schedule|organize|optimise|optimize)\s*(?:my|the|today'?s?)?\s*(?:day|schedule|tasks?|quests?)\b/i, trigger: true },
+  { regex: /\b(?:help\s*me\s*)?plan\s*(?:out\s*)?today\b/i, trigger: true },
+  { regex: /\bwhat\s*should\s*I\s*do\s*(?:today|first|next)\b/i, trigger: true },
+  { regex: /\b(?:build|create|make)\s*(?:my|a)?\s*schedule\b/i, trigger: true },
+  { regex: /\bauto[- ]?schedule\b/i, trigger: true },
+];
+
 function cleanTaskText(text: string): string {
   let cleaned = text;
 
@@ -430,6 +440,7 @@ function cleanTaskText(text: string): string {
     ...XP_PATTERNS.map(p => p.regex),
     ...RENAME_PATTERNS.map(p => p.regex),
     ...DECOMPOSITION_PATTERNS.map(p => p.regex),
+    ...PLAN_MY_DAY_PATTERNS.map(p => p.regex),
   ];
 
   patternsToRemove.forEach(pattern => {
@@ -480,6 +491,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     xpMultiplier: null,
     newTitle: null,
     triggerDecomposition: false,
+    triggerPlanMyDay: false,
   };
 
   // Parse clear patterns first
@@ -641,6 +653,14 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of DECOMPOSITION_PATTERNS) {
     if (pattern.regex.test(input)) {
       result.triggerDecomposition = pattern.trigger;
+      break;
+    }
+  }
+
+  // Parse plan my day
+  for (const pattern of PLAN_MY_DAY_PATTERNS) {
+    if (pattern.regex.test(input)) {
+      result.triggerPlanMyDay = pattern.trigger;
       break;
     }
   }

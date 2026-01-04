@@ -35,7 +35,10 @@ import { usePerfectDayTracker } from "@/hooks/usePerfectDayTracker";
 import { useComboTracker } from "@/hooks/useComboTracker";
 import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
+import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
+import { useEpics } from "@/hooks/useEpics";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
+import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
 
 const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -62,6 +65,16 @@ const Journeys = () => {
   
   // Combo tracking
   const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
+  
+  // Daily plan optimization
+  const { refetch: refetchPlan, suggestedSchedule, isLoading: isPlanLoading } = useDailyPlanOptimization();
+  
+  // Epics for plan my day questions
+  const { epics } = useEpics();
+  const activeEpics = useMemo(() => 
+    epics?.filter(e => e.status === 'active').slice(0, 5) || [],
+    [epics]
+  );
   
   const { currentStreak } = useStreakMultiplier();
 
@@ -289,6 +302,25 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: targetDateStr });
   }, [moveTaskToDate]);
 
+  // Handle Plan My Day command
+  const handlePlanMyDay = useCallback(async (answers: PlanMyDayAnswers) => {
+    try {
+      const result = await refetchPlan();
+      const schedule = result.data?.suggestedSchedule;
+      
+      if (schedule && schedule.length > 0) {
+        toast.success(`Found optimal times for ${schedule.length} tasks!`, {
+          description: "Check your daily insights for suggestions",
+        });
+      } else {
+        toast.info("Your schedule looks good! No changes suggested.");
+      }
+    } catch (error) {
+      console.error('Plan optimization failed:', error);
+      toast.error("Couldn't generate plan. Try again later.");
+    }
+  }, [refetchPlan]);
+
   return (
     <TaskDragProvider>
     <PageTransition>
@@ -366,6 +398,8 @@ const Journeys = () => {
                 notes: parsed.notes,
               });
             }}
+            onPlanMyDay={handlePlanMyDay}
+            activeEpics={activeEpics}
           />
         </motion.div>
 
