@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const EXAMPLES = [
+const PLAN_MY_DAY = "Plan my day";
+
+const OTHER_EXAMPLES = [
   // Dates + Times
   "Call mom tomorrow at 3pm",
   "Meeting next Monday at 9am",
-  // Plan My Day
-  "Plan my day",
   "Submit report by Friday",
   // Duration
   "Deep work session for 2h",
@@ -39,18 +39,47 @@ const EXAMPLES = [
   "Gym @gym tomorrow 6pm for 1h",
 ];
 
+// Fisher-Yates shuffle
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Build example list with "Plan my day" appearing more frequently
+function buildExampleList(): string[] {
+  const shuffled = shuffleArray(OTHER_EXAMPLES);
+  const result: string[] = [PLAN_MY_DAY]; // Always start with Plan my day
+  
+  // Insert "Plan my day" every ~5 examples
+  for (let i = 0; i < shuffled.length; i++) {
+    result.push(shuffled[i]);
+    if ((i + 1) % 5 === 0 && i < shuffled.length - 1) {
+      result.push(PLAN_MY_DAY);
+    }
+  }
+  
+  return result;
+}
+
 interface TypewriterPlaceholderProps {
   isActive: boolean;
   prefix?: string;
 }
 
 export function TypewriterPlaceholder({ isActive, prefix = "Add a quest... try '" }: TypewriterPlaceholderProps) {
+  // Shuffle once when component mounts (per session)
+  const examples = useMemo(() => buildExampleList(), []);
+  
   const [exampleIndex, setExampleIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [displayText, setDisplayText] = useState('');
 
-  const currentExample = EXAMPLES[exampleIndex];
+  const currentExample = examples[exampleIndex];
 
   const tick = useCallback(() => {
     if (!isActive) return;
@@ -72,10 +101,10 @@ export function TypewriterPlaceholder({ isActive, prefix = "Add a quest... try '
       } else {
         // Move to next example
         setIsDeleting(false);
-        setExampleIndex(prev => (prev + 1) % EXAMPLES.length);
+        setExampleIndex(prev => (prev + 1) % examples.length);
       }
     }
-  }, [isActive, charIndex, isDeleting, currentExample]);
+  }, [isActive, charIndex, isDeleting, currentExample, examples.length]);
 
   useEffect(() => {
     if (!isActive) {
