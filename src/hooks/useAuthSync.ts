@@ -12,11 +12,12 @@ export const useAuthSync = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event) => {
-        // On sign in or token refresh, invalidate profile to get fresh data
+        // On sign in or token refresh, refetch profile immediately to get fresh data
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           // Use setTimeout to avoid deadlock - defer Supabase calls
           setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ["profile"] });
+            // Use refetchQueries for immediate fresh data before redirect decisions
+            queryClient.refetchQueries({ queryKey: ["profile"] });
             queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] });
             queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
           }, 0);

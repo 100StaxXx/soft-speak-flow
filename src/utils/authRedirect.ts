@@ -15,11 +15,27 @@ const withTimeout = <T>(promiseFn: () => PromiseLike<T>, timeoutMs: number, oper
 };
 
 /**
+ * Quick check if user has completed onboarding (for fallback scenarios)
+ */
+const isReturningUser = async (userId: string): Promise<boolean> => {
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("onboarding_completed")
+      .eq("id", userId)
+      .maybeSingle();
+    return data?.onboarding_completed === true;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Centralized auth redirect logic
  * Determines where to send users based on their auth and profile state
  */
 export const getAuthRedirectPath = async (userId: string): Promise<string> => {
-  const QUERY_TIMEOUT = 3000; // 3 second timeout for each query
+  const QUERY_TIMEOUT = 5000; // 5 second timeout for each query
   
   try {
     logger.debug('[getAuthRedirectPath] Fetching profile...', { userId: userId.substring(0, 8) });
@@ -35,8 +51,9 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
     );
     
     if (error) {
-      logger.warn('[getAuthRedirectPath] Profile fetch error, defaulting to onboarding', { error: error.message });
-      return "/onboarding";
+      logger.warn('[getAuthRedirectPath] Profile fetch error, checking if returning user', { error: error.message });
+      const returning = await isReturningUser(userId);
+      return returning ? "/tasks" : "/onboarding";
     }
 
     const resolvedMentorId = getResolvedMentorId(profile);
@@ -75,8 +92,9 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
     logger.debug('[getAuthRedirectPath] Has mentor, redirecting to /tasks');
     return "/tasks";
   } catch (error) {
-    logger.error("[getAuthRedirectPath] Error", { error });
-    return "/onboarding";
+    logger.error("[getAuthRedirectPath] Error, checking if returning user", { error });
+    const returning = await isReturningUser(userId);
+    return returning ? "/tasks" : "/onboarding";
   }
 };
 

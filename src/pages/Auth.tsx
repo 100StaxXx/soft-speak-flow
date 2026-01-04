@@ -86,14 +86,27 @@ const Auth = () => {
     const NAVIGATION_TIMEOUT = 5000;
     let navigationCompleted = false;
     
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       if (!navigationCompleted) {
-        logger.warn(`[Auth ${source}] TIMEOUT after ${NAVIGATION_TIMEOUT}ms - forcing navigation to /onboarding`);
+        logger.warn(`[Auth ${source}] TIMEOUT after ${NAVIGATION_TIMEOUT}ms - checking if returning user`);
         toast({
           title: "Taking longer than expected",
           description: "Redirecting you now...",
         });
-        safeNavigate(navigate, '/onboarding');
+        
+        // Check if user has completed onboarding before defaulting
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          
+          const path = data?.onboarding_completed ? '/tasks' : '/onboarding';
+          safeNavigate(navigate, path);
+        } catch {
+          safeNavigate(navigate, '/onboarding');
+        }
       }
     }, NAVIGATION_TIMEOUT);
 
