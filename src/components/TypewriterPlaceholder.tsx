@@ -2,14 +2,39 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EXAMPLES = [
+  // Dates + Times
   "Call mom tomorrow at 3pm",
-  "Workout for 30min @gym",
-  "Submit report by Friday !urgent",
-  "Read for 1h #low-energy",
-  "Weekly team sync every Monday",
-  "Buy groceries @errands easy",
-  "Deep work session 2h #high-energy",
-  "Dentist appointment Jan 15 at 10am",
+  "Meeting next Monday at 9am",
+  "Submit report by Friday",
+  // Duration
+  "Deep work session for 2h",
+  "Quick 15m email check",
+  // Context locations
+  "Buy groceries @errands",
+  "Reply to emails @work",
+  "Evening yoga @home",
+  // Priority levels
+  "Fix critical bug !urgent",
+  "Review docs p2",
+  // Difficulty + Energy
+  "File taxes hard #high-energy",
+  "Water plants easy #low-energy",
+  // Recurrence
+  "Meditate every day",
+  "Team standup every Monday",
+  "Gym 3x week",
+  // Category (mind/body/soul)
+  "Read book for mind",
+  "Workout session for body",
+  "Journal gratitude for soul",
+  // Top 3 / Main Focus
+  "Launch feature #top3",
+  // Reminders
+  "Doctor appt remind 1h before",
+  // Notes
+  "Call client (prepare notes)",
+  // Combined examples
+  "Gym @gym tomorrow 6pm for 1h",
 ];
 
 interface TypewriterPlaceholderProps {

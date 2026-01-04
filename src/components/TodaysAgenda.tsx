@@ -646,23 +646,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     </div>
                   )}
                   
-                  {/* Compact Smart Input */}
-                  {onQuickAdd && (
-                    <div className="flex-1 min-w-0">
-                      <CompactSmartInput
-                        onSubmit={onQuickAdd}
-                        placeholder="Add quest..."
-                      />
-                    </div>
-                  )}
-                  
+                  {/* Sort dropdown - moved to left of input */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
                         <ArrowUpDown className="w-3 h-3" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-28">
+                    <DropdownMenuContent align="start" className="w-28">
                       <DropdownMenuItem 
                         onClick={() => setSortBy('custom')}
                         className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
@@ -689,6 +680,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  
+                  {/* Compact Smart Input */}
+                  {onQuickAdd && (
+                    <div className="flex-1 min-w-0">
+                      <CompactSmartInput
+                        onSubmit={onQuickAdd}
+                        placeholder="Add quest..."
+                      />
+                    </div>
+                  )}
                 </div>
                 {/* Native iOS uses overlay, web uses DraggableTaskList directly */}
                 {isNative ? (
