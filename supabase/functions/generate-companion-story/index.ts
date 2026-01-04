@@ -57,6 +57,20 @@ function getColorName(color: string): string {
   return 'vibrant';
 }
 
+// Failsafe: Remove any hex color codes that slip through AI generation
+function sanitizeHexCodes(text: string): string {
+  if (!text) return text;
+  
+  // Match hex codes with or without # (e.g., #9333ea, 9333ea, #fff, abc123)
+  const hexPattern = /#?[0-9A-Fa-f]{6}\b|#[0-9A-Fa-f]{3}\b/g;
+  
+  return text.replace(hexPattern, (match) => {
+    const colorName = getColorName(match);
+    console.log(`Failsafe: Replaced hex "${match}" with "${colorName}"`);
+    return colorName;
+  });
+}
+
 const EVOLUTION_THEMES = [
   "Fate sleeping",              // Stage 0: Egg
   "First awakening",            // Stage 1: Hatchling
@@ -332,7 +346,7 @@ STRUCTURE FOR EACH CHAPTER:
    ${stage === 1 ? '• THE HATCHING: The creature emerges for the first time - small, vulnerable, but clearly showing its species traits' : ''}
    • show clear, species-faithful physical evolution
    • keep the creature anatomically consistent with ${speciesTraits}
-   • incorporate ${companion.favorite_color}, ${companion.fur_color}, and ${companion.eye_color} subtly and beautifully
+   • incorporate ${getColorName(companion.favorite_color)}, ${getColorName(companion.fur_color)}, and ${getColorName(companion.eye_color)} subtly and beautifully
    • display elemental effects appropriate to ${companion.core_element}
    • include at least one "Goal Mirror Moment" tied to "${userGoal}"
    ${stage > 0 ? `• reference at least one detail from: ${memoryNotes}` : ''}
@@ -484,9 +498,17 @@ Generate now:`;
       console.warn('Story validation warnings:', validationResult.warnings);
     }
 
-    // Ensure lore_expansion is an array
+    // Failsafe: Sanitize any hex codes that slipped through AI generation
+    storyData.chapter_title = sanitizeHexCodes(storyData.chapter_title);
+    storyData.intro_line = sanitizeHexCodes(storyData.intro_line);
+    storyData.main_story = sanitizeHexCodes(storyData.main_story);
+    storyData.bond_moment = sanitizeHexCodes(storyData.bond_moment);
+    storyData.life_lesson = sanitizeHexCodes(storyData.life_lesson);
+    storyData.next_hook = sanitizeHexCodes(storyData.next_hook);
+
+    // Ensure lore_expansion is an array and sanitize it
     const loreExpansion = Array.isArray(storyData.lore_expansion) 
-      ? storyData.lore_expansion 
+      ? storyData.lore_expansion.map((item: string) => sanitizeHexCodes(item))
       : [];
 
     // Save to database
