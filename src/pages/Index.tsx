@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,13 +20,12 @@ import { IndexPageSkeleton } from "@/components/skeletons";
 import { MentorTutorialModal } from "@/components/MentorTutorialModal";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { ParallaxCard } from "@/components/ui/parallax-card";
-
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { Sparkles } from "lucide-react";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -39,14 +38,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [hasActiveHabits, setHasActiveHabits] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [mentorImage, setMentorImage] = useState<string>("");
-  const [todaysQuote, setTodaysQuote] = useState<{
-    text: string;
-    author: string | null;
-  } | null>(null);
   const { showModal, dismissModal } = useFirstTimeModal("mentor");
+
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // Combined initialization effect for better performance
   const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
@@ -77,49 +75,41 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     void syncMentorSelection();
   }, [profile, queryClient, user]);
 
-  useEffect(() => {
-    // Scroll to top on mount
-    window.scrollTo(0, 0);
+  // Use React Query for mentor data with proper caching
+  const { data: mentorPageData } = useQuery({
+    queryKey: ['mentor-page-data', resolvedMentorId],
+    queryFn: async () => {
+      if (!resolvedMentorId) return null;
 
-    let isMounted = true;
+      const { data: mentorData } = await supabase
+        .from("mentors")
+        .select("avatar_url, slug")
+        .eq("id", resolvedMentorId)
+        .maybeSingle();
 
-    const fetchMentorData = async () => {
-      if (!resolvedMentorId) return;
+      if (!mentorData) return null;
 
-      try {
-        const { data: mentorData } = await supabase
-          .from("mentors")
-          .select("avatar_url, slug")
-          .eq("id", resolvedMentorId)
-          .maybeSingle();
+      // Dynamically load mentor image
+      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
 
-        if (!isMounted || !mentorData) return;
+      // Get today's pep talk and quote in parallel
+      const today = new Date().toLocaleDateString("en-CA");
+      const { data: dailyPepTalk } = await supabase
+        .from("daily_pep_talks")
+        .select("topic_category")
+        .eq("for_date", today)
+        .eq("mentor_slug", mentorData.slug)
+        .maybeSingle();
 
-        // Dynamically load only the mentor image we need (saves ~20MB!)
-        const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
-        if (isMounted) {
-          setMentorImage(imageUrl);
-        }
-
-        // Get today's pep talk to find related quote
-        const today = new Date().toLocaleDateString("en-CA");
-        const { data: dailyPepTalk } = await supabase
-          .from("daily_pep_talks")
-          .select("emotional_triggers, topic_category")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentorData.slug)
-          .maybeSingle();
-
-        if (!isMounted || !dailyPepTalk) return;
-
-        // Try to fetch a quote that matches category first, then fall back to any quote
+      let quote = null;
+      if (dailyPepTalk?.topic_category) {
+        // Try category match first
         let { data: quotes } = await supabase
           .from("quotes")
           .select("text, author")
           .eq("category", dailyPepTalk.topic_category)
           .limit(10);
 
-        // If no category match, get any quotes
         if (!quotes || quotes.length === 0) {
           const { data: allQuotes } = await supabase
             .from("quotes")
@@ -128,46 +118,19 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
           quotes = allQuotes;
         }
 
-        // Pick a random quote
-        if (isMounted && quotes && quotes.length > 0) {
-          const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-          setTodaysQuote(randomQuote);
+        if (quotes && quotes.length > 0) {
+          quote = quotes[Math.floor(Math.random() * quotes.length)];
         }
-      } catch (error) {
-        console.error('Error fetching mentor data:', error);
-        // Non-critical error - continue without quote
       }
-    };
 
-    const checkHabits = async () => {
-      if (!user) return;
-      try {
-        const { data } = await supabase
-          .from("habits")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .limit(1);
-        if (isMounted) {
-          setHasActiveHabits(!!data && data.length > 0);
-        }
-      } catch (error) {
-        console.error('Error checking habits:', error);
-      }
-    };
+      return { mentorImage: imageUrl, todaysQuote: quote };
+    },
+    enabled: !!resolvedMentorId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-    // Run both async operations in parallel
-    Promise.all([
-      fetchMentorData(),
-      checkHabits()
-    ]).catch(error => {
-      console.error('Error in initialization:', error);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [resolvedMentorId, user]);
+  const mentorImage = mentorPageData?.mentorImage || "";
+  const todaysQuote = mentorPageData?.todaysQuote || null;
 
   // Wait for all critical data to load before marking ready
   useEffect(() => {

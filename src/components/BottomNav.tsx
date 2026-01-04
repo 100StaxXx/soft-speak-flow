@@ -9,8 +9,6 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
-// HIDDEN: Long press to arcade disabled
-// import { useLongPress } from "@/hooks/useLongPress";
 import { haptics } from "@/utils/haptics";
 
 export const BottomNav = memo(() => {
@@ -18,9 +16,6 @@ export const BottomNav = memo(() => {
   const { companion, progressToNext } = useCompanion();
 
   const resolvedMentorId = getResolvedMentorId(profile);
-
-  // HIDDEN: Long press arcade navigation disabled
-  // const longPressHandlers = useLongPress({ ... });
 
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],

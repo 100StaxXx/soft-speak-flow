@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -280,8 +280,10 @@ const MorningCheckInContent = () => {
   );
 };
 
-export const MorningCheckIn = () => (
+export const MorningCheckIn = memo(() => (
   <ErrorBoundary fallback={<CheckInErrorFallback />}>
     <MorningCheckInContent />
   </ErrorBoundary>
-);
+));
+
+MorningCheckIn.displayName = 'MorningCheckIn';

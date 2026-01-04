@@ -1,9 +1,10 @@
-import { Calendar, Sparkles, ChevronRight } from "lucide-react";
+import { memo } from "react";
+import { Sparkles, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
 
-export const WeeklyRecapCard = () => {
+export const WeeklyRecapCard = memo(() => {
   const { currentRecap, openRecap } = useWeeklyRecap();
 
   // Only show if recap exists for current week
@@ -41,4 +42,6 @@ export const WeeklyRecapCard = () => {
       </button>
     </motion.div>
   );
-};
+});
+
+WeeklyRecapCard.displayName = 'WeeklyRecapCard';
