@@ -54,19 +54,23 @@ function inferWorkStyle(patterns: SchedulingPatterns): { style: string; confiden
   let traditional9to5Score = 0;
   let entrepreneurScore = 0;
 
+  // Safely access arrays with defaults
+  const startTimes = patterns.commonStartTimes || [];
+  const endTimes = patterns.commonEndTimes || [];
+
   // 9-5 indicators
   if (patterns.lunchBreakPattern?.detected) traditional9to5Score += 25;
-  if (patterns.commonStartTimes.includes(9)) traditional9to5Score += 20;
-  if (patterns.commonEndTimes.includes(17) || patterns.commonEndTimes.includes(18)) traditional9to5Score += 20;
-  if (patterns.eveningProductivity < 0.2) traditional9to5Score += 15;
-  if (patterns.weekdayVsWeekend.weekday > 0.7 && patterns.weekdayVsWeekend.weekend < 0.3) traditional9to5Score += 20;
+  if (startTimes.includes(9)) traditional9to5Score += 20;
+  if (endTimes.includes(17) || endTimes.includes(18)) traditional9to5Score += 20;
+  if ((patterns.eveningProductivity || 0) < 0.2) traditional9to5Score += 15;
+  if ((patterns.weekdayVsWeekend?.weekday || 0) > 0.7 && (patterns.weekdayVsWeekend?.weekend || 0) < 0.3) traditional9to5Score += 20;
 
   // Entrepreneur indicators
-  if (patterns.eveningProductivity > 0.5) entrepreneurScore += 25;
-  if (patterns.commonStartTimes.some(t => t > 10 || t < 7)) entrepreneurScore += 20;
-  if (patterns.weekdayVsWeekend.weekend > 0.5) entrepreneurScore += 15;
-  if (patterns.taskBatchingScore > 0.7) entrepreneurScore += 20;
-  if ((patterns.avgCompletionHour.hard || 12) > 14) entrepreneurScore += 20;
+  if ((patterns.eveningProductivity || 0) > 0.5) entrepreneurScore += 25;
+  if (startTimes.some(t => t > 10 || t < 7)) entrepreneurScore += 20;
+  if ((patterns.weekdayVsWeekend?.weekend || 0) > 0.5) entrepreneurScore += 15;
+  if ((patterns.taskBatchingScore || 0) > 0.7) entrepreneurScore += 20;
+  if ((patterns.avgCompletionHour?.hard || 12) > 14) entrepreneurScore += 20;
 
   const total = traditional9to5Score + entrepreneurScore;
   const confidence = Math.min(100, total);
