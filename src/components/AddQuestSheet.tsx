@@ -138,8 +138,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         <DrawerContent 
           className="max-h-[200px]"
           style={{ 
-            transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : undefined,
-            transition: 'transform 0.15s ease-out'
+            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
+            transition: 'bottom 0.2s ease-out'
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
