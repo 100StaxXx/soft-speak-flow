@@ -60,7 +60,7 @@ export function TypewriterPlaceholder({ isActive, prefix = "Add a quest... try '
         setCharIndex(prev => prev + 1);
       } else {
         // Pause at end before deleting
-        setTimeout(() => setIsDeleting(true), 6000);
+        setTimeout(() => setIsDeleting(true), 2000);
       }
     } else {
       // Deleting
@@ -83,7 +83,7 @@ export function TypewriterPlaceholder({ isActive, prefix = "Add a quest... try '
       return;
     }
 
-    const speed = isDeleting ? 60 : 100;
+    const speed = isDeleting ? 30 : 50;
     const timer = setTimeout(tick, speed);
     return () => clearTimeout(timer);
   }, [isActive, tick, isDeleting]);

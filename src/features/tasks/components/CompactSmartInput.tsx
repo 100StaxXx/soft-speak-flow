@@ -70,7 +70,7 @@ export function CompactSmartInput({
   }, [isRecording, success, medium, toggleRecording]);
 
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
-  const showTypewriter = !displayText && !isRecording;
+  const showTypewriter = isFocused && !displayText && !isRecording;
 
   const handleSubmit = () => {
     if (!parsed || !parsed.text.trim()) return;
