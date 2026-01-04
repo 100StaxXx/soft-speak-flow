@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -23,7 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { useCompanion } from "@/hooks/useCompanion";
 
-export const ResetCompanionButton = () => {
+export const ResetCompanionButton = memo(() => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -107,4 +107,5 @@ export const ResetCompanionButton = () => {
       </Dialog>
     </>
   );
-};
+});
+ResetCompanionButton.displayName = 'ResetCompanionButton';

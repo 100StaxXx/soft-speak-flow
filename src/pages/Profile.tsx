@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -43,8 +43,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Quick Action Card Component
-const QuickActionCard = ({ 
+// Quick Action Card Component - memoized to prevent unnecessary re-renders
+const QuickActionCard = memo(({ 
   icon: Icon, 
   label, 
   description,
@@ -90,7 +90,8 @@ const QuickActionCard = ({
     </div>
     <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
   </button>
-);
+));
+QuickActionCard.displayName = 'QuickActionCard';
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -128,6 +129,7 @@ const Profile = () => {
 
   const { data: mentors } = useQuery({
     queryKey: ["mentors", "active"],
+    staleTime: 10 * 60 * 1000, // 10 minutes - mentors rarely change
     queryFn: async () => {
       const { data, error } = await supabase
         .from("mentors")
@@ -146,6 +148,7 @@ const Profile = () => {
 
   const { data: selectedMentor } = useQuery({
     queryKey: ["selected-mentor", profile?.selected_mentor_id],
+    staleTime: 10 * 60 * 1000, // 10 minutes - mentor selection rarely changes
     enabled: !!profile?.selected_mentor_id,
     queryFn: async () => {
       if (!profile?.selected_mentor_id) {
@@ -163,7 +166,7 @@ const Profile = () => {
   });
 
 
-  const handleChangeMentor = async (mentorId: string) => {
+  const handleChangeMentor = useCallback(async (mentorId: string) => {
     if (!user || isChangingMentor) return;
     setIsChangingMentor(true);
     try {
@@ -182,9 +185,9 @@ const Profile = () => {
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
       setIsChangingMentor(false);
     }
-  };
+  }, [user, isChangingMentor, profile?.timezone, toast]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
     try {
@@ -195,9 +198,9 @@ const Profile = () => {
       toast({ title: "Error signing out", description: errorMessage, variant: "destructive" });
       setIsSigningOut(false);
     }
-  };
+  }, [isSigningOut, signOut, navigate, toast]);
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = useCallback(async () => {
     if (!user || isDeletingAccount || !isDeleteConfirmationValid) return;
 
     setIsDeletingAccount(true);
@@ -253,7 +256,7 @@ const Profile = () => {
     } finally {
       setIsDeletingAccount(false);
     }
-  };
+  }, [user, isDeletingAccount, isDeleteConfirmationValid, queryClient, toast, signOut, navigate]);
 
 
 

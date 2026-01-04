@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { getFactionById, FactionType } from "@/config/factions";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +10,7 @@ interface FactionBadgeProps {
   showTraits?: boolean;
 }
 
-export const FactionBadge = ({ 
+export const FactionBadge = memo(({ 
   faction, 
   variant = "compact", 
   className,
@@ -137,4 +138,5 @@ export const FactionBadge = ({
       </div>
     </div>
   );
-};
+});
+FactionBadge.displayName = 'FactionBadge';

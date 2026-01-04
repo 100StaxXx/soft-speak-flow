@@ -1,3 +1,4 @@
+import { useState, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -5,9 +6,8 @@ import { Sparkles, Lock, Check, ChevronDown } from "lucide-react";
 import { useReferrals } from "@/hooks/useReferrals";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useState } from "react";
 
-export const CompanionSkins = () => {
+export const CompanionSkins = memo(() => {
   const { availableSkins, unlockedSkins, equipSkin, unequipSkin, referralStats } = useReferrals();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -124,4 +124,5 @@ export const CompanionSkins = () => {
       </Card>
     </Collapsible>
   );
-};
+});
+CompanionSkins.displayName = 'CompanionSkins';

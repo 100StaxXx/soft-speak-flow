@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ interface LegalDocumentViewerProps {
   documentType: "terms" | "privacy";
 }
 
-export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalDocumentViewerProps) => {
+export const LegalDocumentViewer = memo(({ open, onOpenChange, documentType }: LegalDocumentViewerProps) => {
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
@@ -128,4 +128,5 @@ export const LegalDocumentViewer = ({ open, onOpenChange, documentType }: LegalD
       </DialogContent>
     </Dialog>
   );
-};
+});
+LegalDocumentViewer.displayName = 'LegalDocumentViewer';

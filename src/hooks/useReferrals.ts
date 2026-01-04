@@ -16,6 +16,7 @@ export const useReferrals = () => {
   // Fetch user's referral code from profiles table (auto-generated on signup)
   const { data: referralStats, isLoading } = useQuery({
     queryKey: ["referral-stats", user?.id],
+    staleTime: 5 * 60 * 1000, // 5 minutes - referral stats don't change frequently
     queryFn: async () => {
       if (!user) return null;
 
@@ -41,6 +42,7 @@ export const useReferrals = () => {
   // Fetch unlocked skins
   const { data: unlockedSkins } = useQuery({
     queryKey: ["unlocked-skins", user?.id],
+    staleTime: 5 * 60 * 1000, // 5 minutes
     queryFn: async () => {
       if (!user) return [];
 
@@ -64,6 +66,7 @@ export const useReferrals = () => {
   // Fetch available skins (for display)
   const { data: availableSkins } = useQuery({
     queryKey: ["available-skins"],
+    staleTime: 10 * 60 * 1000, // 10 minutes - available skins rarely change
     queryFn: async () => {
       // FIX Bug #25: Add pagination limit for safety
       const { data, error } = await supabase

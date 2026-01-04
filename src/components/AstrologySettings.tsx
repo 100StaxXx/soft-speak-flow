@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Sun } from "lucide-react";
 
-export const AstrologySettings = () => {
+export const AstrologySettings = memo(() => {
   const { profile } = useProfile();
 
   return (
@@ -31,4 +32,5 @@ export const AstrologySettings = () => {
       </CardContent>
     </Card>
   );
-};
+});
+AstrologySettings.displayName = 'AstrologySettings';

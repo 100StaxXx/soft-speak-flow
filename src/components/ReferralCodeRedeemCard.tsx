@@ -1,11 +1,11 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, memo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Gift, CheckCircle2 } from "lucide-react";
 import { useReferrals } from "@/hooks/useReferrals";
 
-export const ReferralCodeRedeemCard = () => {
+export const ReferralCodeRedeemCard = memo(() => {
   const [code, setCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { referralStats, applyReferralCode } = useReferrals();
@@ -74,4 +74,5 @@ export const ReferralCodeRedeemCard = () => {
       </CardContent>
     </Card>
   );
-};
+});
+ReferralCodeRedeemCard.displayName = 'ReferralCodeRedeemCard';

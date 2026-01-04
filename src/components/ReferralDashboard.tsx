@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Share, Copy, Users, Gift } from "lucide-react";
@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Share as CapacitorShare } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 
-export const ReferralDashboard = () => {
+export const ReferralDashboard = memo(() => {
   const { referralStats, availableSkins } = useReferrals();
   const [isSharing, setIsSharing] = useState(false);
 
@@ -170,4 +170,5 @@ export const ReferralDashboard = () => {
       </div>
     </Card>
   );
-};
+});
+ReferralDashboard.displayName = 'ReferralDashboard';

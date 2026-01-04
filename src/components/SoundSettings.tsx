@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { safeLocalStorage } from "@/utils/storage";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { Volume2, VolumeX, Sparkles } from "lucide-react";
 import { soundManager } from "@/utils/soundEffects";
 import { globalAudio } from "@/utils/globalAudio";
 
-export const SoundSettings = () => {
+export const SoundSettings = memo(() => {
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
@@ -114,4 +114,5 @@ export const SoundSettings = () => {
       </div>
     </Card>
   );
-};
+});
+SoundSettings.displayName = 'SoundSettings';

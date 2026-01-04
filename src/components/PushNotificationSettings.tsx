@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -33,7 +33,7 @@ const timeOptions = [
   { value: "20:00", label: "8:00 PM" },
 ];
 
-export const PushNotificationSettings = () => {
+export const PushNotificationSettings = memo(() => {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -375,10 +375,11 @@ export const PushNotificationSettings = () => {
       </div>
     </Card>
   );
-};
+});
+PushNotificationSettings.displayName = 'PushNotificationSettings';
 
-// Push Debug Panel Component
-const PushDebugPanel = ({ userId }: { userId?: string }) => {
+// Push Debug Panel Component - memoized
+const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [debugInfo, setDebugInfo] = useState<{
     platform: string;
@@ -538,4 +539,5 @@ const PushDebugPanel = ({ userId }: { userId?: string }) => {
       </CollapsibleContent>
     </Collapsible>
   );
-};
+});
+PushDebugPanel.displayName = 'PushDebugPanel';

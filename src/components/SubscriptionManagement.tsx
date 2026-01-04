@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
@@ -21,7 +21,7 @@ type PlanOption = {
   badge?: string;
 };
 
-export function SubscriptionManagement() {
+export const SubscriptionManagement = memo(function SubscriptionManagement() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { subscription, isLoading, isActive, nextBillingDate, planPrice, plan, isCancelled } = useSubscription();
@@ -463,4 +463,4 @@ export function SubscriptionManagement() {
       </CardFooter>
     </Card>
   );
-}
+});
