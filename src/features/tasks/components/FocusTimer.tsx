@@ -226,6 +226,17 @@ export function FocusTimer({ taskId, taskName, compact = false, onComplete }: Fo
           </div>
         )}
 
+        {/* Daily XP Cap Indicator */}
+        {stats.sessionsUntilCap > 0 ? (
+          <div className="text-center mt-4 text-sm text-muted-foreground">
+            <span className="font-medium text-primary">{stats.sessionsUntilCap}</span> full XP session{stats.sessionsUntilCap !== 1 ? 's' : ''} remaining today
+          </div>
+        ) : (
+          <div className="text-center mt-4 text-sm text-muted-foreground">
+            Daily cap reached — sessions now award <span className="font-medium">3 XP</span>
+          </div>
+        )}
+
         {/* Today's Stats */}
         <div className="flex justify-center gap-6 mt-6 pt-4 border-t border-border">
           <div className="text-center">

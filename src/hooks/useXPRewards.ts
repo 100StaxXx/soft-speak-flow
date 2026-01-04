@@ -248,30 +248,27 @@ export const useXPRewards = () => {
   };
 
   // ============================================
-  // NEW: Focus Session XP Rewards
+  // Focus Session XP Rewards (Pomodoro with daily cap)
   // ============================================
   
-  const awardFocusSessionComplete = (durationType: 'quick' | 'standard' | 'deep_work', isPerfect: boolean = false) => {
+  const awardFocusSessionComplete = (isPerfect: boolean = false, isUnderCap: boolean = true) => {
     if (!companion || awardXP.isPending) return;
 
-    let baseReward: number = FOCUS_XP_REWARDS.STANDARD;
-    let label = "Focus Session Complete!";
+    let baseReward: number;
+    let label: string;
 
-    switch (durationType) {
-      case 'quick':
-        baseReward = FOCUS_XP_REWARDS.QUICK;
-        label = "Quick Focus Done!";
-        break;
-      case 'deep_work':
-        baseReward = FOCUS_XP_REWARDS.DEEP_WORK;
-        label = "Deep Work Complete!";
-        break;
-    }
+    if (isUnderCap) {
+      baseReward = FOCUS_XP_REWARDS.SESSION_COMPLETE;
+      label = "Focus Session Complete!";
 
-    // Add perfect focus bonus if no distractions
-    if (isPerfect) {
-      baseReward += FOCUS_XP_REWARDS.PERFECT_FOCUS_BONUS;
-      label = "Perfect Focus! 🎯";
+      // Add perfect focus bonus if no distractions
+      if (isPerfect) {
+        baseReward += FOCUS_XP_REWARDS.PERFECT_FOCUS_BONUS;
+        label = "Perfect Focus! 🎯";
+      }
+    } else {
+      baseReward = FOCUS_XP_REWARDS.CAPPED_SESSION_XP;
+      label = isPerfect ? "Bonus Focus! 🎯" : "Bonus Focus Session!";
     }
 
     const reward = applyStreakMultiplier(baseReward);
@@ -279,17 +276,7 @@ export const useXPRewards = () => {
     awardXP.mutate({
       eventType: "focus_session",
       xpAmount: reward,
-      metadata: { durationType, isPerfect },
-    });
-  };
-
-  const awardFocusComboBonus = () => {
-    if (!companion) return;
-    const reward = applyStreakMultiplier(FOCUS_XP_REWARDS.COMBO_BONUS);
-    showXPToast(reward, "4x Focus Combo! 🔥");
-    awardXP.mutate({
-      eventType: "focus_combo",
-      xpAmount: reward,
+      metadata: { isPerfect, isUnderCap },
     });
   };
 
@@ -535,9 +522,8 @@ export const useXPRewards = () => {
     awardQuoteShared,
     awardCustomXP,
     
-    // NEW: Focus Session rewards
+    // Focus Session rewards
     awardFocusSessionComplete,
-    awardFocusComboBonus,
     
     // NEW: Subtask rewards
     awardSubtaskComplete,
