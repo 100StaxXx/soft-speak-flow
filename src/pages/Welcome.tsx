@@ -31,7 +31,7 @@ const Welcome = () => {
   }, [available, permitted, requestPermission]);
 
   const features = [
-    { icon: Star, text: "AI-Powered Mentors", delay: 0.1 },
+    { icon: Star, text: "Personal Mentors", delay: 0.1 },
     { icon: Zap, text: "Daily Quests & XP", delay: 0.2 },
     { icon: Heart, text: "Evolving Companion", delay: 0.3 },
   ];
@@ -116,7 +116,7 @@ const Welcome = () => {
           transition={{ delay: 0.3, duration: 0.5 }}
           className="text-lg text-muted-foreground mb-8 px-2 md:max-w-md"
         >
-          Transform your daily habits into an epic adventure with AI mentors and a companion that grows with you
+          Transform your daily habits into an epic adventure with mentors and a companion that grows with you
         </motion.p>
 
         {/* Feature Pills */}

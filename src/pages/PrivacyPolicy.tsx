@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="text-primary shrink-0">•</span>
-                  <span>Generate AI-powered content and mentor responses</span>
+                  <span>Generate personalized content and mentor responses</span>
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="text-primary shrink-0">•</span>

@@ -156,7 +156,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Music className="h-5 w-5" />
-          Fully AI-Generate Pep Talk
+          Generate Pep Talk
         </CardTitle>
         <CardDescription>
           Select options below, then generate a complete pep talk with title, description, script, and audio
@@ -259,7 +259,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           ) : (
             <>
               <Music className="mr-2 h-4 w-4" />
-              Fully AI-Generate Pep Talk
+              Generate Pep Talk
             </>
           )}
         </Button>
