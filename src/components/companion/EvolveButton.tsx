@@ -80,13 +80,13 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           />
         </div>
 
-        {/* Sparkle particles */}
+        {/* Star sparkle particles */}
         <div className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden">
-          <div className="absolute w-1 h-1 bg-white rounded-full animate-sparkle-1" style={{ top: '20%', left: '15%' }} />
-          <div className="absolute w-1.5 h-1.5 bg-white rounded-full animate-sparkle-2" style={{ top: '60%', left: '75%' }} />
-          <div className="absolute w-1 h-1 bg-white rounded-full animate-sparkle-3" style={{ top: '40%', left: '45%' }} />
-          <div className="absolute w-0.5 h-0.5 bg-white rounded-full animate-sparkle-4" style={{ top: '70%', left: '25%' }} />
-          <div className="absolute w-1 h-1 bg-white rounded-full animate-sparkle-5" style={{ top: '30%', left: '85%' }} />
+          <div className="absolute w-3 h-3 bg-white star-sparkle-4 animate-sparkle-1" style={{ top: '20%', left: '15%' }} />
+          <div className="absolute w-4 h-4 bg-white star-sparkle-4 animate-sparkle-2" style={{ top: '60%', left: '75%' }} />
+          <div className="absolute w-3 h-3 bg-white star-sparkle-4 animate-sparkle-3" style={{ top: '40%', left: '45%' }} />
+          <div className="absolute w-2 h-2 bg-white star-sparkle-4 animate-sparkle-4" style={{ top: '70%', left: '25%' }} />
+          <div className="absolute w-3 h-3 bg-white star-sparkle-4 animate-sparkle-5" style={{ top: '30%', left: '85%' }} />
         </div>
 
         {/* Rainbow border glow */}
