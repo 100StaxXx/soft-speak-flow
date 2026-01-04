@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useXPRewards } from '@/hooks/useXPRewards';
+import { FOCUS_XP_REWARDS } from '@/config/xpRewards';
 
 export interface FocusSession {
   id: string;
@@ -45,6 +47,7 @@ export function useFocusSession() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { awardFocusSessionComplete } = useXPRewards();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -136,21 +139,36 @@ export function useFocusSession() {
     },
   });
 
+  // Calculate completed sessions today for XP cap
+  const completedSessionsToday = todaySessions.filter(s => s.status === 'completed').length;
+  const isUnderDailyCap = completedSessionsToday < FOCUS_XP_REWARDS.DAILY_SESSION_CAP;
+  const sessionsUntilCap = Math.max(0, FOCUS_XP_REWARDS.DAILY_SESSION_CAP - completedSessionsToday);
+
   // Complete session mutation
   const completeSessionMutation = useMutation({
     mutationFn: async ({ 
       sessionId, 
       actualDuration,
       distractionsCount,
+      isPerfect,
+      underCap,
     }: { 
       sessionId: string; 
       actualDuration: number;
       distractionsCount: number;
+      isPerfect: boolean;
+      underCap: boolean;
     }) => {
-      // Calculate XP based on completion
-      const baseXP = 15;
-      const bonusXP = distractionsCount === 0 ? 10 : 0;
-      const totalXP = baseXP + bonusXP;
+      // Calculate XP for database record (centralized XP is awarded separately)
+      let xpEarned: number;
+      if (underCap) {
+        xpEarned = FOCUS_XP_REWARDS.SESSION_COMPLETE;
+        if (isPerfect) {
+          xpEarned += FOCUS_XP_REWARDS.PERFECT_FOCUS_BONUS;
+        }
+      } else {
+        xpEarned = FOCUS_XP_REWARDS.CAPPED_SESSION_XP;
+      }
 
       const { data, error } = await supabase
         .from('focus_sessions')
@@ -159,22 +177,22 @@ export function useFocusSession() {
           completed_at: new Date().toISOString(),
           actual_duration: actualDuration,
           distractions_count: distractionsCount,
-          xp_earned: totalXP,
+          xp_earned: xpEarned,
         })
         .eq('id', sessionId)
         .select()
         .single();
 
       if (error) throw error;
-      return data as FocusSession;
+      return { session: data as FocusSession, isPerfect, underCap };
     },
-    onSuccess: (session) => {
+    onSuccess: ({ session, isPerfect, underCap }) => {
       queryClient.invalidateQueries({ queryKey: ['focus-sessions'] });
-      toast({
-        title: "Focus session complete! 🎯",
-        description: `+${session.xp_earned} XP earned. Take a 5-minute break!`,
-      });
-      // Start cooldown instead of resetting
+      
+      // Award XP through centralized system
+      awardFocusSessionComplete(isPerfect, underCap);
+      
+      // Start cooldown
       startCooldown();
     },
   });
@@ -317,10 +335,13 @@ export function useFocusSession() {
             // Timer complete
             if (prev.currentSessionId) {
               const actualMinutes = Math.round((prev.totalTime - prev.timeRemaining) / 60);
+              const isPerfect = prev.distractionsCount === 0;
               completeSessionMutation.mutate({
                 sessionId: prev.currentSessionId,
                 actualDuration: actualMinutes,
                 distractionsCount: prev.distractionsCount,
+                isPerfect,
+                underCap: isUnderDailyCap,
               });
             }
             return { ...prev, isRunning: false, timeRemaining: 0 };
@@ -335,7 +356,7 @@ export function useFocusSession() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [timerState.isRunning, timerState.isPaused]);
+  }, [timerState.isRunning, timerState.isPaused, isUnderDailyCap]);
 
   const startSession = useCallback((
     taskId?: string,
@@ -396,7 +417,6 @@ export function useFocusSession() {
   }, []);
 
   // Stats calculations
-  const completedToday = todaySessions.filter(s => s.status === 'completed').length;
   const totalFocusMinutes = todaySessions
     .filter(s => s.status === 'completed' && s.duration_type === 'pomodoro')
     .reduce((acc, s) => acc + (s.actual_duration || 0), 0);
@@ -417,9 +437,11 @@ export function useFocusSession() {
     logDistraction,
     skipCooldown,
     stats: {
-      completedToday,
+      completedToday: completedSessionsToday,
       totalFocusMinutes,
       totalXPToday,
+      sessionsUntilCap,
+      dailyCap: FOCUS_XP_REWARDS.DAILY_SESSION_CAP,
     },
     DURATION_PRESETS,
   };

@@ -127,21 +127,17 @@ export const CALENDAR_BONUS_XP = {
 /**
  * Focus Session XP Rewards
  * 
- * Rewards based on session duration and completion.
+ * Simplified for single Pomodoro mode with daily cap.
  */
 export const FOCUS_XP_REWARDS = {
-  /** Quick focus session (15 minutes) */
-  QUICK: 15,
   /** Standard Pomodoro session (25 minutes) */
-  STANDARD: 25,
-  /** Deep work session (50 minutes) */
-  DEEP_WORK: 50,
-  /** Combo bonus for 4 consecutive sessions */
-  COMBO_BONUS: 20,
+  SESSION_COMPLETE: 20,
   /** Perfect focus (no distractions) bonus */
-  PERFECT_FOCUS_BONUS: 10,
-  /** Early quit penalty (negative) */
-  EARLY_QUIT_PENALTY: -5,
+  PERFECT_FOCUS_BONUS: 5,
+  /** Maximum XP-earning sessions per day */
+  DAILY_SESSION_CAP: 4,
+  /** XP when cap reached (reduced but still rewarding) */
+  CAPPED_SESSION_XP: 3,
 } as const;
 
 /**
