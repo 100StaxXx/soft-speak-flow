@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { QUEST_XP_REWARDS } from "@/config/xpRewards";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { SuggestedTimeSlots } from "@/components/SuggestedTimeSlots";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useIOSKeyboardAvoidance } from "@/hooks/useIOSKeyboardAvoidance";
 import {
   Drawer,
   DrawerClose,
@@ -62,8 +62,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   // Input ref for delayed focus
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keyboard height for positioning drawer above keyboard
-  const keyboardHeight = useKeyboardHeight();
+  // iOS keyboard avoidance
+  const { containerStyle, inputStyle, scrollInputIntoView } = useIOSKeyboardAvoidance({ 
+    offsetBuffer: 10 
+  });
 
   // Update scheduled time when prefilledTime changes
   useEffect(() => {
@@ -137,10 +139,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
         <DrawerContent 
           className="max-h-[200px]"
-          style={{ 
-            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
-            transition: 'bottom 0.2s ease-out'
-          }}
+          style={containerStyle}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
@@ -153,9 +152,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 value={taskText}
                 onChange={(e) => setTaskText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                onFocus={() => scrollInputIntoView(inputRef)}
                 disabled={isAdding}
                 className="flex-1"
-                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                style={inputStyle}
               />
               <Button 
                 size="icon"
@@ -208,8 +208,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               value={taskText}
               onChange={(e) => setTaskText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleSubmit()}
+              onFocus={() => scrollInputIntoView(inputRef)}
               disabled={isAdding}
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              style={inputStyle}
             />
           </div>
 

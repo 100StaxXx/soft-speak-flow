@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Moon, Sparkles } from "lucide-react";
 import {
   Drawer,
@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useEveningReflection } from "@/hooks/useEveningReflection";
+import { useIOSKeyboardAvoidance } from "@/hooks/useIOSKeyboardAvoidance";
 
 const MOOD_OPTIONS = [
   { emoji: "😊", label: "Great", value: "great" },
@@ -29,6 +30,10 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
   const [mood, setMood] = useState<string>("");
   const [wins, setWins] = useState("");
   const [gratitude, setGratitude] = useState("");
+  
+  const winsRef = useRef<HTMLTextAreaElement>(null);
+  const gratitudeRef = useRef<HTMLTextAreaElement>(null);
+  const { containerStyle, inputStyle, scrollInputIntoView } = useIOSKeyboardAvoidance({ offsetBuffer: 10 });
 
   // Reset form when drawer closes
   const handleOpenChange = (isOpen: boolean) => {
@@ -59,7 +64,7 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
-      <DrawerContent className="max-h-[85dvh]">
+      <DrawerContent className="max-h-[85dvh]" style={containerStyle}>
         <div 
           className="mx-auto w-full max-w-lg px-4 pb-8 overflow-y-auto overscroll-contain"
           style={{ 
@@ -108,11 +113,13 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 What went well today? <span className="text-muted-foreground">(optional)</span>
               </label>
               <Textarea
+                ref={winsRef}
                 placeholder="A small win, a moment of joy, something you accomplished..."
                 value={wins}
                 onChange={(e) => setWins(e.target.value.slice(0, 280))}
+                onFocus={() => scrollInputIntoView(winsRef)}
                 className="resize-none h-20 bg-muted/30 border-border/50"
-                style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
+                style={inputStyle}
               />
               <p className="text-xs text-muted-foreground text-right">{wins.length}/280</p>
             </div>
@@ -123,11 +130,13 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 What are you grateful for? <span className="text-muted-foreground">(optional)</span>
               </label>
               <Textarea
+                ref={gratitudeRef}
                 placeholder="Something or someone you appreciate today..."
                 value={gratitude}
                 onChange={(e) => setGratitude(e.target.value.slice(0, 280))}
+                onFocus={() => scrollInputIntoView(gratitudeRef)}
                 className="resize-none h-20 bg-muted/30 border-border/50"
-                style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
+                style={inputStyle}
               />
               <p className="text-xs text-muted-foreground text-right">{gratitude.length}/280</p>
             </div>
