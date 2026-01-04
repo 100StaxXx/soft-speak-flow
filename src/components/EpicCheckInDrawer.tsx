@@ -155,7 +155,6 @@ export const EpicCheckInDrawer = ({ epicId, habits, isActive, onAdjustPlan, show
       open={open} 
       onOpenChange={setOpen}
       shouldScaleBackground={false}
-      handleOnly={true}
     >
       <DrawerTrigger asChild>
         {renderTrigger ? (

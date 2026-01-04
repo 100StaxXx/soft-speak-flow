@@ -172,7 +172,7 @@ export const JourneyDetailDrawer = ({
         chapterNumber={postcardJustUnlocked?.chapterNumber}
         onDismiss={clearPostcardUnlocked}
       />
-      <Drawer open={open} onOpenChange={setOpen} handleOnly={true} shouldScaleBackground={false}>
+      <Drawer open={open} onOpenChange={setOpen} shouldScaleBackground={false}>
       <DrawerTrigger asChild>
         {children || (
           <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
