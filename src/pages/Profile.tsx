@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, Search, ChevronRight, ExternalLink, type LucideIcon } from "lucide-react";
+import { Crown, User, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -297,13 +297,6 @@ const Profile = () => {
           <section className="space-y-3">
             <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Quick Access</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <QuickActionCard 
-                icon={Search} 
-                label="Search" 
-                description="Find quotes, pep talks & more"
-                onClick={() => navigate("/search")} 
-                variant="info"
-              />
               <QuickActionCard 
                 icon={BookHeart} 
                 label="Library" 
