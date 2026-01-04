@@ -14,7 +14,7 @@ import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
-import { useUnreadGuildStories } from "@/hooks/useUnreadGuildStories";
+
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -55,7 +55,6 @@ OverviewTab.displayName = 'OverviewTab';
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
   const { profile } = useProfile();
-  const { data: unreadStoryCount = 0 } = useUnreadGuildStories();
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
@@ -142,14 +141,9 @@ const Companion = () => {
                 <Timer className="h-4 w-4" />
                 <span className="hidden sm:inline">Focus</span>
               </TabsTrigger>
-              <TabsTrigger value="stories" className="flex items-center gap-2 relative">
+              <TabsTrigger value="stories" className="flex items-center gap-2">
                 <BookOpen className="h-4 w-4" />
                 <span className="hidden sm:inline">Stories</span>
-                {unreadStoryCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full flex items-center justify-center">
-                    {unreadStoryCount > 9 ? '9+' : unreadStoryCount}
-                  </span>
-                )}
               </TabsTrigger>
               <TabsTrigger value="postcards" className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
