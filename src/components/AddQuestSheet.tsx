@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Zap, Flame, Mountain, Sliders } from "lucide-react";
+import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QUEST_XP_REWARDS } from "@/config/xpRewards";
@@ -14,6 +14,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { cn } from "@/lib/utils";
 
 export interface AddQuestData {
   text: string;
@@ -54,6 +55,9 @@ export function AddQuestSheet({
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
+  
+  // Expanded mode - starts minimal, expands when user wants more options
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Input ref for delayed focus
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,10 +74,13 @@ export function AddQuestSheet({
         inputRef.current?.focus();
       }, 350);
       return () => clearTimeout(timer);
+    } else {
+      // Reset expanded state when drawer closes
+      setIsExpanded(false);
     }
   }, [open]);
 
-  // Swipe-up gesture tracking
+  // Swipe-up gesture tracking for expanding
   const touchStartY = useRef<number>(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -85,8 +92,8 @@ export function AddQuestSheet({
     const swipeDistance = touchStartY.current - touchEnd;
     
     // Swipe up detected (minimum 50px threshold)
-    if (swipeDistance > 50 && !showAdvanced) {
-      setShowAdvanced(true);
+    if (swipeDistance > 50 && !isExpanded) {
+      setIsExpanded(true);
     }
   };
 
@@ -101,6 +108,7 @@ export function AddQuestSheet({
     setReminderEnabled(false);
     setReminderMinutesBefore(15);
     setMoreInformation(null);
+    setIsExpanded(false);
   };
 
   const handleSubmit = async () => {
@@ -122,6 +130,57 @@ export function AddQuestSheet({
     onOpenChange(false);
   };
 
+  const handleExpand = () => {
+    setIsExpanded(true);
+  };
+
+  // Minimal mode: just input + quick submit
+  if (!isExpanded) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={true}>
+        <DrawerContent 
+          className="max-h-[200px]"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="px-4 py-3 space-y-3" data-vaul-no-drag>
+            {/* Compact input row with send button */}
+            <div className="flex items-center gap-2">
+              <Input
+                ref={inputRef}
+                placeholder="What's your quest?"
+                value={taskText}
+                onChange={(e) => setTaskText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                disabled={isAdding}
+                className="flex-1"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              />
+              <Button 
+                size="icon"
+                onClick={handleSubmit}
+                disabled={isAdding || !taskText.trim()}
+                className="shrink-0"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Expand button */}
+            <button
+              onClick={handleExpand}
+              className="flex items-center justify-center gap-2 w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronUp className="w-4 h-4" />
+              <span>More options (difficulty, time, reminders)</span>
+            </button>
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // Expanded mode: full form
   return (
     <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
       <DrawerContent className="max-h-[85vh]">
