@@ -84,19 +84,12 @@ const PepTalkDetail = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: { audioUrl: pepTalk.audio_url }
+        body: { audioUrl: pepTalk.audio_url, pepTalkId: id }
       });
 
       if (error) throw error;
 
       if (data?.transcript && Array.isArray(data.transcript)) {
-        const { error: updateError } = await supabase
-          .from('pep_talks')
-          .update({ transcript: data.transcript })
-          .eq('id', id);
-
-        if (updateError) throw updateError;
-
         toast.success("Transcript generated successfully!");
         await fetchPepTalk(id);
       } else {
