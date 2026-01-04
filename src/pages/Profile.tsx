@@ -311,18 +311,18 @@ const Profile = () => {
                 onClick={() => navigate("/library")} 
               />
               <QuickActionCard 
-                icon={HelpCircle} 
-                label="Help Center" 
-                description="Guides & tutorials"
-                onClick={() => navigate("/help")} 
-                variant="info"
-              />
-              <QuickActionCard 
                 icon={Sparkles} 
                 label="Weekly Recaps" 
                 description="Past reflections"
                 onClick={() => navigate("/recaps")} 
                 variant="accent"
+              />
+              <QuickActionCard 
+                icon={HelpCircle} 
+                label="Help Center" 
+                description="Guides & tutorials"
+                onClick={() => navigate("/help")} 
+                variant="info"
               />
             </div>
           </section>
