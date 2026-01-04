@@ -114,15 +114,25 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           transition={{ duration: 0.1 }}
         />
         
-        {/* Content */}
-        <span 
-          className="relative z-10 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
-          style={{
-            textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
-          }}
-        >
-          {isHolding ? "HOLD TO EVOLVE" : "EVOLVE"}
-        </span>
+        {/* Content - use absolute positioning to prevent layout shift */}
+        <div className="relative z-10 h-[1.2em]">
+          <span 
+            className={`absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] transition-opacity duration-150 ${isHolding ? 'opacity-0' : 'opacity-100'}`}
+            style={{
+              textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
+            }}
+          >
+            EVOLVE
+          </span>
+          <span 
+            className={`absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] transition-opacity duration-150 text-xl sm:text-2xl ${isHolding ? 'opacity-100' : 'opacity-0'}`}
+            style={{
+              textShadow: "0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,255,255,0.3)",
+            }}
+          >
+            HOLD TO EVOLVE
+          </span>
+        </div>
       </button>
     </motion.div>
   );
