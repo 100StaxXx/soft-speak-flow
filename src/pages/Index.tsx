@@ -224,10 +224,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     );
   }
 
-  // Simple loading fallback - memoized
-  const ComponentLoader = memo(() => <div className="h-20" />);
-  ComponentLoader.displayName = "ComponentLoader";
-
   // Memoized insight action handler
   const onInsightAction = useCallback((insight: { actionType?: string }) => {
     switch (insight.actionType) {
