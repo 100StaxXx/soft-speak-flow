@@ -129,9 +129,9 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
       setIsPlaying(false);
       updateMediaSession({ playbackState: 'paused' });
     } else {
-      // Don't play if globally muted
+      // If globally muted, unmute when user explicitly clicks play
       if (globalAudio.getMuted()) {
-        return;
+        globalAudio.setMuted(false);
       }
       
       // Ensure audio is not muted before playing
