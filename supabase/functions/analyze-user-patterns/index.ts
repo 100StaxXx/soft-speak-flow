@@ -42,6 +42,14 @@ interface TaskCreationData {
   hour: number;
 }
 
+interface MentorChatSignal {
+  chatHour: number;
+  dayOfWeek: number;
+  mentionsEnergy: 'low' | 'high' | null;
+  mentionsOverwhelm: boolean;
+  mentionsWorkStyle: string | null;
+}
+
 function inferWorkStyle(patterns: SchedulingPatterns): { style: string; confidence: number } {
   let traditional9to5Score = 0;
   let entrepreneurScore = 0;
@@ -256,6 +264,65 @@ serve(async (req) => {
           currentPatterns.commonStartTimes = [...commonTimes, hour].slice(-5);
         }
       }
+    } else if (type === 'mentor_chat_signal') {
+      // Learn from mentor chat interactions
+      const signal = data as MentorChatSignal;
+      
+      // Track engagement hours (when user actively uses app)
+      let engagementHours: number[] = learning?.engagement_hours || [];
+      if (!engagementHours.includes(signal.chatHour)) {
+        engagementHours = [...engagementHours, signal.chatHour].slice(-10);
+      }
+      
+      // Track energy mentions by hour
+      let energyByHour: Record<string, { low: number; high: number }> = learning?.energy_by_hour || {};
+      if (signal.mentionsEnergy) {
+        const hourKey = String(signal.chatHour);
+        if (!energyByHour[hourKey]) {
+          energyByHour[hourKey] = { low: 0, high: 0 };
+        }
+        energyByHour[hourKey][signal.mentionsEnergy]++;
+      }
+      
+      // Track overwhelm signals
+      let overwhelmSignals: number = learning?.overwhelm_signals || 0;
+      if (signal.mentionsOverwhelm) {
+        overwhelmSignals++;
+      }
+      
+      // Track work style signals with high confidence (explicit mentions)
+      let workStyleSignals: Array<{ source: string; style: string; weight: number }> = learning?.work_style_signals || [];
+      if (signal.mentionsWorkStyle) {
+        workStyleSignals.push({
+          source: 'explicit_mention',
+          style: signal.mentionsWorkStyle,
+          weight: 3, // Worth 3x a normal completion signal
+        });
+        workStyleSignals = workStyleSignals.slice(-20); // Keep last 20
+      }
+      
+      // Update learning with mentor chat signals
+      const { error: chatSignalError } = await supabase
+        .from('user_ai_learning')
+        .upsert({
+          user_id: user.id,
+          engagement_hours: engagementHours,
+          energy_by_hour: energyByHour,
+          overwhelm_signals: overwhelmSignals,
+          work_style_signals: workStyleSignals,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      
+      if (chatSignalError) {
+        console.error('[analyze-user-patterns] Error upserting chat signals:', chatSignalError);
+        throw chatSignalError;
+      }
+      
+      console.log(`[analyze-user-patterns] Processed mentor_chat_signal: energy=${signal.mentionsEnergy}, overwhelm=${signal.mentionsOverwhelm}, workStyle=${signal.mentionsWorkStyle}`);
+      
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Re-analyze patterns if we have enough data

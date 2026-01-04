@@ -5669,12 +5669,15 @@ export type Database = {
           common_contexts: string[] | null
           created_at: string
           day_of_week_patterns: Json | null
+          energy_by_hour: Json | null
+          engagement_hours: number[] | null
           failed_patterns: Json | null
           id: string
           inferred_work_style: string | null
           interaction_count: number | null
           last_interaction_at: string | null
           modification_rate: number | null
+          overwhelm_signals: number | null
           peak_productivity_times: string[] | null
           preference_weights: Json | null
           preferred_epic_duration: number | null
@@ -5686,18 +5689,22 @@ export type Database = {
           updated_at: string
           user_id: string
           work_style_confidence: number | null
+          work_style_signals: Json | null
         }
         Insert: {
           acceptance_rate?: number | null
           common_contexts?: string[] | null
           created_at?: string
           day_of_week_patterns?: Json | null
+          energy_by_hour?: Json | null
+          engagement_hours?: number[] | null
           failed_patterns?: Json | null
           id?: string
           inferred_work_style?: string | null
           interaction_count?: number | null
           last_interaction_at?: string | null
           modification_rate?: number | null
+          overwhelm_signals?: number | null
           peak_productivity_times?: string[] | null
           preference_weights?: Json | null
           preferred_epic_duration?: number | null
@@ -5709,18 +5716,22 @@ export type Database = {
           updated_at?: string
           user_id: string
           work_style_confidence?: number | null
+          work_style_signals?: Json | null
         }
         Update: {
           acceptance_rate?: number | null
           common_contexts?: string[] | null
           created_at?: string
           day_of_week_patterns?: Json | null
+          energy_by_hour?: Json | null
+          engagement_hours?: number[] | null
           failed_patterns?: Json | null
           id?: string
           inferred_work_style?: string | null
           interaction_count?: number | null
           last_interaction_at?: string | null
           modification_rate?: number | null
+          overwhelm_signals?: number | null
           peak_productivity_times?: string[] | null
           preference_weights?: Json | null
           preferred_epic_duration?: number | null
@@ -5732,6 +5743,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           work_style_confidence?: number | null
+          work_style_signals?: Json | null
         }
         Relationships: [
           {

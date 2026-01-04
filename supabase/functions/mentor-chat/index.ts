@@ -112,6 +112,81 @@ async function updateCommunicationLearning(
 }
 
 /**
+ * Extract scheduling-relevant signals from chat messages
+ */
+interface SchedulingSignals {
+  chatHour: number;
+  dayOfWeek: number;
+  mentionsEnergy: 'low' | 'high' | null;
+  mentionsOverwhelm: boolean;
+  mentionsWorkStyle: string | null;
+}
+
+function extractSchedulingSignals(message: string): SchedulingSignals {
+  const lowerMsg = message.toLowerCase();
+  const now = new Date();
+  
+  let mentionsEnergy: 'low' | 'high' | null = null;
+  if (/tired|exhausted|low energy|drained|burnt out|sleepy|fatigued/.test(lowerMsg)) {
+    mentionsEnergy = 'low';
+  } else if (/energized|pumped|ready|motivated|fired up|great|amazing|productive/.test(lowerMsg)) {
+    mentionsEnergy = 'high';
+  }
+  
+  const mentionsOverwhelm = /overwhelm|too much|can't handle|stressed|behind|swamped|drowning/.test(lowerMsg);
+  
+  let mentionsWorkStyle: string | null = null;
+  if (/9.?to.?5|office hours|work hours|day job|corporate/.test(lowerMsg)) {
+    mentionsWorkStyle = 'traditional';
+  } else if (/night owl|late night|evening person|work late|midnight/.test(lowerMsg)) {
+    mentionsWorkStyle = 'entrepreneur';
+  } else if (/morning person|early bird|start early|wake up early/.test(lowerMsg)) {
+    mentionsWorkStyle = 'traditional';
+  } else if (/flexible|my own hours|whenever|freelance/.test(lowerMsg)) {
+    mentionsWorkStyle = 'flexible';
+  }
+  
+  return {
+    chatHour: now.getHours(),
+    dayOfWeek: now.getDay(),
+    mentionsEnergy,
+    mentionsOverwhelm,
+    mentionsWorkStyle,
+  };
+}
+
+/**
+ * Send scheduling signals to pattern analyzer (non-blocking)
+ */
+async function sendSchedulingSignals(
+  supabaseUrl: string,
+  authHeader: string,
+  message: string
+): Promise<void> {
+  try {
+    const signals = extractSchedulingSignals(message);
+    
+    // Only send if there's something meaningful to learn
+    if (signals.mentionsEnergy || signals.mentionsOverwhelm || signals.mentionsWorkStyle) {
+      await fetch(`${supabaseUrl}/functions/v1/analyze-user-patterns`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'mentor_chat_signal',
+          data: signals
+        })
+      });
+    }
+  } catch (error) {
+    // Non-blocking - don't fail the chat
+    console.error('Failed to send scheduling signals:', error);
+  }
+}
+
+/**
  * Sanitize error messages for client responses
  * Logs full error server-side, returns generic message to client
  */
@@ -334,6 +409,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       user.id,
       communicationAnalysis
+    );
+
+    // Send scheduling-relevant signals to pattern analyzer (non-blocking)
+    sendSchedulingSignals(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      authHeader,
+      message
     );
 
     return new Response(
