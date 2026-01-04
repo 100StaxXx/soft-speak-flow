@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { GlassCard } from "@/components/ui/glass-card";
+import { FileText } from "lucide-react";
 
 interface CaptionWord {
   word: string;
@@ -50,41 +52,55 @@ export const TimedCaptions = ({ transcript, currentTime, className }: TimedCapti
 
   if (!transcript || transcript.length === 0) {
     return (
-      <div className={cn("bg-card rounded-3xl p-6 shadow-soft", className)}>
-        <p className="text-muted-foreground text-center italic">
+      <GlassCard variant="default" glow="soft" className={cn("p-6", className)}>
+        <div className="flex items-center gap-2 mb-3">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <h3 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Transcript
+          </h3>
+        </div>
+        <p className="text-muted-foreground text-center italic py-4">
           No transcript available for this pep talk.
         </p>
-      </div>
+      </GlassCard>
     );
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className={cn(
-        "bg-card rounded-3xl p-6 shadow-soft max-h-[400px] overflow-y-auto scroll-smooth",
-        className
-      )}
+    <GlassCard 
+      variant="default" 
+      glow="soft"
+      className={cn("p-6", className)}
     >
-      <h3 className="font-heading text-lg font-semibold text-foreground mb-4">
-        Transcript
-      </h3>
-      <div className="text-base leading-relaxed">
-        {transcript.map((word, index) => (
-          <span
-            key={index}
-            ref={index === activeWordIndex ? activeWordRef : null}
-            className={cn(
-              "transition-all duration-200 px-0.5",
-              index === activeWordIndex
-                ? "bg-blush-rose/30 text-foreground font-semibold scale-105 inline-block"
-                : "text-muted-foreground"
-            )}
-          >
-            {word.word}{" "}
-          </span>
-        ))}
+      <div className="flex items-center gap-2 mb-4">
+        <FileText className="h-4 w-4 text-stardust-gold" />
+        <h3 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Transcript
+        </h3>
       </div>
-    </div>
+      <div 
+        ref={containerRef}
+        className="max-h-[300px] overflow-y-auto scroll-smooth pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+      >
+        <div className="text-base leading-relaxed">
+          {transcript.map((word, index) => (
+            <span
+              key={index}
+              ref={index === activeWordIndex ? activeWordRef : null}
+              className={cn(
+                "transition-all duration-200 px-0.5 py-0.5 rounded",
+                index === activeWordIndex
+                  ? "bg-stardust-gold/30 text-foreground font-semibold shadow-[0_0_8px_rgba(255,215,0,0.3)]"
+                  : index < activeWordIndex
+                  ? "text-muted-foreground/70"
+                  : "text-muted-foreground"
+              )}
+            >
+              {word.word}{" "}
+            </span>
+          ))}
+        </div>
+      </div>
+    </GlassCard>
   );
 };
