@@ -1,12 +1,12 @@
 import { ReactNode, useState } from "react";
 import { motion, PanInfo, useMotionValue, useTransform, AnimatePresence } from "framer-motion";
-import { Check, Undo2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SwipeableTaskItemProps {
   children: ReactNode;
   onSwipeComplete: () => void;
-  onSwipeUndo?: () => void;
+  onSwipeDelete?: () => void;
   isComplete: boolean;
   disabled?: boolean;
   xpReward?: number;
@@ -21,7 +21,7 @@ interface Particle {
 export function SwipeableTaskItem({
   children,
   onSwipeComplete,
-  onSwipeUndo,
+  onSwipeDelete,
   isComplete,
   disabled = false,
   xpReward = 0,
@@ -29,25 +29,29 @@ export function SwipeableTaskItem({
   const x = useMotionValue(0);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [showXpBurst, setShowXpBurst] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const SWIPE_THRESHOLD = 80;
+  const DELETE_THRESHOLD = 100;
   const VELOCITY_THRESHOLD = 500;
   const DRAG_LIMIT = 120;
 
-  // Transform values for visual feedback
+  // Transform values for visual feedback - Complete (right swipe)
   const completeOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1]);
-  const undoOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]);
   const completeScale = useTransform(x, [0, SWIPE_THRESHOLD], [0.5, 1]);
-  const undoScale = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0.5]);
   const backgroundGreen = useTransform(
     x, 
     [0, SWIPE_THRESHOLD], 
     ["hsl(var(--background))", "hsl(142 76% 36% / 0.15)"]
   );
-  const backgroundOrange = useTransform(
+  
+  // Transform values for visual feedback - Delete (left swipe)
+  const deleteOpacity = useTransform(x, [-DELETE_THRESHOLD, 0], [1, 0]);
+  const deleteScale = useTransform(x, [-DELETE_THRESHOLD, 0], [1, 0.5]);
+  const backgroundRed = useTransform(
     x, 
-    [-SWIPE_THRESHOLD, 0], 
-    ["hsl(25 95% 53% / 0.15)", "hsl(var(--background))"]
+    [-DELETE_THRESHOLD, 0], 
+    ["hsl(0 84% 60% / 0.15)", "hsl(var(--background))"]
   );
 
   const spawnParticles = () => {
@@ -65,16 +69,20 @@ export function SwipeableTaskItem({
   };
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (disabled) return;
+    if (disabled || isDeleting) return;
 
     const swipedRight = info.offset.x > SWIPE_THRESHOLD || info.velocity.x > VELOCITY_THRESHOLD;
-    const swipedLeft = info.offset.x < -SWIPE_THRESHOLD || info.velocity.x < -VELOCITY_THRESHOLD;
+    const swipedLeft = info.offset.x < -DELETE_THRESHOLD || info.velocity.x < -VELOCITY_THRESHOLD;
 
     if (swipedRight && !isComplete) {
       spawnParticles();
       onSwipeComplete();
-    } else if (swipedLeft && isComplete && onSwipeUndo) {
-      onSwipeUndo();
+    } else if (swipedLeft && onSwipeDelete) {
+      setIsDeleting(true);
+      // Animate off-screen then call delete
+      setTimeout(() => {
+        onSwipeDelete();
+      }, 200);
     }
   };
 
@@ -99,22 +107,22 @@ export function SwipeableTaskItem({
         </motion.div>
       </motion.div>
 
-      {/* Undo action background (left swipe) - Orange */}
-      {isComplete && onSwipeUndo && (
+      {/* Delete action background (left swipe) - Red */}
+      {onSwipeDelete && (
         <motion.div
           className="absolute inset-0 flex items-center justify-end pr-5"
           style={{ 
-            opacity: undoOpacity,
-            background: backgroundOrange 
+            opacity: deleteOpacity,
+            background: backgroundRed 
           }}
         >
           <motion.div 
             className="flex items-center gap-2"
-            style={{ scale: undoScale }}
+            style={{ scale: deleteScale }}
           >
-            <span className="text-orange-500 font-semibold text-sm">Undo</span>
-            <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center">
-              <Undo2 className="w-6 h-6 text-white" />
+            <span className="text-red-500 font-semibold text-sm">Delete</span>
+            <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center">
+              <Trash2 className="w-6 h-6 text-white" />
             </div>
           </motion.div>
         </motion.div>
@@ -122,16 +130,21 @@ export function SwipeableTaskItem({
 
       {/* Draggable task content */}
       <motion.div
-        drag={disabled ? false : "x"}
-        dragConstraints={{ left: isComplete ? -DRAG_LIMIT : 0, right: isComplete ? 0 : DRAG_LIMIT }}
+        drag={disabled || isDeleting ? false : "x"}
+        dragConstraints={{ 
+          left: onSwipeDelete ? -DRAG_LIMIT : 0, 
+          right: isComplete ? 0 : DRAG_LIMIT 
+        }}
         dragElastic={0.3}
         style={{ x }}
         onDragEnd={handleDragEnd}
+        animate={isDeleting ? { x: -500, opacity: 0 } : {}}
+        transition={isDeleting ? { duration: 0.2, ease: "easeOut" } : {}}
         className={cn(
           "relative touch-pan-y",
-          !disabled && "cursor-grab active:cursor-grabbing"
+          !disabled && !isDeleting && "cursor-grab active:cursor-grabbing"
         )}
-        whileTap={disabled ? {} : { scale: 0.99 }}
+        whileTap={disabled || isDeleting ? {} : { scale: 0.99 }}
       >
         {children}
       </motion.div>
