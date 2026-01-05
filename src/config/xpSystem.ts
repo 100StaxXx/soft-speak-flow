@@ -136,6 +136,51 @@ export const EVOLUTION_THRESHOLDS: Record<number, number> = {
   20: 38000,   // Ultimate
 };
 
+/**
+ * User Level System: Scaling progression curve
+ * 
+ * Early levels are quick to hook users, later levels take weeks/months.
+ * - Level 10: ~2 weeks of vigorous daily use (~175 XP/day)
+ * - Level 14: ~2 months of near-perfect daily use (~250 XP/day)
+ * - Level 20: 6+ months of dedication (legendary achievement)
+ */
+export const LEVEL_THRESHOLDS: Record<number, number> = {
+  1: 0,       // Start
+  2: 50,      // ~1 day
+  3: 150,     // ~1 day
+  4: 300,     // ~1 day
+  5: 500,     // 1-2 days
+  6: 800,     // 2 days
+  7: 1200,    // 2-3 days
+  8: 1750,    // 3 days
+  9: 2500,    // 4-5 days
+  10: 3500,   // ~2 weeks total (milestone!)
+  11: 5000,   // 8-9 days
+  12: 7000,   // 11-12 days
+  13: 10000,  // 17-20 days
+  14: 14000,  // ~2 months total (elite!)
+  15: 19000,  // 28-30 days
+  16: 25000,  // 35+ days
+  17: 32000,  // 40+ days
+  18: 40000,  // 45+ days
+  19: 50000,  // 55+ days
+  20: 65000,  // 85+ days (legendary)
+};
+
+/** Get total XP required for a specific level */
+export function getXPForLevel(level: number): number {
+  if (level <= 1) return 0;
+  if (level >= 20) return LEVEL_THRESHOLDS[20];
+  return LEVEL_THRESHOLDS[level] ?? LEVEL_THRESHOLDS[20];
+}
+
+/** Get XP needed to progress from current level to next */
+export function getXPToNextLevel(currentLevel: number): number {
+  const current = getXPForLevel(currentLevel);
+  const next = getXPForLevel(Math.min(currentLevel + 1, 20));
+  return next - current;
+}
+
 export const XP_SYSTEM_DOCS = {
   note: "See useXPRewards hook for implementation",
 } as const;
