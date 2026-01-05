@@ -31,19 +31,42 @@ export function useSubscription() {
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase.functions.invoke("check-apple-subscription");
+      // Create a timeout promise to prevent infinite loading
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          logger.warn('Subscription check timed out after 5s');
+          resolve(null);
+        }, 5000);
+      });
 
-      if (error) throw error;
-      return data as {
-        subscribed: boolean;
-        status?: string;
-        subscription_end?: string;
-        plan?: string;
-      } | null;
+      try {
+        // Race the actual check against the timeout
+        const result = await Promise.race([
+          supabase.functions.invoke("check-apple-subscription").then(({ data, error }) => {
+            if (error) {
+              logger.warn('Subscription check error:', { error: error.message });
+              return null;
+            }
+            return data as {
+              subscribed: boolean;
+              status?: string;
+              subscription_end?: string;
+              plan?: string;
+            } | null;
+          }),
+          timeoutPromise
+        ]);
+
+        return result;
+      } catch (err) {
+        logger.warn('Subscription check failed:', { error: err instanceof Error ? err.message : 'Unknown error' });
+        return null;
+      }
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes - increased for better performance
     refetchInterval: false, // Disable automatic refetching for better performance
+    retry: false, // Don't retry failed subscription checks to avoid blocking
   });
 
   // Only consider loading if auth is done AND user exists AND query is actually loading
