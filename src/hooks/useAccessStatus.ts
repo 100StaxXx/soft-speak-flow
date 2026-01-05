@@ -31,9 +31,9 @@ export function useAccessStatus(): AccessStatus {
     const loading = profileLoading || subscriptionLoading;
     
     // If still loading, return safe defaults (grant access during load to avoid flash)
-    if (loading) {
+    if (loading || !profile) {
       return {
-        hasAccess: true,
+        hasAccess: true, // Optimistic - don't block during load
         isSubscribed: false,
         isInTrial: false,
         trialExpired: false,
@@ -41,20 +41,6 @@ export function useAccessStatus(): AccessStatus {
         accessSource: 'none' as AccessSource,
         trialEndsAt: null,
         loading: true,
-      };
-    }
-
-    // If profile fetch failed/timed out, grant optimistic access
-    if (!profile) {
-      return {
-        hasAccess: true,
-        isSubscribed: isSubscribed ?? false,
-        isInTrial: true,
-        trialExpired: false,
-        trialDaysRemaining: 7,
-        accessSource: isSubscribed ? 'subscription' : 'trial',
-        trialEndsAt: null,
-        loading: false,
       };
     }
 

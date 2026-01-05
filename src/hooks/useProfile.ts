@@ -53,66 +53,46 @@ export const useProfile = () => {
     queryFn: async () => {
       if (!user) return null;
 
-      // Create a timeout promise to prevent infinite loading
-      const timeoutPromise = new Promise<null>((resolve) => {
-        setTimeout(() => {
-          console.warn('Profile fetch timed out after 5s');
-          resolve(null);
-        }, 5000);
-      });
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      try {
-        // Race the actual query against the timeout
-        const result = await Promise.race([
-          (async () => {
-            const { data, error } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", user.id)
-              .maybeSingle();
-
-            if (error) {
-              console.warn("Error fetching profile:", error);
-              return null;
-            }
-
-            if (!data) {
-              // Auto-create profile on first login if missing
-              const { data: inserted, error: insertError } = await supabase
-                .from("profiles")
-                .upsert({
-                  id: user.id,
-                  email: user.email ?? null,
-                }, {
-                  onConflict: 'id',
-                  ignoreDuplicates: false
-                })
-                .select("*")
-                .maybeSingle();
-
-              if (insertError) {
-                console.warn("Error creating profile:", insertError);
-                return null;
-              }
-              
-              return inserted;
-            }
-
-            return data;
-          })(),
-          timeoutPromise
-        ]);
-
-        return result;
-      } catch (err) {
-        console.warn('Profile fetch failed:', err);
-        return null;
+      if (error) {
+        console.error("Error fetching profile:", error);
+        throw error;
       }
+
+      if (!data) {
+        // Auto-create profile on first login if missing (upsert prevents race conditions)
+        const { data: inserted, error: insertError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            email: user.email ?? null,
+          }, {
+            onConflict: 'id',
+            ignoreDuplicates: false
+          })
+          .select("*")
+          .maybeSingle();
+
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          throw insertError;
+        }
+        
+        if (!inserted) throw new Error("Failed to create profile");
+        
+        return inserted;
+      }
+
+      return data;
     },
     enabled: !!user,
-    staleTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    retry: false, // Don't retry failed profile fetches to avoid blocking
+    staleTime: 2 * 60 * 1000, // 2 minutes - balance between performance and freshness
+    refetchOnWindowFocus: false, // Prevent unnecessary refetches on tab switch
   });
 
   return { profile: profile ?? null, loading };
