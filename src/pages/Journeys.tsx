@@ -11,7 +11,7 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { QuestHubTutorial } from "@/components/QuestHubTutorial";
-
+import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,6 +51,7 @@ const Journeys = () => {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
   const [showRescheduleCard, setShowRescheduleCard] = useState(true);
+  const [showHourlyModal, setShowHourlyModal] = useState(false);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for onboarding
@@ -328,6 +329,45 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: targetDateStr });
   }, [moveTaskToDate]);
 
+  // Handle date pill click - open hourly modal
+  const handleDatePillClick = useCallback((date: Date) => {
+    setSelectedDate(date);
+    setShowHourlyModal(true);
+  }, []);
+
+  // Format tasks for HourlyViewModal (CalendarTask format)
+  const formattedTasksForModal = useMemo(() => 
+    dailyTasks.map(task => ({
+      id: task.id,
+      task_text: task.task_text,
+      task_date: task.task_date,
+      scheduled_time: task.scheduled_time,
+      estimated_duration: task.estimated_duration,
+      completed: task.completed ?? false,
+      is_main_quest: task.is_main_quest ?? false,
+      difficulty: task.difficulty,
+      xp_reward: task.xp_reward ?? 0,
+      category: task.category,
+    })),
+    [dailyTasks]
+  );
+
+  // Handle task drop from modal (reschedule time and/or date)
+  const handleModalTaskDrop = useCallback((taskId: string, newDate: Date, newTime?: string) => {
+    const updates: Record<string, unknown> = {};
+    if (newTime) {
+      updates.scheduled_time = newTime;
+    }
+    const newDateStr = format(newDate, 'yyyy-MM-dd');
+    const currentTask = dailyTasks.find(t => t.id === taskId);
+    if (currentTask && currentTask.task_date !== newDateStr) {
+      moveTaskToDate({ taskId, targetDate: newDateStr });
+    }
+    if (Object.keys(updates).length > 0) {
+      updateTask({ taskId, updates });
+    }
+  }, [dailyTasks, moveTaskToDate, updateTask]);
+
   // Handle Plan My Day command - generates actual tasks
   const handlePlanMyDay = useCallback(async (answers: PlanMyDayAnswers) => {
     try {
@@ -417,7 +457,7 @@ const Journeys = () => {
         >
           <DatePillsScroller
             selectedDate={selectedDate}
-            onDateSelect={setSelectedDate}
+            onDateSelect={handleDatePillClick}
             tasksPerDay={tasksPerDay}
             onTaskDrop={handleMoveTaskToDate}
           />
@@ -573,6 +613,28 @@ const Journeys = () => {
           tasksCompleted={perfectDayTasksCompleted}
           currentStreak={currentStreak}
           onDismiss={dismissPerfectDay}
+        />
+        
+        {/* Hourly/Month View Modal */}
+        <HourlyViewModal
+          open={showHourlyModal}
+          onOpenChange={setShowHourlyModal}
+          selectedDate={selectedDate}
+          onDateSelect={(date) => {
+            setSelectedDate(date);
+          }}
+          tasks={formattedTasksForModal}
+          milestones={[]}
+          onTaskDrop={handleModalTaskDrop}
+          onTimeSlotLongPress={(date, time) => {
+            setSelectedDate(date);
+            setShowAddSheet(true);
+          }}
+          onTaskLongPress={(taskId) => {
+            const task = dailyTasks.find(t => t.id === taskId);
+            if (task) handleEditQuest(task);
+          }}
+          onMilestoneClick={() => {}}
         />
       </div>
 
