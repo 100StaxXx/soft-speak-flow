@@ -210,31 +210,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     );
   }
 
-  if (!enableOnboardingGuard && isReady && !resolvedMentorId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background/95 to-accent/10 px-4 py-12">
-        <div className="max-w-lg mx-auto text-center space-y-6 bg-card/70 backdrop-blur-sm border border-border/50 rounded-3xl p-8 shadow-soft">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary shadow-glow">
-            <Sparkles className="h-8 w-8" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">Choose your mentor to get started</h1>
-            <p className="text-muted-foreground">
-              Pick a mentor to unlock personalized guidance. You can always change your mentor later.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button onClick={() => navigate("/mentor-selection")} className="flex-1 min-w-[180px]">
-              Select Mentor
-            </Button>
-            <Button variant="ghost" onClick={() => navigate("/journeys")} className="flex-1 min-w-[180px]">
-              View Quests
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
   return (
     <PageTransition>
       {/* Cosmiq Starfield Background */}
