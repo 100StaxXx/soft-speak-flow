@@ -16,6 +16,23 @@ Soft Speak Flow is a personal wellness and self-improvement application that pro
 - AI-powered mentor guidance and chat features
 - Progress tracking and achievement system
 
+### 2.1 AI-Powered Personalization
+
+To provide better recommendations and a more tailored experience, the App uses artificial intelligence to learn from your usage patterns. This includes:
+
+- **Task completion patterns**: When you complete tasks, the times you're most productive, and your success rates with different task types
+- **Scheduling preferences**: How you modify AI-generated schedules and your preferred task timing
+- **Interaction patterns**: How you respond to AI suggestions (accept, modify, or skip)
+- **Category preferences**: Which types of activities you engage with most successfully
+
+This behavioral learning is used **solely** to improve your personal experience within the App. Your learning profile:
+- Is private to your account
+- Is never shared with third parties for advertising purposes
+- Can be reset at any time through your account settings
+- Does not include the content of your personal entries (journals, reflections, etc.)
+
+By using the App, you consent to this personalization. If you prefer not to have AI learn from your behavior, you may disable personalized recommendations in Settings, though this may reduce the App's ability to provide tailored suggestions.
+
 ## 3. Important Health Disclaimer and No Medical Advice
 
 **THE APP IS NOT A SUBSTITUTE FOR PROFESSIONAL MEDICAL ADVICE, DIAGNOSIS, OR TREATMENT.**
@@ -221,7 +238,7 @@ The App may contain links to third-party websites or services that are not owned
 Third-party services include:
 - Supabase (data storage and authentication)
 - Stripe (payment processing)
-- Artificial Intelligence services (for mentor chat and personalized content generation)
+- Artificial Intelligence services (for mentor chat, personalized content generation, daily planning, and behavioral learning as described in Section 2.1)
 - Mobile app platforms (Apple App Store, Google Play Store)
 - Other integrated services
 

@@ -38,6 +38,7 @@ import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
 import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
 import { useWeeklyPlanOptimization } from "@/hooks/useWeeklyPlanOptimization";
 import { useEpics } from "@/hooks/useEpics";
+import { SmartDailyRescheduleCard } from "@/components/SmartDailyRescheduleCard";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
@@ -47,7 +48,7 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
-  
+  const [showRescheduleCard, setShowRescheduleCard] = useState(true);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for onboarding
@@ -398,6 +399,25 @@ const Journeys = () => {
             onTaskDrop={handleMoveTaskToDate}
           />
         </motion.div>
+
+        {/* Smart Reschedule Card */}
+        {showRescheduleCard && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-4"
+          >
+            <SmartDailyRescheduleCard
+              tasks={dailyTasks}
+              selectedDate={selectedDate}
+              onReplan={() => {
+                // Could trigger the plan my day flow here
+              }}
+              onDismiss={() => setShowRescheduleCard(false)}
+            />
+          </motion.div>
+        )}
 
         {/* Main Content Area */}
         <motion.div
