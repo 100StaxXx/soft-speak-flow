@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { format, addHours, addDays } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface RescheduleAction {
   type: 'push_hours' | 'prioritize' | 'extend_tomorrow' | 'replan';
@@ -21,6 +22,7 @@ export interface RescheduleAnalysis {
 
 export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isRescheduling, setIsRescheduling] = useState(false);
 
   const analysis = useMemo((): RescheduleAnalysis => {
@@ -55,7 +57,6 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
     }
 
     // Calculate expected progress based on time of day
-    // By 6pm, expect ~75% done; by 9pm, expect 100%
     const expectedProgress = Math.min(100, Math.max(0, (currentHour - 8) / 13 * 100));
     const isBehind = completionRate < expectedProgress - 20;
 
@@ -69,11 +70,9 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
       };
     }
 
-    // Determine best action based on time and task count
     let suggestedAction: RescheduleAction;
 
     if (currentHour >= 20) {
-      // Late evening - suggest moving to tomorrow
       suggestedAction = {
         type: 'extend_tomorrow',
         label: 'Move to tomorrow',
@@ -81,7 +80,6 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
         icon: '📅',
       };
     } else if (incompleteTasks > 5) {
-      // Many tasks - prioritize essentials
       suggestedAction = {
         type: 'prioritize',
         label: 'Focus on essentials',
@@ -89,7 +87,6 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
         icon: '🎯',
       };
     } else {
-      // Default - push times
       suggestedAction = {
         type: 'push_hours',
         label: 'Push by 2 hours',
@@ -109,75 +106,114 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
 
   const pushByHours = useCallback(async (hours: number = 2) => {
     if (!user) return;
-    setIsRescheduling(true);
+    
+    const incompleteTasks = tasks.filter(t => !t.completed && t.scheduled_time);
+    if (incompleteTasks.length === 0) return;
 
+    // Optimistically update cache immediately
+    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => {
+        if (!t.completed && t.scheduled_time) {
+          const [h, m] = t.scheduled_time.split(':').map(Number);
+          const newHour = Math.min(23, h + hours);
+          return { ...t, scheduled_time: `${String(newHour).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
+        }
+        return t;
+      });
+    });
+
+    setIsRescheduling(true);
     try {
-      const incompleteTasks = tasks.filter(t => !t.completed && t.scheduled_time);
-      
-      for (const task of incompleteTasks) {
+      // Batch update in background
+      const updates = incompleteTasks.map(task => {
         const [h, m] = task.scheduled_time.split(':').map(Number);
         const newHour = Math.min(23, h + hours);
-        const newTime = `${String(newHour).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        
+        return { id: task.id, time: `${String(newHour).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
+      });
+
+      for (const update of updates) {
         await supabase
           .from('daily_tasks')
-          .update({ scheduled_time: newTime })
-          .eq('id', task.id);
+          .update({ scheduled_time: update.time })
+          .eq('id', update.id);
       }
 
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       toast.success(`Pushed ${incompleteTasks.length} tasks by ${hours} hours`);
     } catch (error) {
       console.error('Error pushing tasks:', error);
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       toast.error('Failed to reschedule tasks');
     } finally {
       setIsRescheduling(false);
     }
-  }, [user, tasks]);
+  }, [user, tasks, queryClient]);
 
   const prioritizeEssentials = useCallback(async () => {
     if (!user) return;
+
+    const incompleteTasks = tasks.filter(t => !t.completed);
+    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+    
+    const toMove = incompleteTasks.filter(t => 
+      t.priority !== 'high' && 
+      !t.habit_source_id && 
+      !t.is_main_quest
+    );
+
+    if (toMove.length === 0) return;
+
+    // Optimistically remove moved tasks from today's view
+    const moveIds = new Set(toMove.map(t => t.id));
+    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.filter(t => !moveIds.has(t.id) || t.completed);
+    });
+
     setIsRescheduling(true);
-
     try {
-      const incompleteTasks = tasks.filter(t => !t.completed);
-      const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+      // Batch update using .in()
+      const { error } = await supabase
+        .from('daily_tasks')
+        .update({ task_date: tomorrow })
+        .in('id', toMove.map(t => t.id));
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       
-      // Keep high priority and habit-linked tasks, move rest to tomorrow
-      const toKeep = incompleteTasks.filter(t => 
-        t.priority === 'high' || 
-        t.habit_source_id || 
-        t.is_main_quest
-      );
-      const toMove = incompleteTasks.filter(t => 
-        t.priority !== 'high' && 
-        !t.habit_source_id && 
-        !t.is_main_quest
-      );
-
-      for (const task of toMove) {
-        await supabase
-          .from('daily_tasks')
-          .update({ task_date: tomorrow })
-          .eq('id', task.id);
-      }
-
-      toast.success(`Focused on ${toKeep.length} essentials, moved ${toMove.length} to tomorrow`);
+      const kept = incompleteTasks.length - toMove.length;
+      toast.success(`Focused on ${kept} essentials, moved ${toMove.length} to tomorrow`);
     } catch (error) {
       console.error('Error prioritizing tasks:', error);
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       toast.error('Failed to prioritize tasks');
     } finally {
       setIsRescheduling(false);
     }
-  }, [user, tasks]);
+  }, [user, tasks, queryClient]);
 
   const extendToTomorrow = useCallback(async () => {
     if (!user) return;
-    setIsRescheduling(true);
 
+    const incompleteTasks = tasks.filter(t => !t.completed);
+    if (incompleteTasks.length === 0) return;
+
+    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+    const moveIds = new Set(incompleteTasks.map(t => t.id));
+
+    // Optimistically remove from today's view immediately
+    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.filter(t => !moveIds.has(t.id));
+    });
+
+    setIsRescheduling(true);
     try {
-      const incompleteTasks = tasks.filter(t => !t.completed);
-      const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-      
+      // Single batch update
       const { error } = await supabase
         .from('daily_tasks')
         .update({ task_date: tomorrow })
@@ -185,14 +221,17 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
 
       if (error) throw error;
 
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       toast.success(`Moved ${incompleteTasks.length} tasks to tomorrow`);
     } catch (error) {
       console.error('Error moving tasks:', error);
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       toast.error('Failed to move tasks');
     } finally {
       setIsRescheduling(false);
     }
-  }, [user, tasks]);
+  }, [user, tasks, queryClient]);
 
   const executeAction = useCallback(async (action: RescheduleAction['type']) => {
     switch (action) {
@@ -206,7 +245,6 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
         await extendToTomorrow();
         break;
       case 'replan':
-        // This would trigger a new plan generation - handled by parent
         break;
     }
   }, [pushByHours, prioritizeEssentials, extendToTomorrow]);
