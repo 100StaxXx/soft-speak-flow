@@ -588,6 +588,15 @@ All colors MUST be HSL.
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* iOS Safari specific - aggressive text selection prevention */
+  @supports (-webkit-touch-callout: none) {
+    p, span, div, h1, h2, h3, h4, h5, h6, label {
+      -webkit-user-select: none !important;
+      user-select: none !important;
+      -webkit-touch-callout: none !important;
+    }
+  }
   
   /* 3D flip utilities */
   .preserve-3d {
