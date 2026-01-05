@@ -46,7 +46,7 @@ const Welcome = () => {
   // Device motion parallax - subtle movement based on device tilt
   // gamma: left/right tilt (-90 to 90), beta: front/back tilt (-180 to 180)
   const gyroX = permitted ? (gamma / 45) * 15 : 0; // Max 15px movement
-  const gyroY = permitted ? ((beta - 45) / 45) * 10 : 0; // Offset beta for natural holding angle
+  const gyroY = permitted ? Math.max(-5, Math.min(5, ((beta - 45) / 45) * 10)) : 0; // Clamped to prevent cutoff
 
   if (loading) {
     return <PageLoader message="Preparing your journey..." />;
@@ -61,13 +61,14 @@ const Welcome = () => {
     >
       {/* Parallax Background with Gyroscope */}
       <motion.div 
-        className="fixed inset-0 -z-10"
+        className="fixed -inset-4 -z-10"
         style={{
           backgroundImage: `url(${backgroundImage})`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundPosition: 'center top',
           y: backgroundY,
-          scale: 1.15,
+          scale: 1.2,
+          transformOrigin: 'center top',
         }}
         animate={{
           x: gyroX,
