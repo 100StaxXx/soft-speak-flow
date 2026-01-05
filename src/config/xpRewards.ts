@@ -12,9 +12,9 @@
  * Main Quest receives 1.5x multiplier.
  */
 export const QUEST_XP_REWARDS = {
-  EASY: 8,
-  MEDIUM: 16,
-  HARD: 28,
+  EASY: 10,
+  MEDIUM: 18,
+  HARD: 30,
 } as const;
 
 /**

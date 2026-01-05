@@ -1,26 +1,48 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { safeLocalStorage } from "@/utils/storage";
-
-const XP_PER_LEVEL = 500;
+import { LEVEL_THRESHOLDS, getXPForLevel, getXPToNextLevel } from "@/config/xpSystem";
 
 interface LevelUpState {
   showLevelUp: boolean;
   newLevel: number;
 }
 
+/**
+ * Calculate user level from total XP using threshold-based lookup.
+ * Uses exponentially scaling thresholds for progression.
+ */
 export function calculateLevel(xp: number): number {
-  return Math.floor(xp / XP_PER_LEVEL) + 1;
+  let level = 1;
+  const levels = Object.keys(LEVEL_THRESHOLDS)
+    .map(Number)
+    .sort((a, b) => a - b);
+  
+  for (const lvl of levels) {
+    if (xp >= LEVEL_THRESHOLDS[lvl]) {
+      level = lvl;
+    } else {
+      break;
+    }
+  }
+  return level;
 }
 
+/**
+ * Calculate XP progress within current level.
+ * Returns current XP into level, XP needed for next level, and percentage.
+ */
 export function calculateXPProgress(xp: number): { current: number; needed: number; percent: number } {
   const level = calculateLevel(xp);
-  const xpForCurrentLevel = (level - 1) * XP_PER_LEVEL;
-  const xpIntoLevel = xp - xpForCurrentLevel;
+  const currentThreshold = getXPForLevel(level);
+  const xpNeeded = getXPToNextLevel(level);
+  
+  const xpIntoLevel = xp - currentThreshold;
+  const percent = xpNeeded > 0 ? (xpIntoLevel / xpNeeded) * 100 : 100;
   
   return {
     current: xpIntoLevel,
-    needed: XP_PER_LEVEL,
-    percent: (xpIntoLevel / XP_PER_LEVEL) * 100,
+    needed: xpNeeded,
+    percent: Math.min(percent, 100),
   };
 }
 
@@ -75,7 +97,7 @@ export function useLevelUpTracker(currentXP: number | undefined) {
   }, []);
 
   const currentLevel = currentXP !== undefined ? calculateLevel(currentXP) : 1;
-  const xpProgress = currentXP !== undefined ? calculateXPProgress(currentXP) : { current: 0, needed: XP_PER_LEVEL, percent: 0 };
+  const xpProgress = currentXP !== undefined ? calculateXPProgress(currentXP) : { current: 0, needed: getXPToNextLevel(1), percent: 0 };
 
   return {
     showLevelUp: state.showLevelUp,
