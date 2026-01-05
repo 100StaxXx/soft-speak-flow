@@ -128,7 +128,7 @@ export function CompactSmartInput({
   const handlePlanSkip = async () => {
     setIsPlanLoading(true);
     try {
-      await onPlanMyDay?.({ energyLevel: 'medium' });
+      await onPlanMyDay?.({ energyLevel: 'medium', dayType: 'mixed', focusArea: 'progress' });
       reset();
       setInterimText('');
       setShowPlanClarification(false);
@@ -420,8 +420,6 @@ export function CompactSmartInput({
             onComplete={handlePlanComplete}
             onSkip={handlePlanSkip}
             isLoading={isPlanLoading}
-            activeEpics={activeEpics}
-            habitsAtRisk={habitsAtRisk}
           />
         )}
       </AnimatePresence>
