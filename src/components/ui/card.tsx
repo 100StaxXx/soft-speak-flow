@@ -12,8 +12,10 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
       "shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
       "transition-all duration-300",
       "active:scale-[0.99] sm:hover:scale-[1.01] touch-manipulation",
+      "select-none",
       className
-    )} 
+    )}
+    onContextMenu={(e) => e.preventDefault()}
     {...props} 
   />
 ));

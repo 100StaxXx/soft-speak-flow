@@ -98,7 +98,8 @@ const DailyMissionsContent = memo(() => {
     return (
       <div
         key={mission.id}
-        className={`flex items-center justify-between p-2.5 sm:p-3 rounded-lg border transition-all ${
+        onContextMenu={(e) => e.preventDefault()}
+        className={`flex items-center justify-between p-2.5 sm:p-3 rounded-lg border transition-all select-none ${
           mission.completed
             ? "bg-accent/5 border-accent/20 opacity-60"
             : "bg-background border-border hover:border-accent/40"
