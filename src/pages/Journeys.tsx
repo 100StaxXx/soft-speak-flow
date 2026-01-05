@@ -68,8 +68,8 @@ const Journeys = () => {
   // Combo tracking
   const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
   
-  // Daily plan optimization
-  const { refetch: refetchPlan, suggestedSchedule, isLoading: isPlanLoading, optimizeWithAnswers } = useDailyPlanOptimization();
+  // Daily plan optimization & generation
+  const { refetch: refetchPlan, generatePlan, isGenerating } = useDailyPlanOptimization();
   
   // Weekly plan optimization
   const { refetch: refetchWeeklyPlan, optimizeWithAnswers: optimizeWeekWithAnswers } = useWeeklyPlanOptimization();
@@ -307,27 +307,36 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: targetDateStr });
   }, [moveTaskToDate]);
 
-  // Handle Plan My Day command with clarification answers
+  // Handle Plan My Day command - generates actual tasks
   const handlePlanMyDay = useCallback(async (answers: PlanMyDayAnswers) => {
     try {
-      // Use optimizeWithAnswers to pass clarification answers to edge function
-      const result = await optimizeWithAnswers(answers);
-      const schedule = result?.suggestedSchedule;
+      const result = await generatePlan(answers);
       
-      if (schedule && schedule.length > 0) {
-        toast.success(`Found optimal times for ${schedule.length} tasks!`, {
-          description: "Check your daily insights for suggestions",
+      if (result?.tasks && result.tasks.length > 0) {
+        toast.success(`Your day is planned! ${result.tasks.length} tasks ready`, {
+          description: result.summaryMessage,
         });
-        // Refetch to update the UI with new suggestions
-        refetchPlan();
+        
+        // Show protected streaks if any
+        if (result.protectedStreaks && result.protectedStreaks.length > 0) {
+          const streakNames = result.protectedStreaks.map(s => s.title).join(', ');
+          toast.info(`Protected ${result.protectedStreaks.length} streak(s)`, {
+            description: streakNames,
+          });
+        }
+        
+        // Show optional bonus if provided
+        if (result.optionalBonus) {
+          toast(`Bonus: ${result.optionalBonus}`, { icon: '✨' });
+        }
       } else {
-        toast.info("Your schedule looks good! No changes suggested.");
+        toast.info("Plan created! Check your tasks.");
       }
     } catch (error) {
-      console.error('Plan optimization failed:', error);
+      console.error('Plan generation failed:', error);
       toast.error("Couldn't generate plan. Try again later.");
     }
-  }, [optimizeWithAnswers, refetchPlan]);
+  }, [generatePlan]);
 
   // Handle Plan My Week command with clarification answers
   const handlePlanMyWeek = useCallback(async (answers: PlanMyWeekAnswers) => {

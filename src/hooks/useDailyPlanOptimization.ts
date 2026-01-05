@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,8 +29,31 @@ interface DailyPlanOptimization {
   overallReadiness: number;
 }
 
+interface GeneratedPlanResponse {
+  plan: {
+    energyLevel: string;
+    dayType: string;
+    focusArea: string;
+    taskCount: number;
+  };
+  tasks: Array<{
+    id: string;
+    task_text: string;
+    category: string;
+    difficulty: string;
+    scheduled_time: string;
+    estimated_duration: number;
+    xp_reward: number;
+  }>;
+  preservedTasks: Array<{ id: string; task_text: string }>;
+  protectedStreaks: Array<{ habitId: string; title: string; streak: number }>;
+  optionalBonus: string | null;
+  summaryMessage: string;
+}
+
 export function useDailyPlanOptimization() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const {
     data,
@@ -58,7 +81,30 @@ export function useDailyPlanOptimization() {
   });
 
   /**
-   * Optimize with clarification answers from Plan My Day flow
+   * Generate a new daily plan with tasks (opinionated AI)
+   */
+  const generatePlanMutation = useMutation({
+    mutationFn: async (answers: PlanMyDayAnswers): Promise<GeneratedPlanResponse> => {
+      const { data, error } = await supabase.functions.invoke('generate-daily-plan', {
+        body: answers,
+      });
+
+      if (error) {
+        console.error('Error generating daily plan:', error);
+        throw error;
+      }
+
+      return data as GeneratedPlanResponse;
+    },
+    onSuccess: () => {
+      // Invalidate task queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    },
+  });
+
+  /**
+   * Legacy: Optimize with clarification answers (keeps suggestions flow)
    */
   const optimizeWithAnswers = useCallback(async (answers?: PlanMyDayAnswers): Promise<DailyPlanOptimization | null> => {
     if (!user) return null;
@@ -66,8 +112,8 @@ export function useDailyPlanOptimization() {
     // Map PlanMyDayAnswers to edge function format
     const body = answers ? {
       energyLevel: answers.energyLevel,
-      prioritizedEpicId: answers.prioritizedEpicId,
-      protectStreaks: answers.protectStreaks,
+      dayType: answers.dayType,
+      focusArea: answers.focusArea,
     } : {};
 
     const { data, error } = await supabase.functions.invoke('optimize-daily-plan', {
@@ -99,7 +145,11 @@ export function useDailyPlanOptimization() {
     error: error instanceof Error ? error.message : null,
     refetch,
     optimizeWithAnswers,
+    // New generation API
+    generatePlan: generatePlanMutation.mutateAsync,
+    isGenerating: generatePlanMutation.isPending,
+    generateError: generatePlanMutation.error,
   };
 }
 
-export type { DailyInsight, DailyPlanOptimization };
+export type { DailyInsight, DailyPlanOptimization, GeneratedPlanResponse };

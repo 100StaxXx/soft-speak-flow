@@ -266,3 +266,6 @@ verify_jwt = true
 
 [functions.optimize-weekly-plan]
 verify_jwt = true
+
+[functions.generate-daily-plan]
+verify_jwt = true

@@ -1,109 +1,79 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Sparkles, Battery, BatteryLow, BatteryFull, Target, Shield, 
-  Clock, ChevronRight, X, Loader2 
+  Sparkles, Battery, BatteryLow, BatteryFull, 
+  Briefcase, Coffee, Shuffle,
+  TrendingUp, Home, Heart, Users, Shield,
+  ChevronRight, X, Loader2 
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export interface PlanMyDayAnswers {
   energyLevel: 'low' | 'medium' | 'high';
-  prioritizedEpicId?: string;
-  protectStreaks?: boolean;
-  availableHours?: number;
-  constraints?: string;
-}
-
-interface Epic {
-  id: string;
-  title: string;
-  progress_percentage?: number | null;
-}
-
-interface HabitAtRisk {
-  id: string;
-  title: string;
-  current_streak: number;
+  dayType: 'workday' | 'dayoff' | 'mixed';
+  focusArea: 'progress' | 'order' | 'health' | 'connection' | 'survival';
 }
 
 interface PlanMyDayClarificationProps {
   onComplete: (answers: PlanMyDayAnswers) => void;
   onSkip: () => void;
   isLoading?: boolean;
-  activeEpics?: Epic[];
-  habitsAtRisk?: HabitAtRisk[];
 }
 
-type QuestionStep = 'energy' | 'epic' | 'streaks' | 'time';
+type QuestionStep = 'energy' | 'dayType' | 'focus';
 
 export function PlanMyDayClarification({
   onComplete,
   onSkip,
   isLoading = false,
-  activeEpics = [],
-  habitsAtRisk = [],
 }: PlanMyDayClarificationProps) {
   const [step, setStep] = useState<QuestionStep>('energy');
   const [answers, setAnswers] = useState<Partial<PlanMyDayAnswers>>({});
 
-  // Determine which questions to show
-  const hasMultipleEpics = activeEpics.length > 1;
-  const hasStreaksAtRisk = habitsAtRisk.length > 0;
-
-  const getNextStep = (current: QuestionStep): QuestionStep | 'done' => {
-    if (current === 'energy') {
-      if (hasMultipleEpics) return 'epic';
-      if (hasStreaksAtRisk) return 'streaks';
-      return 'time';
-    }
-    if (current === 'epic') {
-      if (hasStreaksAtRisk) return 'streaks';
-      return 'time';
-    }
-    if (current === 'streaks') return 'time';
-    return 'done';
-  };
-
   const handleEnergySelect = (level: 'low' | 'medium' | 'high') => {
-    const newAnswers = { ...answers, energyLevel: level };
-    setAnswers(newAnswers);
-    
-    const next = getNextStep('energy');
-    if (next === 'done' || next === 'time') {
-      // Skip time question for now, complete
-      onComplete({ energyLevel: level, ...newAnswers });
-    } else {
-      setStep(next);
-    }
+    setAnswers({ ...answers, energyLevel: level });
+    setStep('dayType');
   };
 
-  const handleEpicSelect = (epicId: string | 'balanced') => {
-    const newAnswers = { 
-      ...answers, 
-      prioritizedEpicId: epicId === 'balanced' ? undefined : epicId 
+  const handleDayTypeSelect = (dayType: 'workday' | 'dayoff' | 'mixed') => {
+    setAnswers({ ...answers, dayType });
+    setStep('focus');
+  };
+
+  const handleFocusSelect = (focus: 'progress' | 'order' | 'health' | 'connection' | 'survival') => {
+    const finalAnswers: PlanMyDayAnswers = {
+      energyLevel: answers.energyLevel || 'medium',
+      dayType: answers.dayType || 'mixed',
+      focusArea: focus,
     };
-    setAnswers(newAnswers);
-    
-    const next = getNextStep('epic');
-    if (next === 'done' || next === 'time') {
-      onComplete({ energyLevel: answers.energyLevel || 'medium', ...newAnswers });
-    } else {
-      setStep(next);
-    }
-  };
-
-  const handleStreakProtect = (protect: boolean) => {
-    const newAnswers = { ...answers, protectStreaks: protect };
-    setAnswers(newAnswers);
-    onComplete({ energyLevel: answers.energyLevel || 'medium', ...newAnswers });
+    onComplete(finalAnswers);
   };
 
   const energyOptions = [
     { value: 'low' as const, icon: BatteryLow, label: 'Low', desc: 'Keep it light' },
-    { value: 'medium' as const, icon: Battery, label: 'Medium', desc: 'Balanced' },
+    { value: 'medium' as const, icon: Battery, label: 'Medium', desc: 'Balanced day' },
     { value: 'high' as const, icon: BatteryFull, label: 'High', desc: 'Bring it on' },
   ];
+
+  const dayTypeOptions = [
+    { value: 'workday' as const, icon: Briefcase, label: 'Workday', desc: 'Full schedule' },
+    { value: 'dayoff' as const, icon: Coffee, label: 'Day Off', desc: 'Relaxed pace' },
+    { value: 'mixed' as const, icon: Shuffle, label: 'Mixed', desc: 'Bit of both' },
+  ];
+
+  const focusOptions = [
+    { value: 'progress' as const, icon: TrendingUp, label: 'Progress', desc: 'Work & goals' },
+    { value: 'order' as const, icon: Home, label: 'Order', desc: 'Cleaning & admin' },
+    { value: 'health' as const, icon: Heart, label: 'Health', desc: 'Body & mind' },
+    { value: 'connection' as const, icon: Users, label: 'Connection', desc: 'Relationships' },
+    { value: 'survival' as const, icon: Shield, label: 'Survival', desc: 'Bare minimum' },
+  ];
+
+  const getStepNumber = () => {
+    if (step === 'energy') return 1;
+    if (step === 'dayType') return 2;
+    return 3;
+  };
 
   return (
     <motion.div
@@ -128,6 +98,7 @@ export function PlanMyDayClarification({
           <Sparkles className="h-4 w-4 text-violet-400" />
         </div>
         <span className="text-sm font-medium text-violet-300">Plan My Day</span>
+        <span className="ml-auto text-xs text-muted-foreground">{getStepNumber()}/3</span>
       </div>
 
       <AnimatePresence mode="wait">
@@ -162,99 +133,82 @@ export function PlanMyDayClarification({
           </motion.div>
         )}
 
-        {/* Epic Priority Question */}
-        {step === 'epic' && (
+        {/* Day Type Question */}
+        {step === 'dayType' && (
           <motion.div
-            key="epic"
+            key="dayType"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             className="space-y-3"
           >
-            <p className="text-sm text-foreground">Which goal should we focus on?</p>
-            <div className="flex flex-col gap-2">
-              {activeEpics.slice(0, 3).map((epic) => (
+            <p className="text-sm text-foreground">What kind of day is this?</p>
+            <div className="flex gap-2">
+              {dayTypeOptions.map((opt) => (
                 <button
-                  key={epic.id}
-                  onClick={() => handleEpicSelect(epic.id)}
+                  key={opt.value}
+                  onClick={() => handleDayTypeSelect(opt.value)}
                   disabled={isLoading}
                   className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border transition-all",
+                    "flex-1 flex flex-col items-center gap-1 p-3 rounded-lg border transition-all",
                     "bg-background/50 hover:bg-background/80 border-border/50 hover:border-violet-500/50",
-                    "disabled:opacity-50"
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-violet-400" />
-                    <span className="text-sm">{epic.title}</span>
-                  </div>
-                  {epic.progress_percentage !== undefined && (
-                    <span className="text-xs text-muted-foreground">
-                      {Math.round(epic.progress_percentage || 0)}%
-                    </span>
-                  )}
+                  <opt.icon className="h-5 w-5 text-violet-400" />
+                  <span className="text-xs font-medium">{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{opt.desc}</span>
                 </button>
               ))}
-              <button
-                onClick={() => handleEpicSelect('balanced')}
-                disabled={isLoading}
-                className={cn(
-                  "flex items-center gap-2 p-3 rounded-lg border transition-all",
-                  "bg-background/30 hover:bg-background/50 border-border/30 hover:border-violet-500/30",
-                  "text-muted-foreground hover:text-foreground disabled:opacity-50"
-                )}
-              >
-                <span className="text-sm">Balance all goals</span>
-              </button>
             </div>
           </motion.div>
         )}
 
-        {/* Streak Protection Question */}
-        {step === 'streaks' && (
+        {/* Focus Area Question */}
+        {step === 'focus' && (
           <motion.div
-            key="streaks"
+            key="focus"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             className="space-y-3"
           >
-            <p className="text-sm text-foreground">
-              Protect your {habitsAtRisk.length > 1 ? 'streaks' : 'streak'}?
-            </p>
-            <div className="text-xs text-muted-foreground mb-2">
-              {habitsAtRisk.slice(0, 2).map((h, i) => (
-                <span key={h.id}>
-                  {i > 0 && ', '}
-                  {h.title} ({h.current_streak}d)
-                </span>
+            <p className="text-sm text-foreground">What do you want more of today?</p>
+            <div className="grid grid-cols-3 gap-2">
+              {focusOptions.slice(0, 3).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleFocusSelect(opt.value)}
+                  disabled={isLoading}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-3 rounded-lg border transition-all",
+                    "bg-background/50 hover:bg-background/80 border-border/50 hover:border-violet-500/50",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  <opt.icon className="h-5 w-5 text-violet-400" />
+                  <span className="text-xs font-medium">{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{opt.desc}</span>
+                </button>
               ))}
-              {habitsAtRisk.length > 2 && ` +${habitsAtRisk.length - 2} more`}
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleStreakProtect(true)}
-                disabled={isLoading}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border transition-all",
-                  "bg-green-500/10 hover:bg-green-500/20 border-green-500/30 hover:border-green-500/50",
-                  "text-green-400 disabled:opacity-50"
-                )}
-              >
-                <Shield className="h-4 w-4" />
-                <span className="text-sm font-medium">Protect</span>
-              </button>
-              <button
-                onClick={() => handleStreakProtect(false)}
-                disabled={isLoading}
-                className={cn(
-                  "flex-1 p-3 rounded-lg border transition-all",
-                  "bg-background/30 hover:bg-background/50 border-border/30",
-                  "text-muted-foreground hover:text-foreground disabled:opacity-50"
-                )}
-              >
-                <span className="text-sm">Skip today</span>
-              </button>
+            <div className="grid grid-cols-2 gap-2">
+              {focusOptions.slice(3).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleFocusSelect(opt.value)}
+                  disabled={isLoading}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-3 rounded-lg border transition-all",
+                    "bg-background/50 hover:bg-background/80 border-border/50 hover:border-violet-500/50",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  <opt.icon className="h-5 w-5 text-violet-400" />
+                  <span className="text-xs font-medium">{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{opt.desc}</span>
+                </button>
+              ))}
             </div>
           </motion.div>
         )}
