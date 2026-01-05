@@ -79,6 +79,11 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'mentor-audio': { maxCalls: 15, windowHours: 24 },
   'evolution-voice': { maxCalls: 15, windowHours: 24 },
   
+  // AI orchestrator and general AI operations
+  'ai-orchestrator': { maxCalls: 100, windowHours: 24 },
+  'generate-quotes': { maxCalls: 20, windowHours: 24 },
+  'generate-lesson': { maxCalls: 10, windowHours: 24 },
+  
   // Light operations
   'daily-missions': { maxCalls: 10, windowHours: 24 },
   'check-in-response': { maxCalls: 20, windowHours: 24 },
