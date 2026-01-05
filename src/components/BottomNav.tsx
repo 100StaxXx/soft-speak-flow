@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { PawPrint, User, Compass, Command } from "lucide-react";
 import { NorthStar } from "@/components/icons/NorthStar";
 import { NavLink } from "@/components/NavLink";
@@ -11,9 +11,23 @@ import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { haptics } from "@/utils/haptics";
 
+// Prefetch page modules on hover for instant navigation
+const prefetchMap: Record<string, () => Promise<unknown>> = {
+  mentor: () => import('@/pages/Mentor'),
+  companion: () => import('@/pages/Companion'),
+  journeys: () => import('@/pages/Journeys'),
+  campaigns: () => import('@/pages/Campaigns'),
+  profile: () => import('@/pages/Profile'),
+};
+
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
+
+  // Prefetch on hover/focus for even faster perceived navigation
+  const handlePrefetch = useCallback((page: keyof typeof prefetchMap) => {
+    prefetchMap[page]?.();
+  }, []);
 
   const resolvedMentorId = getResolvedMentorId(profile);
 
@@ -45,109 +59,119 @@ export const BottomNav = memo(() => {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-3 sm:py-2.5">
-        <NavLink
-          to="/mentor"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-orange-500/20 to-orange-500/5 shadow-soft"
-          onClick={() => haptics.light()}
-        >
-          {({ isActive }) => (
-            <>
-              {mentorLoading ? (
-                <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
-              ) : selectedMentor ? (
-                <MentorAvatar
-                  mentorSlug={selectedMentor.slug || ''}
-                  mentorName={selectedMentor.name}
-                  primaryColor={selectedMentor.primary_color || '#000'}
-                  size="sm"
-                  className="w-7 h-7"
-                  showBorder={false}
-                />
-              ) : (
-                <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-orange-400 drop-shadow-[0_0_8px_hsl(25,95%,55%)]' : 'text-muted-foreground'}`} />
-              )}
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-orange-400' : 'text-muted-foreground/80'}`}>
-                Mentor
-              </span>
-            </>
-          )}
-        </NavLink>
-
-        <NavLink
-          to="/companion"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px] relative"
-          activeClassName="bg-gradient-to-br from-stardust-gold/20 to-stardust-gold/5 shadow-soft"
-          data-tour="companion-tab"
-          onClick={() => haptics.light()}
-        >
-          {({ isActive }) => (
-            <>
-              <div className="relative">
-                <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-all duration-300 ${isActive ? 'text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]' : 'text-muted-foreground'}`} />
-                {companion && progressToNext > 90 && (
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-stardust-gold text-black animate-pulse">
-                    !
-                  </Badge>
+          <NavLink
+            to="/mentor"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
+            activeClassName="bg-gradient-to-br from-orange-500/20 to-orange-500/5 shadow-soft"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('mentor')}
+            onFocus={() => handlePrefetch('mentor')}
+          >
+            {({ isActive }) => (
+              <>
+                {mentorLoading ? (
+                  <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
+                ) : selectedMentor ? (
+                  <MentorAvatar
+                    mentorSlug={selectedMentor.slug || ''}
+                    mentorName={selectedMentor.name}
+                    primaryColor={selectedMentor.primary_color || '#000'}
+                    size="sm"
+                    className="w-7 h-7"
+                    showBorder={false}
+                  />
+                ) : (
+                  <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-orange-400 drop-shadow-[0_0_8px_hsl(25,95%,55%)]' : 'text-muted-foreground'}`} />
                 )}
-              </div>
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/80'}`}>
-                Companion
-              </span>
-            </>
-          )}
-        </NavLink>
+                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-orange-400' : 'text-muted-foreground/80'}`}>
+                  Mentor
+                </span>
+              </>
+            )}
+          </NavLink>
 
-        <NavLink
-          to="/journeys"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-purple-500/20 to-purple-500/5 shadow-soft"
-          data-tour="tasks-tab"
-          onClick={() => haptics.light()}
-        >
-          {({ isActive }) => (
-            <>
-              <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
-                Quests
-              </span>
-            </>
-          )}
-        </NavLink>
+          <NavLink
+            to="/companion"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px] relative"
+            activeClassName="bg-gradient-to-br from-stardust-gold/20 to-stardust-gold/5 shadow-soft"
+            data-tour="companion-tab"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('companion')}
+            onFocus={() => handlePrefetch('companion')}
+          >
+            {({ isActive }) => (
+              <>
+                <div className="relative">
+                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-all duration-300 ${isActive ? 'text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]' : 'text-muted-foreground'}`} />
+                  {companion && progressToNext > 90 && (
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-stardust-gold text-black animate-pulse">
+                      !
+                    </Badge>
+                  )}
+                </div>
+                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/80'}`}>
+                  Companion
+                </span>
+              </>
+            )}
+          </NavLink>
 
-        <NavLink
-          to="/campaigns"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-sky-500/20 to-sky-500/5 shadow-soft"
-          onClick={() => haptics.light()}
-        >
-          {({ isActive }) => (
-            <>
-              <NorthStar size={24} className={`transition-all duration-300 ${isActive ? 'text-sky-400 drop-shadow-[0_0_8px_hsl(200,90%,60%)]' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-sky-400' : 'text-muted-foreground/80'}`}>
-                Campaigns
-              </span>
-            </>
-          )}
-        </NavLink>
+          <NavLink
+            to="/journeys"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
+            activeClassName="bg-gradient-to-br from-purple-500/20 to-purple-500/5 shadow-soft"
+            data-tour="tasks-tab"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('journeys')}
+            onFocus={() => handlePrefetch('journeys')}
+          >
+            {({ isActive }) => (
+              <>
+                <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
+                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
+                  Quests
+                </span>
+              </>
+            )}
+          </NavLink>
 
-        <NavLink
-          to="/profile"
-          className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-          activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
-          onClick={() => haptics.light()}
-        >
-          {({ isActive }) => (
-            <>
-              <Command className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                Command
-              </span>
-            </>
-          )}
-        </NavLink>
-      </div>
-    </nav>
+          <NavLink
+            to="/campaigns"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
+            activeClassName="bg-gradient-to-br from-sky-500/20 to-sky-500/5 shadow-soft"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('campaigns')}
+            onFocus={() => handlePrefetch('campaigns')}
+          >
+            {({ isActive }) => (
+              <>
+                <NorthStar size={24} className={`transition-all duration-300 ${isActive ? 'text-sky-400 drop-shadow-[0_0_8px_hsl(200,90%,60%)]' : 'text-muted-foreground'}`} />
+                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-sky-400' : 'text-muted-foreground/80'}`}>
+                  Campaigns
+                </span>
+              </>
+            )}
+          </NavLink>
+
+          <NavLink
+            to="/profile"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
+            activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('profile')}
+            onFocus={() => handlePrefetch('profile')}
+          >
+            {({ isActive }) => (
+              <>
+                <Command className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
+                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
+                  Command
+                </span>
+              </>
+            )}
+          </NavLink>
+        </div>
+      </nav>
     </>
   );
 });

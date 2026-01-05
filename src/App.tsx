@@ -98,6 +98,27 @@ const queryClient = new QueryClient({
   },
 });
 
+// Prefetch critical routes during idle time for instant navigation
+const prefetchCriticalRoutes = () => {
+  const routes = [
+    () => import('./pages/Journeys'),
+    () => import('./pages/Profile'),
+    () => import('./pages/MentorChat'),
+    () => import('./pages/Companion'),
+    () => import('./pages/Mentor'),
+  ];
+  routes.forEach(route => route());
+};
+
+// Run prefetch when browser is idle
+if (typeof window !== 'undefined') {
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(prefetchCriticalRoutes, { timeout: 3000 });
+  } else {
+    setTimeout(prefetchCriticalRoutes, 1500);
+  }
+}
+
 // Memoized loading fallback to prevent recreation
 const LoadingFallback = memo(() => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -207,7 +228,7 @@ const AppContent = memo(() => {
             {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
               <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="sync">
                   <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />
