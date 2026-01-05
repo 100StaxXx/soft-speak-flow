@@ -68,6 +68,20 @@ export const TodaysPepTalk = memo(() => {
     setIsAudioReady(false);
   }, [pepTalk?.audio_url]);
 
+  // Timeout fallback for slow connections - allow play after 5 seconds
+  useEffect(() => {
+    if (!pepTalk?.audio_url || isAudioReady) return;
+    
+    const timeout = setTimeout(() => {
+      if (!isAudioReady && audioRef.current) {
+        console.log('Audio ready timeout - enabling play button');
+        setIsAudioReady(true);
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeout);
+  }, [pepTalk?.audio_url, isAudioReady]);
+
 
   // Removed walkthrough tracking - was causing play button to be permanently disabled
 
@@ -622,7 +636,7 @@ export const TodaysPepTalk = memo(() => {
             ref={audioRef} 
             src={pepTalk.audio_url} 
             preload="auto"
-            onCanPlayThrough={() => setIsAudioReady(true)}
+            onCanPlay={() => setIsAudioReady(true)}
             onError={() => {
               logger.error('Audio loading error', { 
                 audioUrl: pepTalk.audio_url,
@@ -633,6 +647,10 @@ export const TodaysPepTalk = memo(() => {
             onLoadedMetadata={() => {
               logger.log('Audio loaded successfully');
               logger.log('Duration:', audioRef.current?.duration);
+              // If we have duration, audio is likely ready enough
+              if (audioRef.current?.duration && audioRef.current.duration > 0) {
+                setIsAudioReady(true);
+              }
             }}
           />
           
