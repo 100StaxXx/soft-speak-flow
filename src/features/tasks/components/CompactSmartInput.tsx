@@ -11,7 +11,9 @@ import { cn } from '@/lib/utils';
 import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { useQuestAutocomplete } from '@/hooks/useQuestAutocomplete';
 import { QuickSuggestionChips } from './QuickSuggestionChips';
+import { QuestAutocompleteSuggestions } from './QuestAutocompleteSuggestions';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
 import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
 import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
@@ -52,8 +54,14 @@ export function CompactSmartInput({
   const [showPlanClarification, setShowPlanClarification] = useState(false);
   const [showWeekClarification, setShowWeekClarification] = useState(false);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
 
   const { medium, success, light, tap } = useHapticFeedback();
+  
+  // Autocomplete suggestions
+  const displayText = interimText ? `${input} ${interimText}`.trim() : input;
+  const { suggestions, hasSuggestions } = useQuestAutocomplete(displayText);
+  const showAutocomplete = isFocused && hasSuggestions && !showPreview && !showPlanClarification && !showWeekClarification;
 
   const { isRecording, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -90,7 +98,6 @@ export function CompactSmartInput({
     toggleRecording();
   }, [isRecording, success, medium, toggleRecording]);
 
-  const displayText = interimText ? `${input} ${interimText}`.trim() : input;
   const showTypewriter = isFocused && !displayText && !isRecording;
 
   const handleSubmit = () => {
@@ -182,16 +189,55 @@ export function CompactSmartInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle autocomplete navigation
+    if (showAutocomplete) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        return;
+      }
+      if (e.key === 'Tab' && selectedSuggestionIndex >= 0) {
+        e.preventDefault();
+        handleAutocompleteSelect(suggestions[selectedSuggestionIndex].text);
+        return;
+      }
+      if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+        e.preventDefault();
+        handleAutocompleteSelect(suggestions[selectedSuggestionIndex].text);
+        return;
+      }
+    }
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
     if (e.key === 'Escape') {
-      reset();
-      setInterimText('');
-      inputRef.current?.blur();
+      if (showAutocomplete) {
+        setSelectedSuggestionIndex(-1);
+      } else {
+        reset();
+        setInterimText('');
+        inputRef.current?.blur();
+      }
     }
   };
+
+  const handleAutocompleteSelect = useCallback((text: string) => {
+    tap();
+    setInput(text);
+    setSelectedSuggestionIndex(-1);
+    inputRef.current?.focus();
+  }, [tap, setInput]);
 
   const handleSuggestionClick = (suggestion: string) => {
     tap();
@@ -377,6 +423,15 @@ export function CompactSmartInput({
               <Send className="h-3 w-3" />
             </Button>
           </div>
+          
+          {/* Autocomplete suggestions dropdown */}
+          <QuestAutocompleteSuggestions
+            suggestions={suggestions}
+            onSelect={handleAutocompleteSelect}
+            isVisible={showAutocomplete}
+            selectedIndex={selectedSuggestionIndex}
+            inputValue={displayText}
+          />
         </div>
       </div>
       
