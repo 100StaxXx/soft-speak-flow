@@ -1,8 +1,9 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Rocket, Sparkles, ChevronRight } from 'lucide-react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useWelcomeImage } from '../hooks/useWelcomeImage';
+import { useDeviceOrientation } from '@/hooks/useDeviceOrientation';
 import campaignWelcomeFallback from '@/assets/campaign-welcome-fallback.webp';
 
 interface CampaignEmptyStateModalProps {
@@ -12,11 +13,23 @@ interface CampaignEmptyStateModalProps {
 
 export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ open, onLaunch }: CampaignEmptyStateModalProps) {
   const { imageUrl, isLoading } = useWelcomeImage();
+  const { gamma, beta, permitted, available, requestPermission } = useDeviceOrientation();
   
   const backgroundImage = imageUrl || campaignWelcomeFallback;
   
   // Skip animation if image is already cached (instant load)
   const isCached = !isLoading && !!imageUrl;
+  
+  // Calculate parallax offset from device orientation
+  const gyroX = permitted ? (gamma / 45) * 15 : 0; // Max 15px X movement
+  const gyroY = permitted ? ((beta - 45) / 45) * 10 : 0; // Max 10px Y movement
+  
+  // Request gyroscope permission on touch (required for iOS)
+  const handleInteraction = useCallback(() => {
+    if (available && !permitted) {
+      requestPermission();
+    }
+  }, [available, permitted, requestPermission]);
 
   return (
     <AnimatePresence>
@@ -28,6 +41,8 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
           transition={{ duration: 0.4 }}
           className="fixed inset-0 z-50 flex flex-col"
           style={{ height: '100dvh' }}
+          onTouchStart={handleInteraction}
+          onClick={handleInteraction}
         >
           {/* Full-screen background image */}
           <div className="absolute inset-0">
@@ -40,14 +55,24 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
               />
             )}
             
-            {/* Background image - skip animation if cached */}
+            {/* Background image with parallax - skip animation if cached */}
             <motion.img
               src={backgroundImage}
               alt="Your journey awaits"
               className="w-full h-full object-cover"
-              initial={isCached ? false : { scale: 1.1, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
+              initial={isCached ? false : { scale: 1.15, opacity: 0 }}
+              animate={{ 
+                scale: 1.1, // Slight overscale for parallax room
+                opacity: 1,
+                x: gyroX,
+                y: gyroY,
+              }}
+              transition={{ 
+                scale: { duration: 0.8, ease: 'easeOut' },
+                opacity: { duration: 0.8, ease: 'easeOut' },
+                x: { type: "spring", stiffness: 100, damping: 30, mass: 0.5 },
+                y: { type: "spring", stiffness: 100, damping: 30, mass: 0.5 },
+              }}
             />
             
             {/* Top gradient overlay for text readability */}
