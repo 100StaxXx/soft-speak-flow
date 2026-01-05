@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Pencil, Repeat, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarIcon, Pencil, Repeat, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +21,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
@@ -29,6 +37,7 @@ import { ParsedTask } from "@/features/tasks/hooks";
 interface Task {
   id: string;
   task_text: string;
+  task_date?: string | null;
   difficulty?: string | null;
   scheduled_time?: string | null;
   estimated_duration?: number | null;
@@ -46,6 +55,7 @@ interface EditQuestDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: (taskId: string, updates: {
     task_text: string;
+    task_date: string | null;
     difficulty: string;
     scheduled_time: string | null;
     estimated_duration: number | null;
@@ -70,6 +80,7 @@ export function EditQuestDialog({
   isDeleting,
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
+  const [taskDate, setTaskDate] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<QuestDifficulty>("medium");
   const [scheduledTime, setScheduledTime] = useState<string>("");
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
@@ -84,6 +95,7 @@ export function EditQuestDialog({
   useEffect(() => {
     if (task) {
       setTaskText(task.task_text);
+      setTaskDate(task.task_date || null);
       setDifficulty((task.difficulty as QuestDifficulty) || "medium");
       setScheduledTime(task.scheduled_time || "");
       setEstimatedDuration(task.estimated_duration || null);
@@ -136,6 +148,7 @@ export function EditQuestDialog({
     
     await onSave(task.id, {
       task_text: taskText.trim(),
+      task_date: taskDate,
       difficulty,
       scheduled_time: scheduledTime || null,
       estimated_duration: estimatedDuration,
@@ -202,6 +215,33 @@ export function EditQuestDialog({
                 value={difficulty}
                 onChange={setDifficulty}
               />
+            </div>
+
+            {/* Date Picker */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !taskDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {taskDate ? format(new Date(taskDate + 'T00:00:00'), "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={taskDate ? new Date(taskDate + 'T00:00:00') : undefined}
+                    onSelect={(date) => setTaskDate(date ? format(date, 'yyyy-MM-dd') : null)}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

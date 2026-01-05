@@ -22,6 +22,7 @@ const Community = () => {
   const [editingTask, setEditingTask] = useState<{
     id: string;
     task_text: string;
+    task_date?: string | null;
     difficulty?: string | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
@@ -63,6 +64,7 @@ const Community = () => {
     setEditingTask({
       id: task.id,
       task_text: task.task_text,
+      task_date: task.task_date,
       difficulty: task.difficulty,
       scheduled_time: task.scheduled_time,
       estimated_duration: task.estimated_duration,
@@ -103,6 +105,7 @@ const Community = () => {
 
   const handleSaveEdit = async (taskId: string, updates: {
     task_text: string;
+    task_date: string | null;
     difficulty: string;
     scheduled_time: string | null;
     estimated_duration: number | null;
