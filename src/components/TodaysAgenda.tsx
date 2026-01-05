@@ -639,13 +639,28 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {tasks.length === 0 ? (
           <div className="text-center py-6">
             <Circle className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm text-muted-foreground mb-4">
               No tasks for this day
             </p>
-            <Button size="sm" onClick={onAddQuest} className="gap-1">
-              <Plus className="w-4 h-4" />
-              Add Quest
-            </Button>
+            
+            {/* CompactSmartInput for empty state */}
+            {onQuickAdd ? (
+              <div className="max-w-md mx-auto px-4">
+                <CompactSmartInput
+                  onSubmit={onQuickAdd}
+                  onPlanMyDay={onPlanMyDay}
+                  onPlanMyWeek={onPlanMyWeek}
+                  activeEpics={activeEpics}
+                  habitsAtRisk={habitsAtRisk}
+                  placeholder="Add your first quest..."
+                />
+              </div>
+            ) : (
+              <Button size="sm" onClick={onAddQuest} className="gap-1">
+                <Plus className="w-4 h-4" />
+                Add Quest
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-1">
