@@ -30,8 +30,6 @@ import { logger } from "@/utils/logger";
 // import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
-import { LevelUpCelebration } from "@/components/LevelUpCelebration";
-import { useLevelUpTracker } from "@/hooks/useLevelUpTracker";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAuthSync } from "@/hooks/useAuthSync";
 import { safeSessionStorage } from "@/utils/storage";
@@ -125,22 +123,6 @@ const ScrollToTop = memo(() => {
 
 ScrollToTop.displayName = 'ScrollToTop';
 
-// Component for level-up celebration (needs companion XP)
-const LevelUpHandler = memo(() => {
-  const { companion } = useCompanion();
-  const { showLevelUp, newLevel, dismissLevelUp } = useLevelUpTracker(companion?.current_xp);
-  
-  return (
-    <LevelUpCelebration
-      show={showLevelUp}
-      newLevel={newLevel}
-      onDismiss={dismissLevelUp}
-    />
-  );
-});
-
-LevelUpHandler.displayName = 'LevelUpHandler';
-
 // Separate component for evolution-aware features
 const EvolutionAwareContent = memo(() => {
   return (
@@ -148,7 +130,6 @@ const EvolutionAwareContent = memo(() => {
       <GlobalEvolutionListener />
       <SubscriptionGate />
       <WeeklyRecapModal />
-      <LevelUpHandler />
     </>
   );
 });
