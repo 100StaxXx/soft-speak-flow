@@ -683,20 +683,51 @@ export const useTaskMutations = (taskDate: string) => {
         .from('daily_tasks')
         .update({ 
           task_date: targetDate,
-          sort_order: 0, // Place at top of new day
+          sort_order: 0,
         })
         .eq('id', taskId)
         .eq('user_id', user.id);
 
       if (error) throw error;
+      return { taskId, targetDate };
     },
-    onSuccess: (_data, variables) => {
+    onMutate: async ({ taskId, targetDate }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
+      await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
+
+      // Snapshot previous values
+      const previousDaily = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
+      const previousCalendar = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
+
+      // Optimistically update task date in cache
+      queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map(t => t.id === taskId ? { ...t, task_date: targetDate } : t);
+      });
+      queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map(t => t.id === taskId ? { ...t, task_date: targetDate } : t);
+      });
+
+      return { previousDaily, previousCalendar };
+    },
+    onError: (error: Error, _vars, context) => {
+      // Rollback on error
+      if (context?.previousDaily) {
+        context.previousDaily.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      }
+      if (context?.previousCalendar) {
+        context.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      }
+      toast({ title: "Failed to move task", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast({ title: `Task moved to ${format(new Date(variables.targetDate + 'T00:00:00'), 'MMM d')}` });
     },
-    onError: (error: Error) => {
-      toast({ title: "Failed to move task", description: error.message, variant: "destructive" });
+    onSuccess: (_data, variables) => {
+      toast({ title: `Task moved to ${format(new Date(variables.targetDate + 'T00:00:00'), 'MMM d')}` });
     },
   });
 

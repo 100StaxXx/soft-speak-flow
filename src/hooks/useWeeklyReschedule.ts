@@ -1,7 +1,8 @@
 import { useMemo, useState, useCallback } from 'react';
-import { format, addDays, startOfDay, isSameDay } from 'date-fns';
+import { format, addDays, startOfDay } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface WeeklyTask {
   id: string;
@@ -30,13 +31,13 @@ interface WeeklyRescheduleAnalysis {
 
 export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date = new Date()) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isRescheduling, setIsRescheduling] = useState(false);
 
   const analysis = useMemo((): WeeklyRescheduleAnalysis => {
     const today = startOfDay(startDate);
     const weekDays: { date: Date; dateStr: string; tasks: WeeklyTask[]; totalHours: number }[] = [];
 
-    // Build 7-day view
     for (let i = 0; i < 7; i++) {
       const date = addDays(today, i);
       const dateStr = format(date, 'yyyy-MM-dd');
@@ -53,15 +54,12 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
       .filter(d => d.tasks.length === 0)
       .map(d => format(d.date, 'EEEE'));
 
-    // Calculate balance score (0-100, 100 = perfectly balanced)
     const avgHours = weekDays.reduce((sum, d) => sum + d.totalHours, 0) / 7;
     const variance = weekDays.reduce((sum, d) => sum + Math.pow(d.totalHours - avgHours, 2), 0) / 7;
     const balanceScore = Math.max(0, Math.min(100, 100 - variance * 10));
 
-    // Determine if week is unbalanced
     const isUnbalanced = overloadedDays.length > 0 || (emptyDays.length > 3 && weeklyTasks.length > 10);
 
-    // Suggest action based on situation
     let suggestedAction: RescheduleAction | null = null;
     let recommendation = '';
 
@@ -111,109 +109,179 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
   const balanceWeek = useCallback(async () => {
     if (!user?.id) return;
-    setIsRescheduling(true);
+    
+    const today = startOfDay(startDate);
+    const incompleteTasks = weeklyTasks.filter(t => !t.completed);
+    
+    if (incompleteTasks.length === 0) return;
 
-    try {
-      const today = startOfDay(startDate);
-      const incompleteTasks = weeklyTasks.filter(t => !t.completed);
+    const tasksPerDay = Math.ceil(incompleteTasks.length / 7);
+    const updates: { id: string; task_date: string }[] = [];
+
+    let taskIndex = 0;
+    for (let dayIndex = 0; dayIndex < 7 && taskIndex < incompleteTasks.length; dayIndex++) {
+      const targetDate = format(addDays(today, dayIndex), 'yyyy-MM-dd');
       
-      if (incompleteTasks.length === 0) return;
-
-      // Target: distribute evenly across 7 days
-      const tasksPerDay = Math.ceil(incompleteTasks.length / 7);
-      const updates: { id: string; task_date: string }[] = [];
-
-      let taskIndex = 0;
-      for (let dayIndex = 0; dayIndex < 7 && taskIndex < incompleteTasks.length; dayIndex++) {
-        const targetDate = format(addDays(today, dayIndex), 'yyyy-MM-dd');
-        
-        for (let i = 0; i < tasksPerDay && taskIndex < incompleteTasks.length; i++) {
-          const task = incompleteTasks[taskIndex];
-          if (task.task_date !== targetDate) {
-            updates.push({ id: task.id, task_date: targetDate });
-          }
-          taskIndex++;
+      for (let i = 0; i < tasksPerDay && taskIndex < incompleteTasks.length; i++) {
+        const task = incompleteTasks[taskIndex];
+        if (task.task_date !== targetDate) {
+          updates.push({ id: task.id, task_date: targetDate });
         }
+        taskIndex++;
       }
+    }
 
-      // Batch update
-      for (const update of updates) {
+    if (updates.length === 0) return;
+
+    // Optimistic update
+    const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
+    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
+    });
+    queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
+    });
+
+    setIsRescheduling(true);
+    try {
+      // Batch by date for efficiency
+      const byDate = updates.reduce((acc, u) => {
+        (acc[u.task_date] ||= []).push(u.id);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      for (const [date, ids] of Object.entries(byDate)) {
         await supabase
           .from('daily_tasks')
-          .update({ task_date: update.task_date })
-          .eq('id', update.id)
+          .update({ task_date: date })
+          .in('id', ids)
           .eq('user_id', user.id);
       }
+
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     } finally {
       setIsRescheduling(false);
     }
-  }, [user?.id, weeklyTasks, startDate]);
+  }, [user?.id, weeklyTasks, startDate, queryClient]);
 
   const clearWeekend = useCallback(async () => {
     if (!user?.id) return;
+
+    const today = startOfDay(startDate);
+    const weekendDates = [5, 6].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
+    
+    const weekendTasks = weeklyTasks.filter(
+      t => weekendDates.includes(t.task_date) && !t.completed && !t.is_main_quest
+    );
+
+    if (weekendTasks.length === 0) return;
+
+    const weekdayDates = [0, 1, 2, 3, 4].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
+    const updates = weekendTasks.map((task, i) => ({
+      id: task.id,
+      task_date: weekdayDates[i % 5]
+    }));
+
+    // Optimistic update
+    const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
+    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
+    });
+    queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
+    });
+
     setIsRescheduling(true);
-
     try {
-      const today = startOfDay(startDate);
-      const weekendDates = [5, 6].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
-      
-      const weekendTasks = weeklyTasks.filter(
-        t => weekendDates.includes(t.task_date) && !t.completed && !t.is_main_quest
-      );
+      const byDate = updates.reduce((acc, u) => {
+        (acc[u.task_date] ||= []).push(u.id);
+        return acc;
+      }, {} as Record<string, string[]>);
 
-      if (weekendTasks.length === 0) return;
-
-      // Move to weekdays (Mon-Fri)
-      const weekdayDates = [0, 1, 2, 3, 4].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
-      
-      for (let i = 0; i < weekendTasks.length; i++) {
-        const targetDate = weekdayDates[i % 5];
+      for (const [date, ids] of Object.entries(byDate)) {
         await supabase
           .from('daily_tasks')
-          .update({ task_date: targetDate })
-          .eq('id', weekendTasks[i].id)
+          .update({ task_date: date })
+          .in('id', ids)
           .eq('user_id', user.id);
       }
+
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     } finally {
       setIsRescheduling(false);
     }
-  }, [user?.id, weeklyTasks, startDate]);
+  }, [user?.id, weeklyTasks, startDate, queryClient]);
 
   const pushHeavyDays = useCallback(async () => {
     if (!user?.id) return;
-    setIsRescheduling(true);
 
-    try {
-      const today = startOfDay(startDate);
+    const today = startOfDay(startDate);
+    const updates: { id: string; task_date: string }[] = [];
+    const laterDates = [3, 4, 5, 6].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
+    let laterIndex = 0;
+
+    for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
+      const dateStr = format(addDays(today, dayOffset), 'yyyy-MM-dd');
+      const dayTasks = weeklyTasks.filter(t => t.task_date === dateStr && !t.completed);
       
-      // Find overloaded days (first 3 days)
-      const earlyDays = [0, 1, 2].map(offset => ({
-        date: format(addDays(today, offset), 'yyyy-MM-dd'),
-        tasks: weeklyTasks.filter(t => t.task_date === format(addDays(today, offset), 'yyyy-MM-dd') && !t.completed),
-      }));
-
-      // Move excess tasks (anything beyond 4 per day) to later days
-      const laterDates = [3, 4, 5, 6].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
-      let laterIndex = 0;
-
-      for (const day of earlyDays) {
-        if (day.tasks.length > 4) {
-          const excess = day.tasks.slice(4).filter(t => !t.is_main_quest);
-          
-          for (const task of excess) {
-            await supabase
-              .from('daily_tasks')
-              .update({ task_date: laterDates[laterIndex % 4] })
-              .eq('id', task.id)
-              .eq('user_id', user.id);
-            laterIndex++;
-          }
+      if (dayTasks.length > 4) {
+        const excess = dayTasks.slice(4).filter(t => !t.is_main_quest);
+        for (const task of excess) {
+          updates.push({ id: task.id, task_date: laterDates[laterIndex % 4] });
+          laterIndex++;
         }
       }
+    }
+
+    if (updates.length === 0) return;
+
+    // Optimistic update
+    const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
+    queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
+    });
+    queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(t => updateMap.has(t.id) ? { ...t, task_date: updateMap.get(t.id) } : t);
+    });
+
+    setIsRescheduling(true);
+    try {
+      const byDate = updates.reduce((acc, u) => {
+        (acc[u.task_date] ||= []).push(u.id);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      for (const [date, ids] of Object.entries(byDate)) {
+        await supabase
+          .from('daily_tasks')
+          .update({ task_date: date })
+          .in('id', ids)
+          .eq('user_id', user.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     } finally {
       setIsRescheduling(false);
     }
-  }, [user?.id, weeklyTasks, startDate]);
+  }, [user?.id, weeklyTasks, startDate, queryClient]);
 
   const executeAction = useCallback(async (actionType: RescheduleAction['type']) => {
     switch (actionType) {
