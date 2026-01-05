@@ -8,10 +8,10 @@ export const CompanionPageSkeleton = () => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="min-h-screen pb-nav-safe pt-safe"
+      className="min-h-screen pb-nav-safe"
     >
-      {/* Header skeleton */}
-      <div className="sticky top-0 z-40 w-full cosmiq-glass-header safe-area-top">
+      {/* Fixed header skeleton - matches Companion page */}
+      <div className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
         <div className="container flex items-center justify-between py-4">
           <div className="flex items-center gap-2">
             <Skeleton className="h-5 w-5 rounded-full" />
@@ -23,6 +23,9 @@ export const CompanionPageSkeleton = () => {
           </div>
         </div>
       </div>
+      
+      {/* Spacer for fixed header */}
+      <div className="pt-safe" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 72px)' }} />
 
       <div className="container py-6 space-y-6">
         {/* Tabs skeleton */}

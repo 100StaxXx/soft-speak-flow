@@ -216,14 +216,17 @@ const Companion = () => {
     <PageTransition>
       <CompanionErrorBoundary>
         <StarfieldBackground />
-        <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
-          
-          <header className="sticky top-0 z-40 w-full cosmiq-glass-header safe-area-top">
+        <div className="min-h-screen pb-nav-safe relative z-10">
+          {/* Fixed header - won't move on iOS overscroll */}
+          <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
             <div className="container flex items-center justify-between py-4">
               <h1 className="font-heading font-black text-2xl">Companion</h1>
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </header>
+          
+          {/* Spacer for fixed header */}
+          <div className="pt-safe" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 72px)' }} />
 
           {renderContent()}
         </div>
