@@ -260,9 +260,94 @@ export function useAIInteractionTracker() {
     }
   }, [user, updatePreferenceWeights]);
 
+  /**
+   * Track daily plan task outcomes for learning
+   */
+  const trackDailyPlanOutcome = useCallback(async (
+    taskId: string,
+    outcome: 'completed' | 'skipped' | 'deleted' | 'rescheduled',
+    metadata?: {
+      scheduledTime?: string;
+      actualCompletionTime?: string;
+      difficulty?: string;
+      category?: string;
+      wasOnTime?: boolean;
+    }
+  ) => {
+    if (!user) return;
+
+    try {
+      // Get current learning profile
+      const { data: learning } = await supabase
+        .from('user_ai_learning')
+        .select('successful_patterns, failed_patterns, energy_by_hour, day_of_week_patterns')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const successfulPatterns = (learning?.successful_patterns as Record<string, number>) || {};
+      const failedPatterns = (learning?.failed_patterns as Record<string, number>) || {};
+      const energyByHour = (learning?.energy_by_hour as Record<string, number>) || {};
+      const dayPatterns = (learning?.day_of_week_patterns as Record<string, number>) || {};
+
+      const isSuccess = outcome === 'completed';
+      const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+      // Update energy by hour if we have timing info
+      if (metadata?.actualCompletionTime && isSuccess) {
+        const hour = metadata.actualCompletionTime.split(':')[0];
+        energyByHour[hour] = (energyByHour[hour] || 50) + 5; // Boost successful hours
+      } else if (metadata?.scheduledTime && !isSuccess) {
+        const hour = metadata.scheduledTime.split(':')[0];
+        energyByHour[hour] = Math.max(0, (energyByHour[hour] || 50) - 5); // Reduce failed hours
+      }
+
+      // Update day-of-week patterns
+      const currentDayTotal = (dayPatterns[`${dayOfWeek}_total`] || 0) + 1;
+      const currentDaySuccess = (dayPatterns[`${dayOfWeek}_success`] || 0) + (isSuccess ? 1 : 0);
+      dayPatterns[`${dayOfWeek}_total`] = currentDayTotal;
+      dayPatterns[`${dayOfWeek}_success`] = currentDaySuccess;
+      dayPatterns[dayOfWeek] = Math.round((currentDaySuccess / currentDayTotal) * 100);
+
+      // Track category success/failure
+      if (metadata?.category) {
+        const catKey = `category_${metadata.category}`;
+        if (isSuccess) {
+          successfulPatterns[catKey] = (successfulPatterns[catKey] || 0) + 1;
+        } else {
+          failedPatterns[catKey] = (failedPatterns[catKey] || 0) + 1;
+        }
+      }
+
+      // Track difficulty success/failure
+      if (metadata?.difficulty) {
+        const diffKey = `difficulty_${metadata.difficulty}`;
+        if (isSuccess) {
+          successfulPatterns[diffKey] = (successfulPatterns[diffKey] || 0) + 1;
+        } else {
+          failedPatterns[diffKey] = (failedPatterns[diffKey] || 0) + 1;
+        }
+      }
+
+      await supabase
+        .from('user_ai_learning')
+        .upsert({
+          user_id: user.id,
+          successful_patterns: successfulPatterns,
+          failed_patterns: failedPatterns,
+          energy_by_hour: energyByHour,
+          day_of_week_patterns: dayPatterns,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+
+    } catch (err) {
+      console.warn('Error tracking daily plan outcome (non-blocking):', err);
+    }
+  }, [user]);
+
   return {
     trackInteraction,
     updatePreferenceWeights,
     trackEpicOutcome,
+    trackDailyPlanOutcome,
   };
 }

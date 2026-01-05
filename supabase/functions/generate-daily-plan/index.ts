@@ -24,6 +24,72 @@ interface GeneratedTask {
   habit_source_id?: string;
 }
 
+interface LearningContext {
+  peakHours: string[];
+  avoidHours: string[];
+  preferredTaskCount: number | null;
+  successfulCategories: string[];
+  dayOfWeekPattern: string | null;
+}
+
+// Build personalization context from AI learning data
+function buildLearningContext(aiLearning: any): LearningContext {
+  const context: LearningContext = {
+    peakHours: [],
+    avoidHours: [],
+    preferredTaskCount: null,
+    successfulCategories: [],
+    dayOfWeekPattern: null,
+  };
+
+  // Extract peak productivity hours from energy_by_hour
+  const energyByHour = aiLearning.energy_by_hour as Record<string, number> | null;
+  if (energyByHour) {
+    const sorted = Object.entries(energyByHour).sort(([, a], [, b]) => b - a);
+    context.peakHours = sorted.slice(0, 3).map(([hour]) => `${hour}:00`);
+    context.avoidHours = sorted.slice(-2).map(([hour]) => `${hour}:00`);
+  }
+
+  // Extract preferred task count from successful patterns
+  const successfulPatterns = aiLearning.successful_patterns as Record<string, number> | null;
+  if (successfulPatterns) {
+    const taskCounts = Object.keys(successfulPatterns)
+      .filter(k => k.startsWith('task_count_'))
+      .map(k => ({ count: parseInt(k.replace('task_count_', '')), success: successfulPatterns[k] }));
+    if (taskCounts.length > 0) {
+      const best = taskCounts.sort((a, b) => b.success - a.success)[0];
+      context.preferredTaskCount = best.count;
+    }
+  }
+
+  // Extract successful categories
+  const preferenceWeights = aiLearning.preference_weights as Record<string, Record<string, number>> | null;
+  if (preferenceWeights?.categories) {
+    const cats = Object.entries(preferenceWeights.categories)
+      .filter(([, weight]) => weight > 0)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([cat]) => cat);
+    context.successfulCategories = cats;
+  }
+
+  // Day-of-week patterns
+  const dayPatterns = aiLearning.day_of_week_patterns as Record<string, number> | null;
+  if (dayPatterns) {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const todayCompletion = dayPatterns[today];
+    if (todayCompletion !== undefined) {
+      if (todayCompletion < 50) {
+        context.dayOfWeekPattern = `User typically completes ${todayCompletion}% on ${today}s - suggest fewer/easier tasks`;
+      } else if (todayCompletion > 80) {
+        context.dayOfWeekPattern = `User is highly productive on ${today}s (${todayCompletion}% completion) - can handle more`;
+      }
+    }
+  }
+
+  return context;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -103,6 +169,9 @@ serve(async (req) => {
     // Identify epics behind schedule (progress < expected based on time)
     const epicsBehind = epicContext.filter(e => e.progress < 50 && e.milestones.length > 0);
 
+    // Build personalization context from AI learning data
+    const learningContext = aiLearning ? buildLearningContext(aiLearning) : null;
+
     // Build system prompt with hard rules
     const systemPrompt = `You are an opinionated daily planner AI. Generate a realistic, achievable daily plan.
 
@@ -136,6 +205,14 @@ USER CONTEXT:
 ${epicsBehind.length > 0 ? `Epics behind schedule: ${epicsBehind.map(e => e.title).join(', ')}` : 'No epics behind schedule'}
 ${habitsToProtect.length > 0 ? `Streaks to protect (>=3 days): ${habitsToProtect.map(h => `${h.title} (${h.streak}d)`).join(', ')}` : 'No significant streaks'}
 ${existingTaskTexts.length > 0 ? `Already scheduled today: ${existingTaskTexts.slice(0, 5).join(', ')}` : 'No tasks yet today'}
+${learningContext ? `
+PERSONALIZATION (learned from user behavior):
+${learningContext.peakHours.length > 0 ? `- Peak productivity hours: ${learningContext.peakHours.join(', ')}` : ''}
+${learningContext.preferredTaskCount ? `- Preferred daily task count: ${learningContext.preferredTaskCount}` : ''}
+${learningContext.avoidHours.length > 0 ? `- Low energy hours to avoid difficult tasks: ${learningContext.avoidHours.join(', ')}` : ''}
+${learningContext.successfulCategories.length > 0 ? `- Categories with high completion: ${learningContext.successfulCategories.join(', ')}` : ''}
+${learningContext.dayOfWeekPattern ? `- ${learningContext.dayOfWeekPattern}` : ''}
+` : ''}
 
 AVOID duplicating tasks already scheduled. Be specific and actionable.`;
 
