@@ -8,6 +8,7 @@ import { AnimatePresence } from "framer-motion";
 import { useEffect, Suspense, lazy, memo, useState } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
+import { TimeProvider } from "@/contexts/TimeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { CelebrationProvider } from "@/contexts/CelebrationContext";
@@ -295,19 +296,21 @@ const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <EvolutionProvider>
-          <CelebrationProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <InstallPWA />
-              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                <ScrollToTop />
-                <AppContent />
-              </BrowserRouter>
-            </TooltipProvider>
-          </CelebrationProvider>
-        </EvolutionProvider>
+        <TimeProvider>
+          <EvolutionProvider>
+            <CelebrationProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <InstallPWA />
+                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                  <ScrollToTop />
+                  <AppContent />
+                </BrowserRouter>
+              </TooltipProvider>
+            </CelebrationProvider>
+          </EvolutionProvider>
+        </TimeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
