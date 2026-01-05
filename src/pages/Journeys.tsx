@@ -37,8 +37,10 @@ import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
 import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
 import { useWeeklyPlanOptimization } from "@/hooks/useWeeklyPlanOptimization";
+import { useWeeklyPlanGeneration } from "@/hooks/useWeeklyPlanGeneration";
 import { useEpics } from "@/hooks/useEpics";
 import { SmartDailyRescheduleCard } from "@/components/SmartDailyRescheduleCard";
+import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
@@ -72,8 +74,12 @@ const Journeys = () => {
   // Daily plan optimization & generation
   const { refetch: refetchPlan, generatePlan, isGenerating } = useDailyPlanOptimization();
   
-  // Weekly plan optimization
+  // Weekly plan optimization & generation
   const { refetch: refetchWeeklyPlan, optimizeWithAnswers: optimizeWeekWithAnswers } = useWeeklyPlanOptimization();
+  const { generateWeeklyPlan, isGenerating: isGeneratingWeek } = useWeeklyPlanGeneration();
+  
+  // AI interaction tracking
+  const { trackDailyPlanOutcome } = useAIInteractionTracker();
   
   // Epics for plan my day questions
   const { epics } = useEpics();
@@ -189,12 +195,22 @@ const Journeys = () => {
     setShowAddSheet(false);
   }, [selectedDate, addTask]);
 
-  const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number) => {
+  const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null }) => {
     if (completed) {
       recordCompletion(); // Track combo for consecutive completions
+      
+      // Track for AI learning (only for AI-generated tasks)
+      if (taskData?.ai_generated) {
+        trackDailyPlanOutcome(taskId, 'completed', {
+          scheduledTime: taskData.scheduled_time ?? undefined,
+          difficulty: taskData.difficulty ?? undefined,
+          category: taskData.category ?? undefined,
+          wasOnTime: true,
+        });
+      }
     }
     toggleTask({ taskId, completed, xpReward });
-  }, [recordCompletion, toggleTask]);
+  }, [recordCompletion, toggleTask, trackDailyPlanOutcome]);
   
   const handleUndoToggle = useCallback((taskId: string, xpReward: number) => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
@@ -251,10 +267,14 @@ const Journeys = () => {
     setEditingTask(null);
   }, [updateTask]);
 
-  const handleDeleteQuest = useCallback(async (taskId: string) => {
+  const handleDeleteQuest = useCallback(async (taskId: string, isAIGenerated?: boolean) => {
+    // Track deletion for AI learning
+    if (isAIGenerated) {
+      trackDailyPlanOutcome(taskId, 'deleted');
+    }
     await deleteTask(taskId);
     setEditingTask(null);
-  }, [deleteTask]);
+  }, [deleteTask, trackDailyPlanOutcome]);
 
   const handleDeleteRitual = useCallback(async (habitId: string) => {
     if (!user?.id) return;
@@ -339,27 +359,30 @@ const Journeys = () => {
     }
   }, [generatePlan]);
 
-  // Handle Plan My Week command with clarification answers
+  // Handle Plan My Week command with clarification answers - generates actual tasks
   const handlePlanMyWeek = useCallback(async (answers: PlanMyWeekAnswers) => {
     try {
-      const result = await optimizeWeekWithAnswers(answers);
-      const dailyPlans = result?.dailyPlans;
+      const result = await generateWeeklyPlan(answers);
       
-      if (dailyPlans && dailyPlans.length > 0) {
-        const totalTasks = dailyPlans.reduce((sum, d) => sum + d.tasks.length, 0);
-        toast.success(`Week planned! ${totalTasks} tasks across ${dailyPlans.length} days`, {
-          description: `Balance score: ${result?.balanceScore || 0}%`,
+      if (result?.weeklyTasks && result.weeklyTasks.length > 0) {
+        const dayCount = new Set(result.weeklyTasks.map(t => t.task_date)).size;
+        toast.success(`Week planned! ${result.weeklyTasks.length} tasks across ${dayCount} days`, {
+          description: result.summaryMessage || `Balance score: ${result.balanceScore || 0}%`,
         });
+        
+        // Refresh data
         refetchWeeklyPlan();
         refetchPlan();
+        queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       } else {
-        toast.info("Your week looks open. Add some tasks to optimize!");
+        toast.info("Your week looks open. Add some tasks to plan!");
       }
     } catch (error) {
-      console.error('Weekly plan optimization failed:', error);
+      console.error('Weekly plan generation failed:', error);
       toast.error("Couldn't generate weekly plan. Try again later.");
     }
-  }, [optimizeWeekWithAnswers, refetchWeeklyPlan, refetchPlan]);
+  }, [generateWeeklyPlan, refetchWeeklyPlan, refetchPlan, queryClient]);
 
   return (
     <TaskDragProvider>
@@ -411,8 +434,14 @@ const Journeys = () => {
             <SmartDailyRescheduleCard
               tasks={dailyTasks}
               selectedDate={selectedDate}
-              onReplan={() => {
-                // Could trigger the plan my day flow here
+              onReplan={async () => {
+                // Trigger a quick replan with default settings
+                try {
+                  await generatePlan({ energyLevel: 'medium', dayType: 'mixed', focusArea: undefined });
+                  toast.success("Day replanned!");
+                } catch (e) {
+                  console.error('Replan failed:', e);
+                }
               }}
               onDismiss={() => setShowRescheduleCard(false)}
             />
