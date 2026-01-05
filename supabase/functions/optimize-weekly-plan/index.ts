@@ -34,6 +34,52 @@ interface DailyPlan {
   energyLevel: 'low' | 'medium' | 'high';
 }
 
+interface LearningContext {
+  peakHours: number[];
+  preferredTaskCount: number;
+  dayOfWeekPatterns: Record<string, { avgTasks: number; completionRate: number }>;
+  successfulCategories: string[];
+}
+
+function buildLearningContext(aiLearning: Record<string, unknown> | null): LearningContext {
+  const defaultContext: LearningContext = {
+    peakHours: [9, 10, 11, 14, 15],
+    preferredTaskCount: 5,
+    dayOfWeekPatterns: {},
+    successfulCategories: [],
+  };
+
+  if (!aiLearning) return defaultContext;
+
+  // Extract peak hours from energy_by_hour
+  const energyByHour = aiLearning.energy_by_hour as Record<string, number> | undefined;
+  if (energyByHour) {
+    const sorted = Object.entries(energyByHour)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5);
+    defaultContext.peakHours = sorted.map(([hour]) => parseInt(hour));
+  }
+
+  // Extract successful categories
+  const successfulPatterns = aiLearning.successful_patterns as Record<string, unknown> | undefined;
+  if (successfulPatterns?.categories) {
+    defaultContext.successfulCategories = Object.keys(successfulPatterns.categories as Record<string, unknown>);
+  }
+
+  // Extract day of week patterns
+  const dayPatterns = aiLearning.day_of_week_patterns as Record<string, { tasks_completed?: number; total_tasks?: number }> | undefined;
+  if (dayPatterns) {
+    Object.entries(dayPatterns).forEach(([day, data]) => {
+      defaultContext.dayOfWeekPatterns[day] = {
+        avgTasks: data.tasks_completed || 0,
+        completionRate: data.total_tasks ? (data.tasks_completed || 0) / data.total_tasks : 0,
+      };
+    });
+  }
+
+  return defaultContext;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -92,6 +138,16 @@ serve(async (req) => {
 
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
     const getDayName = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+    // Fetch AI learning data for personalization
+    const { data: aiLearning } = await supabase
+      .from('user_ai_learning')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const learningContext = buildLearningContext(aiLearning);
+    console.log('Learning context for optimization:', learningContext);
 
     // Fetch existing tasks for the week
     const { data: existingTasks, error: tasksError } = await supabase
