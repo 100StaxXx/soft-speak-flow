@@ -3,7 +3,9 @@ import { format } from "date-fns";
 import { BottomNav } from "@/components/BottomNav";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { TimelineView } from "@/components/calendar";
+import { CalendarDayView } from "@/components/CalendarDayView";
 import { MonthViewModal } from "@/components/calendar/MonthViewModal";
+import { CalendarViewToggle } from "@/components/calendar/CalendarViewToggle";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
@@ -14,6 +16,7 @@ import { PageTransition } from "@/components/PageTransition";
 
 const Community = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [calendarView, setCalendarView] = useState<'timeline' | 'grid'>('timeline');
   const [showMonthModal, setShowMonthModal] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
@@ -85,6 +88,13 @@ const Community = () => {
     });
   }, [updateTask]);
 
+  // Adapter for CalendarDayView's onTaskDrop signature
+  const handleTaskDrop = useCallback((taskId: string, _date: Date, newTime?: string) => {
+    if (newTime) {
+      handleTaskReschedule(taskId, newTime);
+    }
+  }, [handleTaskReschedule]);
+
   const handleAddQuest = async (data: AddQuestData) => {
     const taskDate = format(selectedDate, 'yyyy-MM-dd');
     await addTask({
@@ -132,21 +142,39 @@ const Community = () => {
         {/* Safe area padding for top */}
         <div className="pt-[env(safe-area-inset-top)]" />
 
+        {/* View Toggle Header */}
+        <div className="max-w-2xl mx-auto w-full px-4 pt-3 pb-2 relative z-10 flex justify-end">
+          <CalendarViewToggle view={calendarView} onChange={setCalendarView} />
+        </div>
+
         {/* Main Content */}
         <div className="flex-1 max-w-2xl mx-auto w-full relative z-10 overflow-hidden">
-          <TimelineView
-            selectedDate={selectedDate}
-            onDateSelect={handleDateSelect}
-            tasks={formattedTasks}
-            milestones={calendarMilestones}
-            onTaskClick={handleTaskClick}
-            onTaskLongPress={handleTaskLongPress}
-            onTimeSlotLongPress={handleTimeSlotLongPress}
-            onMilestoneClick={() => {}}
-            onAddClick={() => setShowAddSheet(true)}
-            onTaskReschedule={handleTaskReschedule}
-            onDateHeaderClick={() => setShowMonthModal(true)}
-          />
+          {calendarView === 'timeline' ? (
+            <TimelineView
+              selectedDate={selectedDate}
+              onDateSelect={handleDateSelect}
+              tasks={formattedTasks}
+              milestones={calendarMilestones}
+              onTaskClick={handleTaskClick}
+              onTaskLongPress={handleTaskLongPress}
+              onTimeSlotLongPress={handleTimeSlotLongPress}
+              onMilestoneClick={() => {}}
+              onAddClick={() => setShowAddSheet(true)}
+              onTaskReschedule={handleTaskReschedule}
+              onDateHeaderClick={() => setShowMonthModal(true)}
+            />
+          ) : (
+            <CalendarDayView
+              selectedDate={selectedDate}
+              onDateSelect={handleDateSelect}
+              tasks={formattedTasks}
+              milestones={calendarMilestones}
+              onTaskDrop={handleTaskDrop}
+              onTimeSlotLongPress={handleTimeSlotLongPress}
+              onTaskLongPress={handleTaskLongPress}
+              onMilestoneClick={() => {}}
+            />
+          )}
         </div>
 
         {/* Month View Modal */}
