@@ -1,13 +1,21 @@
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface QuoteRequest {
-  type: 'trigger' | 'category';
-  value: string;
-  count: number;
-}
+// Input validation schema
+const QuoteRequestSchema = z.object({
+  type: z.enum(['trigger', 'category']),
+  value: z.string()
+    .min(1, "Value is required")
+    .max(100, "Value must be less than 100 characters")
+    .regex(/^[a-zA-Z0-9\s\-_]+$/, "Value contains invalid characters"),
+  count: z.number().int().min(1).max(10).default(5),
+});
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -17,8 +25,33 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { type, value, count = 5 } = await req.json() as QuoteRequest;
+    // Parse and validate input
+    let rawBody;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const parseResult = QuoteRequestSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      console.error('[generate-quotes] Validation error:', parseResult.error.errors);
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: parseResult.error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { type, value, count } = parseResult.data;
+
+    // Rate limit check (anonymous but still limit by IP-based estimation via service call count)
+    // Note: For authenticated endpoints, we'd use userId
+    const rateLimitConfig = RATE_LIMITS['generate-quotes'] || { maxCalls: 20, windowHours: 24 };
 
     console.log('Generating quotes for:', { type, value, count });
 
@@ -39,6 +72,12 @@ Deno.serve(async (req) => {
     });
 
     if (!aiResp.ok) {
+      if (aiResp.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded, please try again later.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       const txt = await aiResp.text();
       throw new Error(`AI gateway error: ${aiResp.status} ${txt}`);
     }

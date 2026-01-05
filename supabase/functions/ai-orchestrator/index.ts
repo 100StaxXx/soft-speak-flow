@@ -1,18 +1,24 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface OrchestratorRequest {
-  input: string;
-  interactionType: 'classify' | 'suggest_epic' | 'adjust_plan' | 'chat';
-  sessionId?: string;
-  additionalContext?: Record<string, unknown>;
-}
+// Input validation schema with strict limits
+const OrchestratorRequestSchema = z.object({
+  input: z.string()
+    .min(1, "Input is required")
+    .max(2000, "Input must be less than 2000 characters")
+    .transform(s => s.trim()),
+  interactionType: z.enum(['classify', 'suggest_epic', 'adjust_plan', 'chat']),
+  sessionId: z.string().uuid().optional(),
+  additionalContext: z.record(z.unknown()).optional(),
+});
 
 interface EnrichedContext {
   activeEpics: Array<{ id: string; title: string; progress: number; daysRemaining: number; habitCount: number; storyType: string | null; themeColor: string | null }>;
@@ -66,8 +72,41 @@ serve(async (req) => {
     }
 
     const userId = user.id;
-    const body: OrchestratorRequest = await req.json();
-    const { input, interactionType, sessionId, additionalContext } = body;
+
+    // Parse and validate input
+    let rawBody;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const parseResult = OrchestratorRequestSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      console.error('[ai-orchestrator] Validation error:', parseResult.error.errors);
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: parseResult.error.errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { input, interactionType, sessionId, additionalContext } = parseResult.data;
+
+    // Check rate limit for AI orchestrator calls
+    const rateLimitResult = await checkRateLimit(
+      supabase,
+      userId,
+      'ai-orchestrator',
+      RATE_LIMITS['ai-orchestrator'] || { maxCalls: 100, windowHours: 24 }
+    );
+
+    if (!rateLimitResult.allowed) {
+      console.warn(`[ai-orchestrator] Rate limit exceeded for user ${userId}`);
+      return createRateLimitResponse(rateLimitResult, corsHeaders);
+    }
 
     console.log(`Orchestrator request: type=${interactionType}, input="${input.substring(0, 50)}..."`);
 
