@@ -10,7 +10,7 @@ const features = [
   { icon: Mic, text: "Listen to daily pep talks for motivation" },
   { icon: Sun, text: "Morning & evening check-ins to track your mood" },
   { icon: HelpCircle, text: "Ask questions anytime for personalized guidance" },
-  { icon: Sparkles, text: "Your mentor adapts to your zodiac profile" },
+  { icon: Sparkles, text: "Unlock unique mentor personalities and styles" },
 ];
 
 export function MentorTutorialModal({ open, onClose }: MentorTutorialModalProps) {
