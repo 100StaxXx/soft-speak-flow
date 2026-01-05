@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Rocket, Sparkles, ChevronRight } from 'lucide-react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useWelcomeImage } from '../hooks/useWelcomeImage';
@@ -30,6 +30,39 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
       requestPermission();
     }
   }, [available, permitted, requestPermission]);
+  
+  // Track drag position for reactive effects
+  const dragX = useMotionValue(0);
+  
+  // Create reactive transforms based on drag position
+  const rocketRotation = useTransform(dragX, [0, 200], [-22, 45]); // Rotate as it moves right
+  const trailWidth = useTransform(dragX, [0, 200], [0, 180]); // Trail grows behind rocket
+  const trailOpacity = useTransform(dragX, [0, 50, 200], [0, 0.6, 0.9]); // Trail fades in
+  const rocketGlow = useTransform(
+    dragX, 
+    [0, 100, 200], 
+    [
+      '0 0 15px rgba(168, 85, 247, 0.5)',
+      '0 0 25px rgba(168, 85, 247, 0.7)',
+      '0 0 40px rgba(168, 85, 247, 0.9), 0 0 60px rgba(236, 72, 153, 0.5)'
+    ]
+  );
+  
+  // Sparkle effects - each appears progressively
+  const sparkleOpacities = [
+    useTransform(dragX, [30, 60], [0, 0.8]),
+    useTransform(dragX, [50, 80], [0, 0.8]),
+    useTransform(dragX, [70, 100], [0, 0.8]),
+    useTransform(dragX, [90, 120], [0, 0.8]),
+    useTransform(dragX, [110, 140], [0, 0.8]),
+  ];
+  const sparkleScales = [
+    useTransform(dragX, [30, 60, 120], [0, 1, 0.5]),
+    useTransform(dragX, [50, 80, 140], [0, 1, 0.5]),
+    useTransform(dragX, [70, 100, 160], [0, 1, 0.5]),
+    useTransform(dragX, [90, 120, 180], [0, 1, 0.5]),
+    useTransform(dragX, [110, 140, 200], [0, 1, 0.5]),
+  ];
 
   return (
     <AnimatePresence>
@@ -147,6 +180,29 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   />
                   
+                  {/* Trail behind rocket */}
+                  <motion.div 
+                    className="absolute left-1.5 top-1/2 -translate-y-1/2 h-10 rounded-full bg-gradient-to-r from-primary/60 via-purple-500/40 to-transparent"
+                    style={{ 
+                      width: trailWidth,
+                      opacity: trailOpacity,
+                    }}
+                  />
+                  
+                  {/* Position-based sparkles */}
+                  {[...Array(5)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1.5 h-1.5 rounded-full bg-primary"
+                      style={{
+                        left: 56 + (i * 28),
+                        top: `${50 + (i % 2 === 0 ? -8 : 8)}%`,
+                        opacity: sparkleOpacities[i],
+                        scale: sparkleScales[i],
+                      }}
+                    />
+                  ))}
+                  
                   {/* Draggable rocket */}
                   <motion.div
                     drag="x"
@@ -163,10 +219,17 @@ export const CampaignEmptyStateModal = memo(function CampaignEmptyStateModal({ o
                     }}
                     whileDrag={{ scale: 1.15 }}
                     whileHover={{ scale: 1.05 }}
-                    className="relative w-13 h-13 rounded-full bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg shadow-primary/50 z-10"
-                    style={{ width: 52, height: 52 }}
+                    className="relative w-13 h-13 rounded-full bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center cursor-grab active:cursor-grabbing z-10"
+                    style={{ 
+                      x: dragX, 
+                      width: 52, 
+                      height: 52,
+                      boxShadow: rocketGlow,
+                    }}
                   >
-                    <Rocket className="w-6 h-6 text-white -rotate-[22deg]" />
+                    <motion.div style={{ rotate: rocketRotation }}>
+                      <Rocket className="w-6 h-6 text-white" />
+                    </motion.div>
                   </motion.div>
                   
                   {/* Destination indicator */}
