@@ -1526,7 +1526,7 @@ All colors MUST be HSL.
 
   /* Bottom Nav Height + Safe Area for page padding */
   .pb-nav-safe {
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .mb-nav-safe {
