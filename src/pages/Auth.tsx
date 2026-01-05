@@ -788,7 +788,7 @@ const Auth = () => {
                     <button
                       type="button"
                       onClick={() => setIsForgotPassword(true)}
-                      className="text-xs text-steel hover:text-pure-white transition-colors"
+                      className="text-xs text-pure-white/70 hover:text-pure-white transition-colors"
                     >
                       Forgot password?
                     </button>
@@ -831,7 +831,7 @@ const Auth = () => {
                     setConfirmPassword(""); // Clear confirm password when switching modes
                   }
                 }}
-                className="text-royal-purple hover:text-accent-purple"
+                className="text-pure-white/90 hover:text-stardust-gold underline underline-offset-4"
               >
                 {isForgotPassword 
                   ? "Back to Sign In" 
