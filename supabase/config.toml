@@ -272,3 +272,6 @@ verify_jwt = true
 
 [functions.generate-weekly-plan]
 verify_jwt = true
+
+[functions.check-contact-reminders]
+verify_jwt = false

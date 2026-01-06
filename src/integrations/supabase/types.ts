@@ -1427,6 +1427,47 @@ export type Database = {
           },
         ]
       }
+      contact_reminders: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          reminder_at: string
+          sent: boolean
+          sent_at: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reminder_at: string
+          sent?: boolean
+          sent_at?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reminder_at?: string
+          sent?: boolean
+          sent_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_reminders_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           avatar_url: string | null
