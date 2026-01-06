@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Mail, Phone, Building2, Star, Plus, X } from 'lucide-react';
+import { Mail, Phone, Building2, Star, Plus, Bell } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -10,10 +10,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Contact } from '@/hooks/useContacts';
 import { useContactInteractions } from '@/hooks/useContactInteractions';
+import { useContactReminders } from '@/hooks/useContactReminders';
 import { InteractionDialog } from './InteractionDialog';
 import { InteractionsList } from './InteractionsList';
+import { ReminderDialog } from './ReminderDialog';
+import { RemindersList } from './RemindersList';
 import { cn } from '@/lib/utils';
 
 interface ContactDetailSheetProps {
@@ -33,6 +37,7 @@ function getInitials(name: string): string {
 
 export function ContactDetailSheet({ contact, open, onOpenChange }: ContactDetailSheetProps) {
   const [interactionDialogOpen, setInteractionDialogOpen] = useState(false);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   
   const {
     interactions,
@@ -40,6 +45,9 @@ export function ContactDetailSheet({ contact, open, onOpenChange }: ContactDetai
     createInteraction,
     deleteInteraction,
   } = useContactInteractions(contact?.id);
+
+  const { reminders } = useContactReminders(contact?.id);
+  const pendingReminders = reminders.filter((r) => !r.sent);
 
   if (!contact) return null;
 
@@ -130,28 +138,59 @@ export function ContactDetailSheet({ contact, open, onOpenChange }: ContactDetai
             </div>
           </SheetHeader>
 
-          {/* Interactions section */}
-          <div className="flex-1 flex flex-col min-h-0">
+          {/* Content Tabs */}
+          <Tabs defaultValue="interactions" className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between px-6 py-3 border-b bg-muted/50">
-              <h3 className="font-medium text-sm">Interaction History</h3>
-              <Button
-                size="sm"
-                onClick={() => setInteractionDialogOpen(true)}
-                className="h-8"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Log Interaction
-              </Button>
+              <TabsList className="h-8">
+                <TabsTrigger value="interactions" className="text-xs px-3">
+                  History
+                </TabsTrigger>
+                <TabsTrigger value="reminders" className="text-xs px-3 relative">
+                  Reminders
+                  {pendingReminders.length > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                      {pendingReminders.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setReminderDialogOpen(true)}
+                  className="h-8"
+                >
+                  <Bell className="h-4 w-4 mr-1" />
+                  Remind
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setInteractionDialogOpen(true)}
+                  className="h-8"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Log
+                </Button>
+              </div>
             </div>
 
-            <ScrollArea className="flex-1 px-6 py-4">
-              <InteractionsList
-                interactions={interactions}
-                isLoading={isLoading}
-                onDelete={(id) => deleteInteraction.mutate({ id, contactId: contact.id })}
-              />
-            </ScrollArea>
-          </div>
+            <TabsContent value="interactions" className="flex-1 m-0">
+              <ScrollArea className="h-full px-6 py-4">
+                <InteractionsList
+                  interactions={interactions}
+                  isLoading={isLoading}
+                  onDelete={(id) => deleteInteraction.mutate({ id, contactId: contact.id })}
+                />
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="reminders" className="flex-1 m-0">
+              <ScrollArea className="h-full px-6 py-4">
+                <RemindersList contactId={contact.id} />
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </SheetContent>
       </Sheet>
 
@@ -169,6 +208,12 @@ export function ContactDetailSheet({ contact, open, onOpenChange }: ContactDetai
           setInteractionDialogOpen(false);
         }}
         isLoading={createInteraction.isPending}
+      />
+
+      <ReminderDialog
+        contact={contact}
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
       />
     </>
   );

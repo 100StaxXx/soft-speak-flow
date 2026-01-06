@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Contact } from '@/hooks/useContacts';
+import { useContactReminders } from '@/hooks/useContactReminders';
+import { ReminderBadge } from './ReminderBadge';
 import { cn } from '@/lib/utils';
 
 interface ContactCardProps {
@@ -36,6 +38,9 @@ export const ContactCard = memo(function ContactCard({
   onToggleFavorite,
   onClick,
 }: ContactCardProps) {
+  const { reminders } = useContactReminders(contact.id);
+  const nextReminder = reminders.find((r) => !r.sent);
+
   return (
     <Card 
       className="p-4 flex items-start gap-4 cursor-pointer hover:bg-accent/50 transition-colors"
@@ -53,6 +58,12 @@ export const ContactCard = memo(function ContactCard({
           <h3 className="font-semibold text-foreground truncate">{contact.name}</h3>
           {contact.is_favorite && (
             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 shrink-0" />
+          )}
+          {nextReminder && (
+            <ReminderBadge
+              reminderAt={nextReminder.reminder_at}
+              reason={nextReminder.reason}
+            />
           )}
         </div>
 
