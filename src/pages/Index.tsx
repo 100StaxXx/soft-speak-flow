@@ -76,7 +76,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   }, [profile, queryClient, user]);
 
   // Use React Query for mentor data with proper caching
-  const { data: mentorPageData } = useQuery({
+  const { data: mentorPageData, isLoading: mentorPageDataLoading } = useQuery({
     queryKey: ['mentor-page-data', resolvedMentorId],
     queryFn: async () => {
       if (!resolvedMentorId) return null;
@@ -146,10 +146,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     const hasCompletedOnboarding = profile?.onboarding_completed === true;
     const hasMentor = !!resolvedMentorId;
     
-    // Ready = loading done AND (not completed onboarding OR has mentor)
-    const ready = loadingComplete && (!hasCompletedOnboarding || hasMentor);
+    // Also wait for mentor page data to load (if we have a mentor)
+    const mentorDataReady = !hasMentor || !mentorPageDataLoading;
+    
+    // Ready = loading done AND (not completed onboarding OR has mentor) AND mentor data loaded
+    const ready = loadingComplete && (!hasCompletedOnboarding || hasMentor) && mentorDataReady;
     setIsReady(ready);
-  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId]);
+  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId, mentorPageDataLoading]);
 
   // Memoized insight action handler - MUST be before early returns
   const onInsightAction = useCallback((insight: { actionType?: string }) => {
