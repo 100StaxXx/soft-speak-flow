@@ -40,6 +40,14 @@ export interface DailyTask {
   epic_title?: string | null;
   // Sort order for drag reordering
   sort_order?: number | null;
+  // Contact integration
+  contact_id: string | null;
+  auto_log_interaction: boolean | null;
+  contact?: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {
@@ -59,7 +67,11 @@ export const useTasksQuery = (selectedDate?: Date) => {
       
       const { data, error } = await supabase
         .from('daily_tasks')
-        .select('*, epics(title)')
+        .select(`
+          *,
+          epics(title),
+          contact:contacts!contact_id(id, name, avatar_url)
+        `)
         .eq('user_id', user.id)
         .eq('task_date', taskDate)
         .order('sort_order', { ascending: true })
@@ -70,10 +82,11 @@ export const useTasksQuery = (selectedDate?: Date) => {
         throw error;
       }
       
-      // Flatten epic title from joined data
+      // Flatten epic title and contact from joined data
       return (data || []).map(task => ({
         ...task,
         epic_title: (task.epics as { title: string } | null)?.title || null,
+        contact: task.contact as { id: string; name: string; avatar_url: string | null } | null,
       })) as DailyTask[];
     },
     enabled: !!user?.id,

@@ -9,9 +9,11 @@ import {
   Star,
   MoreHorizontal,
   Sparkles,
+  User,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +43,12 @@ export interface TaskCardTask {
   estimated_duration?: number | null;
   scheduled_time?: string | null;
   category?: string | null;
+  contact_id?: string | null;
+  contact?: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface EnhancedTaskCardProps {
@@ -173,6 +181,17 @@ export function EnhancedTaskCard({
                 />
               )}
               {task.energy_level && <EnergyBadge level={task.energy_level} />}
+              {task.contact && (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full">
+                  <Avatar className="h-3.5 w-3.5">
+                    <AvatarImage src={task.contact.avatar_url || undefined} />
+                    <AvatarFallback className="text-[8px] bg-emerald-100 dark:bg-emerald-900">
+                      {task.contact.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate max-w-[80px]">{task.contact.name}</span>
+                </span>
+              )}
               {task.estimated_duration && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="w-3 h-3" />

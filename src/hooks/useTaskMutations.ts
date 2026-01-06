@@ -49,6 +49,8 @@ export interface AddTaskParams {
   reminderMinutesBefore?: number;
   category?: string;
   notes?: string | null;
+  contactId?: string | null;
+  autoLogInteraction?: boolean;
 }
 
 export const useTaskMutations = (taskDate: string) => {
@@ -101,7 +103,9 @@ export const useTaskMutations = (taskDate: string) => {
             reminder_minutes_before: params.reminderMinutesBefore ?? 15,
             category: detectedCategory,
             is_bonus: false,
-            notes: params.notes || null
+            notes: params.notes || null,
+            contact_id: params.contactId || null,
+            auto_log_interaction: params.autoLogInteraction ?? true,
           })
           .select()
           .single();
@@ -215,7 +219,11 @@ export const useTaskMutations = (taskDate: string) => {
 
       const { data: existingTask, error: existingError } = await supabase
         .from('daily_tasks')
-        .select('completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category')
+        .select(`
+          completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category,
+          contact_id, auto_log_interaction,
+          contact:contacts!contact_id(id, name, avatar_url)
+        `)
         .eq('id', taskId)
         .eq('user_id', user.id)
         .maybeSingle();
@@ -320,6 +328,9 @@ export const useTaskMutations = (taskDate: string) => {
       const taskDifficulty = existingTask?.difficulty || 'medium';
       const taskScheduledTime = existingTask?.scheduled_time || null;
       const taskCategory = existingTask?.category || null;
+      const contactId = existingTask?.contact_id || null;
+      const autoLogInteraction = existingTask?.auto_log_interaction ?? true;
+      const contact = existingTask?.contact as { id: string; name: string; avatar_url: string | null } | null;
 
       return { 
         taskId, 
@@ -334,6 +345,9 @@ export const useTaskMutations = (taskDate: string) => {
         taskDifficulty,
         taskScheduledTime,
         taskCategory,
+        contactId,
+        autoLogInteraction,
+        contact,
       };
     },
     onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId, taskDifficulty, taskScheduledTime, taskCategory }) => {

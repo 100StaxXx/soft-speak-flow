@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X } from 'lucide-react';
+import { Calendar, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format } from 'date-fns';
+import { ContactPicker } from '@/components/tasks/ContactPicker';
 
 interface TaskAdvancedEditSheetProps {
   open: boolean;
@@ -79,6 +80,8 @@ export function TaskAdvancedEditSheet({
   const [reminderEnabled, setReminderEnabled] = useState(parsed.reminderEnabled || false);
   const [reminderMinutes, setReminderMinutes] = useState(parsed.reminderMinutesBefore || 15);
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
+  const [contactId, setContactId] = useState<string | null>(parsed.contactId || null);
+  const [autoLogInteraction, setAutoLogInteraction] = useState(parsed.autoLogInteraction ?? true);
   
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
@@ -97,6 +100,8 @@ export function TaskAdvancedEditSheet({
       reminderEnabled,
       reminderMinutesBefore: reminderEnabled ? reminderMinutes : null,
       recurrencePattern: recurrencePattern || null,
+      contactId,
+      autoLogInteraction,
     };
     onSave(updated);
   };
@@ -344,6 +349,30 @@ export function TaskAdvancedEditSheet({
               placeholder="Add additional details..."
               className="bg-background/50 min-h-[80px] resize-none"
             />
+          </div>
+
+          {/* Contact Link */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-emerald-500" />
+              Link to Contact
+            </Label>
+            <ContactPicker
+              value={contactId}
+              onChange={setContactId}
+              placeholder="Select a contact..."
+            />
+            {contactId && (
+              <div className="flex items-center justify-between mt-2">
+                <Label className="text-sm text-muted-foreground">
+                  Log as interaction when completed
+                </Label>
+                <Switch
+                  checked={autoLogInteraction}
+                  onCheckedChange={setAutoLogInteraction}
+                />
+              </div>
+            )}
           </div>
         </div>
 

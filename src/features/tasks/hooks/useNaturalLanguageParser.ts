@@ -16,6 +16,11 @@ export interface ParsedTask {
   reminderMinutesBefore: number | null;
   notes: string | null;
   
+  // Contact linking
+  contactId: string | null;
+  autoLogInteraction: boolean;
+  mentionedContactName: string | null;
+  
   // Clear actions
   clearTime: boolean;
   clearDate: boolean;
@@ -483,6 +488,9 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     reminderEnabled: false,
     reminderMinutesBefore: null,
     notes: null,
+    contactId: null,
+    autoLogInteraction: true,
+    mentionedContactName: null,
     clearTime: false,
     clearDate: false,
     clearDuration: false,
