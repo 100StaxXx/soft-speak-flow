@@ -127,6 +127,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     },
     enabled: !!resolvedMentorId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    placeholderData: (previousData) => previousData, // Keep showing cached data during refetch
   });
 
   const mentorImage = mentorPageData?.mentorImage || "";
@@ -146,13 +147,13 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     const hasCompletedOnboarding = profile?.onboarding_completed === true;
     const hasMentor = !!resolvedMentorId;
     
-    // Also wait for mentor page data to load (if we have a mentor)
-    const mentorDataReady = !hasMentor || !mentorPageDataLoading;
+    // Mentor is ready if: no mentor needed, OR we have cached data, OR initial load complete
+    const mentorDataReady = !hasMentor || !!mentorPageData || !mentorPageDataLoading;
     
     // Ready = loading done AND (not completed onboarding OR has mentor) AND mentor data loaded
     const ready = loadingComplete && (!hasCompletedOnboarding || hasMentor) && mentorDataReady;
     setIsReady(ready);
-  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId, mentorPageDataLoading]);
+  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId, mentorPageDataLoading, mentorPageData]);
 
   // Memoized insight action handler - MUST be before early returns
   const onInsightAction = useCallback((insight: { actionType?: string }) => {
