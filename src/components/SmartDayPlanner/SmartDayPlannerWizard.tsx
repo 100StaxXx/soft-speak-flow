@@ -134,6 +134,7 @@ export function SmartDayPlannerWizard({
               {step === 'quick_start' && savedPreferences && (
                 <QuickStartStep
                   savedPreferences={savedPreferences}
+                  contactsNeedingAttentionCount={planner.contactsNeedingAttention.length}
                   onUseDefaults={applyDefaults}
                   onCustomize={() => planner.setStep('check_in')}
                   onReset={resetPreferences}
@@ -149,6 +150,7 @@ export function SmartDayPlannerWizard({
                   habitsWithStreaks={planner.habitsWithStreaks}
                   upcomingMilestones={planner.upcomingMilestones}
                   existingTasks={planner.existingTasks}
+                  contactsNeedingAttention={planner.contactsNeedingAttention}
                   isLoading={planner.isLoadingAnchors}
                   onNext={planner.nextStep}
                 />

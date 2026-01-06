@@ -25,6 +25,14 @@ interface GeneratedTask {
   rationale?: string;
 }
 
+interface ContactNeedingAttention {
+  id: string;
+  name: string;
+  reason: "overdue" | "going_cold";
+  daysSinceContact?: number;
+  reminderReason?: string | null;
+}
+
 interface RequestBody {
   planDate: string;
   energyLevel: "low" | "medium" | "high";
@@ -33,6 +41,7 @@ interface RequestBody {
   protectedHabitIds: string[];
   prioritizedEpicIds: string[];
   dayShape: "front_load" | "spread" | "back_load" | "auto";
+  contactsNeedingAttention?: ContactNeedingAttention[];
   adjustmentRequest?: string;
   previousPlan?: {
     tasks: GeneratedTask[];
@@ -76,6 +85,7 @@ serve(async (req) => {
       protectedHabitIds,
       prioritizedEpicIds,
       dayShape,
+      contactsNeedingAttention,
       adjustmentRequest,
       previousPlan,
     } = body;
@@ -136,6 +146,7 @@ serve(async (req) => {
       epicContext,
       existingTasks: existingTasks || [],
       hardCommitments,
+      contactsNeedingAttention: contactsNeedingAttention || [],
       aiLearning,
       adjustmentRequest,
       previousPlan,
@@ -177,9 +188,10 @@ serve(async (req) => {
                         estimatedDuration: { type: "number", description: "Duration in minutes" },
                         priority: { type: "string", enum: ["low", "medium", "high"] },
                         category: { type: "string" },
-                        blockType: { type: "string", enum: ["focus", "admin", "health", "social", "quick_win"] },
+                        blockType: { type: "string", enum: ["focus", "admin", "health", "social", "quick_win", "relationship"] },
                         isAnchor: { type: "boolean" },
                         epicId: { type: "string" },
+                        contactId: { type: "string", description: "ID of linked contact if this is a relationship task" },
                         rationale: { type: "string" },
                       },
                       required: ["title", "scheduledTime", "estimatedDuration", "priority"],
@@ -267,6 +279,7 @@ function buildSystemPrompt(context: {
   epicContext: any[];
   existingTasks: any[];
   hardCommitments: HardCommitment[];
+  contactsNeedingAttention: ContactNeedingAttention[];
   aiLearning: any;
   adjustmentRequest?: string;
   previousPlan?: any;
@@ -279,6 +292,7 @@ function buildSystemPrompt(context: {
     epicContext,
     existingTasks,
     hardCommitments,
+    contactsNeedingAttention,
     aiLearning,
   } = context;
 
@@ -310,6 +324,17 @@ function buildSystemPrompt(context: {
   if (protectedHabits.length > 0) {
     prompt += `\n## Protected Habits (MUST include, preserve streaks!)
 ${protectedHabits.map((h) => `- ${h.name} (${h.streak} day streak${h.preferred_time ? `, usually at ${h.preferred_time}` : ""})`).join("\n")}
+`;
+  }
+
+  if (contactsNeedingAttention.length > 0) {
+    prompt += `\n## Contacts Needing Attention (Create relationship tasks with contactId set!)
+${contactsNeedingAttention.map((c) => `- ${c.name} (ID: ${c.id}) - ${c.reason === "overdue" ? `Follow-up overdue${c.reminderReason ? `: ${c.reminderReason}` : ""}` : `${c.daysSinceContact} days since last contact`}`).join("\n")}
+
+For each contact, create a task like "Follow up with [Name]" or "Check in with [Name]" and set:
+- blockType: "relationship"
+- contactId: the contact's ID
+- priority: "high" for overdue, "medium" for going cold
 `;
   }
 

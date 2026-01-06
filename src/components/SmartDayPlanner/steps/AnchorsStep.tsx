@@ -2,8 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { PlanContext, HabitWithStreak, UpcomingMilestone, ExistingTask } from '@/hooks/useSmartDayPlanner';
-import { Flame, Target, Calendar, Loader2, Shield, Sparkles } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PlanContext, HabitWithStreak, UpcomingMilestone, ExistingTask, ContactNeedingAttention } from '@/hooks/useSmartDayPlanner';
+import { Flame, Target, Calendar, Loader2, Shield, Sparkles, Users, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AnchorsStepProps {
@@ -12,6 +13,7 @@ interface AnchorsStepProps {
   habitsWithStreaks: HabitWithStreak[];
   upcomingMilestones: UpcomingMilestone[];
   existingTasks: ExistingTask[];
+  contactsNeedingAttention: ContactNeedingAttention[];
   isLoading: boolean;
   onNext: () => void;
 }
@@ -22,6 +24,7 @@ export function AnchorsStep({
   habitsWithStreaks,
   upcomingMilestones,
   existingTasks,
+  contactsNeedingAttention,
   isLoading,
   onNext,
 }: AnchorsStepProps) {
@@ -41,8 +44,20 @@ export function AnchorsStep({
     updateContext({ prioritizedEpicIds: updated });
   };
 
+  const toggleContact = (contactId: string) => {
+    const current = context.selectedContactIds;
+    const updated = current.includes(contactId)
+      ? current.filter(id => id !== contactId)
+      : [...current, contactId];
+    updateContext({ selectedContactIds: updated });
+  };
+
   const selectAllHabits = () => {
     updateContext({ protectedHabitIds: habitsWithStreaks.map(h => h.id) });
+  };
+
+  const selectAllContacts = () => {
+    updateContext({ selectedContactIds: contactsNeedingAttention.map(c => c.id) });
   };
 
   // Get unique epics from milestones
@@ -68,7 +83,7 @@ export function AnchorsStep({
     );
   }
 
-  const hasNoAnchors = habitsWithStreaks.length === 0 && uniqueEpics.length === 0;
+  const hasNoAnchors = habitsWithStreaks.length === 0 && uniqueEpics.length === 0 && contactsNeedingAttention.length === 0;
 
   return (
     <div className="space-y-5">
@@ -81,11 +96,91 @@ export function AnchorsStep({
           <Sparkles className="h-10 w-10 text-primary/50 mx-auto mb-3" />
           <h3 className="font-medium text-foreground mb-1">Fresh Start!</h3>
           <p className="text-sm text-muted-foreground">
-            No active streaks or milestones yet. We'll create a balanced plan for you.
+            No active streaks, milestones, or contacts needing attention. We'll create a balanced plan for you.
           </p>
         </motion.div>
       ) : (
         <>
+          {/* Contacts Needing Attention */}
+          {contactsNeedingAttention.length > 0 && context.includeRelationshipTasks && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Users className="h-4 w-4 text-amber-500" />
+                  Relationships
+                </label>
+                {contactsNeedingAttention.length > 1 && (
+                  <button
+                    onClick={selectAllContacts}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Select all
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {contactsNeedingAttention.slice(0, 5).map((contact, index) => {
+                  const isSelected = context.selectedContactIds.includes(contact.id);
+                  const initials = contact.name
+                    .split(' ')
+                    .map(n => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2);
+
+                  return (
+                    <motion.div
+                      key={contact.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => toggleContact(contact.id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                        isSelected
+                          ? "border-amber-500/50 bg-amber-500/10"
+                          : "border-border hover:border-amber-500/30"
+                      )}
+                    >
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleContact(contact.id)}
+                        className="border-amber-500 data-[state=checked]:bg-amber-500"
+                      />
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={contact.avatarUrl || undefined} />
+                        <AvatarFallback className="bg-amber-500/10 text-amber-600 text-xs">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{contact.name}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          {contact.hasOverdueReminder ? (
+                            <>
+                              <AlertCircle className="h-3 w-3 text-amber-500" />
+                              {contact.reminderReason || 'Follow-up overdue'}
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="h-3 w-3" />
+                              {contact.daysSinceContact} days since contact
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+              {contactsNeedingAttention.length > 5 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  +{contactsNeedingAttention.length - 5} more contacts need attention
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Habits with Streaks */}
           {habitsWithStreaks.length > 0 && (
             <div className="space-y-2">
@@ -203,7 +298,7 @@ export function AnchorsStep({
       )}
 
       {/* Summary */}
-      {(context.protectedHabitIds.length > 0 || context.prioritizedEpicIds.length > 0) && (
+      {(context.protectedHabitIds.length > 0 || context.prioritizedEpicIds.length > 0 || context.selectedContactIds.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
@@ -211,8 +306,9 @@ export function AnchorsStep({
         >
           <Shield className="h-4 w-4 text-primary" />
           <p className="text-xs text-primary">
-            Protecting {context.protectedHabitIds.length} streak{context.protectedHabitIds.length !== 1 ? 's' : ''} 
-            {context.prioritizedEpicIds.length > 0 && ` + ${context.prioritizedEpicIds.length} epic${context.prioritizedEpicIds.length !== 1 ? 's' : ''}`}
+            {context.protectedHabitIds.length > 0 && `${context.protectedHabitIds.length} streak${context.protectedHabitIds.length !== 1 ? 's' : ''}`}
+            {context.prioritizedEpicIds.length > 0 && `${context.protectedHabitIds.length > 0 ? ' + ' : ''}${context.prioritizedEpicIds.length} epic${context.prioritizedEpicIds.length !== 1 ? 's' : ''}`}
+            {context.selectedContactIds.length > 0 && `${(context.protectedHabitIds.length > 0 || context.prioritizedEpicIds.length > 0) ? ' + ' : ''}${context.selectedContactIds.length} contact${context.selectedContactIds.length !== 1 ? 's' : ''}`}
           </p>
         </motion.div>
       )}

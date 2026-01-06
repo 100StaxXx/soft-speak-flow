@@ -62,12 +62,23 @@ export interface GeneratedPlan {
   dayShape: DayShape;
 }
 
+export interface ContactNeedingAttention {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  daysSinceContact: number;
+  hasOverdueReminder: boolean;
+  reminderReason: string | null;
+}
+
 export interface PlanContext {
   energyLevel: EnergyLevel;
   flexTimeHours: number;
   hardCommitments: HardCommitment[];
   protectedHabitIds: string[];
   prioritizedEpicIds: string[];
+  selectedContactIds: string[];
+  includeRelationshipTasks: boolean;
   dayShape: DayShape;
   adjustmentRequest?: string;
 }
@@ -77,6 +88,9 @@ export interface SavedPreferences {
   defaultFlexHours: number;
   defaultDayShape: DayShape;
   autoProtectStreaks: boolean;
+  includeRelationshipTasks: boolean;
+  coldContactThresholdDays: number;
+  relationshipTasksCount: number;
   timesUsed: number;
 }
 
@@ -86,6 +100,8 @@ const DEFAULT_CONTEXT: PlanContext = {
   hardCommitments: [],
   protectedHabitIds: [],
   prioritizedEpicIds: [],
+  selectedContactIds: [],
+  includeRelationshipTasks: true,
   dayShape: 'auto',
 };
 
@@ -102,6 +118,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
   const [habitsWithStreaks, setHabitsWithStreaks] = useState<HabitWithStreak[]>([]);
   const [upcomingMilestones, setUpcomingMilestones] = useState<UpcomingMilestone[]>([]);
   const [existingTasks, setExistingTasks] = useState<ExistingTask[]>([]);
+  const [contactsNeedingAttention, setContactsNeedingAttention] = useState<ContactNeedingAttention[]>([]);
   
   // Loading states
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
@@ -207,6 +224,89 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     }
   }, [user?.id, dateStr]);
 
+  // Fetch contacts needing attention (overdue reminders or going cold)
+  const fetchContactsNeedingAttention = useCallback(async () => {
+    if (!user?.id) return;
+    
+    const thresholdDays = savedPreferences?.coldContactThresholdDays || 14;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - thresholdDays);
+    
+    try {
+      // Get contacts with overdue reminders
+      const { data: overdueReminders } = await supabase
+        .from('contact_reminders')
+        .select('contact_id, reason, contacts!inner(id, name, avatar_url)')
+        .eq('user_id', user.id)
+        .eq('sent', false)
+        .lt('reminder_at', new Date().toISOString());
+
+      // Get all contacts with their last interaction
+      const { data: contacts } = await supabase
+        .from('contacts')
+        .select('id, name, avatar_url')
+        .eq('user_id', user.id);
+
+      // Get last interaction for each contact
+      const { data: interactions } = await supabase
+        .from('contact_interactions')
+        .select('contact_id, occurred_at')
+        .eq('user_id', user.id)
+        .order('occurred_at', { ascending: false });
+
+      // Build map of last interaction per contact
+      const lastInteractionMap = new Map<string, string>();
+      (interactions || []).forEach(i => {
+        if (!lastInteractionMap.has(i.contact_id)) {
+          lastInteractionMap.set(i.contact_id, i.occurred_at);
+        }
+      });
+
+      // Build overdue reminder map
+      const overdueMap = new Map<string, string>();
+      (overdueReminders || []).forEach((r: any) => {
+        overdueMap.set(r.contact_id, r.reason || 'Follow-up overdue');
+      });
+
+      // Combine into contacts needing attention
+      const needingAttention: ContactNeedingAttention[] = [];
+
+      (contacts || []).forEach(contact => {
+        const lastInteraction = lastInteractionMap.get(contact.id);
+        const hasOverdueReminder = overdueMap.has(contact.id);
+        
+        let daysSinceContact = 999;
+        if (lastInteraction) {
+          const lastDate = new Date(lastInteraction);
+          daysSinceContact = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        }
+
+        // Include if overdue reminder OR going cold
+        if (hasOverdueReminder || daysSinceContact >= thresholdDays) {
+          needingAttention.push({
+            id: contact.id,
+            name: contact.name,
+            avatarUrl: contact.avatar_url,
+            daysSinceContact,
+            hasOverdueReminder,
+            reminderReason: overdueMap.get(contact.id) || null,
+          });
+        }
+      });
+
+      // Sort: overdue reminders first, then by days since contact
+      needingAttention.sort((a, b) => {
+        if (a.hasOverdueReminder && !b.hasOverdueReminder) return -1;
+        if (!a.hasOverdueReminder && b.hasOverdueReminder) return 1;
+        return b.daysSinceContact - a.daysSinceContact;
+      });
+
+      setContactsNeedingAttention(needingAttention);
+    } catch (err) {
+      console.error('Error fetching contacts needing attention:', err);
+    }
+  }, [user?.id, savedPreferences?.coldContactThresholdDays]);
+
   // Load all anchor data
   const loadAnchors = useCallback(async () => {
     setIsLoadingAnchors(true);
@@ -215,11 +315,12 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
         fetchHabitsWithStreaks(),
         fetchUpcomingMilestones(),
         fetchExistingTasks(),
+        fetchContactsNeedingAttention(),
       ]);
     } finally {
       setIsLoadingAnchors(false);
     }
-  }, [fetchHabitsWithStreaks, fetchUpcomingMilestones, fetchExistingTasks]);
+  }, [fetchHabitsWithStreaks, fetchUpcomingMilestones, fetchExistingTasks, fetchContactsNeedingAttention]);
 
   // Load anchors when entering the anchors step
   useEffect(() => {
@@ -248,6 +349,9 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           defaultFlexHours: data.default_flex_hours || 6,
           defaultDayShape: (data.default_day_shape as DayShape) || 'auto',
           autoProtectStreaks: data.auto_protect_streaks ?? true,
+          includeRelationshipTasks: data.include_relationship_tasks ?? true,
+          coldContactThresholdDays: data.cold_contact_threshold_days || 14,
+          relationshipTasksCount: data.relationship_tasks_count || 2,
           timesUsed: data.times_used || 0,
         });
         // Start at quick_start if preferences exist
@@ -277,6 +381,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           default_energy_level: context.energyLevel,
           default_flex_hours: context.flexTimeHours,
           default_day_shape: context.dayShape,
+          include_relationship_tasks: context.includeRelationshipTasks,
           times_used: (savedPreferences?.timesUsed || 0) + 1,
           last_used_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
@@ -316,6 +421,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
       energyLevel: savedPreferences.defaultEnergyLevel,
       flexTimeHours: savedPreferences.defaultFlexHours,
       dayShape: savedPreferences.defaultDayShape,
+      includeRelationshipTasks: savedPreferences.includeRelationshipTasks,
     }));
     
     // Update usage count
@@ -362,6 +468,17 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     setError(null);
     
     try {
+      // Get contact details for selected contacts
+      const selectedContacts = contactsNeedingAttention
+        .filter(c => context.selectedContactIds.includes(c.id))
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          reason: c.hasOverdueReminder ? 'overdue' : 'going_cold',
+          daysSinceContact: c.daysSinceContact,
+          reminderReason: c.reminderReason,
+        }));
+
       const { data, error: funcError } = await supabase.functions.invoke('generate-smart-daily-plan', {
         body: {
           planDate: dateStr,
@@ -371,6 +488,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           protectedHabitIds: context.protectedHabitIds,
           prioritizedEpicIds: context.prioritizedEpicIds,
           dayShape: context.dayShape,
+          contactsNeedingAttention: context.includeRelationshipTasks ? selectedContacts : [],
         },
       });
 
@@ -404,6 +522,14 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     setError(null);
     
     try {
+      const selectedContacts = contactsNeedingAttention
+        .filter(c => context.selectedContactIds.includes(c.id))
+        .map(c => ({
+          id: c.id,
+          name: c.name,
+          reason: c.hasOverdueReminder ? 'overdue' : 'going_cold',
+        }));
+
       const { data, error: funcError } = await supabase.functions.invoke('generate-smart-daily-plan', {
         body: {
           planDate: dateStr,
@@ -413,6 +539,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           protectedHabitIds: context.protectedHabitIds,
           prioritizedEpicIds: context.prioritizedEpicIds,
           dayShape: context.dayShape,
+          contactsNeedingAttention: context.includeRelationshipTasks ? selectedContacts : [],
           adjustmentRequest,
           previousPlan: generatedPlan,
         },
@@ -510,6 +637,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     habitsWithStreaks,
     upcomingMilestones,
     existingTasks,
+    contactsNeedingAttention,
     
     // Actions
     setStep,
