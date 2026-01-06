@@ -1819,13 +1819,16 @@ export type Database = {
       daily_planning_preferences: {
         Row: {
           auto_protect_streaks: boolean | null
+          cold_contact_threshold_days: number | null
           created_at: string | null
           default_day_shape: string | null
           default_energy_level: string | null
           default_flex_hours: number | null
           id: string
+          include_relationship_tasks: boolean | null
           last_used_at: string | null
           preferred_work_blocks: Json | null
+          relationship_tasks_count: number | null
           times_used: number | null
           updated_at: string | null
           user_id: string
@@ -1834,13 +1837,16 @@ export type Database = {
         }
         Insert: {
           auto_protect_streaks?: boolean | null
+          cold_contact_threshold_days?: number | null
           created_at?: string | null
           default_day_shape?: string | null
           default_energy_level?: string | null
           default_flex_hours?: number | null
           id?: string
+          include_relationship_tasks?: boolean | null
           last_used_at?: string | null
           preferred_work_blocks?: Json | null
+          relationship_tasks_count?: number | null
           times_used?: number | null
           updated_at?: string | null
           user_id: string
@@ -1849,13 +1855,16 @@ export type Database = {
         }
         Update: {
           auto_protect_streaks?: boolean | null
+          cold_contact_threshold_days?: number | null
           created_at?: string | null
           default_day_shape?: string | null
           default_energy_level?: string | null
           default_flex_hours?: number | null
           id?: string
+          include_relationship_tasks?: boolean | null
           last_used_at?: string | null
           preferred_work_blocks?: Json | null
+          relationship_tasks_count?: number | null
           times_used?: number | null
           updated_at?: string | null
           user_id?: string
@@ -1892,10 +1901,12 @@ export type Database = {
         Row: {
           actual_time_spent: number | null
           ai_generated: boolean | null
+          auto_log_interaction: boolean | null
           block_type: string | null
           category: string | null
           completed: boolean | null
           completed_at: string | null
+          contact_id: string | null
           context_id: string | null
           created_at: string | null
           difficulty: string | null
@@ -1929,10 +1940,12 @@ export type Database = {
         Insert: {
           actual_time_spent?: number | null
           ai_generated?: boolean | null
+          auto_log_interaction?: boolean | null
           block_type?: string | null
           category?: string | null
           completed?: boolean | null
           completed_at?: string | null
+          contact_id?: string | null
           context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
@@ -1966,10 +1979,12 @@ export type Database = {
         Update: {
           actual_time_spent?: number | null
           ai_generated?: boolean | null
+          auto_log_interaction?: boolean | null
           block_type?: string | null
           category?: string | null
           completed?: boolean | null
           completed_at?: string | null
+          contact_id?: string | null
           context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
@@ -2001,6 +2016,13 @@ export type Database = {
           xp_reward?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "daily_tasks_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "daily_tasks_context_id_fkey"
             columns: ["context_id"]
