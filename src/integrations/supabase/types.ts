@@ -4552,6 +4552,7 @@ export type Database = {
           birth_location: string | null
           birth_time: string | null
           birthdate: string | null
+          completed_tasks_stay_in_place: boolean | null
           cosmic_profile_generated_at: string | null
           created_at: string | null
           current_habit_streak: number | null
@@ -4607,6 +4608,7 @@ export type Database = {
           birth_location?: string | null
           birth_time?: string | null
           birthdate?: string | null
+          completed_tasks_stay_in_place?: boolean | null
           cosmic_profile_generated_at?: string | null
           created_at?: string | null
           current_habit_streak?: number | null
@@ -4662,6 +4664,7 @@ export type Database = {
           birth_location?: string | null
           birth_time?: string | null
           birthdate?: string | null
+          completed_tasks_stay_in_place?: boolean | null
           cosmic_profile_generated_at?: string | null
           created_at?: string | null
           current_habit_streak?: number | null

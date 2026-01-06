@@ -28,6 +28,7 @@ import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { AstrologySettings } from "@/components/AstrologySettings";
+import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -520,6 +521,7 @@ const Profile = () => {
 
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-y-4">
+              <QuestBehaviorSettings />
               <SoundSettings />
               <AstrologySettings />
               
