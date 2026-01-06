@@ -1386,6 +1386,47 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_interactions: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          interaction_type: string
+          notes: string | null
+          occurred_at: string
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          interaction_type: string
+          notes?: string | null
+          occurred_at?: string
+          summary: string
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          interaction_type?: string
+          notes?: string | null
+          occurred_at?: string
+          summary?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_interactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           avatar_url: string | null
