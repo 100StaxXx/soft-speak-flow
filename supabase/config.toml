@@ -275,3 +275,6 @@ verify_jwt = true
 
 [functions.check-contact-reminders]
 verify_jwt = false
+
+[functions.generate-smart-daily-plan]
+verify_jwt = true
