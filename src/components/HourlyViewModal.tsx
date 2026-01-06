@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { format, isSameDay, addDays, subDays } from "date-fns";
+import { format, isSameDay, addDays, subDays, setYear } from "date-fns";
 import { X, Clock, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarDayView } from "./CalendarDayView";
 import { CalendarMonthView } from "./CalendarMonthView";
+import { YearView } from "./calendar/YearViewModal";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ export function HourlyViewModal({
 }: HourlyViewModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [showYearView, setShowYearView] = useState(false);
   const isToday = isSameDay(selectedDate, new Date());
 
   // Auto-scroll to show previous hour at top when modal opens (day view only)
@@ -97,6 +99,16 @@ export function HourlyViewModal({
     const milestoneDate = new Date(milestone.target_date + 'T00:00:00');
     onDateSelect(milestoneDate);
     setViewMode('day');
+  };
+
+  const handleYearSelect = (year: number) => {
+    onDateSelect(setYear(selectedDate, year));
+  };
+
+  const handleMonthSelectFromYear = (date: Date) => {
+    onDateSelect(date);
+    setShowYearView(false);
+    setViewMode('month');
   };
 
   const getTitle = () => {
@@ -176,27 +188,55 @@ export function HourlyViewModal({
           </Button>
         </div>
 
-        {/* Subtitle */}
-        <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border/50 shrink-0">
-          {getSubtitle()}
+        {/* Subtitle - clickable month and year in day view */}
+        <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border/50 shrink-0 flex items-center gap-1">
+          {viewMode === 'day' && !showYearView ? (
+            <>
+              <button 
+                onClick={() => setViewMode('month')}
+                className="hover:text-primary transition-colors"
+              >
+                {format(selectedDate, "MMMM d,")}
+              </button>
+              <button 
+                onClick={() => setShowYearView(true)}
+                className="text-primary hover:underline transition-colors"
+              >
+                {format(selectedDate, "yyyy")}
+              </button>
+              <span className="ml-1">• Scroll to view full day</span>
+            </>
+          ) : (
+            getSubtitle()
+          )}
         </div>
 
         {/* Content */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
-          {viewMode === 'day' ? (
-            <div className="relative">
-              <CalendarDayView
+          {showYearView ? (
+            <YearView
               selectedDate={selectedDate}
-              onDateSelect={onDateSelect}
+              onMonthSelect={handleMonthSelectFromYear}
+              onBack={() => setShowYearView(false)}
+              onClose={() => onOpenChange(false)}
+              onYearChange={handleYearSelect}
               tasks={tasks}
               milestones={milestones}
-              onTaskDrop={onTaskDrop}
-              onTimeSlotLongPress={onTimeSlotLongPress}
-              onTaskLongPress={onTaskLongPress}
-              onMilestoneClick={onMilestoneClick}
-              fullDayMode
-              hideHeader
             />
+          ) : viewMode === 'day' ? (
+            <div className="relative">
+              <CalendarDayView
+                selectedDate={selectedDate}
+                onDateSelect={onDateSelect}
+                tasks={tasks}
+                milestones={milestones}
+                onTaskDrop={onTaskDrop}
+                onTimeSlotLongPress={onTimeSlotLongPress}
+                onTaskLongPress={onTaskLongPress}
+                onMilestoneClick={onMilestoneClick}
+                fullDayMode
+                hideHeader
+              />
             </div>
           ) : (
             <CalendarMonthView
