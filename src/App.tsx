@@ -79,6 +79,7 @@ const Recaps = lazy(() => import("./pages/Recaps"));
 const Community = lazy(() => import("./pages/Community"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const TestScroll = lazy(() => import("./pages/TestScroll"));
+const Contacts = lazy(() => import("./pages/Contacts"));
 
 
 // Create query client outside component for better performance and stability
@@ -269,6 +270,7 @@ const AppContent = memo(() => {
                   <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
                   <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
                   <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+                  <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
                   <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
