@@ -1816,6 +1816,54 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_planning_preferences: {
+        Row: {
+          auto_protect_streaks: boolean | null
+          created_at: string | null
+          default_day_shape: string | null
+          default_energy_level: string | null
+          default_flex_hours: number | null
+          id: string
+          last_used_at: string | null
+          preferred_work_blocks: Json | null
+          times_used: number | null
+          updated_at: string | null
+          user_id: string
+          wake_time: string | null
+          wind_down_time: string | null
+        }
+        Insert: {
+          auto_protect_streaks?: boolean | null
+          created_at?: string | null
+          default_day_shape?: string | null
+          default_energy_level?: string | null
+          default_flex_hours?: number | null
+          id?: string
+          last_used_at?: string | null
+          preferred_work_blocks?: Json | null
+          times_used?: number | null
+          updated_at?: string | null
+          user_id: string
+          wake_time?: string | null
+          wind_down_time?: string | null
+        }
+        Update: {
+          auto_protect_streaks?: boolean | null
+          created_at?: string | null
+          default_day_shape?: string | null
+          default_energy_level?: string | null
+          default_flex_hours?: number | null
+          id?: string
+          last_used_at?: string | null
+          preferred_work_blocks?: Json | null
+          times_used?: number | null
+          updated_at?: string | null
+          user_id?: string
+          wake_time?: string | null
+          wind_down_time?: string | null
+        }
+        Relationships: []
+      }
       daily_quotes: {
         Row: {
           created_at: string

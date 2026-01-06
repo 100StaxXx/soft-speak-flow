@@ -122,7 +122,7 @@ export function DayShapeStep({ context, updateContext, onNext, isGenerating }: D
 
       <div className="grid grid-cols-2 gap-3">
         {SHAPE_OPTIONS.map((option, index) => {
-          const Icon = option.icon;
+          const Icon = option.icon as React.ComponentType<{ className?: string }>;
           const isSelected = context.dayShape === option.value;
           return (
             <motion.button
