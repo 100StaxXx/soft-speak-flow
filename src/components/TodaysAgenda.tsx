@@ -40,6 +40,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { cn, stripMarkdown } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 import { useNativeTaskList } from "@/hooks/useNativeTaskList";
+import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
 
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
@@ -131,6 +132,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   activeEpics = [],
   habitsAtRisk = [],
 }: TodaysAgendaProps) {
+  const { profile } = useProfile();
+  const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
+  
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('expanded_ritual_campaigns');
     return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -196,39 +200,50 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const quests = tasks.filter(t => !t.habit_source_id);
     
     // Sort based on selected sort option
-    const sortGroup = (group: Task[]) => [...group].sort((a, b) => {
-      switch (sortBy) {
-        case 'time':
-          if (a.scheduled_time && b.scheduled_time) {
-            return a.scheduled_time.localeCompare(b.scheduled_time);
-          }
-          if (a.scheduled_time) return -1;
-          if (b.scheduled_time) return 1;
-          return 0;
-        case 'priority':
-          return getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
-        case 'xp':
-          return b.xp_reward - a.xp_reward; // Higher XP first
-        case 'custom':
-        default:
-          // Sort by sort_order, then by scheduled time
-          const orderA = a.sort_order ?? 9999;
-          const orderB = b.sort_order ?? 9999;
-          if (orderA !== orderB) return orderA - orderB;
-          if (a.scheduled_time && b.scheduled_time) {
-            return a.scheduled_time.localeCompare(b.scheduled_time);
-          }
-          if (a.scheduled_time) return -1;
-          if (b.scheduled_time) return 1;
-          return 0;
+    const sortGroup = (group: Task[]) => {
+      let sorted = [...group].sort((a, b) => {
+        switch (sortBy) {
+          case 'time':
+            if (a.scheduled_time && b.scheduled_time) {
+              return a.scheduled_time.localeCompare(b.scheduled_time);
+            }
+            if (a.scheduled_time) return -1;
+            if (b.scheduled_time) return 1;
+            return 0;
+          case 'priority':
+            return getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
+          case 'xp':
+            return b.xp_reward - a.xp_reward; // Higher XP first
+          case 'custom':
+          default:
+            // Sort by sort_order, then by scheduled time
+            const orderA = a.sort_order ?? 9999;
+            const orderB = b.sort_order ?? 9999;
+            if (orderA !== orderB) return orderA - orderB;
+            if (a.scheduled_time && b.scheduled_time) {
+              return a.scheduled_time.localeCompare(b.scheduled_time);
+            }
+            if (a.scheduled_time) return -1;
+            if (b.scheduled_time) return 1;
+            return 0;
+        }
+      });
+      
+      // If setting is off, move completed tasks to bottom
+      if (!keepInPlace) {
+        const incomplete = sorted.filter(t => !t.completed);
+        const complete = sorted.filter(t => t.completed);
+        sorted = [...incomplete, ...complete];
       }
-    });
+      
+      return sorted;
+    };
     
     return {
       ritualTasks: sortGroup(rituals),
       questTasks: sortGroup(quests),
     };
-  }, [tasks, sortBy]);
+  }, [tasks, sortBy, keepInPlace]);
   
   // Handle native task list reorder callback
   const handleNativeReorder = useCallback((taskIds: string[]) => {
