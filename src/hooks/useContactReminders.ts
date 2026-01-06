@@ -92,7 +92,7 @@ export function useContactReminders(contactId?: string) {
       toast.success('Follow-up quest scheduled! 🗓️');
     },
     onError: (error) => {
-      toast.error('Failed to schedule reminder');
+      toast.error('Failed to schedule quest');
       console.error('Create reminder error:', error);
     },
   });
@@ -111,10 +111,10 @@ export function useContactReminders(contactId?: string) {
         queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.byContact(contactId) });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.contactReminders.upcoming() });
-      toast.success('Reminder cancelled');
+      toast.success('Follow-up quest cancelled');
     },
     onError: (error) => {
-      toast.error('Failed to cancel reminder');
+      toast.error('Failed to cancel quest');
       console.error('Delete reminder error:', error);
     },
   });
@@ -136,7 +136,7 @@ export function useContactReminders(contactId?: string) {
       toast.success('Quest complete! Connection made 🎉');
     },
     onError: (error) => {
-      toast.error('Failed to complete reminder');
+      toast.error('Quest completion failed');
       console.error('Mark complete error:', error);
     },
   });

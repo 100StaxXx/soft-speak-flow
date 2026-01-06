@@ -146,6 +146,7 @@ export function ReminderDialog({ contact, open, onOpenChange }: ReminderDialogPr
                 className="pl-10"
               />
             </div>
+            <p className="text-xs text-muted-foreground">Times are in your local timezone</p>
           </div>
 
           {/* Reason */}
