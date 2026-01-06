@@ -19,6 +19,7 @@ import { AudioReactiveWaveform } from '@/components/AudioReactiveWaveform';
 import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
+import { TaskAdvancedEditSheet } from './TaskAdvancedEditSheet';
 import { PlanMyDayClarification, PlanMyDayAnswers } from './PlanMyDayClarification';
 import { PlanMyWeekClarification, PlanMyWeekAnswers } from './PlanMyWeekClarification';
 import { format, parseISO } from 'date-fns';
@@ -55,6 +56,8 @@ export function CompactSmartInput({
   const [showWeekClarification, setShowWeekClarification] = useState(false);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
+  const [editingParsed, setEditingParsed] = useState<ParsedTask | null>(null);
 
   const { medium, success, light, tap } = useHapticFeedback();
   
@@ -184,8 +187,27 @@ export function CompactSmartInput({
   };
 
   const handlePreviewEdit = () => {
+    if (parsed) {
+      setEditingParsed(parsed);
+      setShowAdvancedEdit(true);
+      setShowPreview(false);
+    }
+  };
+
+  const handleAdvancedEditSave = (updated: ParsedTask) => {
+    success();
+    onSubmit(updated);
+    setShowAdvancedEdit(false);
+    setEditingParsed(null);
     setShowPreview(false);
-    inputRef.current?.focus();
+    reset();
+    setInterimText('');
+    inputRef.current?.blur();
+  };
+
+  const handleAdvancedEditCancel = () => {
+    setShowAdvancedEdit(false);
+    setEditingParsed(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -519,6 +541,17 @@ export function CompactSmartInput({
         onRequestPermission={handleRequestPermission}
         permissionStatus={permissionStatus}
       />
+
+      {/* Advanced Edit Sheet */}
+      {editingParsed && (
+        <TaskAdvancedEditSheet
+          open={showAdvancedEdit}
+          onOpenChange={setShowAdvancedEdit}
+          parsed={editingParsed}
+          onSave={handleAdvancedEditSave}
+          onCancel={handleAdvancedEditCancel}
+        />
+      )}
     </div>
   );
 }
