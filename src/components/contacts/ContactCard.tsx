@@ -84,6 +84,7 @@ export const ContactCard = memo(function ContactCard({
           {contact.email && (
             <a
               href={`mailto:${contact.email}`}
+              onClick={(e) => e.stopPropagation()}
               className="flex items-center gap-1 hover:text-primary transition-colors"
             >
               <Mail className="h-3.5 w-3.5" />
@@ -93,6 +94,7 @@ export const ContactCard = memo(function ContactCard({
           {contact.phone && (
             <a
               href={`tel:${contact.phone}`}
+              onClick={(e) => e.stopPropagation()}
               className="flex items-center gap-1 hover:text-primary transition-colors"
             >
               <Phone className="h-3.5 w-3.5" />
@@ -117,7 +119,12 @@ export const ContactCard = memo(function ContactCard({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
