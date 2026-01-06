@@ -1774,6 +1774,48 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_plan_sessions: {
+        Row: {
+          created_at: string
+          day_shape: string | null
+          energy_level: string | null
+          flex_time_hours: number | null
+          generation_context: Json | null
+          id: string
+          plan_date: string
+          protected_epics: Json | null
+          protected_habits: Json | null
+          tasks_generated: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_shape?: string | null
+          energy_level?: string | null
+          flex_time_hours?: number | null
+          generation_context?: Json | null
+          id?: string
+          plan_date: string
+          protected_epics?: Json | null
+          protected_habits?: Json | null
+          tasks_generated?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_shape?: string | null
+          energy_level?: string | null
+          flex_time_hours?: number | null
+          generation_context?: Json | null
+          id?: string
+          plan_date?: string
+          protected_epics?: Json | null
+          protected_habits?: Json | null
+          tasks_generated?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_quotes: {
         Row: {
           created_at: string
@@ -1802,6 +1844,7 @@ export type Database = {
         Row: {
           actual_time_spent: number | null
           ai_generated: boolean | null
+          block_type: string | null
           category: string | null
           completed: boolean | null
           completed_at: string | null
@@ -1813,6 +1856,7 @@ export type Database = {
           estimated_duration: number | null
           habit_source_id: string | null
           id: string
+          is_anchor: boolean | null
           is_bonus: boolean | null
           is_main_quest: boolean | null
           is_milestone: boolean | null
@@ -1837,6 +1881,7 @@ export type Database = {
         Insert: {
           actual_time_spent?: number | null
           ai_generated?: boolean | null
+          block_type?: string | null
           category?: string | null
           completed?: boolean | null
           completed_at?: string | null
@@ -1848,6 +1893,7 @@ export type Database = {
           estimated_duration?: number | null
           habit_source_id?: string | null
           id?: string
+          is_anchor?: boolean | null
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_milestone?: boolean | null
@@ -1872,6 +1918,7 @@ export type Database = {
         Update: {
           actual_time_spent?: number | null
           ai_generated?: boolean | null
+          block_type?: string | null
           category?: string | null
           completed?: boolean | null
           completed_at?: string | null
@@ -1883,6 +1930,7 @@ export type Database = {
           estimated_duration?: number | null
           habit_source_id?: string | null
           id?: string
+          is_anchor?: boolean | null
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
           is_milestone?: boolean | null
