@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 export type EnergyLevel = 'low' | 'medium' | 'high';
 export type DayShape = 'front_load' | 'spread' | 'back_load' | 'auto';
-export type WizardStep = 'check_in' | 'anchors' | 'shape' | 'review';
+export type WizardStep = 'quick_start' | 'check_in' | 'anchors' | 'shape' | 'review';
 
 export interface HardCommitment {
   id: string;
@@ -72,6 +72,14 @@ export interface PlanContext {
   adjustmentRequest?: string;
 }
 
+export interface SavedPreferences {
+  defaultEnergyLevel: EnergyLevel;
+  defaultFlexHours: number;
+  defaultDayShape: DayShape;
+  autoProtectStreaks: boolean;
+  timesUsed: number;
+}
+
 const DEFAULT_CONTEXT: PlanContext = {
   energyLevel: 'medium',
   flexTimeHours: 6,
@@ -85,9 +93,10 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
   const { user } = useAuth();
   const { success, medium } = useHapticFeedback();
   
-  const [step, setStep] = useState<WizardStep>('check_in');
+  const [step, setStep] = useState<WizardStep>('quick_start');
   const [context, setContext] = useState<PlanContext>(DEFAULT_CONTEXT);
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null);
+  const [savedPreferences, setSavedPreferences] = useState<SavedPreferences | null>(null);
   
   // Auto-detected data
   const [habitsWithStreaks, setHabitsWithStreaks] = useState<HabitWithStreak[]>([]);
@@ -95,6 +104,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
   const [existingTasks, setExistingTasks] = useState<ExistingTask[]>([]);
   
   // Loading states
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
   const [isLoadingAnchors, setIsLoadingAnchors] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAdjusting, setIsAdjusting] = useState(false);
@@ -109,20 +119,20 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     try {
       const { data: habits, error: habitsError } = await supabase
         .from('habits')
-        .select('id, habit_name, streak, reminder_time, category')
+        .select('id, title, current_streak, preferred_time, category')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .gte('streak', 3)
-        .order('streak', { ascending: false });
+        .gte('current_streak', 3)
+        .order('current_streak', { ascending: false });
 
       if (habitsError) throw habitsError;
 
       setHabitsWithStreaks(
         (habits || []).map(h => ({
           id: h.id,
-          name: h.habit_name,
-          streak: h.streak || 0,
-          preferredTime: h.reminder_time,
+          name: h.title,
+          streak: h.current_streak || 0,
+          preferredTime: h.preferred_time,
           category: h.category,
         }))
       );
@@ -218,13 +228,118 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     }
   }, [step, loadAnchors]);
 
+  // Load saved preferences
+  const loadPreferences = useCallback(async () => {
+    if (!user?.id) return;
+    
+    setIsLoadingPreferences(true);
+    try {
+      const { data, error: prefError } = await supabase
+        .from('daily_planning_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (prefError) throw prefError;
+
+      if (data) {
+        setSavedPreferences({
+          defaultEnergyLevel: (data.default_energy_level as EnergyLevel) || 'medium',
+          defaultFlexHours: data.default_flex_hours || 6,
+          defaultDayShape: (data.default_day_shape as DayShape) || 'auto',
+          autoProtectStreaks: data.auto_protect_streaks ?? true,
+          timesUsed: data.times_used || 0,
+        });
+        // Start at quick_start if preferences exist
+        setStep('quick_start');
+      } else {
+        // No preferences, skip to check_in
+        setStep('check_in');
+        setSavedPreferences(null);
+      }
+    } catch (err) {
+      console.error('Error loading preferences:', err);
+      setStep('check_in');
+    } finally {
+      setIsLoadingPreferences(false);
+    }
+  }, [user?.id]);
+
+  // Save current settings as preferences
+  const savePreferences = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { error: upsertError } = await supabase
+        .from('daily_planning_preferences')
+        .upsert({
+          user_id: user.id,
+          default_energy_level: context.energyLevel,
+          default_flex_hours: context.flexTimeHours,
+          default_day_shape: context.dayShape,
+          times_used: (savedPreferences?.timesUsed || 0) + 1,
+          last_used_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+
+      if (upsertError) throw upsertError;
+      toast.success('Settings saved for faster planning!');
+    } catch (err) {
+      console.error('Error saving preferences:', err);
+    }
+  }, [user?.id, context, savedPreferences]);
+
+  // Reset preferences
+  const resetPreferences = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      await supabase
+        .from('daily_planning_preferences')
+        .delete()
+        .eq('user_id', user.id);
+      
+      setSavedPreferences(null);
+      setStep('check_in');
+      toast.success('Preferences reset');
+    } catch (err) {
+      console.error('Error resetting preferences:', err);
+    }
+  }, [user?.id]);
+
+  // Apply defaults and jump to anchors step
+  const applyDefaults = useCallback(async () => {
+    if (!savedPreferences) return;
+    
+    // Apply saved preferences to context
+    setContext(prev => ({
+      ...prev,
+      energyLevel: savedPreferences.defaultEnergyLevel,
+      flexTimeHours: savedPreferences.defaultFlexHours,
+      dayShape: savedPreferences.defaultDayShape,
+    }));
+    
+    // Update usage count
+    if (user?.id) {
+      await supabase
+        .from('daily_planning_preferences')
+        .update({ 
+          times_used: (savedPreferences.timesUsed || 0) + 1,
+          last_used_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+    }
+    
+    medium();
+    setStep('anchors');
+  }, [savedPreferences, user?.id, medium]);
+
   const updateContext = useCallback((updates: Partial<PlanContext>) => {
     setContext(prev => ({ ...prev, ...updates }));
   }, []);
 
   const nextStep = useCallback(() => {
     medium();
-    const steps: WizardStep[] = ['check_in', 'anchors', 'shape', 'review'];
+    const steps: WizardStep[] = ['quick_start', 'check_in', 'anchors', 'shape', 'review'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1]);
@@ -233,7 +348,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
   const prevStep = useCallback(() => {
     medium();
-    const steps: WizardStep[] = ['check_in', 'anchors', 'shape', 'review'];
+    const steps: WizardStep[] = ['quick_start', 'check_in', 'anchors', 'shape', 'review'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1]);
@@ -360,10 +475,10 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
         plan_date: dateStr,
         energy_level: context.energyLevel,
         flex_time_hours: context.flexTimeHours,
-        protected_habits: context.protectedHabitIds as unknown as Record<string, unknown>,
-        protected_epics: context.prioritizedEpicIds as unknown as Record<string, unknown>,
+        protected_habits: JSON.parse(JSON.stringify(context.protectedHabitIds)),
+        protected_epics: JSON.parse(JSON.stringify(context.prioritizedEpicIds)),
         day_shape: context.dayShape,
-        generation_context: context as unknown as Record<string, unknown>,
+        generation_context: JSON.parse(JSON.stringify(context)),
         tasks_generated: generatedPlan.tasks.length,
       }]);
 
@@ -378,7 +493,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
   }, [user?.id, dateStr, generatedPlan, context, success]);
 
   const reset = useCallback(() => {
-    setStep('check_in');
+    setStep('quick_start');
     setContext(DEFAULT_CONTEXT);
     setGeneratedPlan(null);
     setError(null);
@@ -389,6 +504,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     step,
     context,
     generatedPlan,
+    savedPreferences,
     
     // Auto-detected data
     habitsWithStreaks,
@@ -403,10 +519,15 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     generatePlan,
     adjustPlan,
     savePlan,
+    savePreferences,
     reset,
     loadAnchors,
+    loadPreferences,
+    resetPreferences,
+    applyDefaults,
     
     // State flags
+    isLoadingPreferences,
     isLoadingAnchors,
     isGenerating,
     isAdjusting,

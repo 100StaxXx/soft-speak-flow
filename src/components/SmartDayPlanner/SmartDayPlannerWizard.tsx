@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSmartDayPlanner, WizardStep } from '@/hooks/useSmartDayPlanner';
+import { QuickStartStep } from './steps/QuickStartStep';
 import { CheckInStep } from './steps/CheckInStep';
 import { AnchorsStep } from './steps/AnchorsStep';
 import { DayShapeStep } from './steps/DayShapeStep';
@@ -18,6 +19,11 @@ interface SmartDayPlannerWizardProps {
 }
 
 const STEP_CONFIG: Record<WizardStep, { title: string; subtitle: string; number: number }> = {
+  quick_start: {
+    title: "Plan Your Day",
+    subtitle: "Your smart daily planning companion",
+    number: 0,
+  },
   check_in: {
     title: "How are you feeling?",
     subtitle: "Let's understand your energy and availability",
@@ -47,15 +53,15 @@ export function SmartDayPlannerWizard({
   onComplete,
 }: SmartDayPlannerWizardProps) {
   const planner = useSmartDayPlanner(planDate);
-  const { step, prevStep, reset } = planner;
+  const { step, prevStep, reset, savedPreferences, loadPreferences, resetPreferences, applyDefaults } = planner;
   const config = STEP_CONFIG[step];
 
-  // Reset when dialog opens
   useEffect(() => {
     if (open) {
       reset();
+      loadPreferences();
     }
-  }, [open, reset]);
+  }, [open, reset, loadPreferences]);
 
   const handleClose = () => {
     onOpenChange(false);
@@ -70,7 +76,8 @@ export function SmartDayPlannerWizard({
     }
   };
 
-  const canGoBack = step !== 'check_in';
+  const canGoBack = step !== 'quick_start' && step !== 'check_in';
+  const showProgress = step !== 'quick_start';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -78,17 +85,11 @@ export function SmartDayPlannerWizard({
         className="max-w-lg p-0 gap-0 overflow-hidden bg-background border-border/50"
         hideCloseButton
       >
-        {/* Header */}
         <div className="relative p-4 pb-2 border-b border-border/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {canGoBack ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={prevStep}
-                  className="h-8 w-8"
-                >
+                <Button variant="ghost" size="icon" onClick={prevStep} className="h-8 w-8">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
               ) : (
@@ -101,35 +102,26 @@ export function SmartDayPlannerWizard({
                 <p className="text-xs text-muted-foreground">{config.subtitle}</p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-8 w-8"
-            >
+            <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
               <X className="h-4 w-4" />
             </Button>
           </div>
           
-          {/* Progress dots */}
-          <div className="flex justify-center gap-1.5 mt-3">
-            {[1, 2, 3, 4].map((num) => (
-              <div
-                key={num}
-                className={cn(
-                  "h-1.5 rounded-full transition-all duration-300",
-                  num === config.number
-                    ? "w-6 bg-primary"
-                    : num < config.number
-                    ? "w-1.5 bg-primary/50"
-                    : "w-1.5 bg-muted"
-                )}
-              />
-            ))}
-          </div>
+          {showProgress && (
+            <div className="flex justify-center gap-1.5 mt-3">
+              {[1, 2, 3, 4].map((num) => (
+                <div
+                  key={num}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-300",
+                    num === config.number ? "w-6 bg-primary" : num < config.number ? "w-1.5 bg-primary/50" : "w-1.5 bg-muted"
+                  )}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Content */}
         <div className="p-4 min-h-[400px] max-h-[60vh] overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div
@@ -139,12 +131,16 @@ export function SmartDayPlannerWizard({
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {step === 'check_in' && (
-                <CheckInStep
-                  context={planner.context}
-                  updateContext={planner.updateContext}
-                  onNext={planner.nextStep}
+              {step === 'quick_start' && savedPreferences && (
+                <QuickStartStep
+                  savedPreferences={savedPreferences}
+                  onUseDefaults={applyDefaults}
+                  onCustomize={() => planner.setStep('check_in')}
+                  onReset={resetPreferences}
                 />
+              )}
+              {step === 'check_in' && (
+                <CheckInStep context={planner.context} updateContext={planner.updateContext} onNext={planner.nextStep} />
               )}
               {step === 'anchors' && (
                 <AnchorsStep

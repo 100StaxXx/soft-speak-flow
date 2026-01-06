@@ -49,8 +49,8 @@ export function CheckInStep({ context, updateContext, onNext }: CheckInStepProps
           Energy Level
         </label>
         <div className="grid grid-cols-3 gap-2">
-          {ENERGY_OPTIONS.map((option, index) => {
-            const Icon = option.icon;
+        {ENERGY_OPTIONS.map((option, index) => {
+            const Icon = option.icon as React.ComponentType<{ className?: string }>;
             const isSelected = context.energyLevel === option.value;
             return (
               <motion.button
