@@ -17,6 +17,7 @@ interface ContactCardProps {
   onEdit: (contact: Contact) => void;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string, isFavorite: boolean) => void;
+  onClick?: (contact: Contact) => void;
 }
 
 function getInitials(name: string): string {
@@ -33,9 +34,13 @@ export const ContactCard = memo(function ContactCard({
   onEdit,
   onDelete,
   onToggleFavorite,
+  onClick,
 }: ContactCardProps) {
   return (
-    <Card className="p-4 flex items-start gap-4">
+    <Card 
+      className="p-4 flex items-start gap-4 cursor-pointer hover:bg-accent/50 transition-colors"
+      onClick={() => onClick?.(contact)}
+    >
       <Avatar className="h-12 w-12 shrink-0">
         <AvatarImage src={contact.avatar_url ?? undefined} alt={contact.name} />
         <AvatarFallback className="bg-primary/10 text-primary font-medium">

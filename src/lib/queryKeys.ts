@@ -146,6 +146,11 @@ export const queryKeys = {
     byUser: (userId: string) => ['contacts', userId] as const,
     detail: (contactId: string) => ['contacts', 'detail', contactId] as const,
   },
+
+  contactInteractions: {
+    all: ['contact-interactions'] as const,
+    byContact: (contactId: string) => ['contact-interactions', contactId] as const,
+  },
 } as const;
 
 // Type helpers for query key inference

@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContactCard } from '@/components/contacts/ContactCard';
 import { ContactDialog } from '@/components/contacts/ContactDialog';
 import { ContactsEmptyState } from '@/components/contacts/ContactsEmptyState';
+import { ContactDetailSheet } from '@/components/contacts/ContactDetailSheet';
 import { useContacts, Contact, ContactInsert } from '@/hooks/useContacts';
 import {
   AlertDialog,
@@ -27,6 +28,7 @@ export default function Contacts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
 
   const filteredContacts = useMemo(() => {
     let result = contacts;
@@ -164,6 +166,7 @@ export default function Contacts() {
               onEdit={handleOpenDialog}
               onDelete={(id) => setDeleteId(id)}
               onToggleFavorite={handleToggleFavorite}
+              onClick={setSelectedContact}
             />
           ))
         )}
@@ -195,6 +198,13 @@ export default function Contacts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Contact Detail Sheet */}
+      <ContactDetailSheet
+        contact={selectedContact}
+        open={!!selectedContact}
+        onOpenChange={(open) => !open && setSelectedContact(null)}
+      />
     </motion.div>
   );
 }
