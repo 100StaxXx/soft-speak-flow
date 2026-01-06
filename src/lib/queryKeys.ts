@@ -137,6 +137,15 @@ export const queryKeys = {
   streaks: {
     freezes: (userId: string) => ['streak-freezes', userId] as const,
   },
+
+  // ============================================
+  // CONTACTS / CRM
+  // ============================================
+  contacts: {
+    all: ['contacts'] as const,
+    byUser: (userId: string) => ['contacts', userId] as const,
+    detail: (contactId: string) => ['contacts', 'detail', contactId] as const,
+  },
 } as const;
 
 // Type helpers for query key inference

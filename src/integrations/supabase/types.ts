@@ -1386,6 +1386,54 @@ export type Database = {
         }
         Relationships: []
       }
+      contacts: {
+        Row: {
+          avatar_url: string | null
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_favorite: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cosmic_codex_entries: {
         Row: {
           adversary_lore: string | null
