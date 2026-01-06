@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MonthViewModal } from "@/components/calendar/MonthViewModal";
+import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -935,16 +935,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </motion.div>
       )}
       
-      <MonthViewModal
+      <HourlyViewModal
         open={showMonthView}
         onOpenChange={setShowMonthView}
         selectedDate={selectedDate}
         onDateSelect={(date) => {
           if (onDateSelect) onDateSelect(date);
-          setShowMonthView(false);
         }}
         tasks={calendarTasks}
         milestones={calendarMilestones}
+        onTaskDrop={() => {}}
       />
     </div>
   );
