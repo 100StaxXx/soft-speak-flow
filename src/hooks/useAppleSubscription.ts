@@ -105,6 +105,8 @@ export function useAppleSubscription() {
 
       const purchase = await purchaseProduct(productId);
       
+      console.log('[IAP] Purchase response:', JSON.stringify(purchase, null, 2));
+      
       if (!purchase) {
         throw new Error("Purchase returned no data");
       }
@@ -113,6 +115,8 @@ export function useAppleSubscription() {
       // Fall back to receipt for legacy verification
       const transactionId = purchase.transactionId;
       const receipt = purchase.receipt ?? purchase.transactionReceipt;
+      
+      console.log('[IAP] Verification payload:', { transactionId: !!transactionId, receipt: !!receipt });
       
       if (!transactionId && !receipt) {
         throw new Error("No transaction ID or receipt data available");
