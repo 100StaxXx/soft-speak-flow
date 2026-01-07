@@ -152,7 +152,7 @@ export function EditableTaskCard({
           <div className="flex items-center gap-2 mt-1">
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {task.scheduledTime}
+              {task.scheduledTime} · {task.estimatedDuration}m
             </span>
             {hasConflict && (
               <TooltipProvider>
@@ -169,9 +169,6 @@ export function EditableTaskCard({
                 </Tooltip>
               </TooltipProvider>
             )}
-            <span className="text-[10px] text-muted-foreground">
-              {task.estimatedDuration}m
-            </span>
             {task.category && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 {task.category}

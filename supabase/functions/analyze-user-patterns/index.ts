@@ -179,12 +179,19 @@ function analyzeCompletionTimes(completions: TaskCompletionData[]): SchedulingPa
 }
 
 serve(async (req) => {
+  // EARLY LOGGING - before any other code
+  console.log(`[analyze-user-patterns] ===== REQUEST RECEIVED =====`);
+  console.log(`[analyze-user-patterns] Method: ${req.method}`);
+  console.log(`[analyze-user-patterns] Timestamp: ${new Date().toISOString()}`);
+  
   if (req.method === 'OPTIONS') {
+    console.log(`[analyze-user-patterns] CORS preflight - returning`);
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const authHeader = req.headers.get('Authorization');
+    console.log(`[analyze-user-patterns] Auth header present: ${!!authHeader}`);
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
         status: 401,

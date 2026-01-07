@@ -181,7 +181,7 @@ export function ReviewStep({
       )}
 
       {/* Task list - draggable in edit mode */}
-      <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
         {isEditMode && onReorderTasks ? (
           <DraggableTaskList
             tasks={generatedPlan.tasks}
