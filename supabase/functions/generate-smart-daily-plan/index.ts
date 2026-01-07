@@ -357,12 +357,75 @@ ${hardCommitments.map((c) => `- ${c.title}: ${c.startTime} - ${c.endTime}`).join
   }
 
   if (aiLearning) {
-    const learning = aiLearning.learning_data || {};
-    if (learning.peak_hours) {
-      prompt += `\n## User Patterns
-- Peak productivity hours: ${learning.peak_hours.join(", ")}
-- Preferred task count: ${learning.preferred_task_count || "6-8"}
-`;
+    prompt += `\n## User Patterns (learned from behavior)`;
+    
+    // Peak productivity times (stored directly on aiLearning)
+    if (aiLearning.peak_productivity_times?.length > 0) {
+      prompt += `\n- Peak productivity hours: ${aiLearning.peak_productivity_times.join(", ")}:00`;
+    }
+    
+    // Scheduling patterns (stored in scheduling_patterns column)
+    const patterns = aiLearning.scheduling_patterns || {};
+    if (patterns.commonStartTimes?.length > 0) {
+      prompt += `\n- Preferred start times: ${patterns.commonStartTimes.map((h: number) => `${h}:00`).join(", ")}`;
+    }
+    if (patterns.avgCompletionHour?.hard) {
+      prompt += `\n- Hard tasks usually completed around: ${Math.round(patterns.avgCompletionHour.hard)}:00`;
+    }
+    if (patterns.lunchBreakPattern?.detected) {
+      prompt += `\n- Takes lunch break: ${patterns.lunchBreakPattern.start}:00-${patterns.lunchBreakPattern.end}:00`;
+    }
+    if (patterns.morningProductivity > 0.6) {
+      prompt += `\n- Strong morning productivity`;
+    } else if (patterns.eveningProductivity > 0.4) {
+      prompt += `\n- Active in evenings`;
+    }
+    
+    // Work style (stored directly on aiLearning)
+    if (aiLearning.inferred_work_style && aiLearning.work_style_confidence > 50) {
+      prompt += `\n- Work style: ${aiLearning.inferred_work_style} (${aiLearning.work_style_confidence}% confidence)`;
+    }
+    
+    // Day-of-week patterns for today
+    const today = new Date().getDay();
+    const dayPatterns = aiLearning.day_of_week_patterns?.[today] || {};
+    if (dayPatterns.peakHours?.length > 0) {
+      const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][today];
+      prompt += `\n- On ${dayName}s, most productive at: ${dayPatterns.peakHours.slice(0, 3).join(", ")}:00`;
+    }
+    if (dayPatterns.avgTaskCount) {
+      prompt += `\n- Typical task count on this day: ${Math.round(dayPatterns.avgTaskCount)}`;
+    }
+    
+    // Successful categories from preference weights
+    const catWeights = aiLearning.preference_weights?.categories || {};
+    const topCategories = Object.entries(catWeights)
+      .filter(([, w]) => (w as number) > 0)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .slice(0, 3)
+      .map(([cat]) => cat);
+    if (topCategories.length > 0) {
+      prompt += `\n- High completion categories: ${topCategories.join(", ")}`;
+    }
+    
+    // Learned recurring tasks (what the user often creates)
+    const successfulPatterns = aiLearning.successful_patterns || {};
+    if (successfulPatterns.recurring_tasks?.length > 0) {
+      prompt += `\n\n## Recurring Task Templates (user often creates these)
+${successfulPatterns.recurring_tasks.slice(0, 8).map((t: string) => `- ${t}`).join('\n')}
+
+Consider including similar tasks when they fit the day's energy and focus.`;
+    }
+    
+    // Most successful task type combos
+    if (successfulPatterns.category_difficulty) {
+      const topCombos = Object.entries(successfulPatterns.category_difficulty)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 3);
+      if (topCombos.length > 0) {
+        prompt += `\n\n## Most Successful Task Types
+${topCombos.map(([combo, count]) => `- ${combo.replace('_', ' ')}: ${count} completed`).join('\n')}`;
+      }
     }
   }
 
