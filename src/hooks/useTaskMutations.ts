@@ -390,19 +390,25 @@ export const useTaskMutations = (taskDate: string) => {
           taskDifficulty,
           taskCategory,
         });
-        trackTaskCompletion({
-          taskId,
-          completedAt: now.toISOString(),
-          difficulty: taskDifficulty || 'medium',
-          scheduledTime: taskScheduledTime,
-          actualCompletionHour: now.getHours(),
-          dayOfWeek: now.getDay(),
-          wasOnTime: taskScheduledTime 
-            ? Math.abs(parseInt(taskScheduledTime.split(':')[0]) - now.getHours()) <= 1 
-            : null,
-          category: taskCategory || undefined,
-          taskText,
-        });
+        
+        try {
+          await trackTaskCompletion({
+            taskId,
+            completedAt: now.toISOString(),
+            difficulty: taskDifficulty || 'medium',
+            scheduledTime: taskScheduledTime,
+            actualCompletionHour: now.getHours(),
+            dayOfWeek: now.getDay(),
+            wasOnTime: taskScheduledTime 
+              ? Math.abs(parseInt(taskScheduledTime.split(':')[0]) - now.getHours()) <= 1 
+              : null,
+            category: taskCategory || undefined,
+            taskText,
+          });
+          console.log('[TaskMutations] trackTaskCompletion succeeded');
+        } catch (trackError) {
+          console.error('[TaskMutations] trackTaskCompletion failed:', trackError);
+        }
 
         // Show undo toast with 5-second window
         toast({
