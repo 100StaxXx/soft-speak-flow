@@ -427,6 +427,26 @@ Consider including similar tasks when they fit the day's energy and focus.`;
 ${topCombos.map(([combo, count]) => `- ${combo.replace('_', ' ')}: ${count} completed`).join('\n')}`;
       }
     }
+    
+    // AI-accepted tasks from previous plans (what the user kept)
+    if (successfulPatterns.ai_accepted?.length > 0) {
+      prompt += `\n\n## Previously Accepted AI Tasks
+The user has saved plans containing these tasks before:
+${successfulPatterns.ai_accepted.slice(0, 8).map((t: string) => `- ${t}`).join('\n')}
+
+These represent task types the user found valuable from previous AI suggestions.`;
+    }
+    
+    // Successful energy + day shape configurations
+    if (successfulPatterns.plan_types) {
+      const topPlanTypes = Object.entries(successfulPatterns.plan_types)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 2);
+      if (topPlanTypes.length > 0) {
+        prompt += `\n\n## Preferred Plan Configurations
+${topPlanTypes.map(([combo, count]) => `- ${combo.replace('_', ' ')}: used ${count} time(s)`).join('\n')}`;
+      }
+    }
   }
 
   return prompt;

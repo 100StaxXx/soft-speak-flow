@@ -197,7 +197,8 @@ export const useTaskMutations = (taskDate: string) => {
         trackTaskCreation(
           data.scheduled_time,
           data.difficulty || 'medium',
-          data.category
+          data.category,
+          data.task_text
         );
       }
     },
@@ -394,6 +395,7 @@ export const useTaskMutations = (taskDate: string) => {
             ? Math.abs(parseInt(taskScheduledTime.split(':')[0]) - now.getHours()) <= 1 
             : null,
           category: taskCategory || undefined,
+          taskText,
         });
 
         // Show undo toast with 5-second window
