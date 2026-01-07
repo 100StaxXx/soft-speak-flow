@@ -7,6 +7,7 @@ import { QuickStartStep } from './steps/QuickStartStep';
 import { CheckInStep } from './steps/CheckInStep';
 import { AnchorsStep } from './steps/AnchorsStep';
 import { DayShapeStep } from './steps/DayShapeStep';
+import { CustomizeStep } from './steps/CustomizeStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { Compass, ChevronLeft, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -39,10 +40,15 @@ const STEP_CONFIG: Record<WizardStep, { title: string; subtitle: string; number:
     subtitle: "Design how your day flows",
     number: 3,
   },
+  customize: {
+    title: "Customize Your Day",
+    subtitle: "Add time blocks and special requests",
+    number: 4,
+  },
   review: {
     title: "Your Day Awaits",
     subtitle: "Review and customize your plan",
-    number: 4,
+    number: 5,
   },
 };
 
@@ -109,7 +115,7 @@ export function SmartDayPlannerWizard({
           
           {showProgress && (
             <div className="flex justify-center gap-1.5 mt-3">
-              {[1, 2, 3, 4].map((num) => (
+              {[1, 2, 3, 4, 5].map((num) => (
                 <div
                   key={num}
                   className={cn(
@@ -157,6 +163,13 @@ export function SmartDayPlannerWizard({
               )}
               {step === 'shape' && (
                 <DayShapeStep
+                  context={planner.context}
+                  updateContext={planner.updateContext}
+                  onNext={planner.nextStep}
+                />
+              )}
+              {step === 'customize' && (
+                <CustomizeStep
                   context={planner.context}
                   updateContext={planner.updateContext}
                   onNext={async () => {
