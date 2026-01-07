@@ -10,7 +10,7 @@ import { ArrowLeft, RefreshCw, Smartphone, Check, X, Copy, Trash2, RotateCcw, Se
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { IAP_PRODUCTS } from "@/utils/appleIAP";
+import { IAP_PRODUCTS, purchaseProduct } from "@/utils/appleIAP";
 
 interface LogEntry {
   timestamp: string;
@@ -64,16 +64,39 @@ const IAPTest = () => {
     reloadProducts,
   } = useAppleSubscription();
 
-  // Manual fetch products
+  // Manual fetch products with detailed logging
   const handleFetchProducts = useCallback(async () => {
-    addLog('Manually fetching products...', 'info');
+    addLog('[FETCH] Fetching products from App Store...', 'info');
     try {
       const result = await reloadProducts();
-      addLog(`Fetch complete. Products count: ${result.length}`, result.length ? 'success' : 'info');
+      addLog(`[FETCH] Returned ${result.length} products`, result.length ? 'success' : 'info');
+      result.forEach((p, i) => {
+        addLog(`[FETCH] Product ${i}: id="${p.productId}" title="${p.title}" price="${p.price}"`, 'info');
+      });
     } catch (error) {
-      addLog(`Fetch failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      addLog(`[FETCH] Failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
   }, [reloadProducts]);
+
+  // Direct purchase - bypasses hook validation for debugging
+  const handleDirectPurchase = async (productId: string) => {
+    setPurchasingProductId(productId);
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+    
+    addLog(`[DIRECT] Attempting direct purchase (bypassing hook): ${productId}`, 'info');
+    
+    try {
+      const result = await purchaseProduct(productId);
+      addLog(`[DIRECT] Result: ${JSON.stringify(result)}`, 'success');
+      setLastPurchaseResult({ productId, success: true, message: `Direct purchase result: ${JSON.stringify(result)}`, timestamp });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      addLog(`[DIRECT] Error: ${errorMsg}`, 'error');
+      setLastPurchaseResult({ productId, success: false, message: errorMsg, timestamp });
+    } finally {
+      setPurchasingProductId(null);
+    }
+  };
 
   // Environment info
   const platform = Capacitor.getPlatform();
@@ -361,24 +384,49 @@ const IAPTest = () => {
           </CardContent>
         </Card>
 
-        {/* Product State Debug */}
+        {/* Product State Debug - Enhanced */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Database className="h-4 w-4" />
-              Product State
+              Product State (Full Debug)
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <pre className="text-xs bg-muted/50 p-3 rounded-lg overflow-x-auto font-mono max-h-32 overflow-y-auto">
+          <CardContent className="pt-0 space-y-3">
+            <pre className="text-xs bg-muted/50 p-3 rounded-lg overflow-x-auto font-mono max-h-48 overflow-y-auto">
               {JSON.stringify({
                 hasLoadedProducts,
                 productsLoading,
                 productError,
                 productCount: products.length,
-                productIds: products.map(p => p.productId)
+                productIds: products.map(p => p.productId),
+                fullProducts: products
               }, null, 2)}
             </pre>
+            
+            {/* Direct Purchase Buttons */}
+            <div className="pt-2 border-t border-border/50">
+              <p className="text-xs text-muted-foreground mb-2">
+                Direct Purchase (bypasses validation):
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(IAP_PRODUCTS).map(([key, productId]) => (
+                  <Button
+                    key={key}
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDirectPurchase(productId)}
+                    disabled={purchasingProductId === productId}
+                    className="text-xs"
+                  >
+                    {purchasingProductId === productId ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : null}
+                    Direct: {key}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
