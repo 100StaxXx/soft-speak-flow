@@ -619,6 +619,38 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     }
   }, [user?.id, dateStr, generatedPlan, context, success]);
 
+  // Local plan mutation functions for in-place editing
+  const updateTaskInPlan = useCallback((index: number, updates: Partial<GeneratedTask>) => {
+    setGeneratedPlan(prev => {
+      if (!prev) return prev;
+      const newTasks = [...prev.tasks];
+      newTasks[index] = { ...newTasks[index], ...updates };
+      
+      // Recalculate total hours
+      const totalHours = newTasks.reduce((sum, t) => sum + (t.estimatedDuration / 60), 0);
+      
+      return {
+        ...prev,
+        tasks: newTasks,
+        totalHours,
+      };
+    });
+  }, []);
+
+  const removeTaskFromPlan = useCallback((index: number) => {
+    setGeneratedPlan(prev => {
+      if (!prev) return prev;
+      const newTasks = prev.tasks.filter((_, i) => i !== index);
+      const totalHours = newTasks.reduce((sum, t) => sum + (t.estimatedDuration / 60), 0);
+      
+      return {
+        ...prev,
+        tasks: newTasks,
+        totalHours,
+      };
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setStep('quick_start');
     setContext(DEFAULT_CONTEXT);
@@ -653,6 +685,8 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     loadPreferences,
     resetPreferences,
     applyDefaults,
+    updateTaskInPlan,
+    removeTaskFromPlan,
     
     // State flags
     isLoadingPreferences,

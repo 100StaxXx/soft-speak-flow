@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,12 @@ import {
   Sparkles, 
   AlertCircle,
   ChevronRight,
-  Flame
+  Pencil,
+  Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EditableTaskCard } from '../components/EditableTaskCard';
+import { analyzePlan, getSmartAdjustments } from '../utils/planAnalyzer';
 
 interface ReviewStepProps {
   generatedPlan: GeneratedPlan | null;
@@ -22,60 +25,34 @@ interface ReviewStepProps {
   onSave: () => void;
   isAdjusting: boolean;
   error: string | null;
+  hasContacts?: boolean;
+  onUpdateTask?: (index: number, updates: Partial<GeneratedTask>) => void;
+  onRemoveTask?: (index: number) => void;
 }
 
-const QUICK_ADJUSTMENTS = [
-  { label: 'Make lighter', prompt: 'Make the plan lighter with fewer tasks' },
-  { label: 'Add workout', prompt: 'Add a 30-minute workout or exercise block' },
-  { label: 'More breaks', prompt: 'Add more break time between tasks' },
-  { label: 'Focus time', prompt: 'Add a 2-hour deep focus block' },
-];
-
-function TaskCard({ task, index }: { task: GeneratedTask; index: number }) {
-  const priorityColors = {
-    high: 'border-l-red-500',
-    medium: 'border-l-amber-500',
-    low: 'border-l-green-500',
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.03 }}
-      className={cn(
-        "p-3 rounded-lg bg-card border border-border/50 border-l-4",
-        priorityColors[task.priority]
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {task.scheduledTime}
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              {task.estimatedDuration}m
-            </span>
-            {task.category && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                {task.category}
-              </span>
-            )}
-          </div>
-        </div>
-        {task.isAnchor && (
-          <Flame className="h-4 w-4 text-orange-500 flex-shrink-0" />
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-export function ReviewStep({ generatedPlan, onAdjust, onSave, isAdjusting, error }: ReviewStepProps) {
+export function ReviewStep({ 
+  generatedPlan, 
+  onAdjust, 
+  onSave, 
+  isAdjusting, 
+  error,
+  hasContacts = false,
+  onUpdateTask,
+  onRemoveTask,
+}: ReviewStepProps) {
   const [adjustmentInput, setAdjustmentInput] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Analyze plan and get context-aware suggestions
+  const planAnalysis = useMemo(() => 
+    generatedPlan ? analyzePlan(generatedPlan.tasks) : null,
+    [generatedPlan]
+  );
+
+  const smartAdjustments = useMemo(() => 
+    planAnalysis ? getSmartAdjustments(planAnalysis, hasContacts) : [],
+    [planAnalysis, hasContacts]
+  );
 
   const handleQuickAdjust = (prompt: string) => {
     onAdjust(prompt);
@@ -86,6 +63,14 @@ export function ReviewStep({ generatedPlan, onAdjust, onSave, isAdjusting, error
       onAdjust(adjustmentInput.trim());
       setAdjustmentInput('');
     }
+  };
+
+  const handleUpdateTask = (index: number, updates: Partial<GeneratedTask>) => {
+    onUpdateTask?.(index, updates);
+  };
+
+  const handleRemoveTask = (index: number) => {
+    onRemoveTask?.(index);
   };
 
   if (error && !generatedPlan) {
@@ -112,7 +97,7 @@ export function ReviewStep({ generatedPlan, onAdjust, onSave, isAdjusting, error
 
   return (
     <div className="space-y-4">
-      {/* Stats bar */}
+      {/* Stats bar with edit toggle */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -125,15 +110,33 @@ export function ReviewStep({ generatedPlan, onAdjust, onSave, isAdjusting, error
             <span className="text-sm font-medium">{generatedPlan.totalHours.toFixed(1)}h</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Zap className="h-4 w-4 text-amber-500" />
-          <span className="text-sm font-medium">{generatedPlan.balanceScore}%</span>
-          <span className="text-xs text-muted-foreground">balanced</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Zap className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-medium">{generatedPlan.balanceScore}%</span>
+          </div>
+          {onUpdateTask && onRemoveTask && (
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={cn(
+                "p-1.5 rounded-md transition-colors",
+                isEditMode 
+                  ? "bg-primary text-primary-foreground" 
+                  : "hover:bg-muted"
+              )}
+            >
+              {isEditMode ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Insights */}
-      {generatedPlan.insights.length > 0 && (
+      {generatedPlan.insights.length > 0 && !isEditMode && (
         <div className="space-y-1">
           {generatedPlan.insights.slice(0, 2).map((insight, i) => (
             <motion.div
@@ -150,57 +153,71 @@ export function ReviewStep({ generatedPlan, onAdjust, onSave, isAdjusting, error
         </div>
       )}
 
-      {/* Task list */}
+      {/* Task list - editable or static */}
       <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
         {generatedPlan.tasks.map((task, index) => (
-          <TaskCard key={index} task={task} index={index} />
+          <EditableTaskCard
+            key={index}
+            task={task}
+            index={index}
+            isEditMode={isEditMode}
+            onUpdate={handleUpdateTask}
+            onRemove={handleRemoveTask}
+          />
         ))}
       </div>
 
-      {/* Quick adjustments */}
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">Quick adjustments:</p>
-        <div className="flex flex-wrap gap-1.5">
-          {QUICK_ADJUSTMENTS.map((adj) => (
-            <button
-              key={adj.label}
-              onClick={() => handleQuickAdjust(adj.prompt)}
-              disabled={isAdjusting}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-full border transition-colors",
-                "border-border hover:border-primary hover:text-primary",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-            >
-              {adj.label}
-            </button>
-          ))}
+      {/* Context-aware quick adjustments */}
+      {!isEditMode && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Suggested adjustments:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {smartAdjustments.map((adj) => (
+              <button
+                key={adj.label}
+                onClick={() => handleQuickAdjust(adj.prompt)}
+                disabled={isAdjusting}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-full border transition-colors flex items-center gap-1",
+                  adj.priority === 'high' 
+                    ? "border-primary/50 text-primary hover:bg-primary/10" 
+                    : "border-border hover:border-primary hover:text-primary",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+              >
+                {adj.icon && <span>{adj.icon}</span>}
+                {adj.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Custom adjustment input */}
-      <div className="flex gap-2">
-        <Input
-          value={adjustmentInput}
-          onChange={(e) => setAdjustmentInput(e.target.value)}
-          placeholder="Tell the Guide what to change..."
-          className="flex-1 text-sm"
-          onKeyDown={(e) => e.key === 'Enter' && handleCustomAdjust()}
-          disabled={isAdjusting}
-        />
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={handleCustomAdjust}
-          disabled={!adjustmentInput.trim() || isAdjusting}
-        >
-          {isAdjusting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+      {!isEditMode && (
+        <div className="flex gap-2">
+          <Input
+            value={adjustmentInput}
+            onChange={(e) => setAdjustmentInput(e.target.value)}
+            placeholder="Tell the Guide what to change..."
+            className="flex-1 text-sm"
+            onKeyDown={(e) => e.key === 'Enter' && handleCustomAdjust()}
+            disabled={isAdjusting}
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleCustomAdjust}
+            disabled={!adjustmentInput.trim() || isAdjusting}
+          >
+            {isAdjusting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Save button */}
       <Button
