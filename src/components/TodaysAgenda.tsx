@@ -46,7 +46,6 @@ import { playStrikethrough } from "@/utils/soundEffects";
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
-import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 interface Task {
@@ -95,7 +94,7 @@ interface TodaysAgendaProps {
   calendarMilestones?: CalendarMilestone[];
   onDateSelect?: (date: Date) => void;
   onQuickAdd?: (parsed: ParsedTask) => void;
-  onPlanMyDay?: (answers: PlanMyDayAnswers) => void;
+  onPlanMyDay?: () => void;
   onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
   activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
   habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;

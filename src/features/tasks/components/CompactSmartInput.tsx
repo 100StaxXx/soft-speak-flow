@@ -20,14 +20,13 @@ import { TypewriterPlaceholder } from '@/components/TypewriterPlaceholder';
 import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
 import { TaskAdvancedEditSheet } from './TaskAdvancedEditSheet';
-import { PlanMyDayClarification, PlanMyDayAnswers } from './PlanMyDayClarification';
 import { PlanMyWeekClarification, PlanMyWeekAnswers } from './PlanMyWeekClarification';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 interface CompactSmartInputProps {
   onSubmit: (parsed: ParsedTask) => void;
-  onPlanMyDay?: (answers: PlanMyDayAnswers) => void;
+  onPlanMyDay?: () => void;
   onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -52,7 +51,6 @@ export function CompactSmartInput({
   const [interimText, setInterimText] = useState('');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [showPlanClarification, setShowPlanClarification] = useState(false);
   const [showWeekClarification, setShowWeekClarification] = useState(false);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
@@ -64,7 +62,7 @@ export function CompactSmartInput({
   // Autocomplete suggestions
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
   const { suggestions, hasSuggestions } = useQuestAutocomplete(displayText);
-  const showAutocomplete = isFocused && hasSuggestions && !showPreview && !showPlanClarification && !showWeekClarification;
+  const showAutocomplete = isFocused && hasSuggestions && !showPreview && !showWeekClarification;
 
   const { isRecording, isSupported, permissionStatus, toggleRecording, requestPermission } = useVoiceInput({
     onInterimResult: (text) => {
@@ -111,40 +109,18 @@ export function CompactSmartInput({
       return;
     }
     
-    // Check for plan my day trigger
+    // Check for plan my day trigger - open wizard directly
     if (parsed?.triggerPlanMyDay) {
       success();
-      setShowPlanClarification(true);
+      onPlanMyDay?.();
+      reset();
+      setInterimText('');
       return;
     }
     
     if (!parsed || !parsed.text.trim()) return;
     success();
     setShowPreview(true);
-  };
-
-  const handlePlanComplete = async (answers: PlanMyDayAnswers) => {
-    setIsPlanLoading(true);
-    try {
-      await onPlanMyDay?.(answers);
-      reset();
-      setInterimText('');
-      setShowPlanClarification(false);
-    } finally {
-      setIsPlanLoading(false);
-    }
-  };
-
-  const handlePlanSkip = async () => {
-    setIsPlanLoading(true);
-    try {
-      await onPlanMyDay?.({ energyLevel: 'medium', dayType: 'mixed', focusArea: 'progress' });
-      reset();
-      setInterimText('');
-      setShowPlanClarification(false);
-    } finally {
-      setIsPlanLoading(false);
-    }
   };
 
   const handleWeekComplete = async (answers: PlanMyWeekAnswers) => {
@@ -481,22 +457,11 @@ export function CompactSmartInput({
 
       {/* Quick suggestion chips - shown when focused and no preview or clarification */}
       <AnimatePresence>
-        {isFocused && !showPreview && !showPlanClarification && !showWeekClarification && (
+        {isFocused && !showPreview && !showWeekClarification && (
           <QuickSuggestionChips
             onSuggestionClick={handleSuggestionClick}
             currentInput={displayText}
             className="px-1"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Plan My Day Clarification */}
-      <AnimatePresence>
-        {showPlanClarification && (
-          <PlanMyDayClarification
-            onComplete={handlePlanComplete}
-            onSkip={handlePlanSkip}
-            isLoading={isPlanLoading}
           />
         )}
       </AnimatePresence>

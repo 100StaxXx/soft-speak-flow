@@ -41,8 +41,8 @@ import { useWeeklyPlanGeneration } from "@/hooks/useWeeklyPlanGeneration";
 import { useEpics } from "@/hooks/useEpics";
 import { SmartDailyRescheduleCard } from "@/components/SmartDailyRescheduleCard";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
+import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
-import type { PlanMyDayAnswers } from "@/features/tasks/components/PlanMyDayClarification";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 const Journeys = () => {
@@ -52,6 +52,7 @@ const Journeys = () => {
   const [showQuestClear, setShowQuestClear] = useState(false);
   const [showRescheduleCard, setShowRescheduleCard] = useState(true);
   const [showHourlyModal, setShowHourlyModal] = useState(false);
+  const [showDayPlannerWizard, setShowDayPlannerWizard] = useState(false);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for onboarding
@@ -367,36 +368,18 @@ const Journeys = () => {
     }
   }, [dailyTasks, moveTaskToDate, updateTask]);
 
-  // Handle Plan My Day command - generates actual tasks
-  const handlePlanMyDay = useCallback(async (answers: PlanMyDayAnswers) => {
-    try {
-      const result = await generatePlan(answers);
-      
-      if (result?.tasks && result.tasks.length > 0) {
-        toast.success(`Your day is planned! ${result.tasks.length} tasks ready`, {
-          description: result.summaryMessage,
-        });
-        
-        // Show protected streaks if any
-        if (result.protectedStreaks && result.protectedStreaks.length > 0) {
-          const streakNames = result.protectedStreaks.map(s => s.title).join(', ');
-          toast.info(`Protected ${result.protectedStreaks.length} streak(s)`, {
-            description: streakNames,
-          });
-        }
-        
-        // Show optional bonus if provided
-        if (result.optionalBonus) {
-          toast(`Bonus: ${result.optionalBonus}`, { icon: '✨' });
-        }
-      } else {
-        toast.info("Plan created! Check your tasks.");
-      }
-    } catch (error) {
-      console.error('Plan generation failed:', error);
-      toast.error("Couldn't generate plan. Try again later.");
-    }
-  }, [generatePlan]);
+  // Handle Plan My Day command - opens wizard
+  const handlePlanMyDay = useCallback(() => {
+    setShowDayPlannerWizard(true);
+  }, []);
+
+  // Handle wizard completion
+  const handleDayPlannerComplete = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    refetchPlan();
+    toast.success('Your day is planned!');
+  }, [queryClient, refetchPlan]);
 
   // Handle Plan My Week command with clarification answers - generates actual tasks
   const handlePlanMyWeek = useCallback(async (answers: PlanMyWeekAnswers) => {
@@ -634,6 +617,14 @@ const Journeys = () => {
             if (task) handleEditQuest(task);
           }}
           onMilestoneClick={() => {}}
+        />
+
+        {/* Smart Day Planner Wizard */}
+        <SmartDayPlannerWizard
+          open={showDayPlannerWizard}
+          onOpenChange={setShowDayPlannerWizard}
+          planDate={selectedDate}
+          onComplete={handleDayPlannerComplete}
         />
       </div>
 
