@@ -384,6 +384,12 @@ export const useTaskMutations = (taskDate: string) => {
 
         // Track completion for scheduling learner
         const now = new Date();
+        console.log('[TaskMutations] About to track completion:', {
+          taskId,
+          taskText: taskText?.substring(0, 50),
+          taskDifficulty,
+          taskCategory,
+        });
         trackTaskCompletion({
           taskId,
           completedAt: now.toISOString(),
