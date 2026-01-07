@@ -185,28 +185,19 @@ export function DayShapeStep({ context, updateContext, onNext, isGenerating }: D
           <div>
             <p className="text-xs font-medium text-foreground">What happens next</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              We'll generate a personalized plan based on your energy ({context.energyLevel}), 
-              available time ({context.flexTimeHours}h), and selected priorities.
+              Next, you can add blocked time slots and special requests before we generate your plan.
             </p>
           </div>
         </div>
       </motion.div>
 
-      {/* Generate button */}
+      {/* Continue button */}
       <Button
         onClick={onNext}
-        disabled={isGenerating}
         className="w-full mt-4"
         size="lg"
       >
-        {isGenerating ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Crafting Your Day...
-          </>
-        ) : (
-          'Generate My Plan'
-        )}
+        Continue
       </Button>
     </div>
   );
