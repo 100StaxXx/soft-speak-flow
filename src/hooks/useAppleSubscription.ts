@@ -63,16 +63,32 @@ export function useAppleSubscription() {
   }, [fetchProducts]);
 
   const ensureProductsAvailable = useCallback(async () => {
+    console.log('[ENSURE DEBUG] ensureProductsAvailable called');
+    console.log('[ENSURE DEBUG] hasAttemptedProductFetch:', hasAttemptedProductFetch);
+    console.log('[ENSURE DEBUG] products.length:', products.length);
+    
     if (!hasAttemptedProductFetch || products.length === 0) {
+      console.log('[ENSURE DEBUG] Condition met - calling fetchProducts()');
       const loadedProducts = await fetchProducts();
-      return loadedProducts.length ? loadedProducts : null;
+      console.log('[ENSURE DEBUG] fetchProducts returned:', loadedProducts.length, 'products');
+      const result = loadedProducts.length ? loadedProducts : null;
+      console.log('[ENSURE DEBUG] Returning:', result ? 'products' : 'NULL');
+      return result;
     }
 
+    console.log('[ENSURE DEBUG] Using existing products:', products.length);
     return products;
   }, [fetchProducts, hasAttemptedProductFetch, products]);
 
   const handlePurchase = async (productId: string) => {
+    console.log('[PURCHASE DEBUG] ========== handlePurchase START ==========');
+    console.log('[PURCHASE DEBUG] productId:', productId);
+    console.log('[PURCHASE DEBUG] isIAPAvailable():', isIAPAvailable());
+    console.log('[PURCHASE DEBUG] Current products state:', products.length);
+    console.log('[PURCHASE DEBUG] hasAttemptedProductFetch:', hasAttemptedProductFetch);
+    
     if (!isIAPAvailable()) {
+      console.log('[PURCHASE DEBUG] IAP not available - returning false');
       toast({
         title: "Not Available",
         description: "In-App Purchases are only available on iOS devices",
@@ -83,7 +99,9 @@ export function useAppleSubscription() {
 
     setLoading(true);
     try {
+      console.log('[PURCHASE DEBUG] Calling ensureProductsAvailable...');
       const availableProducts = await ensureProductsAvailable();
+      console.log('[PURCHASE DEBUG] ensureProductsAvailable returned:', availableProducts ? availableProducts.length + ' products' : 'NULL');
       if (!availableProducts) {
         toast({
           title: "Unavailable",
