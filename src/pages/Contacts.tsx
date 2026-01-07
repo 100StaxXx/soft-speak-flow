@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Plus, Search, Star, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Plus, Search, Star, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function Contacts() {
+  const navigate = useNavigate();
   const { contacts, isLoading, createContact, updateContact, deleteContact, toggleFavorite } = useContacts();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -91,13 +93,16 @@ export default function Contacts() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-background pb-24"
+      className="min-h-screen bg-background pb-nav-safe pt-safe"
     >
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border safe-area-top">
         <div className="px-4 py-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                 <Users className="h-5 w-5 text-primary" />
               </div>
