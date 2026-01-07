@@ -10,6 +10,7 @@ import { Crown, User, Users, Bell, Repeat, LogOut, BookHeart, FileText, Shield, 
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useLongPress } from "@/hooks/useLongPress";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +94,28 @@ const QuickActionCard = memo(({
   </button>
 ));
 QuickActionCard.displayName = 'QuickActionCard';
+
+// Hidden developer trigger - long press on header to access IAP test page
+const DevTriggerHeader = memo(({ onNavigate }: { onNavigate: () => void }) => {
+  const { handlers, isActivated } = useLongPress({
+    onLongPress: onNavigate,
+    threshold: 800,
+  });
+
+  return (
+    <div 
+      {...handlers}
+      className={`cursor-pointer select-none transition-opacity ${isActivated ? 'opacity-50' : ''}`}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+    >
+      <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+        Command Center
+      </h1>
+      <p className="text-sm text-muted-foreground">Your account & settings</p>
+    </div>
+  );
+});
+DevTriggerHeader.displayName = 'DevTriggerHeader';
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -281,16 +304,11 @@ const Profile = () => {
       <StarfieldBackground />
       
       <div className="min-h-screen pb-nav-safe relative">
-        {/* Header */}
+        {/* Header with hidden dev trigger */}
         <div className="sticky top-0 z-40 cosmiq-glass-header safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  Command Center
-                </h1>
-                <p className="text-sm text-muted-foreground">Your account & settings</p>
-              </div>
+              <DevTriggerHeader onNavigate={() => navigate('/iap-test')} />
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
             </div>
           </div>
