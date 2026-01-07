@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { PlanContext, DayShape } from '@/hooks/useSmartDayPlanner';
-import { Sunrise, Sun, Sunset, Sparkles, Loader2 } from 'lucide-react';
+import { Sunrise, Sun, Sunset, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DayShapeStepProps {

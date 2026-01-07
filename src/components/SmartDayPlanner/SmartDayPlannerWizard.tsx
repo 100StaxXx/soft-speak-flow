@@ -173,8 +173,10 @@ export function SmartDayPlannerWizard({
                   context={planner.context}
                   updateContext={planner.updateContext}
                   onNext={async () => {
-                    await planner.generatePlan();
-                    planner.nextStep();
+                    const plan = await planner.generatePlan();
+                    if (plan) {
+                      planner.nextStep();
+                    }
                   }}
                   isGenerating={planner.isGenerating}
                 />

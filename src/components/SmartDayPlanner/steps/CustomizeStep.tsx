@@ -66,7 +66,9 @@ export function CustomizeStep({ context, updateContext, onNext, isGenerating }: 
   };
 
   const formatTime = (time: string) => {
+    if (!time || !time.includes(':')) return time;
     const [hours, minutes] = time.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return time;
     const period = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 || 12;
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
