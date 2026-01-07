@@ -52,6 +52,7 @@ export interface GeneratedTask {
   blockType?: string;
   isAnchor?: boolean;
   epicId?: string;
+  contactId?: string;
   rationale?: string;
 }
 
@@ -598,6 +599,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
         block_type: task.blockType,
         is_anchor: task.isAnchor || false,
         epic_id: task.epicId,
+        contact_id: task.contactId,
         ai_generated: true,
         source: 'smart_planner',
         xp_reward: task.priority === 'high' ? 30 : task.priority === 'medium' ? 20 : 10,
