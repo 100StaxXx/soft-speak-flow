@@ -173,6 +173,9 @@ export function SmartDayPlannerWizard({
                   onSave={handleComplete}
                   isAdjusting={planner.isAdjusting}
                   error={planner.error}
+                  hasContacts={planner.contactsNeedingAttention.length > 0}
+                  onUpdateTask={planner.updateTaskInPlan}
+                  onRemoveTask={planner.removeTaskFromPlan}
                 />
               )}
             </motion.div>

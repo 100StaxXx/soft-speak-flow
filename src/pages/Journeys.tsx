@@ -42,6 +42,8 @@ import { useEpics } from "@/hooks/useEpics";
 import { SmartDailyRescheduleCard } from "@/components/SmartDailyRescheduleCard";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
+import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
+import { Wand2 } from "lucide-react";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
@@ -53,6 +55,7 @@ const Journeys = () => {
   const [showRescheduleCard, setShowRescheduleCard] = useState(true);
   const [showHourlyModal, setShowHourlyModal] = useState(false);
   const [showDayPlannerWizard, setShowDayPlannerWizard] = useState(false);
+  const [showQuickAdjust, setShowQuickAdjust] = useState(false);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for onboarding
@@ -625,6 +628,29 @@ const Journeys = () => {
           onOpenChange={setShowDayPlannerWizard}
           planDate={selectedDate}
           onComplete={handleDayPlannerComplete}
+        />
+
+        {/* Quick Adjust Floating Button + Drawer */}
+        {dailyTasks.some(t => t.ai_generated) && (
+          <motion.button
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="fixed bottom-24 right-4 z-40 p-3 rounded-full bg-primary shadow-lg active:scale-95 transition-transform"
+            onClick={() => setShowQuickAdjust(true)}
+          >
+            <Wand2 className="h-5 w-5 text-primary-foreground" />
+          </motion.button>
+        )}
+
+        <QuickAdjustDrawer
+          open={showQuickAdjust}
+          onOpenChange={setShowQuickAdjust}
+          tasks={dailyTasks}
+          selectedDate={selectedDate}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+            setShowQuickAdjust(false);
+          }}
         />
       </div>
 

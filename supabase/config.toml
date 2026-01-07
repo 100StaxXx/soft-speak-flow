@@ -278,3 +278,6 @@ verify_jwt = false
 
 [functions.generate-smart-daily-plan]
 verify_jwt = true
+
+[functions.adjust-saved-daily-plan]
+verify_jwt = true
