@@ -93,7 +93,7 @@ export function useAppleSubscription() {
         return false;
       }
 
-      const productExists = availableProducts.some((product) => product.productId === productId);
+      const productExists = availableProducts.some((product) => product.identifier === productId);
       if (!productExists) {
         toast({
           title: "Unavailable",

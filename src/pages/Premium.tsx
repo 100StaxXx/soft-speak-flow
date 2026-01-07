@@ -33,7 +33,7 @@ export default function Premium() {
 
   const productMap = useMemo(() => {
     return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
-      acc[product.productId] = product;
+      acc[product.identifier] = product;
       return acc;
     }, {});
   }, [products]);
@@ -160,7 +160,7 @@ export default function Premium() {
                   {plan}
                 </p>
                 <p className="text-3xl font-bold text-foreground">
-                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.price : productMap[IAP_PRODUCTS.MONTHLY]?.price) ?? plans[plan].fallbackPrice}
+                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.priceString : productMap[IAP_PRODUCTS.MONTHLY]?.priceString) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {plans[plan].period}
@@ -296,7 +296,7 @@ export default function Premium() {
                   Processing...
                 </>
               ) : (
-                `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"} - ${(selectedProduct?.price ?? plans[selectedPlan].fallbackPrice)}${selectedPlan === "yearly" ? " /year" : " /month"}`
+                `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"} - ${(selectedProduct?.priceString ?? plans[selectedPlan].fallbackPrice)}${selectedPlan === "yearly" ? " /year" : " /month"}`
               )}
             </Button>
 

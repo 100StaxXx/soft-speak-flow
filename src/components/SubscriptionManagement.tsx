@@ -44,7 +44,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
   const productMap = useMemo(() => {
     return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
-      acc[product.productId] = product;
+      acc[product.identifier] = product;
       return acc;
     }, {});
   }, [products]);
@@ -212,8 +212,8 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                   <p className="text-muted-foreground mb-1">Loaded Products:</p>
                   {products.length > 0 ? (
                     products.map((p) => (
-                      <div key={p.productId} className="text-green-500">
-                        ✓ {p.productId}: {p.price}
+                      <div key={p.identifier} className="text-green-500">
+                        ✓ {p.identifier}: {p.priceString}
                       </div>
                     ))
                   ) : (

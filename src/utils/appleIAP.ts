@@ -11,12 +11,12 @@ export interface IAPPurchase {
 }
 
 export interface IAPProduct {
-  productId: string;
+  identifier: string;
   title: string;
   description: string;
-  price: string;
-  priceAsDecimal: number;
-  currency: string;
+  price: number;
+  priceString: string;
+  currencyCode: string;
 }
 
 // Apple IAP Product IDs - configure these in App Store Connect

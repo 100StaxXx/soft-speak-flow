@@ -71,7 +71,7 @@ const IAPTest = () => {
       const result = await reloadProducts();
       addLog(`[FETCH] Returned ${result.length} products`, result.length ? 'success' : 'info');
       result.forEach((p, i) => {
-        addLog(`[FETCH] Product ${i}: id="${p.productId}" title="${p.title}" price="${p.price}"`, 'info');
+        addLog(`[FETCH] Product ${i}: id="${p.identifier}" title="${p.title}" price="${p.priceString}"`, 'info');
       });
     } catch (error) {
       addLog(`[FETCH] Failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
@@ -321,21 +321,21 @@ const IAPTest = () => {
 
             {products.map((product) => (
               <div 
-                key={product.productId} 
+                key={product.identifier} 
                 className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
               >
                 <div>
-                  <p className="font-medium text-sm">{product.title || product.productId}</p>
+                  <p className="font-medium text-sm">{product.title || product.identifier}</p>
                   <p className="text-xs text-muted-foreground">
-                    {product.price} • {product.productId}
+                    {product.priceString} • {product.identifier}
                   </p>
                 </div>
                 <Button 
                   size="sm" 
-                  onClick={() => handleTestPurchase(product.productId)}
-                  disabled={purchasingProductId === product.productId}
+                  onClick={() => handleTestPurchase(product.identifier)}
+                  disabled={purchasingProductId === product.identifier}
                 >
-                  {purchasingProductId === product.productId ? (
+                  {purchasingProductId === product.identifier ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     'Buy'
@@ -399,7 +399,7 @@ const IAPTest = () => {
                 productsLoading,
                 productError,
                 productCount: products.length,
-                productIds: products.map(p => p.productId),
+                productIds: products.map(p => p.identifier),
                 fullProducts: products
               }, null, 2)}
             </pre>

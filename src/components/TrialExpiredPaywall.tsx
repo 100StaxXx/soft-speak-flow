@@ -47,7 +47,7 @@ export const TrialExpiredPaywall = () => {
 
   const productMap = useMemo(() => {
     return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
-      acc[product.productId] = product;
+      acc[product.identifier] = product;
       return acc;
     }, {});
   }, [products]);
