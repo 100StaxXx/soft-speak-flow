@@ -281,3 +281,6 @@ verify_jwt = true
 
 [functions.adjust-saved-daily-plan]
 verify_jwt = true
+
+[functions.verify-admin-access]
+verify_jwt = false

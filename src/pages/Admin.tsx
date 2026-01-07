@@ -114,12 +114,10 @@ const Admin = () => {
         return;
       }
 
-      const { data, error } = await supabase.rpc("has_role", {
-        _user_id: user.id,
-        _role: "admin",
-      });
+      // Server-side admin verification via edge function
+      const { data, error } = await supabase.functions.invoke("verify-admin-access");
 
-      if (error || !data) {
+      if (error || !data?.isAdmin) {
         console.debug('Admin check failed', { error, data, userId: user.id });
         toast.error("Access Denied: You don't have permission to access this page.");
         setIsAdmin(false);
