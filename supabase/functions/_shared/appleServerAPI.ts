@@ -162,9 +162,12 @@ export async function getTransactionInfo(
     const errorText = await response.text();
     console.error(`[Apple API] Transaction info error: ${response.status} - ${errorText}`);
     
-    // If production fails with 404 (transaction not found), try sandbox
-    if (!useSandbox && response.status === 404) {
-      console.log("[Apple API] Transaction not found in production, trying sandbox...");
+    // If production fails, try sandbox for:
+    // - 404: Transaction not found (sandbox transactions don't exist in production)
+    // - 401: Unauthorized (sandbox uses different auth context)
+    // - 4xx: Other client errors that may indicate wrong environment
+    if (!useSandbox && (response.status === 404 || response.status === 401 || (response.status >= 400 && response.status < 500))) {
+      console.log(`[Apple API] Production failed with ${response.status}, trying sandbox...`);
       return getTransactionInfo(transactionId, true);
     }
     
@@ -207,9 +210,9 @@ export async function getSubscriptionStatus(
     const errorText = await response.text();
     console.error(`[Apple API] Subscription status error: ${response.status} - ${errorText}`);
     
-    // If production fails, try sandbox
-    if (!useSandbox && response.status === 404) {
-      console.log("[Apple API] Subscription not found in production, trying sandbox...");
+    // If production fails, try sandbox for any 4xx error
+    if (!useSandbox && (response.status === 404 || response.status === 401 || (response.status >= 400 && response.status < 500))) {
+      console.log(`[Apple API] Production failed with ${response.status}, trying sandbox...`);
       return getSubscriptionStatus(transactionId, true);
     }
     
