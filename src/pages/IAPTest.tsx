@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, RefreshCw, Smartphone, Check, X, Copy, Trash2, RotateCcw, Settings, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Smartphone, Check, X, Copy, Trash2, RotateCcw, Settings, Loader2, TestTube, Database } from "lucide-react";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { IAP_PRODUCTS } from "@/utils/appleIAP";
 
 interface LogEntry {
   timestamp: string;
@@ -54,7 +55,19 @@ const IAPTest = () => {
     handleManageSubscriptions,
     loading,
     hasLoadedProducts,
+    reloadProducts,
   } = useAppleSubscription();
+
+  // Manual fetch products
+  const handleFetchProducts = useCallback(async () => {
+    addLog('Manually fetching products...', 'info');
+    try {
+      const result = await reloadProducts();
+      addLog(`Fetch complete. Products count: ${result.length}`, result.length ? 'success' : 'info');
+    } catch (error) {
+      addLog(`Fetch failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    }
+  }, [reloadProducts]);
 
   // Environment info
   const platform = Capacitor.getPlatform();
@@ -72,17 +85,22 @@ const IAPTest = () => {
     setLogs(prev => [...prev.slice(-100), { timestamp, message, type }]);
   };
 
-  // Intercept console.log for IAP-related messages
+  // Intercept console.log for IAP-related messages - broadened to capture more
   useEffect(() => {
     const originalLog = console.log;
     const originalError = console.error;
+
+    const shouldCapture = (message: string) => {
+      const keywords = ['[IAP', '[HOOK', '[Apple', 'NativePurchases', 'product', 'purchase', 'subscription', 'receipt', 'transaction'];
+      return keywords.some(k => message.toLowerCase().includes(k.toLowerCase()));
+    };
 
     console.log = (...args) => {
       originalLog(...args);
       const message = args.map(a => 
         typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
       ).join(' ');
-      if (message.includes('[IAP') || message.includes('[HOOK') || message.includes('[Apple')) {
+      if (shouldCapture(message)) {
         addLog(message, 'info');
       }
     };
@@ -92,7 +110,7 @@ const IAPTest = () => {
       const message = args.map(a => 
         typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
       ).join(' ');
-      if (message.includes('[IAP') || message.includes('[HOOK') || message.includes('[Apple')) {
+      if (shouldCapture(message)) {
         addLog(message, 'error');
       }
     };
@@ -219,19 +237,22 @@ const IAPTest = () => {
           </CardContent>
         </Card>
 
-        {/* Products */}
+        {/* Refresh + Fetch Buttons */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm">App Store Products</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => window.location.reload()}
-                disabled={productsLoading}
-              >
-                <RefreshCw className={`h-4 w-4 ${productsLoading ? 'animate-spin' : ''}`} />
-              </Button>
+              <div className="flex gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleFetchProducts}
+                  disabled={productsLoading}
+                  title="Fetch Products"
+                >
+                  <RefreshCw className={`h-4 w-4 ${productsLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-2">
@@ -277,6 +298,65 @@ const IAPTest = () => {
                 </Button>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Hardcoded Test Products */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TestTube className="h-4 w-4" />
+              Hardcoded Test Products
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Use these when App Store products don't load
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {Object.entries(IAP_PRODUCTS).map(([key, productId]) => (
+              <div 
+                key={key} 
+                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+              >
+                <div>
+                  <p className="font-medium text-sm">{key}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{productId}</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => handleTestPurchase(productId)}
+                  disabled={purchasingProductId === productId}
+                >
+                  {purchasingProductId === productId ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Test Buy'
+                  )}
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Product State Debug */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Product State
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <pre className="text-xs bg-muted/50 p-3 rounded-lg overflow-x-auto font-mono max-h-32 overflow-y-auto">
+              {JSON.stringify({
+                hasLoadedProducts,
+                productsLoading,
+                productError,
+                productCount: products.length,
+                productIds: products.map(p => p.productId)
+              }, null, 2)}
+            </pre>
           </CardContent>
         </Card>
 
