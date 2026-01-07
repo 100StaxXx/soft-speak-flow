@@ -426,15 +426,19 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
       includeRelationshipTasks: savedPreferences.includeRelationshipTasks,
     }));
     
-    // Update usage count
+    // Update usage count (non-blocking)
     if (user?.id) {
-      await supabase
-        .from('daily_planning_preferences')
-        .update({ 
-          times_used: (savedPreferences.timesUsed || 0) + 1,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id);
+      try {
+        await supabase
+          .from('daily_planning_preferences')
+          .update({ 
+            times_used: (savedPreferences.timesUsed || 0) + 1,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id);
+      } catch (err) {
+        console.warn('Failed to update usage count:', err);
+      }
     }
     
     medium();
