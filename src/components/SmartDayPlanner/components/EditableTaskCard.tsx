@@ -10,10 +10,17 @@ import {
   Trash2, 
   Check, 
   X,
-  Pencil
+  Pencil,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DragHandleProps } from '@/components/DraggableTaskList';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface EditableTaskCardProps {
   task: GeneratedTask;
@@ -22,6 +29,8 @@ interface EditableTaskCardProps {
   onUpdate: (index: number, updates: Partial<GeneratedTask>) => void;
   onRemove: (index: number) => void;
   dragHandleProps?: DragHandleProps;
+  hasConflict?: boolean;
+  conflictDetails?: string;
 }
 
 export function EditableTaskCard({ 
@@ -31,6 +40,8 @@ export function EditableTaskCard({
   onUpdate, 
   onRemove,
   dragHandleProps,
+  hasConflict,
+  conflictDetails,
 }: EditableTaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
@@ -117,7 +128,9 @@ export function EditableTaskCard({
       transition={{ delay: index * 0.03 }}
       className={cn(
         "p-3 rounded-lg bg-card border border-border/50 border-l-4",
-        priorityColors[task.priority],
+        hasConflict 
+          ? "border-l-amber-500 bg-amber-500/5 ring-1 ring-amber-500/30" 
+          : priorityColors[task.priority],
         isDragging && "shadow-lg scale-[1.02]"
       )}
     >
@@ -141,6 +154,21 @@ export function EditableTaskCard({
               <Clock className="h-3 w-3" />
               {task.scheduledTime}
             </span>
+            {hasConflict && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                      <AlertTriangle className="h-3 w-3" />
+                      Overlap
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px] text-xs">
+                    {conflictDetails || 'This task overlaps with another'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <span className="text-[10px] text-muted-foreground">
               {task.estimatedDuration}m
             </span>
