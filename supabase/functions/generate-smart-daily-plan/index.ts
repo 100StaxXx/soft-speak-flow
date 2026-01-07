@@ -22,6 +22,7 @@ interface GeneratedTask {
   blockType?: string;
   isAnchor?: boolean;
   epicId?: string;
+  contactId?: string;
   rationale?: string;
 }
 

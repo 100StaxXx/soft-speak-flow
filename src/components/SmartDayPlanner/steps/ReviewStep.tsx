@@ -97,8 +97,8 @@ export function ReviewStep({
         <AlertCircle className="h-10 w-10 text-destructive mb-3" />
         <h3 className="font-medium text-foreground mb-1">Couldn't generate plan</h3>
         <p className="text-sm text-muted-foreground mb-4">{error}</p>
-        <Button variant="outline" onClick={onSave}>
-          Try Again
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          Start Over
         </Button>
       </div>
     );

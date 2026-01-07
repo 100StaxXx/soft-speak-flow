@@ -491,6 +491,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
           prioritizedEpicIds: context.prioritizedEpicIds,
           dayShape: context.dayShape,
           contactsNeedingAttention: context.includeRelationshipTasks ? selectedContacts : [],
+          adjustmentRequest: context.adjustmentRequest,
         },
       });
 
@@ -511,6 +512,8 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
       };
 
       setGeneratedPlan(plan);
+      // Clear adjustmentRequest after initial generation so it doesn't interfere with post-generation adjustments
+      setContext(prev => ({ ...prev, adjustmentRequest: undefined }));
       success();
       return plan;
     } catch (err: any) {

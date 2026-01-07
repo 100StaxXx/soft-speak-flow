@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { PlanContext, HardCommitment } from '@/hooks/useSmartDayPlanner';
 import { Clock, Plus, X, MessageSquare, Calendar, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface CustomizeStepProps {
   context: PlanContext;
@@ -22,8 +23,22 @@ export function CustomizeStep({ context, updateContext, onNext, isGenerating }: 
     endTime: '15:00',
   });
 
+  const parseTimeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + (minutes || 0);
+  };
+
   const handleAddTimeBlock = () => {
     if (!newBlock.title || !newBlock.startTime || !newBlock.endTime) return;
+    
+    // Validate end time is after start time
+    const startMinutes = parseTimeToMinutes(newBlock.startTime);
+    const endMinutes = parseTimeToMinutes(newBlock.endTime);
+    
+    if (endMinutes <= startMinutes) {
+      toast.error('End time must be after start time');
+      return;
+    }
     
     const commitment: HardCommitment = {
       id: `custom-${Date.now()}`,
