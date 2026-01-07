@@ -44,6 +44,12 @@ const IAPTest = () => {
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [purchasingProductId, setPurchasingProductId] = useState<string | null>(null);
+  const [lastPurchaseResult, setLastPurchaseResult] = useState<{
+    productId: string;
+    success: boolean;
+    message: string;
+    timestamp: string;
+  } | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -129,15 +135,31 @@ const IAPTest = () => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Handle purchase with logging
+  // Handle purchase with logging - checks return value properly
   const handleTestPurchase = async (productId: string) => {
     setPurchasingProductId(productId);
-    addLog(`Starting purchase for: ${productId}`, 'info');
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+    
+    addLog(`[TEST] Starting purchase for: ${productId}`, 'info');
+    addLog(`[TEST] Current products count: ${products.length}`, 'info');
+    addLog(`[TEST] hasLoadedProducts: ${hasLoadedProducts}`, 'info');
+    
     try {
-      await handlePurchase(productId);
-      addLog(`Purchase completed for: ${productId}`, 'success');
+      addLog(`[TEST] Calling handlePurchase...`, 'info');
+      const success = await handlePurchase(productId);
+      addLog(`[TEST] handlePurchase returned: ${success}`, success ? 'success' : 'error');
+      
+      if (success) {
+        addLog(`✅ Purchase SUCCESS for: ${productId}`, 'success');
+        setLastPurchaseResult({ productId, success: true, message: 'Purchase completed successfully', timestamp });
+      } else {
+        addLog(`❌ Purchase BLOCKED for: ${productId} - check toast messages`, 'error');
+        setLastPurchaseResult({ productId, success: false, message: 'Purchase blocked or failed', timestamp });
+      }
     } catch (error) {
-      addLog(`Purchase failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      addLog(`❌ Purchase EXCEPTION: ${errorMsg}`, 'error');
+      setLastPurchaseResult({ productId, success: false, message: errorMsg, timestamp });
     } finally {
       setPurchasingProductId(null);
     }
@@ -359,6 +381,30 @@ const IAPTest = () => {
             </pre>
           </CardContent>
         </Card>
+
+        {/* Last Purchase Result */}
+        {lastPurchaseResult && (
+          <Card className={lastPurchaseResult.success ? 'border-green-500/50 bg-green-500/5' : 'border-red-500/50 bg-red-500/5'}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                {lastPurchaseResult.success ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <X className="h-4 w-4 text-red-500" />
+                )}
+                Last Purchase Result
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="text-sm space-y-1">
+                <p><strong>Product:</strong> <span className="font-mono text-xs">{lastPurchaseResult.productId}</span></p>
+                <p><strong>Result:</strong> {lastPurchaseResult.success ? '✅ Success' : '❌ Failed'}</p>
+                <p><strong>Message:</strong> {lastPurchaseResult.message}</p>
+                <p className="text-xs text-muted-foreground">{lastPurchaseResult.timestamp}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Manual Verification */}
         <Card>
