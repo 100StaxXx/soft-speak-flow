@@ -235,6 +235,13 @@ serve(async (req) => {
     if (type === 'task_completion') {
       const completion = data as TaskCompletionData;
       
+      console.log(`[analyze-user-patterns] task_completion received:`, {
+        taskText: completion.taskText?.substring(0, 30),
+        category: completion.category,
+        difficulty: completion.difficulty,
+        hour: completion.actualCompletionHour,
+      });
+      
       // Add to completions (keep last 100)
       currentCompletions = [...currentCompletions, completion].slice(-100);
       
@@ -253,14 +260,15 @@ serve(async (req) => {
       }
       
       // Track task text patterns for learning what tasks user creates
-      if ((completion as any).taskText) {
-        const taskText = (completion as any).taskText;
+      if (completion.taskText) {
+        console.log(`[analyze-user-patterns] Processing taskText: "${completion.taskText.substring(0, 30)}..."`);
         
         // Track recurring task texts (for replication)
         const recurringTasks: string[] = successfulPatterns.recurring_tasks || [];
-        if (!recurringTasks.includes(taskText) && recurringTasks.length < 30) {
-          recurringTasks.push(taskText);
+        if (!recurringTasks.includes(completion.taskText) && recurringTasks.length < 30) {
+          recurringTasks.push(completion.taskText);
           successfulPatterns.recurring_tasks = recurringTasks;
+          console.log(`[analyze-user-patterns] Added to recurring_tasks. Total: ${recurringTasks.length}`);
         }
         
         // Track category + difficulty combos that succeed
@@ -268,6 +276,11 @@ serve(async (req) => {
         const comboCounts: Record<string, number> = successfulPatterns.category_difficulty || {};
         comboCounts[comboKey] = (comboCounts[comboKey] || 0) + 1;
         successfulPatterns.category_difficulty = comboCounts;
+        
+        // Track total completions
+        successfulPatterns.total_completions = (successfulPatterns.total_completions || 0) + 1;
+      } else {
+        console.log(`[analyze-user-patterns] No taskText provided in completion data`);
       }
     } else if (type === 'schedule_modification') {
       const mod = data as ScheduleModificationData;
@@ -450,7 +463,7 @@ serve(async (req) => {
       throw upsertError;
     }
 
-    console.log(`[analyze-user-patterns] Updated patterns. Inferred style: ${style} (${confidence}% confidence)`);
+    console.log(`[analyze-user-patterns] Updated patterns. Inferred style: ${style} (${confidence}% confidence). Recurring tasks: ${successfulPatterns.recurring_tasks?.length || 0}`);
 
     return new Response(JSON.stringify({ 
       success: true, 

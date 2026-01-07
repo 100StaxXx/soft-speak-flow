@@ -36,15 +36,29 @@ export function useSchedulingLearner() {
    * Track when a task is completed - learns completion time patterns
    */
   const trackTaskCompletion = useCallback(async (data: TaskCompletionData) => {
-    if (!user) return;
+    if (!user) {
+      console.log('[SchedulingLearner] No user - skipping completion tracking');
+      return;
+    }
+
+    console.log('[SchedulingLearner] Tracking completion:', {
+      taskText: data.taskText?.substring(0, 30),
+      category: data.category,
+      difficulty: data.difficulty,
+    });
 
     try {
-      await supabase.functions.invoke('analyze-user-patterns', {
+      const { data: result, error } = await supabase.functions.invoke('analyze-user-patterns', {
         body: { type: 'task_completion', data },
       });
+      
+      if (error) {
+        console.error('[SchedulingLearner] Edge function error:', error);
+      } else {
+        console.log('[SchedulingLearner] Completion saved:', result);
+      }
     } catch (error) {
-      // Non-blocking - don't interrupt user flow
-      console.error('[useSchedulingLearner] Error tracking completion:', error);
+      console.error('[SchedulingLearner] Error tracking completion:', error);
     }
   }, [user]);
 
@@ -77,7 +91,16 @@ export function useSchedulingLearner() {
     category?: string,
     taskText?: string
   ) => {
-    if (!user) return;
+    if (!user) {
+      console.log('[SchedulingLearner] No user - skipping creation tracking');
+      return;
+    }
+
+    console.log('[SchedulingLearner] Tracking creation:', {
+      taskText: taskText?.substring(0, 30),
+      category,
+      difficulty,
+    });
 
     try {
       const data: TaskCreationData = {
@@ -88,11 +111,17 @@ export function useSchedulingLearner() {
         taskText,
         category,
       };
-      await supabase.functions.invoke('analyze-user-patterns', {
+      const { data: result, error } = await supabase.functions.invoke('analyze-user-patterns', {
         body: { type: 'task_creation', data },
       });
+      
+      if (error) {
+        console.error('[SchedulingLearner] Edge function error:', error);
+      } else {
+        console.log('[SchedulingLearner] Creation saved:', result);
+      }
     } catch (error) {
-      console.error('[useSchedulingLearner] Error tracking creation:', error);
+      console.error('[SchedulingLearner] Error tracking creation:', error);
     }
   }, [user]);
 
