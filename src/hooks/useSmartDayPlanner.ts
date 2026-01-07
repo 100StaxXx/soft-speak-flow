@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 export type EnergyLevel = 'low' | 'medium' | 'high';
 export type DayShape = 'front_load' | 'spread' | 'back_load' | 'auto';
-export type WizardStep = 'quick_start' | 'check_in' | 'anchors' | 'shape' | 'review';
+export type WizardStep = 'quick_start' | 'check_in' | 'anchors' | 'shape' | 'customize' | 'review';
 
 export interface HardCommitment {
   id: string;
@@ -447,7 +447,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
   const nextStep = useCallback(() => {
     medium();
-    const steps: WizardStep[] = ['quick_start', 'check_in', 'anchors', 'shape', 'review'];
+    const steps: WizardStep[] = ['quick_start', 'check_in', 'anchors', 'shape', 'customize', 'review'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1]);
@@ -456,7 +456,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
   const prevStep = useCallback(() => {
     medium();
-    const steps: WizardStep[] = ['quick_start', 'check_in', 'anchors', 'shape', 'review'];
+    const steps: WizardStep[] = ['quick_start', 'check_in', 'anchors', 'shape', 'customize', 'review'];
     const currentIndex = steps.indexOf(step);
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1]);

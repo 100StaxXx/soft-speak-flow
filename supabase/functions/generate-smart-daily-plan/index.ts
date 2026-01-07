@@ -467,14 +467,28 @@ User's adjustment request: "${adjustmentRequest}"
 Please regenerate the plan incorporating this feedback while maintaining the core structure.`;
   }
 
-  return `Generate a daily plan for ${body.planDate} with these parameters:
+  let prompt = `Generate a daily plan for ${body.planDate} with these parameters:
 - Energy: ${body.energyLevel}
 - Flex time: ${body.flexTimeHours} hours
 - Day shape: ${body.dayShape}
 - Protected habits: ${body.protectedHabitIds.length} habits
-- Prioritized epics: ${body.prioritizedEpicIds.length} epics
+- Prioritized epics: ${body.prioritizedEpicIds.length} epics`;
+
+  // Include initial custom requests if provided (before plan generation)
+  if (adjustmentRequest && !previousPlan) {
+    prompt += `
+
+## User's Special Requests
+The user has specifically asked for: "${adjustmentRequest}"
+
+Make sure to incorporate these requests into the generated plan.`;
+  }
+
+  prompt += `
 
 Create a balanced, achievable plan that respects the user's energy and available time.`;
+
+  return prompt;
 }
 
 function calculateBalanceScore(tasks: GeneratedTask[], dayShape: string): number {

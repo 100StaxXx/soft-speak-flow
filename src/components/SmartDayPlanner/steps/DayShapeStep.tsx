@@ -9,7 +9,7 @@ interface DayShapeStepProps {
   context: PlanContext;
   updateContext: (updates: Partial<PlanContext>) => void;
   onNext: () => void;
-  isGenerating: boolean;
+  isGenerating?: boolean;
 }
 
 interface ShapeOption {
