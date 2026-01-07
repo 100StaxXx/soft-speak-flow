@@ -226,6 +226,9 @@ serve(async (req) => {
     let dayPatterns = learning?.day_of_week_patterns || {};
 
     // Process based on event type
+    // Initialize successful patterns
+    let successfulPatterns = learning?.successful_patterns || {};
+
     if (type === 'task_completion') {
       const completion = data as TaskCompletionData;
       
@@ -244,6 +247,24 @@ serve(async (req) => {
       if (!peakHours.includes(completion.actualCompletionHour)) {
         peakHours.push(completion.actualCompletionHour);
         dayPatterns[dayKey].peakHours = peakHours.slice(-10);
+      }
+      
+      // Track task text patterns for learning what tasks user creates
+      if ((completion as any).taskText) {
+        const taskText = (completion as any).taskText;
+        
+        // Track recurring task texts (for replication)
+        const recurringTasks: string[] = successfulPatterns.recurring_tasks || [];
+        if (!recurringTasks.includes(taskText) && recurringTasks.length < 30) {
+          recurringTasks.push(taskText);
+          successfulPatterns.recurring_tasks = recurringTasks;
+        }
+        
+        // Track category + difficulty combos that succeed
+        const comboKey = `${completion.category || 'uncategorized'}_${completion.difficulty}`;
+        const comboCounts: Record<string, number> = successfulPatterns.category_difficulty || {};
+        comboCounts[comboKey] = (comboCounts[comboKey] || 0) + 1;
+        successfulPatterns.category_difficulty = comboCounts;
       }
     } else if (type === 'schedule_modification') {
       const mod = data as ScheduleModificationData;
@@ -327,6 +348,51 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    } else if (type === 'plan_saved') {
+      // Learn from successful plan generations - what tasks the user accepted
+      const planData = data as { 
+        energyLevel: string; 
+        dayShape: string; 
+        taskCount: number; 
+        tasks: Array<{ title: string; category?: string; priority?: string; scheduledTime?: string }>; 
+        hour: number; 
+        dayOfWeek: number;
+      };
+      
+      console.log(`[analyze-user-patterns] Processing plan_saved: ${planData.taskCount} tasks at hour ${planData.hour}`);
+      
+      // Track which task titles the AI generated that user accepted
+      const aiAcceptedTasks: string[] = successfulPatterns.ai_accepted || [];
+      planData.tasks.forEach(task => {
+        if (!aiAcceptedTasks.includes(task.title) && aiAcceptedTasks.length < 50) {
+          aiAcceptedTasks.push(task.title);
+        }
+      });
+      successfulPatterns.ai_accepted = aiAcceptedTasks;
+      
+      // Track energy + day shape combos that worked
+      const planKey = `${planData.energyLevel}_${planData.dayShape}`;
+      const planCounts: Record<string, number> = successfulPatterns.plan_types || {};
+      planCounts[planKey] = (planCounts[planKey] || 0) + 1;
+      successfulPatterns.plan_types = planCounts;
+      
+      // Update day-of-week task count averages
+      const dayKey = String(planData.dayOfWeek);
+      if (!dayPatterns[dayKey]) {
+        dayPatterns[dayKey] = { peakHours: [], completionCount: 0, planCount: 0, avgTaskCount: 0 };
+      }
+      const prevPlanCount = dayPatterns[dayKey].planCount || 0;
+      const prevAvgTaskCount = dayPatterns[dayKey].avgTaskCount || 0;
+      dayPatterns[dayKey].planCount = prevPlanCount + 1;
+      dayPatterns[dayKey].avgTaskCount = 
+        (prevAvgTaskCount * prevPlanCount + planData.taskCount) / (prevPlanCount + 1);
+      
+      // Track plan generation hours
+      const planGenHours: number[] = dayPatterns[dayKey].planGenerationHours || [];
+      if (!planGenHours.includes(planData.hour)) {
+        planGenHours.push(planData.hour);
+        dayPatterns[dayKey].planGenerationHours = planGenHours.slice(-5);
+      }
     }
 
     // Re-analyze patterns if we have enough data
@@ -345,6 +411,7 @@ serve(async (req) => {
         task_completion_times: currentCompletions,
         scheduling_patterns: currentPatterns,
         day_of_week_patterns: dayPatterns,
+        successful_patterns: successfulPatterns,
         inferred_work_style: style,
         work_style_confidence: confidence,
         updated_at: new Date().toISOString(),

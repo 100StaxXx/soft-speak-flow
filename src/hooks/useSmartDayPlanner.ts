@@ -622,6 +622,29 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
         tasks_generated: generatedPlan.tasks.length,
       }]);
 
+      // Send learning feedback - track which tasks were accepted
+      supabase.functions.invoke('analyze-user-patterns', {
+        body: {
+          type: 'plan_saved',
+          data: {
+            energyLevel: context.energyLevel,
+            dayShape: generatedPlan.dayShape,
+            taskCount: generatedPlan.tasks.length,
+            tasks: generatedPlan.tasks.map(t => ({
+              title: t.title,
+              category: t.category,
+              priority: t.priority,
+              scheduledTime: t.scheduledTime,
+            })),
+            hour: new Date().getHours(),
+            dayOfWeek: new Date().getDay(),
+          },
+        },
+      }).catch(err => {
+        // Don't block on learning - just log
+        console.warn('Failed to send plan learning feedback:', err);
+      });
+
       success();
       toast.success('Day planned! May your quests be legendary ⚔️');
       return true;
