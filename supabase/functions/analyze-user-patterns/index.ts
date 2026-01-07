@@ -27,6 +27,7 @@ interface TaskCompletionData {
   dayOfWeek: number;
   wasOnTime: boolean | null;
   category?: string;
+  taskText?: string;
 }
 
 interface ScheduleModificationData {
@@ -40,6 +41,8 @@ interface TaskCreationData {
   difficulty: string;
   createdAt: string;
   hour: number;
+  taskText?: string;
+  category?: string;
 }
 
 interface MentorChatSignal {
@@ -281,6 +284,8 @@ serve(async (req) => {
       }
     } else if (type === 'task_creation') {
       const creation = data as TaskCreationData;
+      console.log(`[analyze-user-patterns] Task creation - text: "${creation.taskText?.substring(0, 30)}..." category: ${creation.category}, difficulty: ${creation.difficulty}`);
+      
       // Learn from when users manually schedule tasks
       if (creation.scheduledTime) {
         const hour = parseInt(creation.scheduledTime.split(':')[0]);
@@ -288,6 +293,29 @@ serve(async (req) => {
         if (!commonTimes.includes(hour)) {
           currentPatterns.commonStartTimes = [...commonTimes, hour].slice(-5);
         }
+      }
+      
+      // Track task text patterns from creation (what tasks user manually creates)
+      if (creation.taskText) {
+        const recurringTasks: string[] = successfulPatterns.recurring_tasks || [];
+        // Check for similar existing tasks to avoid duplicates
+        const normalizedNew = creation.taskText.toLowerCase().trim();
+        const alreadyExists = recurringTasks.some(existing => 
+          existing.toLowerCase().includes(normalizedNew.substring(0, 15)) ||
+          normalizedNew.includes(existing.toLowerCase().substring(0, 15))
+        );
+        
+        if (!alreadyExists && recurringTasks.length < 30) {
+          recurringTasks.push(creation.taskText);
+          successfulPatterns.recurring_tasks = recurringTasks;
+          console.log(`[analyze-user-patterns] Added recurring task. Total: ${recurringTasks.length}`);
+        }
+        
+        // Track category + difficulty combos
+        const comboKey = `${creation.category || 'uncategorized'}_${creation.difficulty}`;
+        const comboCounts: Record<string, number> = successfulPatterns.category_difficulty || {};
+        comboCounts[comboKey] = (comboCounts[comboKey] || 0) + 1;
+        successfulPatterns.category_difficulty = comboCounts;
       }
     } else if (type === 'mentor_chat_signal') {
       // Learn from mentor chat interactions

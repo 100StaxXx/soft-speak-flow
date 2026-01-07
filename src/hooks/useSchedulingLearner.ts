@@ -11,6 +11,7 @@ interface TaskCompletionData {
   dayOfWeek: number;
   wasOnTime: boolean | null;
   category?: string;
+  taskText?: string;
 }
 
 interface ScheduleModificationData {
@@ -24,6 +25,8 @@ interface TaskCreationData {
   difficulty: string;
   createdAt: string;
   hour: number;
+  taskText?: string;
+  category?: string;
 }
 
 export function useSchedulingLearner() {
@@ -71,7 +74,8 @@ export function useSchedulingLearner() {
   const trackTaskCreation = useCallback(async (
     scheduledTime: string | null,
     difficulty: string,
-    category?: string
+    category?: string,
+    taskText?: string
   ) => {
     if (!user) return;
 
@@ -81,6 +85,8 @@ export function useSchedulingLearner() {
         difficulty,
         createdAt: new Date().toISOString(),
         hour: new Date().getHours(),
+        taskText,
+        category,
       };
       await supabase.functions.invoke('analyze-user-patterns', {
         body: { type: 'task_creation', data },
