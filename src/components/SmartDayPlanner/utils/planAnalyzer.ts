@@ -1,5 +1,14 @@
 import { GeneratedTask } from '@/hooks/useSmartDayPlanner';
 
+export interface TimeConflict {
+  taskAId: string;
+  taskBId: string;
+  taskATitle: string;
+  taskBTitle: string;
+  overlapMinutes: number;
+  suggestedFix: string;
+}
+
 export interface PlanAnalysis {
   hasWorkout: boolean;
   hasLunchBreak: boolean;
@@ -10,6 +19,8 @@ export interface PlanAnalysis {
   totalTasks: number;
   averageGapMinutes: number;
   highPriorityCount: number;
+  conflicts: TimeConflict[];
+  hasConflicts: boolean;
 }
 
 export interface SmartAdjustment {
@@ -47,6 +58,49 @@ function calculateAverageGap(tasks: GeneratedTask[]): number {
   return gapCount > 0 ? totalGap / gapCount : 60;
 }
 
+export function detectTimeConflicts(tasks: GeneratedTask[]): TimeConflict[] {
+  if (tasks.length < 2) return [];
+  
+  const sortedTasks = [...tasks].sort((a, b) => 
+    parseTimeToMinutes(a.scheduledTime) - parseTimeToMinutes(b.scheduledTime)
+  );
+  
+  const conflicts: TimeConflict[] = [];
+  
+  for (let i = 0; i < sortedTasks.length - 1; i++) {
+    const taskA = sortedTasks[i];
+    const taskB = sortedTasks[i + 1];
+    
+    const endOfA = parseTimeToMinutes(taskA.scheduledTime) + taskA.estimatedDuration;
+    const startOfB = parseTimeToMinutes(taskB.scheduledTime);
+    
+    if (endOfA > startOfB) {
+      const overlapMinutes = endOfA - startOfB;
+      conflicts.push({
+        taskAId: taskA.id,
+        taskBId: taskB.id,
+        taskATitle: taskA.title,
+        taskBTitle: taskB.title,
+        overlapMinutes,
+        suggestedFix: overlapMinutes < 30 
+          ? `Push "${taskB.title}" back by ${overlapMinutes} minutes`
+          : `Shorten "${taskA.title}" or reschedule "${taskB.title}"`,
+      });
+    }
+  }
+  
+  return conflicts;
+}
+
+export function getConflictingTaskIds(conflicts: TimeConflict[]): Set<string> {
+  const ids = new Set<string>();
+  conflicts.forEach(c => {
+    ids.add(c.taskAId);
+    ids.add(c.taskBId);
+  });
+  return ids;
+}
+
 export function analyzePlan(tasks: GeneratedTask[]): PlanAnalysis {
   const hasWorkout = tasks.some(t => 
     t.blockType === 'health' || 
@@ -76,6 +130,7 @@ export function analyzePlan(tasks: GeneratedTask[]): PlanAnalysis {
   
   const highPriorityCount = tasks.filter(t => t.priority === 'high').length;
   const averageGapMinutes = calculateAverageGap(tasks);
+  const conflicts = detectTimeConflicts(tasks);
   
   return {
     hasWorkout,
@@ -87,6 +142,8 @@ export function analyzePlan(tasks: GeneratedTask[]): PlanAnalysis {
     totalTasks: tasks.length,
     averageGapMinutes,
     highPriorityCount,
+    conflicts,
+    hasConflicts: conflicts.length > 0,
   };
 }
 
@@ -96,7 +153,16 @@ export function getSmartAdjustments(
 ): SmartAdjustment[] {
   const suggestions: SmartAdjustment[] = [];
   
-  // High priority suggestions first
+  // High priority suggestions first - conflicts are most critical
+  if (analysis.hasConflicts) {
+    suggestions.push({
+      label: 'Fix conflicts',
+      prompt: 'Fix all time conflicts - adjust task times so nothing overlaps. Maintain task order but add gaps between overlapping tasks.',
+      priority: 'high',
+      icon: '⚠️'
+    });
+  }
+  
   if (analysis.isOverloaded) {
     suggestions.push({
       label: 'Lighten load',

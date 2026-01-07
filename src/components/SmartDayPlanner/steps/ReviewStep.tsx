@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EditableTaskCard } from '../components/EditableTaskCard';
-import { analyzePlan, getSmartAdjustments } from '../utils/planAnalyzer';
+import { analyzePlan, getSmartAdjustments, getConflictingTaskIds, TimeConflict } from '../utils/planAnalyzer';
 import { DraggableTaskList, DragHandleProps } from '@/components/DraggableTaskList';
+import { ConflictBanner } from '../components/ConflictBanner';
 
 interface ReviewStepProps {
   generatedPlan: GeneratedPlan | null;
@@ -56,6 +57,20 @@ export function ReviewStep({
     planAnalysis ? getSmartAdjustments(planAnalysis, hasContacts) : [],
     [planAnalysis, hasContacts]
   );
+
+  const conflicts = planAnalysis?.conflicts ?? [];
+  const conflictingTaskIds = useMemo(() => getConflictingTaskIds(conflicts), [conflicts]);
+
+  const getConflictDetailsForTask = (taskId: string): string | undefined => {
+    const conflict = conflicts.find(c => c.taskAId === taskId || c.taskBId === taskId);
+    if (!conflict) return undefined;
+    const otherTask = conflict.taskAId === taskId ? conflict.taskBTitle : conflict.taskATitle;
+    return `Overlaps with "${otherTask}" by ${conflict.overlapMinutes}m`;
+  };
+
+  const handleAutoFixConflicts = () => {
+    onAdjust('Fix all time conflicts - adjust task times so nothing overlaps. Maintain task order but add gaps between overlapping tasks.');
+  };
 
   const handleQuickAdjust = (prompt: string) => {
     onAdjust(prompt);
@@ -138,6 +153,15 @@ export function ReviewStep({
         </div>
       </div>
 
+      {/* Conflict Banner */}
+      {conflicts.length > 0 && (
+        <ConflictBanner
+          conflicts={conflicts}
+          onAutoFix={handleAutoFixConflicts}
+          isFixing={isAdjusting}
+        />
+      )}
+
       {/* Insights */}
       {generatedPlan.insights.length > 0 && !isEditMode && (
         <div className="space-y-1">
@@ -171,6 +195,8 @@ export function ReviewStep({
                 onUpdate={handleUpdateTask}
                 onRemove={handleRemoveTask}
                 dragHandleProps={dragProps}
+                hasConflict={conflictingTaskIds.has(task.id)}
+                conflictDetails={getConflictDetailsForTask(task.id)}
               />
             )}
           />
@@ -183,6 +209,8 @@ export function ReviewStep({
               isEditMode={isEditMode}
               onUpdate={handleUpdateTask}
               onRemove={handleRemoveTask}
+              hasConflict={conflictingTaskIds.has(task.id)}
+              conflictDetails={getConflictDetailsForTask(task.id)}
             />
           ))
         )}
