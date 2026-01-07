@@ -43,6 +43,7 @@ export interface ExistingTask {
 }
 
 export interface GeneratedTask {
+  id: string; // Temp ID for drag reordering
   title: string;
   scheduledTime: string;
   estimatedDuration: number;
@@ -494,8 +495,14 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
       if (funcError) throw funcError;
 
+      // Assign temp IDs for drag reordering
+      const tasksWithIds = (data.tasks || []).map((task: Omit<GeneratedTask, 'id'>, i: number) => ({
+        ...task,
+        id: `temp-${i}-${Date.now()}`,
+      }));
+
       const plan: GeneratedPlan = {
-        tasks: data.tasks || [],
+        tasks: tasksWithIds,
         insights: data.insights || [],
         totalHours: data.totalHours || 0,
         balanceScore: data.balanceScore || 0,
@@ -547,8 +554,14 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
       if (funcError) throw funcError;
 
+      // Assign temp IDs for drag reordering
+      const tasksWithIds = (data.tasks || []).map((task: Omit<GeneratedTask, 'id'>, i: number) => ({
+        ...task,
+        id: `temp-${i}-${Date.now()}`,
+      }));
+
       const plan: GeneratedPlan = {
-        tasks: data.tasks || [],
+        tasks: tasksWithIds,
         insights: data.insights || [],
         totalHours: data.totalHours || 0,
         balanceScore: data.balanceScore || 0,
@@ -651,6 +664,16 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     });
   }, []);
 
+  const reorderTasksInPlan = useCallback((reorderedTasks: GeneratedTask[]) => {
+    setGeneratedPlan(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tasks: reorderedTasks,
+      };
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setStep('quick_start');
     setContext(DEFAULT_CONTEXT);
@@ -687,6 +710,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
     applyDefaults,
     updateTaskInPlan,
     removeTaskFromPlan,
+    reorderTasksInPlan,
     
     // State flags
     isLoadingPreferences,
