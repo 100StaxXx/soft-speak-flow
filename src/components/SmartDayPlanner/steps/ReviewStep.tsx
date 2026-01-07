@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { EditableTaskCard } from '../components/EditableTaskCard';
 import { analyzePlan, getSmartAdjustments } from '../utils/planAnalyzer';
+import { DraggableTaskList, DragHandleProps } from '@/components/DraggableTaskList';
 
 interface ReviewStepProps {
   generatedPlan: GeneratedPlan | null;
@@ -28,6 +29,7 @@ interface ReviewStepProps {
   hasContacts?: boolean;
   onUpdateTask?: (index: number, updates: Partial<GeneratedTask>) => void;
   onRemoveTask?: (index: number) => void;
+  onReorderTasks?: (tasks: GeneratedTask[]) => void;
 }
 
 export function ReviewStep({ 
@@ -39,6 +41,7 @@ export function ReviewStep({
   hasContacts = false,
   onUpdateTask,
   onRemoveTask,
+  onReorderTasks,
 }: ReviewStepProps) {
   const [adjustmentInput, setAdjustmentInput] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -153,18 +156,36 @@ export function ReviewStep({
         </div>
       )}
 
-      {/* Task list - editable or static */}
+      {/* Task list - draggable in edit mode */}
       <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-        {generatedPlan.tasks.map((task, index) => (
-          <EditableTaskCard
-            key={index}
-            task={task}
-            index={index}
-            isEditMode={isEditMode}
-            onUpdate={handleUpdateTask}
-            onRemove={handleRemoveTask}
+        {isEditMode && onReorderTasks ? (
+          <DraggableTaskList
+            tasks={generatedPlan.tasks}
+            onReorder={onReorderTasks}
+            renderItem={(task, dragProps) => (
+              <EditableTaskCard
+                key={task.id}
+                task={task}
+                index={generatedPlan.tasks.findIndex(t => t.id === task.id)}
+                isEditMode={isEditMode}
+                onUpdate={handleUpdateTask}
+                onRemove={handleRemoveTask}
+                dragHandleProps={dragProps}
+              />
+            )}
           />
-        ))}
+        ) : (
+          generatedPlan.tasks.map((task, index) => (
+            <EditableTaskCard
+              key={task.id || index}
+              task={task}
+              index={index}
+              isEditMode={isEditMode}
+              onUpdate={handleUpdateTask}
+              onRemove={handleRemoveTask}
+            />
+          ))
+        )}
       </div>
 
       {/* Context-aware quick adjustments */}

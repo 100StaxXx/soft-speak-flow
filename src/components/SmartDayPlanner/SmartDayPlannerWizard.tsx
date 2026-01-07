@@ -176,6 +176,7 @@ export function SmartDayPlannerWizard({
                   hasContacts={planner.contactsNeedingAttention.length > 0}
                   onUpdateTask={planner.updateTaskInPlan}
                   onRemoveTask={planner.removeTaskFromPlan}
+                  onReorderTasks={planner.reorderTasksInPlan}
                 />
               )}
             </motion.div>

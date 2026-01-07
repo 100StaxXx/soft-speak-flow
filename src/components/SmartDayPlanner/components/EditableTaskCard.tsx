@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GeneratedTask } from '@/hooks/useSmartDayPlanner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DragHandleProps } from '@/components/DraggableTaskList';
 
 interface EditableTaskCardProps {
   task: GeneratedTask;
@@ -20,8 +21,7 @@ interface EditableTaskCardProps {
   isEditMode: boolean;
   onUpdate: (index: number, updates: Partial<GeneratedTask>) => void;
   onRemove: (index: number) => void;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
+  dragHandleProps?: DragHandleProps;
 }
 
 export function EditableTaskCard({ 
@@ -30,14 +30,12 @@ export function EditableTaskCard({
   isEditMode,
   onUpdate, 
   onRemove,
-  onDragStart,
-  onDragEnd,
+  dragHandleProps,
 }: EditableTaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
   const [editedTime, setEditedTime] = useState(task.scheduledTime);
   const [editedDuration, setEditedDuration] = useState(task.estimatedDuration.toString());
-  const [swipeX, setSwipeX] = useState(0);
 
   const priorityColors = {
     high: 'border-l-red-500',
@@ -61,20 +59,7 @@ export function EditableTaskCard({
     setIsEditing(false);
   };
 
-  const handleDrag = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    // Only allow left swipe to reveal delete
-    if (info.offset.x < 0) {
-      setSwipeX(Math.max(info.offset.x, -80));
-    }
-  };
-
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.x < -40) {
-      setSwipeX(-80);
-    } else {
-      setSwipeX(0);
-    }
-  };
+  const isDragging = dragHandleProps?.isDragging ?? false;
 
   if (isEditing) {
     return (
@@ -126,81 +111,69 @@ export function EditableTaskCard({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-lg">
-      {/* Delete button revealed on swipe */}
-      <AnimatePresence>
-        {swipeX < -20 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute right-0 top-0 bottom-0 w-20 flex items-center justify-center bg-destructive rounded-r-lg"
-          >
-            <button 
-              onClick={() => onRemove(index)}
-              className="p-2 text-destructive-foreground"
-            >
-              <Trash2 className="h-5 w-5" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: swipeX }}
-        transition={{ delay: index * 0.03 }}
-        drag={isEditMode ? "x" : false}
-        dragConstraints={{ left: -80, right: 0 }}
-        dragElastic={0.1}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
-        className={cn(
-          "p-3 rounded-lg bg-card border border-border/50 border-l-4",
-          priorityColors[task.priority],
-          isEditMode && "cursor-grab active:cursor-grabbing"
-        )}
-      >
-        <div className="flex items-start justify-between gap-2">
-          {isEditMode && (
-            <div className="flex items-center gap-1 mr-1">
-              <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-            </div>
-          )}
-          
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {task.scheduledTime}
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                {task.estimatedDuration}m
-              </span>
-              {task.category && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {task.category}
-                </span>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1">
-            {task.isAnchor && (
-              <Flame className="h-4 w-4 text-orange-500 flex-shrink-0" />
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className={cn(
+        "p-3 rounded-lg bg-card border border-border/50 border-l-4",
+        priorityColors[task.priority],
+        isDragging && "shadow-lg scale-[1.02]"
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        {isEditMode && (
+          <div 
+            ref={dragHandleProps?.dragHandleRef}
+            className={cn(
+              "flex items-center gap-1 mr-1 touch-none cursor-grab active:cursor-grabbing",
+              dragHandleProps?.isActivated && "scale-110"
             )}
-            {isEditMode && (
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+          </div>
+        )}
+        
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {task.scheduledTime}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {task.estimatedDuration}m
+            </span>
+            {task.category && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {task.category}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          {task.isAnchor && (
+            <Flame className="h-4 w-4 text-orange-500 flex-shrink-0" />
+          )}
+          {isEditMode && (
+            <>
               <button
                 onClick={() => setIsEditing(true)}
                 className="p-1.5 rounded-md hover:bg-muted transition-colors"
               >
                 <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
               </button>
-            )}
-          </div>
+              <button
+                onClick={() => onRemove(index)}
+                className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </button>
+            </>
+          )}
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }
