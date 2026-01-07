@@ -235,8 +235,24 @@ serve(async (req) => {
     if (type === 'task_completion') {
       const completion = data as TaskCompletionData;
       
-      console.log(`[analyze-user-patterns] task_completion received:`, {
-        taskText: completion.taskText?.substring(0, 30),
+      console.log(`[analyze-user-patterns] RECEIVED RAW DATA:`, JSON.stringify(data));
+      console.log(`[analyze-user-patterns] taskText present:`, !!completion.taskText);
+      
+      // Fallback: if taskText missing, fetch from database
+      let taskText = completion.taskText;
+      if (!taskText && completion.taskId) {
+        console.log(`[analyze-user-patterns] taskText missing, fetching from DB for taskId: ${completion.taskId}`);
+        const { data: taskData } = await supabase
+          .from('daily_tasks')
+          .select('task_text')
+          .eq('id', completion.taskId)
+          .single();
+        taskText = taskData?.task_text;
+        console.log(`[analyze-user-patterns] Fetched taskText from DB: "${taskText?.substring(0, 30)}"`);
+      }
+      
+      console.log(`[analyze-user-patterns] task_completion processing:`, {
+        taskText: taskText?.substring(0, 30),
         category: completion.category,
         difficulty: completion.difficulty,
         hour: completion.actualCompletionHour,
@@ -260,13 +276,13 @@ serve(async (req) => {
       }
       
       // Track task text patterns for learning what tasks user creates
-      if (completion.taskText) {
-        console.log(`[analyze-user-patterns] Processing taskText: "${completion.taskText.substring(0, 30)}..."`);
+      if (taskText) {
+        console.log(`[analyze-user-patterns] Processing taskText: "${taskText.substring(0, 30)}..."`);
         
         // Track recurring task texts (for replication)
         const recurringTasks: string[] = successfulPatterns.recurring_tasks || [];
-        if (!recurringTasks.includes(completion.taskText) && recurringTasks.length < 30) {
-          recurringTasks.push(completion.taskText);
+        if (!recurringTasks.includes(taskText) && recurringTasks.length < 30) {
+          recurringTasks.push(taskText);
           successfulPatterns.recurring_tasks = recurringTasks;
           console.log(`[analyze-user-patterns] Added to recurring_tasks. Total: ${recurringTasks.length}`);
         }
@@ -280,7 +296,7 @@ serve(async (req) => {
         // Track total completions
         successfulPatterns.total_completions = (successfulPatterns.total_completions || 0) + 1;
       } else {
-        console.log(`[analyze-user-patterns] No taskText provided in completion data`);
+        console.log(`[analyze-user-patterns] No taskText available (neither from payload nor DB)`);
       }
     } else if (type === 'schedule_modification') {
       const mod = data as ScheduleModificationData;
