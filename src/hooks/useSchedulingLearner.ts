@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 
 interface TaskCompletionData {
   taskId: string;
@@ -30,18 +29,20 @@ interface TaskCreationData {
 }
 
 export function useSchedulingLearner() {
-  const { user } = useAuth();
-
   /**
    * Track when a task is completed - learns completion time patterns
    */
   const trackTaskCompletion = useCallback(async (data: TaskCompletionData) => {
-    if (!user) {
+    // Get fresh auth state to avoid stale closure issues
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    
+    if (!currentUser) {
       console.log('[SchedulingLearner] No user - skipping completion tracking');
       return;
     }
 
-    console.log('[SchedulingLearner] Tracking completion:', {
+    console.log('[SchedulingLearner] Tracking completion for user:', currentUser.id);
+    console.log('[SchedulingLearner] Data:', {
       taskText: data.taskText?.substring(0, 30),
       category: data.category,
       difficulty: data.difficulty,
@@ -60,7 +61,7 @@ export function useSchedulingLearner() {
     } catch (error) {
       console.error('[SchedulingLearner] Error tracking completion:', error);
     }
-  }, [user]);
+  }, []);
 
   /**
    * Track when user modifies a suggested time - learns preference corrections
@@ -70,7 +71,8 @@ export function useSchedulingLearner() {
     actualTime: string,
     taskDifficulty: string
   ) => {
-    if (!user) return;
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) return;
 
     try {
       const data: ScheduleModificationData = { suggestedTime, actualTime, taskDifficulty };
@@ -80,7 +82,7 @@ export function useSchedulingLearner() {
     } catch (error) {
       console.error('[useSchedulingLearner] Error tracking modification:', error);
     }
-  }, [user]);
+  }, []);
 
   /**
    * Track when user creates a task with a specific time - learns scheduling preferences
@@ -91,7 +93,9 @@ export function useSchedulingLearner() {
     category?: string,
     taskText?: string
   ) => {
-    if (!user) {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    
+    if (!currentUser) {
       console.log('[SchedulingLearner] No user - skipping creation tracking');
       return;
     }
@@ -123,7 +127,7 @@ export function useSchedulingLearner() {
     } catch (error) {
       console.error('[SchedulingLearner] Error tracking creation:', error);
     }
-  }, [user]);
+  }, []);
 
   return {
     trackTaskCompletion,
