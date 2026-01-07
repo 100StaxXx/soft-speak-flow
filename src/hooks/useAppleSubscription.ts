@@ -93,7 +93,10 @@ export function useAppleSubscription() {
         return false;
       }
 
+      console.log('[HOOK DEBUG] Checking productId:', productId);
+      console.log('[HOOK DEBUG] Available identifiers:', availableProducts.map(p => p.identifier));
       const productExists = availableProducts.some((product) => product.identifier === productId);
+      console.log('[HOOK DEBUG] productExists result:', productExists);
       if (!productExists) {
         toast({
           title: "Unavailable",
