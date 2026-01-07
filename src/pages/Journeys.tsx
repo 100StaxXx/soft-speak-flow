@@ -329,10 +329,9 @@ const Journeys = () => {
     moveTaskToDate({ taskId, targetDate: targetDateStr });
   }, [moveTaskToDate]);
 
-  // Handle date pill click - open hourly modal
+  // Handle date pill click - just navigate to that day
   const handleDatePillClick = useCallback((date: Date) => {
     setSelectedDate(date);
-    setShowHourlyModal(true);
   }, []);
 
   // Format tasks for HourlyViewModal (CalendarTask format)
