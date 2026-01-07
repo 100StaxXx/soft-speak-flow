@@ -78,6 +78,7 @@ const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 const Recaps = lazy(() => import("./pages/Recaps"));
 const Community = lazy(() => import("./pages/Community"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const TestDayPlanner = lazy(() => import("./pages/TestDayPlanner"));
 const TestScroll = lazy(() => import("./pages/TestScroll"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const IAPTest = lazy(() => import("./pages/IAPTest"));
@@ -277,6 +278,7 @@ const AppContent = memo(() => {
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/test-scroll" element={<TestScroll />} />
+                  <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
                   </Routes>
                 </AnimatePresence>

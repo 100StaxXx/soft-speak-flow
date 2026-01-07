@@ -95,7 +95,7 @@ serve(async (req) => {
     if (protectedHabitIds.length > 0) {
       const { data } = await supabaseClient
         .from("habits")
-        .select("id, name, preferred_time, category, streak")
+        .select("id, title, preferred_time, category, current_streak")
         .in("id", protectedHabitIds);
       protectedHabits = data || [];
     }
@@ -323,7 +323,7 @@ function buildSystemPrompt(context: {
 
   if (protectedHabits.length > 0) {
     prompt += `\n## Protected Habits (MUST include, preserve streaks!)
-${protectedHabits.map((h) => `- ${h.name} (${h.streak} day streak${h.preferred_time ? `, usually at ${h.preferred_time}` : ""})`).join("\n")}
+${protectedHabits.map((h) => `- ${h.title} (${h.current_streak || 0} day streak${h.preferred_time ? `, usually at ${h.preferred_time}` : ""})`).join("\n")}
 `;
   }
 
