@@ -671,6 +671,22 @@ All colors MUST be HSL.
     padding-top: calc(2.5rem + env(safe-area-inset-top, 0px));
   }
 
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pl-safe-left {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .pr-safe-right {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
   /* Better touch targets for iOS inputs */
   input, textarea, select {
     touch-action: manipulation;
