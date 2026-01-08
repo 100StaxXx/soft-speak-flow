@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { useTimeColors, StarColor } from "@/hooks/useTimeColors";
+import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
 
 interface Star {
   id: number;
@@ -82,6 +83,47 @@ export const StarfieldBackground = memo(() => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { gamma, beta, permitted } = useDeviceOrientation();
   const { period, colors, rotationHue, starDistribution, getStarHSL, getStarGlow } = useTimeColors();
+  const { presence: companionPresence } = useCompanionPresence();
+  
+  // Companion mood-based visual modifiers
+  const moodModifiers = useMemo(() => {
+    const { mood, auraHue, overallCare } = companionPresence;
+    
+    // Hue shift: warm when joyful, cool when sad, none when dormant
+    let hueShift = 0;
+    let saturationMod = 0;
+    let twinkleReduction = 0;
+    
+    switch (mood) {
+      case 'joyful':
+        hueShift = 10; // Slight warm tint
+        saturationMod = 0.1;
+        break;
+      case 'content':
+        hueShift = 5;
+        saturationMod = 0.05;
+        break;
+      case 'neutral':
+        hueShift = 0;
+        saturationMod = 0;
+        break;
+      case 'reserved':
+        hueShift = -5;
+        saturationMod = -0.1;
+        break;
+      case 'quiet':
+        hueShift = -10;
+        saturationMod = -0.2;
+        break;
+      case 'dormant':
+        hueShift = 0;
+        saturationMod = -0.4;
+        twinkleReduction = 0.5; // 50% fewer twinkling stars
+        break;
+    }
+    
+    return { hueShift, saturationMod, twinkleReduction, auraHue, overallCare };
+  }, [companionPresence]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -155,8 +197,8 @@ export const StarfieldBackground = memo(() => {
     return gradients[period];
   }, [period]);
 
-  // Small hue shift for variety
-  const hueShift = rotationHue * 0.1;
+  // Small hue shift for variety + companion mood influence
+  const hueShift = rotationHue * 0.1 + moodModifiers.hueShift;
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">

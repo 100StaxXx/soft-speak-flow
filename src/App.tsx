@@ -12,6 +12,7 @@ import { TimeProvider } from "@/contexts/TimeContext";
 import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { CelebrationProvider } from "@/contexts/CelebrationContext";
+import { CompanionPresenceProvider } from "@/contexts/CompanionPresenceContext";
 import { useProfile } from "@/hooks/useProfile";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +24,8 @@ import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
+import { CompanionAmbientParticles } from "@/components/companion/CompanionAmbientParticles";
+import { CompanionMoodOverlay } from "@/components/companion/CompanionMoodOverlay";
 
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
@@ -229,7 +232,12 @@ const AppContent = memo(() => {
       <ViewModeProvider>
         <XPProvider>
           <WeeklyRecapProvider>
-            {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
+            <CompanionPresenceProvider>
+              {/* Global companion presence layers */}
+              <CompanionMoodOverlay />
+              <CompanionAmbientParticles />
+              
+              {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
               <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
                 <AnimatePresence mode="sync">
@@ -283,7 +291,8 @@ const AppContent = memo(() => {
                   </Routes>
                 </AnimatePresence>
               </Suspense>
-            {/* HIDDEN: AstralEncounterProvider closing tag removed */}
+              {/* HIDDEN: AstralEncounterProvider closing tag removed */}
+            </CompanionPresenceProvider>
           </WeeklyRecapProvider>
         </XPProvider>
       </ViewModeProvider>
