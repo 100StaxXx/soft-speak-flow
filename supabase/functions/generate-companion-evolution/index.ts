@@ -576,9 +576,14 @@ Be extremely specific and detailed. This will be used to maintain 95% continuity
    - Divine enhancements unlimited: Halos, crowns, armor, cosmiq appendages, energy constructs
    - Reality-bending features: Spacetime distortions, dimensional rifts, universe-birthing energy
    - CRITICAL ANATOMY RULE: SINGLE HEAD ONLY - even at god-tier, never generate multiple heads or extra faces. One head, one face.
-   - Soul of ${companion.spirit_animal} maintained: Core identity recognizable in the chaos
-   - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
+         - Soul of ${companion.spirit_animal} maintained: Core identity recognizable in the chaos
+         - GRANDIOSE MANDATE: Push boundaries - this is a living god, force of nature, legend incarnate`;
       }
+      
+      // Get evolution path modifiers for visual styling
+      const evolutionPath = companion.evolution_path;
+      const pathModifiers = getEvolutionPathModifiers(evolutionPath);
+      const hasPathModifiers = pathModifiers.visualStyle.length > 0;
       
       userPrompt = `STYLIZED FANTASY EVOLUTION - Stage ${currentStage} to ${nextStage}:
 
@@ -592,6 +597,16 @@ THESE ARE ABSOLUTE UNCHANGEABLE FACTS ABOUT THIS CREATURE:
 - Elemental Affinity: ${companion.core_element}
 ${companion.eye_color ? `- Eye Color: ${companion.eye_color} (exact match required)` : ''}
 ${companion.fur_color ? `- Fur/Scale/Feather Color: ${companion.fur_color} (exact match required)` : ''}${aquaticNote}
+
+=== EVOLUTION PATH: ${evolutionPath ? evolutionPath.toUpperCase().replace('_', ' ') : 'UNDETERMINED'} ===
+${hasPathModifiers ? `This companion's care patterns have shaped their evolution path.
+
+${pathModifiers.visualStyle}
+
+PATH-SPECIFIC AURA: ${pathModifiers.auraDescription}
+PERSONALITY EXPRESSION: ${pathModifiers.personalityExpression}
+COLOR INFLUENCE: ${pathModifiers.colorModifier}
+` : 'Evolution path not yet determined - use neutral evolution style.'}
 
 === EVOLUTION STAGE CONTEXT ===
 - Previous Stage: ${currentStage}
@@ -607,6 +622,7 @@ ${speciesRequirements}
    - Same color placement and distribution patterns
    - Same hue, saturation relationships
    - Only allow subtle increases in luminosity/glow intensity
+   ${hasPathModifiers ? `- PATH INFLUENCE: ${pathModifiers.colorModifier}` : ''}
 
 3. FACIAL FEATURES (100% PRESERVATION):
    - EXACT same eye color (${companion.eye_color || companion.favorite_color})
@@ -614,6 +630,7 @@ ${speciesRequirements}
    - Same iris patterns and pupil shape
    - Same facial markings and patterns
    - Same expression capability and character
+   ${hasPathModifiers ? `- Expression should reflect: ${pathModifiers.personalityExpression}` : ''}
 
 4. SIGNATURE MARKINGS (100% MATCH):
    - Every stripe, spot, pattern MUST be in exact same location
@@ -626,6 +643,7 @@ ${speciesRequirements}
    - Same elemental manifestation style (aura/wisps/glow/particles)
    - Enhanced intensity and detail but same placement
    - Energy follows same anatomical contours
+   ${hasPathModifiers ? `- PATH AURA OVERLAY: ${pathModifiers.auraDescription}` : ''}
 
 6. SIGNATURE FEATURES:
    - Same horns/antlers (if present) - location and base shape unchanged
@@ -852,4 +870,83 @@ function getStageGuidance(stage: number): string {
   };
 
   return guidance[stage] || "Continued evolution with enhanced power and presence";
+}
+
+// Evolution Path visual modifiers - these shape HOW the companion evolves visually
+function getEvolutionPathModifiers(path: string | null): { 
+  visualStyle: string; 
+  auraDescription: string; 
+  personalityExpression: string;
+  colorModifier: string;
+} {
+  switch (path) {
+    case 'steady_guardian':
+      return {
+        visualStyle: `GUARDIAN EVOLUTION STYLE:
+- Calm, protective stance with grounded posture
+- Warm, nurturing energy radiating steadily
+- Shield-like aura or protective glow surrounding form
+- Wise, knowing eyes with gentle but unwavering gaze
+- Serene expression showing deep inner peace
+- Soft golden or amber energy accents
+- Stable, symmetrical composition suggesting reliability`,
+        auraDescription: 'warm protective golden glow, shield-like energy barrier, steady unwavering light',
+        personalityExpression: 'calm confidence, protective warmth, wise serenity, patient strength',
+        colorModifier: 'Add warm amber/gold undertones to the existing palette, emphasizing stability and warmth'
+      };
+    
+    case 'volatile_ascendant':
+      return {
+        visualStyle: `ASCENDANT EVOLUTION STYLE:
+- Dynamic, powerful stance crackling with barely contained energy
+- Intense, piercing eyes showing passion and fire
+- Unstable but beautiful energy arcs and lightning effects
+- Dramatic poses suggesting explosive power ready to unleash
+- Sharp, angular energy patterns around the form
+- Purple, electric blue, or storm-colored energy accents
+- Asymmetric composition suggesting unpredictability and raw power`,
+        auraDescription: 'crackling unstable energy, electric arcs, storm clouds, barely contained power bursts',
+        personalityExpression: 'intense passion, fierce determination, volatile power, untamed spirit',
+        colorModifier: 'Add electric purple/storm blue accents suggesting volatile energy and passion'
+      };
+    
+    case 'neglected_wanderer':
+      return {
+        visualStyle: `WANDERER EVOLUTION STYLE:
+- Distant, independent stance with weathered appearance
+- Melancholic but resilient eyes showing survival wisdom
+- Subtle scars or wear marks telling stories of solitude
+- Slightly withdrawn posture suggesting self-reliance
+- Muted, dusty energy effects suggesting long journeys alone
+- Silver, gray, or twilight-colored energy accents
+- Atmospheric composition with sense of vast distance traveled`,
+        auraDescription: 'faded ethereal glow, dust motes, distant starlight, solitary aurora',
+        personalityExpression: 'distant melancholy, quiet resilience, independent strength, survivor wisdom',
+        colorModifier: 'Add weathered silver/twilight tones, slightly desaturated, with distant ethereal quality'
+      };
+    
+    case 'balanced_architect':
+      return {
+        visualStyle: `ARCHITECT EVOLUTION STYLE:
+- Perfect equilibrium stance with harmonious proportions
+- Transcendent, enlightened eyes containing deep wisdom
+- Sacred geometry patterns naturally forming in energy effects
+- Graceful, deliberate pose suggesting mastery over all elements
+- Crystalline or prismatic energy showing perfect balance
+- Rainbow/prismatic or pure white light accents
+- Symmetrical yet dynamic composition suggesting cosmic order`,
+        auraDescription: 'sacred geometry, perfect crystalline patterns, prismatic light, cosmic harmony, mandala formations',
+        personalityExpression: 'transcendent calm, perfect balance, cosmic wisdom, harmonious power',
+        colorModifier: 'Add prismatic/crystalline highlights showing perfect balance of all elements'
+      };
+    
+    default:
+      // No path yet - neutral evolution
+      return {
+        visualStyle: '',
+        auraDescription: '',
+        personalityExpression: '',
+        colorModifier: ''
+      };
+  }
 }
