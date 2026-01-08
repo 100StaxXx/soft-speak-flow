@@ -1,6 +1,5 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
-import { useEvolveLongPress } from "@/hooks/useEvolveLongPress";
 import { useEvolution } from "@/contexts/EvolutionContext";
 
 interface EvolveButtonProps {
@@ -10,11 +9,12 @@ interface EvolveButtonProps {
 
 export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
-  const { progress, isHolding, handlers } = useEvolveLongPress({
-    onComplete: onEvolve,
-    duration: 1500,
-    disabled: isEvolving || isEvolvingLoading,
-  });
+
+  const handleClick = () => {
+    if (!isEvolving && !isEvolvingLoading) {
+      onEvolve();
+    }
+  };
 
   return (
     <motion.div
@@ -25,8 +25,8 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
       className="pt-4"
     >
       <button
-        {...handlers}
-        disabled={isEvolving}
+        onClick={handleClick}
+        disabled={isEvolving || isEvolvingLoading}
         className="
           relative w-full py-5 rounded-xl
           font-heading font-black text-3xl sm:text-4xl tracking-[0.35em]
@@ -34,7 +34,6 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           transition-all duration-300
           hover:scale-[1.02] active:scale-[0.98]
           disabled:cursor-not-allowed disabled:opacity-70
-          touch-none select-none
           border border-white/20
         "
         style={{
@@ -59,9 +58,6 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           animation: "rainbow-slide 3s linear infinite",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          WebkitTouchCallout: "none",
-          WebkitUserSelect: "none",
-          userSelect: "none",
         }}
       >
         {/* Metallic sheen overlay */}
@@ -104,19 +100,6 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
             filter: "blur(8px)",
             transform: "scale(1.02)",
           }}
-        />
-
-        {/* Fill overlay - rises from bottom */}
-        <motion.div
-          className="absolute inset-0 rounded-xl pointer-events-none"
-          style={{
-            background: "linear-gradient(to top, rgba(255,255,255,0.6), rgba(255,255,255,0.2))",
-            clipPath: `inset(${100 - progress}% 0 0 0)`,
-          }}
-          animate={{
-            opacity: isHolding ? 1 : 0,
-          }}
-          transition={{ duration: 0.1 }}
         />
         
         {/* Content */}
