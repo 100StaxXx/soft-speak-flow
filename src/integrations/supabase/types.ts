@@ -1230,6 +1230,7 @@ export type Database = {
           final_evolution_stage: number | null
           final_image_url: string | null
           id: string
+          legacy_traits_passed: Json | null
           memorial_image_url: string | null
           spirit_animal: string
           user_id: string
@@ -1244,6 +1245,7 @@ export type Database = {
           final_evolution_stage?: number | null
           final_image_url?: string | null
           id?: string
+          legacy_traits_passed?: Json | null
           memorial_image_url?: string | null
           spirit_animal: string
           user_id: string
@@ -1258,6 +1260,7 @@ export type Database = {
           final_evolution_stage?: number | null
           final_image_url?: string | null
           id?: string
+          legacy_traits_passed?: Json | null
           memorial_image_url?: string | null
           spirit_animal?: string
           user_id?: string
@@ -6407,6 +6410,7 @@ export type Database = {
           last_energy_update: string | null
           last_interaction_at: string | null
           last_mood_update: string | null
+          legacy_traits: Json | null
           mind: number | null
           neglected_image_url: string | null
           path_determination_date: string | null
@@ -6462,6 +6466,7 @@ export type Database = {
           last_energy_update?: string | null
           last_interaction_at?: string | null
           last_mood_update?: string | null
+          legacy_traits?: Json | null
           mind?: number | null
           neglected_image_url?: string | null
           path_determination_date?: string | null
@@ -6517,6 +6522,7 @@ export type Database = {
           last_energy_update?: string | null
           last_interaction_at?: string | null
           last_mood_update?: string | null
+          legacy_traits?: Json | null
           mind?: number | null
           neglected_image_url?: string | null
           path_determination_date?: string | null
