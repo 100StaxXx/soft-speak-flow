@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { BondProgress } from "./BondProgress";
-import { MemoryTimeline } from "./MemoryTimeline";
+// import { MemoryTimeline } from "./MemoryTimeline"; // Hidden for now - will implement differently later
 import { MemoryWhisper } from "./MemoryWhisper";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 
@@ -20,13 +20,14 @@ export const BondTab = memo(() => {
         </div>
       </ParallaxCard>
       
-      {/* Recent memories */}
+      {/* Hidden for now - will implement differently later
       <ParallaxCard offset={18}>
         <div className="p-4">
           <h3 className="font-heading font-bold text-lg mb-4">Special Memories</h3>
           <MemoryTimeline limit={5} />
         </div>
       </ParallaxCard>
+      */}
     </div>
   );
 });
