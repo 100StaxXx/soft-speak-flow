@@ -24,6 +24,9 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
   const [memoryLine, setMemoryLine] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
+  // Track if we've already shown a memory this mount
+  const hasShownRef = useState(false);
+
   // Try to show a memory on mount if conditions are right
   useEffect(() => {
     // Don't show if companion is dormant or not present
@@ -31,6 +34,9 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
     
     // Don't show if no memories
     if (memories.length === 0) return;
+    
+    // Only run once per mount
+    if (hasShownRef[0]) return;
     
     // Random chance check
     if (Math.random() > chance) return;
@@ -44,12 +50,15 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
           setMemoryLine(dialogue);
           setIsVisible(true);
           referenceMemory(memory.id);
+          hasShownRef[0] = true;
         }
       }
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [memories.length, presence.isPresent, presence.mood, chance, getRandomMemory, getMemoryDialogue, referenceMemory]);
+    // Only depend on stable values to prevent re-triggering
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memories.length, presence.isPresent, presence.mood, chance]);
 
   if (!memoryLine || !isVisible) {
     return null;

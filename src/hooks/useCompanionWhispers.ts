@@ -260,7 +260,8 @@ export function useCompanionWhispers() {
     } else if (care.overallCare < 0.3 && presence.mood !== 'dormant') {
       showWhisper('care_warning', 'low_care');
     }
-  }, [care?.hasDormancyWarning, care?.overallCare, presenceLoading, presence.mood, showWhisper]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [care?.hasDormancyWarning, care?.overallCare, presenceLoading]);
 
   // Time-based trigger (check every 5 minutes)
   useEffect(() => {

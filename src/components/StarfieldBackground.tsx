@@ -122,7 +122,7 @@ export const StarfieldBackground = memo(() => {
         break;
     }
     
-    return { hueShift, saturationMod, twinkleReduction, auraHue, overallCare };
+    return { hueShift, saturationMod, twinkleReduction };
   }, [companionPresence]);
 
   useEffect(() => {

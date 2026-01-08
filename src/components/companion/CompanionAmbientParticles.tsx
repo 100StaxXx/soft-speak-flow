@@ -101,13 +101,13 @@ export const CompanionAmbientParticles = memo(() => {
             transform: translate(0, 0) scale(1);
           }
           25% {
-            transform: translate(${20 + Math.random() * 30}px, ${-30 - Math.random() * 20}px) scale(1.1);
+            transform: translate(30px, -40px) scale(1.1);
           }
           50% {
-            transform: translate(${-10 - Math.random() * 20}px, ${-60 - Math.random() * 40}px) scale(0.9);
+            transform: translate(-20px, -80px) scale(0.9);
           }
           75% {
-            transform: translate(${30 + Math.random() * 20}px, ${-30 - Math.random() * 20}px) scale(1.05);
+            transform: translate(40px, -40px) scale(1.05);
           }
         }
 
