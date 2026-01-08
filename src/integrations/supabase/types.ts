@@ -1048,6 +1048,51 @@ export type Database = {
           },
         ]
       }
+      companion_behavior_log: {
+        Row: {
+          activity_gaps: Json | null
+          behavior_date: string
+          check_ins: number | null
+          completion_velocity: number | null
+          created_at: string | null
+          first_activity_time: string | null
+          habits_completed: number | null
+          id: string
+          is_binge: boolean | null
+          last_activity_time: string | null
+          tasks_completed: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_gaps?: Json | null
+          behavior_date?: string
+          check_ins?: number | null
+          completion_velocity?: number | null
+          created_at?: string | null
+          first_activity_time?: string | null
+          habits_completed?: number | null
+          id?: string
+          is_binge?: boolean | null
+          last_activity_time?: string | null
+          tasks_completed?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_gaps?: Json | null
+          behavior_date?: string
+          check_ins?: number | null
+          completion_velocity?: number | null
+          created_at?: string | null
+          first_activity_time?: string | null
+          habits_completed?: number | null
+          id?: string
+          is_binge?: boolean | null
+          last_activity_time?: string | null
+          tasks_completed?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       companion_evolution_cards: {
         Row: {
           bond_level: number | null
@@ -1218,6 +1263,94 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      companion_memories: {
+        Row: {
+          companion_id: string
+          created_at: string | null
+          id: string
+          last_referenced_at: string | null
+          memory_context: Json | null
+          memory_date: string
+          memory_type: string
+          referenced_count: number | null
+          user_id: string
+        }
+        Insert: {
+          companion_id: string
+          created_at?: string | null
+          id?: string
+          last_referenced_at?: string | null
+          memory_context?: Json | null
+          memory_date?: string
+          memory_type: string
+          referenced_count?: number | null
+          user_id: string
+        }
+        Update: {
+          companion_id?: string
+          created_at?: string | null
+          id?: string
+          last_referenced_at?: string | null
+          memory_context?: Json | null
+          memory_date?: string
+          memory_type?: string
+          referenced_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_memories_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_pending_consequences: {
+        Row: {
+          companion_id: string
+          consequence_type: string
+          created_at: string | null
+          id: string
+          payload: Json | null
+          processed: boolean | null
+          processed_at: string | null
+          trigger_date: string
+          user_id: string
+        }
+        Insert: {
+          companion_id: string
+          consequence_type: string
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+          processed?: boolean | null
+          processed_at?: string | null
+          trigger_date: string
+          user_id: string
+        }
+        Update: {
+          companion_id?: string
+          consequence_type?: string
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+          processed?: boolean | null
+          processed_at?: string | null
+          trigger_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_pending_consequences_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companion_postcards: {
         Row: {
@@ -1400,32 +1533,56 @@ export type Database = {
       }
       companion_voice_templates: {
         Row: {
+          bond_level_dialogue: Json | null
+          care_critical_greetings: string[] | null
+          care_high_greetings: string[] | null
+          care_low_greetings: string[] | null
+          care_medium_greetings: string[] | null
           concern_templates: string[] | null
           created_at: string | null
           encouragement_templates: string[] | null
           greeting_templates: string[] | null
           id: string
+          path_greetings: Json | null
           personality_traits: string[]
+          recovery_greetings: string[] | null
+          scar_references: string[] | null
           species: string
           voice_style: string
         }
         Insert: {
+          bond_level_dialogue?: Json | null
+          care_critical_greetings?: string[] | null
+          care_high_greetings?: string[] | null
+          care_low_greetings?: string[] | null
+          care_medium_greetings?: string[] | null
           concern_templates?: string[] | null
           created_at?: string | null
           encouragement_templates?: string[] | null
           greeting_templates?: string[] | null
           id?: string
+          path_greetings?: Json | null
           personality_traits?: string[]
+          recovery_greetings?: string[] | null
+          scar_references?: string[] | null
           species: string
           voice_style: string
         }
         Update: {
+          bond_level_dialogue?: Json | null
+          care_critical_greetings?: string[] | null
+          care_high_greetings?: string[] | null
+          care_low_greetings?: string[] | null
+          care_medium_greetings?: string[] | null
           concern_templates?: string[] | null
           created_at?: string | null
           encouragement_templates?: string[] | null
           greeting_templates?: string[] | null
           id?: string
+          path_greetings?: Json | null
           personality_traits?: string[]
+          recovery_greetings?: string[] | null
+          scar_references?: string[] | null
           species?: string
           voice_style?: string
         }
@@ -6211,7 +6368,16 @@ export type Database = {
       user_companion: {
         Row: {
           body: number | null
+          bond_level: number | null
+          bond_portrait_urls: Json | null
+          care_balance: number | null
+          care_consistency: number | null
+          care_intent: number | null
+          care_pattern: Json | null
+          care_recovery: number | null
+          care_responsiveness: number | null
           care_score: number | null
+          completion_timestamps: Json | null
           core_element: string
           created_at: string
           current_image_url: string | null
@@ -6220,6 +6386,12 @@ export type Database = {
           current_xp: number
           death_cause: string | null
           death_date: string | null
+          dormancy_count: number | null
+          dormancy_recovery_days: number | null
+          dormant_image_url: string | null
+          dormant_since: string | null
+          evolution_path: string | null
+          evolution_path_locked: boolean | null
           eye_color: string | null
           favorite_color: string
           fur_color: string | null
@@ -6230,22 +6402,37 @@ export type Database = {
           inactive_days: number | null
           initial_image_url: string | null
           is_alive: boolean | null
+          last_7_days_activity: Json | null
           last_activity_date: string | null
           last_energy_update: string | null
+          last_interaction_at: string | null
           last_mood_update: string | null
           mind: number | null
           neglected_image_url: string | null
+          path_determination_date: string | null
           recovery_progress: number | null
+          scar_history: Json | null
+          scarred_image_url: string | null
           scars: Json | null
           soul: number | null
           spirit_animal: string
           story_tone: string
+          total_interactions: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
           body?: number | null
+          bond_level?: number | null
+          bond_portrait_urls?: Json | null
+          care_balance?: number | null
+          care_consistency?: number | null
+          care_intent?: number | null
+          care_pattern?: Json | null
+          care_recovery?: number | null
+          care_responsiveness?: number | null
           care_score?: number | null
+          completion_timestamps?: Json | null
           core_element: string
           created_at?: string
           current_image_url?: string | null
@@ -6254,6 +6441,12 @@ export type Database = {
           current_xp?: number
           death_cause?: string | null
           death_date?: string | null
+          dormancy_count?: number | null
+          dormancy_recovery_days?: number | null
+          dormant_image_url?: string | null
+          dormant_since?: string | null
+          evolution_path?: string | null
+          evolution_path_locked?: boolean | null
           eye_color?: string | null
           favorite_color: string
           fur_color?: string | null
@@ -6264,22 +6457,37 @@ export type Database = {
           inactive_days?: number | null
           initial_image_url?: string | null
           is_alive?: boolean | null
+          last_7_days_activity?: Json | null
           last_activity_date?: string | null
           last_energy_update?: string | null
+          last_interaction_at?: string | null
           last_mood_update?: string | null
           mind?: number | null
           neglected_image_url?: string | null
+          path_determination_date?: string | null
           recovery_progress?: number | null
+          scar_history?: Json | null
+          scarred_image_url?: string | null
           scars?: Json | null
           soul?: number | null
           spirit_animal: string
           story_tone?: string
+          total_interactions?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
           body?: number | null
+          bond_level?: number | null
+          bond_portrait_urls?: Json | null
+          care_balance?: number | null
+          care_consistency?: number | null
+          care_intent?: number | null
+          care_pattern?: Json | null
+          care_recovery?: number | null
+          care_responsiveness?: number | null
           care_score?: number | null
+          completion_timestamps?: Json | null
           core_element?: string
           created_at?: string
           current_image_url?: string | null
@@ -6288,6 +6496,12 @@ export type Database = {
           current_xp?: number
           death_cause?: string | null
           death_date?: string | null
+          dormancy_count?: number | null
+          dormancy_recovery_days?: number | null
+          dormant_image_url?: string | null
+          dormant_since?: string | null
+          evolution_path?: string | null
+          evolution_path_locked?: boolean | null
           eye_color?: string | null
           favorite_color?: string
           fur_color?: string | null
@@ -6298,16 +6512,22 @@ export type Database = {
           inactive_days?: number | null
           initial_image_url?: string | null
           is_alive?: boolean | null
+          last_7_days_activity?: Json | null
           last_activity_date?: string | null
           last_energy_update?: string | null
+          last_interaction_at?: string | null
           last_mood_update?: string | null
           mind?: number | null
           neglected_image_url?: string | null
+          path_determination_date?: string | null
           recovery_progress?: number | null
+          scar_history?: Json | null
+          scarred_image_url?: string | null
           scars?: Json | null
           soul?: number | null
           spirit_animal?: string
           story_tone?: string
+          total_interactions?: number | null
           updated_at?: string
           user_id?: string
         }

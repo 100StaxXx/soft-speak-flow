@@ -284,3 +284,9 @@ verify_jwt = true
 
 [functions.verify-admin-access]
 verify_jwt = false
+
+[functions.generate-dormant-companion-image]
+verify_jwt = false
+
+[functions.generate-companion-scar]
+verify_jwt = false
