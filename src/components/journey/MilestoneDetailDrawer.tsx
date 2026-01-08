@@ -76,7 +76,7 @@ export const MilestoneDetailDrawer = ({
   const daysInfo = getDaysInfo();
 
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} handleOnly={true} shouldScaleBackground={false}>
+    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()} handleOnly={true} shouldScaleBackground={false} modal={false}>
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader className="pb-2 border-b border-border/50">
           <div className="flex items-center justify-between">
