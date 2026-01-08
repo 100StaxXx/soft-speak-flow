@@ -14,6 +14,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
 import { CompanionBadge } from "@/components/CompanionBadge";
+import { CompanionBondBadge } from "@/components/companion/CompanionBondBadge";
 import { WelcomeBackModal } from "@/components/WelcomeBackModal";
 import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
 import { EvolveButton } from "@/components/companion/EvolveButton";
@@ -448,12 +449,13 @@ export const CompanionDisplay = memo(() => {
           </div>
 
           <div className="space-y-3">
-            <div className="flex justify-center mb-3">
+            <div className="flex justify-center items-center gap-3 mb-3 flex-wrap">
               <CompanionBadge 
                 element={companion.core_element} 
                 stage={companion.current_stage}
                 showStage={true}
               />
+              <CompanionBondBadge />
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">

@@ -1,14 +1,16 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { getStageName } from "@/config/companionStages";
+import { useCompanionMemories } from "@/hooks/useCompanionMemories";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
   currentXP: number;
   nextEvolutionXP: number;
   progressPercent: number;
+  showBondProgress?: boolean;
 }
 
 const XP_TIPS = [
@@ -25,11 +27,25 @@ export const NextEvolutionPreview = memo(({
   currentXP,
   nextEvolutionXP,
   progressPercent,
+  showBondProgress = true,
 }: NextEvolutionPreviewProps) => {
   const nextStage = Math.min(currentStage + 1, 20);
   const nextStageName = getStageName(nextStage);
   const xpNeeded = nextEvolutionXP - currentXP;
   const isMaxStage = currentStage >= 20;
+  
+  const { currentBond, isLoading: bondLoading } = useCompanionMemories();
+
+  // Calculate bond progress percentage
+  const bondProgressPercent = useMemo(() => {
+    if (!currentBond?.nextMilestone) return 100;
+    const getThreshold = (level: number) => Math.round(25 * Math.pow(1.8, level - 2));
+    const currentThreshold = currentBond.level === 1 ? 0 : getThreshold(currentBond.level);
+    const nextThreshold = getThreshold(currentBond.level + 1);
+    const range = nextThreshold - currentThreshold;
+    const progress = currentBond.totalInteractions - currentThreshold;
+    return Math.min(100, Math.max(0, (progress / range) * 100));
+  }, [currentBond]);
 
   if (isMaxStage) {
     return (
@@ -65,7 +81,7 @@ export const NextEvolutionPreview = memo(({
           </div>
         </div>
 
-        {/* Progress */}
+        {/* XP Progress */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
@@ -78,6 +94,26 @@ export const NextEvolutionPreview = memo(({
             {currentXP} / {nextEvolutionXP} XP
           </p>
         </div>
+
+        {/* Bond Progress */}
+        {showBondProgress && currentBond && !bondLoading && (
+          <div className="space-y-2 pt-3 border-t border-border/30">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{currentBond.icon}</span>
+              <div className="flex-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Bond: {currentBond.name}</span>
+                  {currentBond.nextMilestone && (
+                    <span className="font-medium text-primary/80">
+                      → {currentBond.nextMilestone.name}
+                    </span>
+                  )}
+                </div>
+                <Progress value={bondProgressPercent} className="h-1.5 mt-1" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* XP Tips */}
         <div className="space-y-2 pt-2 border-t border-border/50">
