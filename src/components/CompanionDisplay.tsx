@@ -1,21 +1,22 @@
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, AlertTriangle, Heart } from "lucide-react";
+import { Sparkles, AlertTriangle, Heart, Moon } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
+import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
 import { AttributeTooltip } from "@/components/AttributeTooltip";
-import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { CompanionBadge } from "@/components/CompanionBadge";
 import { WelcomeBackModal } from "@/components/WelcomeBackModal";
 import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
 import { EvolveButton } from "@/components/companion/EvolveButton";
+import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { AnimatePresence } from "framer-motion";
 import {
   useState,
@@ -89,10 +90,25 @@ export const CompanionDisplay = memo(() => {
   const { profile } = useProfile();
   const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error, canEvolve, triggerManualEvolution } = useCompanion();
   const { unlockedSkins } = useReferrals();
-  const { health, needsWelcomeBack, getMoodFilterStyles } = useCompanionHealth();
+  const { health, needsWelcomeBack } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   const { isEvolvingLoading } = useEvolution();
+  
+  // Use care-based visual state instead of mood-based
+  const { 
+    cssStyles: careStyles, 
+    animationClass, 
+    evolutionPath, 
+    isDormant,
+    hasDormancyWarning,
+  } = useCompanionVisualState(
+    health.moodState,
+    health.hunger,
+    health.happiness,
+    health.isAlive,
+    health.recoveryProgress
+  );
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0); // Force image reload
@@ -282,24 +298,6 @@ export const CompanionDisplay = memo(() => {
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
 
-  // Get mood-based filter styles
-  const moodStyles = getMoodFilterStyles(health.moodState);
-
-  // Get mood badge info
-  const getMoodBadge = () => {
-    switch (health.moodState) {
-      case 'worried':
-        return { emoji: '😟', label: 'Worried' };
-      case 'sad':
-        return { emoji: '😢', label: 'Missing you' };
-      case 'sick':
-        return { emoji: '💔', label: 'Needs attention' };
-      default:
-        return null;
-    }
-  };
-  const moodBadge = getMoodBadge();
-
   const stageName = getStageName(companion.current_stage);
   const colorName = getColorName(companion.favorite_color);
 
@@ -395,12 +393,12 @@ export const CompanionDisplay = memo(() => {
               <img
                 key={imageKey}
                 src={effectiveImageUrl}
-                alt={`${stageName} companion at stage ${companion.current_stage}${health.moodState !== 'happy' ? ` (${health.moodState})` : ''}`}
-                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-transform duration-300 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''}`}
-                style={{ ...skinStyles, ...moodStyles, ...equippedCosmeticStyles }}
+                alt={`${stageName} companion at stage ${companion.current_stage}`}
+                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''} ${animationClass}`}
+                style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
                 onLoad={() => {
                   setImageLoaded(true);
-                  setImageError(false); // Clear error on successful load
+                  setImageError(false);
                 }}
                 onError={() => {
                   setImageError(true);
@@ -410,11 +408,21 @@ export const CompanionDisplay = memo(() => {
                 decoding="async"
                 draggable={false}
               />
-              {/* Mood badge overlay */}
-              {moodBadge && (
-                <div className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/90 border border-destructive/50 shadow-lg">
-                  <span className="text-lg">{moodBadge.emoji}</span>
-                  <span className="text-xs font-medium text-destructive">{moodBadge.label}</span>
+              {/* Dormancy warning overlay */}
+              {hasDormancyWarning && (
+                <div className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/90 border border-amber-500/50 shadow-lg animate-pulse">
+                  <Moon className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-medium text-amber-500">Fading...</span>
+                </div>
+              )}
+              {/* Dormant overlay */}
+              {isDormant && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-background/60 backdrop-blur-sm">
+                  <div className="text-center p-4">
+                    <Moon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">Dormant</p>
+                    <p className="text-xs text-muted-foreground/70">Care for them to wake</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -458,12 +466,15 @@ export const CompanionDisplay = memo(() => {
             </div>
           </div>
 
-          {/* Companion Attributes */}
-          <CompanionAttributes companion={{ 
-            body: companion.body, 
-            mind: companion.mind,
-            soul: companion.soul
-          }} />
+          {/* Evolution Path Badge - visible indicator of care patterns */}
+          {evolutionPath.path && (
+            <div className="flex justify-center">
+              <EvolutionPathBadge 
+                path={evolutionPath.path} 
+                isLocked={evolutionPath.isLocked}
+              />
+            </div>
+          )}
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
