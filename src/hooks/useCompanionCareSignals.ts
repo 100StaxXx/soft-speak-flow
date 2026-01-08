@@ -29,6 +29,8 @@ export interface DormancyState {
   dormancyCount: number;
   recoveryDays: number;
   daysUntilWake: number;
+  inactiveDays: number;
+  daysUntilDormancy: number | null; // null if not approaching dormancy
 }
 
 export interface BondState {
@@ -77,6 +79,7 @@ export const useCompanionCareSignals = () => {
           dormant_since,
           dormancy_count,
           dormancy_recovery_days,
+          inactive_days,
           bond_level,
           total_interactions,
           last_interaction_at
@@ -125,6 +128,14 @@ export const useCompanionCareSignals = () => {
     const dormantSince = careData?.dormant_since;
     const isDormant = !!dormantSince;
     const recoveryDays = careData?.dormancy_recovery_days ?? 0;
+    const inactiveDays = careData?.inactive_days ?? 0;
+    
+    // Calculate days until dormancy (warning shows at 5-6 inactive days, dormancy at 7)
+    const DORMANCY_THRESHOLD = 7;
+    const WARNING_THRESHOLD = 5;
+    const daysUntilDormancy = !isDormant && inactiveDays >= WARNING_THRESHOLD 
+      ? Math.max(1, DORMANCY_THRESHOLD - inactiveDays) 
+      : null;
     
     const dormancy: DormancyState = {
       isDormant,
@@ -132,6 +143,8 @@ export const useCompanionCareSignals = () => {
       dormancyCount: careData?.dormancy_count ?? 0,
       recoveryDays,
       daysUntilWake: isDormant ? Math.max(0, DORMANCY_RECOVERY_DAYS_REQUIRED - recoveryDays) : 0,
+      inactiveDays,
+      daysUntilDormancy,
     };
 
     // Bond state
