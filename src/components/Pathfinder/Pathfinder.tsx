@@ -304,16 +304,24 @@ export function Pathfinder({
       timelineContext: timelineContext.trim() || undefined,
     });
     
+    // Only proceed if generation was successful
+    if (!result) {
+      toast.error('Failed to generate timeline', {
+        description: 'Please try again or adjust your goal'
+      });
+      return;
+    }
+    
     // Store original rituals for reset functionality
-    if (result?.rituals) {
+    if (result.rituals) {
       setOriginalRituals([...result.rituals]);
     }
     
     // Auto-set story type and theme color from AI suggestions
-    if (result?.suggestedStoryType) {
+    if (result.suggestedStoryType) {
       setStoryType(result.suggestedStoryType);
     }
-    if (result?.suggestedThemeColor) {
+    if (result.suggestedThemeColor) {
       setThemeColor(result.suggestedThemeColor);
     }
     

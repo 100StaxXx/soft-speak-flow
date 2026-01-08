@@ -4,16 +4,24 @@ import { Pathfinder } from "@/components/Pathfinder";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { EpicsTutorialModal } from "@/components/EpicsTutorialModal";
 import { CampaignEmptyStateModal } from "./CampaignEmptyStateModal";
+import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { useEpics } from "@/hooks/useEpics";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+interface CreatedCampaignData {
+  title: string;
+  habits: Array<{ title: string }>;
+}
 
 export const EpicsTab = memo(function EpicsTab() {
   const { activeEpics, completedEpics, isLoading, createEpic, isCreating, updateEpicStatus } = useEpics();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showTemplatesFirst, setShowTemplatesFirst] = useState(false);
   const [joinEpicDialogOpen, setJoinEpicDialogOpen] = useState(false);
+  const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
+  const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('epics');
 
   const hasCampaigns = activeEpics.length > 0 || completedEpics.length > 0;
@@ -21,6 +29,30 @@ export const EpicsTab = memo(function EpicsTab() {
   const handleAddCampaign = useCallback(() => {
     setShowTemplatesFirst(false);
     setWizardOpen(true);
+  }, []);
+
+  const handleCreateEpic = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
+    try {
+      // Wait for mutation to complete
+      await createEpic(data);
+      // Close wizard after successful creation
+      setWizardOpen(false);
+      // Store data for celebration animation
+      setCreatedCampaignData({
+        title: data.title,
+        habits: data.habits.map(h => ({ title: h.title })),
+      });
+      // Show celebration
+      setShowCreatedAnimation(true);
+    } catch (error) {
+      // Error is already handled by the mutation's onError
+      console.error('Failed to create campaign:', error);
+    }
+  }, [createEpic]);
+
+  const handleAnimationComplete = useCallback(() => {
+    setShowCreatedAnimation(false);
+    setCreatedCampaignData(null);
   }, []);
 
   return (
@@ -109,10 +141,7 @@ export const EpicsTab = memo(function EpicsTab() {
       <Pathfinder
         open={wizardOpen}
         onOpenChange={setWizardOpen}
-        onCreateEpic={(data) => {
-          createEpic(data);
-          setWizardOpen(false);
-        }}
+        onCreateEpic={handleCreateEpic}
         isCreating={isCreating}
         showTemplatesFirst={showTemplatesFirst}
       />
@@ -125,6 +154,14 @@ export const EpicsTab = memo(function EpicsTab() {
       
       {/* First-time Tutorial Modal */}
       <EpicsTutorialModal open={showTutorial} onClose={dismissTutorial} />
+
+      {/* Campaign Created Celebration */}
+      <CampaignCreatedAnimation
+        isVisible={showCreatedAnimation}
+        campaignTitle={createdCampaignData?.title || ''}
+        habits={createdCampaignData?.habits || []}
+        onComplete={handleAnimationComplete}
+      />
     </div>
   );
 });
