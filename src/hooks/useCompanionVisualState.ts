@@ -66,6 +66,22 @@ export const useCompanionVisualState = (
       };
     }
 
+    // Pre-dormancy visual decay (5-6 days inactive)
+    if (care.dormancy.daysUntilDormancy !== null) {
+      const daysUntil = care.dormancy.daysUntilDormancy;
+      // Progressive fade: 2 days = slight, 1 day = more noticeable
+      const fadeProgress = daysUntil === 1 ? 0.6 : 0.3;
+      return {
+        filter: `saturate(${0.7 - fadeProgress * 0.2}) brightness(${0.85 - fadeProgress * 0.1}) sepia(${fadeProgress * 0.15})`,
+        animation: 'droop',
+        animationDuration: '5s',
+        opacity: 0.9 - fadeProgress * 0.1,
+        saturation: 0.7 - fadeProgress * 0.2,
+        posture: 'withdrawn',
+        eyeContact: 'averted',
+      };
+    }
+
     // Care-based visual states (uses hidden signals)
     const overallCare = care.overallCare;
 
