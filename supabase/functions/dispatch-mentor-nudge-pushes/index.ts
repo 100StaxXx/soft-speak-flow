@@ -105,11 +105,18 @@ serve(async (req) => {
         // Get companion name from context
         const context = nudge.context as { companion_animal?: string; concern_level?: string } | null
         const companionName = context?.companion_animal || 'Your companion'
+        const concernLevel = context?.concern_level
 
-        // Build notification title based on nudge type
+        // Build notification title based on nudge type and concern level
         let title = `${mentorName} says:`
         if (nudge.nudge_type === 'companion_concern') {
-          title = `${companionName} misses you 💔`
+          if (concernLevel === 'dormancy_warning') {
+            title = `${companionName} is fading... 🌑`
+          } else if (concernLevel === 'dormancy_imminent') {
+            title = `${companionName} needs you now ⚠️`
+          } else {
+            title = `${companionName} misses you 💔`
+          }
         }
 
         // Send to each device
@@ -129,6 +136,8 @@ serve(async (req) => {
                   type: 'mentor_nudge',
                   nudge_id: nudge.id,
                   nudge_type: nudge.nudge_type,
+                  // Deep link to companion page for dormancy warnings
+                  url: concernLevel?.includes('dormancy') ? '/companion' : undefined,
                 },
               }),
             })
