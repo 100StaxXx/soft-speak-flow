@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCompanionCareSignals } from './useCompanionCareSignals';
 import { useCompanion } from './useCompanion';
+import { useCompanionScars } from './useCompanionScars';
 
 const WAKE_UP_SEEN_KEY = 'companion_wake_up_seen';
 
@@ -16,14 +17,17 @@ interface WakeUpState {
 /**
  * Detects when a companion transitions out of dormancy and triggers a celebration.
  * Tracks the transition state to avoid showing celebration on page reload.
+ * Also triggers the dormancy_survivor scar.
  */
 export function useCompanionWakeUp(): WakeUpState {
   const { companion } = useCompanion();
   const { care, isLoading } = useCompanionCareSignals();
+  const { addScarAsync } = useCompanionScars();
   
   const [showCelebration, setShowCelebration] = useState(false);
   const previousDormantRef = useRef<boolean | null>(null);
   const hasInitialized = useRef(false);
+  const scarTriggered = useRef(false);
 
   // Check if we've already shown this celebration
   const getSeenKey = useCallback(() => {
@@ -71,14 +75,28 @@ export function useCompanionWakeUp(): WakeUpState {
       if (!hasBeenSeen()) {
         setShowCelebration(true);
         markAsSeen();
+        
+        // Trigger dormancy survivor scar (only once per wake-up)
+        if (!scarTriggered.current) {
+          scarTriggered.current = true;
+          addScarAsync({
+            type: 'dormancy_survivor',
+            context: 'Awakened from the deep sleep through your consistent care and dedication',
+            generateImage: true,
+          }).catch((err) => {
+            console.error('[WakeUp] Failed to add dormancy scar:', err);
+          });
+        }
       }
     }
 
     previousDormantRef.current = isDormant;
-  }, [care, isLoading, hasBeenSeen, markAsSeen]);
+  }, [care, isLoading, hasBeenSeen, markAsSeen, addScarAsync]);
 
   const dismissCelebration = useCallback(() => {
     setShowCelebration(false);
+    // Reset scar trigger for next dormancy cycle
+    scarTriggered.current = false;
   }, []);
 
   return {
@@ -86,7 +104,7 @@ export function useCompanionWakeUp(): WakeUpState {
     dismissCelebration,
     companionName: companion?.spirit_animal || 'companion',
     companionImageUrl: companion?.current_image_url || '',
-    dormantImageUrl: (companion as any)?.dormant_image_url || null,
+    dormantImageUrl: companion?.dormant_image_url || null,
     bondLevel: care?.bond?.level || 1,
   };
 }
