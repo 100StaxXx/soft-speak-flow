@@ -9,6 +9,7 @@ interface Particle {
   size: number;
   animationDelay: number;
   animationDuration: number;
+  twinkleDuration: number;
   opacity: number;
 }
 
@@ -20,6 +21,7 @@ const generateParticles = (count: number): Particle[] => {
     size: Math.random() * 3 + 2, // 2-5px
     animationDelay: Math.random() * 10,
     animationDuration: Math.random() * 20 + 30, // 30-50s drift
+    twinkleDuration: Math.random() * 2 + 3, // 3-5s twinkle
     opacity: Math.random() * 0.4 + 0.3, // 0.3-0.7
   }));
 };
@@ -53,7 +55,7 @@ export const CompanionAmbientParticles = memo(() => {
       return {
         animation: `
           companion-particle-drift ${particle.animationDuration}s ease-in-out ${particle.animationDelay}s infinite,
-          companion-particle-twinkle ${3 + Math.random() * 2}s ease-in-out ${particle.animationDelay}s infinite
+          companion-particle-twinkle ${particle.twinkleDuration}s ease-in-out ${particle.animationDelay}s infinite
         `,
       };
     }

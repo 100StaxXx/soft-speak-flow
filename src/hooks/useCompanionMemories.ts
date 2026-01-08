@@ -61,6 +61,16 @@ const MEMORY_EMOTIONS: Record<string, string[]> = {
   relief: ["We made it through together.", "I'm so glad you came back.", "Everything is okay now."],
 };
 
+// Stable random for consistent dialogue selection within a session
+const getStableRandom = (seed: string): number => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash % 1000) / 1000;
+};
+
 export function useCompanionMemories() {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -196,6 +206,8 @@ export function useCompanionMemories() {
   }, [bondData]);
 
   // Get a random memory for dialogue (prioritizes less-referenced memories)
+  // Note: This function intentionally uses Math.random() for true randomness
+  // since it's called imperatively, not during render
   const getRandomMemory = useCallback((): CompanionMemory | null => {
     if (!memories || memories.length === 0) return null;
 
@@ -217,14 +229,18 @@ export function useCompanionMemories() {
     return memories[0];
   }, [memories]);
 
-  // Get dialogue line for a memory
+  // Get dialogue line for a memory (uses stable random for consistent selection within a day)
   const getMemoryDialogue = useCallback((memory: CompanionMemory): string | null => {
     const context = memory.memory_context;
     if (!context) return null;
 
     const emotion = context.emotion || 'joy';
     const emotionLines = MEMORY_EMOTIONS[emotion] || MEMORY_EMOTIONS.joy;
-    const line = emotionLines[Math.floor(Math.random() * emotionLines.length)];
+    
+    // Use stable random based on memory ID and date for consistency
+    const seed = `${memory.id}-${new Date().toDateString()}`;
+    const index = Math.floor(getStableRandom(seed) * emotionLines.length);
+    const line = emotionLines[index];
 
     if (context.title) {
       return `Remember when ${context.title.toLowerCase()}? ${line}`;

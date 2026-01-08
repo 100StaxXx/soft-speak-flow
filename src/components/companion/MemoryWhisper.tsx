@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, useEffect } from "react";
+import { memo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionMemories } from "@/hooks/useCompanionMemories";
 import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
@@ -25,7 +25,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
   const [isVisible, setIsVisible] = useState(false);
 
   // Track if we've already shown a memory this mount
-  const hasShownRef = useState(false);
+  const hasShownRef = useRef(false);
 
   // Try to show a memory on mount if conditions are right
   useEffect(() => {
@@ -36,7 +36,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
     if (memories.length === 0) return;
     
     // Only run once per mount
-    if (hasShownRef[0]) return;
+    if (hasShownRef.current) return;
     
     // Random chance check
     if (Math.random() > chance) return;
@@ -50,7 +50,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
           setMemoryLine(dialogue);
           setIsVisible(true);
           referenceMemory(memory.id);
-          hasShownRef[0] = true;
+          hasShownRef.current = true;
         }
       }
     }, 2000);
