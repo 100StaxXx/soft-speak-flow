@@ -8,6 +8,7 @@ import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
+import { useCompanionWakeUp } from "@/hooks/useCompanionWakeUp";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { CompanionSkeleton } from "@/components/CompanionSkeleton";
@@ -19,6 +20,8 @@ import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
+import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
+import { NursingMode } from "@/components/companion/NursingMode";
 import { AnimatePresence } from "framer-motion";
 import {
   useState,
@@ -96,6 +99,16 @@ export const CompanionDisplay = memo(() => {
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   const { isEvolvingLoading } = useEvolution();
+  
+  // Wake-up celebration detection
+  const {
+    showCelebration: showWakeUpCelebration,
+    dismissCelebration: dismissWakeUpCelebration,
+    companionName: wakeUpCompanionName,
+    companionImageUrl: wakeUpCompanionImageUrl,
+    dormantImageUrl: wakeUpDormantImageUrl,
+    bondLevel: wakeUpBondLevel,
+  } = useCompanionWakeUp();
   
   // Use care-based visual state (includes care signals to avoid duplicate hook calls)
   const { 
@@ -277,9 +290,17 @@ export const CompanionDisplay = memo(() => {
   }, [needsWelcomeBack, welcomeBackDismissed, companion]);
 
   // Calculate effective image URL (must be before the useEffect that depends on it)
-  const displayImageUrl = health.isNeglected && health.neglectedImageUrl 
-    ? health.neglectedImageUrl 
-    : companion?.current_image_url;
+  // Priority: dormant image > neglected image > current image
+  const displayImageUrl = useMemo(() => {
+    if (isDormant && companion?.dormant_image_url) {
+      return companion.dormant_image_url;
+    }
+    if (health.isNeglected && health.neglectedImageUrl) {
+      return health.neglectedImageUrl;
+    }
+    return companion?.current_image_url;
+  }, [isDormant, companion?.dormant_image_url, health.isNeglected, health.neglectedImageUrl, companion?.current_image_url]);
+  
   const effectiveImageUrl = displayImageUrl || COMPANION_PLACEHOLDER;
 
   // Track image URL changes to reset loading state
@@ -495,6 +516,16 @@ export const CompanionDisplay = memo(() => {
           setShowWelcomeBack(false);
           setWelcomeBackDismissed(true);
         }} 
+      />
+
+      {/* Wake-Up Celebration Modal */}
+      <WakeUpCelebration
+        isOpen={showWakeUpCelebration}
+        onClose={dismissWakeUpCelebration}
+        companionName={wakeUpCompanionName}
+        companionImageUrl={wakeUpCompanionImageUrl}
+        dormantImageUrl={wakeUpDormantImageUrl}
+        bondLevel={wakeUpBondLevel}
       />
 
       {/* Hidden Regenerate Dialog */}

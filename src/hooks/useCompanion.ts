@@ -23,6 +23,7 @@ export interface Companion {
   current_xp: number;
   current_image_url: string | null;
   initial_image_url?: string | null;
+  dormant_image_url?: string | null;
   eye_color?: string;
   fur_color?: string;
   body?: number;

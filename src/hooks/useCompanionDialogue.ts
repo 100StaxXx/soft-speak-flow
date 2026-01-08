@@ -65,6 +65,15 @@ export function useCompanionDialogue() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  // Recovery-day-specific dialogue lines
+  const recoveryDayDialogue: Record<number, string> = {
+    1: "...is someone there?",
+    2: "I can feel you... don't leave...",
+    3: "Your warmth... it's bringing me back...",
+    4: "I remember now... we had so many days together...",
+    5: "I'm almost ready... thank you for not giving up on me...",
+  };
+
   // Determine dialogue mood based on care signals
   const dialogueMood = useMemo((): DialogueMood => {
     if (!care) return 'content';
@@ -81,6 +90,14 @@ export function useCompanionDialogue() {
     return 'desperate';
   }, [care]);
 
+  // Get recovery-specific greeting based on recovery day
+  const recoveryGreeting = useMemo(() => {
+    if (!care?.dormancy?.isDormant || care.dormancy.recoveryDays === 0) return null;
+    
+    const day = Math.min(care.dormancy.recoveryDays, 5);
+    return recoveryDayDialogue[day] || null;
+  }, [care?.dormancy]);
+
   // Select appropriate greeting based on care level and path
   const currentGreeting = useMemo(() => {
     if (!voiceTemplate) return "Hello, friend.";
@@ -90,7 +107,12 @@ export function useCompanionDialogue() {
       return arr[Math.floor(Math.random() * arr.length)];
     };
     
-    // Priority 1: Recovery greeting if recovering
+    // Priority 1: Recovery-day-specific greeting (highest priority during recovery)
+    if (dialogueMood === 'recovering' && recoveryGreeting) {
+      return recoveryGreeting;
+    }
+    
+    // Priority 2: Generic recovery greeting from template
     if (dialogueMood === 'recovering' && voiceTemplate.recovery_greetings?.length) {
       return pickRandom(voiceTemplate.recovery_greetings);
     }
@@ -117,7 +139,7 @@ export function useCompanionDialogue() {
       default:
         return pickRandom(voiceTemplate.greeting_templates);
     }
-  }, [voiceTemplate, dialogueMood, care?.evolutionPath]);
+  }, [voiceTemplate, dialogueMood, care?.evolutionPath, recoveryGreeting]);
 
   // Get scar reference if companion has scars
   const scarReference = useMemo(() => {
