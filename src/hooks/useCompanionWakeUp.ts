@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCompanionCareSignals } from './useCompanionCareSignals';
 import { useCompanion } from './useCompanion';
-import { useCompanionScars } from './useCompanionScars';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,12 +24,10 @@ export function useCompanionWakeUp(): WakeUpState {
   const { user } = useAuth();
   const { companion } = useCompanion();
   const { care, isLoading } = useCompanionCareSignals();
-  const { addScarAsync } = useCompanionScars();
   
   const [showCelebration, setShowCelebration] = useState(false);
   const previousDormantRef = useRef<boolean | null>(null);
   const hasInitialized = useRef(false);
-  const scarTriggered = useRef(false);
   const memoryTriggered = useRef(false);
 
   // Check if we've already shown this celebration
@@ -80,18 +77,6 @@ export function useCompanionWakeUp(): WakeUpState {
         setShowCelebration(true);
         markAsSeen();
         
-        // Trigger dormancy survivor scar (only once per wake-up)
-        if (!scarTriggered.current) {
-          scarTriggered.current = true;
-          addScarAsync({
-            type: 'dormancy_survivor',
-            context: 'Awakened from the deep sleep through your consistent care and dedication',
-            generateImage: true,
-          }).catch((err) => {
-            console.error('[WakeUp] Failed to add dormancy scar:', err);
-          });
-        }
-        
         // Create recovery memory (only once per wake-up)
         if (!memoryTriggered.current && user?.id && companion?.id) {
           memoryTriggered.current = true;
@@ -115,12 +100,11 @@ export function useCompanionWakeUp(): WakeUpState {
     }
 
     previousDormantRef.current = isDormant;
-  }, [care, isLoading, hasBeenSeen, markAsSeen, addScarAsync, user?.id, companion?.id]);
+  }, [care, isLoading, hasBeenSeen, markAsSeen, user?.id, companion?.id]);
 
   const dismissCelebration = useCallback(() => {
     setShowCelebration(false);
-    // Reset triggers for next dormancy cycle
-    scarTriggered.current = false;
+    // Reset trigger for next dormancy cycle
     memoryTriggered.current = false;
   }, []);
 

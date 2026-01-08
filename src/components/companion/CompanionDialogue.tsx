@@ -26,7 +26,6 @@ interface CompanionDialogueProps {
 export const CompanionDialogue = memo(({ className, showBondInfo = false }: CompanionDialogueProps) => {
   const { 
     greeting, 
-    scarReference, 
     bondDialogue, 
     dialogueMood, 
     isLoading 
@@ -57,7 +56,7 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
   const IconComponent = config.icon;
   
   // Decide what secondary text to show
-  const secondaryText = scarReference ?? (showBondInfo ? bondDialogue : null);
+  const secondaryText = showBondInfo ? bondDialogue : null;
 
   return (
     <motion.div 
