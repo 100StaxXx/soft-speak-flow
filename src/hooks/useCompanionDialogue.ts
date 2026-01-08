@@ -26,7 +26,6 @@ interface VoiceTemplate {
   care_low_greetings: string[];
   care_critical_greetings: string[];
   recovery_greetings: string[];
-  scar_references: string[];
   path_greetings: Record<string, string[]>;
   bond_level_dialogue: Record<string, string[]>;
 }
@@ -66,7 +65,6 @@ export function useCompanionDialogue() {
         care_low_greetings: data.care_low_greetings || [],
         care_critical_greetings: data.care_critical_greetings || [],
         recovery_greetings: data.recovery_greetings || [],
-        scar_references: data.scar_references || [],
         path_greetings: (data.path_greetings as Record<string, string[]>) || {},
         bond_level_dialogue: (data.bond_level_dialogue as Record<string, string[]>) || {},
       };
@@ -155,19 +153,6 @@ export function useCompanionDialogue() {
     }
   }, [voiceTemplate, dialogueMood, care?.evolutionPath, recoveryGreeting, pickRandom]);
 
-  // Get scar reference if companion has scars
-  const scarReference = useMemo(() => {
-    if (!voiceTemplate || !companion) return null;
-    
-    const scarHistory = (companion as any).scar_history as any[] | null;
-    if (!scarHistory || scarHistory.length === 0) return null;
-    
-    // 15% chance to reference a scar (using stable random)
-    if (getStableRandom(`${new Date().toDateString()}-scar-chance`) > 0.15) return null;
-    
-    return pickRandom(voiceTemplate.scar_references, 'scar');
-  }, [voiceTemplate, companion, pickRandom]);
-
   // Get bond-level dialogue
   const bondDialogue = useMemo(() => {
     if (!voiceTemplate || !care?.bond) return null;
@@ -189,7 +174,6 @@ export function useCompanionDialogue() {
 
   return {
     greeting: currentGreeting,
-    scarReference,
     bondDialogue,
     encouragement,
     dialogueMood,

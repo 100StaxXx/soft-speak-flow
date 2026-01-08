@@ -23,7 +23,6 @@ import { DormancyWarning, DormantOverlay } from "@/components/companion/Dormancy
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { NursingMode } from "@/components/companion/NursingMode";
-import { ScarIndicator } from "@/components/companion/ScarDisplay";
 import { AnimatePresence } from "framer-motion";
 import {
   useState,
@@ -495,8 +494,6 @@ export const CompanionDisplay = memo(() => {
                 isLocked={evolutionPath.isLocked}
               />
             )}
-            {/* Scar Indicator - shows marks of survival */}
-            <ScarIndicator />
           </div>
 
           {/* Companion Dialogue - emotional responses based on care signals */}
