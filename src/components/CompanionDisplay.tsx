@@ -19,6 +19,7 @@ import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialo
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
+import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { AnimatePresence } from "framer-motion";
 import {
   useState,
@@ -474,6 +475,9 @@ export const CompanionDisplay = memo(() => {
               />
             </div>
           )}
+
+          {/* Companion Dialogue - emotional responses based on care signals */}
+          <CompanionDialogue showBondInfo className="mt-2" />
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
