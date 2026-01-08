@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
+import { useCompanionCareSignals } from "@/hooks/useCompanionCareSignals";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { useEvolution } from "@/contexts/EvolutionContext";
@@ -17,6 +18,7 @@ import { WelcomeBackModal } from "@/components/WelcomeBackModal";
 import { CompanionRegenerateDialog } from "@/components/CompanionRegenerateDialog";
 import { EvolveButton } from "@/components/companion/EvolveButton";
 import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
+import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { AnimatePresence } from "framer-motion";
 import {
   useState,
@@ -94,6 +96,9 @@ export const CompanionDisplay = memo(() => {
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   const { isEvolvingLoading } = useEvolution();
+  
+  // Get care signals for advanced visual state
+  const { care } = useCompanionCareSignals();
   
   // Use care-based visual state instead of mood-based
   const { 
@@ -408,23 +413,17 @@ export const CompanionDisplay = memo(() => {
                 decoding="async"
                 draggable={false}
               />
-              {/* Dormancy warning overlay */}
-              {hasDormancyWarning && (
-                <div className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-background/90 border border-amber-500/50 shadow-lg animate-pulse">
-                  <Moon className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-medium text-amber-500">Fading...</span>
-                </div>
-              )}
-              {/* Dormant overlay */}
-              {isDormant && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-background/60 backdrop-blur-sm">
-                  <div className="text-center p-4">
-                    <Moon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm font-medium text-muted-foreground">Dormant</p>
-                    <p className="text-xs text-muted-foreground/70">Care for them to wake</p>
-                  </div>
-                </div>
-              )}
+              {/* Dormancy warning component */}
+              <DormancyWarning 
+                show={hasDormancyWarning && !isDormant}
+                daysUntilDormancy={care.dormancy.daysUntilWake > 0 ? undefined : 2}
+              />
+              {/* Dormant overlay component */}
+              <DormantOverlay 
+                isDormant={care.dormancy.isDormant}
+                recoveryDays={care.dormancy.recoveryDays}
+                daysUntilWake={care.dormancy.daysUntilWake}
+              />
             </div>
           </div>
 
