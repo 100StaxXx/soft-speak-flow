@@ -113,6 +113,27 @@ export const GlobalEvolutionListener = () => {
             // Notify walkthrough that evolution is starting
             window.dispatchEvent(new CustomEvent('evolution-loading-start'));
 
+            // Create evolution memory (non-blocking)
+            const today = new Date().toISOString().split('T')[0];
+            const isFirstEvolution = newStage === 1;
+            supabase.from('companion_memories').insert({
+              user_id: user.id,
+              companion_id: companionId,
+              memory_type: isFirstEvolution ? 'first_evolution' : 'evolution',
+              memory_date: today,
+              memory_context: {
+                title: isFirstEvolution ? 'First Evolution' : `Evolved to Stage ${newStage}`,
+                description: isFirstEvolution 
+                  ? 'The first transformation - proof of our growing bond.'
+                  : `Another beautiful transformation, reaching stage ${newStage}.`,
+                emotion: isFirstEvolution ? 'pride' : 'joy',
+                details: { stage: newStage, previousStage: oldStage },
+              },
+              referenced_count: 0,
+            }).then(({ error }) => {
+              if (error) logger.error('Failed to create evolution memory:', error);
+            });
+
             // Invalidate companion query to refresh data
             if (user?.id) {
               queryClient.invalidateQueries({ queryKey: ['companion', user.id] });

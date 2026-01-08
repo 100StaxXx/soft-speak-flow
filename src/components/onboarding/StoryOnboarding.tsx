@@ -476,6 +476,27 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
+      // Create first meeting memory (non-blocking)
+      const today = new Date().toISOString().split('T')[0];
+      supabase.from('companion_memories').insert({
+        user_id: user.id,
+        companion_id: companionData.id,
+        memory_type: 'first_meeting',
+        memory_date: today,
+        memory_context: {
+          title: 'Our First Meeting',
+          description: `The day we met - a ${preferences.spiritAnimal} appeared and our journey began.`,
+          emotion: 'wonder',
+          details: { 
+            spiritAnimal: preferences.spiritAnimal,
+            coreElement: preferences.coreElement,
+          },
+        },
+        referenced_count: 0,
+      }).then(({ error }) => {
+        if (error) console.error('Failed to create first meeting memory:', error);
+      });
+
       const companionDisplayName = await waitForCompanionDisplayName(companionData.id);
       if (!companionDisplayName) {
         console.warn("Companion name was not ready in time; falling back to spirit animal.");

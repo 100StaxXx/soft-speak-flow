@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCompanionCareSignals } from './useCompanionCareSignals';
 import { useCompanion } from './useCompanion';
 import { useCompanionScars } from './useCompanionScars';
+import { useAuth } from './useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const WAKE_UP_SEEN_KEY = 'companion_wake_up_seen';
 
@@ -20,6 +22,7 @@ interface WakeUpState {
  * Also triggers the dormancy_survivor scar.
  */
 export function useCompanionWakeUp(): WakeUpState {
+  const { user } = useAuth();
   const { companion } = useCompanion();
   const { care, isLoading } = useCompanionCareSignals();
   const { addScarAsync } = useCompanionScars();
@@ -28,6 +31,7 @@ export function useCompanionWakeUp(): WakeUpState {
   const previousDormantRef = useRef<boolean | null>(null);
   const hasInitialized = useRef(false);
   const scarTriggered = useRef(false);
+  const memoryTriggered = useRef(false);
 
   // Check if we've already shown this celebration
   const getSeenKey = useCallback(() => {
@@ -87,16 +91,37 @@ export function useCompanionWakeUp(): WakeUpState {
             console.error('[WakeUp] Failed to add dormancy scar:', err);
           });
         }
+        
+        // Create recovery memory (only once per wake-up)
+        if (!memoryTriggered.current && user?.id && companion?.id) {
+          memoryTriggered.current = true;
+          const today = new Date().toISOString().split('T')[0];
+          supabase.from('companion_memories').insert({
+            user_id: user.id,
+            companion_id: companion.id,
+            memory_type: 'recovery',
+            memory_date: today,
+            memory_context: {
+              title: 'Awakening',
+              description: 'You came back and brought me out of the darkness. I will never forget.',
+              emotion: 'relief',
+            },
+            referenced_count: 0,
+          }).then(({ error }) => {
+            if (error) console.error('[WakeUp] Failed to create recovery memory:', error);
+          });
+        }
       }
     }
 
     previousDormantRef.current = isDormant;
-  }, [care, isLoading, hasBeenSeen, markAsSeen, addScarAsync]);
+  }, [care, isLoading, hasBeenSeen, markAsSeen, addScarAsync, user?.id, companion?.id]);
 
   const dismissCelebration = useCallback(() => {
     setShowCelebration(false);
-    // Reset scar trigger for next dormancy cycle
+    // Reset triggers for next dormancy cycle
     scarTriggered.current = false;
+    memoryTriggered.current = false;
   }, []);
 
   return {

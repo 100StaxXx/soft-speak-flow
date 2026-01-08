@@ -208,6 +208,26 @@ export const useXPRewards = () => {
           companionId,
           streakDays: milestone,
         }).catch(err => logger.error('Soul streak update failed:', err));
+        
+        // Create streak memory for significant milestones (7, 30, 100 days)
+        if (milestone === 7 || milestone === 30 || milestone === 100) {
+          const today = new Date().toISOString().split('T')[0];
+          supabase.from('companion_memories').insert({
+            user_id: user?.id,
+            companion_id: companionId,
+            memory_type: 'streak',
+            memory_date: today,
+            memory_context: {
+              title: `${milestone}-Day Streak`,
+              description: `${milestone} days of dedication and growth together.`,
+              emotion: milestone >= 30 ? 'joy' : 'pride',
+              details: { streakDays: milestone },
+            },
+            referenced_count: 0,
+          }).then(({ error }) => {
+            if (error) logger.error('Failed to create streak memory:', error);
+          });
+        }
       }
     } catch (error) {
       logger.error('Error awarding streak milestone:', error);
@@ -480,6 +500,27 @@ export const useXPRewards = () => {
       xpAmount: reward,
       metadata: { epicTitle },
     });
+    
+    // Create epic complete memory (non-blocking)
+    const companionId = companion.id;
+    if (companionId && user?.id) {
+      const today = new Date().toISOString().split('T')[0];
+      supabase.from('companion_memories').insert({
+        user_id: user.id,
+        companion_id: companionId,
+        memory_type: 'epic_complete',
+        memory_date: today,
+        memory_context: {
+          title: 'Epic Complete',
+          description: `We conquered "${epicTitle}" together!`,
+          emotion: 'pride',
+          details: { epicTitle },
+        },
+        referenced_count: 0,
+      }).then(({ error }) => {
+        if (error) logger.error('Failed to create epic memory:', error);
+      });
+    }
   };
 
   const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
