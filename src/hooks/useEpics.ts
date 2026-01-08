@@ -583,7 +583,7 @@ export const useEpics = () => {
     completedEpics,
     isLoading,
     error: epicsError,
-    createEpic: createEpic.mutate,
+    createEpic: createEpic.mutateAsync,
     isCreating: createEpic.isPending,
     isCreateSuccess: createEpic.isSuccess,
     updateEpicStatus: updateEpicStatus.mutate,
