@@ -487,11 +487,63 @@ export const useEpics = () => {
 
       if (error) throw error;
 
+      // Clean up rituals and milestones when abandoning
+      if (status === "abandoned") {
+        console.log('[Epic Abandon] Cleaning up rituals and milestones for epic:', epicId);
+        
+        // Get all habit IDs linked to this epic
+        const { data: epicHabits } = await supabase
+          .from("epic_habits")
+          .select("habit_id")
+          .eq("epic_id", epicId);
+
+        if (epicHabits && epicHabits.length > 0) {
+          const habitIds = epicHabits.map(eh => eh.habit_id);
+          console.log('[Epic Abandon] Deleting habits:', habitIds);
+
+          // Delete the habits
+          const { error: habitsDeleteError } = await supabase
+            .from("habits")
+            .delete()
+            .in("id", habitIds)
+            .eq("user_id", user.id);
+
+          if (habitsDeleteError) {
+            console.error("Failed to delete habits:", habitsDeleteError);
+          }
+
+          // Delete epic_habits links
+          const { error: linksDeleteError } = await supabase
+            .from("epic_habits")
+            .delete()
+            .eq("epic_id", epicId);
+
+          if (linksDeleteError) {
+            console.error("Failed to delete epic_habits links:", linksDeleteError);
+          }
+        }
+
+        // Delete milestones
+        const { error: milestonesDeleteError } = await supabase
+          .from("epic_milestones")
+          .delete()
+          .eq("epic_id", epicId)
+          .eq("user_id", user.id);
+
+        if (milestonesDeleteError) {
+          console.error("Failed to delete milestones:", milestonesDeleteError);
+        }
+        
+        console.log('[Epic Abandon] Cleanup complete');
+      }
+
       return { epic, status, wasAlreadyCompleted: epic.status === "completed" };
     },
     onSuccess: async ({ epic, status, wasAlreadyCompleted }, variables) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
-      
+      queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       // Track epic outcome for AI learning
       if (status === "completed" || status === "abandoned") {
         trackEpicOutcome(variables.epicId, status).catch(err => {
