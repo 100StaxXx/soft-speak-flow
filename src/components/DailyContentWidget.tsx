@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Bell, Quote, Play, Sparkles, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 interface DailyContent {
   pepTalk?: { title: string; summary: string; audio_url?: string; id: string } | null;
@@ -18,10 +19,11 @@ export const DailyContentWidget = () => {
   const navigate = useNavigate();
   const [content, setContent] = useState<DailyContent>({});
   const [loading, setLoading] = useState(true);
+  const resolvedMentorId = getResolvedMentorId(profile);
 
   useEffect(() => {
     const fetchDailyContent = async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         setLoading(false);
         setContent({});
         return;
@@ -33,7 +35,7 @@ export const DailyContentWidget = () => {
       const { data: mentor } = await supabase
         .from("mentors")
         .select("slug, name")
-        .eq("id", profile.selected_mentor_id)
+        .eq("id", resolvedMentorId)
         .maybeSingle();
 
       if (!mentor) {
@@ -80,7 +82,7 @@ export const DailyContentWidget = () => {
     };
 
     fetchDailyContent();
-  }, [profile?.selected_mentor_id]);
+  }, [resolvedMentorId]);
 
   if (loading) {
     return (

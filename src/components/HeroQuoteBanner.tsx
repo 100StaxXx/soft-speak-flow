@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 interface QuoteData {
   id: string;
@@ -24,10 +25,11 @@ export const HeroQuoteBanner = memo(() => {
   const [mentor, setMentor] = useState<Mentor | null>(null);
   const [mentorImageUrl, setMentorImageUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const resolvedMentorId = getResolvedMentorId(profile);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         setLoading(false);
         return;
       }
@@ -38,7 +40,7 @@ export const HeroQuoteBanner = memo(() => {
       const { data: mentorData } = await supabase
         .from("mentors")
         .select("name, avatar_url, slug")
-        .eq("id", profile.selected_mentor_id)
+        .eq("id", resolvedMentorId)
         .maybeSingle();
 
       if (!mentorData) {
@@ -86,7 +88,7 @@ export const HeroQuoteBanner = memo(() => {
     };
 
     fetchData();
-  }, [profile?.selected_mentor_id]);
+  }, [resolvedMentorId]);
 
   if (loading || !todaysQuote || !mentor || !mentorImageUrl) return null;
 

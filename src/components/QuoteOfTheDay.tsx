@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Quote as QuoteIcon, Sparkles } from "lucide-react";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { format } from "date-fns";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 interface QuoteData {
   id: string;
@@ -19,10 +20,11 @@ export const QuoteOfTheDay = () => {
   const personality = useMentorPersonality();
   const [todaysQuote, setTodaysQuote] = useState<QuoteData | null>(null);
   const [loading, setLoading] = useState(true);
+  const resolvedMentorId = getResolvedMentorId(profile);
 
   useEffect(() => {
     const fetchTodaysQuote = async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         setLoading(false);
         return;
       }
@@ -33,7 +35,7 @@ export const QuoteOfTheDay = () => {
       const { data: mentor } = await supabase
         .from("mentors")
         .select("slug")
-        .eq("id", profile.selected_mentor_id)
+        .eq("id", resolvedMentorId)
         .maybeSingle();
 
       if (!mentor) {
@@ -75,7 +77,7 @@ export const QuoteOfTheDay = () => {
     };
 
     fetchTodaysQuote();
-  }, [profile?.selected_mentor_id]);
+  }, [resolvedMentorId]);
 
   if (loading) return <SkeletonQuote />;
   if (!todaysQuote) return null;

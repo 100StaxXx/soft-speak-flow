@@ -11,7 +11,7 @@ import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, W
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-
+import { getResolvedMentorId } from "@/utils/mentor";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -86,9 +86,11 @@ export const TodaysPepTalk = memo(() => {
   // Removed walkthrough tracking - was causing play button to be permanently disabled
 
 
+  const resolvedMentorId = getResolvedMentorId(profile);
+
   useEffect(() => {
     const fetchDailyPepTalk = async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         setLoading(false);
         return;
       }
@@ -101,7 +103,7 @@ export const TodaysPepTalk = memo(() => {
         const { data: mentor, error: mentorError } = await supabase
           .from("mentors")
           .select("slug, name")
-          .eq("id", profile.selected_mentor_id)
+          .eq("id", resolvedMentorId)
           .maybeSingle();
 
         if (mentorError) {
@@ -184,7 +186,7 @@ export const TodaysPepTalk = memo(() => {
     };
 
     fetchDailyPepTalk();
-  }, [profile?.selected_mentor_id]);
+  }, [resolvedMentorId]);
 
   // Handle user-triggered pep talk generation
   const handleGeneratePepTalk = async () => {

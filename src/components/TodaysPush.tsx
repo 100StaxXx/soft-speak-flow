@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Bell, Play, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 interface DailyPepTalk {
   id: string;
@@ -21,10 +22,11 @@ export const TodaysPush = () => {
   const { profile } = useProfile();
   const navigate = useNavigate();
   const [todaysPepTalk, setTodaysPepTalk] = useState<DailyPepTalk | null>(null);
+  const resolvedMentorId = getResolvedMentorId(profile);
 
   useEffect(() => {
     const fetchTodaysPepTalk = async () => {
-      if (!profile?.selected_mentor_id) return;
+      if (!resolvedMentorId) return;
 
       const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -32,7 +34,7 @@ export const TodaysPush = () => {
       const { data: mentor } = await supabase
         .from("mentors")
         .select("slug, name")
-        .eq("id", profile.selected_mentor_id)
+        .eq("id", resolvedMentorId)
         .maybeSingle();
 
       if (!mentor) return;
@@ -51,7 +53,7 @@ export const TodaysPush = () => {
     };
 
     fetchTodaysPepTalk();
-  }, [profile?.selected_mentor_id]);
+  }, [resolvedMentorId]);
 
   if (!todaysPepTalk) return null;
 

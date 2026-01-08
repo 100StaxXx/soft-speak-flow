@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { PageTransition } from "@/components/PageTransition";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 
 export default function MentorChat() {
@@ -26,25 +27,26 @@ export default function MentorChat() {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const haptics = useHapticFeedback();
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('mentor');
+  const resolvedMentorId = getResolvedMentorId(profile);
 
   // Get briefing context from navigation state
   const briefingContext = location.state?.briefingContext;
   const comprehensiveMode = location.state?.comprehensiveMode || false;
 
   const { data: mentor, isLoading: mentorLoading, error: mentorError } = useQuery({
-    queryKey: ['mentor', profile?.selected_mentor_id],
+    queryKey: ['mentor', resolvedMentorId],
     queryFn: async () => {
-      if (!profile?.selected_mentor_id) return null;
+      if (!resolvedMentorId) return null;
       const { data, error } = await supabase
         .from('mentors')
         .select('*')
-        .eq('id', profile.selected_mentor_id)
+        .eq('id', resolvedMentorId)
         .maybeSingle();
       
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.selected_mentor_id,
+    enabled: !!resolvedMentorId,
   });
 
   // Show loading state while profile or mentor is loading
