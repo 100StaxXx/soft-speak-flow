@@ -1174,6 +1174,51 @@ export type Database = {
           },
         ]
       }
+      companion_memorials: {
+        Row: {
+          companion_name: string
+          core_element: string | null
+          created_at: string | null
+          days_together: number
+          death_cause: string
+          death_date: string
+          final_evolution_stage: number | null
+          final_image_url: string | null
+          id: string
+          memorial_image_url: string | null
+          spirit_animal: string
+          user_id: string
+        }
+        Insert: {
+          companion_name: string
+          core_element?: string | null
+          created_at?: string | null
+          days_together: number
+          death_cause: string
+          death_date: string
+          final_evolution_stage?: number | null
+          final_image_url?: string | null
+          id?: string
+          memorial_image_url?: string | null
+          spirit_animal: string
+          user_id: string
+        }
+        Update: {
+          companion_name?: string
+          core_element?: string | null
+          created_at?: string | null
+          days_together?: number
+          death_cause?: string
+          death_date?: string
+          final_evolution_stage?: number | null
+          final_image_url?: string | null
+          id?: string
+          memorial_image_url?: string | null
+          spirit_animal?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       companion_postcards: {
         Row: {
           caption: string | null
@@ -6166,24 +6211,32 @@ export type Database = {
       user_companion: {
         Row: {
           body: number | null
+          care_score: number | null
           core_element: string
           created_at: string
           current_image_url: string | null
           current_mood: string | null
           current_stage: number
           current_xp: number
+          death_cause: string | null
+          death_date: string | null
           eye_color: string | null
           favorite_color: string
           fur_color: string | null
+          happiness: number | null
+          hunger: number | null
           id: string
           image_regenerations_used: number
           inactive_days: number | null
           initial_image_url: string | null
+          is_alive: boolean | null
           last_activity_date: string | null
           last_energy_update: string | null
           last_mood_update: string | null
           mind: number | null
           neglected_image_url: string | null
+          recovery_progress: number | null
+          scars: Json | null
           soul: number | null
           spirit_animal: string
           story_tone: string
@@ -6192,24 +6245,32 @@ export type Database = {
         }
         Insert: {
           body?: number | null
+          care_score?: number | null
           core_element: string
           created_at?: string
           current_image_url?: string | null
           current_mood?: string | null
           current_stage?: number
           current_xp?: number
+          death_cause?: string | null
+          death_date?: string | null
           eye_color?: string | null
           favorite_color: string
           fur_color?: string | null
+          happiness?: number | null
+          hunger?: number | null
           id?: string
           image_regenerations_used?: number
           inactive_days?: number | null
           initial_image_url?: string | null
+          is_alive?: boolean | null
           last_activity_date?: string | null
           last_energy_update?: string | null
           last_mood_update?: string | null
           mind?: number | null
           neglected_image_url?: string | null
+          recovery_progress?: number | null
+          scars?: Json | null
           soul?: number | null
           spirit_animal: string
           story_tone?: string
@@ -6218,24 +6279,32 @@ export type Database = {
         }
         Update: {
           body?: number | null
+          care_score?: number | null
           core_element?: string
           created_at?: string
           current_image_url?: string | null
           current_mood?: string | null
           current_stage?: number
           current_xp?: number
+          death_cause?: string | null
+          death_date?: string | null
           eye_color?: string | null
           favorite_color?: string
           fur_color?: string | null
+          happiness?: number | null
+          hunger?: number | null
           id?: string
           image_regenerations_used?: number
           inactive_days?: number | null
           initial_image_url?: string | null
+          is_alive?: boolean | null
           last_activity_date?: string | null
           last_energy_update?: string | null
           last_mood_update?: string | null
           mind?: number | null
           neglected_image_url?: string | null
+          recovery_progress?: number | null
+          scars?: Json | null
           soul?: number | null
           spirit_animal?: string
           story_tone?: string
