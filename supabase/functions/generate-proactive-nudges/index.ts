@@ -7,12 +7,16 @@ const corsHeaders = {
 }
 
 // Concern level messages based on inactive days
-// Only 3, 7, and 14+ days trigger push notifications
+// Push notifications at: 3, 5, 6, 7, and 14+ days
 const getConcernLevel = (inactiveDays: number) => {
   if (inactiveDays === 1) return { level: 'gentle', tone: 'curious and casual', sendPush: false };
   if (inactiveDays === 2) return { level: 'concerned', tone: 'noticeably worried but supportive', sendPush: false };
   if (inactiveDays === 3) return { level: 'urgent', tone: 'genuinely concerned and caring', sendPush: true };
-  if (inactiveDays >= 4 && inactiveDays < 7) return { level: 'waiting', tone: 'patient but hopeful', sendPush: false };
+  if (inactiveDays === 4) return { level: 'waiting', tone: 'patient but hopeful', sendPush: false };
+  // Dormancy warning push at day 5
+  if (inactiveDays === 5) return { level: 'dormancy_warning', tone: 'worried about losing connection, caring but urgent', sendPush: true };
+  // Critical push at day 6 (dormancy imminent)
+  if (inactiveDays === 6) return { level: 'dormancy_imminent', tone: 'deeply concerned, this is a final warning', sendPush: true };
   if (inactiveDays === 7) return { level: 'emotional', tone: 'deeply worried and emotional', sendPush: true };
   if (inactiveDays >= 8 && inactiveDays < 14) return { level: 'hopeful', tone: 'still hopeful, missing you', sendPush: false };
   if (inactiveDays >= 14) return { level: 'final', tone: 'sad but hopeful, like a friend who misses you deeply', sendPush: true };
@@ -100,6 +104,12 @@ serve(async (req) => {
                     break;
                   case 'waiting':
                     contextPrompt = `The user has been away for ${companion.inactive_days} days. Their ${companionName} companion is waiting patiently. Generate a ${concernInfo.tone} message (1 sentence) - gentle and understanding.`;
+                    break;
+                  case 'dormancy_warning':
+                    contextPrompt = `The user has been away for 5 days. Their ${companionName} companion is in danger - if they don't return within 2 days, the companion will go dormant (a deep sleep state). Generate a ${concernInfo.tone} message (2 sentences max). Mention they only have 2 days left before their companion falls into a deep sleep. Be genuine, not guilt-trippy.`;
+                    break;
+                  case 'dormancy_imminent':
+                    contextPrompt = `URGENT: The user has been away for 6 days. Their ${companionName} companion will go dormant TOMORROW if they don't return. Generate a ${concernInfo.tone} message (2 sentences max). This is the final warning before dormancy. Convey urgency without being manipulative - their companion truly needs them.`;
                     break;
                   case 'emotional':
                     contextPrompt = `The user has been gone for a week (${companion.inactive_days} days). Their ${companionName} companion is not doing well - visibly sad and weakening. Generate a ${concernInfo.tone} message (2 sentences max) from the heart. This should feel personal, not like a notification.`;
