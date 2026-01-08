@@ -25,6 +25,7 @@ import { FactionBadge } from "@/components/FactionBadge";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
+import { getResolvedMentorId } from "@/utils/mentor";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
@@ -170,19 +171,21 @@ const Profile = () => {
     },
   });
 
+  const resolvedMentorId = getResolvedMentorId(profile);
+
   const { data: selectedMentor } = useQuery({
-    queryKey: ["selected-mentor", profile?.selected_mentor_id],
+    queryKey: ["selected-mentor", resolvedMentorId],
     staleTime: 10 * 60 * 1000, // 10 minutes - mentor selection rarely changes
-    enabled: !!profile?.selected_mentor_id,
+    enabled: !!resolvedMentorId,
     queryFn: async () => {
-      if (!profile?.selected_mentor_id) {
+      if (!resolvedMentorId) {
         throw new Error('No mentor selected');
       }
       
       const { data, error } = await supabase
         .from("mentors")
         .select("*")
-        .eq("id", profile.selected_mentor_id)
+        .eq("id", resolvedMentorId)
         .maybeSingle();
       if (error) throw error;
       return data;

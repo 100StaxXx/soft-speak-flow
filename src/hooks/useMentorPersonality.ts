@@ -1,6 +1,7 @@
 import { useProfile } from "./useProfile";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 interface MentorPersonality {
   name: string;
@@ -50,19 +51,20 @@ const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
 
 export const useMentorPersonality = (): MentorPersonality | null => {
   const { profile } = useProfile();
+  const resolvedMentorId = getResolvedMentorId(profile);
 
   const { data: mentor } = useQuery({
-    queryKey: ['mentor-personality', profile?.selected_mentor_id],
+    queryKey: ['mentor-personality', resolvedMentorId],
     queryFn: async () => {
-      if (!profile?.selected_mentor_id) return null;
+      if (!resolvedMentorId) return null;
       const { data } = await supabase
         .from('mentors')
         .select('name, slug, tone_description, style, avatar_url, primary_color')
-        .eq('id', profile.selected_mentor_id)
+        .eq('id', resolvedMentorId)
         .maybeSingle();
       return data;
     },
-    enabled: !!profile?.selected_mentor_id,
+    enabled: !!resolvedMentorId,
   });
 
   if (!mentor) return null;

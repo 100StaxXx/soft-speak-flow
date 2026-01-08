@@ -7,6 +7,7 @@ import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCelebration } from "@/contexts/CelebrationContext";
 import { logger } from "@/utils/logger";
+import { getResolvedMentorId } from "@/utils/mentor";
 
 export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
@@ -15,6 +16,7 @@ export const GlobalEvolutionListener = () => {
   const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
   const { setEvolutionInProgress } = useCelebration();
   const [isEvolving, setIsEvolving] = useState(false);
+  const resolvedMentorId = getResolvedMentorId(profile);
   const [evolutionData, setEvolutionData] = useState<{ 
     stage: number; 
     imageUrl: string;
@@ -88,11 +90,11 @@ export const GlobalEvolutionListener = () => {
 
             // Fetch mentor slug if we have a selected mentor
             let mentorSlug: string | undefined;
-            if (profile?.selected_mentor_id) {
+            if (resolvedMentorId) {
               const { data: mentor } = await supabase
                 .from('mentors')
                 .select('slug')
-                .eq('id', profile.selected_mentor_id)
+                .eq('id', resolvedMentorId)
                 .maybeSingle();
               
               mentorSlug = mentor?.slug;
@@ -129,7 +131,7 @@ export const GlobalEvolutionListener = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, user?.id, profile?.selected_mentor_id, queryClient]); // Include all used dependencies
+  }, [user, user?.id, resolvedMentorId, queryClient, setEvolutionInProgress]); // Include all used dependencies
 
   if (!isEvolving || !evolutionData) {
     return null;
