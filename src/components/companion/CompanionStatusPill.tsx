@@ -30,9 +30,12 @@ export const CompanionStatusPill = memo(({
   const { primaryAura } = useCompanionAuraColors();
   const navigate = useNavigate();
 
+  // Memoize status message but use a stable random pick per mood change
   const statusMessage = useMemo(() => {
     const messages = STATUS_MESSAGES[presence.mood];
-    return messages[Math.floor(Math.random() * messages.length)];
+    // Use a stable index based on mood string to avoid re-renders
+    const stableIndex = presence.mood.charCodeAt(0) % messages.length;
+    return messages[stableIndex];
   }, [presence.mood]);
 
   // Don't show if loading

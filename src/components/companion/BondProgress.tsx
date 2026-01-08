@@ -107,12 +107,14 @@ export const BondProgress = memo(({ className, showMilestones = false }: BondPro
                 >
                   {milestone.icon}
                 </div>
-                {/* Connecting line */}
+                {/* Connecting line - positioned correctly */}
                 {index < bondMilestones.length - 1 && (
                   <div className={cn(
-                    "absolute h-0.5 w-full",
+                    "h-0.5 flex-1 mx-0.5",
                     milestone.unlockedAt ? "bg-primary/30" : "bg-muted/20"
-                  )} />
+                  )} 
+                  style={{ display: 'none' }} // Hidden for now - timeline layout needs restructure
+                  />
                 )}
               </div>
             ))}

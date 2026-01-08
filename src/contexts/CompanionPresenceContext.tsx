@@ -70,8 +70,12 @@ export const CompanionPresenceProvider = memo(({ children }: { children: ReactNo
 
     const { overallCare, evolutionPath, dormancy, hasDormancyWarning, dialogueTone } = care;
     
-    // Map dialogue tone to mood
-    const mood: CompanionMood = dormancy.isDormant ? 'dormant' : dialogueTone as CompanionMood;
+    // Map dialogue tone to mood - validate that dialogueTone is a valid CompanionMood
+    const validMoods: CompanionMood[] = ['joyful', 'content', 'neutral', 'reserved', 'quiet', 'dormant'];
+    const mappedMood = dialogueTone as CompanionMood;
+    const mood: CompanionMood = dormancy.isDormant 
+      ? 'dormant' 
+      : validMoods.includes(mappedMood) ? mappedMood : 'neutral';
     
     // Get evolution path hue or default to neutral gold
     const auraHue = evolutionPath.path ? PATH_HUES[evolutionPath.path] ?? 45 : 45;

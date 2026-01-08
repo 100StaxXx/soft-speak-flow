@@ -31,7 +31,7 @@ export const CompanionMoodOverlay = memo(() => {
       style={{
         background: gradientOverlay,
         transition: prefersReducedMotion ? 'none' : 'background 3000ms ease-in-out',
-        willChange: 'background',
+        willChange: prefersReducedMotion ? 'auto' : 'background',
       }}
     />
   );
