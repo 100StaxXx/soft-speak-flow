@@ -2,7 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
+
+// Stable random based on seed - ensures consistency within a session
+const getStableRandom = (seed: string): number => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash % 1000) / 1000;
+};
 
 interface VoiceTemplate {
   species: string;
@@ -98,14 +108,17 @@ export function useCompanionDialogue() {
     return recoveryDayDialogue[day] || null;
   }, [care?.dormancy]);
 
+  // Stable random picker that varies by day but is consistent within a session
+  const pickRandom = useCallback((arr: string[], contextKey: string): string => {
+    if (!arr || arr.length === 0) return "";
+    const seed = `${new Date().toDateString()}-${contextKey}-${species}`;
+    const index = Math.floor(getStableRandom(seed) * arr.length);
+    return arr[index];
+  }, [species]);
+
   // Select appropriate greeting based on care level and path
   const currentGreeting = useMemo(() => {
     if (!voiceTemplate) return "Hello, friend.";
-    
-    const pickRandom = (arr: string[]): string => {
-      if (!arr || arr.length === 0) return "";
-      return arr[Math.floor(Math.random() * arr.length)];
-    };
     
     // Priority 1: Recovery-day-specific greeting (highest priority during recovery)
     if (dialogueMood === 'recovering' && recoveryGreeting) {
@@ -114,32 +127,33 @@ export function useCompanionDialogue() {
     
     // Priority 2: Generic recovery greeting from template
     if (dialogueMood === 'recovering' && voiceTemplate.recovery_greetings?.length) {
-      return pickRandom(voiceTemplate.recovery_greetings);
+      return pickRandom(voiceTemplate.recovery_greetings, 'recovery');
     }
     
     // Priority 2: Path-specific greeting (20% chance if path is locked)
     const evolutionPath = care?.evolutionPath?.path;
     if (evolutionPath && care?.evolutionPath?.isLocked) {
       const pathGreetings = voiceTemplate.path_greetings?.[evolutionPath];
-      if (pathGreetings?.length && Math.random() < 0.2) {
-        return pickRandom(pathGreetings as string[]);
+      // Use stable random for path chance too
+      if (pathGreetings?.length && getStableRandom(`${new Date().toDateString()}-path-chance`) < 0.2) {
+        return pickRandom(pathGreetings as string[], `path-${evolutionPath}`);
       }
     }
     
     // Priority 3: Care level greeting
     switch (dialogueMood) {
       case 'thriving':
-        return pickRandom(voiceTemplate.care_high_greetings) || pickRandom(voiceTemplate.greeting_templates);
+        return pickRandom(voiceTemplate.care_high_greetings, 'thriving') || pickRandom(voiceTemplate.greeting_templates, 'default');
       case 'content':
-        return pickRandom(voiceTemplate.care_medium_greetings) || pickRandom(voiceTemplate.greeting_templates);
+        return pickRandom(voiceTemplate.care_medium_greetings, 'content') || pickRandom(voiceTemplate.greeting_templates, 'default');
       case 'concerned':
-        return pickRandom(voiceTemplate.care_low_greetings) || pickRandom(voiceTemplate.concern_templates);
+        return pickRandom(voiceTemplate.care_low_greetings, 'concerned') || pickRandom(voiceTemplate.concern_templates, 'concern');
       case 'desperate':
-        return pickRandom(voiceTemplate.care_critical_greetings) || pickRandom(voiceTemplate.concern_templates);
+        return pickRandom(voiceTemplate.care_critical_greetings, 'desperate') || pickRandom(voiceTemplate.concern_templates, 'concern');
       default:
-        return pickRandom(voiceTemplate.greeting_templates);
+        return pickRandom(voiceTemplate.greeting_templates, 'default');
     }
-  }, [voiceTemplate, dialogueMood, care?.evolutionPath, recoveryGreeting]);
+  }, [voiceTemplate, dialogueMood, care?.evolutionPath, recoveryGreeting, pickRandom]);
 
   // Get scar reference if companion has scars
   const scarReference = useMemo(() => {
@@ -148,16 +162,11 @@ export function useCompanionDialogue() {
     const scarHistory = (companion as any).scar_history as any[] | null;
     if (!scarHistory || scarHistory.length === 0) return null;
     
-    // 15% chance to reference a scar
-    if (Math.random() > 0.15) return null;
+    // 15% chance to reference a scar (using stable random)
+    if (getStableRandom(`${new Date().toDateString()}-scar-chance`) > 0.15) return null;
     
-    const pickRandom = (arr: string[]): string => {
-      if (!arr || arr.length === 0) return "";
-      return arr[Math.floor(Math.random() * arr.length)];
-    };
-    
-    return pickRandom(voiceTemplate.scar_references);
-  }, [voiceTemplate, companion]);
+    return pickRandom(voiceTemplate.scar_references, 'scar');
+  }, [voiceTemplate, companion, pickRandom]);
 
   // Get bond-level dialogue
   const bondDialogue = useMemo(() => {
@@ -168,20 +177,15 @@ export function useCompanionDialogue() {
     
     if (!bondLines || bondLines.length === 0) return null;
     
-    return bondLines[Math.floor(Math.random() * bondLines.length)];
-  }, [voiceTemplate, care?.bond]);
+    return pickRandom(bondLines, `bond-${bondLevel}`);
+  }, [voiceTemplate, care?.bond, pickRandom]);
 
   // Get encouragement based on mood
   const encouragement = useMemo(() => {
     if (!voiceTemplate) return null;
     
-    const pickRandom = (arr: string[]): string => {
-      if (!arr || arr.length === 0) return "";
-      return arr[Math.floor(Math.random() * arr.length)];
-    };
-    
-    return pickRandom(voiceTemplate.encouragement_templates);
-  }, [voiceTemplate]);
+    return pickRandom(voiceTemplate.encouragement_templates, 'encouragement');
+  }, [voiceTemplate, pickRandom]);
 
   return {
     greeting: currentGreeting,

@@ -17,14 +17,18 @@ export const BondProgress = memo(({ className, showMilestones = false }: BondPro
   const { currentBond, bondMilestones, isLoading } = useCompanionMemories();
   const { primaryAura } = useCompanionAuraColors();
 
-  // Calculate progress to next level (based on interactions)
+  // Calculate progress to next level using exponential thresholds
   const progressToNext = useMemo(() => {
     if (!currentBond.nextMilestone) return 100; // Max level
     
-    // Rough estimate: ~50 interactions per level
-    const interactionsPerLevel = 50;
-    const levelInteractions = currentBond.totalInteractions % interactionsPerLevel;
-    return Math.min(100, (levelInteractions / interactionsPerLevel) * 100);
+    // Exponential thresholds: level 2 = 25, level 3 = 70, level 4 = 150, etc.
+    const getThreshold = (level: number) => Math.round(25 * Math.pow(1.8, level - 2));
+    const currentThreshold = currentBond.level === 1 ? 0 : getThreshold(currentBond.level);
+    const nextThreshold = getThreshold(currentBond.level + 1);
+    const range = nextThreshold - currentThreshold;
+    const progress = currentBond.totalInteractions - currentThreshold;
+    
+    return Math.min(100, Math.max(0, (progress / range) * 100));
   }, [currentBond]);
 
   if (isLoading) {
@@ -87,35 +91,42 @@ export const BondProgress = memo(({ className, showMilestones = false }: BondPro
       {showMilestones && (
         <div className="pt-4 space-y-2">
           <h4 className="text-sm font-medium text-muted-foreground">Bond Journey</h4>
-          <div className="flex items-center gap-1">
-            {bondMilestones.map((milestone, index) => (
+          <div className="relative flex items-center justify-between px-3">
+            {/* Background connecting line */}
+            <div className="absolute top-3 left-6 right-6 h-0.5 bg-muted/30" />
+            {/* Progress line overlay */}
+            <div 
+              className="absolute top-3 left-6 h-0.5 bg-primary/50 transition-all duration-500"
+              style={{ 
+                width: `calc(${((currentBond.level - 1) / (bondMilestones.length - 1)) * 100}% - 24px)` 
+              }}
+            />
+            
+            {/* Milestone dots */}
+            {bondMilestones.map((milestone) => (
               <div
                 key={milestone.level}
-                className={cn(
-                  "flex-1 flex flex-col items-center gap-1",
-                  milestone.unlockedAt ? "opacity-100" : "opacity-40"
-                )}
+                className="relative z-10 flex flex-col items-center gap-1"
               >
-                {/* Milestone dot */}
                 <div
                   className={cn(
-                    "w-6 h-6 rounded-full flex items-center justify-center text-xs",
+                    "w-6 h-6 rounded-full flex items-center justify-center text-xs bg-background border-2",
                     milestone.unlockedAt 
-                      ? "bg-primary/20 ring-2 ring-primary/50" 
-                      : "bg-muted/30"
+                      ? "border-primary/70" 
+                      : "border-muted/40 opacity-50"
                   )}
+                  style={{
+                    boxShadow: milestone.unlockedAt ? `0 0 8px ${primaryAura}` : 'none'
+                  }}
                 >
                   {milestone.icon}
                 </div>
-                {/* Connecting line - positioned correctly */}
-                {index < bondMilestones.length - 1 && (
-                  <div className={cn(
-                    "h-0.5 flex-1 mx-0.5",
-                    milestone.unlockedAt ? "bg-primary/30" : "bg-muted/20"
-                  )} 
-                  style={{ display: 'none' }} // Hidden for now - timeline layout needs restructure
-                  />
-                )}
+                <span className={cn(
+                  "text-[10px] text-center max-w-[50px] leading-tight",
+                  milestone.unlockedAt ? "text-foreground" : "text-muted-foreground/50"
+                )}>
+                  {milestone.name.split(' ')[0]}
+                </span>
               </div>
             ))}
           </div>

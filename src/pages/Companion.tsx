@@ -6,9 +6,10 @@ import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer } from "lucide-react";
+import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer, Heart } from "lucide-react";
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
+import { BondTab } from "@/components/companion/BondTab";
 import { useCompanion } from "@/hooks/useCompanion";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
@@ -132,10 +133,14 @@ const Companion = () => {
     // Loading or loaded content with tabs
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="container pb-6">
-        <TabsList className="grid w-full grid-cols-5 cosmiq-glass-subtle border border-cosmiq-glow/20">
+        <TabsList className="grid w-full grid-cols-6 cosmiq-glass-subtle border border-cosmiq-glow/20">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="bond" className="flex items-center gap-2">
+            <Heart className="h-4 w-4" />
+            <span className="hidden sm:inline">Bond</span>
           </TabsTrigger>
           <TabsTrigger value="focus" className="flex items-center gap-2">
             <Timer className="h-4 w-4" />
@@ -180,6 +185,10 @@ const Companion = () => {
                     progressToNext={progressToNext}
                   />
                 )}
+              </TabsContent>
+
+              <TabsContent value="bond">
+                {activeTab === "bond" && <BondTab />}
               </TabsContent>
 
               <TabsContent value="focus">
