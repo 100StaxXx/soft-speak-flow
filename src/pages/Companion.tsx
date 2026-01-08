@@ -10,6 +10,7 @@ import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer, Heart } from "l
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { BondTab } from "@/components/companion/BondTab";
+import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
@@ -34,6 +35,9 @@ const OverviewTab = memo(({
   progressToNext: number;
 }) => (
   <div className="space-y-6 mt-6">
+    {/* Memory whisper - occasional floating "remember when" message */}
+    <MemoryWhisper chance={0.2} className="px-2" />
+    
     <ParallaxCard offset={30}>
       <CompanionDisplay />
     </ParallaxCard>
