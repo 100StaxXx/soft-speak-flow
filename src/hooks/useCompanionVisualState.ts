@@ -164,6 +164,7 @@ export const useCompanionVisualState = (
     visualState,
     cssStyles,
     animationClass,
+    care, // Return full care object to avoid duplicate hook calls
     overallCare: care.overallCare,
     evolutionPath: care.evolutionPath,
     dialogueTone: care.dialogueTone,

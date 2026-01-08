@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
-import { useCompanionCareSignals } from "@/hooks/useCompanionCareSignals";
 import { useCompanionRegenerate } from "@/hooks/useCompanionRegenerate";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import { useEvolution } from "@/contexts/EvolutionContext";
@@ -98,13 +97,11 @@ export const CompanionDisplay = memo(() => {
   const { equippedRewards } = useEpicRewards();
   const { isEvolvingLoading } = useEvolution();
   
-  // Get care signals for advanced visual state
-  const { care } = useCompanionCareSignals();
-  
-  // Use care-based visual state instead of mood-based
+  // Use care-based visual state (includes care signals to avoid duplicate hook calls)
   const { 
     cssStyles: careStyles, 
     animationClass, 
+    care,
     evolutionPath, 
     isDormant,
     hasDormancyWarning,
@@ -417,7 +414,7 @@ export const CompanionDisplay = memo(() => {
               {/* Dormancy warning component */}
               <DormancyWarning 
                 show={hasDormancyWarning && !isDormant}
-                daysUntilDormancy={care.dormancy.daysUntilWake > 0 ? undefined : 2}
+                daysUntilDormancy={care.dormancy.daysUntilDormancy ?? undefined}
               />
               {/* Dormant overlay component */}
               <DormantOverlay 
