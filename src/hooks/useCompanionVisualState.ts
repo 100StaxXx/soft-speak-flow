@@ -1,17 +1,20 @@
 import { useMemo } from 'react';
 import type { CompanionMoodState } from './useCompanionHealth';
+import { useCompanionCareSignals, type CareSignals } from './useCompanionCareSignals';
 
 interface VisualState {
   filter: string;
-  animation: 'bounce' | 'pulse' | 'shiver' | 'droop' | 'none';
+  animation: 'bounce' | 'pulse' | 'shiver' | 'droop' | 'dormant-breathe' | 'none';
   animationDuration: string;
   opacity: number;
   saturation: number;
+  posture: 'confident' | 'relaxed' | 'neutral' | 'withdrawn' | 'curled' | 'sleeping';
+  eyeContact: 'direct' | 'friendly' | 'occasional' | 'averted' | 'none' | 'closed';
 }
 
 /**
- * Maps companion health and mood to visual CSS filters and animations
- * Uses CSS-only approach for transient states (no AI calls)
+ * Maps companion health and HIDDEN care signals to visual CSS filters and animations.
+ * Users see the effects but never the underlying numbers.
  */
 export const useCompanionVisualState = (
   moodState: CompanionMoodState,
@@ -20,6 +23,8 @@ export const useCompanionVisualState = (
   isAlive: boolean,
   recoveryProgress: number
 ) => {
+  const { care } = useCompanionCareSignals();
+
   const visualState = useMemo((): VisualState => {
     // Dead companion - grayscale and no animation
     if (!isAlive) {
@@ -29,93 +34,110 @@ export const useCompanionVisualState = (
         animationDuration: '0s',
         opacity: 0.7,
         saturation: 0,
+        posture: 'curled',
+        eyeContact: 'closed',
       };
     }
 
-    // Recovering companion - gradual improvement
-    if (recoveryProgress < 100) {
-      const recoveryPercent = recoveryProgress / 100;
+    // Dormant companion - sleeping state
+    if (care.dormancy.isDormant) {
       return {
-        filter: `saturate(${0.5 + recoveryPercent * 0.5}) brightness(${0.85 + recoveryPercent * 0.15})`,
+        filter: 'grayscale(0.5) brightness(0.6) blur(0.5px)',
+        animation: 'dormant-breathe',
+        animationDuration: '6s',
+        opacity: 0.75,
+        saturation: 0.5,
+        posture: 'sleeping',
+        eyeContact: 'closed',
+      };
+    }
+
+    // Recovering from dormancy
+    if (care.dormancy.recoveryDays > 0 && care.dormancy.recoveryDays < 5) {
+      const recoveryPercent = care.dormancy.recoveryDays / 5;
+      return {
+        filter: `saturate(${0.5 + recoveryPercent * 0.5}) brightness(${0.8 + recoveryPercent * 0.2})`,
         animation: 'pulse',
-        animationDuration: '3s',
+        animationDuration: '4s',
         opacity: 0.8 + recoveryPercent * 0.2,
         saturation: 0.5 + recoveryPercent * 0.5,
+        posture: recoveryPercent > 0.5 ? 'neutral' : 'withdrawn',
+        eyeContact: recoveryPercent > 0.5 ? 'occasional' : 'averted',
       };
     }
 
-    // Mood-based visual states
-    switch (moodState) {
-      case 'happy':
-        return {
-          filter: 'saturate(1.2) brightness(1.1)',
-          animation: 'bounce',
-          animationDuration: '2s',
-          opacity: 1,
-          saturation: 1.2,
-        };
+    // Care-based visual states (uses hidden signals)
+    const overallCare = care.overallCare;
 
-      case 'content':
-        return {
-          filter: 'saturate(1.1) brightness(1.05)',
-          animation: 'pulse',
-          animationDuration: '4s',
-          opacity: 1,
-          saturation: 1.1,
-        };
-
-      case 'neutral':
-        return {
-          filter: 'saturate(0.95) brightness(0.98)',
-          animation: 'pulse',
-          animationDuration: '5s',
-          opacity: 0.95,
-          saturation: 0.95,
-        };
-
-      case 'worried':
-        return {
-          filter: 'saturate(0.8) brightness(0.92)',
-          animation: 'shiver',
-          animationDuration: '0.5s',
-          opacity: 0.9,
-          saturation: 0.8,
-        };
-
-      case 'sad':
-        return {
-          filter: 'saturate(0.6) brightness(0.85) sepia(0.1)',
-          animation: 'droop',
-          animationDuration: '3s',
-          opacity: 0.85,
-          saturation: 0.6,
-        };
-
-      case 'sick':
-        return {
-          filter: 'saturate(0.4) brightness(0.7) sepia(0.2)',
-          animation: 'shiver',
-          animationDuration: '0.3s',
-          opacity: 0.75,
-          saturation: 0.4,
-        };
-
-      default:
-        return {
-          filter: 'none',
-          animation: 'none',
-          animationDuration: '0s',
-          opacity: 1,
-          saturation: 1,
-        };
+    // High care (0.8+) - Vibrant and engaged
+    if (overallCare > 0.8) {
+      return {
+        filter: 'saturate(1.25) brightness(1.1)',
+        animation: 'bounce',
+        animationDuration: '2s',
+        opacity: 1,
+        saturation: 1.25,
+        posture: 'confident',
+        eyeContact: 'direct',
+      };
     }
-  }, [moodState, hunger, happiness, isAlive, recoveryProgress]);
+
+    // Good care (0.6-0.8) - Content and friendly
+    if (overallCare > 0.6) {
+      return {
+        filter: 'saturate(1.1) brightness(1.05)',
+        animation: 'pulse',
+        animationDuration: '3s',
+        opacity: 1,
+        saturation: 1.1,
+        posture: 'relaxed',
+        eyeContact: 'friendly',
+      };
+    }
+
+    // Moderate care (0.4-0.6) - Neutral
+    if (overallCare > 0.4) {
+      return {
+        filter: 'saturate(0.95) brightness(0.98)',
+        animation: 'pulse',
+        animationDuration: '5s',
+        opacity: 0.95,
+        saturation: 0.95,
+        posture: 'neutral',
+        eyeContact: 'occasional',
+      };
+    }
+
+    // Low care (0.2-0.4) - Withdrawn
+    if (overallCare > 0.2) {
+      return {
+        filter: 'saturate(0.75) brightness(0.88) sepia(0.08)',
+        animation: 'droop',
+        animationDuration: '4s',
+        opacity: 0.88,
+        saturation: 0.75,
+        posture: 'withdrawn',
+        eyeContact: 'averted',
+      };
+    }
+
+    // Critical care (<0.2) - Distressed
+    return {
+      filter: 'saturate(0.5) brightness(0.75) sepia(0.15)',
+      animation: 'shiver',
+      animationDuration: '0.4s',
+      opacity: 0.75,
+      saturation: 0.5,
+      posture: 'curled',
+      eyeContact: 'none',
+    };
+  }, [care, isAlive]);
 
   // Generate CSS styles object
   const cssStyles = useMemo((): React.CSSProperties => ({
     filter: visualState.filter,
     opacity: visualState.opacity,
-    transition: 'filter 0.5s ease, opacity 0.5s ease',
+    transition: 'filter 0.8s ease, opacity 0.8s ease',
   }), [visualState]);
 
   // Generate animation class name
@@ -131,6 +153,8 @@ export const useCompanionVisualState = (
         return 'animate-companion-shiver';
       case 'droop':
         return 'animate-companion-droop';
+      case 'dormant-breathe':
+        return 'animate-companion-dormant';
       default:
         return '';
     }
@@ -140,5 +164,11 @@ export const useCompanionVisualState = (
     visualState,
     cssStyles,
     animationClass,
+    overallCare: care.overallCare,
+    evolutionPath: care.evolutionPath,
+    dialogueTone: care.dialogueTone,
+    isDormant: care.dormancy.isDormant,
+    hasDormancyWarning: care.hasDormancyWarning,
+    bondLevel: care.bond.level,
   };
 };
