@@ -155,6 +155,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
       open={open} 
       onOpenChange={setOpen}
       shouldScaleBackground={false}
+      handleOnly={true}
     >
       <DrawerTrigger asChild>
         {renderTrigger ? (
