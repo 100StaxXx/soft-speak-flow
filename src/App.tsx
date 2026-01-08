@@ -26,6 +26,7 @@ import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 import { CompanionAmbientParticles } from "@/components/companion/CompanionAmbientParticles";
 import { CompanionMoodOverlay } from "@/components/companion/CompanionMoodOverlay";
+import { CompanionWhisper } from "@/components/companion/CompanionWhisper";
 
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
@@ -236,6 +237,7 @@ const AppContent = memo(() => {
               {/* Global companion presence layers */}
               <CompanionMoodOverlay />
               <CompanionAmbientParticles />
+              <CompanionWhisper />
               
               {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
               <Suspense fallback={<LoadingFallback />}>
