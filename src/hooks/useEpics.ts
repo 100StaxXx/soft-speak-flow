@@ -274,14 +274,44 @@ export const useEpics = () => {
           }
         }
 
-        // Create milestones with dates if provided
-        if (epicData.milestones && epicData.milestones.length > 0) {
-          console.log('[Epic Creation] Inserting milestones:', epicData.milestones.length, epicData.milestones);
+        // Create milestones with dates if provided, or generate defaults
+        let milestonesToInsert = epicData.milestones;
+        
+        // Fallback: generate default milestones if none provided but we have a story type
+        if ((!milestonesToInsert || milestonesToInsert.length === 0) && epicData.story_type_slug) {
+          console.log('[Epic Creation] No milestones provided, generating defaults for story type:', epicData.story_type_slug);
+          
+          // Calculate chapter count based on duration
+          let chapterCount = 5;
+          if (epicData.target_days <= 14) chapterCount = 3;
+          else if (epicData.target_days <= 30) chapterCount = 4;
+          else if (epicData.target_days <= 60) chapterCount = 5;
+          else chapterCount = 6;
+          
+          const now = new Date();
+          milestonesToInsert = Array.from({ length: chapterCount }, (_, i) => {
+            const percent = Math.round(((i + 1) / chapterCount) * 100);
+            const daysOffset = Math.floor((epicData.target_days * percent) / 100);
+            const targetDate = new Date(now);
+            targetDate.setDate(targetDate.getDate() + daysOffset);
+            
+            return {
+              title: i === chapterCount - 1 ? 'The Finale' : `Chapter ${i + 1}`,
+              description: i === chapterCount - 1 ? 'Complete your epic journey!' : `Reach ${percent}% of your goal`,
+              target_date: targetDate.toISOString().split('T')[0],
+              milestone_percent: percent,
+              is_postcard_milestone: true,
+            };
+          });
+        }
+        
+        if (milestonesToInsert && milestonesToInsert.length > 0) {
+          console.log('[Epic Creation] Inserting milestones:', milestonesToInsert.length, milestonesToInsert);
           
           const { data: insertedMilestones, error: milestonesError } = await supabase
             .from("epic_milestones")
             .insert(
-              epicData.milestones.map((milestone, index) => ({
+              milestonesToInsert.map((milestone, index) => ({
                 epic_id: epic.id,
                 user_id: currentUserId,
                 title: milestone.title,
@@ -303,7 +333,7 @@ export const useEpics = () => {
             console.log('[Epic Creation] Successfully created milestones:', insertedMilestones?.length);
           }
         } else {
-          console.log('[Epic Creation] No milestones provided in epicData');
+          console.log('[Epic Creation] No milestones to insert and no story type for fallback');
         }
 
         // Trigger narrative seed generation in background if story type selected
