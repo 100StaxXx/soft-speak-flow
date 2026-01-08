@@ -97,7 +97,7 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
               </motion.p>
             </AnimatePresence>
             
-            {/* Secondary text (scar reference or bond dialogue) */}
+            {/* Secondary text (bond dialogue) */}
             {secondaryText && (
               <motion.p
                 className="text-xs text-muted-foreground mt-2 italic"

@@ -18,7 +18,7 @@ interface WakeUpState {
 /**
  * Detects when a companion transitions out of dormancy and triggers a celebration.
  * Tracks the transition state to avoid showing celebration on page reload.
- * Also triggers the dormancy_survivor scar.
+ * Also creates a recovery memory when the companion wakes up.
  */
 export function useCompanionWakeUp(): WakeUpState {
   const { user } = useAuth();

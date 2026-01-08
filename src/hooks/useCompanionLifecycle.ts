@@ -9,7 +9,6 @@ interface CompanionLifecycle {
   deathCause: string | null;
   careScore: number;
   recoveryProgress: number;
-  scars: Array<{ date: string; context: string }>;
   hunger: number;
   happiness: number;
   isRecovering: boolean;
@@ -31,7 +30,7 @@ interface CompanionMemorial {
 
 /**
  * Hook to manage the Tamagotchi-style companion lifecycle
- * Handles death, recovery, scars, and care score
+ * Handles death, recovery, and care score
  */
 export const useCompanionLifecycle = () => {
   const { user } = useAuth();
@@ -47,7 +46,7 @@ export const useCompanionLifecycle = () => {
 
       const { data, error } = await supabase
         .from('user_companion')
-        .select('is_alive, death_date, death_cause, care_score, recovery_progress, scars, hunger, happiness, inactive_days, spirit_animal, current_stage, current_image_url')
+        .select('is_alive, death_date, death_cause, care_score, recovery_progress, hunger, happiness, inactive_days, spirit_animal, current_stage, current_image_url')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -93,7 +92,6 @@ export const useCompanionLifecycle = () => {
     deathCause: lifecycleData?.death_cause ?? null,
     careScore: lifecycleData?.care_score ?? 100,
     recoveryProgress: lifecycleData?.recovery_progress ?? 100,
-    scars: (lifecycleData?.scars as Array<{ date: string; context: string }>) ?? [],
     hunger: lifecycleData?.hunger ?? 100,
     happiness: lifecycleData?.happiness ?? 100,
     isRecovering: (lifecycleData?.recovery_progress ?? 100) < 100,
