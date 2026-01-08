@@ -17,6 +17,17 @@ interface UserCompanion {
   soul: number | null;
   neglected_image_url: string | null;
   current_image_url: string | null;
+  // New Tamagotchi fields
+  is_alive: boolean | null;
+  care_score: number | null;
+  recovery_progress: number | null;
+  scars: Array<{ date: string; context: string }> | null;
+  hunger: number | null;
+  happiness: number | null;
+  spirit_animal: string | null;
+  core_element: string | null;
+  current_stage: number | null;
+  created_at: string | null;
 }
 
 interface UserProfile {
@@ -25,6 +36,11 @@ interface UserProfile {
   streak_freezes_available: number | null;
   streak_freezes_reset_at: string | null;
 }
+
+const DEATH_THRESHOLD_DAYS = 7;
+const CRITICAL_THRESHOLD_DAYS = 5;
+const SCAR_THRESHOLD_DAYS = 5;
+const RECOVERY_PER_DAY = 25;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -41,23 +57,26 @@ serve(async (req) => {
 
     console.log(`[Daily Decay] Processing for date: ${today}`);
 
-    // Get all users with companions
+    // Get all ALIVE user companions
     const { data: companions, error: companionsError } = await supabase
       .from("user_companion")
-      .select("id, user_id, inactive_days, last_activity_date, current_mood, body, mind, soul, neglected_image_url, current_image_url");
+      .select("id, user_id, inactive_days, last_activity_date, current_mood, body, mind, soul, neglected_image_url, current_image_url, is_alive, care_score, recovery_progress, scars, hunger, happiness, spirit_animal, core_element, current_stage, created_at")
+      .or("is_alive.is.null,is_alive.eq.true");
 
     if (companionsError) {
       console.error("Error fetching companions:", companionsError);
       throw companionsError;
     }
 
-    console.log(`[Daily Decay] Found ${companions?.length || 0} companions to process`);
+    console.log(`[Daily Decay] Found ${companions?.length || 0} alive companions to process`);
 
     let processedCount = 0;
     let decayedCount = 0;
     let recoveredCount = 0;
     let freezesUsed = 0;
     let neglectedImageTriggered = 0;
+    let deathsCount = 0;
+    let scarsAdded = 0;
 
     for (const companion of (companions as UserCompanion[]) || []) {
       try {
@@ -65,34 +84,134 @@ serve(async (req) => {
         const hadActivity = await checkUserActivity(supabase, companion.user_id, yesterday);
 
         if (hadActivity) {
-          // User was active - reset decay
-          if (companion.inactive_days > 0) {
-            console.log(`[Recovery] User ${companion.user_id} was active, resetting decay`);
-            
-            // Recovery bonus: +10 to each stat
-            const newBody = Math.min(100, (companion.body ?? 100) + 10);
-            const newMind = Math.min(100, (companion.mind ?? 0) + 10);
-            const newSoul = Math.min(100, (companion.soul ?? 0) + 10);
+          // User was active - apply recovery and care score bonus
+          const currentRecovery = companion.recovery_progress ?? 100;
+          const currentCareScore = companion.care_score ?? 100;
+          const currentHunger = companion.hunger ?? 100;
+          const currentHappiness = companion.happiness ?? 100;
+          const wasRecovering = currentRecovery < 100;
 
-            await supabase
-              .from("user_companion")
-              .update({
-                inactive_days: 0,
-                last_activity_date: yesterday,
-                current_mood: "happy",
-                body: newBody,
-                mind: newMind,
-                soul: newSoul,
-              })
-              .eq("id", companion.id);
+          // Recovery progress increases by 25% per active day
+          const newRecovery = Math.min(100, currentRecovery + RECOVERY_PER_DAY);
+          
+          // Care score increases with consistent activity
+          const newCareScore = Math.min(100, currentCareScore + 5);
+          
+          // Hunger and happiness replenish
+          const newHunger = Math.min(100, currentHunger + 30);
+          const newHappiness = Math.min(100, currentHappiness + 20);
 
-            recoveredCount++;
+          // Determine new mood based on recovery state
+          let newMood = "happy";
+          if (newRecovery < 50) {
+            newMood = "sad";
+          } else if (newRecovery < 100) {
+            newMood = "neutral";
           }
+
+          // Recovery bonus: +10 to each stat
+          const newBody = Math.min(100, (companion.body ?? 100) + 10);
+          const newMind = Math.min(100, (companion.mind ?? 0) + 10);
+          const newSoul = Math.min(100, (companion.soul ?? 0) + 10);
+
+          console.log(`[Recovery] User ${companion.user_id} was active. Recovery: ${currentRecovery}% -> ${newRecovery}%, Care score: ${newCareScore}`);
+
+          await supabase
+            .from("user_companion")
+            .update({
+              inactive_days: 0,
+              last_activity_date: yesterday,
+              current_mood: newMood,
+              body: newBody,
+              mind: newMind,
+              soul: newSoul,
+              recovery_progress: newRecovery,
+              care_score: newCareScore,
+              hunger: newHunger,
+              happiness: newHappiness,
+            })
+            .eq("id", companion.id);
+
+          recoveredCount++;
         } else {
           // User was inactive - apply decay
           const newInactiveDays = (companion.inactive_days ?? 0) + 1;
-          
+          const currentCareScore = companion.care_score ?? 100;
+          const currentHunger = companion.hunger ?? 100;
+          const currentHappiness = companion.happiness ?? 100;
+          const currentScars = companion.scars ?? [];
+
           console.log(`[Decay] User ${companion.user_id} inactive for ${newInactiveDays} days`);
+
+          // Check for DEATH at 7 days
+          if (newInactiveDays >= DEATH_THRESHOLD_DAYS) {
+            console.log(`[DEATH] Companion for user ${companion.user_id} has died after ${newInactiveDays} days of neglect`);
+            
+            // Calculate days together
+            const createdAt = companion.created_at ? new Date(companion.created_at) : new Date();
+            const daysTogether = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+            // Create memorial
+            const { error: memorialError } = await supabase
+              .from("companion_memorials")
+              .insert({
+                user_id: companion.user_id,
+                companion_name: `The ${companion.spirit_animal || 'Companion'}`,
+                spirit_animal: companion.spirit_animal || 'Unknown',
+                core_element: companion.core_element,
+                days_together: daysTogether,
+                death_date: today,
+                death_cause: "Passed away from neglect after waiting too long",
+                final_evolution_stage: companion.current_stage ?? 1,
+                final_image_url: companion.current_image_url,
+              });
+
+            if (memorialError) {
+              console.error(`Failed to create memorial for user ${companion.user_id}:`, memorialError);
+            }
+
+            // Mark companion as dead
+            await supabase
+              .from("user_companion")
+              .update({
+                is_alive: false,
+                death_date: today,
+                death_cause: "Neglect",
+                current_mood: "dead",
+              })
+              .eq("id", companion.id);
+
+            deathsCount++;
+            processedCount++;
+            continue;
+          }
+
+          // Check for SCAR at 5-6 days (only add once per critical period)
+          const hasScarForThisPeriod = currentScars.some(scar => {
+            const scarDate = new Date(scar.date);
+            const daysSinceScar = Math.floor((Date.now() - scarDate.getTime()) / (1000 * 60 * 60 * 24));
+            return daysSinceScar < 7; // Only one scar per week
+          });
+
+          let newScars = currentScars;
+          if (newInactiveDays >= SCAR_THRESHOLD_DAYS && !hasScarForThisPeriod) {
+            console.log(`[SCAR] Adding scar for user ${companion.user_id} at ${newInactiveDays} days inactive`);
+            newScars = [
+              ...currentScars,
+              {
+                date: today,
+                context: `Nearly lost after ${newInactiveDays} days of absence`,
+              },
+            ];
+            scarsAdded++;
+          }
+
+          // Care score decreases with neglect
+          const newCareScore = Math.max(0, currentCareScore - 10);
+          
+          // Hunger and happiness decay
+          const newHunger = Math.max(0, currentHunger - 15);
+          const newHappiness = Math.max(0, currentHappiness - 20);
 
           // Apply stat decay: -5 per stat per day (minimum 0)
           const newBody = Math.max(0, (companion.body ?? 100) - 5);
@@ -106,6 +225,10 @@ serve(async (req) => {
           else if (newInactiveDays >= 3 && newInactiveDays < 5) newMood = "sad";
           else if (newInactiveDays >= 5) newMood = "sick";
 
+          // If companion was previously recovered and now neglected, start recovery decline
+          const currentRecovery = companion.recovery_progress ?? 100;
+          const newRecovery = newInactiveDays >= 3 ? Math.max(0, currentRecovery - 25) : currentRecovery;
+
           await supabase
             .from("user_companion")
             .update({
@@ -114,6 +237,11 @@ serve(async (req) => {
               body: newBody,
               mind: newMind,
               soul: newSoul,
+              care_score: newCareScore,
+              recovery_progress: newRecovery,
+              hunger: newHunger,
+              happiness: newHappiness,
+              scars: newScars,
             })
             .eq("id", companion.id);
 
@@ -123,7 +251,6 @@ serve(async (req) => {
           if (newInactiveDays === 3 && !companion.neglected_image_url && companion.current_image_url) {
             console.log(`[Neglected Image] Triggering generation for user ${companion.user_id}`);
             
-            // Call the generate-neglected-companion-image function in background
             try {
               await supabase.functions.invoke("generate-neglected-companion-image", {
                 body: {
@@ -151,7 +278,7 @@ serve(async (req) => {
     // Reset streak freezes for users whose reset date has passed
     await resetExpiredStreakFreezes(supabase, today);
 
-    console.log(`[Daily Decay] Complete: ${processedCount} processed, ${decayedCount} decayed, ${recoveredCount} recovered, ${neglectedImageTriggered} neglected images triggered`);
+    console.log(`[Daily Decay] Complete: ${processedCount} processed, ${decayedCount} decayed, ${recoveredCount} recovered, ${deathsCount} deaths, ${scarsAdded} scars added, ${neglectedImageTriggered} neglected images triggered`);
 
     return new Response(
       JSON.stringify({
@@ -159,6 +286,8 @@ serve(async (req) => {
         processed: processedCount,
         decayed: decayedCount,
         recovered: recoveredCount,
+        deaths: deathsCount,
+        scarsAdded,
         freezesUsed,
         neglectedImageTriggered,
       }),
@@ -178,7 +307,6 @@ serve(async (req) => {
     );
   }
 });
-
 async function checkUserActivity(supabase: any, userId: string, date: string): Promise<boolean> {
   // Check for quest completions
   const { data: tasks } = await supabase

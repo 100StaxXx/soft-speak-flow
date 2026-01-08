@@ -17,6 +17,14 @@ interface CompanionHealth {
   mind: number;
   soul: number;
   lastActivityDate: string | null;
+  // New Tamagotchi fields
+  isAlive: boolean;
+  hunger: number;
+  happiness: number;
+  careScore: number;
+  recoveryProgress: number;
+  isRecovering: boolean;
+  isCritical: boolean;
 }
 
 interface StreakFreezeData {
@@ -42,7 +50,7 @@ export const useCompanionHealth = () => {
       
       const { data, error } = await supabase
         .from('user_companion')
-        .select('inactive_days, last_activity_date, neglected_image_url, current_mood, body, mind, soul, current_image_url')
+        .select('inactive_days, last_activity_date, neglected_image_url, current_mood, body, mind, soul, current_image_url, is_alive, hunger, happiness, care_score, recovery_progress')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -96,10 +104,17 @@ export const useCompanionHealth = () => {
     const mind = companionHealthData?.mind ?? 0;
     const soul = companionHealthData?.soul ?? 0;
     const inactiveDays = companionHealthData?.inactive_days ?? 0;
+    const isAlive = companionHealthData?.is_alive ?? true;
+    const hunger = companionHealthData?.hunger ?? 100;
+    const happiness = companionHealthData?.happiness ?? 100;
+    const careScore = companionHealthData?.care_score ?? 100;
+    const recoveryProgress = companionHealthData?.recovery_progress ?? 100;
     
     const healthPercentage = Math.round((body + mind + soul) / 3);
     const moodState = getMoodState(inactiveDays);
     const isNeglected = inactiveDays >= 3;
+    const isRecovering = recoveryProgress < 100;
+    const isCritical = inactiveDays >= 5;
     
     // Determine which image to show based on mood
     const shouldShowNeglectedImage = isNeglected && companionHealthData?.neglected_image_url;
@@ -118,6 +133,13 @@ export const useCompanionHealth = () => {
       mind,
       soul,
       lastActivityDate: companionHealthData?.last_activity_date || null,
+      isAlive,
+      hunger,
+      happiness,
+      careScore,
+      recoveryProgress,
+      isRecovering,
+      isCritical,
     };
   }, [companionHealthData, companion]);
 

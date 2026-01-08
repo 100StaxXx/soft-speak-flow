@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== COMPANION MOOD ANIMATIONS ===== */
+@keyframes companion-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes companion-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+@keyframes companion-shiver {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+@keyframes companion-droop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(4px) rotate(-1deg); }
+}
+.animate-companion-bounce { animation: companion-bounce 2s ease-in-out infinite; }
+.animate-companion-pulse { animation: companion-pulse 4s ease-in-out infinite; }
+.animate-companion-shiver { animation: companion-shiver 0.3s ease-in-out infinite; }
+.animate-companion-droop { animation: companion-droop 3s ease-in-out infinite; }
+
 /* ===== iOS-STYLE ULTRA GLASS UTILITIES ===== */
 
 /* Maximum transparency glass - for hero cards */
