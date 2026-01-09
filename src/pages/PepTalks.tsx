@@ -62,7 +62,7 @@ export default function PepTalks() {
       <StarfieldBackground />
       <div className="min-h-screen pb-nav-safe relative z-10">
         {/* Sticky Header */}
-        <div className="sticky top-0 z-50 cosmiq-glass-header border-b border-cosmiq-glow/10">
+        <div className="sticky top-0 z-50 cosmiq-glass-header border-b border-cosmiq-glow/10 safe-area-top">
           <div className="max-w-4xl mx-auto px-4 py-3 pt-safe">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
