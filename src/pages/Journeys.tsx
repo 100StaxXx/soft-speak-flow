@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { motion } from "framer-motion";
 import { Compass } from "lucide-react";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
+import { SwipeDateNavigation } from "@/components/SwipeDateNavigation";
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -338,6 +340,24 @@ const Journeys = () => {
     setSelectedDate(date);
   }, []);
 
+  // Handle swipe right to navigate to next day
+  const handleNavigateNextDay = useCallback(async () => {
+    setSelectedDate(prev => addDays(prev, 1));
+  }, []);
+
+  // Handle swipe-to-delete quest
+  const handleSwipeDeleteQuest = useCallback(async (taskId: string) => {
+    try {
+      await Haptics.impact({ style: ImpactStyle.Medium });
+    } catch (e) {
+      // Haptics not available on web
+    }
+    await deleteTask(taskId);
+    toast("Quest deleted", {
+      description: "Swipe to delete",
+    });
+  }, [deleteTask]);
+
   // Format tasks for HourlyViewModal (CalendarTask format)
   const formattedTasksForModal = useMemo(() => 
     dailyTasks.map(task => ({
@@ -479,42 +499,45 @@ const Journeys = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
         >
-          {/* Today's Agenda */}
-          <TodaysAgenda
-            tasks={dailyTasks}
-            selectedDate={selectedDate}
-            onToggle={handleToggleTask}
-            onAddQuest={() => setShowAddSheet(true)}
-            completedCount={completedCount}
-            totalCount={totalCount}
-            currentStreak={currentStreak}
-            activeJourneys={[]}
-            onUndoToggle={handleUndoToggle}
-            onEditQuest={handleEditQuest}
-            onReorderTasks={handleReorderTasks}
-            hideIndicator={showTutorial}
-            calendarTasks={allCalendarTasks}
-            calendarMilestones={[]}
-            onDateSelect={setSelectedDate}
-            onQuickAdd={async (parsed) => {
-              const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
-              await addTask({
-                taskText: parsed.text,
-                difficulty: parsed.difficulty || 'medium',
-                taskDate,
-                isMainQuest: false,
-                scheduledTime: parsed.scheduledTime,
-                estimatedDuration: parsed.estimatedDuration,
-                recurrencePattern: parsed.recurrencePattern,
-                reminderEnabled: parsed.reminderEnabled,
-                reminderMinutesBefore: parsed.reminderMinutesBefore,
-                notes: parsed.notes,
-              });
-            }}
-            onPlanMyDay={handlePlanMyDay}
-            onPlanMyWeek={handlePlanMyWeek}
-            activeEpics={activeEpics}
-          />
+          {/* Today's Agenda with swipe navigation */}
+          <SwipeDateNavigation onNext={handleNavigateNextDay}>
+            <TodaysAgenda
+              tasks={dailyTasks}
+              selectedDate={selectedDate}
+              onToggle={handleToggleTask}
+              onAddQuest={() => setShowAddSheet(true)}
+              completedCount={completedCount}
+              totalCount={totalCount}
+              currentStreak={currentStreak}
+              activeJourneys={[]}
+              onUndoToggle={handleUndoToggle}
+              onEditQuest={handleEditQuest}
+              onReorderTasks={handleReorderTasks}
+              hideIndicator={showTutorial}
+              calendarTasks={allCalendarTasks}
+              calendarMilestones={[]}
+              onDateSelect={setSelectedDate}
+              onQuickAdd={async (parsed) => {
+                const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
+                await addTask({
+                  taskText: parsed.text,
+                  difficulty: parsed.difficulty || 'medium',
+                  taskDate,
+                  isMainQuest: false,
+                  scheduledTime: parsed.scheduledTime,
+                  estimatedDuration: parsed.estimatedDuration,
+                  recurrencePattern: parsed.recurrencePattern,
+                  reminderEnabled: parsed.reminderEnabled,
+                  reminderMinutesBefore: parsed.reminderMinutesBefore,
+                  notes: parsed.notes,
+                });
+              }}
+              onPlanMyDay={handlePlanMyDay}
+              onPlanMyWeek={handlePlanMyWeek}
+              activeEpics={activeEpics}
+              onDeleteQuest={handleSwipeDeleteQuest}
+            />
+          </SwipeDateNavigation>
         </motion.div>
 
         
