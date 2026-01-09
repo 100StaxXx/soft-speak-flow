@@ -590,10 +590,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
     // Wrap with SwipeableTaskItem for swipe gestures (only for non-completed, non-dragging tasks)
     if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated) {
+      // Don't allow "move to next day" for rituals - they're recurring and already exist every day
+      const isRitual = !!task.habit_source_id;
+      
       return (
         <SwipeableTaskItem
           onSwipeDelete={() => onDeleteQuest?.(task.id)}
-          onSwipeMoveToNextDay={onMoveQuestToNextDay ? () => onMoveQuestToNextDay(task.id) : undefined}
+          onSwipeMoveToNextDay={!isRitual && onMoveQuestToNextDay ? () => onMoveQuestToNextDay(task.id) : undefined}
           disabled={isDragging || isActivated}
         >
           {taskContent}
