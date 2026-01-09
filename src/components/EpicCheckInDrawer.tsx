@@ -1,10 +1,12 @@
 import { memo, useState, useMemo } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen, Settings2 } from "lucide-react";
+import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen, Settings2, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
+import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -77,6 +79,12 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const [earlyBirdExpanded, setEarlyBirdExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  // Add new ritual state
+  const [isAddingRitual, setIsAddingRitual] = useState(false);
+  const [newRitualTitle, setNewRitualTitle] = useState("");
+  const [newRitualDifficulty, setNewRitualDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [isAddingLoading, setIsAddingLoading] = useState(false);
+  
   // Convert habit to RitualData for the unified editor
   const handleEditHabit = (habit: Habit) => {
     setEditingRitual({
@@ -130,6 +138,52 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
       setIsDeleting(false);
     }
     setEditingRitual(null);
+  };
+
+  const handleAddRitual = async () => {
+    if (!user?.id || !newRitualTitle.trim()) return;
+    
+    setIsAddingLoading(true);
+    try {
+      // Insert new habit linked to this epic
+      const { data: newHabit, error } = await supabase
+        .from('habits')
+        .insert({
+          user_id: user.id,
+          epic_id: epicId,
+          title: newRitualTitle.trim(),
+          difficulty: newRitualDifficulty,
+          frequency: 'daily',
+          is_active: true,
+        })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+
+      // Also link via epic_habits junction table
+      if (newHabit?.id) {
+        await supabase.from('epic_habits').insert({
+          epic_id: epicId,
+          habit_id: newHabit.id,
+        });
+      }
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      
+      toast.success('Ritual added to campaign!');
+      setNewRitualTitle("");
+      setNewRitualDifficulty('medium');
+      setIsAddingRitual(false);
+    } catch (error) {
+      console.error('Error adding ritual:', error);
+      toast.error('Failed to add ritual');
+    } finally {
+      setIsAddingLoading(false);
+    }
   };
   
   // Split habits into today's and upcoming
@@ -472,6 +526,61 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                 </CollapsibleContent>
               </Collapsible>
             )}
+            
+            {/* Add New Ritual Section */}
+            <div className="mt-4 pt-4 border-t border-border/30">
+              {isAddingRitual ? (
+                <div className="space-y-3 p-3 rounded-xl bg-secondary/30 border border-primary/20" data-vaul-no-drag>
+                  <Input
+                    value={newRitualTitle}
+                    onChange={(e) => setNewRitualTitle(e.target.value)}
+                    placeholder="New ritual name..."
+                    autoFocus
+                    className="bg-background/50"
+                  />
+                  <HabitDifficultySelector
+                    value={newRitualDifficulty}
+                    onChange={setNewRitualDifficulty}
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      onClick={handleAddRitual} 
+                      disabled={!newRitualTitle.trim() || isAddingLoading}
+                      className="flex-1"
+                    >
+                      {isAddingLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-1" /> Add Ritual
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsAddingRitual(false);
+                        setNewRitualTitle("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-dashed gap-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsAddingRitual(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add New Ritual
+                </Button>
+              )}
+            </div>
           </div>
           {/* Adjust Plan Button */}
           {showAdjustPlan && onAdjustPlan && (
