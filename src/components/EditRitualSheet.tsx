@@ -409,20 +409,20 @@ export const EditRitualSheet = memo(function EditRitualSheet({
           </div>
         </ScrollArea>
 
-        <SheetFooter className="pt-4 flex justify-between">
-          <div>
-            {onDelete && (
-              <Button 
-                variant="ghost" 
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={isDeleting || saving}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-            )}
-          </div>
+        <SheetFooter className="pt-4 flex flex-row justify-between items-center gap-2">
+          {onDelete ? (
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting || saving}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          ) : (
+            <div />
+          )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
