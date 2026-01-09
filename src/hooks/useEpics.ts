@@ -4,6 +4,7 @@ import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
+import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
 
 // Helper to normalize difficulty values to valid database enum
@@ -499,17 +500,30 @@ export const useEpics = () => {
 
         if (epicHabits && epicHabits.length > 0) {
           const habitIds = epicHabits.map(eh => eh.habit_id);
-          console.log('[Epic Abandon] Deleting habits:', habitIds);
+          console.log('[Epic Abandon] Deactivating habits:', habitIds);
 
-          // Delete the habits
-          const { error: habitsDeleteError } = await supabase
+          // Deactivate habits instead of deleting (safer, preserves history)
+          const { error: habitsUpdateError } = await supabase
             .from("habits")
-            .delete()
+            .update({ is_active: false })
             .in("id", habitIds)
             .eq("user_id", user.id);
 
-          if (habitsDeleteError) {
-            console.error("Failed to delete habits:", habitsDeleteError);
+          if (habitsUpdateError) {
+            console.error("Failed to deactivate habits:", habitsUpdateError);
+          }
+
+          // Delete future uncompleted daily_tasks linked to these habits
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const { error: tasksDeleteError } = await supabase
+            .from("daily_tasks")
+            .delete()
+            .in("habit_source_id", habitIds)
+            .gte("task_date", today)
+            .eq("completed", false);
+
+          if (tasksDeleteError) {
+            console.error("Failed to delete future habit tasks:", tasksDeleteError);
           }
 
           // Delete epic_habits links
