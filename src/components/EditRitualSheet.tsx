@@ -406,38 +406,38 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                 </div>
               )}
             </div>
+
+            {/* Delete button - separated from save actions */}
+            {onDelete && (
+              <div className="pt-6 mt-4 border-t border-border/50">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isDeleting || saving}
+                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Ritual
+                </Button>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
-        <SheetFooter className="pt-4 flex flex-row justify-between items-center gap-2">
-          {onDelete ? (
-            <Button 
-              variant="ghost" 
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={isDeleting || saving}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </Button>
-          ) : (
-            <div />
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !title.trim()}>
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          </div>
+        <SheetFooter className="pt-4 flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button className="flex-1" onClick={handleSave} disabled={saving || !title.trim()}>
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
         </SheetFooter>
       </SheetContent>
 
