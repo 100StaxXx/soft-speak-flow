@@ -44,6 +44,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
 
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
+import { SwipeableTaskItem } from "./SwipeableTaskItem";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
@@ -98,6 +99,7 @@ interface TodaysAgendaProps {
   onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
   activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
   habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
+  onDeleteQuest?: (taskId: string) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -130,6 +132,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onPlanMyWeek,
   activeEpics = [],
   habitsAtRisk = [],
+  onDeleteQuest,
 }: TodaysAgendaProps) {
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -583,8 +586,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       </Collapsible>
     );
 
+    // Wrap with SwipeableTaskItem for swipe-to-delete (only for non-completed, non-dragging tasks)
+    if (onDeleteQuest && !isComplete && !isDragging && !isActivated) {
+      return (
+        <SwipeableTaskItem
+          onSwipeDelete={() => onDeleteQuest(task.id)}
+          disabled={isDragging || isActivated}
+        >
+          {taskContent}
+        </SwipeableTaskItem>
+      );
+    }
+
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded]);
+  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, keepInPlace]);
 
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
