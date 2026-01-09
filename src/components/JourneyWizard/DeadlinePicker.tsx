@@ -89,6 +89,9 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
             disabled={(date) => date < effectiveMinDate}
             initialFocus
             className="pointer-events-auto"
+            captionLayout="dropdown"
+            fromYear={new Date().getFullYear()}
+            toYear={new Date().getFullYear() + 10}
           />
         </PopoverContent>
       </Popover>
