@@ -100,6 +100,7 @@ interface TodaysAgendaProps {
   activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
   habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
   onDeleteQuest?: (taskId: string) => void;
+  onMoveQuestToNextDay?: (taskId: string) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -133,6 +134,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   activeEpics = [],
   habitsAtRisk = [],
   onDeleteQuest,
+  onMoveQuestToNextDay,
 }: TodaysAgendaProps) {
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -586,11 +588,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       </Collapsible>
     );
 
-    // Wrap with SwipeableTaskItem for swipe-to-delete (only for non-completed, non-dragging tasks)
-    if (onDeleteQuest && !isComplete && !isDragging && !isActivated) {
+    // Wrap with SwipeableTaskItem for swipe gestures (only for non-completed, non-dragging tasks)
+    if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated) {
       return (
         <SwipeableTaskItem
-          onSwipeDelete={() => onDeleteQuest(task.id)}
+          onSwipeDelete={() => onDeleteQuest?.(task.id)}
+          onSwipeMoveToNextDay={onMoveQuestToNextDay ? () => onMoveQuestToNextDay(task.id) : undefined}
           disabled={isDragging || isActivated}
         >
           {taskContent}
@@ -599,7 +602,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, keepInPlace]);
+  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, keepInPlace]);
 
   // Handle reordering of quest tasks
   const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
