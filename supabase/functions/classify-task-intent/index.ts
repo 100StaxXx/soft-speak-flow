@@ -204,7 +204,21 @@ Use "multiSelect": true when the user can logically choose multiple options:
 - Focus areas or modules
 - Any question where selecting multiple answers makes sense
 
-Examples with multiSelect:
+**AVOIDING CONFLICTING MULTI-SELECT QUESTIONS:**
+NEVER combine opposite concepts in one multi-select question. These are problematic:
+- "What resources do you have or need?" ❌ (conflicting - "have" vs "need" are opposites)
+- "What do you like or dislike?" ❌ (conflicting meanings)
+- "What strengths or weaknesses do you have?" ❌ (conflicting meanings)
+
+INSTEAD, split into separate questions:
+- "What resources do you already have?" ✓ + "What resources do you still need?" ✓
+- "What strengths can you leverage?" ✓ + "What areas need improvement?" ✓
+
+For resource/asset questions, use this two-question pattern:
+{ "id": "resources_have", "question": "What resources do you already have?", "type": "select", "options": ["Strong client base", "Marketing materials", "Sales training", "Team support", "Lead database"], "multiSelect": true, "required": false }
+{ "id": "resources_need", "question": "What resources do you still need?", "type": "select", "options": ["Strong client base", "Marketing materials", "Sales training", "Team support", "Lead database"], "multiSelect": true, "required": false }
+
+Examples with multiSelect (non-conflicting):
 { "id": "subjects", "question": "Which subjects need focus?", "type": "select", "options": ["Contracts", "Torts", "Constitutional Law", "Criminal Law"], "multiSelect": true, "required": true }
 { "id": "focus_areas", "question": "What areas do you want to improve?", "type": "select", "options": ["Endurance", "Speed", "Strength", "Flexibility"], "multiSelect": true, "required": false }
 
