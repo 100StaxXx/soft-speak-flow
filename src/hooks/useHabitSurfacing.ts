@@ -110,28 +110,38 @@ export function useHabitSurfacing(selectedDate?: Date) {
         existingTasks?.map(t => [t.habit_source_id, t]) || []
       );
 
-      // Map habits to surfaced format
-      const surfaced: SurfacedHabit[] = (habits || []).map(habit => {
-        const epicHabit = habit.epic_habits?.[0];
-        const epic = epicHabit?.epics;
-        const existingTask = tasksByHabit.get(habit.id);
+      // Filter out habits linked to non-active epics, then map to surfaced format
+      const surfaced: SurfacedHabit[] = (habits || [])
+        .filter(habit => {
+          // If habit is linked to an epic, that epic must be active
+          const epicHabit = habit.epic_habits?.[0];
+          const epic = epicHabit?.epics;
+          if (epicHabit && epic && epic.status !== 'active') {
+            return false; // Skip habits from abandoned/completed epics
+          }
+          return true;
+        })
+        .map(habit => {
+          const epicHabit = habit.epic_habits?.[0];
+          const epic = epicHabit?.epics;
+          const existingTask = tasksByHabit.get(habit.id);
 
-        return {
-          id: habit.id,
-          habit_id: habit.id,
-          habit_name: habit.title,
-          habit_description: habit.description || null,
-          frequency: habit.frequency || 'daily',
-          estimated_minutes: habit.estimated_minutes || null,
-          preferred_time: habit.preferred_time || null,
-          epic_id: epic?.status === 'active' ? epic.id : null,
-          epic_title: epic?.status === 'active' ? epic.title : null,
-          task_id: existingTask?.id || null,
-          is_completed: existingTask?.completed || false,
-          category: categorizeQuest(habit.title),
-          custom_days: habit.custom_days || null,
-        };
-      });
+          return {
+            id: habit.id,
+            habit_id: habit.id,
+            habit_name: habit.title,
+            habit_description: habit.description || null,
+            frequency: habit.frequency || 'daily',
+            estimated_minutes: habit.estimated_minutes || null,
+            preferred_time: habit.preferred_time || null,
+            epic_id: epic?.id || null,
+            epic_title: epic?.title || null,
+            task_id: existingTask?.id || null,
+            is_completed: existingTask?.completed || false,
+            category: categorizeQuest(habit.title),
+            custom_days: habit.custom_days || null,
+          };
+        });
 
       return surfaced;
     },
