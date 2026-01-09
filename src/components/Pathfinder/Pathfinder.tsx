@@ -262,6 +262,7 @@ export function Pathfinder({
     () => {
       // Use schedule rituals if available, otherwise fall back to suggestions
       if (schedule?.rituals) {
+        console.log('[Pathfinder] Mapping schedule rituals:', schedule.rituals.length, schedule.rituals.map(r => ({ title: r.title, estimatedMinutes: r.estimatedMinutes })));
         return schedule.rituals.map(r => ({
           id: r.id,
           title: r.title,
@@ -269,6 +270,7 @@ export function Pathfinder({
           type: 'habit' as const,
           difficulty: r.difficulty,
           frequency: r.frequency,
+          estimatedMinutes: r.estimatedMinutes,
           isSelected: true,
         }));
       }
@@ -443,6 +445,12 @@ export function Pathfinder({
       custom_days: [],
       estimated_minutes: h.estimatedMinutes,
     }));
+
+    // Log for debugging ritual count issues
+    console.log('[Pathfinder] Creating epic with habits:', habits.length, habits.map(h => h.title));
+    if (habits.length < 2 && schedule?.rituals && schedule.rituals.length > habits.length) {
+      console.warn('[Pathfinder] Habit count mismatch! Schedule has', schedule.rituals.length, 'but habits array has', habits.length);
+    }
 
     // Include milestones with dates from schedule
     const milestones = schedule?.milestones.map(m => ({

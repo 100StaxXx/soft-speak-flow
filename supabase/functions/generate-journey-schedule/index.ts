@@ -309,6 +309,9 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
+    // Log raw AI response for debugging
+    console.log('[Journey Schedule] Raw AI response length:', content?.length, 'chars');
+
     if (!content) {
       throw new Error('No content in AI response');
     }
@@ -323,6 +326,9 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
       }
       
       schedule = JSON.parse(jsonStr);
+      
+      // Log parsed rituals for debugging
+      console.log('[Journey Schedule] Parsed rituals:', schedule.rituals?.length, schedule.rituals?.map(r => r.title));
       
       // Validate and fix IDs
       schedule.phases = schedule.phases.map((p, i) => ({

@@ -165,7 +165,7 @@ serve(async (req) => {
     // Fetch user's habits for streak protection
     const { data: habits } = await supabase
       .from('habits')
-      .select('id, title, current_streak, frequency, preferred_time, estimated_duration')
+      .select('id, title, current_streak, frequency, preferred_time, estimated_minutes')
       .eq('user_id', user.id)
       .eq('is_active', true);
 
@@ -242,7 +242,7 @@ serve(async (req) => {
               plannedTasks.push({
                 title: habit.title,
                 suggestedTime: habit.preferred_time || undefined,
-                estimatedDuration: habit.estimated_duration || 15,
+                estimatedDuration: habit.estimated_minutes || 15,
                 priority: 'high',
                 reason: `Protect ${habit.current_streak}-day streak`,
               });
