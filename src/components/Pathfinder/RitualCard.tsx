@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
+import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency } from './FrequencyPresets';
 
 interface RitualCardProps {
   ritual: JourneyRitual;
@@ -36,9 +37,10 @@ const difficultyColors = {
 
 const frequencyLabels: Record<string, string> = {
   daily: 'Daily',
+  weekdays: 'Weekdays',
   '5x_week': '5x/week',
   '3x_week': '3x/week',
-  weekly: 'Weekly', // backwards compat
+  weekly: 'Weekly',
   custom: 'Custom',
 };
 
@@ -54,6 +56,10 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
   const handleCancel = () => {
     setEditedRitual(ritual);
     setIsEditing(false);
+  };
+
+  const handleFrequencyChange = (frequency: JourneyRitual['frequency'], days: number[]) => {
+    setEditedRitual({ ...editedRitual, frequency, customDays: days });
   };
 
   if (isEditing) {
@@ -77,27 +83,14 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Frequency</label>
-            <Select
-              value={editedRitual.frequency}
-              onValueChange={(value: 'daily' | '5x_week' | '3x_week' | 'custom') => 
-                setEditedRitual({ ...editedRitual, frequency: value })
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="5x_week">5x per week</SelectItem>
-                <SelectItem value="3x_week">3x per week</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Frequency Presets */}
+        <FrequencyPresets
+          frequency={editedRitual.frequency}
+          customDays={editedRitual.customDays || getDefaultDaysForFrequency(editedRitual.frequency)}
+          onFrequencyChange={handleFrequencyChange}
+        />
 
+        <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-[10px] text-muted-foreground mb-1 block">Difficulty</label>
             <Select
@@ -146,6 +139,9 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
     );
   }
 
+  // Get display days
+  const displayDays = formatDaysShort(ritual.customDays || []);
+
   return (
     <motion.div
       layout
@@ -165,6 +161,11 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{frequencyLabels[ritual.frequency]}</span>
+          {displayDays && ritual.frequency !== 'daily' && (
+            <>
+              <span className="text-[10px] opacity-70">({displayDays})</span>
+            </>
+          )}
           {ritual.estimatedMinutes && (
             <>
               <span>•</span>
