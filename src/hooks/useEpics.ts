@@ -135,6 +135,8 @@ export const useEpics = () => {
         target_date: string;
         milestone_percent: number;
         is_postcard_milestone: boolean;
+        phase_name?: string;
+        phaseName?: string; // camelCase fallback from AI
       }>;
       phases?: Array<{
         name: string;
@@ -170,18 +172,29 @@ export const useEpics = () => {
         const { data: habits, error: habitError } = await supabase
           .from("habits")
           .insert(
-            epicData.habits.map(habit => ({
-              user_id: currentUserId,
-              title: habit.title,
-              description: habit.description || null,
-              difficulty: normalizeDifficulty(habit.difficulty),
-              frequency: normalizeFrequency(habit.frequency),
-              custom_days: habit.custom_days.length > 0 ? habit.custom_days : null,
-              preferred_time: habit.preferred_time || null,
-              reminder_enabled: habit.reminder_enabled || false,
-              reminder_minutes_before: habit.reminder_minutes_before || 15,
-              estimated_minutes: habit.estimated_minutes || null,
-            }))
+            epicData.habits.map(habit => {
+              const normalizedFreq = normalizeFrequency(habit.frequency);
+              // Ensure custom_days has a default for non-daily frequencies
+              let customDays = habit.custom_days?.length > 0 ? habit.custom_days : null;
+              if (!customDays && normalizedFreq !== 'daily') {
+                // Set default days based on frequency
+                if (normalizedFreq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
+                else if (normalizedFreq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
+                else if (normalizedFreq === 'custom') customDays = [0]; // Default Monday
+              }
+              return {
+                user_id: currentUserId,
+                title: habit.title,
+                description: habit.description || null,
+                difficulty: normalizeDifficulty(habit.difficulty),
+                frequency: normalizedFreq,
+                custom_days: customDays,
+                preferred_time: habit.preferred_time || null,
+                reminder_enabled: habit.reminder_enabled || false,
+                reminder_minutes_before: habit.reminder_minutes_before || 15,
+                estimated_minutes: habit.estimated_minutes || null,
+              };
+            })
           )
           .select();
 
@@ -321,6 +334,7 @@ export const useEpics = () => {
                 milestone_percent: milestone.milestone_percent,
                 is_postcard_milestone: milestone.is_postcard_milestone ?? false,
                 phase_order: index + 1,
+                phase_name: milestone.phase_name || milestone.phaseName || null,
               }))
             )
             .select();

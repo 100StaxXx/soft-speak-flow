@@ -27,6 +27,7 @@ export interface SurfacedHabit {
 function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number): boolean {
   const frequency = habit.frequency?.toLowerCase();
   
+  // Database convention: 0=Mon, 1=Tue, ..., 6=Sun
   switch (frequency) {
     case 'daily':
       return true;
@@ -36,21 +37,24 @@ function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number): boolean {
       if (habit.custom_days && habit.custom_days.length > 0) {
         return habit.custom_days.includes(dayOfWeek);
       }
-      // Default: surface on Mondays for weekly habits without specific days
-      return dayOfWeek === 1;
+      // Default: surface on Mondays (0) for weekly habits without specific days
+      return dayOfWeek === 0;
       
     case 'weekdays':
-      return dayOfWeek >= 1 && dayOfWeek <= 5;
+    case '5x_week':
+      // Monday (0) through Friday (4)
+      return dayOfWeek >= 0 && dayOfWeek <= 4;
       
     case 'weekends':
-      return dayOfWeek === 0 || dayOfWeek === 6;
+      // Saturday (5) and Sunday (6)
+      return dayOfWeek === 5 || dayOfWeek === 6;
       
     case '3x_week':
-      // Monday, Wednesday, Friday
+      // Monday (0), Wednesday (2), Friday (4)
       if (habit.custom_days && habit.custom_days.length > 0) {
         return habit.custom_days.includes(dayOfWeek);
       }
-      return [1, 3, 5].includes(dayOfWeek);
+      return [0, 2, 4].includes(dayOfWeek);
       
     case 'custom':
       if (habit.custom_days && habit.custom_days.length > 0) {
@@ -68,7 +72,9 @@ export function useHabitSurfacing(selectedDate?: Date) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const taskDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
-  const dayOfWeek = getDay(selectedDate || new Date()); // 0 = Sunday, 1 = Monday, etc.
+  // Convert JS getDay() (0=Sunday) to our convention (0=Monday)
+  const jsDay = getDay(selectedDate || new Date());
+  const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1; // Sunday(0)->6, Mon(1)->0, ..., Sat(6)->5
 
   // Fetch habits that should be surfaced as tasks today
   const { data: surfacedHabits, isLoading, error } = useQuery({

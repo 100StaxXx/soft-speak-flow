@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const DAY_FULL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-type FrequencyType = 'daily' | 'weekdays' | '5x_week' | '3x_week' | 'weekly' | 'custom';
+type FrequencyType = 'daily' | '5x_week' | '3x_week' | 'weekly' | 'custom';
 
 interface FrequencyPresetsProps {
   frequency: FrequencyType;
@@ -13,7 +13,7 @@ interface FrequencyPresetsProps {
 
 const presets: { value: FrequencyType; label: string; days: number[] }[] = [
   { value: 'daily', label: 'Daily', days: [0, 1, 2, 3, 4, 5, 6] },
-  { value: 'weekdays', label: 'Weekdays', days: [0, 1, 2, 3, 4] },
+  { value: '5x_week', label: 'Weekdays', days: [0, 1, 2, 3, 4] }, // Maps to 5x_week in DB
   { value: '3x_week', label: '3x/wk', days: [0, 2, 4] }, // Mon/Wed/Fri
   { value: 'weekly', label: 'Weekly', days: [0] }, // Monday default
   { value: 'custom', label: 'Custom', days: [] },
