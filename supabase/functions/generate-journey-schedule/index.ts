@@ -52,6 +52,7 @@ interface JourneyRitual {
   title: string;
   description: string;
   frequency: 'daily' | '5x_week' | '3x_week' | 'custom';
+  customDays?: number[]; // 0=Mon, 1=Tue, ..., 6=Sun
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedMinutes?: number;
 }
@@ -344,12 +345,24 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
         milestonePercent: m.milestonePercent || Math.round((i + 1) / schedule.milestones.length * 100),
       }));
       
-      schedule.rituals = schedule.rituals.map((r, i) => ({
-        ...r,
-        id: r.id || `ritual-${Date.now()}-${i}`,
-        frequency: normalizeFrequency(r.frequency),
-        difficulty: normalizeDifficulty(r.difficulty),
-      }));
+      schedule.rituals = schedule.rituals.map((r, i) => {
+        const freq = normalizeFrequency(r.frequency);
+        // Default customDays based on frequency if not provided
+        let customDays = r.customDays;
+        if (!customDays || customDays.length === 0) {
+          if (freq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
+          else if (freq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
+          else if (freq === 'custom') customDays = [0]; // Default Monday
+          // daily doesn't need customDays
+        }
+        return {
+          ...r,
+          id: r.id || `ritual-${Date.now()}-${i}`,
+          frequency: freq,
+          customDays,
+          difficulty: normalizeDifficulty(r.difficulty),
+        };
+      });
       
       // Ensure suggestedChapterCount matches actual postcard milestone count
       const postcardCount = schedule.milestones.filter(m => m.isPostcardMilestone).length;
