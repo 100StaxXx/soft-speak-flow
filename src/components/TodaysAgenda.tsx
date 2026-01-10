@@ -699,70 +699,79 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         ) : (
           <div className="space-y-1">
-            {/* Quests Section */}
+            {/* Quest Input - Always visible */}
+            <div className="flex items-center gap-2 py-1.5 px-1">
+              {questTasks.length > 0 && ritualTasks.length > 0 && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Quests
+                  </span>
+                  <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
+                    {questTasks.length}
+                  </Badge>
+                </div>
+              )}
+              {questTasks.length === 0 && ritualTasks.length > 0 && (
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex-shrink-0">
+                  Add Quest
+                </span>
+              )}
+              
+              {/* Sort dropdown - only show when quests exist */}
+              {questTasks.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
+                      <ArrowUpDown className="w-3 h-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-28">
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy('custom')}
+                      className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
+                    >
+                      Custom
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy('time')}
+                      className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
+                    >
+                      Time
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy('priority')}
+                      className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
+                    >
+                      Priority
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setSortBy('xp')}
+                      className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
+                    >
+                      XP
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
+              {/* Compact Smart Input - Always visible */}
+              {onQuickAdd && (
+                <div className="flex-1 min-w-0">
+                  <CompactSmartInput
+                    onSubmit={onQuickAdd}
+                    onPlanMyDay={onPlanMyDay}
+                    onPlanMyWeek={onPlanMyWeek}
+                    activeEpics={activeEpics}
+                    habitsAtRisk={habitsAtRisk}
+                    placeholder="Add quest..."
+                  />
+                </div>
+              )}
+            </div>
+            
+            {/* Quests List Section */}
             {questTasks.length > 0 && (
               <>
-                <div className="flex items-center gap-2 py-1.5 px-1">
-                  {ritualTasks.length > 0 && (
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                        Quests
-                      </span>
-                      <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
-                        {questTasks.length}
-                      </Badge>
-                    </div>
-                  )}
-                  
-                  {/* Sort dropdown - moved to left of input */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
-                        <ArrowUpDown className="w-3 h-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-28">
-                      <DropdownMenuItem 
-                        onClick={() => setSortBy('custom')}
-                        className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
-                      >
-                        Custom
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setSortBy('time')}
-                        className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
-                      >
-                        Time
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setSortBy('priority')}
-                        className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
-                      >
-                        Priority
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setSortBy('xp')}
-                        className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
-                      >
-                        XP
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  
-                  {/* Compact Smart Input */}
-                  {onQuickAdd && (
-                    <div className="flex-1 min-w-0">
-                      <CompactSmartInput
-                        onSubmit={onQuickAdd}
-                        onPlanMyDay={onPlanMyDay}
-                        onPlanMyWeek={onPlanMyWeek}
-                        activeEpics={activeEpics}
-                        habitsAtRisk={habitsAtRisk}
-                        placeholder="Add quest..."
-                      />
-                    </div>
-                  )}
-                </div>
                 {/* Native iOS uses overlay, web uses DraggableTaskList directly */}
                 {isNative ? (
                   <div 
