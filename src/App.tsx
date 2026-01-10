@@ -13,7 +13,7 @@ import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { CelebrationProvider } from "@/contexts/CelebrationContext";
 import { CompanionPresenceProvider } from "@/contexts/CompanionPresenceContext";
-import { CompanionWhisperProvider } from "@/contexts/CompanionWhisperContext";
+
 import { useProfile } from "@/hooks/useProfile";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,7 +27,7 @@ import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 import { CompanionAmbientParticles } from "@/components/companion/CompanionAmbientParticles";
 import { CompanionMoodOverlay } from "@/components/companion/CompanionMoodOverlay";
-import { CompanionWhisper } from "@/components/companion/CompanionWhisper";
+
 
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
@@ -235,11 +235,9 @@ const AppContent = memo(() => {
         <XPProvider>
           <WeeklyRecapProvider>
             <CompanionPresenceProvider>
-              <CompanionWhisperProvider>
                 {/* Global companion presence layers */}
                 <CompanionMoodOverlay />
                 <CompanionAmbientParticles />
-                <CompanionWhisper />
                 
                 {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
                 <Suspense fallback={<LoadingFallback />}>
@@ -296,7 +294,7 @@ const AppContent = memo(() => {
                 </AnimatePresence>
                 </Suspense>
                 {/* HIDDEN: AstralEncounterProvider closing tag removed */}
-              </CompanionWhisperProvider>
+              
             </CompanionPresenceProvider>
           </WeeklyRecapProvider>
         </XPProvider>
