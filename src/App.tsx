@@ -25,8 +25,6 @@ import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
-import { CompanionAmbientParticles } from "@/components/companion/CompanionAmbientParticles";
-import { CompanionMoodOverlay } from "@/components/companion/CompanionMoodOverlay";
 
 
 import { hideSplashScreen } from "@/utils/capacitor";
@@ -235,9 +233,6 @@ const AppContent = memo(() => {
         <XPProvider>
           <WeeklyRecapProvider>
             <CompanionPresenceProvider>
-                {/* Global companion presence layers */}
-                <CompanionMoodOverlay />
-                <CompanionAmbientParticles />
                 
                 {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
                 <Suspense fallback={<LoadingFallback />}>
