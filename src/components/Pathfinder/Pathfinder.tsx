@@ -39,6 +39,7 @@ import { useIntentClassifier } from '@/hooks/useIntentClassifier';
 import { SuggestionCard } from './SuggestionCard';
 import { RitualEditor } from './RitualEditor';
 import { PostcardPreview } from './PostcardPreview';
+import { getDefaultDaysForFrequency } from './FrequencyPresets';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { themeColors } from './StoryStep';
 import { EpicClarificationFlow } from '@/features/tasks/components/EpicClarificationFlow';
@@ -442,7 +443,7 @@ export function Pathfinder({
       description: h.description,
       difficulty: h.difficulty,
       frequency: h.frequency || 'daily',
-      custom_days: [],
+      custom_days: h.customDays || getDefaultDaysForFrequency(h.frequency || 'daily'),
       estimated_minutes: h.estimatedMinutes,
     }));
 
