@@ -182,6 +182,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const hasOnboardingTasks = onboardingTasks.length > 0;
   const onboardingComplete = onboardingTasks.filter(t => t.completed).length;
   const onboardingTotal = onboardingTasks.length;
+
+  // Auto-expand uncompleted onboarding tasks
+  useEffect(() => {
+    const onboardingTaskIds = tasks
+      .filter(t => isOnboardingTask(t.task_text) && !t.completed)
+      .map(t => t.id);
+    
+    if (onboardingTaskIds.length > 0) {
+      setExpandedTasks(prev => {
+        const next = new Set(prev);
+        onboardingTaskIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }, [tasks]);
   
 // Display limits
   const QUEST_LIMIT_WITH_RITUALS = 6;
@@ -420,33 +435,60 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )}
         >
           {/* Checkbox - only this toggles completion */}
-          <button
-            onClick={handleCheckboxClick}
-            className="relative touch-manipulation active:scale-95 transition-transform"
-            aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
-          >
-            <motion.div 
-              className={cn(
-                "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
-                isComplete 
-                  ? "bg-primary border-primary" 
-                  : isOnboarding
-                    ? "border-primary ring-2 ring-primary/30 ring-offset-1 ring-offset-background"
-                    : "border-muted-foreground/30 hover:border-primary"
-              )}
-              whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
+          <div className="relative">
+            {/* Tutorial quest breathing glow effect */}
+            {isOnboarding && !isComplete && (
+              <motion.div
+                className="absolute inset-0 rounded-full bg-primary/30"
+                animate={{ 
+                  scale: [1, 1.5, 1],
+                  opacity: [0.6, 0, 0.6]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            )}
+            <button
+              onClick={handleCheckboxClick}
+              className="relative touch-manipulation active:scale-95 transition-transform"
+              aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
             >
-              {isComplete && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                >
-                  <Check className="w-3 h-3 text-primary-foreground" />
-                </motion.div>
-              )}
-            </motion.div>
-          </button>
+              <motion.div 
+                className={cn(
+                  "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
+                  isComplete 
+                    ? "bg-primary border-primary" 
+                    : isOnboarding
+                      ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
+                      : "border-muted-foreground/30 hover:border-primary"
+                )}
+                whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
+              >
+                {isComplete && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                  >
+                    <Check className="w-3 h-3 text-primary-foreground" />
+                  </motion.div>
+                )}
+              </motion.div>
+            </button>
+            {/* Tutorial quest helper label */}
+            {isOnboarding && !isComplete && (
+              <motion.span
+                className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                Tap to complete
+              </motion.span>
+            )}
+          </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -511,12 +553,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {/* Expandable details section */}
         <CollapsibleContent>
           <div className="pl-8 pr-2 pb-2 space-y-2">
-            {/* Notes */}
+            {/* Notes - with tutorial highlight */}
             {task.notes && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <motion.div 
+                className={cn(
+                  "flex items-start gap-2 text-sm",
+                  isOnboarding && !isComplete 
+                    ? "p-2 rounded-lg bg-primary/10 border border-primary/20 text-foreground" 
+                    : "text-muted-foreground"
+                )}
+                animate={isOnboarding && !isComplete ? {
+                  boxShadow: [
+                    "0 0 0 0 rgba(129, 140, 248, 0)",
+                    "0 0 12px 2px rgba(129, 140, 248, 0.3)",
+                    "0 0 0 0 rgba(129, 140, 248, 0)"
+                  ]
+                } : {}}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+              >
                 <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <p className="text-xs">{stripMarkdown(task.notes)}</p>
-              </div>
+              </motion.div>
             )}
             
             {/* Badges row */}
