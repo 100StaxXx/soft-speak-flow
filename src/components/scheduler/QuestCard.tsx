@@ -67,7 +67,7 @@ export function QuestCard({
   onToggle,
   onEdit,
 }: QuestCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(isTutorialQuest && !completed);
   const diffStyle = difficultyConfig[difficulty];
   const CategoryIcon = category ? categoryIcons[category] : null;
 
