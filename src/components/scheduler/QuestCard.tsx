@@ -126,30 +126,57 @@ export function QuestCard({
         {/* Main row */}
         <div className="flex items-center gap-3 p-3">
           {/* Checkbox with XP burst animation */}
-          <motion.button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle(id, !completed);
-            }}
-            className={cn(
-              "relative flex-shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
-              completed
-                ? "bg-primary border-primary text-primary-foreground"
-                : "border-primary/50 hover:border-primary hover:bg-primary/10",
-              isTutorialQuest && !completed && "ring-4 ring-primary/30 animate-pulse"
-            )}
-            whileTap={{ scale: 0.9 }}
-          >
-            {completed && (
+          <div className="relative">
+            {/* Tutorial quest breathing glow effect */}
+            {isTutorialQuest && !completed && (
               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500 }}
-              >
-                <Check className="h-3 w-3" />
-              </motion.div>
+                className="absolute inset-0 rounded-full bg-primary/30"
+                animate={{ 
+                  scale: [1, 1.5, 1],
+                  opacity: [0.6, 0, 0.6]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
             )}
-          </motion.button>
+            <motion.button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle(id, !completed);
+              }}
+              className={cn(
+                "relative flex-shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+                completed
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "border-primary/50 hover:border-primary hover:bg-primary/10",
+                isTutorialQuest && !completed && "ring-4 ring-primary/40"
+              )}
+              whileTap={{ scale: 0.9 }}
+            >
+              {completed && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500 }}
+                >
+                  <Check className="h-3 w-3" />
+                </motion.div>
+              )}
+            </motion.button>
+            {/* Tutorial quest helper label */}
+            {isTutorialQuest && !completed && (
+              <motion.span
+                className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                Tap to complete
+              </motion.span>
+            )}
+          </div>
 
           {/* Content - clickable for edit */}
           <div className="flex-1 min-w-0 cursor-pointer" onClick={onEdit}>
@@ -230,12 +257,25 @@ export function QuestCard({
             <CollapsibleContent forceMount className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
               <div className="px-3 pb-3 pt-0 border-t border-border/30 mt-0">
                 <div className="pt-3 space-y-2">
-                  {/* Notes */}
+                  {/* Notes - with tutorial highlight */}
                   {notes && (
-                    <div className="flex items-start gap-2">
+                    <motion.div 
+                      className={cn(
+                        "flex items-start gap-2 p-2 rounded-lg",
+                        isTutorialQuest && !completed && "bg-primary/10 border border-primary/20"
+                      )}
+                      animate={isTutorialQuest && !completed ? {
+                        boxShadow: [
+                          "0 0 0 0 rgba(129, 140, 248, 0)",
+                          "0 0 12px 2px rgba(129, 140, 248, 0.3)",
+                          "0 0 0 0 rgba(129, 140, 248, 0)"
+                        ]
+                      } : {}}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                    >
                       <FileText className="h-3.5 w-3.5 text-celestial-blue mt-0.5 flex-shrink-0" />
                       <p className="text-sm text-celestial-blue/80">{notes}</p>
-                    </div>
+                    </motion.div>
                   )}
 
                   {/* Badges row */}
