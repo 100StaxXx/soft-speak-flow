@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Target, Calendar, RefreshCw, X } from 'lucide-react';
+import { Target, Calendar, RefreshCw, X, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDailyTaskReschedule, RescheduleAction } from '@/hooks/useDailyTaskReschedule';
@@ -12,7 +12,6 @@ interface SmartDailyRescheduleCardProps {
 }
 
 const actionIcons: Record<RescheduleAction['type'], React.ReactNode> = {
-  push_hours: <Clock className="h-4 w-4" />,
   prioritize: <Target className="h-4 w-4" />,
   extend_tomorrow: <Calendar className="h-4 w-4" />,
   replan: <RefreshCw className="h-4 w-4" />,
