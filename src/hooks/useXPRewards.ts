@@ -533,7 +533,7 @@ export const useXPRewards = () => {
       logger.warn('Cannot award XP: previous award still in progress');
       return;
     }
-    if (displayReason) {
+    if (displayReason && xpAmount > 0) {
       showXPToast(xpAmount, displayReason);
     }
 
