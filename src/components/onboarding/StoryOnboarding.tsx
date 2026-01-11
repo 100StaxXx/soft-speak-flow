@@ -80,10 +80,10 @@ interface Mentor {
 }
 
 const ENERGY_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
-  "Focused, intense energy": "high",
-  "Calm, grounded presence": "gentle",
-  "Warm, uplifting support": "medium",
-  "Spiritual and intuitive guidance": "gentle",
+  "Intense and challenging": "high",
+  "Balanced and steady": "medium",
+  "Gentle and nurturing": "gentle",
+  "Ethereal and transcendent": "gentle",
 };
 
 const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
@@ -228,8 +228,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     // Show loading screen immediately
     setStage("calculating");
 
-    // Question weights: Q1=1.4, Q2=1.4, Q3=1.0, Q4=1.3, Q5=1.2
-    const QUESTION_WEIGHTS = [1.4, 1.4, 1.0, 1.3, 1.2];
+    // Question weights: Q1=1.5, Q2=1.4, Q3=1.2, Q4=1.3
+    const QUESTION_WEIGHTS = [1.5, 1.4, 1.2, 1.3];
 
     // Build canonical tag weight map instead of duplicating strings
     const canonicalTagWeights: Record<string, number> = {};
@@ -242,8 +242,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       });
     });
 
-    // Extract desired intensity from Q4 (energy_preference)
-    const energyAnswer = questionAnswers.find(a => a.questionId === "energy_preference");
+    // Extract desired intensity from Q3 (energy_level)
+    const energyAnswer = questionAnswers.find(a => a.questionId === "energy_level");
     const desiredIntensity: "high" | "medium" | "gentle" = energyAnswer
       ? ENERGY_TO_INTENSITY[energyAnswer.answer] ?? "medium"
       : "medium";
