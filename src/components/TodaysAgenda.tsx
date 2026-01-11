@@ -415,6 +415,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             return next;
           });
         }, 600);
+        
+        // Auto-collapse tutorial quests when completed
+        if (isOnboarding) {
+          setExpandedTasks(prev => {
+            const next = new Set(prev);
+            next.delete(task.id);
+            return next;
+          });
+        }
+        
         onToggle(task.id, !isComplete, task.xp_reward);
       }
     };
