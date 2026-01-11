@@ -23,19 +23,16 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
     starfall: [
       "As flames dance in the distance, your ship awaits its next destination...",
       "The engines hum with potential energy. Your crew looks to you for direction...",
-      "The cosmos rewards those who take action...",
       "Your final choice approaches, warrior...",
     ],
     void: [
       "In the silent depths between stars, clarity emerges from stillness...",
       "The void speaks to those who listen. A whisper guides your path...",
-      "In the darkness, you find your light...",
       "The universe awaits your answer...",
     ],
     stellar: [
       "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
       "Your companion gazes at the stars with wonder. What do you see?",
-      "The stars whisper secrets of possibility...",
       "Your cosmic journey reaches its turning point...",
     ],
   };
@@ -44,47 +41,36 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
 
 const questions: StoryQuestion[] = [
   {
-    id: "primary_need",
+    id: "growth_focus",
     narrative: "",
-    question: "What do you need most right now?",
+    question: "What do you want to intentionally grow in your life right now?",
     options: [
-      { text: "Structure and self-discipline", tags: ["discipline"] },
-      { text: "Peace of mind and clarity", tags: ["calm"] },
-      { text: "Emotional healing and recovery", tags: ["healing"] },
-      { text: "Forward momentum and energy", tags: ["momentum"] },
+      { text: "Discipline, structure, and daily momentum", tags: ["discipline", "momentum"] },
+      { text: "Emotional strength and meaningful connection", tags: ["healing", "supportive"] },
+      { text: "Confidence, self-expression, and personal boundaries", tags: ["confidence", "discipline"] },
+      { text: "Mental clarity, calm focus, and inner peace", tags: ["calm", "spiritual"] },
     ],
   },
   {
-    id: "guidance_approach",
+    id: "support_style",
     narrative: "",
-    question: "How do you want to be guided?",
+    question: "What kind of support resonates with you?",
     options: [
-      { text: "Calm wisdom and perspective", tags: ["calm"] },
-      { text: "Confidence-building encouragement", tags: ["confidence"] },
-      { text: "Warm, understanding support", tags: ["supportive"] },
-      { text: "Spiritual insight and intuition", tags: ["spiritual"] },
+      { text: "Tough love and direct accountability", tags: ["discipline"] },
+      { text: "High-energy motivation and drive", tags: ["momentum", "confidence"] },
+      { text: "Warm encouragement and understanding", tags: ["supportive", "healing"] },
+      { text: "Calm wisdom and grounded perspective", tags: ["calm", "spiritual"] },
     ],
   },
   {
-    id: "energy_level",
+    id: "mentor_energy",
     narrative: "",
     question: "What energy do you want from your mentor?",
     options: [
-      { text: "Intense and challenging", tags: ["discipline", "momentum"] },
-      { text: "Balanced and steady", tags: ["confidence", "supportive"] },
-      { text: "Gentle and nurturing", tags: ["healing", "calm"] },
+      { text: "Intense and no-excuses", tags: ["discipline"] },
+      { text: "Steady and empowering", tags: ["confidence", "supportive"] },
+      { text: "Gentle and nurturing", tags: ["healing", "supportive"] },
       { text: "Ethereal and transcendent", tags: ["spiritual", "calm"] },
-    ],
-  },
-  {
-    id: "vision",
-    narrative: "",
-    question: "Who are you becoming?",
-    options: [
-      { text: "Someone unshakeable and disciplined", tags: ["discipline"] },
-      { text: "Someone peaceful and grounded", tags: ["calm"] },
-      { text: "Someone healed and whole", tags: ["healing"] },
-      { text: "Someone confident and rising", tags: ["confidence", "momentum"] },
     ],
   },
 ];
