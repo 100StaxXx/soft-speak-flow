@@ -469,6 +469,70 @@ export const useTaskMutations = (taskDate: string) => {
     },
   });
 
+  // Restore a deleted task (for undo functionality)
+  const restoreTask = useMutation({
+    mutationFn: async (taskData: {
+      task_text: string;
+      task_date: string;
+      xp_reward?: number;
+      difficulty?: string | null;
+      scheduled_time?: string | null;
+      estimated_duration?: number | null;
+      is_main_quest?: boolean;
+      epic_id?: string | null;
+      sort_order?: number | null;
+      notes?: string | null;
+      priority?: string | null;
+      energy_level?: string | null;
+      category?: string | null;
+      habit_source_id?: string | null;
+      is_recurring?: boolean;
+      recurrence_pattern?: string | null;
+      recurrence_days?: number[] | null;
+      reminder_enabled?: boolean;
+      reminder_minutes_before?: number | null;
+    }) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase
+        .from('daily_tasks')
+        .insert({
+          user_id: user.id,
+          task_text: taskData.task_text,
+          task_date: taskData.task_date,
+          xp_reward: taskData.xp_reward ?? 10,
+          difficulty: taskData.difficulty ?? 'medium',
+          scheduled_time: taskData.scheduled_time,
+          estimated_duration: taskData.estimated_duration,
+          is_main_quest: taskData.is_main_quest ?? false,
+          epic_id: taskData.epic_id,
+          sort_order: taskData.sort_order,
+          notes: taskData.notes,
+          priority: taskData.priority,
+          energy_level: taskData.energy_level,
+          category: taskData.category,
+          habit_source_id: taskData.habit_source_id,
+          is_recurring: taskData.is_recurring ?? false,
+          recurrence_pattern: taskData.recurrence_pattern,
+          recurrence_days: taskData.recurrence_days,
+          reminder_enabled: taskData.reminder_enabled ?? false,
+          reminder_minutes_before: taskData.reminder_minutes_before,
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to restore task", description: error.message, variant: "destructive" });
+    },
+  });
+
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -763,6 +827,7 @@ export const useTaskMutations = (taskDate: string) => {
     addTask: addTask.mutate,
     toggleTask: toggleTask.mutate,
     deleteTask: deleteTask.mutate,
+    restoreTask: restoreTask.mutate,
     setMainQuest: setMainQuest.mutate,
     updateTask: updateTask.mutateAsync,
     reorderTasks: reorderTasks.mutate,
@@ -771,6 +836,7 @@ export const useTaskMutations = (taskDate: string) => {
     isAdding: addTask.isPending,
     isToggling: toggleTask.isPending,
     isDeleting: deleteTask.isPending,
+    isRestoring: restoreTask.isPending,
     isUpdating: updateTask.isPending,
     isReordering: reorderTasks.isPending,
     isMoving: moveTaskToSection.isPending,

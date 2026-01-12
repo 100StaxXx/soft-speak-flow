@@ -103,6 +103,7 @@ const Journeys = () => {
     toggleTask,
     updateTask,
     deleteTask,
+    restoreTask,
     reorderTasks,
     moveTaskToSection,
     moveTaskToDate,
@@ -341,33 +342,83 @@ const Journeys = () => {
   }, []);
 
 
-  // Handle swipe-to-delete quest
+  // Handle swipe-to-delete quest with undo
   const handleSwipeDeleteQuest = useCallback(async (taskId: string) => {
+    // Capture task data before deletion for potential restore
+    const taskToDelete = dailyTasks.find(t => t.id === taskId);
+    if (!taskToDelete) return;
+    
+    const taskData = {
+      task_text: taskToDelete.task_text,
+      task_date: taskToDelete.task_date,
+      xp_reward: taskToDelete.xp_reward,
+      difficulty: taskToDelete.difficulty,
+      scheduled_time: taskToDelete.scheduled_time,
+      estimated_duration: taskToDelete.estimated_duration,
+      is_main_quest: taskToDelete.is_main_quest,
+      epic_id: taskToDelete.epic_id,
+      sort_order: taskToDelete.sort_order,
+      priority: taskToDelete.priority,
+      energy_level: taskToDelete.energy_level,
+      category: taskToDelete.category,
+      habit_source_id: taskToDelete.habit_source_id,
+      is_recurring: taskToDelete.is_recurring,
+      recurrence_pattern: taskToDelete.recurrence_pattern,
+      recurrence_days: taskToDelete.recurrence_days,
+      reminder_enabled: taskToDelete.reminder_enabled,
+      reminder_minutes_before: taskToDelete.reminder_minutes_before,
+    };
+    
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
     } catch (e) {
       // Haptics not available on web
     }
+    
     await deleteTask(taskId);
+    
     toast("Quest deleted", {
-      description: "Swipe left to delete",
+      duration: 4000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          restoreTask(taskData);
+          toast.success("Quest restored");
+        },
+      },
     });
-  }, [deleteTask]);
+  }, [dailyTasks, deleteTask, restoreTask]);
 
-  // Handle swipe-to-move-to-next-day
+  // Handle swipe-to-move-to-next-day with undo
   const handleSwipeMoveToNextDay = useCallback(async (taskId: string) => {
+    // Capture original date for undo
+    const taskToMove = dailyTasks.find(t => t.id === taskId);
+    const originalDate = taskToMove?.task_date;
+    
     try {
       await Haptics.impact({ style: ImpactStyle.Light });
     } catch (e) {
       // Haptics not available on web
     }
+    
     const nextDay = addDays(selectedDate, 1);
     const nextDayStr = format(nextDay, 'yyyy-MM-dd');
+    
     moveTaskToDate({ taskId, targetDate: nextDayStr });
-    toast("Moved to tomorrow", {
-      description: format(nextDay, "EEEE, MMM d"),
+    
+    toast(`Moved to ${format(nextDay, "EEEE, MMM d")}`, {
+      duration: 4000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          if (originalDate) {
+            moveTaskToDate({ taskId, targetDate: originalDate });
+            toast.success("Move undone");
+          }
+        },
+      },
     });
-  }, [selectedDate, moveTaskToDate]);
+  }, [dailyTasks, selectedDate, moveTaskToDate]);
 
   // Format tasks for HourlyViewModal (CalendarTask format)
   const formattedTasksForModal = useMemo(() => 
