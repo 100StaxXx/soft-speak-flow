@@ -117,6 +117,47 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       intensity: 'soft',
       triggers: ['Anxious & Overthinking', 'Feeling Stuck']
     }
+  ],
+  carmen: [
+    {
+      topic_category: 'discipline',
+      intensity: 'strong',
+      triggers: ['Avoiding Action', 'Needing Discipline']
+    },
+    {
+      topic_category: 'business',
+      intensity: 'strong',
+      triggers: ['In Transition', 'Feeling Stuck']
+    }
+  ],
+  reign: [
+    {
+      topic_category: 'physique',
+      intensity: 'strong',
+      triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated']
+    },
+    {
+      topic_category: 'business',
+      intensity: 'strong',
+      triggers: ['Motivated & Ready', 'Feeling Stuck']
+    },
+    {
+      topic_category: 'discipline',
+      intensity: 'strong',
+      triggers: ['Avoiding Action', 'Needing Discipline']
+    }
+  ],
+  elizabeth: [
+    {
+      topic_category: 'confidence',
+      intensity: 'medium',
+      triggers: ['Self-Doubt', 'Feeling Stuck']
+    },
+    {
+      topic_category: 'mindset',
+      intensity: 'medium',
+      triggers: ['Heavy or Low', 'Unmotivated']
+    }
   ]
 };
 
@@ -129,5 +170,8 @@ export const MENTOR_SLUGS = [
   'lumi',
   'kai',
   'stryker',
-  'solace'
+  'solace',
+  'carmen',
+  'reign',
+  'elizabeth'
 ] as const;

@@ -90,8 +90,13 @@ export const MENTOR_FALLBACK_TAGS: Record<string, CanonicalTrait[]> = {
   kai: ["discipline", "momentum"],         // Gritty discipline + action-oriented
   stryker: ["momentum", "discipline"],     // High-energy momentum first
 
+  // STRONG FEMALE
+  carmen: ["discipline", "confidence"],    // Feminine tough-love coach
+  reign: ["momentum", "discipline"],       // Elite performance queen
+
   // BALANCED (confidence/supportive)
   eli: ["confidence", "supportive"],       // Uplifting confidence + warmth
+  elizabeth: ["confidence", "supportive"], // Feminine Eli - uplift sister
 
   // SOFT/HEALING
   lumi: ["healing", "supportive"],         // Relationship healing + support

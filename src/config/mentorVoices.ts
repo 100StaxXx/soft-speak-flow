@@ -140,6 +140,48 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
       use_speaker_boost: true,
     },
   },
+  carmen: {
+    mentorSlug: "carmen",
+    mentorName: "Carmen",
+    voiceName: "Rachel",
+    voiceId: "21m00Tcm4TlvDq8ikWAM",
+    defaultIntensity: "high",
+    categories: ["discipline", "business", "confidence"],
+    voiceSettings: {
+      stability: 0.75,
+      similarity_boost: 0.85,
+      style_exaggeration: 0.6,
+      use_speaker_boost: true,
+    },
+  },
+  reign: {
+    mentorSlug: "reign",
+    mentorName: "Reign",
+    voiceName: "Bella",
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    defaultIntensity: "high",
+    categories: ["physique", "business", "momentum"],
+    voiceSettings: {
+      stability: 0.7,
+      similarity_boost: 0.9,
+      style_exaggeration: 0.8,
+      use_speaker_boost: true,
+    },
+  },
+  elizabeth: {
+    mentorSlug: "elizabeth",
+    mentorName: "Elizabeth",
+    voiceName: "Aria",
+    voiceId: "9BWtsMINqrJLrRacOk9x",
+    defaultIntensity: "medium",
+    categories: ["confidence", "support", "encouragement"],
+    voiceSettings: {
+      stability: 0.75,
+      similarity_boost: 0.8,
+      style_exaggeration: 0.4,
+      use_speaker_boost: true,
+    },
+  },
 };
 
 export const getMentorVoiceConfig = (mentorSlug: string): MentorVoiceConfig | null => {
