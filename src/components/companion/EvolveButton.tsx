@@ -113,7 +113,7 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
               animate={{ opacity: [1, 0.5, 1] }}
               transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
             >
-              PREPARING...
+              EVOLVING...
             </motion.span>
           ) : (
             <span 
