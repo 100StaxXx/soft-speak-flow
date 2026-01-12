@@ -183,16 +183,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const onboardingComplete = onboardingTasks.filter(t => t.completed).length;
   const onboardingTotal = onboardingTasks.length;
 
-  // Auto-expand uncompleted onboarding tasks
+  // Auto-expand only the first uncompleted onboarding task (accordion style)
   useEffect(() => {
-    const onboardingTaskIds = tasks
-      .filter(t => isOnboardingTask(t.task_text) && !t.completed)
-      .map(t => t.id);
+    const firstUncompletedOnboarding = tasks.find(t => isOnboardingTask(t.task_text) && !t.completed);
     
-    if (onboardingTaskIds.length > 0) {
+    if (firstUncompletedOnboarding) {
       setExpandedTasks(prev => {
+        // Only add if not already expanded
+        if (prev.has(firstUncompletedOnboarding.id)) return prev;
         const next = new Set(prev);
-        onboardingTaskIds.forEach(id => next.add(id));
+        next.add(firstUncompletedOnboarding.id);
         return next;
       });
     }
@@ -362,16 +362,30 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const toggleTaskExpanded = useCallback((taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    const isClickingOnboarding = tasks.some(t => t.id === taskId && isOnboardingTask(t.task_text));
+    
     setExpandedTasks(prev => {
       const next = new Set(prev);
+      
       if (next.has(taskId)) {
+        // Closing this task
         next.delete(taskId);
       } else {
+        // Opening this task - if it's onboarding, close other onboarding tasks first
+        if (isClickingOnboarding) {
+          tasks.forEach(t => {
+            if (isOnboardingTask(t.task_text) && t.id !== taskId) {
+              next.delete(t.id);
+            }
+          });
+        }
         next.add(taskId);
       }
+      
       return next;
     });
-  }, []);
+  }, [tasks]);
 
   const getCategoryIcon = (category: string | null | undefined) => {
     switch (category) {
@@ -416,11 +430,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           });
         }, 600);
         
-        // Auto-collapse tutorial quests when completed
+        // Auto-collapse tutorial quests when completed and expand next one
         if (isOnboarding) {
           setExpandedTasks(prev => {
             const next = new Set(prev);
             next.delete(task.id);
+            
+            // Find and expand the next uncompleted onboarding task
+            const nextOnboarding = tasks.find(t => 
+              isOnboardingTask(t.task_text) && 
+              !t.completed && 
+              t.id !== task.id
+            );
+            if (nextOnboarding) {
+              next.add(nextOnboarding.id);
+            }
+            
             return next;
           });
         }
