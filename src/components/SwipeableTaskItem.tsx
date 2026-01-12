@@ -1,7 +1,8 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useRef, useEffect } from "react";
 import { motion, PanInfo, useMotionValue, useTransform } from "framer-motion";
-import { Trash2, CalendarArrowUp } from "lucide-react";
+import { Trash2, CalendarArrowUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 interface SwipeableTaskItemProps {
   children: ReactNode;
@@ -19,10 +20,25 @@ export function SwipeableTaskItem({
   const x = useMotionValue(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [isPastThreshold, setIsPastThreshold] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  const THRESHOLD = 100;
-  const VELOCITY_THRESHOLD = 500;
-  const DRAG_LIMIT = 120;
+  // Increased thresholds for more deliberate swipes
+  const THRESHOLD = 140;
+  const VELOCITY_THRESHOLD = 1000;
+  const DRAG_LIMIT = 180;
+  const HOLD_DURATION = 300; // milliseconds to hold at threshold
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
 
   // Transform values for visual feedback - Delete (left swipe)
   const deleteOpacity = useTransform(x, [-THRESHOLD, 0], [1, 0]);
@@ -42,8 +58,53 @@ export function SwipeableTaskItem({
     ["hsl(var(--background))", "hsl(var(--primary) / 0.15)"]
   );
 
+  const handleDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (disabled || isDeleting || isMoving) return;
+
+    const pastLeft = info.offset.x < -THRESHOLD;
+    const pastRight = info.offset.x > THRESHOLD && onSwipeMoveToNextDay;
+    const direction = pastLeft ? 'left' : pastRight ? 'right' : null;
+
+    if ((pastLeft || pastRight) && !isPastThreshold) {
+      setIsPastThreshold(true);
+      setSwipeDirection(direction);
+      
+      // Start hold timer
+      holdTimerRef.current = setTimeout(async () => {
+        setIsConfirmed(true);
+        try {
+          await Haptics.impact({ style: ImpactStyle.Heavy });
+        } catch (e) {
+          // Haptics not available on web
+        }
+      }, HOLD_DURATION);
+    } else if (!pastLeft && !pastRight && isPastThreshold) {
+      // User dragged back - cancel
+      setIsPastThreshold(false);
+      setIsConfirmed(false);
+      setSwipeDirection(null);
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+    }
+  };
+
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (disabled || isDeleting || isMoving) return;
+
+    // Clear any pending timer
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    // Only execute action if user held long enough
+    if (!isConfirmed) {
+      setIsPastThreshold(false);
+      setSwipeDirection(null);
+      return;
+    }
 
     const swipedLeft = info.offset.x < -THRESHOLD || info.velocity.x < -VELOCITY_THRESHOLD;
     const swipedRight = info.offset.x > THRESHOLD || info.velocity.x > VELOCITY_THRESHOLD;
@@ -59,6 +120,10 @@ export function SwipeableTaskItem({
         onSwipeMoveToNextDay();
       }, 200);
     }
+
+    setIsPastThreshold(false);
+    setIsConfirmed(false);
+    setSwipeDirection(null);
   };
 
   return (
@@ -75,10 +140,34 @@ export function SwipeableTaskItem({
           className="flex items-center gap-2"
           style={{ scale: moveScale }}
         >
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-            <CalendarArrowUp className="w-5 h-5 text-primary-foreground" />
+          <div className="relative w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+            {isConfirmed && swipeDirection === 'right' ? (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+              >
+                <Check className="w-5 h-5 text-primary-foreground" />
+              </motion.div>
+            ) : (
+              <CalendarArrowUp className="w-5 h-5 text-primary-foreground" />
+            )}
+            {isPastThreshold && !isConfirmed && swipeDirection === 'right' && (
+              <motion.div
+                className="absolute inset-0 rounded-full border-2 border-primary-foreground"
+                initial={{ scale: 1, opacity: 0.5 }}
+                animate={{ scale: 1.3, opacity: 0 }}
+                transition={{ duration: 0.3, repeat: Infinity }}
+              />
+            )}
           </div>
-          <span className="text-primary font-semibold text-sm">Tomorrow</span>
+          <span className="text-primary font-semibold text-sm">
+            {isConfirmed && swipeDirection === 'right' 
+              ? "Release!" 
+              : isPastThreshold && swipeDirection === 'right'
+                ? "Hold..."
+                : "Tomorrow"}
+          </span>
         </motion.div>
       </motion.div>
 
@@ -94,9 +183,33 @@ export function SwipeableTaskItem({
           className="flex items-center gap-2"
           style={{ scale: deleteScale }}
         >
-          <span className="text-red-500 font-semibold text-sm">Delete</span>
-          <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center">
-            <Trash2 className="w-6 h-6 text-white" />
+          <span className="text-red-500 font-semibold text-sm">
+            {isConfirmed && swipeDirection === 'left'
+              ? "Release!"
+              : isPastThreshold && swipeDirection === 'left'
+                ? "Hold..."
+                : "Delete"}
+          </span>
+          <div className="relative w-10 h-10 rounded-full bg-red-500 flex items-center justify-center">
+            {isConfirmed && swipeDirection === 'left' ? (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+              >
+                <Check className="w-6 h-6 text-white" />
+              </motion.div>
+            ) : (
+              <Trash2 className="w-6 h-6 text-white" />
+            )}
+            {isPastThreshold && !isConfirmed && swipeDirection === 'left' && (
+              <motion.div
+                className="absolute inset-0 rounded-full border-2 border-white"
+                initial={{ scale: 1, opacity: 0.5 }}
+                animate={{ scale: 1.3, opacity: 0 }}
+                transition={{ duration: 0.3, repeat: Infinity }}
+              />
+            )}
           </div>
         </motion.div>
       </motion.div>
@@ -105,8 +218,9 @@ export function SwipeableTaskItem({
       <motion.div
         drag={disabled || isDeleting || isMoving ? false : "x"}
         dragConstraints={{ left: -DRAG_LIMIT, right: onSwipeMoveToNextDay ? DRAG_LIMIT : 0 }}
-        dragElastic={0.3}
+        dragElastic={0.15}
         style={{ x }}
+        onDrag={handleDrag}
         onDragEnd={handleDragEnd}
         animate={
           isDeleting 
