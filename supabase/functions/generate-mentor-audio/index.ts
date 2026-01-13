@@ -68,6 +68,24 @@ const mentorVoices: Record<string, any> = {
     similarity_boost: 0.85,
     style_exaggeration: 0.2,
   },
+  carmen: {
+    voiceId: "AZnzlk1XvdvUeBnXmlld", // Domi - Strong, assertive female
+    stability: 0.75,
+    similarity_boost: 0.85,
+    style_exaggeration: 0.7,
+  },
+  reign: {
+    voiceId: "jsCqWAovK2LkecY7zXl4", // Freya - Commanding, high-energy
+    stability: 0.65,
+    similarity_boost: 0.90,
+    style_exaggeration: 0.85,
+  },
+  elizabeth: {
+    voiceId: "XrExE9yKIg1WjnnlVkGX", // Matilda - Warm, nurturing
+    stability: 0.80,
+    similarity_boost: 0.80,
+    style_exaggeration: 0.35,
+  },
 };
 
 serve(async (req) => {
