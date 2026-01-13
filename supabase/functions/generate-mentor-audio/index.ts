@@ -75,7 +75,7 @@ const mentorVoices: Record<string, any> = {
     style_exaggeration: 0.7,
   },
   reign: {
-    voiceId: "jsCqWAovK2LkecY7zXl4", // Freya - Commanding, high-energy
+    voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah - Commanding, high-energy
     stability: 0.65,
     similarity_boost: 0.90,
     style_exaggeration: 0.85,
