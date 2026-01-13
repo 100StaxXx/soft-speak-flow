@@ -465,12 +465,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             isRitual ? "py-3.5" : "py-2",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
-            isActivated && !isDragging && "bg-muted/30 rounded-lg -mx-1 px-1",
-            isOnboarding && !isComplete && "bg-primary/5 -mx-2 px-2 rounded-lg"
+                isActivated && !isDragging && "bg-muted/30 rounded-lg",
+                isOnboarding && !isComplete && "bg-primary/5 rounded-lg"
           )}
         >
           {/* Checkbox - only this toggles completion */}
-          <div className="relative">
+              <div className="relative ml-1">
             {/* Tutorial quest breathing glow effect */}
             {isOnboarding && !isComplete && (
               <motion.div
