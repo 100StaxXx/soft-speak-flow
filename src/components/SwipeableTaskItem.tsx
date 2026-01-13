@@ -220,7 +220,13 @@ export function SwipeableTaskItem({
         dragConstraints={{ left: -DRAG_LIMIT, right: onSwipeMoveToNextDay ? DRAG_LIMIT : 0 }}
         dragElastic={0.15}
         dragDirectionLock
+        dragSnapToOrigin={!isDeleting && !isMoving}
         style={{ x }}
+        onDragStart={() => {
+          setIsPastThreshold(false);
+          setIsConfirmed(false);
+          setSwipeDirection(null);
+        }}
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}
         animate={
@@ -232,7 +238,7 @@ export function SwipeableTaskItem({
         }
         transition={isDeleting || isMoving ? { duration: 0.2, ease: "easeOut" } : {}}
         className={cn(
-          "relative touch-pan-y",
+          "relative",
           !disabled && !isDeleting && !isMoving && "cursor-grab active:cursor-grabbing"
         )}
         whileTap={disabled || isDeleting || isMoving ? {} : { scale: 0.99 }}
