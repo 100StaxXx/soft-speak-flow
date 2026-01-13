@@ -84,6 +84,10 @@ const ENERGY_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
   "Steady and empowering": "medium",
   "Gentle and nurturing": "gentle",
   "Ethereal and transcendent": "gentle",
+  // New intensity_preference question mappings
+  "Push me hard — I need direct, no-excuses accountability": "high",
+  "Challenge me, but with encouragement and compassion": "medium",
+  "Guide me gently — I'm working through something tender": "gentle",
 };
 
 const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
@@ -228,8 +232,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     // Show loading screen immediately
     setStage("calculating");
 
-    // Question weights: Q1=1.5, Q2=1.4, Q3=1.3
-    const QUESTION_WEIGHTS = [1.5, 1.4, 1.3];
+    // Question weights: Q1=1.5, Q2=1.4, Q3=1.3, Q4=1.2, Q5=1.1
+    const QUESTION_WEIGHTS = [1.5, 1.4, 1.3, 1.2, 1.1];
 
     // Build canonical tag weight map instead of duplicating strings
     const canonicalTagWeights: Record<string, number> = {};
