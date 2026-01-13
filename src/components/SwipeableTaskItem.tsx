@@ -219,6 +219,7 @@ export function SwipeableTaskItem({
         drag={disabled || isDeleting || isMoving ? false : "x"}
         dragConstraints={{ left: -DRAG_LIMIT, right: onSwipeMoveToNextDay ? DRAG_LIMIT : 0 }}
         dragElastic={0.15}
+        dragDirectionLock
         style={{ x }}
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}
