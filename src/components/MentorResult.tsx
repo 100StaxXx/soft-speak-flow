@@ -19,6 +19,7 @@ interface MentorResultProps {
     paragraph: string;
     bullets: string[];
   };
+  compatibilityScore?: number | null;
   onConfirm: () => void;
   onSeeAll: () => void;
   isConfirming?: boolean;
@@ -27,6 +28,7 @@ interface MentorResultProps {
 export const MentorResult = ({
   mentor,
   explanation,
+  compatibilityScore,
   onConfirm,
   onSeeAll,
   isConfirming = false
@@ -56,6 +58,22 @@ export const MentorResult = ({
               className="animate-scale-in"
             />
           </div>
+
+          {/* Compatibility Score Badge */}
+          {compatibilityScore && (
+            <div 
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-charcoal/80 border border-steel/30 animate-scale-in"
+              style={{ boxShadow: `0 0 25px ${mentor.primary_color}50` }}
+            >
+              <span 
+                className="text-3xl font-black"
+                style={{ color: mentor.primary_color }}
+              >
+                {compatibilityScore}%
+              </span>
+              <span className="text-sm font-semibold text-steel uppercase tracking-wide">Match</span>
+            </div>
+          )}
 
           {/* Name & Title */}
           <div className="text-center space-y-3">
