@@ -23,17 +23,23 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
     starfall: [
       "As flames dance in the distance, your ship awaits its next destination...",
       "The engines hum with potential energy. Your crew looks to you for direction...",
-      "Your final choice approaches, warrior...",
+      "Your path grows clearer with each choice...",
+      "The path ahead grows steeper. How will you face the climb?",
+      "A voice echoes from the stars. Which one calls to you?",
     ],
     void: [
       "In the silent depths between stars, clarity emerges from stillness...",
       "The void speaks to those who listen. A whisper guides your path...",
-      "The universe awaits your answer...",
+      "The shadows reveal what light cannot...",
+      "In the depths, strength takes many forms. What is yours?",
+      "A presence emerges from the darkness. What energy does it hold?",
     ],
     stellar: [
       "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
       "Your companion gazes at the stars with wonder. What do you see?",
-      "Your cosmic journey reaches its turning point...",
+      "The constellations align to show your way...",
+      "The cosmos offers many guides. How do you wish to be led?",
+      "A mentor materializes from stardust. What essence do they carry?",
     ],
   };
   return narratives[faction][questionIndex] || narratives[faction][0];
@@ -71,6 +77,27 @@ const questions: StoryQuestion[] = [
       { text: "Steady and empowering", tags: ["confidence", "supportive"] },
       { text: "Gentle and nurturing", tags: ["healing", "supportive"] },
       { text: "Ethereal and transcendent", tags: ["spiritual", "calm"] },
+    ],
+  },
+  {
+    id: "intensity_preference",
+    narrative: "",
+    question: "How do you want to be challenged?",
+    options: [
+      { text: "Push me hard — I need direct, no-excuses accountability", tags: ["discipline", "momentum"] },
+      { text: "Challenge me, but with encouragement and compassion", tags: ["confidence", "supportive"] },
+      { text: "Guide me gently — I'm working through something tender", tags: ["healing", "calm"] },
+    ],
+  },
+  {
+    id: "mentor_voice",
+    narrative: "",
+    question: "What kind of voice do you want guiding you?",
+    options: [
+      { text: "A bold, direct voice that cuts through the noise", tags: ["discipline", "momentum"] },
+      { text: "A warm, sisterly presence that feels like a friend", tags: ["supportive", "healing"] },
+      { text: "A calm, grounded voice that brings clarity", tags: ["calm", "spiritual"] },
+      { text: "An empowering voice that believes in me", tags: ["confidence", "supportive"] },
     ],
   },
 ];
