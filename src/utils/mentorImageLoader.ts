@@ -3,7 +3,7 @@
  * Only loads the mentor image that's actually needed, not all 23MB upfront!
  */
 
-type MentorSlug = 'atlas' | 'darius' | 'kai' | 'eli' | 'nova' | 'sienna' | 'lumi' | 'stryker' | 'solace';
+type MentorSlug = 'atlas' | 'kai' | 'eli' | 'nova' | 'sienna' | 'lumi' | 'stryker' | 'carmen' | 'reign' | 'elizabeth';
 
 // Cache loaded images to avoid re-importing
 const imageCache = new Map<string, string>();
@@ -25,14 +25,11 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
       case 'atlas':
         module = await import('@/assets/atlas-sage.png');
         break;
-      case 'darius':
-        module = await import('@/assets/darius-sage.png');
-        break;
       case 'kai':
         module = await import('@/assets/kai-sage.png');
         break;
       case 'eli':
-        module = await import('@/assets/eli-sage.png');
+        module = await import('@/assets/darius-sage.png'); // Eli uses Darius's image
         break;
       case 'nova':
         module = await import('@/assets/nova-sage.png');
@@ -46,12 +43,18 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
       case 'stryker':
         module = await import('@/assets/stryker-sage.png');
         break;
-      case 'solace':
-        module = await import('@/assets/solace-sage.png');
+      case 'carmen':
+        module = await import('@/assets/carmen-sage.png');
+        break;
+      case 'reign':
+        module = await import('@/assets/reign-sage.png');
+        break;
+      case 'elizabeth':
+        module = await import('@/assets/solace-sage.png'); // Elizabeth uses Solace's image
         break;
       default:
         // Default fallback
-        module = await import('@/assets/darius-sage.png');
+        module = await import('@/assets/atlas-sage.png');
     }
     
     const imageUrl = module.default;
