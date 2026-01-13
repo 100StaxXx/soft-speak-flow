@@ -20,12 +20,6 @@ const mentorVoices: Record<string, any> = {
     similarity_boost: 0.85,
     style_exaggeration: 0.5,
   },
-  darius: {
-    voiceId: "rWyjfFeMZ6PxkHqD3wGC", // Brian
-    stability: 0.8,
-    similarity_boost: 0.9,
-    style_exaggeration: 0.7,
-  },
   eli: {
     voiceId: "iP95p4xoKVk53GoZ742B", // Chris
     stability: 0.7,
@@ -61,12 +55,6 @@ const mentorVoices: Record<string, any> = {
     stability: 0.85,
     similarity_boost: 0.9,
     style_exaggeration: 0.7,
-  },
-  solace: {
-    voiceId: "pFZP5JQG7iQjIQuC4Bku", // Lily
-    stability: 0.8,
-    similarity_boost: 0.85,
-    style_exaggeration: 0.2,
   },
   carmen: {
     voiceId: "AZnzlk1XvdvUeBnXmlld", // Domi - Strong, assertive female
