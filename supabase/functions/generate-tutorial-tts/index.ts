@@ -17,6 +17,9 @@ const mentorVoiceMap: Record<string, string> = {
   kai: 'onyx',        // Callum (Astor) - high energy
   stryker: 'fable',   // Rich (Rich) - strong, resilient
   solace: 'shimmer',  // Lily - gentle, empathetic
+  carmen: 'nova',     // Domi - strong, authoritative female
+  reign: 'nova',      // Freya - commanding, high-energy
+  elizabeth: 'shimmer', // Matilda - warm, nurturing
 };
 
 serve(async (req) => {
