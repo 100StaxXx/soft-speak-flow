@@ -79,7 +79,7 @@ export function SwipeableTaskItem({
         }
       }, HOLD_DURATION);
     } else if (!pastLeft && !pastRight && isPastThreshold) {
-      // User dragged back - cancel
+      // User dragged back - cancel and reset
       setIsPastThreshold(false);
       setIsConfirmed(false);
       setSwipeDirection(null);
@@ -89,6 +89,9 @@ export function SwipeableTaskItem({
       }
     }
   };
+
+
+
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (disabled || isDeleting || isMoving) return;
@@ -220,7 +223,7 @@ export function SwipeableTaskItem({
         dragConstraints={{ left: -DRAG_LIMIT, right: onSwipeMoveToNextDay ? DRAG_LIMIT : 0 }}
         dragElastic={0.15}
         dragDirectionLock
-        dragSnapToOrigin={!isDeleting && !isMoving}
+        dragSnapToOrigin={!isDeleting && !isMoving && !isPastThreshold}
         style={{ x }}
         onDragStart={() => {
           setIsPastThreshold(false);
