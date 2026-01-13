@@ -157,8 +157,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   reign: {
     mentorSlug: "reign",
     mentorName: "Reign",
-    voiceName: "Freya",
-    voiceId: "jsCqWAovK2LkecY7zXl4",
+    voiceName: "Sarah",
+    voiceId: "EXAVITQu4vr4xnSDxMaL",
     defaultIntensity: "high",
     categories: ["physique", "business", "momentum"],
     voiceSettings: {
