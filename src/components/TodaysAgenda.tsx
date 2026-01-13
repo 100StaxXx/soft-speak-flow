@@ -791,7 +791,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         ) : (
           <div className="space-y-1">
-            {/* Quest Input - Always visible */}
+            {/* Quest Header Row */}
             <div className="flex items-center gap-2 py-1.5 px-1">
               {questTasks.length > 0 && ritualTasks.length > 0 && (
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -845,21 +845,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              
-              {/* Compact Smart Input - Always visible */}
-              {onQuickAdd && (
-                <div className="flex-1 min-w-0">
-                  <CompactSmartInput
-                    onSubmit={onQuickAdd}
-                    onPlanMyDay={onPlanMyDay}
-                    onPlanMyWeek={onPlanMyWeek}
-                    activeEpics={activeEpics}
-                    habitsAtRisk={habitsAtRisk}
-                    placeholder="Add quest..."
-                  />
-                </div>
-              )}
             </div>
+            
+            {/* Compact Smart Input - Separate row for full width */}
+            {onQuickAdd && (
+              <div className="px-1">
+                <CompactSmartInput
+                  onSubmit={onQuickAdd}
+                  onPlanMyDay={onPlanMyDay}
+                  onPlanMyWeek={onPlanMyWeek}
+                  activeEpics={activeEpics}
+                  habitsAtRisk={habitsAtRisk}
+                  placeholder="Add quest..."
+                />
+              </div>
+            )}
             
             {/* Quests List Section */}
             {questTasks.length > 0 && (
