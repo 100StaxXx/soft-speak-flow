@@ -708,7 +708,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   return (
     <div className="relative">
-      <div className="relative p-2 overflow-visible">
+      <div className="relative px-4 py-2 overflow-visible">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
