@@ -41,7 +41,7 @@ import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
 import { useWeeklyPlanOptimization } from "@/hooks/useWeeklyPlanOptimization";
 import { useWeeklyPlanGeneration } from "@/hooks/useWeeklyPlanGeneration";
 import { useEpics } from "@/hooks/useEpics";
-import { SmartDailyRescheduleCard } from "@/components/SmartDailyRescheduleCard";
+
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
 import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
@@ -54,7 +54,7 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
-  const [showRescheduleCard, setShowRescheduleCard] = useState(true);
+  
   const [showHourlyModal, setShowHourlyModal] = useState(false);
   const [showDayPlannerWizard, setShowDayPlannerWizard] = useState(false);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
@@ -530,30 +530,6 @@ const Journeys = () => {
           />
         </motion.div>
 
-        {/* Smart Reschedule Card */}
-        {showRescheduleCard && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-4"
-          >
-            <SmartDailyRescheduleCard
-              tasks={dailyTasks}
-              selectedDate={selectedDate}
-              onReplan={async () => {
-                // Trigger a quick replan with default settings
-                try {
-                  await generatePlan({ energyLevel: 'medium', dayType: 'mixed', focusArea: undefined });
-                  toast.success("Day replanned!");
-                } catch (e) {
-                  console.error('Replan failed:', e);
-                }
-              }}
-              onDismiss={() => setShowRescheduleCard(false)}
-            />
-          </motion.div>
-        )}
 
         {/* Main Content Area */}
         <motion.div
