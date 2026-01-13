@@ -120,6 +120,7 @@ export const StoryOnboarding = () => {
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
+  const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
 
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -351,6 +352,18 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
     if (bestMatch) {
       setRecommendedMentor(bestMatch);
+
+      // Calculate compatibility percentage
+      const bestMatchEntry = mentorScores.find(m => m.mentor.id === bestMatch.id);
+      const bestScore = bestMatchEntry?.score ?? 0;
+      const bestMentorTags = MENTOR_FALLBACK_TAGS[bestMatch.slug] ?? 
+        canonicalizeTags([...(bestMatch.tags || []), ...(bestMatch.themes || [])]);
+      const totalWeight = QUESTION_WEIGHTS.reduce((a, b) => a + b, 0);
+      // Max possible = mentor tags × average weight per question + intensity bonus
+      const maxScore = Math.max(bestMentorTags.length * (totalWeight / QUESTION_WEIGHTS.length) * 2, 4) + 0.8;
+      const rawPercent = Math.round((bestScore / maxScore) * 100);
+      const compatibilityPercent = Math.max(65, Math.min(99, rawPercent));
+      setCompatibilityScore(compatibilityPercent);
 
       // Convert answers to Record format for explanation generator
       const selectedAnswers: Record<string, string> = {};
@@ -601,6 +614,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             <MentorResult
               mentor={recommendedMentor}
               explanation={mentorExplanation}
+              compatibilityScore={compatibilityScore}
               onConfirm={() => handleMentorConfirm(recommendedMentor)}
               onSeeAll={handleSeeAllMentors}
             />
