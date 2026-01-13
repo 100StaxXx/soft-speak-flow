@@ -41,6 +41,8 @@ import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
 import { useWeeklyPlanOptimization } from "@/hooks/useWeeklyPlanOptimization";
 import { useWeeklyPlanGeneration } from "@/hooks/useWeeklyPlanGeneration";
 import { useEpics } from "@/hooks/useEpics";
+import { useDeepLink } from "@/contexts/DeepLinkContext";
+import { logger } from "@/utils/logger";
 
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
@@ -176,6 +178,37 @@ const Journeys = () => {
     (profile?.onboarding_data as Record<string, unknown>)?.walkthrough_completed === true;
   
   useOnboardingSchedule(user?.id, hasCompletedWalkthrough, profileLoading);
+  
+  // Deep link handling - open task from widget tap
+  const { pendingTaskId, clearPendingTask } = useDeepLink();
+  const deepLinkProcessedRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    // Skip if no pending task or already processed this task
+    if (!pendingTaskId || deepLinkProcessedRef.current === pendingTaskId) {
+      return;
+    }
+    
+    // Wait for tasks to load
+    if (dailyTasks.length === 0) {
+      return;
+    }
+    
+    // Find the task in today's tasks
+    const task = dailyTasks.find(t => t.id === pendingTaskId);
+    
+    if (task) {
+      logger.log('[Journeys] Opening deep-linked task:', pendingTaskId);
+      deepLinkProcessedRef.current = pendingTaskId;
+      handleEditQuest(task);
+      clearPendingTask();
+    } else {
+      // Task not found in today's list - might be on a different day
+      logger.log('[Journeys] Deep link task not found in daily tasks:', pendingTaskId);
+      deepLinkProcessedRef.current = pendingTaskId;
+      clearPendingTask();
+    }
+  }, [pendingTaskId, dailyTasks, clearPendingTask]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
