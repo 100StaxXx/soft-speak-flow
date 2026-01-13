@@ -103,27 +103,6 @@ export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
     finaleRole: 'Stands beside the hero in the final battle, fighting as equals.',
   },
   
-  darius: {
-    slug: 'darius',
-    name: 'Darius',
-    storyRole: 'wise_coach',
-    narrativeVoice: 'Steady and grounding, like a wise older brother who has walked this path.',
-    speechPatterns: [
-      'Uses sports and training metaphors',
-      'Balances challenge with encouragement',
-      'References the process, not just results',
-      'Speaks with calm confidence',
-    ],
-    wisdomStyle: 'Coaching - breaks big goals into manageable steps',
-    exampleDialogue: [
-      '"Champions aren\'t made in the spotlight. They\'re made in the practice—in the daily grind."',
-      '"You\'re not behind. You\'re exactly where your journey needs you to be. Now take the next step."',
-      '"Focus on what you can control. Everything else is noise."',
-    ],
-    storyAppearance: 'A solid, dependable figure with an aura of quiet strength and earned wisdom.',
-    farewellStyle: '"You\'ve got the fundamentals. Now it\'s game time. Go show them what you\'re made of."',
-    finaleRole: 'Helps the hero strategize for the final confrontation, then steps back to watch them succeed.',
-  },
   
   nova: {
     slug: 'nova',
@@ -169,27 +148,6 @@ export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
     finaleRole: 'Heals the hero\'s emotional wounds before the final confrontation.',
   },
   
-  solace: {
-    slug: 'solace',
-    name: 'Solace',
-    storyRole: 'gentle_healer',
-    narrativeVoice: 'Peaceful and centering, bringing calm to chaos.',
-    speechPatterns: [
-      'Speaks slowly and deliberately',
-      'Uses nature and stillness metaphors',
-      'References breath, peace, and inner sanctuary',
-      'Often pauses meaningfully',
-    ],
-    wisdomStyle: 'Meditative - guides through stillness and presence',
-    exampleDialogue: [
-      '"Breathe. The storm outside cannot touch the stillness within."',
-      '"You are not your anxious thoughts. You are the awareness watching them pass."',
-      '"Peace is not the absence of struggle. It is presence within it."',
-    ],
-    storyAppearance: 'An ethereal presence like morning mist, serene and impossibly peaceful.',
-    farewellStyle: '"The sanctuary was never me. It was always inside you. Return whenever you need."',
-    finaleRole: 'Creates a moment of profound peace before the final battle, centering the hero.',
-  },
   
   sienna: {
     slug: 'sienna',

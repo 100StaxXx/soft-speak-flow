@@ -27,7 +27,7 @@ interface MentorGridProps {
 }
 
 // Preferred display order - new mentors will appear after these
-const MENTOR_ORDER = ['atlas', 'darius', 'kai', 'eli', 'nova', 'sienna', 'lumi', 'stryker', 'solace'];
+const MENTOR_ORDER = ['atlas', 'kai', 'eli', 'nova', 'sienna', 'lumi', 'stryker', 'carmen', 'reign', 'elizabeth'];
 
 export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommendedMentorId, isSelecting = false }: MentorGridProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);
@@ -178,7 +178,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
           selectedMentor ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}
       >
-        <div className="grid grid-cols-3 gap-8 md:gap-12 animate-fade-in">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 md:gap-8 animate-fade-in">
           {orderedMentors.map((mentor) => (
             <div
               key={mentor.id}

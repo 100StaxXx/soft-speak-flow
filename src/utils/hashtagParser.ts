@@ -13,14 +13,15 @@ export interface ParsedHashtags {
 
 const MENTOR_SLUG_MAP: Record<string, string> = {
   'mentor_atlas': 'atlas',
-  'mentor_darius': 'darius',
   'mentor_kai': 'kai',
   'mentor_eli': 'eli',
   'mentor_nova': 'nova',
   'mentor_sienna': 'sienna',
   'mentor_lumi': 'lumi',
   'mentor_stryker': 'stryker',
-  'mentor_solace': 'solace',
+  'mentor_carmen': 'carmen',
+  'mentor_reign': 'reign',
+  'mentor_elizabeth': 'elizabeth',
 };
 
 const CONTENT_TYPES = [

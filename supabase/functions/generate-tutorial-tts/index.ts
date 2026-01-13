@@ -8,18 +8,16 @@ const corsHeaders = {
 
 // Map mentor slugs to OpenAI TTS voices
 const mentorVoiceMap: Record<string, string> = {
-  atlas: 'onyx',      // George - deep, authoritative
-  darius: 'fable',    // Brian - intense, commanding
-  eli: 'echo',        // Chris - wise, measured
-  nova: 'nova',       // Daniel - innovative, energetic
-  sienna: 'shimmer',  // Charlotte - warm, compassionate
-  lumi: 'alloy',      // Sarah - calm, peaceful
-  kai: 'onyx',        // Callum (Astor) - high energy
-  stryker: 'fable',   // Rich (Rich) - strong, resilient
-  solace: 'shimmer',  // Lily - gentle, empathetic
-  carmen: 'nova',     // Domi - strong, authoritative female
-  reign: 'nova',      // Freya - commanding, high-energy
-  elizabeth: 'shimmer', // Matilda - warm, nurturing
+  atlas: 'onyx',      // deep, authoritative
+  eli: 'echo',        // wise, measured
+  nova: 'nova',       // innovative, energetic
+  sienna: 'shimmer',  // warm, compassionate
+  lumi: 'alloy',      // calm, peaceful
+  kai: 'onyx',        // high energy
+  stryker: 'fable',   // strong, resilient
+  carmen: 'nova',     // strong, authoritative female
+  reign: 'fable',     // commanding, high-energy
+  elizabeth: 'shimmer', // warm, nurturing
 };
 
 serve(async (req) => {

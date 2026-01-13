@@ -12,10 +12,6 @@ const mentorDailyThemes: Record<string, any[]> = {
     { topic_category: 'mindset', intensity: 'medium', triggers: ['In Transition', 'Self-Doubt'] },
     { topic_category: 'business', intensity: 'medium', triggers: ['In Transition', 'Avoiding Action'] }
   ],
-  darius: [
-    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline', 'Unmotivated'] },
-    { topic_category: 'business', intensity: 'medium', triggers: ['Feeling Stuck', 'In Transition'] }
-  ],
   eli: [
     { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] },
     { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Emotionally Hurt'] }
@@ -40,9 +36,18 @@ const mentorDailyThemes: Record<string, any[]> = {
     { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
     { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] }
   ],
-  solace: [
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Heavy or Low', 'Emotionally Hurt'] },
-    { topic_category: 'focus', intensity: 'soft', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] }
+  carmen: [
+    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline'] },
+    { topic_category: 'business', intensity: 'strong', triggers: ['In Transition', 'Feeling Stuck'] }
+  ],
+  reign: [
+    { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
+    { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] },
+    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline'] }
+  ],
+  elizabeth: [
+    { topic_category: 'confidence', intensity: 'medium', triggers: ['Self-Doubt', 'Feeling Stuck'] },
+    { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Unmotivated'] }
   ]
 };
 
