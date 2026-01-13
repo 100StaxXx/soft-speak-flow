@@ -295,6 +295,7 @@ const Journeys = () => {
   
   const handleSaveEdit = useCallback(async (taskId: string, updates: {
     task_text: string;
+    task_date: string | null;
     difficulty: string;
     scheduled_time: string | null;
     estimated_duration: number | null;

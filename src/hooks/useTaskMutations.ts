@@ -577,6 +577,7 @@ export const useTaskMutations = (taskDate: string) => {
       taskId: string; 
       updates: {
         task_text?: string;
+        task_date?: string | null;
         difficulty?: string;
         scheduled_time?: string | null;
         estimated_duration?: number | null;
@@ -594,6 +595,9 @@ export const useTaskMutations = (taskDate: string) => {
       
       if (updates.task_text !== undefined) {
         updateData.task_text = updates.task_text;
+      }
+      if (updates.task_date !== undefined) {
+        updateData.task_date = updates.task_date;
       }
       if (updates.difficulty !== undefined) {
         updateData.difficulty = updates.difficulty;
