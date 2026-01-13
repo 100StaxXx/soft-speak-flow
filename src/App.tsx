@@ -13,6 +13,7 @@ import { XPProvider } from "@/contexts/XPContext";
 import { EvolutionProvider } from "@/contexts/EvolutionContext";
 import { CelebrationProvider } from "@/contexts/CelebrationContext";
 import { CompanionPresenceProvider } from "@/contexts/CompanionPresenceContext";
+import { DeepLinkProvider } from "@/contexts/DeepLinkContext";
 
 import { useProfile } from "@/hooks/useProfile";
 import { getResolvedMentorId } from "@/utils/mentor";
@@ -198,6 +199,18 @@ const AppContent = memo(() => {
     return () => window.removeEventListener('native-push-navigation', handler as EventListener);
   }, [navigate]);
   
+  // Respond to deep link navigation events (from widget taps)
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { path } = (event as CustomEvent<{ path: string; taskId: string }>).detail;
+      if (path) {
+        navigate(path);
+      }
+    };
+    window.addEventListener('deep-link-navigation', handler as EventListener);
+    return () => window.removeEventListener('deep-link-navigation', handler as EventListener);
+  }, [navigate]);
+  
   // Initialize native push on login
   useEffect(() => {
     if (session?.user) {
@@ -317,8 +330,10 @@ const App = () => {
                 <Sonner />
                 <InstallPWA />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                  <ScrollToTop />
-                  <AppContent />
+                  <DeepLinkProvider>
+                    <ScrollToTop />
+                    <AppContent />
+                  </DeepLinkProvider>
                 </BrowserRouter>
               </TooltipProvider>
             </CelebrationProvider>

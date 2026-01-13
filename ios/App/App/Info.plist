@@ -37,9 +37,19 @@
 			<string>app-callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.darrylgraham.revolution</string>
-			</array>
-		</dict>
+			<string>com.darrylgraham.revolution</string>
+		</array>
+	</dict>
+	<dict>
+		<key>CFBundleTypeRole</key>
+		<string>Editor</string>
+		<key>CFBundleURLName</key>
+		<string>widget-deeplink</string>
+		<key>CFBundleURLSchemes</key>
+		<array>
+			<string>cosmiq</string>
+		</array>
+	</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
