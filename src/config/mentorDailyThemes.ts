@@ -22,18 +22,6 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       triggers: ['In Transition', 'Avoiding Action']
     }
   ],
-  darius: [
-    {
-      topic_category: 'discipline',
-      intensity: 'strong',
-      triggers: ['Avoiding Action', 'Needing Discipline', 'Unmotivated']
-    },
-    {
-      topic_category: 'business',
-      intensity: 'medium',
-      triggers: ['Feeling Stuck', 'In Transition']
-    }
-  ],
   eli: [
     {
       topic_category: 'confidence',
@@ -106,18 +94,6 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       triggers: ['Motivated & Ready', 'Feeling Stuck']
     }
   ],
-  solace: [
-    {
-      topic_category: 'mindset',
-      intensity: 'soft',
-      triggers: ['Heavy or Low', 'Emotionally Hurt']
-    },
-    {
-      topic_category: 'focus',
-      intensity: 'soft',
-      triggers: ['Anxious & Overthinking', 'Feeling Stuck']
-    }
-  ],
   carmen: [
     {
       topic_category: 'discipline',
@@ -163,14 +139,12 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
 
 export const MENTOR_SLUGS = [
   'atlas',
-  'darius',
   'eli',
   'nova',
   'sienna',
   'lumi',
   'kai',
   'stryker',
-  'solace',
   'carmen',
   'reign',
   'elizabeth'

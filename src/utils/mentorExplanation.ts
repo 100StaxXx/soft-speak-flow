@@ -21,11 +21,6 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Keeps you grounded in principles, not impulses",
     "Unlocks clear thinking even in emotional moments"
   ],
-  darius: [
-    "Strengthens your self-respect and personal standards",
-    "Empowers you to lead yourself with discipline",
-    "Helps you set boundaries and stand firm"
-  ],
   kai: [
     "Ignites the drive you've been looking for",
     "Holds you to a high standard, no excuses",
@@ -56,10 +51,20 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Treats your goals like an athlete treats competition",
     "Elevates you toward peak performance daily"
   ],
-  solace: [
-    "Reconnects you with your inner wisdom",
-    "Helps you trust your intuition again",
-    "Guides you toward spiritual alignment and peace"
+  carmen: [
+    "Pushes you to meet your full potential",
+    "Holds you accountable with fierce compassion",
+    "Builds your leadership and executive presence"
+  ],
+  reign: [
+    "Demands peak performance in body and mind",
+    "Transforms you through relentless discipline",
+    "Elevates your physical and professional standards"
+  ],
+  elizabeth: [
+    "Celebrates your wins with genuine warmth",
+    "Builds your confidence through steady support",
+    "Reminds you of your strength when you forget"
   ]
 };
 
