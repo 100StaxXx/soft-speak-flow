@@ -283,6 +283,31 @@ export function EditQuestDialog({
               </div>
             </div>
 
+            {/* Photo Section */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Photo</label>
+              <div className="flex items-center gap-3">
+                {imageUrl ? (
+                  <div className="flex items-center gap-3">
+                    <QuestImageThumbnail
+                      imageUrl={imageUrl}
+                      size="lg"
+                      onRemove={handleRemoveImage}
+                    />
+                    <QuestImagePicker
+                      onImageSelected={(url) => setImageUrl(url)}
+                      variant="button"
+                    />
+                  </div>
+                ) : (
+                  <QuestImagePicker
+                    onImageSelected={(url) => setImageUrl(url)}
+                    variant="button"
+                  />
+                )}
+              </div>
+            </div>
+
             {/* Advanced Options */}
             <div className="pt-2">
               <Button

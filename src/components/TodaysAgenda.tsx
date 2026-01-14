@@ -69,7 +69,11 @@ interface Task {
   estimated_duration?: number | null;
   is_recurring?: boolean | null;
   recurrence_pattern?: string | null;
+  recurrence_days?: number[] | null;
+  reminder_enabled?: boolean | null;
+  reminder_minutes_before?: number | null;
   category?: string | null;
+  image_url?: string | null;
 }
 
 interface Journey {
