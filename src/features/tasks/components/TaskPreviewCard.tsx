@@ -23,7 +23,8 @@ import {
   Loader2,
   Wand2,
   Target,
-  Bell
+  Bell,
+  ImageIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { SuggestedSubtask } from '@/hooks/useTaskDecomposition';
 import { SubtaskPreviewList } from './SubtaskPreviewList';
 import { useIntentClassifier } from '@/hooks/useIntentClassifier';
+import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
 
 interface TaskPreviewCardProps {
   parsed: ParsedTask;
@@ -188,7 +190,8 @@ export function TaskPreviewCard({
     parsed.recurrencePattern ||
     parsed.reminderEnabled ||
     parsed.difficulty !== 'medium' ||
-    parsed.energyLevel !== 'medium';
+    parsed.energyLevel !== 'medium' ||
+    parsed.imageUrl;
 
   const showBreakdownPrompt = onBreakdown && 
     !suggestedSubtasks?.length && 
@@ -324,7 +327,24 @@ export function TaskPreviewCard({
                 colorClass={energyConfig[parsed.energyLevel].color}
               />
             )}
+            {parsed.imageUrl && (
+              <MetaBadge 
+                icon={ImageIcon} 
+                label="Photo" 
+                colorClass="text-pink-500 bg-pink-500/10"
+              />
+            )}
           </div>
+          
+          {/* Image Preview */}
+          {parsed.imageUrl && (
+            <div className="mt-2">
+              <QuestImageThumbnail
+                imageUrl={parsed.imageUrl}
+                size="md"
+              />
+            </div>
+          )}
         </div>
       )}
 
