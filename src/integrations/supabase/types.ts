@@ -2120,6 +2120,7 @@ export type Database = {
           estimated_duration: number | null
           habit_source_id: string | null
           id: string
+          image_url: string | null
           is_anchor: boolean | null
           is_bonus: boolean | null
           is_main_quest: boolean | null
@@ -2159,6 +2160,7 @@ export type Database = {
           estimated_duration?: number | null
           habit_source_id?: string | null
           id?: string
+          image_url?: string | null
           is_anchor?: boolean | null
           is_bonus?: boolean | null
           is_main_quest?: boolean | null
@@ -2198,6 +2200,7 @@ export type Database = {
           estimated_duration?: number | null
           habit_source_id?: string | null
           id?: string
+          image_url?: string | null
           is_anchor?: boolean | null
           is_bonus?: boolean | null
           is_main_quest?: boolean | null

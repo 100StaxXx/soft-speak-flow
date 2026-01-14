@@ -12,6 +12,7 @@ import {
   User,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -49,6 +50,7 @@ export interface TaskCardTask {
     name: string;
     avatar_url: string | null;
   } | null;
+  image_url?: string | null;
 }
 
 interface EnhancedTaskCardProps {
@@ -209,6 +211,17 @@ export function EnhancedTaskCard({
                 </span>
               )}
             </div>
+            
+            {/* Image Thumbnail */}
+            {task.image_url && (
+              <div className="mt-2">
+                <QuestImageThumbnail 
+                  imageUrl={task.image_url} 
+                  size="md"
+                  removable={false}
+                />
+              </div>
+            )}
           </div>
 
           {/* Actions */}
