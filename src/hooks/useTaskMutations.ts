@@ -51,6 +51,7 @@ export interface AddTaskParams {
   notes?: string | null;
   contactId?: string | null;
   autoLogInteraction?: boolean;
+  imageUrl?: string | null;
 }
 
 export const useTaskMutations = (taskDate: string) => {
@@ -106,6 +107,7 @@ export const useTaskMutations = (taskDate: string) => {
             notes: params.notes || null,
             contact_id: params.contactId || null,
             auto_log_interaction: params.autoLogInteraction ?? true,
+            image_url: params.imageUrl || null,
           })
           .select()
           .single();
@@ -586,6 +588,7 @@ export const useTaskMutations = (taskDate: string) => {
         reminder_enabled?: boolean;
         reminder_minutes_before?: number;
         category?: string | null;
+        image_url?: string | null;
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -629,6 +632,11 @@ export const useTaskMutations = (taskDate: string) => {
             ? detectCategory(updates.task_text, updates.category || undefined)
             : updates.category;
         updateData.category = validatedCategory;
+      }
+      
+      // Handle image_url
+      if (updates.image_url !== undefined) {
+        updateData.image_url = updates.image_url;
       }
 
       if (Object.keys(updateData).length === 0) {

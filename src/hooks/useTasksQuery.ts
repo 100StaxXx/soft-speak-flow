@@ -48,6 +48,8 @@ export interface DailyTask {
     name: string;
     avatar_url: string | null;
   } | null;
+  // Photo attachment
+  image_url: string | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Pencil, Repeat, Trash2 } from "lucide-react";
+import { CalendarIcon, Pencil, Repeat, Trash2, Camera, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { NaturalLanguageEditor } from "./NaturalLanguageEditor";
+import { QuestImageThumbnail } from "@/components/QuestImageThumbnail";
+import { QuestImagePicker } from "@/components/QuestImagePicker";
+import { useQuestImagePicker } from "@/hooks/useQuestImagePicker";
 import { QuestDifficulty } from "../types";
 import { ParsedTask } from "@/features/tasks/hooks";
 
@@ -47,6 +50,7 @@ interface Task {
   reminder_minutes_before?: number | null;
   category?: string | null;
   habit_source_id?: string | null;
+  image_url?: string | null;
 }
 
 interface EditQuestDialogProps {
@@ -64,6 +68,7 @@ interface EditQuestDialogProps {
     reminder_enabled: boolean;
     reminder_minutes_before: number;
     category: string | null;
+    image_url: string | null;
   }) => Promise<void>;
   isSaving: boolean;
   onDelete?: (taskId: string) => Promise<void>;
@@ -91,6 +96,9 @@ export function EditQuestDialog({
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  const { deleteImage } = useQuestImagePicker();
 
   useEffect(() => {
     if (task) {
@@ -104,6 +112,7 @@ export function EditQuestDialog({
       setReminderEnabled(task.reminder_enabled || false);
       setReminderMinutesBefore(task.reminder_minutes_before || 15);
       setMoreInformation(task.category || null);
+      setImageUrl(task.image_url || null);
       // Auto-expand advanced if any advanced fields are set
       setShowAdvanced(
         !!task.recurrence_pattern || 
@@ -157,9 +166,18 @@ export function EditQuestDialog({
       reminder_enabled: reminderEnabled,
       reminder_minutes_before: reminderMinutesBefore,
       category: moreInformation,
+      image_url: imageUrl,
     });
     
     onOpenChange(false);
+  };
+
+  const handleRemoveImage = async () => {
+    if (imageUrl) {
+      // Delete from storage if it was uploaded
+      await deleteImage(imageUrl);
+      setImageUrl(null);
+    }
   };
 
   const handleDelete = async () => {
