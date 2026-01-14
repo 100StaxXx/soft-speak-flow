@@ -128,10 +128,17 @@ const Journeys = () => {
   const [editingTask, setEditingTask] = useState<{
     id: string;
     task_text: string;
+    task_date?: string | null;
     difficulty?: string | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
+    recurrence_pattern?: string | null;
+    recurrence_days?: number[] | null;
+    reminder_enabled?: boolean | null;
+    reminder_minutes_before?: number | null;
+    category?: string | null;
     habit_source_id?: string | null;
+    image_url?: string | null;
   } | null>(null);
   
   // Edit ritual state (for tasks linked to habits)
@@ -260,6 +267,7 @@ const Journeys = () => {
   const handleEditQuest = useCallback((task: {
     id: string;
     task_text: string;
+    task_date?: string | null;
     difficulty?: string | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
@@ -269,6 +277,7 @@ const Journeys = () => {
     reminder_minutes_before?: number | null;
     category?: string | null;
     habit_source_id?: string | null;
+    image_url?: string | null;
   }) => {
     // Route to the appropriate editor based on whether it's a ritual
     if (task.habit_source_id) {
@@ -304,6 +313,7 @@ const Journeys = () => {
     reminder_enabled: boolean;
     reminder_minutes_before: number;
     category: string | null;
+    image_url: string | null;
   }) => {
     await updateTask({ taskId, updates });
     setEditingTask(null);
@@ -601,6 +611,7 @@ const Journeys = () => {
                 reminderEnabled: parsed.reminderEnabled,
                 reminderMinutesBefore: parsed.reminderMinutesBefore,
                 notes: parsed.notes,
+                imageUrl: parsed.imageUrl,
               });
             }}
             onPlanMyDay={handlePlanMyDay}

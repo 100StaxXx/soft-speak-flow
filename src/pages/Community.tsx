@@ -29,6 +29,12 @@ const Community = () => {
     difficulty?: string | null;
     scheduled_time?: string | null;
     estimated_duration?: number | null;
+    recurrence_pattern?: string | null;
+    recurrence_days?: number[] | null;
+    reminder_enabled?: boolean | null;
+    reminder_minutes_before?: number | null;
+    category?: string | null;
+    image_url?: string | null;
   } | null>(null);
   
   // Fetch calendar data - always fetch week view for timeline
@@ -124,6 +130,7 @@ const Community = () => {
     reminder_enabled: boolean;
     reminder_minutes_before: number;
     category: string | null;
+    image_url: string | null;
   }) => {
     await updateTask({ taskId, updates });
     setEditingTask(null);

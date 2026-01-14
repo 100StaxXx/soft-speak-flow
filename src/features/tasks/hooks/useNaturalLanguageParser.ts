@@ -58,6 +58,9 @@ export interface ParsedTask {
   triggerDecomposition: boolean;
   triggerPlanMyDay: boolean;
   triggerPlanMyWeek: boolean;
+  
+  // Photo attachment
+  imageUrl: string | null;
 }
 
 // Month name to number mapping
@@ -513,6 +516,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     triggerDecomposition: false,
     triggerPlanMyDay: false,
     triggerPlanMyWeek: false,
+    imageUrl: null,
   };
 
   // Parse clear patterns first
