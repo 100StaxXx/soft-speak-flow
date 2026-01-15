@@ -17,29 +17,23 @@ interface StoryQuestion {
   options: QuestionOption[];
 }
 
-// Faction-themed narratives
+// Faction-themed narratives (3 per faction for 3 questions)
 const getFactionNarrative = (faction: FactionType, questionIndex: number): string => {
   const narratives: Record<FactionType, string[]> = {
     starfall: [
       "As flames dance in the distance, your ship awaits its next destination...",
       "The engines hum with potential energy. Your crew looks to you for direction...",
       "Your path grows clearer with each choice...",
-      "The path ahead grows steeper. How will you face the climb?",
-      "A voice echoes from the stars. Which one calls to you?",
     ],
     void: [
       "In the silent depths between stars, clarity emerges from stillness...",
       "The void speaks to those who listen. A whisper guides your path...",
       "The shadows reveal what light cannot...",
-      "In the depths, strength takes many forms. What is yours?",
-      "A presence emerges from the darkness. What energy does it hold?",
     ],
     stellar: [
       "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
       "Your companion gazes at the stars with wonder. What do you see?",
       "The constellations align to show your way...",
-      "The cosmos offers many guides. How do you wish to be led?",
-      "A mentor materializes from stardust. What essence do they carry?",
     ],
   };
   return narratives[faction][questionIndex] || narratives[faction][0];
@@ -47,57 +41,36 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
 
 const questions: StoryQuestion[] = [
   {
-    id: "growth_focus",
+    id: "focus_area",
     narrative: "",
-    question: "What do you want to intentionally grow in your life right now?",
+    question: "What do you want to work on right now?",
     options: [
-      { text: "Discipline, structure, and daily momentum", tags: ["discipline", "momentum"] },
-      { text: "Emotional strength and meaningful connection", tags: ["healing", "supportive"] },
-      { text: "Confidence, self-expression, and personal boundaries", tags: ["confidence", "discipline"] },
-      { text: "Mental clarity, calm focus, and inner peace", tags: ["calm", "spiritual"] },
+      { text: "🧠 Clarity & mindset", tags: ["calm", "discipline"] },
+      { text: "❤️ Emotions & healing", tags: ["healing", "supportive"] },
+      { text: "🔥 Discipline & performance", tags: ["discipline", "momentum"] },
+      { text: "👑 Leadership & direction", tags: ["confidence", "discipline"] },
     ],
   },
   {
-    id: "support_style",
+    id: "guidance_tone",
     narrative: "",
-    question: "What kind of support resonates with you?",
+    question: "How do you want guidance to feel?",
     options: [
-      { text: "Tough love and direct accountability", tags: ["discipline"] },
-      { text: "High-energy motivation and drive", tags: ["momentum", "confidence"] },
-      { text: "Warm encouragement and understanding", tags: ["supportive", "healing"] },
-      { text: "Calm wisdom and grounded perspective", tags: ["calm", "spiritual"] },
+      { text: "🌱 Gentle & compassionate", tags: ["healing", "supportive"] },
+      { text: "🤝 Encouraging & supportive", tags: ["supportive", "confidence"] },
+      { text: "🧘 Calm & grounded", tags: ["calm", "spiritual"] },
+      { text: "⚔️ Direct & demanding", tags: ["discipline", "momentum"] },
     ],
   },
   {
-    id: "mentor_energy",
+    id: "progress_style",
     narrative: "",
-    question: "What energy do you want from your mentor?",
+    question: "What helps you make progress?",
     options: [
-      { text: "Intense and no-excuses", tags: ["discipline"] },
-      { text: "Steady and empowering", tags: ["confidence", "supportive"] },
-      { text: "Gentle and nurturing", tags: ["healing", "supportive"] },
-      { text: "Ethereal and transcendent", tags: ["spiritual", "calm"] },
-    ],
-  },
-  {
-    id: "intensity_preference",
-    narrative: "",
-    question: "How do you want to be challenged?",
-    options: [
-      { text: "Push me hard — I need direct, no-excuses accountability", tags: ["discipline", "momentum"] },
-      { text: "Challenge me, but with encouragement and compassion", tags: ["confidence", "supportive"] },
-      { text: "Guide me gently — I'm working through something tender", tags: ["healing", "calm"] },
-    ],
-  },
-  {
-    id: "mentor_voice",
-    narrative: "",
-    question: "What kind of voice do you want guiding you?",
-    options: [
-      { text: "A bold, direct voice that cuts through the noise", tags: ["discipline", "momentum"] },
-      { text: "A warm, sisterly presence that feels like a friend", tags: ["supportive", "healing"] },
-      { text: "A calm, grounded voice that brings clarity", tags: ["calm", "spiritual"] },
-      { text: "An empowering voice that believes in me", tags: ["confidence", "supportive"] },
+      { text: "📐 Clear principles and logic", tags: ["calm", "discipline"] },
+      { text: "💛 Emotional reassurance", tags: ["supportive", "healing"] },
+      { text: "🔮 Reflection and perspective", tags: ["calm", "spiritual"] },
+      { text: "🔥 Pressure and high standards", tags: ["discipline", "momentum"] },
     ],
   },
 ];
