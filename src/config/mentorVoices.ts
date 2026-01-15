@@ -112,6 +112,20 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
       use_speaker_boost: true,
     },
   },
+  astor: {
+    mentorSlug: "astor",
+    mentorName: "Astor",
+    voiceName: "Daniel",
+    voiceId: "onwK4e9ZLuTAKqWW03F9",
+    defaultIntensity: "high",
+    categories: ["truth", "discipline", "accountability"],
+    voiceSettings: {
+      stability: 0.80,
+      similarity_boost: 0.85,
+      style_exaggeration: 0.6,
+      use_speaker_boost: true,
+    },
+  },
 };
 
 export const getMentorVoiceConfig = (mentorSlug: string): MentorVoiceConfig | null => {

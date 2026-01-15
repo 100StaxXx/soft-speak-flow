@@ -82,6 +82,7 @@ export const MENTOR_FALLBACK_TAGS: Record<string, CanonicalTrait[]> = {
   // HIGH INTENSITY (discipline-focused)
   atlas: ["discipline", "calm"],           // Stoic discipline + inner calm
   stryker: ["momentum", "discipline"],     // High-energy momentum first
+  astor: ["discipline", "confidence"],     // Raw brutal truth-teller
 
   // STRONG FEMALE
   carmen: ["discipline", "confidence"],    // Feminine tough-love coach
