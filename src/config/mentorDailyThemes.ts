@@ -34,18 +34,6 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       triggers: ['Heavy or Low', 'Emotionally Hurt']
     }
   ],
-  nova: [
-    {
-      topic_category: 'mindset',
-      intensity: 'medium',
-      triggers: ['Anxious & Overthinking', 'Feeling Stuck']
-    },
-    {
-      topic_category: 'focus',
-      intensity: 'medium',
-      triggers: ['Avoiding Action', 'Exhausted']
-    }
-  ],
   sienna: [
     {
       topic_category: 'mindset',
@@ -56,30 +44,6 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       topic_category: 'confidence',
       intensity: 'soft',
       triggers: ['Self-Doubt', 'Heavy or Low']
-    }
-  ],
-  lumi: [
-    {
-      topic_category: 'confidence',
-      intensity: 'soft',
-      triggers: ['Self-Doubt', 'Anxious & Overthinking']
-    },
-    {
-      topic_category: 'mindset',
-      intensity: 'soft',
-      triggers: ['Heavy or Low', 'Unmotivated']
-    }
-  ],
-  kai: [
-    {
-      topic_category: 'discipline',
-      intensity: 'medium',
-      triggers: ['Needing Discipline', 'Unmotivated']
-    },
-    {
-      topic_category: 'physique',
-      intensity: 'medium',
-      triggers: ['Unmotivated', 'Feeling Stuck']
     }
   ],
   stryker: [
@@ -140,10 +104,7 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
 export const MENTOR_SLUGS = [
   'atlas',
   'eli',
-  'nova',
   'sienna',
-  'lumi',
-  'kai',
   'stryker',
   'carmen',
   'reign',

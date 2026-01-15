@@ -21,30 +21,15 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Keeps you grounded in principles, not impulses",
     "Unlocks clear thinking even in emotional moments"
   ],
-  kai: [
-    "Ignites the drive you've been looking for",
-    "Holds you to a high standard, no excuses",
-    "Accelerates your growth when you're ready to level up"
-  ],
   eli: [
     "Reminds you of the strength you already have",
     "Celebrates your progress, not just perfection",
     "Fuels your confidence with steady encouragement"
   ],
-  nova: [
-    "Creates space for calm and clear thinking",
-    "Helps you find peace in the present moment",
-    "Unlocks mental clarity and inner stillness"
-  ],
   sienna: [
     "Honors your journey while moving you forward",
     "Creates emotional safety while building strength",
     "Validates your feelings and guides you gently"
-  ],
-  lumi: [
-    "Illuminates patterns in how you connect",
-    "Strengthens your understanding of boundaries",
-    "Guides you toward deeper, healthier relationships"
   ],
   stryker: [
     "Maximizes your focus and execution",
@@ -61,7 +46,7 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Transforms you through relentless discipline",
     "Elevates your physical and professional standards"
   ],
-  elizabeth: [
+  solace: [
     "Celebrates your wins with genuine warmth",
     "Builds your confidence through steady support",
     "Reminds you of your strength when you forget"
