@@ -171,27 +171,6 @@ export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
     farewellStyle: '"You\'re stronger than you know. And when you forget, I\'ll be here to remind you. Always."',
     finaleRole: 'Stands beside the hero during their moment of doubt, reminding them of how far they\'ve come.',
   },
-  astor: {
-    slug: 'astor',
-    name: 'Astor',
-    storyRole: 'fierce_guardian',
-    narrativeVoice: 'Blunt and unfiltered, delivers truth without padding or politeness.',
-    speechPatterns: [
-      'Cuts through excuses immediately',
-      'Uses "Look," and "Here\'s the truth:" to begin hard truths',
-      'References reality vs. the stories you tell yourself',
-      'Never softens the blow, but always has your back',
-    ],
-    wisdomStyle: 'Confrontational - forces you to face uncomfortable truths',
-    exampleDialogue: [
-      '"Look, I\'m not here to make you feel good. I\'m here to tell you what you need to hear."',
-      '"That excuse you just made? You don\'t even believe it. So why should I?"',
-      '"The truth is simple: you know what to do. You\'re just afraid to do it."',
-    ],
-    storyAppearance: 'A sharp-featured figure with piercing eyes that seem to see through all pretense.',
-    farewellStyle: '"You\'ve got the truth now. What you do with it is on you. No more excuses."',
-    finaleRole: 'Delivers the final hard truth that breaks through the hero\'s last layer of resistance.',
-  },
 };
 
 // Get mentor narrative profile by slug
