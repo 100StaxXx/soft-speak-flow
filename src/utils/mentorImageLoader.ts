@@ -3,7 +3,7 @@
  * Only loads the mentor image that's actually needed, not all 23MB upfront!
  */
 
-type MentorSlug = 'atlas' | 'kai' | 'eli' | 'nova' | 'sienna' | 'lumi' | 'stryker' | 'carmen' | 'reign' | 'solace';
+type MentorSlug = 'atlas' | 'eli' | 'sienna' | 'stryker' | 'carmen' | 'reign' | 'solace';
 
 // Cache loaded images to avoid re-importing
 const imageCache = new Map<string, string>();
@@ -25,20 +25,11 @@ export const loadMentorImage = async (slug: string): Promise<string> => {
       case 'atlas':
         module = await import('@/assets/atlas-sage.png');
         break;
-      case 'kai':
-        module = await import('@/assets/kai-sage.png');
-        break;
       case 'eli':
         module = await import('@/assets/darius-sage.png'); // Eli uses Darius's image
         break;
-      case 'nova':
-        module = await import('@/assets/nova-sage.png');
-        break;
       case 'sienna':
         module = await import('@/assets/sienna-sage.png');
-        break;
-      case 'lumi':
-        module = await import('@/assets/lumi-sage.png');
         break;
       case 'stryker':
         module = await import('@/assets/stryker-sage.png');

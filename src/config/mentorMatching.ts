@@ -86,7 +86,6 @@ export const canonicalizeTags = (tags: Array<string | null | undefined>): Canoni
 export const MENTOR_FALLBACK_TAGS: Record<string, CanonicalTrait[]> = {
   // HIGH INTENSITY (discipline-focused)
   atlas: ["discipline", "calm"],           // Stoic discipline + inner calm
-  kai: ["discipline", "momentum"],         // Gritty discipline + action-oriented
   stryker: ["momentum", "discipline"],     // High-energy momentum first
 
   // STRONG FEMALE
@@ -98,9 +97,5 @@ export const MENTOR_FALLBACK_TAGS: Record<string, CanonicalTrait[]> = {
   solace: ["confidence", "supportive"],    // Uplift sister
 
   // SOFT/HEALING
-  lumi: ["healing", "supportive"],         // Relationship healing + support
   sienna: ["healing", "calm"],             // Deep healing + gentle calm
-
-  // SPIRITUAL/CALM
-  nova: ["calm", "spiritual"],             // Mindfulness + light spirituality
 };
