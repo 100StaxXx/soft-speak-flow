@@ -46,6 +46,7 @@ import { playStrikethrough } from "@/utils/soundEffects";
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { SwipeableTaskItem } from "./SwipeableTaskItem";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
+import { MarqueeText } from "@/components/ui/marquee-text";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
@@ -534,13 +535,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               {isRitual && (
                 <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
               )}
-              <p className={cn(
-                "text-base truncate",
-                isComplete && "text-muted-foreground",
-                isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
-              )}>
-                {task.task_text}
-              </p>
+              <MarqueeText
+                text={task.task_text}
+                className={cn(
+                  "text-base flex-1",
+                  isComplete && "text-muted-foreground",
+                  isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
+                )}
+              />
             </div>
             {task.scheduled_time && (
               <span className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
