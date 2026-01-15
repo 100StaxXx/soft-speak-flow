@@ -56,11 +56,15 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>We use the camera only if you choose to take or upload a profile or progress photo.</string>
+	<string>We use the camera only if you choose to take photos for your profile, progress tracking, or to attach images to your quests.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We use the microphone for voice input to create tasks and chat with your mentor using your voice.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>We use speech recognition to convert your voice into text for creating tasks and sending messages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We access your photo library only if you choose to attach images to your quests or update your profile photo.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We save photos to your library only if you choose to download images from the app.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
