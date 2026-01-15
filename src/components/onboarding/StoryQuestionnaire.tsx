@@ -48,7 +48,7 @@ const questions: StoryQuestion[] = [
       { text: "🧠 Clarity & mindset", tags: ["calm", "discipline"] },
       { text: "❤️ Emotions & healing", tags: ["healing", "supportive"] },
       { text: "🔥 Discipline & performance", tags: ["discipline", "momentum"] },
-      { text: "👑 Leadership & direction", tags: ["confidence", "discipline"] },
+      { text: "✨ Confidence & self-belief", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -56,9 +56,9 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "How do you want guidance to feel?",
     options: [
-      { text: "🌱 Gentle & compassionate", tags: ["healing", "supportive"] },
+      { text: "🌱 Gentle & compassionate", tags: ["healing", "calm"] },
       { text: "🤝 Encouraging & supportive", tags: ["supportive", "confidence"] },
-      { text: "🧘 Calm & grounded", tags: ["calm", "spiritual"] },
+      { text: "🧘 Calm & grounded", tags: ["calm", "discipline"] },
       { text: "⚔️ Direct & demanding", tags: ["discipline", "momentum"] },
     ],
   },
@@ -69,7 +69,7 @@ const questions: StoryQuestion[] = [
     options: [
       { text: "📐 Clear principles and logic", tags: ["calm", "discipline"] },
       { text: "💛 Emotional reassurance", tags: ["supportive", "healing"] },
-      { text: "🔮 Reflection and perspective", tags: ["calm", "spiritual"] },
+      { text: "💪 Someone who believes in me", tags: ["confidence", "supportive"] },
       { text: "🔥 Pressure and high standards", tags: ["discipline", "momentum"] },
     ],
   },

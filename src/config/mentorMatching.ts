@@ -48,10 +48,6 @@ const TAG_ALIASES: Record<string, string> = {
   high_energy: "momentum",
   energetic: "momentum",
   action: "momentum",
-
-  spiritual: "spiritual",
-  intuition: "spiritual",
-  higher_self: "spiritual",
 };
 
 export const CANONICAL_TRAITS = [
@@ -61,7 +57,6 @@ export const CANONICAL_TRAITS = [
   "confidence",
   "momentum",
   "supportive",
-  "spiritual",
 ] as const;
 
 export type CanonicalTrait = (typeof CANONICAL_TRAITS)[number];
