@@ -59,27 +59,6 @@ export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
     finaleRole: 'Provides emotional support during the darkest moment, reminding the hero of their growth.',
   },
   
-  astor: {
-    slug: 'astor',
-    name: 'Astor',
-    storyRole: 'fierce_guardian',
-    narrativeVoice: 'Sharp and direct, cutting through excuses with brutal honesty. No sugarcoating.',
-    speechPatterns: [
-      'Short, punchy sentences',
-      'Challenges directly without cushioning',
-      'Uses rhetorical questions that demand self-reflection',
-      'Never wastes words',
-    ],
-    wisdomStyle: 'Confrontational - forces you to face uncomfortable truths',
-    exampleDialogue: [
-      '"You\'re making excuses. I don\'t accept them. Neither should you."',
-      '"Pain is coming either way. The question is: will it be the pain of discipline or the pain of regret?"',
-      '"Stop waiting for motivation. It\'s not coming. Act anyway."',
-    ],
-    storyAppearance: 'A fierce figure of crackling energy, their eyes burning with intensity.',
-    farewellStyle: '"You don\'t need me anymore. You never did. Now go prove it."',
-    finaleRole: 'Pushes the hero past their limits when they want to give up.',
-  },
   
   kai: {
     slug: 'kai',
@@ -171,27 +150,6 @@ export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
     finaleRole: 'Tends to the hero\'s wounds after victory, celebrating their wholeness.',
   },
   
-  rich: {
-    slug: 'rich',
-    name: 'Rich',
-    storyRole: 'warrior_mentor',
-    narrativeVoice: 'High-energy and performance-focused, like an elite trainer.',
-    speechPatterns: [
-      'Uses peak performance language',
-      'References data, optimization, and excellence',
-      'Speaks with driven intensity',
-      'Always pushes for more',
-    ],
-    wisdomStyle: 'Performance - optimizes for results and excellence',
-    exampleDialogue: [
-      '"Good enough isn\'t in my vocabulary. We\'re aiming for excellent."',
-      '"Your potential is a resource. Are you maximizing it or wasting it?"',
-      '"Every day is a chance to outperform yesterday. What\'s your edge today?"',
-    ],
-    storyAppearance: 'A dynamic figure of pure energy, constantly in motion, radiating drive.',
-    farewellStyle: '"You\'ve reached a new level. But remember—there\'s always another level. Go find it."',
-    finaleRole: 'Pushes the hero to exceed their own expectations in the climactic moment.',
-  },
   
   stryker: {
     slug: 'stryker',
