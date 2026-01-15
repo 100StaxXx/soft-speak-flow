@@ -79,15 +79,12 @@ interface Mentor {
   intensity_level?: string;
 }
 
-const ENERGY_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
-  "Intense and no-excuses": "high",
-  "Steady and empowering": "medium",
-  "Gentle and nurturing": "gentle",
-  "Ethereal and transcendent": "gentle",
-  // New intensity_preference question mappings
-  "Push me hard — I need direct, no-excuses accountability": "high",
-  "Challenge me, but with encouragement and compassion": "medium",
-  "Guide me gently — I'm working through something tender": "gentle",
+// Map Q2 (guidance_tone) answers to intensity levels
+const GUIDANCE_TONE_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
+  "🌱 Gentle & compassionate": "gentle",
+  "🤝 Encouraging & supportive": "medium",
+  "🧘 Calm & grounded": "gentle",
+  "⚔️ Direct & demanding": "high",
 };
 
 const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
@@ -234,7 +231,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     setStage("calculating");
 
     // Question weights: Q1=1.5, Q2=1.4, Q3=1.3, Q4=1.2, Q5=1.1
-    const QUESTION_WEIGHTS = [1.5, 1.4, 1.3, 1.2, 1.1];
+    // Question weights: Q1=1.5 (focus), Q2=1.3 (tone), Q3=1.1 (progress style)
+    const QUESTION_WEIGHTS = [1.5, 1.3, 1.1];
 
     // Build canonical tag weight map instead of duplicating strings
     const canonicalTagWeights: Record<string, number> = {};
@@ -247,10 +245,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       });
     });
 
-    // Extract desired intensity from Q3 (energy_level)
-    const energyAnswer = questionAnswers.find(a => a.questionId === "mentor_energy");
-    const desiredIntensity: "high" | "medium" | "gentle" = energyAnswer
-      ? ENERGY_TO_INTENSITY[energyAnswer.answer] ?? "medium"
+    // Extract desired intensity from Q2 (guidance_tone)
+    const toneAnswer = questionAnswers.find(a => a.questionId === "guidance_tone");
+    const desiredIntensity: "high" | "medium" | "gentle" = toneAnswer
+      ? GUIDANCE_TONE_TO_INTENSITY[toneAnswer.answer] ?? "medium"
       : "medium";
 
     // Calculate scores for each mentor
