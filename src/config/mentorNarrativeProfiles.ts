@@ -259,9 +259,9 @@ export const mentorNarrativeProfiles: Record<string, MentorNarrativeProfile> = {
     finaleRole: 'Pushes the hero to unleash their full power in the climactic moment, demanding their absolute best.',
   },
   
-  elizabeth: {
-    slug: 'elizabeth',
-    name: 'Elizabeth',
+  solace: {
+    slug: 'solace',
+    name: 'Solace',
     storyRole: 'gentle_healer',
     narrativeVoice: 'Warm and affirming, like a supportive older sister who genuinely celebrates your wins.',
     speechPatterns: [
