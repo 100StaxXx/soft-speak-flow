@@ -123,7 +123,7 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       triggers: ['Avoiding Action', 'Needing Discipline']
     }
   ],
-  elizabeth: [
+  solace: [
     {
       topic_category: 'confidence',
       intensity: 'medium',
@@ -147,5 +147,5 @@ export const MENTOR_SLUGS = [
   'stryker',
   'carmen',
   'reign',
-  'elizabeth'
+  'solace'
 ] as const;

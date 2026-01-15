@@ -140,9 +140,9 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
       use_speaker_boost: true,
     },
   },
-  elizabeth: {
-    mentorSlug: "elizabeth",
-    mentorName: "Elizabeth",
+  solace: {
+    mentorSlug: "solace",
+    mentorName: "Solace",
     voiceName: "Matilda",
     voiceId: "XrExE9yKIg1WjnnlVkGX",
     defaultIntensity: "medium",
