@@ -50,6 +50,11 @@ const MENTOR_BULLETS: Record<string, string[]> = {
     "Celebrates your wins with genuine warmth",
     "Builds your confidence through steady support",
     "Reminds you of your strength when you forget"
+  ],
+  astor: [
+    "No sugar-coating - just the truth you need to hear",
+    "Holds you accountable when you make excuses",
+    "Cuts through the stories you tell yourself"
   ]
 };
 

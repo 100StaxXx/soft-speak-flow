@@ -98,6 +98,18 @@ export const mentorDailyThemes: Record<string, MentorDailyTheme[]> = {
       intensity: 'medium',
       triggers: ['Heavy or Low', 'Unmotivated']
     }
+  ],
+  astor: [
+    {
+      topic_category: 'discipline',
+      intensity: 'strong',
+      triggers: ['Avoiding Action', 'Needing Discipline', 'Feeling Stuck']
+    },
+    {
+      topic_category: 'mindset',
+      intensity: 'strong',
+      triggers: ['Self-Doubt', 'Unmotivated']
+    }
   ]
 };
 
@@ -108,5 +120,6 @@ export const MENTOR_SLUGS = [
   'stryker',
   'carmen',
   'reign',
-  'solace'
+  'solace',
+  'astor'
 ] as const;
