@@ -51,7 +51,7 @@ export const HeroQuoteBanner = memo(() => {
       setMentor(mentorData);
       
       // Dynamically load only the needed mentor image
-      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
+      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'atlas');
       setMentorImageUrl(imageUrl);
 
       // Get today's pep talk to find related quote

@@ -25,17 +25,18 @@ export const EMOTIONAL_TRIGGERS = [
 ] as const;
 
 // Default mentor mapping for emotional triggers (for AI hints)
+// Active mentors: atlas, eli, sienna, stryker, carmen, reign, solace
 export const TRIGGER_MENTOR_MAPPING: Record<string, string[]> = {
-  "Exhausted": ["nova", "atlas"],
-  "Avoiding Action": ["darius", "kai"],
-  "Anxious & Overthinking": ["nova", "solace", "atlas"],
-  "Self-Doubt": ["eli", "lumi"],
-  "Feeling Stuck": ["atlas", "darius"],
-  "Frustrated": ["stryker", "kai"],
-  "Heavy or Low": ["sienna", "lumi"],
-  "Emotionally Hurt": ["sienna", "lumi", "solace"],
-  "Unmotivated": ["stryker", "darius", "eli"],
-  "In Transition": ["atlas", "nova", "solace"],
-  "Needing Discipline": ["darius", "kai", "stryker"],
-  "Motivated & Ready": ["stryker", "eli"],
+  "Exhausted": ["sienna", "atlas"],
+  "Avoiding Action": ["stryker", "carmen"],
+  "Anxious & Overthinking": ["sienna", "solace", "atlas"],
+  "Self-Doubt": ["eli", "solace"],
+  "Feeling Stuck": ["atlas", "stryker"],
+  "Frustrated": ["stryker", "carmen"],
+  "Heavy or Low": ["sienna", "solace"],
+  "Emotionally Hurt": ["sienna", "solace"],
+  "Unmotivated": ["stryker", "reign", "eli"],
+  "In Transition": ["atlas", "sienna", "solace"],
+  "Needing Discipline": ["carmen", "reign", "stryker"],
+  "Motivated & Ready": ["stryker", "reign", "eli"],
 };

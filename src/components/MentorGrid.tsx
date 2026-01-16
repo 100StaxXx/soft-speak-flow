@@ -26,8 +26,8 @@ interface MentorGridProps {
   isSelecting?: boolean;
 }
 
-// Preferred display order - new mentors will appear after these
-const MENTOR_ORDER = ['atlas', 'kai', 'eli', 'nova', 'sienna', 'lumi', 'stryker', 'carmen', 'reign', 'elizabeth'];
+// Preferred display order - active mentors only
+const MENTOR_ORDER = ['atlas', 'eli', 'sienna', 'stryker', 'carmen', 'reign', 'solace'];
 
 export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommendedMentorId, isSelecting = false }: MentorGridProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);

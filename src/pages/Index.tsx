@@ -90,7 +90,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       if (!mentorData) return null;
 
       // Dynamically load mentor image
-      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'darius');
+      const imageUrl = mentorData.avatar_url || await loadMentorImage(mentorData.slug || 'atlas');
 
       // Get today's pep talk and quote in parallel
       const today = new Date().toLocaleDateString("en-CA");
