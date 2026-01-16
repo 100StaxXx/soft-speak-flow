@@ -11,17 +11,15 @@ export interface ParsedHashtags {
   date?: string;
 }
 
+// Active mentors only
 const MENTOR_SLUG_MAP: Record<string, string> = {
   'mentor_atlas': 'atlas',
-  'mentor_kai': 'kai',
   'mentor_eli': 'eli',
-  'mentor_nova': 'nova',
   'mentor_sienna': 'sienna',
-  'mentor_lumi': 'lumi',
   'mentor_stryker': 'stryker',
   'mentor_carmen': 'carmen',
   'mentor_reign': 'reign',
-  'mentor_elizabeth': 'elizabeth',
+  'mentor_solace': 'solace',
 };
 
 const CONTENT_TYPES = [

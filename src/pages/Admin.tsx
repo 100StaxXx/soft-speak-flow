@@ -319,15 +319,14 @@ const Admin = () => {
     setAudioFile(null);
   };
 
+  // Active mentors only
   const mentorPreviewTexts: Record<string, string> = {
     atlas: "Let's take a breath, get clear, and move with purpose.",
-    darius: "You know what needs to be done. Let's get to it.",
     eli: "Hey, you're doing better than you think. Keep going.",
-    nova: "Small steps today create big shifts over time.",
     sienna: "You're safe, you're growing, and you're allowed to take your time.",
-    lumi: "You've got this. Your light reaches further than you realize.",
-    kai: "Slow your mind. Focus your breath. Move with intention.",
     stryker: "Stand tall. Lock in. This is your moment to push.",
+    carmen: "No excuses. Show me what you're made of.",
+    reign: "Excellence isn't optional. Let's make today count.",
     solace: "Let your mind settle. Peace starts from within.",
   };
 

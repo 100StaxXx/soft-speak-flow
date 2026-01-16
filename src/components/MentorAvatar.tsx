@@ -1,17 +1,15 @@
 import { useEffect, useState, memo } from "react";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 
+// Active mentors only
 const POSITION_MAP: Record<string, string> = {
   atlas: 'center 20%',
-  kai: 'center 25%',
-  eli: 'center 15%', // Using Darius's position since Eli now uses Darius's image
-  nova: 'center 20%',
+  eli: 'center 15%',
   sienna: 'center 30%',
-  lumi: 'center 20%',
   stryker: 'center 25%',
   carmen: 'center 20%',
   reign: 'center 20%',
-  elizabeth: 'center 25%', // Using Solace's position
+  solace: 'center 25%',
 };
 
 interface MentorAvatarProps {
