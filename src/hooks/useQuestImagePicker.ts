@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -69,6 +68,9 @@ export function useQuestImagePicker(): UseQuestImagePickerReturn {
     try {
       // Check if we're on a native platform
       if (Capacitor.isNativePlatform()) {
+        // Dynamic import - only loaded when needed on native
+        const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+        
         // Use Capacitor Camera for native
         const photo = await Camera.getPhoto({
           quality: 80,
