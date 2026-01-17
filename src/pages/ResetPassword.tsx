@@ -19,12 +19,26 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [validToken, setValidToken] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have a valid recovery token in the URL hash
+    // Check for error parameters first (Supabase sends these for expired/invalid tokens)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const error = hashParams.get('error');
+    const errorDescription = hashParams.get('error_description');
+    
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Reset Link Expired",
+        description: errorDescription || "This password reset link has expired or was already used. Please request a new one.",
+      });
+      safeNavigate(navigate, "/auth");
+      return;
+    }
+
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
     
@@ -32,23 +46,41 @@ const ResetPassword = () => {
       toast({
         variant: "destructive",
         title: "Invalid Link",
-        description: "This password reset link is invalid or has expired",
+        description: "This password reset link is invalid or has expired. Please request a new one.",
       });
       safeNavigate(navigate, "/auth");
       return;
     }
 
+    // Set up timeout to prevent infinite loading
+    const verificationTimeout = setTimeout(() => {
+      if (!validToken) {
+        toast({
+          variant: "destructive",
+          title: "Verification Timeout",
+          description: "Unable to verify the reset link. Please request a new one.",
+        });
+        safeNavigate(navigate, "/auth");
+      }
+    }, 10000);
+
+    // Show fallback button after 5 seconds
+    const fallbackTimer = setTimeout(() => {
+      setShowFallback(true);
+    }, 5000);
+
     // Wait for Supabase to process the recovery token via onAuthStateChange
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // Supabase has successfully processed the recovery token
+        clearTimeout(verificationTimeout);
+        clearTimeout(fallbackTimer);
         if (session) {
           setValidToken(true);
         } else {
-        toast({
+          toast({
             variant: "destructive",
             title: "Session Error",
-            description: "Unable to establish password reset session. Please try again.",
+            description: "Unable to establish password reset session. Please request a new link.",
           });
           safeNavigate(navigate, "/auth");
         }
@@ -58,11 +90,17 @@ const ResetPassword = () => {
     // Also check if session already exists (in case event already fired)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        clearTimeout(verificationTimeout);
+        clearTimeout(fallbackTimer);
         setValidToken(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(verificationTimeout);
+      clearTimeout(fallbackTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]); // toast is stable from useToast hook
 
@@ -125,6 +163,17 @@ const ResetPassword = () => {
         <div className="text-center space-y-4">
           <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
           <p className="text-muted-foreground">Verifying reset link...</p>
+          {showFallback && (
+            <div className="pt-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Taking too long?</p>
+              <Button 
+                variant="outline" 
+                onClick={() => safeNavigate(navigate, "/auth")}
+              >
+                Request New Link
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
