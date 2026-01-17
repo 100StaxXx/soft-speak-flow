@@ -175,6 +175,15 @@ const AppContent = memo(() => {
   // Sync auth state changes with query cache to prevent stale profile data
   useAuthSync();
   
+  // Handle password recovery tokens at any route - redirect to reset password page
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('type=recovery') && !location.pathname.includes('/auth/reset-password')) {
+      // Redirect to reset password page, preserving the hash fragment
+      navigate(`/auth/reset-password${hash}`, { replace: true });
+    }
+  }, [location.pathname, navigate]);
+  
   // Ensure first app load starts on the Quests (Tasks) tab
   useEffect(() => {
     if (location.pathname !== "/") return;
