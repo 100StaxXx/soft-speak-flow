@@ -169,20 +169,27 @@ const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
   const { session } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
+  const [recoveryChecked, setRecoveryChecked] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
   // Sync auth state changes with query cache to prevent stale profile data
   useAuthSync();
   
-  // Handle password recovery tokens at any route - redirect to reset password page
+  // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('type=recovery') && !location.pathname.includes('/auth/reset-password')) {
       // Redirect to reset password page, preserving the hash fragment
       navigate(`/auth/reset-password${hash}`, { replace: true });
     }
+    setRecoveryChecked(true);
   }, [location.pathname, navigate]);
+  
+  // Block route rendering until recovery check is complete - prevents paywall flash
+  if (!recoveryChecked && window.location.hash.includes('type=recovery')) {
+    return <LoadingFallback />;
+  }
   
   // Ensure first app load starts on the Quests (Tasks) tab
   useEffect(() => {
