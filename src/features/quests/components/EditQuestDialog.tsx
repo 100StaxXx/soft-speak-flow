@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Pencil, Repeat, Trash2, Camera, X } from "lucide-react";
+import { CalendarIcon, Pencil, Repeat, Trash2, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,7 @@ interface Task {
   category?: string | null;
   habit_source_id?: string | null;
   image_url?: string | null;
+  location?: string | null;
 }
 
 interface EditQuestDialogProps {
@@ -69,6 +70,7 @@ interface EditQuestDialogProps {
     reminder_minutes_before: number;
     category: string | null;
     image_url: string | null;
+    location: string | null;
   }) => Promise<void>;
   isSaving: boolean;
   onDelete?: (taskId: string) => Promise<void>;
@@ -97,6 +99,7 @@ export function EditQuestDialog({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
   
   const { deleteImage } = useQuestImagePicker();
 
@@ -113,11 +116,13 @@ export function EditQuestDialog({
       setReminderMinutesBefore(task.reminder_minutes_before || 15);
       setMoreInformation(task.category || null);
       setImageUrl(task.image_url || null);
+      setLocation(task.location || null);
       // Auto-expand advanced if any advanced fields are set
       setShowAdvanced(
         !!task.recurrence_pattern || 
         !!task.reminder_enabled || 
-        !!task.category
+        !!task.category ||
+        !!task.location
       );
     }
   }, [task]);
@@ -167,6 +172,7 @@ export function EditQuestDialog({
       reminder_minutes_before: reminderMinutesBefore,
       category: moreInformation,
       image_url: imageUrl,
+      location,
     });
     
     onOpenChange(false);
@@ -283,6 +289,19 @@ export function EditQuestDialog({
               </div>
             </div>
 
+            {/* Location Section */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                Location
+              </label>
+              <Input
+                value={location || ''}
+                onChange={(e) => setLocation(e.target.value || null)}
+                placeholder="Where will this happen? (optional)"
+              />
+            </div>
+
             {/* Photo Section */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Photo</label>
@@ -337,6 +356,8 @@ export function EditQuestDialog({
                     onReminderEnabledChange={setReminderEnabled}
                     onReminderMinutesBeforeChange={setReminderMinutesBefore}
                     onMoreInformationChange={setMoreInformation}
+                    location={location}
+                    onLocationChange={setLocation}
                   />
                 </div>
               )}

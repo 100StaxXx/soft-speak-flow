@@ -2127,6 +2127,7 @@ export type Database = {
           is_milestone: boolean | null
           is_recurring: boolean | null
           is_top_three: boolean | null
+          location: string | null
           notes: string | null
           parent_template_id: string | null
           priority: string | null
@@ -2168,6 +2169,7 @@ export type Database = {
           is_milestone?: boolean | null
           is_recurring?: boolean | null
           is_top_three?: boolean | null
+          location?: string | null
           notes?: string | null
           parent_template_id?: string | null
           priority?: string | null
@@ -2209,6 +2211,7 @@ export type Database = {
           is_milestone?: boolean | null
           is_recurring?: boolean | null
           is_top_three?: boolean | null
+          location?: string | null
           notes?: string | null
           parent_template_id?: string | null
           priority?: string | null
