@@ -45,10 +45,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What do you want to work on right now?",
     options: [
-      { text: "🧠 Clarity & mindset", tags: ["calm", "discipline"] },
-      { text: "❤️ Emotions & healing", tags: ["healing", "supportive"] },
-      { text: "🔥 Discipline & performance", tags: ["discipline", "momentum"] },
-      { text: "✨ Confidence & self-belief", tags: ["confidence", "supportive"] },
+      { text: "Clarity & mindset", tags: ["calm", "discipline"] },
+      { text: "Emotions & healing", tags: ["healing", "supportive"] },
+      { text: "Discipline & performance", tags: ["discipline", "momentum"] },
+      { text: "Confidence & self-belief", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -56,10 +56,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "How do you want guidance to feel?",
     options: [
-      { text: "🌱 Gentle & compassionate", tags: ["healing", "calm"] },
-      { text: "🤝 Encouraging & supportive", tags: ["supportive", "confidence"] },
-      { text: "🧘 Calm & grounded", tags: ["calm", "discipline"] },
-      { text: "⚔️ Direct & demanding", tags: ["discipline", "momentum"] },
+      { text: "Gentle & compassionate", tags: ["healing", "calm"] },
+      { text: "Encouraging & supportive", tags: ["supportive", "confidence"] },
+      { text: "Calm & grounded", tags: ["calm", "discipline"] },
+      { text: "Direct & demanding", tags: ["discipline", "momentum"] },
     ],
   },
   {
@@ -67,10 +67,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What helps you make progress?",
     options: [
-      { text: "📐 Clear principles and logic", tags: ["calm", "discipline"] },
-      { text: "💛 Emotional reassurance", tags: ["supportive", "healing"] },
-      { text: "💪 Someone who believes in me", tags: ["confidence", "supportive"] },
-      { text: "🔥 Pressure and high standards", tags: ["discipline", "momentum"] },
+      { text: "Clear principles and logic", tags: ["calm", "discipline"] },
+      { text: "Emotional reassurance", tags: ["supportive", "healing"] },
+      { text: "Someone who believes in me", tags: ["confidence", "supportive"] },
+      { text: "Pressure and high standards", tags: ["discipline", "momentum"] },
     ],
   },
 ];
