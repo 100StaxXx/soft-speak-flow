@@ -5,7 +5,7 @@ import { useCompanionStory } from "@/hooks/useCompanionStory";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Heart, Lightbulb, Compass } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Sparkles, Loader2, Lock, Grid3x3, Heart, Lightbulb } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
@@ -322,32 +322,6 @@ export const CompanionStoryJournal = () => {
               </div>
             )}
 
-            {/* Section 5: Looking Ahead */}
-            {(story.lore_expansion || story.next_hook) && (
-              <div className="bg-muted/30 p-4 rounded-lg border border-border">
-                <div className="flex items-center gap-2 text-sm font-semibold mb-3 text-muted-foreground">
-                  <Compass className="w-4 h-4" />
-                  <span>Looking Ahead</span>
-                </div>
-                
-                {story.lore_expansion && typeof story.lore_expansion === 'object' && (
-                  <div className="space-y-1 mb-3">
-                    {Object.entries(story.lore_expansion).map(([key, value], idx) => (
-                      <p key={idx} className="text-xs text-muted-foreground flex items-start gap-2">
-                        <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary/50" />
-                        <span><span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</span>
-                      </p>
-                    ))}
-                  </div>
-                )}
-                
-                {story.next_hook && (
-                  <p className="text-sm italic text-foreground/70 border-t border-border pt-3 mt-3">
-                    {story.next_hook}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
         ) : isStageUnlocked ? (
           <Card className="p-8 text-center space-y-4">
