@@ -438,12 +438,13 @@ export const CalendarDayView = ({
                   key={`${hour}-${minute}`}
                   data-hour={isHourMark ? hour : undefined}
                   className={cn(
-                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation",
+                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation select-none",
                     isHourMark && "border-t border-border"
                   )}
                   style={{ 
                     minHeight: '60px',
-                    WebkitTapHighlightColor: 'transparent'
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitTouchCallout: 'none'
                   }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
@@ -517,12 +518,13 @@ export const CalendarDayView = ({
                 <div
                   key={`${hour}-${minute}`}
                   className={cn(
-                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation",
+                    "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation select-none",
                     isHourMark && "border-t border-border"
                   )}
                   style={{ 
                     minHeight: '60px',
-                    WebkitTapHighlightColor: 'transparent'
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitTouchCallout: 'none'
                   }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
