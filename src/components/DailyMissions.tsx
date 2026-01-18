@@ -11,7 +11,6 @@ import confetti from "canvas-confetti";
 import { Badge } from "@/components/ui/badge";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MissionErrorFallback } from "@/components/ErrorFallback";
-import { DailyMissionsInfoTooltip } from "@/components/DailyMissionsInfoTooltip";
 import { MissionCardSkeleton } from "@/components/SkeletonLoader";
 import { getTodaysTheme } from "@/config/missionTemplates";
 
@@ -178,7 +177,6 @@ const DailyMissionsContent = memo(() => {
             <div>
               <div className="flex items-center gap-1">
                 <h3 className="font-heading font-black text-base sm:text-lg">Daily Missions</h3>
-                <DailyMissionsInfoTooltip />
               </div>
               {/* Theme Day Badge */}
               <div className="flex items-center gap-1.5 mt-0.5">
