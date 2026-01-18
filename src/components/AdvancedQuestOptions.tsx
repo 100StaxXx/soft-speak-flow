@@ -60,6 +60,9 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     { value: 15, label: "15 minutes before" },
     { value: 30, label: "30 minutes before" },
     { value: 60, label: "1 hour before" },
+    { value: 120, label: "2 hours before" },
+    { value: 1440, label: "1 day before" },
+    { value: 10080, label: "1 week before" },
   ];
 
   const recurrenceOptions = [
@@ -213,13 +216,16 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">Reminder</Label>
+              <Label className="text-sm font-medium">Early Reminder</Label>
             </div>
             <Switch
               checked={props.reminderEnabled}
               onCheckedChange={props.onReminderEnabledChange}
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            You'll be notified when the quest starts. Add an early reminder to prepare ahead.
+          </p>
         
           {props.reminderEnabled && (
             <div className="relative">

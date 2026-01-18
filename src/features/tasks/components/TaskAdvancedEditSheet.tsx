@@ -60,6 +60,9 @@ const reminderOptions = [
   { value: 15, label: '15 min before' },
   { value: 30, label: '30 min before' },
   { value: 60, label: '1 hour before' },
+  { value: 120, label: '2 hours before' },
+  { value: 1440, label: '1 day before' },
+  { value: 10080, label: '1 week before' },
 ];
 
 export function TaskAdvancedEditSheet({
