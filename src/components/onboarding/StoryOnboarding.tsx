@@ -625,7 +625,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="relative z-10 min-h-screen flex flex-col p-6 pt-safe-top"
+            className="relative z-10 min-h-screen flex flex-col p-6 pt-safe-lg"
           >
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold text-foreground mb-2">Choose Your Mentor</h1>
