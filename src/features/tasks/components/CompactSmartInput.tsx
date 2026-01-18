@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, MicOff, Send, Calendar, Clock, Timer, Zap, Flame, Mountain,
   AlertTriangle, Star, Repeat, Battery, BatteryLow, BatteryFull, StickyNote,
-  Sparkles, CalendarDays, Camera
+  Sparkles, CalendarDays
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { useNaturalLanguageParser, ParsedTask } from '../hooks/useNaturalLanguag
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useQuestAutocomplete } from '@/hooks/useQuestAutocomplete';
-import { useQuestImagePicker } from '@/hooks/useQuestImagePicker';
+
 import { QuickSuggestionChips } from './QuickSuggestionChips';
 import { QuestAutocompleteSuggestions } from './QuestAutocompleteSuggestions';
 import { PermissionRequestDialog } from '@/components/PermissionRequestDialog';
@@ -22,7 +22,7 @@ import { ParsedBadge } from './ParsedBadge';
 import { TaskPreviewCard } from './TaskPreviewCard';
 import { TaskAdvancedEditSheet } from './TaskAdvancedEditSheet';
 import { PlanMyWeekClarification, PlanMyWeekAnswers } from './PlanMyWeekClarification';
-import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
+
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -58,10 +58,10 @@ export function CompactSmartInput({
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
   const [editingParsed, setEditingParsed] = useState<ParsedTask | null>(null);
-  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  
 
   const { medium, success, light, tap } = useHapticFeedback();
-  const { pickImage, isUploading: isUploadingImage, deleteImage } = useQuestImagePicker();
+  
   
   // Autocomplete suggestions
   const displayText = interimText ? `${input} ${interimText}`.trim() : input;
@@ -154,35 +154,21 @@ export function CompactSmartInput({
   const handlePreviewConfirm = () => {
     if (!parsed || !parsed.text.trim()) return;
     success();
-    // Include the pending image URL in the parsed task
-    const taskWithImage = pendingImageUrl 
-      ? { ...parsed, imageUrl: pendingImageUrl }
-      : parsed;
-    onSubmit(taskWithImage);
+    onSubmit(parsed);
     reset();
     setInterimText('');
-    setPendingImageUrl(null);
     setShowPreview(false);
     inputRef.current?.blur();
   };
 
   const handlePreviewDiscard = () => {
     setShowPreview(false);
-    // Clean up the uploaded image if discarding
-    if (pendingImageUrl) {
-      deleteImage(pendingImageUrl).catch(console.error);
-      setPendingImageUrl(null);
-    }
     light();
   };
 
   const handlePreviewEdit = () => {
     if (parsed) {
-      // Include image URL when editing
-      const parsedWithImage = pendingImageUrl
-        ? { ...parsed, imageUrl: pendingImageUrl }
-        : parsed;
-      setEditingParsed(parsedWithImage);
+      setEditingParsed(parsed);
       setShowAdvancedEdit(true);
       setShowPreview(false);
     }
@@ -196,7 +182,6 @@ export function CompactSmartInput({
     setShowPreview(false);
     reset();
     setInterimText('');
-    setPendingImageUrl(null);
     inputRef.current?.blur();
   };
 
@@ -205,22 +190,6 @@ export function CompactSmartInput({
     setEditingParsed(null);
   };
 
-  const handleCameraClick = async () => {
-    tap();
-    const imageUrl = await pickImage();
-    if (imageUrl) {
-      setPendingImageUrl(imageUrl);
-      success();
-    }
-  };
-
-  const handleRemovePendingImage = () => {
-    if (pendingImageUrl) {
-      deleteImage(pendingImageUrl).catch(console.error);
-      setPendingImageUrl(null);
-      light();
-    }
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Handle autocomplete navigation
@@ -421,21 +390,6 @@ export function CompactSmartInput({
           
           {/* Action buttons inside input */}
           <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-            {/* Camera button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleCameraClick}
-              disabled={disabled || isUploadingImage}
-              className={cn(
-                "h-5 w-5 rounded-full",
-                pendingImageUrl && "text-primary",
-                isUploadingImage && "animate-pulse"
-              )}
-            >
-              <Camera className="h-3 w-3 text-muted-foreground" />
-            </Button>
             
             {/* Mic button */}
             {isSupported && (
@@ -507,23 +461,6 @@ export function CompactSmartInput({
         )}
       </AnimatePresence>
       
-      {/* Pending Image Thumbnail */}
-      <AnimatePresence>
-        {pendingImageUrl && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="px-1"
-          >
-            <QuestImageThumbnail
-              imageUrl={pendingImageUrl}
-              size="sm"
-              onRemove={handleRemovePendingImage}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Quick suggestion chips - shown when focused and no preview or clarification */}
       <AnimatePresence>
