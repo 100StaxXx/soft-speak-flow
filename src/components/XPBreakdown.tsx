@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
-import { XPBreakdownInfoTooltip } from "./XPBreakdownInfoTooltip";
 
 export const XPBreakdown = memo(() => {
   const { user } = useAuth();
@@ -68,7 +67,6 @@ export const XPBreakdown = memo(() => {
               <p className="text-2xl font-bold text-primary">{todayXP?.total || 0} XP</p>
             </div>
           </div>
-          <XPBreakdownInfoTooltip />
         </div>
 
         {/* Streak Info */}
