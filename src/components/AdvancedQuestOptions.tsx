@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, ChevronDown, Repeat, Bell, Info, Sparkles, Loader2, Star } from "lucide-react";
+import { Clock, Calendar, ChevronDown, Repeat, Bell, Info, Sparkles, Loader2, Star, MapPin } from "lucide-react";
 import { FrequencyPicker } from "./FrequencyPicker";
 import { useSmartScheduling } from "@/hooks/useSmartScheduling";
 import {
@@ -28,6 +28,8 @@ interface AdvancedQuestOptionsProps {
   onReminderMinutesBeforeChange: (minutes: number) => void;
   moreInformation: string | null;
   onMoreInformationChange: (info: string | null) => void;
+  location: string | null;
+  onLocationChange: (location: string | null) => void;
   // New props for smart scheduling
   selectedDate?: Date;
   taskDifficulty?: 'easy' | 'medium' | 'hard';
@@ -310,6 +312,20 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             onDaysChange={props.onRecurrenceDaysChange}
           />
         )}
+      </div>
+
+      {/* Location */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-muted-foreground" />
+          <Label className="text-sm font-medium">Location</Label>
+        </div>
+        <Input
+          value={props.location || ''}
+          onChange={(e) => props.onLocationChange(e.target.value || null)}
+          placeholder="Where will this happen? (optional)"
+          className="bg-muted/30 border-border/50"
+        />
       </div>
 
       {/* More Information */}

@@ -26,6 +26,7 @@ export interface AddQuestData {
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
   moreInformation: string | null;
+  location: string | null;
 }
 
 interface AddQuestSheetProps {
@@ -55,6 +56,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
   
   // Expanded mode - starts minimal, expands when user wants more options
   const [isExpanded, setIsExpanded] = useState(false);
@@ -107,6 +109,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setReminderEnabled(false);
     setReminderMinutesBefore(15);
     setMoreInformation(null);
+    setLocation(null);
     setIsExpanded(false);
   };
 
@@ -123,6 +126,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       reminderEnabled,
       reminderMinutesBefore,
       moreInformation,
+      location,
     });
     
     resetForm();
@@ -288,6 +292,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 onReminderMinutesBeforeChange={setReminderMinutesBefore}
                 moreInformation={moreInformation}
                 onMoreInformationChange={setMoreInformation}
+                location={location}
+                onLocationChange={setLocation}
                 selectedDate={selectedDate}
                 taskDifficulty={difficulty}
               />

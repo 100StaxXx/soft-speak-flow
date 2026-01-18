@@ -402,6 +402,8 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                     onReminderEnabledChange={setReminderEnabled}
                     onReminderMinutesBeforeChange={setReminderMinutesBefore}
                     onMoreInformationChange={() => {}}
+                    location={null}
+                    onLocationChange={() => {}}
                   />
                 </div>
               )}
