@@ -125,102 +125,8 @@ export const useResistMode = () => {
     },
   });
 
-  // Log a successful resist
-  const logResistMutation = useMutation({
-    mutationFn: async (params: {
-      habitId: string;
-      encounterId?: string;
-      result: 'perfect' | 'good' | 'fail';
-      xpEarned: number;
-    }) => {
-      if (!user?.id) throw new Error('User not found');
-
-      const habit = habits?.find((h) => h.id === params.habitId);
-      if (!habit) throw new Error('Habit not found');
-
-      const careBoost = params.result !== 'fail' ? 0.05 : 0;
-
-      // Log the resist attempt
-      const { error: logError } = await supabase.from('resist_log').insert({
-        user_id: user.id,
-        habit_id: params.habitId,
-        encounter_id: params.encounterId || null,
-        result: params.result,
-        xp_earned: params.xpEarned,
-        care_boost: careBoost,
-      });
-
-      if (logError) throw logError;
-
-      // Update habit stats
-      const isSuccess = params.result !== 'fail';
-      const isToday = habit.last_resisted_at
-        ? new Date(habit.last_resisted_at).toDateString() === new Date().toDateString()
-        : false;
-      const wasYesterday = habit.last_resisted_at
-        ? new Date(habit.last_resisted_at).toDateString() ===
-          new Date(Date.now() - 86400000).toDateString()
-        : false;
-
-      let newStreak = habit.current_streak;
-      if (isSuccess) {
-        if (wasYesterday || isToday) {
-          newStreak = isToday ? habit.current_streak : habit.current_streak + 1;
-        } else {
-          newStreak = 1; // Start new streak
-        }
-      } else {
-        newStreak = 0; // Reset streak on fail
-      }
-
-      const { error: updateError } = await supabase
-        .from('user_bad_habits')
-        .update({
-          times_resisted: habit.times_resisted + (isSuccess ? 1 : 0),
-          current_streak: newStreak,
-          longest_streak: Math.max(habit.longest_streak, newStreak),
-          last_resisted_at: new Date().toISOString(),
-        })
-        .eq('id', params.habitId);
-
-      if (updateError) throw updateError;
-
-      // Boost companion care_recovery if successful
-      if (isSuccess) {
-        const { data: companion } = await supabase
-          .from('user_companion')
-          .select('id, care_recovery')
-          .eq('user_id', user.id)
-          .single();
-
-        if (companion) {
-          const currentRecovery = companion.care_recovery ?? 0;
-          await supabase
-            .from('user_companion')
-            .update({
-              care_recovery: Math.min(1, currentRecovery + careBoost),
-            })
-            .eq('id', companion.id);
-        }
-      }
-
-      return { result: params.result, careBoost };
-    },
-    onSuccess: ({ result }) => {
-      queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
-      queryClient.invalidateQueries({ queryKey: ['resist-log'] });
-      queryClient.invalidateQueries({ queryKey: ['companion'] });
-
-      if (result !== 'fail') {
-        toast.success('You resisted! Your companion grows stronger.', {
-          icon: '💪',
-        });
-      }
-    },
-    onError: (error) => {
-      console.error('Failed to log resist:', error);
-    },
-  });
+  // Note: Resist logging is now handled automatically in useAstralEncounters.completeEncounter
+  // when trigger_type === 'urge_resist'. This keeps all encounter completion logic centralized.
 
   // Get habit by ID
   const getHabit = useCallback(
@@ -257,12 +163,11 @@ export const useResistMode = () => {
     // Loading
     isLoading: habitsLoading || historyLoading,
     isAddingHabit: addHabitMutation.isPending,
-    isLoggingResist: logResistMutation.isPending,
+    isRemovingHabit: removeHabitMutation.isPending,
 
     // Actions
     addHabit: addHabitMutation.mutate,
     removeHabit: removeHabitMutation.mutate,
-    logResist: logResistMutation.mutate,
     getHabit,
   };
 };

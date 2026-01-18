@@ -313,6 +313,75 @@ export const useAstralEncounters = () => {
         }
       }
 
+      // If this was an urge_resist encounter, update habit stats
+      if (activeEncounter.encounter.trigger_type === 'urge_resist') {
+        const habitId = activeEncounter.encounter.trigger_source_id;
+        if (habitId) {
+          // Fetch the habit
+          const { data: habit } = await supabase
+            .from('user_bad_habits')
+            .select('*')
+            .eq('id', habitId)
+            .single();
+
+          if (habit) {
+            const isSuccess = result !== 'fail';
+            const careBoost = isSuccess ? 0.05 : 0;
+
+            // Log the resist attempt
+            await supabase.from('resist_log').insert({
+              user_id: user.id,
+              habit_id: habitId,
+              encounter_id: params.encounterId,
+              result,
+              xp_earned: xpEarned,
+              care_boost: careBoost,
+            });
+
+            // Calculate streak logic
+            const now = new Date();
+            const lastResisted = habit.last_resisted_at ? new Date(habit.last_resisted_at) : null;
+            const isToday = lastResisted?.toDateString() === now.toDateString();
+            const wasYesterday = lastResisted?.toDateString() === new Date(Date.now() - 86400000).toDateString();
+
+            let newStreak = habit.current_streak;
+            if (isSuccess) {
+              newStreak = wasYesterday ? habit.current_streak + 1 : (isToday ? habit.current_streak : 1);
+            } else {
+              newStreak = 0;
+            }
+
+            // Update habit stats
+            await supabase
+              .from('user_bad_habits')
+              .update({
+                times_resisted: habit.times_resisted + (isSuccess ? 1 : 0),
+                current_streak: newStreak,
+                longest_streak: Math.max(habit.longest_streak, newStreak),
+                last_resisted_at: now.toISOString(),
+              })
+              .eq('id', habitId);
+
+            // Boost companion care_recovery if successful
+            if (isSuccess && companion) {
+              const currentRecovery = (companion as any).care_recovery ?? 0;
+              await supabase
+                .from('user_companion')
+                .update({
+                  care_recovery: Math.min(1, currentRecovery + careBoost),
+                })
+                .eq('id', companion.id);
+            }
+
+            if (isSuccess) {
+              toast.success('You resisted! Your companion grows stronger.', {
+                description: `+${xpEarned} XP • Streak: ${newStreak}`,
+              });
+            }
+          }
+        }
+      }
+
       return { result, xpEarned };
     },
     onSuccess: ({ result, xpEarned }) => {
@@ -320,8 +389,11 @@ export const useAstralEncounters = () => {
       queryClient.invalidateQueries({ queryKey: ['adversary-essences'] });
       queryClient.invalidateQueries({ queryKey: ['cosmic-codex'] });
       queryClient.invalidateQueries({ queryKey: ['companion'] });
+      queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
+      queryClient.invalidateQueries({ queryKey: ['resist-log'] });
 
-      if (result !== 'fail') {
+      // Only show generic victory toast if not urge_resist (resist has its own toast)
+      if (result !== 'fail' && activeEncounter?.encounter.trigger_type !== 'urge_resist') {
         toast.success(`Victory! +${xpEarned} XP`);
       }
     },
