@@ -314,6 +314,7 @@ const Journeys = () => {
     reminder_minutes_before: number;
     category: string | null;
     image_url: string | null;
+    location: string | null;
   }) => {
     await updateTask({ taskId, updates });
     setEditingTask(null);
