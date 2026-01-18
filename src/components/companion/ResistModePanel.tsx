@@ -9,7 +9,7 @@ import { useAstralEncounters } from '@/hooks/useAstralEncounters';
 import { AdversaryTheme } from '@/types/astralEncounters';
 
 export const ResistModePanel = memo(() => {
-  const { habits, stats, isLoading, addHabit, removeHabit, logResist, isAddingHabit } = useResistMode();
+  const { habits, stats, isLoading, addHabit, removeHabit, isAddingHabit } = useResistMode();
   const { checkEncounterTrigger } = useAstralEncounters();
   const [resistingHabitId, setResistingHabitId] = useState<string | null>(null);
 
