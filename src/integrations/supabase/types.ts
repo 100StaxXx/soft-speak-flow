@@ -5627,6 +5627,54 @@ export type Database = {
         }
         Relationships: []
       }
+      resist_log: {
+        Row: {
+          care_boost: number | null
+          created_at: string | null
+          encounter_id: string | null
+          habit_id: string
+          id: string
+          result: string
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          care_boost?: number | null
+          created_at?: string | null
+          encounter_id?: string | null
+          habit_id: string
+          id?: string
+          result: string
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          care_boost?: number | null
+          created_at?: string | null
+          encounter_id?: string | null
+          habit_id?: string
+          id?: string
+          result?: string
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resist_log_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "astral_encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resist_log_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "user_bad_habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rhythm_track_ratings: {
         Row: {
           created_at: string | null
@@ -6284,6 +6332,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_bad_habits: {
+        Row: {
+          created_at: string | null
+          current_streak: number | null
+          habit_theme: string
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          last_resisted_at: string | null
+          longest_streak: number | null
+          name: string
+          times_resisted: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_streak?: number | null
+          habit_theme: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_resisted_at?: string | null
+          longest_streak?: number | null
+          name: string
+          times_resisted?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_streak?: number | null
+          habit_theme?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_resisted_at?: string | null
+          longest_streak?: number | null
+          name?: string
+          times_resisted?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_calendar_connections: {
         Row: {

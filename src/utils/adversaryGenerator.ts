@@ -130,6 +130,11 @@ export const getTierFromTrigger = (
     return 'common';
   }
   
+  // Resist encounters are always quick (common/uncommon)
+  if (triggerType === 'urge_resist') {
+    return Math.random() > 0.7 ? 'uncommon' : 'common';
+  }
+  
   if (triggerType === 'epic_checkpoint' && epicProgress !== undefined) {
     if (epicProgress >= 100) return 'legendary';
     if (epicProgress >= 75) return 'epic';
@@ -140,11 +145,51 @@ export const getTierFromTrigger = (
   return 'common';
 };
 
+// Generate adversary specifically for resist mode (always single phase, quick)
+export const generateResistAdversary = (habitTheme: AdversaryTheme): Adversary => {
+  const tier: AdversaryTier = Math.random() > 0.7 ? 'uncommon' : 'common';
+  const config = TIER_CONFIG[tier];
+  
+  const prefix = randomFrom(NAME_PREFIXES[habitTheme]);
+  const suffix = randomFrom(NAME_SUFFIXES[tier]);
+  const name = `${prefix} ${suffix}`;
+  
+  const lore = randomFrom(LORE_TEMPLATES[habitTheme]);
+  const essenceName = randomFrom(ESSENCE_NAMES[habitTheme]);
+  const essenceDescription = ESSENCE_DESCRIPTIONS[habitTheme];
+  
+  return {
+    name,
+    theme: habitTheme,
+    tier,
+    lore,
+    miniGameType: THEME_MINIGAME_MAP[habitTheme],
+    phases: 1, // Always single phase for quick resist sessions
+    essenceName,
+    essenceDescription,
+    statType: THEME_STAT_MAP[habitTheme],
+    statBoost: config.statBoost,
+  };
+};
+
 // Get theme based on epic category or random
 export const getThemeForTrigger = (
   triggerType: TriggerType,
   epicCategory?: string
 ): AdversaryTheme => {
+  // For urge_resist, the epicCategory is actually the habit theme
+  if (triggerType === 'urge_resist' && epicCategory) {
+    // Validate it's a valid theme
+    const validThemes: AdversaryTheme[] = [
+      'distraction', 'chaos', 'stagnation', 'laziness',
+      'anxiety', 'overthinking', 'doubt', 'fear',
+      'confusion', 'vulnerability', 'imbalance'
+    ];
+    if (validThemes.includes(epicCategory as AdversaryTheme)) {
+      return epicCategory as AdversaryTheme;
+    }
+  }
+
   // Map epic categories to themes
   if (triggerType === 'epic_checkpoint' && epicCategory) {
     const categoryMap: Record<string, AdversaryTheme[]> = {

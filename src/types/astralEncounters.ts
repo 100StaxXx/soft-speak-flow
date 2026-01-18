@@ -27,7 +27,7 @@ export type MiniGameType =
   | 'cosmiq_grid'
   | 'stellar_flow';
 
-export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint';
+export type TriggerType = 'quest_milestone' | 'weekly' | 'epic_checkpoint' | 'urge_resist';
 
 export type EncounterResult = 'perfect' | 'good' | 'fail';
 
@@ -193,3 +193,40 @@ export const RESULT_MULTIPLIERS: Record<EncounterResult, number> = {
   good: 1.0,
   fail: 0,
 };
+
+// Bad Habit to AdversaryTheme mapping
+export const HABIT_THEME_MAP: Record<string, AdversaryTheme> = {
+  'phone': 'distraction',
+  'social_media': 'distraction', 
+  'doomscrolling': 'distraction',
+  'sugar': 'laziness',
+  'junk_food': 'laziness',
+  'snacking': 'laziness',
+  'skipping_workout': 'stagnation',
+  'procrastination': 'stagnation',
+  'stress_eating': 'anxiety',
+  'nail_biting': 'anxiety',
+  'overthinking': 'overthinking',
+  'negative_self_talk': 'doubt',
+  'avoidance': 'fear',
+};
+
+// Preset bad habits for quick selection
+export interface PresetBadHabit {
+  name: string;
+  icon: string;
+  theme: AdversaryTheme;
+}
+
+export const PRESET_BAD_HABITS: PresetBadHabit[] = [
+  { name: 'Doomscrolling', icon: '📱', theme: 'distraction' },
+  { name: 'Sugar Cravings', icon: '🍬', theme: 'laziness' },
+  { name: 'Skipping Workouts', icon: '🏃', theme: 'stagnation' },
+  { name: 'Stress Eating', icon: '🍕', theme: 'anxiety' },
+  { name: 'Procrastination', icon: '⏰', theme: 'stagnation' },
+  { name: 'Negative Self-Talk', icon: '💭', theme: 'doubt' },
+  { name: 'Nail Biting', icon: '💅', theme: 'anxiety' },
+  { name: 'Junk Food', icon: '🍔', theme: 'laziness' },
+  { name: 'Social Media', icon: '📲', theme: 'distraction' },
+  { name: 'Overthinking', icon: '🧠', theme: 'overthinking' },
+];
