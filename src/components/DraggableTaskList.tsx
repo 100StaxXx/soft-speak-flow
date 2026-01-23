@@ -269,6 +269,12 @@ function DraggableTaskListInner<T extends { id: string }>({
   const handleTouchStart = useCallback((e: React.TouchEvent, taskId: string, index: number) => {
     if (disabled || draggingId) return;
     
+    // Skip long-press detection if tapping on interactive elements (checkbox, buttons)
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="checkbox"]') || target.closest('[data-interactive]')) {
+      return; // Let the button handle the tap directly
+    }
+    
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     
@@ -300,6 +306,12 @@ function DraggableTaskListInner<T extends { id: string }>({
   // Pointer events for mouse (desktop)
   const handlePointerDown = useCallback((e: React.PointerEvent, taskId: string, index: number) => {
     if (disabled || draggingId || e.pointerType === 'touch') return;
+    
+    // Skip long-press detection if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="checkbox"]') || target.closest('[data-interactive]')) {
+      return; // Let the button handle the click directly
+    }
     
     touchStartPosRef.current = { x: e.clientX, y: e.clientY };
     
