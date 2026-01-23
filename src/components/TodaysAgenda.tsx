@@ -466,8 +466,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div
           className={cn(
             "flex items-center gap-3 transition-all relative group",
-            "select-none",
-            isRitual ? "py-3.5" : "py-2",
+            "select-none min-h-[52px]",
+            isRitual ? "py-4" : "py-3",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
                 isActivated && !isDragging && "bg-muted/30 rounded-lg",
