@@ -492,9 +492,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               />
             )}
             <button
+              data-interactive="true"
               onClick={handleCheckboxClick}
-              className="relative touch-manipulation active:scale-95 transition-transform"
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCheckboxClick(e as unknown as React.MouseEvent);
+              }}
+              className="relative flex items-center justify-center w-11 h-11 -ml-3 touch-manipulation active:scale-95 transition-transform select-none"
+              style={{
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation',
+              }}
               aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+              role="checkbox"
+              aria-checked={isComplete}
+              tabIndex={0}
             >
               <motion.div 
                 className={cn(
