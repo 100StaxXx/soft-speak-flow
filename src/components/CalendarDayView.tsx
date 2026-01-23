@@ -444,7 +444,9 @@ export const CalendarDayView = ({
                   style={{ 
                     minHeight: '60px',
                     WebkitTapHighlightColor: 'transparent',
-                    WebkitTouchCallout: 'none'
+                    WebkitTouchCallout: 'none',
+                    WebkitUserSelect: 'none',
+                    userSelect: 'none',
                   }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
@@ -524,7 +526,9 @@ export const CalendarDayView = ({
                   style={{ 
                     minHeight: '60px',
                     WebkitTapHighlightColor: 'transparent',
-                    WebkitTouchCallout: 'none'
+                    WebkitTouchCallout: 'none',
+                    WebkitUserSelect: 'none',
+                    userSelect: 'none',
                   }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
