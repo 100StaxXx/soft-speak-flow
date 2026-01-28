@@ -20,7 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
-import { PerfectDayCelebration } from "@/components/PerfectDayCelebration";
+
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { TaskDragProvider } from "@/contexts/TaskDragContext";
@@ -33,7 +33,7 @@ import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
-import { usePerfectDayTracker } from "@/hooks/usePerfectDayTracker";
+
 import { useComboTracker } from "@/hooks/useComboTracker";
 import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
@@ -116,13 +116,6 @@ const Journeys = () => {
     isDeleting
   } = useDailyTasks(selectedDate);
   
-  // Perfect Day celebration tracking
-  const { 
-    showPerfectDay, 
-    totalXP: perfectDayXP, 
-    tasksCompleted: perfectDayTasksCompleted,
-    dismissPerfectDay 
-  } = usePerfectDayTracker(dailyTasks, selectedDate);
   
   // Edit quest state (for regular quests)
   const [editingTask, setEditingTask] = useState<{
@@ -697,14 +690,6 @@ const Journeys = () => {
           onDismiss={() => setShowQuestClear(false)}
         />
         
-        {/* Perfect Day Celebration */}
-        <PerfectDayCelebration
-          show={showPerfectDay}
-          totalXP={perfectDayXP}
-          tasksCompleted={perfectDayTasksCompleted}
-          currentStreak={currentStreak}
-          onDismiss={dismissPerfectDay}
-        />
         
         {/* Hourly/Month View Modal */}
         <HourlyViewModal
