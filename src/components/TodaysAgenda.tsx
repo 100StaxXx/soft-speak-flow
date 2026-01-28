@@ -154,6 +154,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [showMonthView, setShowMonthView] = useState(false);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
+  const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
   
   // Track if we've already shown the tooltip this session
   const tooltipShownRef = useRef(false);
@@ -165,6 +166,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   useEffect(() => {
     localStorage.setItem('expanded_ritual_campaigns', JSON.stringify([...expandedCampaigns]));
   }, [expandedCampaigns]);
+  
+  // Clean up optimistic state when server confirms completion
+  useEffect(() => {
+    setOptimisticCompleted(prev => {
+      const confirmedIds = tasks.filter(t => t.completed).map(t => t.id);
+      const next = new Set(prev);
+      confirmedIds.forEach(id => next.delete(id));
+      return next.size !== prev.size ? next : prev;
+    });
+  }, [tasks]);
   
   const toggleCampaign = (campaignId: string) => {
     setExpandedCampaigns(prev => {
@@ -402,7 +413,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   };
 
   const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
-    const isComplete = !!task.completed;
+    const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isOnboarding = isOnboardingTask(task.task_text);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
@@ -420,9 +431,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       }
       
       if (isComplete && onUndoToggle) {
+        // Undo: remove from optimistic set
+        setOptimisticCompleted(prev => {
+          const next = new Set(prev);
+          next.delete(task.id);
+          return next;
+        });
         triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, task.xp_reward);
       } else {
+        // Complete: add to optimistic set immediately for instant strikethrough
+        setOptimisticCompleted(prev => new Set(prev).add(task.id));
         triggerHaptic(ImpactStyle.Medium);
         playStrikethrough();
         // Track for strikethrough animation
@@ -511,14 +530,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             >
               <motion.div 
                 className={cn(
-                  "flex-shrink-0 w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center transition-all",
+                  "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                   isComplete 
                     ? "bg-primary border-primary" 
                     : isOnboarding
                       ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
-                      : "border-muted-foreground/30 hover:border-primary"
+                      : "border-muted-foreground/40 hover:border-primary"
                 )}
-                whileTap={!isDragging && !isPressed ? { scale: 0.9 } : {}}
+                whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
               >
                 {isComplete && (
                   <motion.div
@@ -526,7 +545,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", stiffness: 500, damping: 25 }}
                   >
-                    <Check className="w-3 h-3 text-primary-foreground" />
+                    <Check className="w-4 h-4 text-primary-foreground" />
                   </motion.div>
                 )}
               </motion.div>
