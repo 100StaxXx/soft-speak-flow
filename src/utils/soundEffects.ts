@@ -398,8 +398,12 @@ class SoundManager {
   }
 
   // Strikethrough sound - quick descending swoosh like a pen striking through text
-  playStrikethrough() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playStrikethrough() {
+    if (this.shouldMute()) return;
+
+    // Ensure audio context is ready (especially for iOS)
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Quick descending swoosh - like a pen striking through text
     const osc = this.audioContext.createOscillator();
