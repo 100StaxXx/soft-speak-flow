@@ -1,192 +1,126 @@
 
+# High Priority Fixes: Unsafe Queries & Sound Fix Audit
 
-# Plan: Improve Quest Toggle Clickability, Instant Strikethrough, and Fix Sound
+## Overview
 
-## Summary
+This plan addresses the two highest-impact issues identified in the audit:
 
-This plan addresses three issues:
-1. **Quest toggle clickability** - Make the checkbox easier to tap on mobile
-2. **Immediate strikethrough** - Show the line-through animation instantly before server response
-3. **Strikethrough sound not playing** - Fix iOS audio context issue in the sound function
-
----
-
-## Issue Analysis
-
-### 1. Quest Toggle Clickability
-**Current state:** The checkbox has a 44x44px touch target (w-11 h-11), which is good but could be more prominent.
-
-**Improvements:**
-- Increase the visual size of the checkbox circle slightly
-- Add a more visible tap feedback
-- Ensure the touch area is clearly tappable
-
-### 2. Strikethrough Animation Delay
-**Current state:** The `justCompletedTasks` state tracks just-completed tasks for the animation, but the actual `completed` state only updates after the server responds and React Query invalidates the cache.
-
-**Problem:** The animation class is applied as `isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")` - but `isComplete` comes from server state, not local state.
-
-**Fix:** Track local completion state immediately when checkbox is clicked, independent of server response.
-
-### 3. Strikethrough Sound Not Playing on iOS
-**Current state:** The `playStrikethrough()` function does NOT call `ensureAudioContext()` before creating oscillators, unlike some other sound methods. On iOS, if the AudioContext is suspended, the sound silently fails.
-
-**Fix:** Add `ensureAudioContext()` call at the start of `playStrikethrough()`.
+1. **Unsafe `.single()` queries** → Convert to `.maybeSingle()` where data may not exist
+2. **Missing `ensureAudioContext()` in remaining sound methods** → Audit and fix
 
 ---
 
-## Implementation Details
+## Issue 1: Unsafe `.single()` Queries
 
-### File 1: `src/components/TodaysAgenda.tsx`
+### The Problem
+`.single()` throws a **runtime error** if 0 or 2+ rows are returned. This causes crashes when:
+- User has no data yet (new users)
+- Data was deleted
+- Query conditions match nothing
 
-**Change A: Add local optimistic completion state** (around line 156)
+### Analysis of 280+ Occurrences
 
-Add a new state to track tasks that should appear completed immediately:
-```tsx
-const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
+After reviewing the codebase, the `.single()` calls fall into two categories:
+
+| Category | Action | Count |
+|----------|--------|-------|
+| **Safe** - After `.insert()` or `.update()` (guaranteed 1 row) | Keep as-is | ~180 |
+| **Unsafe** - SELECT queries where data may not exist | Convert to `.maybeSingle()` | ~15 files |
+
+### Files Requiring Changes
+
+| File | Line(s) | Context | Fix |
+|------|---------|---------|-----|
+| `src/features/epics/hooks/useWelcomeImage.ts` | 19 | Checks if user has cached image | `.maybeSingle()` |
+| `src/hooks/useCompanionDialogue.ts` | 49 | Fetches voice template by species | `.maybeSingle()` |
+| `src/hooks/useGuildShouts.ts` | 121 | Fetches sender's profile | `.maybeSingle()` |
+| `src/hooks/useAstralEncounters.ts` | 214, 325, 426 | Fetches encounter/habit data | `.maybeSingle()` |
+| `src/hooks/useCompanionMemories.ts` | 113, 165 | Fetches bond level/memory count | `.maybeSingle()` |
+| `src/hooks/useEpicProgress.ts` | 164 | Fetches epic by ID | `.maybeSingle()` + null check |
+| `src/hooks/useLegacyTraits.ts` | 84 | Fetches existing traits | `.maybeSingle()` |
+| `src/hooks/useMilestoneSurfacing.ts` | 108 | Checks for existing task | `.maybeSingle()` |
+| `src/hooks/useAIInteractionTracker.ts` | 232 | Fetches epic details | `.maybeSingle()` |
+| `src/components/journey/SmartRescheduleAdvisor.tsx` | 61, 108 | Fetches epic/log data | `.maybeSingle()` |
+
+### Implementation Pattern
+
+**Before (unsafe):**
+```typescript
+const { data, error } = await supabase
+  .from('table')
+  .select('*')
+  .eq('id', someId)
+  .single();
+
+if (error) throw error;
+doSomething(data.field); // CRASH if no row exists
 ```
 
-**Change B: Update checkbox click handler** (around line 414-460)
+**After (safe):**
+```typescript
+const { data, error } = await supabase
+  .from('table')
+  .select('*')
+  .eq('id', someId)
+  .maybeSingle();
 
-Modify `handleCheckboxClick` to:
-1. Immediately add task to `optimisticCompleted` set when completing
-2. Remove from set when uncompleting (undo)
-3. This makes the strikethrough appear instantly
-
-```tsx
-const handleCheckboxClick = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  if (isDragging || isActivated || isPressed) {
-    e.preventDefault();
-    return;
-  }
-  
-  if (isComplete && onUndoToggle) {
-    // Undo: remove from optimistic set
-    setOptimisticCompleted(prev => {
-      const next = new Set(prev);
-      next.delete(task.id);
-      return next;
-    });
-    triggerHaptic(ImpactStyle.Light);
-    onUndoToggle(task.id, task.xp_reward);
-  } else {
-    // Complete: add to optimistic set immediately
-    setOptimisticCompleted(prev => new Set(prev).add(task.id));
-    triggerHaptic(ImpactStyle.Medium);
-    playStrikethrough();
-    // Track for strikethrough animation
-    setJustCompletedTasks(prev => new Set(prev).add(task.id));
-    // ... rest of existing logic
-    onToggle(task.id, !isComplete, task.xp_reward);
-  }
-};
-```
-
-**Change C: Use optimistic state for visual completion** (around line 405)
-
-Update the `isComplete` check to use optimistic state:
-```tsx
-const isComplete = !!task.completed || optimisticCompleted.has(task.id);
-```
-
-**Change D: Clean up optimistic state when server confirms** (around line 165)
-
-Add effect to clean up optimistic state when task data updates:
-```tsx
-useEffect(() => {
-  // Clean up optimistic completed tasks when server confirms
-  setOptimisticCompleted(prev => {
-    const confirmedIds = tasks.filter(t => t.completed).map(t => t.id);
-    const next = new Set(prev);
-    confirmedIds.forEach(id => next.delete(id));
-    return next.size !== prev.size ? next : prev;
-  });
-}, [tasks]);
-```
-
-**Change E: Increase checkbox visual size** (around line 512-520)
-
-Increase the inner checkbox circle from `w-5 h-5` to `w-6 h-6`:
-```tsx
-<motion.div 
-  className={cn(
-    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-    isComplete 
-      ? "bg-primary border-primary" 
-      : isOnboarding
-        ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
-        : "border-muted-foreground/40 hover:border-primary"
-  )}
-  whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
->
-  {isComplete && (
-    <motion.div
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      transition={{ type: "spring", stiffness: 500, damping: 25 }}
-    >
-      <Check className="w-4 h-4 text-primary-foreground" />
-    </motion.div>
-  )}
-</motion.div>
+if (error) throw error;
+if (!data) return; // Graceful early return or handle null case
+doSomething(data.field);
 ```
 
 ---
 
-### File 2: `src/utils/soundEffects.ts`
+## Issue 2: Sound Effects Audio Context
 
-**Change: Fix playStrikethrough to ensure audio context is ready** (around line 400-425)
+### The Problem
+The `playStrikethrough()` fix was applied, but other sound methods may also need the `ensureAudioContext()` call for iOS compatibility.
 
-Add async wrapper and ensureAudioContext call:
-```tsx
-async playStrikethrough() {
+### Audit Required
+Review `src/utils/soundEffects.ts` to ensure ALL public sound methods that use oscillators call `ensureAudioContext()`.
+
+### Expected Pattern
+```typescript
+async playXyz() {
   if (this.shouldMute()) return;
-  
-  // Ensure audio context is ready (especially for iOS)
   await this.ensureAudioContext();
   if (!this.audioContext) return;
-
-  // Quick descending swoosh - like a pen striking through text
-  const osc = this.audioContext.createOscillator();
-  const gain = this.audioContext.createGain();
-  
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(1200, this.audioContext.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(300, this.audioContext.currentTime + 0.15);
-  
-  gain.gain.setValueAtTime(this.masterVolume * 0.25, this.audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.18);
-  
-  osc.connect(gain);
-  gain.connect(this.audioContext.destination);
-  osc.start();
-  osc.stop(this.audioContext.currentTime + 0.2);
-  
-  // Add a subtle "pop" at the end for satisfaction
-  setTimeout(() => {
-    this.createOscillator(800, 0.08, 'triangle');
-  }, 100);
+  // ... create oscillators
 }
 ```
 
 ---
 
-## Summary Table
+## Summary of Changes
 
-| File | Change | Purpose |
-|------|--------|---------|
-| `TodaysAgenda.tsx` | Add `optimisticCompleted` state | Track completion before server responds |
-| `TodaysAgenda.tsx` | Update `isComplete` calculation | Use optimistic state for immediate visual feedback |
-| `TodaysAgenda.tsx` | Increase checkbox to `w-6 h-6` | Bigger, easier to tap |
-| `TodaysAgenda.tsx` | Add cleanup effect | Remove from optimistic set when server confirms |
-| `soundEffects.ts` | Add `ensureAudioContext()` to `playStrikethrough` | Fix iOS audio not playing |
+| File | Changes |
+|------|---------|
+| `src/features/epics/hooks/useWelcomeImage.ts` | `.single()` → `.maybeSingle()` |
+| `src/hooks/useCompanionDialogue.ts` | `.single()` → `.maybeSingle()` + null handling |
+| `src/hooks/useGuildShouts.ts` | `.single()` → `.maybeSingle()` + null handling |
+| `src/hooks/useAstralEncounters.ts` | 3 occurrences → `.maybeSingle()` |
+| `src/hooks/useCompanionMemories.ts` | 2 occurrences → `.maybeSingle()` |
+| `src/hooks/useEpicProgress.ts` | `.single()` → `.maybeSingle()` + null guard |
+| `src/hooks/useLegacyTraits.ts` | `.single()` → `.maybeSingle()` |
+| `src/hooks/useMilestoneSurfacing.ts` | `.single()` → `.maybeSingle()` |
+| `src/hooks/useAIInteractionTracker.ts` | `.single()` → `.maybeSingle()` |
+| `src/components/journey/SmartRescheduleAdvisor.tsx` | 2 occurrences → `.maybeSingle()` |
+| `src/utils/soundEffects.ts` | Audit all methods for `ensureAudioContext()` |
 
 ---
 
-## Expected Result
+## Technical Notes
 
-1. **Checkbox** - Larger (24px circle instead of 20px), more visible tap feedback
-2. **Strikethrough** - Appears instantly when tapped, no wait for server
-3. **Sound** - Plays reliably on iOS when completing a quest
+### Why Keep `.single()` After INSERT/UPDATE?
+When you call `.insert().select().single()` or `.update().select().single()`, you're guaranteed exactly 1 row is affected, so `.single()` is appropriate.
 
+### Why `.maybeSingle()` for SELECT?
+SELECT queries with `.eq()` filters may return 0 rows. Using `.single()` throws an error; `.maybeSingle()` returns `null` gracefully.
+
+---
+
+## Estimated Impact
+
+- **Prevents ~15 potential runtime crashes** for edge cases (new users, missing data)
+- **Improves iOS sound reliability** for all audio feedback
+- **No breaking changes** - only safer error handling
