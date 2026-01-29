@@ -211,7 +211,7 @@ export const useAstralEncounters = () => {
           .select('id, times_defeated')
           .eq('user_id', user.id)
           .eq('adversary_theme', activeEncounter.adversary.theme)
-          .single();
+          .maybeSingle();
 
         let newTimesDefeated = 1;
         if (existingEntry) {
@@ -322,7 +322,7 @@ export const useAstralEncounters = () => {
             .from('user_bad_habits')
             .select('*')
             .eq('id', habitId)
-            .single();
+            .maybeSingle();
 
           if (habit) {
             const isSuccess = result !== 'fail';
@@ -423,7 +423,7 @@ export const useAstralEncounters = () => {
       .select('*')
       .eq('user_id', user.id)
       .is('completed_at', null)
-      .single();
+      .maybeSingle();
 
     if (pendingEncounter) {
       // Resume pending encounter - reconstruct adversary from stored data

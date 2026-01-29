@@ -229,7 +229,7 @@ export function useAIInteractionTracker() {
         .from('epics')
         .select('story_type_slug, theme_color, target_days')
         .eq('id', epicId)
-        .single();
+        .maybeSingle();
 
       if (!epic) return;
 

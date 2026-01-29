@@ -161,7 +161,9 @@ export function useEpicProgress(epicId?: string) {
         .from('epics')
         .select('id, target_days, start_date, end_date')
         .eq('id', targetEpicId)
-        .single();
+        .maybeSingle();
+      
+      if (!epic) throw new Error('Epic not found');
 
       if (epicError) throw epicError;
 

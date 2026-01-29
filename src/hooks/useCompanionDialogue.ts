@@ -46,12 +46,14 @@ export function useCompanionDialogue() {
         .from('companion_voice_templates')
         .select('*')
         .eq('species', species)
-        .single();
+        .maybeSingle();
       
-      if (error || !data) {
+      if (error) {
         console.error('Failed to fetch voice template:', error);
         return null;
       }
+      
+      if (!data) return null;
       
       return {
         species: data.species,

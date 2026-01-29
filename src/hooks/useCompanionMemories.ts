@@ -110,7 +110,7 @@ export function useCompanionMemories() {
         .from('user_companion')
         .select('bond_level, total_interactions, last_interaction_at')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Failed to fetch bond data:', error);
@@ -162,7 +162,7 @@ export function useCompanionMemories() {
         .from('companion_memories')
         .select('referenced_count')
         .eq('id', memoryId)
-        .single();
+        .maybeSingle();
       
       const newCount = (current?.referenced_count || 0) + 1;
       

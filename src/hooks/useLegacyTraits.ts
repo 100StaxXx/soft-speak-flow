@@ -81,7 +81,7 @@ export const useLegacyTraits = () => {
         .from('user_companion')
         .select('legacy_traits')
         .eq('id', companionId)
-        .single();
+        .maybeSingle();
 
       const existingTraits = (existing?.legacy_traits as unknown as LegacyTrait[]) || [];
       const combinedTraits = [...existingTraits, ...traits];
