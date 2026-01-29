@@ -102,8 +102,10 @@ class SoundManager {
   }
 
   // Evolution sounds
-  playEvolutionStart() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playEvolutionStart() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Create powerful ascending magical tones with harmonics
     const frequencies = [220, 277, 330, 440, 554, 659, 880, 1108];
@@ -116,8 +118,10 @@ class SoundManager {
     });
   }
 
-  playEvolutionSuccess() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playEvolutionSuccess() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Create an epic triumphant fanfare with bass and harmonics
     const bassTones = [130.81, 164.81, 196.00]; // C3, E3, G3
@@ -147,16 +151,20 @@ class SoundManager {
     });
   }
 
-  playSparkle() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playSparkle() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     const freq = 1500 + Math.random() * 1000;
     this.createOscillator(freq, 0.15, 'sine');
   }
 
   // UI interaction sounds
-  playHabitComplete() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playHabitComplete() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Satisfying click-ding
     this.createOscillator(800, 0.1, 'triangle');
@@ -165,8 +173,10 @@ class SoundManager {
     }, 50);
   }
 
-  playXPGain() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playXPGain() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Quick ascending notes
     const notes = [440, 554.37, 659.25]; // A, C#, E
@@ -177,8 +187,10 @@ class SoundManager {
     });
   }
 
-  playMissionComplete() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playMissionComplete() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Achievement sound
     this.createOscillator(523.25, 0.15, 'triangle');
@@ -190,8 +202,10 @@ class SoundManager {
     }, 150);
   }
 
-  playLessonComplete() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playLessonComplete() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Gentle, satisfying completion chime
     this.createOscillator(659.25, 0.2, 'sine');
@@ -203,8 +217,10 @@ class SoundManager {
     }, 200);
   }
 
-  playAchievementUnlock() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playAchievementUnlock() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Epic achievement fanfare
     const melody = [
@@ -221,14 +237,18 @@ class SoundManager {
     });
   }
 
-  playButtonClick() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playButtonClick() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     this.createOscillator(300, 0.05, 'square');
   }
 
-  playNotification() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playNotification() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Gentle notification chime
     this.createOscillator(660, 0.15, 'sine');
@@ -237,8 +257,10 @@ class SoundManager {
     }, 100);
   }
 
-  playStreakMilestone() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playStreakMilestone() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Celebratory sequence
     const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C, E, G, C, E
@@ -250,8 +272,10 @@ class SoundManager {
   }
 
   // Ambient sounds (simple versions)
-  playAmbientNature() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playAmbientNature() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Create gentle nature ambience with multiple oscillators
     const frequencies = [100, 150, 200, 250];
@@ -280,8 +304,10 @@ class SoundManager {
     };
   }
 
-  playCalming() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playCalming() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Calming tones for meditation
     this.createOscillator(220, 3, 'sine');
@@ -291,8 +317,10 @@ class SoundManager {
   }
 
   // Arcade sounds
-  playArcadeEntrance() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playArcadeEntrance() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Retro power-up sweep with layered oscillators
     const startFreq = 150;
@@ -332,8 +360,10 @@ class SoundManager {
     }, 400);
   }
 
-  playArcadeSelect() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playArcadeSelect() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Quick 8-bit bloop
     const osc = this.audioContext.createOscillator();
@@ -349,8 +379,10 @@ class SoundManager {
     osc.stop(this.audioContext.currentTime + 0.1);
   }
 
-  playArcadeHighScore() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playArcadeHighScore() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Victory fanfare arpeggio C5 → E5 → G5 → C6
     const notes = [523.25, 659.25, 783.99, 1046.50];
@@ -371,8 +403,10 @@ class SoundManager {
   }
 
   // Pokemon-style encounter trigger sound - classic ascending arpeggio
-  playEncounterTrigger() {
-    if (!this.audioContext || this.shouldMute()) return;
+  async playEncounterTrigger() {
+    if (this.shouldMute()) return;
+    await this.ensureAudioContext();
+    if (!this.audioContext) return;
 
     // Classic Pokemon "wild encounter!" arpeggio: E4 → G4 → B4 → E5
     const notes = [329.63, 392.00, 493.88, 659.25];

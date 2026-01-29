@@ -16,7 +16,7 @@ export function useWelcomeImage() {
         .from('user_welcome_images')
         .select('image_url')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (existingImage?.image_url) {
         return existingImage.image_url;

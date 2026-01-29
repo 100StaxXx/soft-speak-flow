@@ -118,7 +118,7 @@ export const useGuildShouts = (options: UseGuildShoutsOptions | string = {}) => 
         .from("profiles")
         .select("email, onboarding_data")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
       const senderName = getUserDisplayName(userProfile);
       

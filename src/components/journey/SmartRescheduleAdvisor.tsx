@@ -58,8 +58,9 @@ export function SmartRescheduleAdvisor({
         .from('epics')
         .select('start_date, end_date, epic_habits(habit_id)')
         .eq('id', epicId)
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) return null;
       return data;
     },
     enabled: !!epicId,
@@ -105,7 +106,7 @@ export function SmartRescheduleAdvisor({
         .eq('user_id', user.id)
         .order('date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
         
       if (error && error.code !== 'PGRST116') throw error;
       return data?.date ? new Date(data.date) : undefined;
