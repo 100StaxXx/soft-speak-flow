@@ -38,7 +38,7 @@ export const useEncounterTrigger = () => {
       .from('profiles')
       .select('astral_encounters_enabled,onboarding_completed,total_quests_completed')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Failed to fetch astral encounter setting', error);
@@ -85,7 +85,7 @@ export const useEncounterTrigger = () => {
         .from('profiles')
         .select('total_quests_completed, next_encounter_quest_count, astral_encounters_enabled')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error || !profile) {
         console.error('Failed to fetch activity count', error);
@@ -158,7 +158,7 @@ export const useEncounterTrigger = () => {
           .from('epics')
           .select('title, description')
           .eq('id', epicId)
-          .single();
+          .maybeSingle();
 
         // Infer category from title/description
         const text = `${epic?.title || ''} ${epic?.description || ''}`.toLowerCase();

@@ -202,10 +202,15 @@ export const useCompanionPostcards = () => {
         .from("epic_milestones")
         .select("id, title, milestone_percent, is_postcard_milestone")
         .eq("id", milestoneId)
-        .single();
+        .maybeSingle();
 
-      if (error || !milestone) {
+      if (error) {
         console.error("Failed to fetch milestone:", error);
+        return;
+      }
+
+      if (!milestone) {
+        console.log("Milestone not found");
         return;
       }
 

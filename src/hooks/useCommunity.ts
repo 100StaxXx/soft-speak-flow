@@ -96,10 +96,10 @@ export const useCommunity = (communityId?: string) => {
         .from("communities")
         .select("*")
         .eq("id", communityId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      return data as Community;
+      return data as Community | null;
     },
     enabled: !!communityId,
   });
