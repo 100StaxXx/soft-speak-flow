@@ -18,7 +18,6 @@ import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ComboCounter } from "@/components/ComboCounter";
 import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
@@ -34,7 +33,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 
-import { useComboTracker } from "@/hooks/useComboTracker";
 import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
 import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
@@ -78,7 +76,7 @@ const Journeys = () => {
   } = useStreakAtRisk();
   
   // Combo tracking
-  const { comboCount, showCombo, bonusXP, recordCompletion } = useComboTracker();
+  
   
   // Daily plan optimization & generation
   const { refetch: refetchPlan, generatePlan, isGenerating } = useDailyPlanOptimization();
@@ -238,8 +236,6 @@ const Journeys = () => {
 
   const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null }) => {
     if (completed) {
-      recordCompletion(); // Track combo for consecutive completions
-      
       // Track for AI learning (only for AI-generated tasks)
       if (taskData?.ai_generated) {
         trackDailyPlanOutcome(taskId, 'completed', {
@@ -251,7 +247,7 @@ const Journeys = () => {
       }
     }
     toggleTask({ taskId, completed, xpReward });
-  }, [recordCompletion, toggleTask, trackDailyPlanOutcome]);
+  }, [toggleTask, trackDailyPlanOutcome]);
   
   const handleUndoToggle = useCallback((taskId: string, xpReward: number) => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
@@ -675,12 +671,6 @@ const Journeys = () => {
           isResolving={isResolving}
         />
         
-        {/* Combo Counter Overlay */}
-        <ComboCounter
-          count={comboCount}
-          show={showCombo}
-          bonusXP={bonusXP}
-        />
         
         {/* Quest Clear Celebration */}
         <QuestClearCelebration
