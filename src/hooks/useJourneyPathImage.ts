@@ -28,10 +28,9 @@ export const useJourneyPathImage = (epicId: string | undefined) => {
         .eq("epic_id", epicId)
         .order("milestone_index", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows found, which is fine
+      if (error) {
         console.error("Error fetching journey path:", error);
         throw error;
       }
