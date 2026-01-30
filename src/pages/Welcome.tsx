@@ -59,17 +59,9 @@ const Welcome = () => {
       onTouchStart={handleInteraction}
       onClick={handleInteraction}
     >
-      {/* Parallax Background with Gyroscope */}
-      <motion.div 
-        className="fixed -inset-8 -z-10"
-        style={{
-          backgroundImage: `url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center center',
-          y: backgroundY,
-          scale: 1.1,
-          transformOrigin: 'center center',
-        }}
+      {/* Outer wrapper for gyroscope movement */}
+      <motion.div
+        className="fixed -inset-12 -z-10"
         animate={{
           x: gyroX,
           y: gyroY,
@@ -78,9 +70,21 @@ const Welcome = () => {
           type: "spring",
           stiffness: 100,
           damping: 30,
-          mass: 0.5,
         }}
-      />
+      >
+        {/* Inner div for scroll parallax */}
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${backgroundImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center center',
+            y: backgroundY,
+            scale: 1.15,
+            transformOrigin: 'center center',
+          }}
+        />
+      </motion.div>
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />
       {/* Hero Section with iOS safe areas */}
