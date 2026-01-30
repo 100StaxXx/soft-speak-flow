@@ -61,14 +61,14 @@ const Welcome = () => {
     >
       {/* Parallax Background with Gyroscope */}
       <motion.div 
-        className="fixed -inset-4 -z-10"
+        className="fixed -inset-8 -z-10"
         style={{
           backgroundImage: `url(${backgroundImage})`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center top',
+          backgroundPosition: 'center center',
           y: backgroundY,
-          scale: 1.2,
-          transformOrigin: 'center top',
+          scale: 1.1,
+          transformOrigin: 'center center',
         }}
         animate={{
           x: gyroX,
