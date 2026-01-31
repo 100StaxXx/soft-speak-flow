@@ -1,144 +1,68 @@
 
 
-# Improve Schedule Visibility & Editing for Rituals
+# Fix Ritual Reordering on Toggle
 
-## Problem Summary
+## Problem
 
-Users can't easily see or edit **which days** their rituals are scheduled for:
+When you check/uncheck a ritual, the rituals visibly "move" or reorder in the list. This happens because:
 
-| Location | Current State | Issue |
-|----------|---------------|-------|
-| Campaign Creation → Habit List | Shows "Daily" or "Custom days" | Doesn't show **which** custom days |
-| Campaign → Rituals Drawer | Shows "Daily" or "3x per week" etc | No day-level detail |
-| Edit Ritual Sheet | Has frequency dropdown + day picker | Day picker only appears for "custom" frequency |
-| Quests → Advanced Options | Same as Edit Ritual | No "every other X" type patterns |
+1. **Identical sort values in database**: All ritual tasks have `sort_order: 0` and many were created at the exact same millisecond
+2. **Non-deterministic ordering**: When multiple rows share the same `sort_order` and `created_at`, the database returns them in arbitrary order
+3. **Refetch triggers re-render**: Completing a task invalidates the query cache, causing a refetch that returns rituals in a different order
 
----
+## Solution
 
-## Solution Overview
+Add a **stable, deterministic fallback sort** to ensure rituals always appear in the same order, regardless of database return order.
 
-### Part 1: Show Schedule Summary in Lists
-
-Add a visual day indicator chip to show exactly which days a ritual is scheduled:
-
-**In `EpicHabitList.tsx` (Campaign Creation):**
-```
-[Morning Run] Easy · M T W T F
-             ^^^^^^^^^^^^^^^^^
-             New: show selected days as small letters
-```
-
-**In `EpicCheckInDrawer.tsx` (Rituals drawer):**
-```
-[Sleep Optimization] Daily          → Shows "Daily"
-[Resistance Training] M W F         → Shows actual days
-```
-
----
-
-### Part 2: Always Show Day Picker in Edit Ritual Sheet
-
-Currently the day picker only appears when frequency = "custom". Change to always show day selection so users can:
-1. See their current schedule
-2. Quickly change which days without switching to "custom" first
-
----
-
-### Part 3: Add Frequency Presets Component
-
-Create a unified `FrequencyPresets` style component for the Edit Ritual Sheet that shows:
-- Quick presets: Daily, Weekdays, 3x/wk, Weekly, Custom
-- Day chips that update based on preset selection
-- Users can click individual days to customize
-
-This already exists in `src/components/Pathfinder/FrequencyPresets.tsx` - reuse this pattern.
-
----
-
-## Implementation Details
-
-### Files to Modify
+### Changes Required
 
 | File | Change |
 |------|--------|
-| `src/components/EpicHabitList.tsx` | Add day indicator chips showing M T W T F S S |
-| `src/components/EpicCheckInDrawer.tsx` | Show day chips next to frequency badge |
-| `src/components/EditRitualSheet.tsx` | Replace frequency dropdown with `FrequencyPresets` component |
+| `src/components/TodaysAgenda.tsx` | Add tertiary sort by `id` to ensure deterministic ordering |
 
-### New Helper Function
+### Implementation
 
-Create a utility to format day arrays into readable display:
+Update the `sortGroup` function in TodaysAgenda to include task ID as the final tiebreaker:
 
-```tsx
-// Format [0, 2, 4] → "M W F"
-// Format [0,1,2,3,4,5,6] → "Daily"
-// Format [0,1,2,3,4] → "Weekdays"
-export function formatDaysDisplay(days: number[]): string {
-  if (!days || days.length === 0) return 'Daily';
-  if (days.length === 7) return 'Daily';
-  if (arraysEqual(days, [0,1,2,3,4])) return 'Weekdays';
-  
-  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  return days.map(d => labels[d]).join(' ');
+```text
+Current sorting:
+  1. sort_order (or scheduled_time/priority/xp)
+  2. scheduled_time (secondary)
+  → If both are equal, order is random ❌
+
+New sorting:
+  1. sort_order (or scheduled_time/priority/xp)
+  2. scheduled_time (secondary)
+  3. Task ID (final tiebreaker)
+  → Order is always consistent ✓
+```
+
+### Code Change
+
+In the `sortGroup` function (around line 238-275), after all sorting logic, add:
+
+```typescript
+// Final tiebreaker - sort by ID for deterministic ordering
+if (orderA === orderB && !a.scheduled_time && !b.scheduled_time) {
+  return a.id.localeCompare(b.id);
 }
 ```
 
----
+This ensures that even when two rituals have:
+- Same `sort_order` (both 0)
+- Same `scheduled_time` (both null)
+- Same `created_at` (same batch creation)
 
-## Visual Examples
+They will still appear in a consistent order based on their unique ID.
 
-### EpicHabitList (During Campaign Creation)
+## Why This Works
 
-Before:
-```
-┌─────────────────────────────────────┐
-│ Morning Run                    ✏️ 🗑 │
-│ Custom days                         │
-└─────────────────────────────────────┘
-```
-
-After:
-```
-┌─────────────────────────────────────┐
-│ Morning Run                    ✏️ 🗑 │
-│ [M][T][W][T][F][ ][ ] · 7:00 AM    │
-└─────────────────────────────────────┘
-```
-
-### EditRitualSheet (Editing Ritual)
-
-Before:
-```
-Frequency
-┌──────────────────────┐
-│ 3x per week       ▼ │
-└──────────────────────┘
-(no day picker visible unless "custom" selected)
-```
-
-After:
-```
-Schedule
-[Daily] [Weekdays] [3x/wk] [Weekly] [Custom]
-                   ^^^^^^^^
-                   Selected
-┌───────────────────────────────────────┐
-│ (M) (T) (W) (T) (F) ( ) ( )           │
-│  ✓       ✓       ✓                    │
-└───────────────────────────────────────┘
-Repeats every Mon, Wed, Fri
-```
-
----
+- Task IDs are unique and immutable (UUIDs)
+- `localeCompare` on UUIDs provides stable, predictable ordering
+- No visual "jumping" even when the database returns data in different order
+- Zero impact on user experience - they won't notice the ID-based ordering
 
 ## Summary
 
-| Enhancement | User Benefit |
-|-------------|--------------|
-| Day chips in habit lists | See at a glance which days each ritual runs |
-| Frequency presets in editor | Quick selection of common patterns |
-| Always-visible day picker | Easy to customize exact days |
-| Readable schedule summary | "Repeats every Mon, Wed, Fri" label |
-
-This ensures users can see and control their ritual schedules at every touchpoint - during campaign creation and when editing existing rituals.
+This is a one-file, minimal change that eliminates the visual glitch without changing any user-facing behavior or requiring database migrations.
 
