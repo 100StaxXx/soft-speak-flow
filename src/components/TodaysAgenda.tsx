@@ -251,7 +251,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             return b.xp_reward - a.xp_reward; // Higher XP first
           case 'custom':
           default:
-            // Sort by sort_order, then by scheduled time
+            // Sort by sort_order, then by scheduled time, then by ID for deterministic ordering
             const orderA = a.sort_order ?? 9999;
             const orderB = b.sort_order ?? 9999;
             if (orderA !== orderB) return orderA - orderB;
@@ -260,7 +260,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             }
             if (a.scheduled_time) return -1;
             if (b.scheduled_time) return 1;
-            return 0;
+            // Final tiebreaker - sort by ID for deterministic ordering
+            return a.id.localeCompare(b.id);
         }
       });
       
