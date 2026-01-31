@@ -1,68 +1,129 @@
 
 
-# Fix Ritual Reordering on Toggle
+# Sync Contacts with Phone Contacts
 
-## Problem
+## Overview
 
-When you check/uncheck a ritual, the rituals visibly "move" or reorder in the list. This happens because:
+Yes! You can sync contacts from your phone's native contacts into the app. Since Cosmiq is an iOS-native app using Capacitor, we can use a Capacitor contacts plugin to access the device's contact list.
 
-1. **Identical sort values in database**: All ritual tasks have `sort_order: 0` and many were created at the exact same millisecond
-2. **Non-deterministic ordering**: When multiple rows share the same `sort_order` and `created_at`, the database returns them in arbitrary order
-3. **Refetch triggers re-render**: Completing a task invalidates the query cache, causing a refetch that returns rituals in a different order
+## What This Will Do
 
-## Solution
+| Feature | Description |
+|---------|-------------|
+| Import from Phone | Pull contacts from your iPhone's Contacts app |
+| Permission Request | App will ask for contacts access permission |
+| Selective Import | Choose which contacts to import (or import all) |
+| Duplicate Detection | Skip contacts that already exist in the app |
+| Merge Data | Map phone contact fields → app contact fields |
 
-Add a **stable, deterministic fallback sort** to ensure rituals always appear in the same order, regardless of database return order.
+---
 
-### Changes Required
+## Implementation Plan
+
+### Part 1: Install Capacitor Contacts Plugin
+
+Install the `@capawesome-team/capacitor-contacts` plugin (the most actively maintained option):
+
+```bash
+npm install @capawesome-team/capacitor-contacts
+npx cap sync ios
+```
+
+### Part 2: Add iOS Permission
+
+Update `Info.plist` with the contacts permission description:
+
+```xml
+<key>NSContactsUsageDescription</key>
+<string>We use your contacts to help you quickly add people to your network without typing their information manually.</string>
+```
+
+### Part 3: Create Phone Contacts Hook
+
+New file: `src/hooks/usePhoneContacts.ts`
+
+This hook will:
+- Check/request contacts permission
+- Fetch all or specific contacts from the phone
+- Format phone contacts to match our database schema
+
+```text
+Phone Contact Fields → App Contact Fields
+├── givenName + familyName → name
+├── emailAddresses[0] → email
+├── phoneNumbers[0] → phone
+├── organizationName → company
+├── jobTitle → role
+└── image (optional) → avatar_url
+```
+
+### Part 4: Add Import UI
+
+Update the Contacts page with:
+
+1. **"Import from Phone" button** - Shows on empty state and in header
+2. **Contact picker modal** - Select which contacts to import
+3. **Import progress** - Show progress during bulk import
+4. **Duplicate handling** - Skip or update existing matches by phone/email
+
+### Visual Flow
+
+```text
+┌────────────────────────────────┐
+│  NO CONTACTS YET               │
+│                                │
+│  [+ Add Contact]               │
+│                                │
+│  ── or ──                      │
+│                                │
+│  [📱 Import from Phone]        │  ← NEW
+└────────────────────────────────┘
+
+User taps "Import from Phone"
+          ↓
+┌────────────────────────────────┐
+│  SELECT CONTACTS               │
+│                                │
+│  [✓] Select All (147)          │
+│                                │
+│  ☐ John Smith                  │
+│  ☑ Jane Doe                    │
+│  ☑ Bob Johnson                 │
+│  ...                           │
+│                                │
+│  [Import 2 Contacts]           │
+└────────────────────────────────┘
+```
+
+---
+
+## Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `src/components/TodaysAgenda.tsx` | Add tertiary sort by `id` to ensure deterministic ordering |
+| `package.json` | Add `@capawesome-team/capacitor-contacts` |
+| `ios/App/App/Info.plist` | Add `NSContactsUsageDescription` |
+| `src/hooks/usePhoneContacts.ts` | **New** - Hook for native contacts access |
+| `src/components/contacts/PhoneContactsPicker.tsx` | **New** - Modal to select contacts |
+| `src/components/contacts/ContactsEmptyState.tsx` | Add "Import from Phone" button |
+| `src/pages/Contacts.tsx` | Add import button and connect picker |
 
-### Implementation
+---
 
-Update the `sortGroup` function in TodaysAgenda to include task ID as the final tiebreaker:
+## Technical Notes
 
-```text
-Current sorting:
-  1. sort_order (or scheduled_time/priority/xp)
-  2. scheduled_time (secondary)
-  → If both are equal, order is random ❌
+- **iOS Only**: The plugin works on native iOS. On web, the import button will be hidden
+- **Permission Handling**: If user denies permission, show helpful message with settings link
+- **Duplicate Check**: Match by phone number OR email to prevent duplicates
+- **Batch Import**: Use batch insert for performance on large contact lists
 
-New sorting:
-  1. sort_order (or scheduled_time/priority/xp)
-  2. scheduled_time (secondary)
-  3. Task ID (final tiebreaker)
-  → Order is always consistent ✓
-```
+---
 
-### Code Change
+## After Implementation
 
-In the `sortGroup` function (around line 238-275), after all sorting logic, add:
-
-```typescript
-// Final tiebreaker - sort by ID for deterministic ordering
-if (orderA === orderB && !a.scheduled_time && !b.scheduled_time) {
-  return a.id.localeCompare(b.id);
-}
-```
-
-This ensures that even when two rituals have:
-- Same `sort_order` (both 0)
-- Same `scheduled_time` (both null)
-- Same `created_at` (same batch creation)
-
-They will still appear in a consistent order based on their unique ID.
-
-## Why This Works
-
-- Task IDs are unique and immutable (UUIDs)
-- `localeCompare` on UUIDs provides stable, predictable ordering
-- No visual "jumping" even when the database returns data in different order
-- Zero impact on user experience - they won't notice the ID-based ordering
-
-## Summary
-
-This is a one-file, minimal change that eliminates the visual glitch without changing any user-facing behavior or requiring database migrations.
+You'll need to:
+1. Pull the code changes
+2. Run `npm install` to get the new plugin
+3. Run `npx cap sync ios` to sync native dependencies  
+4. Open Xcode and rebuild the app
 
