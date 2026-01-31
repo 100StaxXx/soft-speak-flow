@@ -33,6 +33,8 @@ interface AdvancedQuestOptionsProps {
   // New props for smart scheduling
   selectedDate?: Date;
   taskDifficulty?: 'easy' | 'medium' | 'hard';
+  // Hide recurrence for rituals (they use FrequencyPresets instead)
+  hideRecurrence?: boolean;
 }
 
 // Helper to format 24h time to 12h
@@ -266,53 +268,55 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
         </div>
       )}
 
-      {/* Recurrence Section */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Repeat className="w-4 h-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Recurrence</Label>
-        </div>
-        
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowRecurrenceOptions(!showRecurrenceOptions)}
-            className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
-          >
-            <span>
-              {recurrenceOptions.find(opt => opt.value === (props.recurrencePattern || 'none'))?.label || "None"}
-            </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
+      {/* Recurrence Section - hide for rituals */}
+      {!props.hideRecurrence && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Repeat className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Recurrence</Label>
+          </div>
           
-          {showRecurrenceOptions && (
-            <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg">
-              {recurrenceOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    props.onRecurrencePatternChange(option.value === 'none' ? null : option.value);
-                    setShowRecurrenceOptions(false);
-                  }}
-                  className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
-                    (props.recurrencePattern || 'none') === option.value ? 'bg-accent' : ''
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowRecurrenceOptions(!showRecurrenceOptions)}
+              className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+            >
+              <span>
+                {recurrenceOptions.find(opt => opt.value === (props.recurrencePattern || 'none'))?.label || "None"}
+              </span>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </button>
+            
+            {showRecurrenceOptions && (
+              <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg">
+                {recurrenceOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      props.onRecurrencePatternChange(option.value === 'none' ? null : option.value);
+                      setShowRecurrenceOptions(false);
+                    }}
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
+                      (props.recurrencePattern || 'none') === option.value ? 'bg-accent' : ''
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {(props.recurrencePattern === 'custom' || props.recurrencePattern === 'weekly') && (
+            <FrequencyPicker
+              selectedDays={props.recurrenceDays}
+              onDaysChange={props.onRecurrenceDaysChange}
+            />
           )}
         </div>
-        
-        {(props.recurrencePattern === 'custom' || props.recurrencePattern === 'weekly') && (
-          <FrequencyPicker
-            selectedDays={props.recurrenceDays}
-            onDaysChange={props.onRecurrenceDaysChange}
-          />
-        )}
-      </div>
+      )}
 
       {/* Location */}
       <div className="space-y-2">

@@ -398,6 +398,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                     onMoreInformationChange={() => {}}
                     location={null}
                     onLocationChange={() => {}}
+                    hideRecurrence={true}
                   />
                 </div>
               )}
