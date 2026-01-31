@@ -11,11 +11,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users } from 'lucide-react';
+import { Calendar, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format } from 'date-fns';
 import { ContactPicker } from '@/components/tasks/ContactPicker';
+import { QuestImagePicker } from '@/components/QuestImagePicker';
+import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
+import { useQuestImagePicker } from '@/hooks/useQuestImagePicker';
 
 interface TaskAdvancedEditSheetProps {
   open: boolean;
@@ -85,9 +88,19 @@ export function TaskAdvancedEditSheet({
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
   const [contactId, setContactId] = useState<string | null>(parsed.contactId || null);
   const [autoLogInteraction, setAutoLogInteraction] = useState(parsed.autoLogInteraction ?? true);
+  const [imageUrl, setImageUrl] = useState<string | null>(parsed.imageUrl || null);
   
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
+  
+  const { deleteImage } = useQuestImagePicker();
+
+  const handleRemoveImage = async () => {
+    if (imageUrl) {
+      await deleteImage(imageUrl);
+      setImageUrl(null);
+    }
+  };
 
   const handleSave = () => {
     const updated: ParsedTask = {
@@ -105,6 +118,7 @@ export function TaskAdvancedEditSheet({
       recurrencePattern: recurrencePattern || null,
       contactId,
       autoLogInteraction,
+      imageUrl,
     };
     onSave(updated);
   };
@@ -352,6 +366,28 @@ export function TaskAdvancedEditSheet({
               placeholder="Add additional details..."
               className="bg-background/50 min-h-[80px] resize-none"
             />
+          </div>
+
+          {/* Photo */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5 text-pink-500" />
+              Photo
+            </Label>
+            <div className="flex items-center gap-2">
+              {imageUrl && (
+                <QuestImageThumbnail
+                  imageUrl={imageUrl}
+                  onRemove={handleRemoveImage}
+                  size="md"
+                />
+              )}
+              <QuestImagePicker
+                onImageSelected={setImageUrl}
+                variant="button"
+                disabled={!!imageUrl}
+              />
+            </div>
           </div>
 
           {/* Contact Link */}
