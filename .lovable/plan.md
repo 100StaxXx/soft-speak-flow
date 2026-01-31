@@ -1,113 +1,98 @@
 
-# Fix Contact Interaction Logging Integration
 
-## Problem Confirmed
+# Fix Contact Linking Integration for Quest Creation
 
-The interaction logging system is fully built but **disconnected**:
+## Problems Found
 
-| Component | Status |
-|-----------|--------|
-| `useTaskCompletionWithInteraction` hook | Built, but never imported |
-| `InteractionLogModal` component | Built, but never rendered |
-| `toggleTask` mutation | Returns contact data, but data is ignored |
+The contact interaction logging system is fully built and now connected for task completion, **but there's no way to actually link contacts to tasks when creating them**.
 
-When you complete a contact-linked task:
-- Task gets marked complete
-- XP is awarded
-- Contact data is fetched and returned
-- **Nothing happens with the contact data** - no modal, no interaction logged
+| Issue | Location | Impact |
+|-------|----------|--------|
+| `AddQuestData` missing contact fields | `src/components/AddQuestSheet.tsx` | Main quest creation has no contact support |
+| `handleAddQuest` doesn't pass contact data | `src/pages/Journeys.tsx` | Contact data never reaches the database |
+| `onQuickAdd` doesn't pass contact data | `src/pages/Journeys.tsx` | Quick-add from calendar ignores contacts |
+| `AddQuestSheet` has no ContactPicker UI | `src/components/AddQuestSheet.tsx` | Users can't select contacts when creating quests |
+| `TaskManagerPanel` missing contact pass-through | `src/features/tasks/components/TaskManagerPanel.tsx` | Secondary panel ignores contacts |
 
 ## Solution
 
-Wire up the existing components in **Journeys.tsx** (the main task list page):
+Add contact linking capability to the main quest creation flow:
 
-### Changes Required
+### Step 1: Update `AddQuestData` Interface
 
-| File | Change |
-|------|--------|
-| `src/pages/Journeys.tsx` | Import hook + modal, integrate with task toggle flow |
-
-### Implementation Details
-
-**1. Add imports:**
-```typescript
-import { useTaskCompletionWithInteraction } from '@/hooks/useTaskCompletionWithInteraction';
-import { InteractionLogModal } from '@/components/tasks/InteractionLogModal';
-```
-
-**2. Initialize the hook:**
-```typescript
-const {
-  pendingInteraction,
-  isModalOpen,
-  handleTaskCompleted,
-  logInteraction,
-  skipInteraction,
-  closeModal,
-  isLogging,
-} = useTaskCompletionWithInteraction();
-```
-
-**3. Update `handleToggleTask` callback:**
-
-When a task is toggled complete and has contact data, call `handleTaskCompleted`:
+Add contact fields to the data structure in `AddQuestSheet.tsx`:
 
 ```typescript
-const handleToggleTask = useCallback((...) => {
-  toggleTask({ taskId, completed, xpReward }, {
-    onSuccess: (result) => {
-      // If completed and has a contact, trigger interaction modal
-      if (result.completed && result.contact && result.autoLogInteraction) {
-        handleTaskCompleted(
-          result.taskId,
-          result.taskText,
-          result.contact,
-          result.autoLogInteraction
-        );
-      }
-    }
-  });
-}, [..., handleTaskCompleted]);
+export interface AddQuestData {
+  // ... existing fields ...
+  contactId: string | null;
+  autoLogInteraction: boolean;
+}
 ```
 
-**4. Render the modal:**
+### Step 2: Add ContactPicker to AddQuestSheet UI
 
-Add the `InteractionLogModal` near other dialogs at the bottom of the component:
+In the expanded mode of `AddQuestSheet.tsx`, add a contact picker section (similar to `TaskAdvancedEditSheet`):
+
+- Add state for `contactId` and `autoLogInteraction`
+- Import and render `ContactPicker` component
+- Add toggle for "Log as interaction when completed"
+- Include fields in the `handleSubmit` data payload
+
+### Step 3: Update `handleAddQuest` in Journeys.tsx
+
+Pass the new contact fields to `addTask`:
 
 ```typescript
-<InteractionLogModal
-  open={isModalOpen}
-  onOpenChange={closeModal}
-  contactName={pendingInteraction?.contact?.name ?? ''}
-  contactAvatarUrl={pendingInteraction?.contact?.avatar_url}
-  taskTitle={pendingInteraction?.taskText ?? ''}
-  onLog={async (type, summary) => {
-    await logInteraction(type as InteractionType, summary);
-  }}
-  onSkip={skipInteraction}
-/>
+await addTask({
+  // ... existing fields ...
+  contactId: data.contactId,
+  autoLogInteraction: data.autoLogInteraction,
+});
 ```
+
+### Step 4: Update `onQuickAdd` in Journeys.tsx
+
+Similarly pass contact data from `ParsedTask`:
+
+```typescript
+await addTask({
+  // ... existing fields ...
+  contactId: parsed.contactId,
+  autoLogInteraction: parsed.autoLogInteraction ?? true,
+});
+```
+
+### Step 5: Update TaskManagerPanel (secondary flow)
+
+Update `handleTaskAdd` to include contact fields in the metadata.
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/AddQuestSheet.tsx` | Add interface fields, state, UI (ContactPicker + toggle), and submit logic |
+| `src/pages/Journeys.tsx` | Pass contact data in `handleAddQuest` and `onQuickAdd` |
+| `src/features/tasks/components/TaskManagerPanel.tsx` | Pass contact data in `handleTaskAdd` |
 
 ## Data Flow After Fix
 
 ```text
-User checks task → toggleTask mutation
-                        ↓
-              Returns { contact, autoLogInteraction, ... }
-                        ↓
-              handleTaskCompleted() called
-                        ↓
-              InteractionLogModal opens
-                        ↓
-        User picks "Call/Email/Meeting/etc" + summary
-                        ↓
-              logInteraction() saves to DB
-                        ↓
-              contact_interactions table updated
-                        ↓
-              Smart Day Planner knows about the interaction
+User creates quest → Selects contact in ContactPicker
+                            ↓
+              AddQuestSheet includes contactId in data
+                            ↓
+              handleAddQuest passes to addTask mutation
+                            ↓
+              Database saves contact_id + auto_log_interaction
+                            ↓
+              When task completed → InteractionLogModal appears
 ```
 
-## Summary
+## Technical Notes
 
-This is a **single file change** (Journeys.tsx) that connects existing, working components. The hook, modal, and backend logic are all ready - they just need to be plugged in.
+- The `ContactPicker` component already exists and works
+- The `addTask` mutation already supports `contactId` and `autoLogInteraction` parameters
+- The `ParsedTask` type already includes `contactId` and `autoLogInteraction` fields
+- Only the UI integration and data pass-through are missing
+
