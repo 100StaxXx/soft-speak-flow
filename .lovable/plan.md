@@ -1,85 +1,65 @@
 
-# Fix Contacts Runtime Error in Native iOS App
+# Remove "3x/wk" Frequency Option
 
-## Problem
+## Overview
 
-The app crashes on TestFlight with:
-```
-TypeError: Module name, '@capacitor-co...
-```
+Remove the "3x/wk" preset from the frequency picker in the Edit Ritual sheet and related components.
 
-This happens because `usePhoneContacts.ts` has a **top-level import** of `@capacitor-community/contacts`:
+## Changes Required
 
+### File: `src/components/Pathfinder/FrequencyPresets.tsx`
+
+| Line | Change |
+|------|--------|
+| 6 | Update `FrequencyType` to remove `'3x_week'` from the union type |
+| 17 | Remove the preset entry `{ value: '3x_week', label: '3x/wk', days: [0, 2, 4] }` |
+| 90 | Remove the `case '3x_week'` from `getDefaultDaysForFrequency()` helper |
+
+**Before:**
 ```typescript
-import { Contacts, PermissionStatus } from '@capacitor-community/contacts';
+type FrequencyType = 'daily' | '5x_week' | '3x_week' | 'weekly' | 'custom';
+
+const presets = [
+  { value: 'daily', label: 'Daily', days: [0, 1, 2, 3, 4, 5, 6] },
+  { value: '5x_week', label: 'Weekdays', days: [0, 1, 2, 3, 4] },
+  { value: '3x_week', label: '3x/wk', days: [0, 2, 4] },  // REMOVE
+  { value: 'weekly', label: 'Weekly', days: [0] },
+  { value: 'custom', label: 'Custom', days: [] },
+];
 ```
 
-When Vite loads this file, it tries to resolve the module immediately - but since we externalized it for web builds, it can't be found at runtime in the native WebView.
-
-## Root Cause
-
-| Step | What Happens |
-|------|--------------|
-| 1 | User navigates to Contacts page |
-| 2 | `Contacts.tsx` imports `PhoneContactsPicker` |
-| 3 | `PhoneContactsPicker` imports `usePhoneContacts` |
-| 4 | `usePhoneContacts` tries to import `@capacitor-community/contacts` at top level |
-| 5 | Module resolution fails → App crashes before any code runs |
-
-The platform check (`Capacitor.isNativePlatform()`) happens **too late** - the import already failed.
-
-## Solution
-
-Use **dynamic imports** to load the Contacts plugin only when actually needed on native platforms.
-
-### Changes to `src/hooks/usePhoneContacts.ts`
-
-1. Remove the top-level import of `@capacitor-community/contacts`
-2. Define a local type for permission status (since we can't import it)
-3. Dynamically import the plugin inside each function that uses it
-4. Only load the module when `isNative` is true
-
+**After:**
 ```typescript
-// BEFORE (crashes immediately)
-import { Contacts, PermissionStatus } from '@capacitor-community/contacts';
+type FrequencyType = 'daily' | '5x_week' | 'weekly' | 'custom';
 
-// AFTER (loads only when needed)
-type ContactsPermissionStatus = 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale';
-
-const checkPermission = useCallback(async () => {
-  if (!isNative) return 'denied';
-  
-  // Dynamic import - only runs on native
-  const { Contacts } = await import('@capacitor-community/contacts');
-  const status = await Contacts.checkPermissions();
-  // ...
-}, [isNative]);
+const presets = [
+  { value: 'daily', label: 'Daily', days: [0, 1, 2, 3, 4, 5, 6] },
+  { value: '5x_week', label: 'Weekdays', days: [0, 1, 2, 3, 4] },
+  { value: 'weekly', label: 'Weekly', days: [0] },
+  { value: 'custom', label: 'Custom', days: [] },
+];
 ```
 
-## Files to Modify
+## Result
 
-| File | Changes |
-|------|---------|
-| `src/hooks/usePhoneContacts.ts` | Remove top-level import, use dynamic imports in callbacks |
+The frequency picker will show only: **Daily**, **Weekdays**, **Weekly**, **Custom**
 
-## Why This Works
+Users who want a 3x/week schedule can still achieve this using the "Custom" option and selecting Mon/Wed/Fri manually.
 
-- On **web**: `isNative` is false, functions return early, dynamic import never runs
-- On **native iOS**: When contacts are actually accessed, the plugin is loaded dynamically
-- The **build** still externalizes the module (via `vite.config.ts`)
-- The **runtime** only loads it when actually needed
+---
 
-## Technical Implementation
+## Technical Details
 
-```text
-Before:
-  Module Load → Import fails → App crashes
+### Files Modified
 
-After:
-  Module Load → No import → App starts
-       ↓
-  User opens Contacts → Checks isNative
-       ↓
-  Native? → Dynamic import → Plugin loads → Works
-  Web? → Return early → No import needed
-```
+| File | Change |
+|------|--------|
+| `src/components/Pathfinder/FrequencyPresets.tsx` | Remove `3x_week` from type, presets array, and helper function |
+
+### Database Compatibility
+
+The database schema still supports `3x_week` as a valid enum value. Existing rituals with `3x_week` frequency will continue to work - they'll just show the Custom preset selected when edited. No database migration is needed.
+
+### Type Cast Update
+
+The type cast in `EditRitualSheet.tsx` (line 332) will automatically exclude `3x_week` since the type is inferred from the prop, but no change is needed there since the frequency value from existing data will still be accepted.
