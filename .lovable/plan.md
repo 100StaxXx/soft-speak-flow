@@ -1,129 +1,113 @@
 
+# Fix Contact Interaction Logging Integration
 
-# Sync Contacts with Phone Contacts
+## Problem Confirmed
 
-## Overview
+The interaction logging system is fully built but **disconnected**:
 
-Yes! You can sync contacts from your phone's native contacts into the app. Since Cosmiq is an iOS-native app using Capacitor, we can use a Capacitor contacts plugin to access the device's contact list.
+| Component | Status |
+|-----------|--------|
+| `useTaskCompletionWithInteraction` hook | Built, but never imported |
+| `InteractionLogModal` component | Built, but never rendered |
+| `toggleTask` mutation | Returns contact data, but data is ignored |
 
-## What This Will Do
+When you complete a contact-linked task:
+- Task gets marked complete
+- XP is awarded
+- Contact data is fetched and returned
+- **Nothing happens with the contact data** - no modal, no interaction logged
 
-| Feature | Description |
-|---------|-------------|
-| Import from Phone | Pull contacts from your iPhone's Contacts app |
-| Permission Request | App will ask for contacts access permission |
-| Selective Import | Choose which contacts to import (or import all) |
-| Duplicate Detection | Skip contacts that already exist in the app |
-| Merge Data | Map phone contact fields → app contact fields |
+## Solution
 
----
+Wire up the existing components in **Journeys.tsx** (the main task list page):
 
-## Implementation Plan
-
-### Part 1: Install Capacitor Contacts Plugin
-
-Install the `@capawesome-team/capacitor-contacts` plugin (the most actively maintained option):
-
-```bash
-npm install @capawesome-team/capacitor-contacts
-npx cap sync ios
-```
-
-### Part 2: Add iOS Permission
-
-Update `Info.plist` with the contacts permission description:
-
-```xml
-<key>NSContactsUsageDescription</key>
-<string>We use your contacts to help you quickly add people to your network without typing their information manually.</string>
-```
-
-### Part 3: Create Phone Contacts Hook
-
-New file: `src/hooks/usePhoneContacts.ts`
-
-This hook will:
-- Check/request contacts permission
-- Fetch all or specific contacts from the phone
-- Format phone contacts to match our database schema
-
-```text
-Phone Contact Fields → App Contact Fields
-├── givenName + familyName → name
-├── emailAddresses[0] → email
-├── phoneNumbers[0] → phone
-├── organizationName → company
-├── jobTitle → role
-└── image (optional) → avatar_url
-```
-
-### Part 4: Add Import UI
-
-Update the Contacts page with:
-
-1. **"Import from Phone" button** - Shows on empty state and in header
-2. **Contact picker modal** - Select which contacts to import
-3. **Import progress** - Show progress during bulk import
-4. **Duplicate handling** - Skip or update existing matches by phone/email
-
-### Visual Flow
-
-```text
-┌────────────────────────────────┐
-│  NO CONTACTS YET               │
-│                                │
-│  [+ Add Contact]               │
-│                                │
-│  ── or ──                      │
-│                                │
-│  [📱 Import from Phone]        │  ← NEW
-└────────────────────────────────┘
-
-User taps "Import from Phone"
-          ↓
-┌────────────────────────────────┐
-│  SELECT CONTACTS               │
-│                                │
-│  [✓] Select All (147)          │
-│                                │
-│  ☐ John Smith                  │
-│  ☑ Jane Doe                    │
-│  ☑ Bob Johnson                 │
-│  ...                           │
-│                                │
-│  [Import 2 Contacts]           │
-└────────────────────────────────┘
-```
-
----
-
-## Files to Create/Modify
+### Changes Required
 
 | File | Change |
 |------|--------|
-| `package.json` | Add `@capawesome-team/capacitor-contacts` |
-| `ios/App/App/Info.plist` | Add `NSContactsUsageDescription` |
-| `src/hooks/usePhoneContacts.ts` | **New** - Hook for native contacts access |
-| `src/components/contacts/PhoneContactsPicker.tsx` | **New** - Modal to select contacts |
-| `src/components/contacts/ContactsEmptyState.tsx` | Add "Import from Phone" button |
-| `src/pages/Contacts.tsx` | Add import button and connect picker |
+| `src/pages/Journeys.tsx` | Import hook + modal, integrate with task toggle flow |
 
----
+### Implementation Details
 
-## Technical Notes
+**1. Add imports:**
+```typescript
+import { useTaskCompletionWithInteraction } from '@/hooks/useTaskCompletionWithInteraction';
+import { InteractionLogModal } from '@/components/tasks/InteractionLogModal';
+```
 
-- **iOS Only**: The plugin works on native iOS. On web, the import button will be hidden
-- **Permission Handling**: If user denies permission, show helpful message with settings link
-- **Duplicate Check**: Match by phone number OR email to prevent duplicates
-- **Batch Import**: Use batch insert for performance on large contact lists
+**2. Initialize the hook:**
+```typescript
+const {
+  pendingInteraction,
+  isModalOpen,
+  handleTaskCompleted,
+  logInteraction,
+  skipInteraction,
+  closeModal,
+  isLogging,
+} = useTaskCompletionWithInteraction();
+```
 
----
+**3. Update `handleToggleTask` callback:**
 
-## After Implementation
+When a task is toggled complete and has contact data, call `handleTaskCompleted`:
 
-You'll need to:
-1. Pull the code changes
-2. Run `npm install` to get the new plugin
-3. Run `npx cap sync ios` to sync native dependencies  
-4. Open Xcode and rebuild the app
+```typescript
+const handleToggleTask = useCallback((...) => {
+  toggleTask({ taskId, completed, xpReward }, {
+    onSuccess: (result) => {
+      // If completed and has a contact, trigger interaction modal
+      if (result.completed && result.contact && result.autoLogInteraction) {
+        handleTaskCompleted(
+          result.taskId,
+          result.taskText,
+          result.contact,
+          result.autoLogInteraction
+        );
+      }
+    }
+  });
+}, [..., handleTaskCompleted]);
+```
 
+**4. Render the modal:**
+
+Add the `InteractionLogModal` near other dialogs at the bottom of the component:
+
+```typescript
+<InteractionLogModal
+  open={isModalOpen}
+  onOpenChange={closeModal}
+  contactName={pendingInteraction?.contact?.name ?? ''}
+  contactAvatarUrl={pendingInteraction?.contact?.avatar_url}
+  taskTitle={pendingInteraction?.taskText ?? ''}
+  onLog={async (type, summary) => {
+    await logInteraction(type as InteractionType, summary);
+  }}
+  onSkip={skipInteraction}
+/>
+```
+
+## Data Flow After Fix
+
+```text
+User checks task → toggleTask mutation
+                        ↓
+              Returns { contact, autoLogInteraction, ... }
+                        ↓
+              handleTaskCompleted() called
+                        ↓
+              InteractionLogModal opens
+                        ↓
+        User picks "Call/Email/Meeting/etc" + summary
+                        ↓
+              logInteraction() saves to DB
+                        ↓
+              contact_interactions table updated
+                        ↓
+              Smart Day Planner knows about the interaction
+```
+
+## Summary
+
+This is a **single file change** (Journeys.tsx) that connects existing, working components. The hook, modal, and backend logic are all ready - they just need to be plugged in.
