@@ -79,7 +79,7 @@ export default defineConfig(({ mode }) => ({
     minify: 'esbuild', // 3-5x faster than terser
     cssMinify: 'lightningcss',
     rollupOptions: {
-      external: ['@capacitor/camera'],
+      external: ['@capacitor/camera', '@capacitor-community/contacts'],
       output: {
         manualChunks: (id) => {
           // Core React libraries
