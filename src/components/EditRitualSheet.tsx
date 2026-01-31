@@ -329,7 +329,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
             
             {/* Frequency with day picker */}
             <FrequencyPresets
-              frequency={frequency as 'daily' | '5x_week' | '3x_week' | 'weekly' | 'custom'}
+              frequency={frequency === '3x_week' ? 'custom' : frequency as 'daily' | '5x_week' | 'weekly' | 'custom'}
               customDays={recurrenceDays}
               onFrequencyChange={(newFreq, newDays) => {
                 setFrequency(newFreq);

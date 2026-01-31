@@ -85,7 +85,7 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
 
         {/* Frequency Presets */}
         <FrequencyPresets
-          frequency={editedRitual.frequency}
+          frequency={editedRitual.frequency === '3x_week' ? 'custom' : editedRitual.frequency as 'daily' | '5x_week' | 'weekly' | 'custom'}
           customDays={editedRitual.customDays || getDefaultDaysForFrequency(editedRitual.frequency)}
           onFrequencyChange={handleFrequencyChange}
         />
