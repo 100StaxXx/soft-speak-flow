@@ -82,6 +82,11 @@ export default defineConfig(({ mode }) => ({
       external: ['@capacitor/camera', '@capacitor-community/contacts'],
       output: {
         manualChunks: (id) => {
+          // Skip externalized modules
+          if (id.includes('@capacitor/camera') || id.includes('@capacitor-community/contacts')) {
+            return undefined;
+          }
+          
           // Core React libraries
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
             return 'react-vendor';
@@ -139,8 +144,10 @@ export default defineConfig(({ mode }) => ({
             return 'date-vendor';
           }
           
-          // Capacitor plugins
-          if (id.includes('node_modules/@capacitor')) {
+          // Capacitor core (not externalized plugins)
+          if (id.includes('node_modules/@capacitor/core') || 
+              id.includes('node_modules/@capacitor/app') ||
+              id.includes('node_modules/@capacitor/haptics')) {
             return 'capacitor-vendor';
           }
         },
