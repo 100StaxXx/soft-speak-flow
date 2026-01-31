@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Search, Star, Users } from 'lucide-react';
+import { ChevronLeft, Plus, Search, Star, Users, Smartphone } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import { ContactCard } from '@/components/contacts/ContactCard';
 import { ContactDialog } from '@/components/contacts/ContactDialog';
 import { ContactsEmptyState } from '@/components/contacts/ContactsEmptyState';
 import { ContactDetailSheet } from '@/components/contacts/ContactDetailSheet';
+import { PhoneContactsPicker } from '@/components/contacts/PhoneContactsPicker';
 import { useContacts, Contact, ContactInsert } from '@/hooks/useContacts';
 import {
   AlertDialog,
@@ -24,6 +26,7 @@ import {
 export default function Contacts() {
   const navigate = useNavigate();
   const { contacts, isLoading, createContact, updateContact, deleteContact, toggleFavorite } = useContacts();
+  const isNative = Capacitor.isNativePlatform();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
@@ -31,6 +34,7 @@ export default function Contacts() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [phonePickerOpen, setPhonePickerOpen] = useState(false);
 
   const filteredContacts = useMemo(() => {
     let result = contacts;
@@ -113,13 +117,18 @@ export default function Contacts() {
                 </p>
               </div>
             </div>
-            <Button size="sm" onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add
-            </Button>
+            <div className="flex items-center gap-2">
+              {isNative && (
+                <Button size="sm" variant="outline" onClick={() => setPhonePickerOpen(true)}>
+                  <Smartphone className="h-4 w-4" />
+                </Button>
+              )}
+              <Button size="sm" onClick={() => handleOpenDialog()}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
           </div>
-
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -161,6 +170,7 @@ export default function Contacts() {
         ) : filteredContacts.length === 0 ? (
           <ContactsEmptyState
             onAddContact={() => handleOpenDialog()}
+            onImportFromPhone={() => setPhonePickerOpen(true)}
             isFavoritesView={activeTab === 'favorites'}
           />
         ) : (
@@ -209,6 +219,12 @@ export default function Contacts() {
         contact={selectedContact}
         open={!!selectedContact}
         onOpenChange={(open) => !open && setSelectedContact(null)}
+      />
+
+      {/* Phone Contacts Picker */}
+      <PhoneContactsPicker
+        open={phonePickerOpen}
+        onOpenChange={setPhonePickerOpen}
       />
     </motion.div>
   );
