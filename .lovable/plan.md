@@ -1,82 +1,64 @@
 
-# Add "Import All Contacts" with Permission Request
+# Fix Camera Module Resolution on iOS
 
 ## Problem
 
-Currently, the phone contacts import flow:
-1. Opens the picker dialog
-2. Auto-fetches contacts (which requests permission silently)
-3. Shows "0 found" if permission is denied (confusing!)
-4. Requires manually selecting each contact
+The error "Module name, '@capacitor/camera' does not resolve to a valid URL" occurs because:
 
-Users want to:
-1. See a clear permission request before importing
-2. Have an "Import All" option to quickly import everything
+1. `@capacitor/camera` is externalized from the Vite build (correctly, for web)
+2. Your iOS app loads web content from the Lovable preview URL for hot-reload
+3. When the dynamic import runs, the browser can't find the module since it's not bundled
+
+This is a conflict between:
+- **Development mode**: App loads from preview URL (needs camera bundled)
+- **Production mode**: App loads from local `dist/` folder (camera provided by native)
 
 ## Solution
 
-Add a permission request step that shows before fetching contacts, and add an "Import All" button alongside "Select All" for faster bulk imports.
+Instead of externalizing `@capacitor/camera`, we should **bundle it normally** but only execute it on native platforms (which the code already does with `Capacitor.isNativePlatform()` check).
+
+The camera plugin actually has a web implementation that shows a file picker on web - so there's no need to externalize it.
 
 ## Changes
 
-### 1. Create `ContactsPermissionDialog.tsx`
-
-A new dialog component (similar to `PermissionRequestDialog`) specifically for contacts access:
-
-| State | Display |
-|-------|---------|
-| Prompt | "Import Contacts?" with explanation and "Allow Access" button |
-| Denied | "Contacts Access Blocked" with instructions to enable in Settings |
-
-### 2. Update `PhoneContactsPicker.tsx`
+### File: `vite.config.ts`
 
 | Change | Description |
 |--------|-------------|
-| Add permission check state | Check permission before auto-fetching |
-| Show permission dialog first | If permission not granted, show request dialog |
-| Add "Import All" button | Quick action to import all non-duplicate contacts |
-| Fix error state bug | Return the error from `fetchContacts` directly instead of checking stale state |
+| Remove `@capacitor/camera` from external | Allow it to be bundled normally |
+| Keep `@capacitor-community/contacts` external | This one truly has no web implementation |
 
-**New Flow:**
-
-```text
-Dialog Opens
-     |
-     v
-Check Permission
-     |
-     +--> Granted --> Fetch Contacts --> Show Selection
-     |
-     +--> Prompt --> Show Permission Dialog --> Request --> Granted --> Fetch
-     |                                                  |
-     |                                                  +--> Denied --> Show Error
-     |
-     +--> Denied --> Show "Enable in Settings" Message
+**Before:**
+```typescript
+external: ['@capacitor/camera', '@capacitor-community/contacts'],
 ```
 
-**New "Import All" button:**
-- Appears alongside "Select All" checkbox
-- One tap to import all non-duplicate contacts
-- Disabled if all contacts are duplicates
+**After:**
+```typescript
+external: ['@capacitor-community/contacts'],
+```
 
-### 3. Update `usePhoneContacts.ts`
+Also update the `manualChunks` skip list to only check for contacts.
 
-| Change | Description |
-|--------|-------------|
-| Return error from fetchContacts | Make the function return both contacts and error state |
+## Why This Works
+
+The `@capacitor/camera` package:
+- Has a web fallback (file input picker)
+- Can be safely bundled for both web and native
+- The native implementation automatically takes over on iOS/Android
+
+The `@capacitor-community/contacts` package:
+- Has NO web implementation
+- Must remain externalized to prevent build errors
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/contacts/ContactsPermissionDialog.tsx` | New file - permission request UI |
-| `src/components/contacts/PhoneContactsPicker.tsx` | Add permission flow + Import All button |
-| `src/hooks/usePhoneContacts.ts` | Improve error handling in fetchContacts |
+| `vite.config.ts` | Remove camera from external list, update manualChunks |
 
 ## Result
 
-1. When user taps the phone import button, they see a friendly permission request first
-2. Clear messaging if permission is denied (not just "0 found")
-3. "Import All" button for one-tap bulk import
-4. Better UX that explains why contacts access is needed
-
+- Camera will work on iOS native app (loaded from preview URL during dev)
+- Camera will work on web (using file picker fallback)
+- No more "does not resolve to a valid URL" error
