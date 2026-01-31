@@ -79,11 +79,11 @@ export default defineConfig(({ mode }) => ({
     minify: 'esbuild', // 3-5x faster than terser
     cssMinify: 'lightningcss',
     rollupOptions: {
-      external: ['@capacitor/camera', '@capacitor-community/contacts'],
+      external: ['@capacitor-community/contacts'],
       output: {
         manualChunks: (id) => {
-          // Skip externalized modules
-          if (id.includes('@capacitor/camera') || id.includes('@capacitor-community/contacts')) {
+          // Skip externalized modules (contacts has no web implementation)
+          if (id.includes('@capacitor-community/contacts')) {
             return undefined;
           }
           
