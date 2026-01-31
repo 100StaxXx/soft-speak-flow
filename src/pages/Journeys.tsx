@@ -243,6 +243,8 @@ const Journeys = () => {
       recurrenceDays: data.recurrenceDays,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      contactId: data.contactId,
+      autoLogInteraction: data.autoLogInteraction,
     });
     setShowAddSheet(false);
   }, [selectedDate, addTask]);
@@ -627,6 +629,8 @@ const Journeys = () => {
                 reminderMinutesBefore: parsed.reminderMinutesBefore,
                 notes: parsed.notes,
                 imageUrl: parsed.imageUrl,
+                contactId: parsed.contactId,
+                autoLogInteraction: parsed.autoLogInteraction ?? true,
               });
             }}
             onPlanMyDay={handlePlanMyDay}
