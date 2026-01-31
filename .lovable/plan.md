@@ -1,66 +1,64 @@
 
-# Remove Redundant Recurrence Option from Edit Ritual Sheet
+# Add Photo(s) to Edit Quest Details Menu
 
-## Problem
+## Overview
 
-The "Edit Ritual" sheet shows two scheduling controls:
-1. **Frequency Presets** (Daily, Weekdays, Weekly, Custom) - the main scheduling control
-2. **Recurrence** in Advanced Options (None, Daily, Weekly, Custom Days) - redundant for rituals
+Add the ability to attach photos to quests from the "Edit Quest Details" drawer (TaskAdvancedEditSheet). This will use the existing `QuestImagePicker` and `QuestImageThumbnail` components that are already implemented in the codebase.
 
-This creates confusion since rituals already have their schedule defined by frequency, which is campaign-level scheduling.
+## Current State
 
-## Solution
+The `EditQuestDialog` (the full quest editor sheet) already supports photos, but the simpler `TaskAdvancedEditSheet` (the quick edit drawer shown in your screenshot) does not have this feature yet.
 
-Hide the Recurrence section when `AdvancedQuestOptions` is used inside `EditRitualSheet`. The recurrence option is still useful for one-off quests, so we'll add a prop to conditionally hide it.
+The `ParsedTask` interface already has an `imageUrl` field, so we just need to add the UI controls.
 
 ## Changes
 
-### File: `src/components/AdvancedQuestOptions.tsx`
+### File: `src/features/tasks/components/TaskAdvancedEditSheet.tsx`
 
 | Change | Description |
 |--------|-------------|
-| Add `hideRecurrence` prop | Optional boolean to hide the recurrence section |
-| Conditionally render recurrence | Only show if `hideRecurrence` is false/undefined |
+| Import image components | Add `QuestImagePicker`, `QuestImageThumbnail`, `useQuestImagePicker` |
+| Add Camera icon | Import from lucide-react |
+| Add imageUrl state | Track the photo URL |
+| Add Photo section UI | Add section with picker and thumbnail display |
+| Update handleSave | Include imageUrl in saved data |
+| Handle image removal | Delete from storage when removed |
 
-```typescript
-interface AdvancedQuestOptionsProps {
-  // ... existing props
-  hideRecurrence?: boolean;  // NEW: hide for rituals
-}
+**New Photo Section (between Notes and Contact Link):**
+```
+┌───────────────────────────────────────┐
+│ 📷 Photo                              │
+│                                       │
+│ [Current Photo]  [+ Add Photo]        │
+│                                       │
+└───────────────────────────────────────┘
 ```
 
-```tsx
-{/* Recurrence Section - hide for rituals */}
-{!props.hideRecurrence && (
-  <div className="space-y-3">
-    {/* ... recurrence picker ... */}
-  </div>
-)}
-```
+## Implementation Details
 
-### File: `src/components/EditRitualSheet.tsx`
+1. **State Management**
+   - Add `imageUrl` state initialized from `parsed.imageUrl`
+   - Track image changes during editing
 
-| Change | Description |
-|--------|-------------|
-| Pass `hideRecurrence={true}` | Hide recurrence section in advanced options |
+2. **UI Components**
+   - Show current photo thumbnail if one exists (with remove option)
+   - Show "Add Photo" button to add/replace photo
+   - Use existing `QuestImagePicker` for native camera/gallery access
 
-```tsx
-<AdvancedQuestOptions
-  // ... existing props
-  hideRecurrence={true}  // Rituals use FrequencyPresets instead
-/>
-```
+3. **Save Flow**
+   - Include `imageUrl` in the updated `ParsedTask` when saving
+   - Handle image removal (delete from storage)
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/features/tasks/components/TaskAdvancedEditSheet.tsx` | Add photo upload/display section |
 
 ## Result
 
-- **Edit Ritual Sheet**: Shows only Scheduled Time, Duration, Reminder, Location, and More Information in advanced options
-- **Add Quest Sheet**: Still shows all options including Recurrence (for one-off quests)
-- Frequency Presets remain the single source of truth for ritual scheduling
-
-## Cleanup
-
-We can also remove the unused recurrence state variables from `EditRitualSheet` since they're no longer needed:
-- `recurrencePattern` state → remove
-- `onRecurrencePatternChange` prop → pass no-op or remove
-
-However, I'll keep the state for now since the task update logic still uses it for backwards compatibility with existing tasks.
+Users will be able to:
+- Add a photo to any quest from the quick edit drawer
+- View the current photo as a thumbnail
+- Remove the photo if needed
+- The photo will be saved with the quest and visible elsewhere in the app
