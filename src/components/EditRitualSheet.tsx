@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -26,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { NaturalLanguageEditor } from "@/features/quests/components/NaturalLanguageEditor";
+import { FrequencyPresets, getDefaultDaysForFrequency } from "@/components/Pathfinder/FrequencyPresets";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -327,21 +327,15 @@ export const EditRitualSheet = memo(function EditRitualSheet({
               </div>
             </div>
             
-            {/* Frequency */}
-            <div className="space-y-2">
-              <Label>Frequency</Label>
-              <Select value={frequency} onValueChange={setFrequency}>
-                <SelectTrigger>
-                  <SelectValue placeholder="How often?" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="5x_week">5x per week</SelectItem>
-                  <SelectItem value="3x_week">3x per week</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Frequency with day picker */}
+            <FrequencyPresets
+              frequency={frequency as 'daily' | '5x_week' | '3x_week' | 'weekly' | 'custom'}
+              customDays={recurrenceDays}
+              onFrequencyChange={(newFreq, newDays) => {
+                setFrequency(newFreq);
+                setRecurrenceDays(newDays);
+              }}
+            />
 
             {/* Category */}
             <div className="space-y-2">
