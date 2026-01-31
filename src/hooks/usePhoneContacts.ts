@@ -22,7 +22,7 @@ interface UsePhoneContactsReturn {
   isNative: boolean;
   checkPermission: () => Promise<ContactsPermissionStatus>;
   requestPermission: () => Promise<ContactsPermissionStatus>;
-  fetchContacts: () => Promise<PhoneContact[]>;
+  fetchContacts: () => Promise<{ contacts: PhoneContact[]; error: string | null }>;
   mapToAppContact: (contact: PhoneContact) => ContactInsert;
 }
 
@@ -72,10 +72,11 @@ export function usePhoneContacts(): UsePhoneContactsReturn {
     }
   }, [isNative]);
 
-  const fetchContacts = useCallback(async (): Promise<PhoneContact[]> => {
+  const fetchContacts = useCallback(async (): Promise<{ contacts: PhoneContact[]; error: string | null }> => {
     if (!isNative) {
-      setError('Contacts sync is only available in the native app');
-      return [];
+      const errorMsg = 'Contacts sync is only available in the native app';
+      setError(errorMsg);
+      return { contacts: [], error: errorMsg };
     }
 
     setIsLoading(true);
@@ -84,21 +85,8 @@ export function usePhoneContacts(): UsePhoneContactsReturn {
     try {
       // Dynamic import - only loads on native platforms
       const { Contacts } = await import('@capacitor-community/contacts');
-      
-      // Check permission first
-      let status = await checkPermission();
-      
-      if (status === 'prompt' || status === 'prompt-with-rationale') {
-        status = await requestPermission();
-      }
 
-      if (status !== 'granted') {
-        setError('Contacts permission denied. Please enable in Settings.');
-        setIsLoading(false);
-        return [];
-      }
-
-      // Fetch contacts using the community plugin
+      // Fetch contacts using the community plugin (permission should already be granted)
       const result = await Contacts.getContacts({
         projection: {
           name: true,
@@ -122,14 +110,15 @@ export function usePhoneContacts(): UsePhoneContactsReturn {
 
       setPhoneContacts(mappedContacts);
       setIsLoading(false);
-      return mappedContacts;
+      return { contacts: mappedContacts, error: null };
     } catch (err) {
       console.error('Error fetching contacts:', err);
-      setError('Failed to fetch contacts from device');
+      const errorMsg = 'Failed to fetch contacts from device';
+      setError(errorMsg);
       setIsLoading(false);
-      return [];
+      return { contacts: [], error: errorMsg };
     }
-  }, [isNative, checkPermission, requestPermission]);
+  }, [isNative]);
 
   const mapToAppContact = useCallback((contact: PhoneContact): ContactInsert => {
     return {
