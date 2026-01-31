@@ -24,14 +24,19 @@ interface Habit {
   category?: 'mind' | 'body' | 'soul' | null;
 }
 
-const formatFrequency = (freq: string): string => {
-  switch (freq) {
-    case 'daily': return 'Daily';
-    case '5x_week': return '5x per week';
-    case '3x_week': return '3x per week';
-    case 'custom': return 'Custom';
-    default: return freq;
+const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+
+// Format days for display - show day chips or readable text
+const formatDaysDisplay = (frequency: string | undefined, days: number[] | null | undefined): { type: 'text' | 'chips', value: string | number[] } => {
+  if (frequency === 'daily' || !days || days.length === 0 || days.length === 7) {
+    return { type: 'text', value: 'Daily' };
   }
+  // Check for weekdays
+  if (days.length === 5 && [0,1,2,3,4].every(d => days.includes(d))) {
+    return { type: 'text', value: 'Weekdays' };
+  }
+  // Show chips for custom days
+  return { type: 'chips', value: days };
 };
 
 // Check if a habit is scheduled for today based on frequency and custom_days
@@ -334,12 +339,34 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                           </p>
                         )}
                         <div className="flex flex-wrap items-center gap-3 pt-2">
-                          {habit.frequency && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Calendar className="w-3.5 h-3.5 text-celestial-blue" />
-                              <span>{formatFrequency(habit.frequency)}</span>
-                            </div>
-                          )}
+                          {/* Day schedule display */}
+                          {(() => {
+                            const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days);
+                            return (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Calendar className="w-3.5 h-3.5 text-celestial-blue" />
+                                {daysDisplay.type === 'text' ? (
+                                  <span>{daysDisplay.value}</span>
+                                ) : (
+                                  <div className="flex gap-0.5">
+                                    {DAYS.map((day, dayIndex) => (
+                                      <span
+                                        key={dayIndex}
+                                        className={cn(
+                                          "w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center",
+                                          (daysDisplay.value as number[]).includes(dayIndex)
+                                            ? "bg-celestial-blue/80 text-white"
+                                            : "bg-muted/30 text-muted-foreground/40"
+                                        )}
+                                      >
+                                        {day}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {habit.estimated_minutes && (
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                               <Clock className="w-3.5 h-3.5 text-celestial-blue" />
@@ -485,12 +512,34 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                   </p>
                                 )}
                                 <div className="flex flex-wrap items-center gap-3 pt-2">
-                                  {habit.frequency && (
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                      <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                                      <span>{formatFrequency(habit.frequency)}</span>
-                                    </div>
-                                  )}
+                                  {/* Day schedule display for upcoming */}
+                                  {(() => {
+                                    const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days);
+                                    return (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                                        {daysDisplay.type === 'text' ? (
+                                          <span>{daysDisplay.value}</span>
+                                        ) : (
+                                          <div className="flex gap-0.5">
+                                            {DAYS.map((day, dayIndex) => (
+                                              <span
+                                                key={dayIndex}
+                                                className={cn(
+                                                  "w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center",
+                                                  (daysDisplay.value as number[]).includes(dayIndex)
+                                                    ? "bg-amber-500/80 text-white"
+                                                    : "bg-muted/30 text-muted-foreground/40"
+                                                )}
+                                              >
+                                                {day}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   {habit.estimated_minutes && (
                                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                       <Clock className="w-3.5 h-3.5 text-amber-500" />
