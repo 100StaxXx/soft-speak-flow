@@ -1,60 +1,85 @@
 
-
-# Fix Build Error: Externalize Capacitor Contacts Plugin
+# Fix Contacts Runtime Error in Native iOS App
 
 ## Problem
 
-The build fails because Rollup cannot resolve the `@capacitor-community/contacts` import:
-
+The app crashes on TestFlight with:
 ```
-Rollup failed to resolve import "@capacitor-community/contacts" from 
-"/Users/user287824/soft-speak-flow/soft-speak-flow/src/hooks/usePhoneContacts.ts"
+TypeError: Module name, '@capacitor-co...
 ```
 
-This happens because native Capacitor plugins are designed to run on mobile devices, not in web builds. The plugin doesn't have a web implementation that Rollup can bundle.
-
-## Current Configuration
-
-In `vite.config.ts`, line 72:
+This happens because `usePhoneContacts.ts` has a **top-level import** of `@capacitor-community/contacts`:
 
 ```typescript
-rollupOptions: {
-  external: ['@capacitor/camera'],  // Only camera is externalized
-  // ...
-}
+import { Contacts, PermissionStatus } from '@capacitor-community/contacts';
 ```
+
+When Vite loads this file, it tries to resolve the module immediately - but since we externalized it for web builds, it can't be found at runtime in the native WebView.
+
+## Root Cause
+
+| Step | What Happens |
+|------|--------------|
+| 1 | User navigates to Contacts page |
+| 2 | `Contacts.tsx` imports `PhoneContactsPicker` |
+| 3 | `PhoneContactsPicker` imports `usePhoneContacts` |
+| 4 | `usePhoneContacts` tries to import `@capacitor-community/contacts` at top level |
+| 5 | Module resolution fails → App crashes before any code runs |
+
+The platform check (`Capacitor.isNativePlatform()`) happens **too late** - the import already failed.
 
 ## Solution
 
-Add `@capacitor-community/contacts` to the external array so Rollup skips bundling it:
+Use **dynamic imports** to load the Contacts plugin only when actually needed on native platforms.
+
+### Changes to `src/hooks/usePhoneContacts.ts`
+
+1. Remove the top-level import of `@capacitor-community/contacts`
+2. Define a local type for permission status (since we can't import it)
+3. Dynamically import the plugin inside each function that uses it
+4. Only load the module when `isNative` is true
 
 ```typescript
-rollupOptions: {
-  external: ['@capacitor/camera', '@capacitor-community/contacts'],
+// BEFORE (crashes immediately)
+import { Contacts, PermissionStatus } from '@capacitor-community/contacts';
+
+// AFTER (loads only when needed)
+type ContactsPermissionStatus = 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale';
+
+const checkPermission = useCallback(async () => {
+  if (!isNative) return 'denied';
+  
+  // Dynamic import - only runs on native
+  const { Contacts } = await import('@capacitor-community/contacts');
+  const status = await Contacts.checkPermissions();
   // ...
-}
+}, [isNative]);
 ```
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/hooks/usePhoneContacts.ts` | Remove top-level import, use dynamic imports in callbacks |
 
 ## Why This Works
 
-- Native Capacitor plugins are injected at runtime on mobile devices
-- In web builds, the `usePhoneContacts` hook already handles this gracefully by checking `Capacitor.isNativePlatform()` and returning early if not on native
-- Externalizing tells Rollup "don't try to bundle this - it will be provided at runtime"
+- On **web**: `isNative` is false, functions return early, dynamic import never runs
+- On **native iOS**: When contacts are actually accessed, the plugin is loaded dynamically
+- The **build** still externalizes the module (via `vite.config.ts`)
+- The **runtime** only loads it when actually needed
 
-## File to Modify
+## Technical Implementation
 
-| File | Change |
-|------|--------|
-| `vite.config.ts` | Add `@capacitor-community/contacts` to `build.rollupOptions.external` array |
+```text
+Before:
+  Module Load → Import fails → App crashes
 
-## Technical Note
-
-The `usePhoneContacts.ts` hook already has proper platform detection:
-
-```typescript
-const isNative = Capacitor.isNativePlatform();
-// Returns 'denied' early if not on native platform
+After:
+  Module Load → No import → App starts
+       ↓
+  User opens Contacts → Checks isNative
+       ↓
+  Native? → Dynamic import → Plugin loads → Works
+  Web? → Return early → No import needed
 ```
-
-So the externalization is purely a build-time fix - the runtime behavior is already correct.
-
