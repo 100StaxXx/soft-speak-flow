@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Contacts, PermissionStatus } from '@capacitor-community/contacts';
 import { ContactInsert } from './useContacts';
+
+// Local type definitions to avoid importing from the native plugin
+type ContactsPermissionStatus = 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale';
 
 export interface PhoneContact {
   id: string;
@@ -16,10 +18,10 @@ interface UsePhoneContactsReturn {
   phoneContacts: PhoneContact[];
   isLoading: boolean;
   error: string | null;
-  permissionStatus: PermissionStatus['contacts'] | null;
+  permissionStatus: ContactsPermissionStatus | null;
   isNative: boolean;
-  checkPermission: () => Promise<PermissionStatus['contacts']>;
-  requestPermission: () => Promise<PermissionStatus['contacts']>;
+  checkPermission: () => Promise<ContactsPermissionStatus>;
+  requestPermission: () => Promise<ContactsPermissionStatus>;
   fetchContacts: () => Promise<PhoneContact[]>;
   mapToAppContact: (contact: PhoneContact) => ContactInsert;
 }
@@ -28,39 +30,45 @@ export function usePhoneContacts(): UsePhoneContactsReturn {
   const [phoneContacts, setPhoneContacts] = useState<PhoneContact[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus['contacts'] | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<ContactsPermissionStatus | null>(null);
 
   const isNative = Capacitor.isNativePlatform();
 
-  const checkPermission = useCallback(async () => {
+  const checkPermission = useCallback(async (): Promise<ContactsPermissionStatus> => {
     if (!isNative) {
-      return 'denied' as const;
+      return 'denied';
     }
     
     try {
+      // Dynamic import - only loads on native platforms
+      const { Contacts } = await import('@capacitor-community/contacts');
       const status = await Contacts.checkPermissions();
-      setPermissionStatus(status.contacts);
-      return status.contacts;
+      const permStatus = status.contacts as ContactsPermissionStatus;
+      setPermissionStatus(permStatus);
+      return permStatus;
     } catch (err) {
       console.error('Error checking contacts permission:', err);
       setError('Failed to check contacts permission');
-      return 'denied' as const;
+      return 'denied';
     }
   }, [isNative]);
 
-  const requestPermission = useCallback(async () => {
+  const requestPermission = useCallback(async (): Promise<ContactsPermissionStatus> => {
     if (!isNative) {
-      return 'denied' as const;
+      return 'denied';
     }
 
     try {
+      // Dynamic import - only loads on native platforms
+      const { Contacts } = await import('@capacitor-community/contacts');
       const status = await Contacts.requestPermissions();
-      setPermissionStatus(status.contacts);
-      return status.contacts;
+      const permStatus = status.contacts as ContactsPermissionStatus;
+      setPermissionStatus(permStatus);
+      return permStatus;
     } catch (err) {
       console.error('Error requesting contacts permission:', err);
       setError('Failed to request contacts permission');
-      return 'denied' as const;
+      return 'denied';
     }
   }, [isNative]);
 
@@ -74,6 +82,9 @@ export function usePhoneContacts(): UsePhoneContactsReturn {
     setError(null);
 
     try {
+      // Dynamic import - only loads on native platforms
+      const { Contacts } = await import('@capacitor-community/contacts');
+      
       // Check permission first
       let status = await checkPermission();
       
