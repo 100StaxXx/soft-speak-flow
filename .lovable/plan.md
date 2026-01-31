@@ -1,65 +1,66 @@
 
-# Remove "3x/wk" Frequency Option
+# Remove Redundant Recurrence Option from Edit Ritual Sheet
 
-## Overview
+## Problem
 
-Remove the "3x/wk" preset from the frequency picker in the Edit Ritual sheet and related components.
+The "Edit Ritual" sheet shows two scheduling controls:
+1. **Frequency Presets** (Daily, Weekdays, Weekly, Custom) - the main scheduling control
+2. **Recurrence** in Advanced Options (None, Daily, Weekly, Custom Days) - redundant for rituals
 
-## Changes Required
+This creates confusion since rituals already have their schedule defined by frequency, which is campaign-level scheduling.
 
-### File: `src/components/Pathfinder/FrequencyPresets.tsx`
+## Solution
 
-| Line | Change |
-|------|--------|
-| 6 | Update `FrequencyType` to remove `'3x_week'` from the union type |
-| 17 | Remove the preset entry `{ value: '3x_week', label: '3x/wk', days: [0, 2, 4] }` |
-| 90 | Remove the `case '3x_week'` from `getDefaultDaysForFrequency()` helper |
+Hide the Recurrence section when `AdvancedQuestOptions` is used inside `EditRitualSheet`. The recurrence option is still useful for one-off quests, so we'll add a prop to conditionally hide it.
 
-**Before:**
+## Changes
+
+### File: `src/components/AdvancedQuestOptions.tsx`
+
+| Change | Description |
+|--------|-------------|
+| Add `hideRecurrence` prop | Optional boolean to hide the recurrence section |
+| Conditionally render recurrence | Only show if `hideRecurrence` is false/undefined |
+
 ```typescript
-type FrequencyType = 'daily' | '5x_week' | '3x_week' | 'weekly' | 'custom';
-
-const presets = [
-  { value: 'daily', label: 'Daily', days: [0, 1, 2, 3, 4, 5, 6] },
-  { value: '5x_week', label: 'Weekdays', days: [0, 1, 2, 3, 4] },
-  { value: '3x_week', label: '3x/wk', days: [0, 2, 4] },  // REMOVE
-  { value: 'weekly', label: 'Weekly', days: [0] },
-  { value: 'custom', label: 'Custom', days: [] },
-];
+interface AdvancedQuestOptionsProps {
+  // ... existing props
+  hideRecurrence?: boolean;  // NEW: hide for rituals
+}
 ```
 
-**After:**
-```typescript
-type FrequencyType = 'daily' | '5x_week' | 'weekly' | 'custom';
+```tsx
+{/* Recurrence Section - hide for rituals */}
+{!props.hideRecurrence && (
+  <div className="space-y-3">
+    {/* ... recurrence picker ... */}
+  </div>
+)}
+```
 
-const presets = [
-  { value: 'daily', label: 'Daily', days: [0, 1, 2, 3, 4, 5, 6] },
-  { value: '5x_week', label: 'Weekdays', days: [0, 1, 2, 3, 4] },
-  { value: 'weekly', label: 'Weekly', days: [0] },
-  { value: 'custom', label: 'Custom', days: [] },
-];
+### File: `src/components/EditRitualSheet.tsx`
+
+| Change | Description |
+|--------|-------------|
+| Pass `hideRecurrence={true}` | Hide recurrence section in advanced options |
+
+```tsx
+<AdvancedQuestOptions
+  // ... existing props
+  hideRecurrence={true}  // Rituals use FrequencyPresets instead
+/>
 ```
 
 ## Result
 
-The frequency picker will show only: **Daily**, **Weekdays**, **Weekly**, **Custom**
+- **Edit Ritual Sheet**: Shows only Scheduled Time, Duration, Reminder, Location, and More Information in advanced options
+- **Add Quest Sheet**: Still shows all options including Recurrence (for one-off quests)
+- Frequency Presets remain the single source of truth for ritual scheduling
 
-Users who want a 3x/week schedule can still achieve this using the "Custom" option and selecting Mon/Wed/Fri manually.
+## Cleanup
 
----
+We can also remove the unused recurrence state variables from `EditRitualSheet` since they're no longer needed:
+- `recurrencePattern` state → remove
+- `onRecurrencePatternChange` prop → pass no-op or remove
 
-## Technical Details
-
-### Files Modified
-
-| File | Change |
-|------|--------|
-| `src/components/Pathfinder/FrequencyPresets.tsx` | Remove `3x_week` from type, presets array, and helper function |
-
-### Database Compatibility
-
-The database schema still supports `3x_week` as a valid enum value. Existing rituals with `3x_week` frequency will continue to work - they'll just show the Custom preset selected when edited. No database migration is needed.
-
-### Type Cast Update
-
-The type cast in `EditRitualSheet.tsx` (line 332) will automatically exclude `3x_week` since the type is inferred from the prop, but no change is needed there since the frequency value from existing data will still be accepted.
+However, I'll keep the state for now since the task update logic still uses it for backwards compatibility with existing tasks.
