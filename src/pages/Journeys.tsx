@@ -49,6 +49,9 @@ import { Wand2 } from "lucide-react";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
+import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
+import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
+
 const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
@@ -96,6 +99,16 @@ const Journeys = () => {
   );
   
   const { currentStreak } = useStreakMultiplier();
+  
+  // Contact interaction logging
+  const {
+    pendingInteraction,
+    isModalOpen: isInteractionModalOpen,
+    handleTaskCompleted,
+    logInteraction,
+    skipInteraction,
+    closeModal: closeInteractionModal,
+  } = useTaskCompletionWithInteraction();
 
   const { 
     tasks: dailyTasks,
@@ -234,7 +247,7 @@ const Journeys = () => {
     setShowAddSheet(false);
   }, [selectedDate, addTask]);
 
-  const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null }) => {
+  const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null; task_text?: string | null }) => {
     if (completed) {
       // Track for AI learning (only for AI-generated tasks)
       if (taskData?.ai_generated) {
@@ -246,8 +259,20 @@ const Journeys = () => {
         });
       }
     }
-    toggleTask({ taskId, completed, xpReward });
-  }, [toggleTask, trackDailyPlanOutcome]);
+    toggleTask({ taskId, completed, xpReward }, {
+      onSuccess: (result) => {
+        // If completed and has a contact with auto-log enabled, trigger interaction modal
+        if (result.completed && result.contact && result.autoLogInteraction) {
+          handleTaskCompleted(
+            result.taskId,
+            result.taskText,
+            result.contact,
+            result.autoLogInteraction
+          );
+        }
+      },
+    });
+  }, [toggleTask, trackDailyPlanOutcome, handleTaskCompleted]);
   
   const handleUndoToggle = useCallback((taskId: string, xpReward: number) => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
@@ -669,6 +694,19 @@ const Journeys = () => {
           onUseFreeze={useFreeze}
           onResetStreak={resetStreak}
           isResolving={isResolving}
+        />
+        
+        {/* Contact Interaction Log Modal */}
+        <InteractionLogModal
+          open={isInteractionModalOpen}
+          onOpenChange={closeInteractionModal}
+          contactName={pendingInteraction?.contact?.name ?? ''}
+          contactAvatarUrl={pendingInteraction?.contact?.avatar_url}
+          taskTitle={pendingInteraction?.taskText ?? ''}
+          onLog={async (type, summary) => {
+            await logInteraction(type as InteractionType, summary);
+          }}
+          onSkip={skipInteraction}
         />
         
         
