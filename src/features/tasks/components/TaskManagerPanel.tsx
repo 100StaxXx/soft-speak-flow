@@ -43,6 +43,8 @@ export function TaskManagerPanel({
       energyLevel: parsed.energyLevel,
       recurrencePattern: parsed.recurrencePattern,
       isTopThree: parsed.isTopThree,
+      contactId: parsed.contactId,
+      autoLogInteraction: parsed.autoLogInteraction ?? true,
     });
   };
 

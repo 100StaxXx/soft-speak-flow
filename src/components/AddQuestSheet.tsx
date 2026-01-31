@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, memo } from "react";
-import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send } from "lucide-react";
+import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { QUEST_XP_REWARDS } from "@/config/xpRewards";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { SuggestedTimeSlots } from "@/components/SuggestedTimeSlots";
+import { ContactPicker } from "@/components/tasks/ContactPicker";
 import { useIOSKeyboardAvoidance } from "@/hooks/useIOSKeyboardAvoidance";
 import {
   Drawer,
@@ -27,6 +30,8 @@ export interface AddQuestData {
   reminderMinutesBefore: number;
   moreInformation: string | null;
   location: string | null;
+  contactId: string | null;
+  autoLogInteraction: boolean;
 }
 
 interface AddQuestSheetProps {
@@ -57,6 +62,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [autoLogInteraction, setAutoLogInteraction] = useState(true);
   
   // Expanded mode - starts minimal, expands when user wants more options
   const [isExpanded, setIsExpanded] = useState(false);
@@ -110,6 +117,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setReminderMinutesBefore(15);
     setMoreInformation(null);
     setLocation(null);
+    setContactId(null);
+    setAutoLogInteraction(true);
     setIsExpanded(false);
   };
 
@@ -127,6 +136,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       reminderMinutesBefore,
       moreInformation,
       location,
+      contactId,
+      autoLogInteraction,
     });
     
     resetForm();
@@ -276,7 +287,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           </button>
 
           {showAdvanced && (
-            <div data-vaul-no-drag>
+            <div data-vaul-no-drag className="space-y-4">
               <AdvancedQuestOptions
                 scheduledTime={scheduledTime}
                 estimatedDuration={estimatedDuration}
@@ -297,6 +308,31 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 selectedDate={selectedDate}
                 taskDifficulty={difficulty}
               />
+              
+              {/* Contact Linking Section */}
+              <div className="space-y-3 pt-2 border-t border-border/50">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Users className="w-4 h-4" />
+                  <span>Link to Contact</span>
+                </div>
+                <ContactPicker
+                  value={contactId}
+                  onChange={setContactId}
+                  placeholder="Select a contact..."
+                />
+                {contactId && (
+                  <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
+                    <Label htmlFor="auto-log" className="text-sm cursor-pointer">
+                      Log as interaction when completed
+                    </Label>
+                    <Switch
+                      id="auto-log"
+                      checked={autoLogInteraction}
+                      onCheckedChange={setAutoLogInteraction}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
