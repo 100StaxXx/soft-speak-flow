@@ -1,137 +1,147 @@
 
-# Fix: Next Chapter Awaits Not Showing on Older Campaigns
 
-## Root Cause
+# Fix MarqueeText: Add Initial Pause Before Scrolling
 
-The "Next Chapter Awaits" section only displays when there are **postcard milestones** in the `epic_milestones` table. 
+## Problem
 
-**Database findings:**
-| Campaign | Created | Milestones |
-|----------|---------|------------|
-| Money in the Bank | Feb 2, 2026 | 7 ✅ |
-| Bulk up a Captain America | Jan 31, 2026 | 0 ❌ |
-
-The "Bulk up" campaign was created **before** the milestone generation logic was added. Newer campaigns get milestones automatically; older ones were never backfilled.
-
----
+The ritual titles start scrolling immediately when they appear. Users need a moment to read the beginning of the title before it starts moving.
 
 ## Solution
 
-Add logic to **retroactively generate milestones** for legacy campaigns that have a `story_type_slug` but zero milestones.
+Add a 3-second initial pause before the scroll animation begins, while also fixing the overall animation timing.
 
-### Approach: On-Demand Backfill in `useMilestones` Hook
+## Changes to `src/components/ui/marquee-text.tsx`
 
-When fetching milestones, if:
-1. Epic has a `story_type_slug` 
-2. No milestones exist
-3. Epic is still active
-
-Then auto-generate and insert default milestones.
-
----
-
-## File Changes
-
-### `src/hooks/useMilestones.ts`
-
-Add a **backfill mutation** that generates milestones for legacy epics:
-
-```typescript
-// After fetching milestones, check if backfill needed
-const backfillLegacyMilestones = useMutation({
-  mutationFn: async (epicData: { 
-    epicId: string; 
-    targetDays: number; 
-    storyTypeSlug: string 
-  }) => {
-    // Calculate chapter count based on duration
-    let chapterCount = 5;
-    if (epicData.targetDays <= 14) chapterCount = 3;
-    else if (epicData.targetDays <= 30) chapterCount = 4;
-    else if (epicData.targetDays <= 60) chapterCount = 5;
-    else chapterCount = 6;
-    
-    const now = new Date();
-    const milestonesToInsert = Array.from({ length: chapterCount }, (_, i) => {
-      const percent = Math.round(((i + 1) / chapterCount) * 100);
-      const daysOffset = Math.floor((epicData.targetDays * percent) / 100);
-      const targetDate = new Date(now);
-      targetDate.setDate(targetDate.getDate() + daysOffset);
-      
-      return {
-        epic_id: epicData.epicId,
-        user_id: user.id,
-        title: i === chapterCount - 1 ? 'The Finale' : `Chapter ${i + 1}`,
-        description: i === chapterCount - 1 ? 'Complete your epic journey!' : `Reach ${percent}% of your goal`,
-        target_date: targetDate.toISOString().split('T')[0],
-        milestone_percent: percent,
-        is_postcard_milestone: true,
-        phase_order: i + 1,
-      };
-    });
-
-    const { error } = await supabase
-      .from('epic_milestones')
-      .insert(milestonesToInsert);
-
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['milestones', epicId] });
-  },
-});
+### Current Animation Flow:
+```
+0% → 40%: Scroll left (no initial pause!)
+40% → 50%: Pause at end
+50% → 90%: Scroll back
+90% → 100%: Pause at start
 ```
 
-### `src/components/JourneyCard.tsx`
+### New Animation Flow:
+```
+0% → 20%: INITIAL PAUSE (new!)
+20% → 50%: Scroll left  
+50% → 60%: Pause at end
+60% → 90%: Scroll back
+90% → 100%: Pause at start (before next loop)
+```
 
-Trigger backfill when card mounts if conditions met:
+### Updated Code:
+
+```typescript
+export function MarqueeText({ 
+  text, 
+  className,
+  speed = 30,
+  pauseDuration = 2000,
+  initialDelay = 3000  // NEW: 3 second initial pause
+}: MarqueeTextProps) {
+  // ... existing refs and state ...
+
+  // Calculate total duration including initial delay
+  const scrollDuration = scrollDistance / speed;
+  const totalDuration = initialDelay / 1000 + scrollDuration + (pauseDuration * 2 / 1000);
+  
+  // Calculate time proportions
+  const initialPauseProportion = (initialDelay / 1000) / totalDuration;
+  const scrollProportion = (scrollDuration / 2) / totalDuration;
+  const endPauseProportion = (pauseDuration / 1000) / totalDuration;
+
+  return (
+    <div ref={containerRef} className={cn("overflow-hidden", className)}>
+      <motion.span
+        ref={textRef}
+        className="whitespace-nowrap inline-block"
+        animate={{
+          x: [0, 0, -scrollDistance, -scrollDistance, 0, 0],
+        }}
+        transition={{
+          duration: totalDuration,
+          times: [
+            0,                                           // Start at 0
+            initialPauseProportion,                      // End initial pause
+            initialPauseProportion + scrollProportion,   // End scroll left
+            initialPauseProportion + scrollProportion + endPauseProportion, // End pause at left
+            initialPauseProportion + scrollProportion * 2 + endPauseProportion, // End scroll back
+            1                                            // End pause at right
+          ],
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      >
+        {text}
+      </motion.span>
+    </div>
+  );
+}
+```
+
+### Also Fix: Overflow Detection Timing
+
+Add ResizeObserver and initial delay to reliably detect overflow:
 
 ```typescript
 useEffect(() => {
-  if (
-    isActive && 
-    journey.story_type_slug && 
-    milestones?.length === 0 && 
-    !isLoading
-  ) {
-    backfillLegacyMilestones({
-      epicId: journey.id,
-      targetDays: journey.target_days,
-      storyTypeSlug: journey.story_type_slug,
-    });
+  const checkOverflow = () => {
+    if (containerRef.current && textRef.current) {
+      const containerWidth = containerRef.current.offsetWidth;
+      const textWidth = textRef.current.scrollWidth;
+      const overflow = textWidth > containerWidth;
+      setIsOverflowing(overflow);
+      if (overflow) {
+        setScrollDistance(textWidth - containerWidth + 20);
+      }
+    }
+  };
+  
+  // Delay initial check to allow layout to settle
+  const timeoutId = setTimeout(checkOverflow, 100);
+  
+  // Use ResizeObserver for container size changes
+  const resizeObserver = new ResizeObserver(checkOverflow);
+  if (containerRef.current) {
+    resizeObserver.observe(containerRef.current);
   }
-}, [journey.id, journey.story_type_slug, milestones?.length, isActive, isLoading]);
+  
+  return () => {
+    clearTimeout(timeoutId);
+    resizeObserver.disconnect();
+  };
+}, [text]);
 ```
 
----
+### Unify JSX Structure
 
-## Alternative: One-Time Database Migration
+Keep refs consistent by always rendering same structure:
 
-If preferred, we could run a SQL migration to backfill all existing epics at once:
-
-```sql
--- This would be a one-time script run manually
-INSERT INTO epic_milestones (epic_id, user_id, title, description, ...)
-SELECT ...
-FROM epics 
-WHERE story_type_slug IS NOT NULL
-AND NOT EXISTS (SELECT 1 FROM epic_milestones WHERE epic_id = epics.id);
+```typescript
+return (
+  <div ref={containerRef} className={cn("overflow-hidden", className)}>
+    <motion.span
+      ref={textRef}
+      className="whitespace-nowrap inline-block"
+      animate={isOverflowing ? { x: [...] } : { x: 0 }}
+      transition={isOverflowing ? { ... } : { duration: 0 }}
+    >
+      {text}
+    </motion.span>
+  </div>
+);
 ```
 
-However, the on-demand approach in the hook is safer and handles edge cases better.
+## File Changes
 
----
-
-## Technical Summary
-
-| Component | Change |
-|-----------|--------|
-| `useMilestones.ts` | Add `backfillLegacyMilestones` mutation |
-| `JourneyCard.tsx` | Trigger backfill on mount for legacy epics |
+| File | Change |
+|------|--------|
+| `src/components/ui/marquee-text.tsx` | Add `initialDelay` prop (default 3s), fix timing, improve overflow detection |
 
 ## Result
 
-After this fix:
-- All campaigns (old and new) will have milestones
-- "Next Chapter Awaits" will appear on all active campaigns with a story type
-- The backfill happens automatically the first time the campaign card loads
+- Text stays still for 3 seconds so users can read the beginning
+- Then smoothly scrolls to reveal the rest
+- Pauses at the end before scrolling back
+- Reliably detects overflow even with delayed layouts
+
