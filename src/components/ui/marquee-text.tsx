@@ -7,13 +7,15 @@ interface MarqueeTextProps {
   className?: string;
   speed?: number; // pixels per second
   pauseDuration?: number; // ms to pause at start/end
+  initialDelay?: number; // ms to pause before first scroll
 }
 
 export function MarqueeText({ 
   text, 
   className,
   speed = 30,
-  pauseDuration = 2000 
+  pauseDuration = 2000,
+  initialDelay = 3000
 }: MarqueeTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
@@ -28,40 +30,56 @@ export function MarqueeText({
         const overflow = textWidth > containerWidth;
         setIsOverflowing(overflow);
         if (overflow) {
-          setScrollDistance(textWidth - containerWidth + 20); // +20 for padding
+          setScrollDistance(textWidth - containerWidth + 20);
         }
       }
     };
     
-    checkOverflow();
-    window.addEventListener('resize', checkOverflow);
-    return () => window.removeEventListener('resize', checkOverflow);
+    // Delay initial check to allow layout to settle
+    const timeoutId = setTimeout(checkOverflow, 100);
+    
+    // Use ResizeObserver for container size changes
+    const resizeObserver = new ResizeObserver(checkOverflow);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    return () => {
+      clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+    };
   }, [text]);
 
-  const duration = scrollDistance / speed;
-
-  if (!isOverflowing) {
-    return (
-      <div ref={containerRef} className={cn("overflow-hidden", className)}>
-        <span ref={textRef} className="whitespace-nowrap">{text}</span>
-      </div>
-    );
-  }
+  // Calculate durations
+  const scrollDuration = scrollDistance / speed;
+  const totalDuration = (initialDelay / 1000) + scrollDuration + (pauseDuration * 2 / 1000);
+  
+  // Calculate time proportions for the animation keyframes
+  const initialPauseProportion = (initialDelay / 1000) / totalDuration;
+  const scrollProportion = (scrollDuration / 2) / totalDuration;
+  const endPauseProportion = (pauseDuration / 1000) / totalDuration;
 
   return (
     <div ref={containerRef} className={cn("overflow-hidden", className)}>
       <motion.span
         ref={textRef}
         className="whitespace-nowrap inline-block"
-        animate={{
-          x: [0, -scrollDistance, -scrollDistance, 0, 0],
-        }}
-        transition={{
-          duration: duration + (pauseDuration * 2 / 1000),
-          times: [0, 0.4, 0.5, 0.9, 1], // pause at ends
+        animate={isOverflowing ? {
+          x: [0, 0, -scrollDistance, -scrollDistance, 0, 0],
+        } : { x: 0 }}
+        transition={isOverflowing ? {
+          duration: totalDuration,
+          times: [
+            0,
+            initialPauseProportion,
+            initialPauseProportion + scrollProportion,
+            initialPauseProportion + scrollProportion + endPauseProportion,
+            initialPauseProportion + scrollProportion * 2 + endPauseProportion,
+            1
+          ],
           repeat: Infinity,
           ease: "linear",
-        }}
+        } : { duration: 0 }}
       >
         {text}
       </motion.span>
