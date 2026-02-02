@@ -1,150 +1,63 @@
 
-# Fix Mentor Disconnection on iOS App Resume
+# Fix Build Error: @capacitor/camera Version Mismatch
 
-## Problem Summary
+## Problem
 
-The mentor section appears empty when the iOS app returns from background. This happens because:
+The build fails with:
+```
+Rollup failed to resolve import "@capacitor/camera" from "src/hooks/useQuestImagePicker.ts"
+```
 
-1. Profile data becomes stale while app is in background
-2. No explicit refresh is triggered when app resumes
-3. `resolvedMentorId` returns `null` from stale profile data
-4. Mentor image and content don't render
+This is caused by a **version mismatch** between Capacitor packages:
+- `@capacitor/camera@8.0.0` requires Capacitor 8.x core
+- `@capacitor/core@7.4.4` is Capacitor 7.x
+
+The camera plugin isn't compatible with the installed core version, causing Rollup to fail when trying to resolve the dynamic import.
 
 ## Solution
 
-Add an app state change listener that refreshes critical data when the app resumes from background on iOS/Android.
+Downgrade `@capacitor/camera` to a version compatible with Capacitor 7.x.
 
-## Implementation
+## Changes Required
 
-### 1. Create App Resume Hook
+### 1. Update package.json
 
-Create a new hook that listens for Capacitor app state changes and refreshes critical queries:
+Change the camera version from `^8.0.0` to `^7.0.0`:
 
-**File: `src/hooks/useAppResumeRefresh.ts`**
-
-```typescript
-import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
-import { logger } from '@/utils/logger';
-
-const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
-
-export const useAppResumeRefresh = () => {
-  const queryClient = useQueryClient();
-  const lastResumeRef = useRef<number>(0);
-
-  useEffect(() => {
-    // Only run on native platforms
-    if (!Capacitor.isNativePlatform()) return;
-
-    const handleAppStateChange = async ({ isActive }: { isActive: boolean }) => {
-      if (!isActive) return; // Only care about resume
-
-      const now = Date.now();
-      const elapsed = now - lastResumeRef.current;
-
-      // Apply cooldown to prevent refresh spam
-      if (elapsed < RESUME_COOLDOWN_MS) {
-        logger.debug('App resume refresh skipped (cooldown)');
-        return;
-      }
-
-      lastResumeRef.current = now;
-      logger.debug('App resumed - refreshing critical data');
-
-      // Refetch profile first (mentor ID depends on it)
-      await queryClient.refetchQueries({ queryKey: ['profile'] });
-      
-      // Then invalidate mentor-related queries
-      queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
-      queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
-    };
-
-    App.addListener('appStateChange', handleAppStateChange);
-
-    return () => {
-      App.removeAllListeners();
-    };
-  }, [queryClient]);
-};
+```json
+"@capacitor/camera": "^7.0.0",
 ```
 
-### 2. Add Hook to App.tsx
+### 2. After Syncing Changes
 
-**File: `src/App.tsx`**
+On your local machine, run these commands:
 
-Import and use the new hook in `AppContent`:
+```bash
+# Remove node_modules and reinstall to get correct versions
+rm -rf node_modules package-lock.json
+npm install
 
-```typescript
-import { useAppResumeRefresh } from '@/hooks/useAppResumeRefresh';
+# Rebuild the project
+npm run build
 
-// Inside AppContent component:
-const AppContent = memo(() => {
-  // ... existing code ...
-  
-  // Refresh critical data on app resume (iOS/Android)
-  useAppResumeRefresh();
-  
-  // ... rest of component ...
-});
+# Sync to iOS
+npx cap sync ios
 ```
 
-### 3. Also Add Web Visibility Change Handler
+## Technical Details
 
-For web/PWA, add visibility change handling to ensure data is fresh when tab becomes visible:
+| Package | Current | Fix |
+|---------|---------|-----|
+| `@capacitor/camera` | 8.0.0 | 7.0.0 |
+| `@capacitor/core` | 7.4.4 | No change |
+| `@capacitor/cli` | 8.0.2 | Should also be 7.x for consistency |
 
-**File: `src/hooks/useAppResumeRefresh.ts`** (extended)
+The CLI version (8.0.2) should also ideally match the core version, but this is less critical for the immediate build fix.
 
-```typescript
-// Also handle web visibility changes
-useEffect(() => {
-  if (Capacitor.isNativePlatform()) return; // Skip on native
+## Alternative Approach (If Upgrade Preferred)
 
-  const handleVisibilityChange = () => {
-    if (document.visibilityState !== 'visible') return;
-
-    const now = Date.now();
-    const elapsed = now - lastResumeRef.current;
-
-    if (elapsed < RESUME_COOLDOWN_MS) return;
-
-    lastResumeRef.current = now;
-    logger.debug('Tab became visible - refreshing critical data');
-
-    queryClient.refetchQueries({ queryKey: ['profile'] });
-    queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
-    queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
-  };
-
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-}, [queryClient]);
-```
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/hooks/useAppResumeRefresh.ts` | Create new hook with app state + visibility handling |
-| `src/App.tsx` | Import and use the new hook in AppContent |
-
-## Why This Fixes It
-
-| Issue | How It's Fixed |
-|-------|----------------|
-| Stale profile data | Forced refetch on resume |
-| Null mentor ID | Fresh profile ensures `resolvedMentorId` is resolved |
-| Empty mentor section | `mentor-page-data` query re-runs with valid ID |
-| iOS background resume | Native `appStateChange` listener |
-| Web tab switch | `visibilitychange` handler |
-
-## Testing
-
-1. **iOS Test**: Open app → Switch to another app → Wait 30 seconds → Return → Mentor should appear
-2. **Web Test**: Open tab → Switch to another tab → Wait 30 seconds → Return → Mentor data should refresh
+If you'd rather upgrade everything to Capacitor 8.x, all `@capacitor/*` packages would need to be updated together. This is a larger change that may require additional testing.
 
 ## Result
 
-The mentor will automatically reconnect and display properly when users return to the app after it's been in the background, whether on iOS native or web.
+After this fix, `npm run build` will complete successfully and the camera functionality will work on native iOS/Android.
