@@ -1,9 +1,9 @@
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useRef } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen, Settings2, Plus, Loader2 } from "lucide-react";
+import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, BookOpen, Settings2, Plus, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
@@ -11,7 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-
+import { format } from "date-fns";
+import { motion } from "framer-motion";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { playStrikethrough } from "@/utils/soundEffects";
+import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
+import { useTaskMutations } from "@/hooks/useTaskMutations";
 interface Habit {
   id: string;
   title: string;
@@ -89,6 +94,61 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const [newRitualTitle, setNewRitualTitle] = useState("");
   const [newRitualDifficulty, setNewRitualDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [isAddingLoading, setIsAddingLoading] = useState(false);
+  
+  // Toggle state and refs for iOS-optimized touch handling
+  const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  
+  // Get habit surfacing data and mutations for syncing with Quests tab
+  const taskDate = format(new Date(), 'yyyy-MM-dd');
+  const { surfacedHabits, surfaceHabit } = useHabitSurfacing();
+  const { toggleTask } = useTaskMutations(taskDate);
+  
+  // Map habit IDs to their task completion state
+  const habitTaskMap = useMemo(() => {
+    const map = new Map<string, { task_id: string | null; is_completed: boolean }>();
+    surfacedHabits.forEach(sh => {
+      map.set(sh.habit_id, { task_id: sh.task_id, is_completed: sh.is_completed });
+    });
+    return map;
+  }, [surfacedHabits]);
+  
+  // Haptic feedback helper
+  const triggerHaptic = async (style: ImpactStyle) => {
+    try {
+      await Haptics.impact({ style });
+    } catch (e) {
+      // Haptics not available on web
+    }
+  };
+  
+  // Handle toggling ritual completion with haptics and sound
+  const handleToggleRitual = async (habitId: string, taskId: string | null, isCompleted: boolean) => {
+    if (isCompleted || togglingHabitId) return;
+    
+    setTogglingHabitId(habitId);
+    triggerHaptic(ImpactStyle.Medium);
+    playStrikethrough();
+    
+    try {
+      // Surface the habit as a task if not already done
+      if (!taskId) {
+        surfaceHabit(habitId);
+        // The surfaceHabit will create the task and invalidate queries
+        // The UI will update via realtime sync
+        return;
+      }
+      
+      // Toggle the task to completed - toggleTask is already the mutate function
+      toggleTask({ 
+        taskId, 
+        completed: true, 
+        xpReward: 25 
+      });
+    } finally {
+      setTimeout(() => setTogglingHabitId(null), 300);
+    }
+  };
   
   // Convert habit to RitualData for the unified editor
   const handleEditHabit = (habit: Habit) => {
@@ -286,11 +346,84 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                         WebkitTapHighlightColor: 'transparent',
                       }}
                     >
-                      {/* Simple bullet indicator instead of checkbox */}
-                      <div className="h-6 w-6 rounded-full border-2 border-primary/30 flex items-center justify-center flex-shrink-0">
-                        <div className="w-2 h-2 rounded-full bg-primary/50" />
-                      </div>
-                      <span className="flex-1 text-sm font-medium">
+                      {/* iOS-optimized clickable toggle */}
+                      {(() => {
+                        const habitState = habitTaskMap.get(habit.id);
+                        const isCompleted = habitState?.is_completed || false;
+                        const isTogglingThis = togglingHabitId === habit.id;
+                        
+                        return (
+                          <button
+                            data-interactive="true"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isCompleted && !isTogglingThis) {
+                                handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
+                              }
+                            }}
+                            onTouchStart={(e) => {
+                              touchStartRef.current = { 
+                                x: e.touches[0].clientX, 
+                                y: e.touches[0].clientY 
+                              };
+                            }}
+                            onTouchEnd={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (touchStartRef.current && !isCompleted && !isTogglingThis) {
+                                const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                                const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                                if (dx < 5 && dy < 5) {
+                                  handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
+                                }
+                              }
+                              touchStartRef.current = null;
+                            }}
+                            disabled={isCompleted}
+                            className={cn(
+                              "relative flex items-center justify-center w-11 h-11 -ml-2.5 touch-manipulation transition-transform select-none",
+                              !isCompleted && "active:scale-95"
+                            )}
+                            style={{
+                              WebkitTapHighlightColor: 'transparent',
+                              touchAction: 'manipulation',
+                            }}
+                            aria-label={isCompleted ? "Ritual completed" : "Mark ritual as complete"}
+                            role="checkbox"
+                            aria-checked={isCompleted}
+                            tabIndex={0}
+                          >
+                            <motion.div 
+                              className={cn(
+                                "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                                isCompleted 
+                                  ? "bg-green-500 border-green-500" 
+                                  : "border-primary/30 hover:border-primary/60",
+                                isTogglingThis && "animate-pulse border-primary"
+                              )}
+                              whileTap={!isCompleted ? { scale: 0.85 } : {}}
+                            >
+                              {isCompleted ? (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                                >
+                                  <Check className="w-4 h-4 text-white" />
+                                </motion.div>
+                              ) : isTogglingThis ? (
+                                <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                              ) : (
+                                <div className="w-2 h-2 rounded-full bg-primary/50" />
+                              )}
+                            </motion.div>
+                          </button>
+                        );
+                      })()}
+                      <span className={cn(
+                        "flex-1 text-sm font-medium transition-all",
+                        habitTaskMap.get(habit.id)?.is_completed && "line-through text-muted-foreground"
+                      )}>
                         {habit.title}
                       </span>
                       {habit.preferred_time && (
@@ -459,11 +592,84 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                 WebkitTapHighlightColor: 'transparent',
                               }}
                             >
-                              {/* Simple bullet indicator */}
-                              <div className="h-6 w-6 rounded-full border-2 border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                                <div className="w-2 h-2 rounded-full bg-amber-500/40" />
-                              </div>
-                              <span className="flex-1 text-sm font-medium">
+                              {/* iOS-optimized clickable toggle for upcoming habits */}
+                              {(() => {
+                                const habitState = habitTaskMap.get(habit.id);
+                                const isCompleted = habitState?.is_completed || false;
+                                const isTogglingThis = togglingHabitId === habit.id;
+                                
+                                return (
+                                  <button
+                                    data-interactive="true"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!isCompleted && !isTogglingThis) {
+                                        handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
+                                      }
+                                    }}
+                                    onTouchStart={(e) => {
+                                      touchStartRef.current = { 
+                                        x: e.touches[0].clientX, 
+                                        y: e.touches[0].clientY 
+                                      };
+                                    }}
+                                    onTouchEnd={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (touchStartRef.current && !isCompleted && !isTogglingThis) {
+                                        const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                                        const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                                        if (dx < 5 && dy < 5) {
+                                          handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
+                                        }
+                                      }
+                                      touchStartRef.current = null;
+                                    }}
+                                    disabled={isCompleted}
+                                    className={cn(
+                                      "relative flex items-center justify-center w-11 h-11 -ml-2.5 touch-manipulation transition-transform select-none",
+                                      !isCompleted && "active:scale-95"
+                                    )}
+                                    style={{
+                                      WebkitTapHighlightColor: 'transparent',
+                                      touchAction: 'manipulation',
+                                    }}
+                                    aria-label={isCompleted ? "Ritual completed" : "Mark ritual as complete"}
+                                    role="checkbox"
+                                    aria-checked={isCompleted}
+                                    tabIndex={0}
+                                  >
+                                    <motion.div 
+                                      className={cn(
+                                        "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                                        isCompleted 
+                                          ? "bg-green-500 border-green-500" 
+                                          : "border-amber-500/30 hover:border-amber-500/60",
+                                        isTogglingThis && "animate-pulse border-amber-500"
+                                      )}
+                                      whileTap={!isCompleted ? { scale: 0.85 } : {}}
+                                    >
+                                      {isCompleted ? (
+                                        <motion.div
+                                          initial={{ scale: 0 }}
+                                          animate={{ scale: 1 }}
+                                          transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                                        >
+                                          <Check className="w-4 h-4 text-white" />
+                                        </motion.div>
+                                      ) : isTogglingThis ? (
+                                        <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
+                                      ) : (
+                                        <div className="w-2 h-2 rounded-full bg-amber-500/40" />
+                                      )}
+                                    </motion.div>
+                                  </button>
+                                );
+                              })()}
+                              <span className={cn(
+                                "flex-1 text-sm font-medium transition-all",
+                                habitTaskMap.get(habit.id)?.is_completed && "line-through text-muted-foreground"
+                              )}>
                                 {habit.title}
                               </span>
                               {/* Day badge showing when scheduled */}
@@ -650,7 +856,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
           {/* Guidance note */}
           <p className="text-center text-xs text-muted-foreground pt-4 flex items-center justify-center gap-1.5">
             <Sparkles className="w-3 h-3" />
-            Mark rituals complete in Today's Agenda
+            Tap circles to complete rituals
           </p>
           
           {todayHabits.length === 0 && upcomingHabits.length > 0 && (
