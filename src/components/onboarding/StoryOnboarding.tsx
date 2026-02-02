@@ -22,34 +22,7 @@ import { generateMentorExplanation, type MentorExplanation } from "@/utils/mento
 import { useCompanion } from "@/hooks/useCompanion";
 import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";
 
-const waitForCompanionDisplayName = async (companionId: string) => {
-  const MAX_ATTEMPTS = 10;
-  const DELAY_MS = 1500;
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const { data, error } = await supabase
-      .from("companion_evolution_cards")
-      .select("creature_name")
-      .eq("companion_id", companionId)
-      .eq("evolution_stage", 0)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Failed to fetch companion display name:", error);
-    }
-
-    const name = data?.creature_name?.trim();
-    if (name) {
-      return name;
-    }
-
-    if (attempt < MAX_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-    }
-  }
-
-  return null;
-};
+// Removed duplicate outer function - using inner component method instead
 
 type OnboardingStage = 
   | "prologue" 
@@ -122,8 +95,12 @@ export const StoryOnboarding = () => {
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const waitForCompanionDisplayName = async (companionId: string) => {
-    const maxAttempts = 30;
+    const maxAttempts = 45;  // Extended from 30 for AI retry scenarios
     const delayMs = 1000;
+    const initialDelay = 2000;  // Give card generation a head start
+    
+    // Initial delay to let card generation begin
+    await wait(initialDelay);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const { data, error } = await supabase
@@ -136,7 +113,7 @@ export const StoryOnboarding = () => {
 
       if (error) {
         console.error("Error fetching companion name:", error);
-        return null;
+        // Don't return null on error, keep trying
       }
 
       if (data?.creature_name) {
