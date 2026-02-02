@@ -1,77 +1,91 @@
 
 
-# Fix npm Install Failure: React 19 Peer Dependency Conflicts
+# Fix Duplicate Ritual/Habit Tasks
 
-## Problem
+## Root Cause Analysis
 
-When running `npm install` after a clean reinstall, npm fails with:
+The app is creating duplicate ritual tasks for the same day. Looking at the database:
+- "Active Recovery / Mobility Work" appears twice on 2026-02-02
+- "Resistance Training Session" appears twice
+- "Sleep Optimization" appears twice
+- etc.
 
-```
-npm error ERESOLVE unable to resolve dependency tree
-npm error peer react@"^16.8 || ^17 || ^18" from next-themes@0.3.0
-```
+**Key finding:** Both duplicates have the same `habit_source_id` but different task IDs, created ~2.5 seconds apart. This is a **race condition** in the habit surfacing system.
 
-This happens because:
-- Your project uses **React 19** (`^19.2.2`)
-- `next-themes@0.3.0` declares a peer dependency on **React 16/17/18 only**
-- npm's strict dependency resolution blocks the install
+### Why This Happens
 
-The failed install leaves `node_modules` incomplete, causing secondary errors like missing `@sentry/react`, `@capacitor/camera`, etc.
+1. User opens the Quests page
+2. `useHabitSurfacing` fetches habits and calculates 5 need surfacing
+3. `Journeys.tsx` effect triggers `surfaceAllEpicHabits()`
+4. Before the insert completes and query invalidates, the effect runs again
+5. Second batch of 5 duplicates gets inserted
 
-## Solution
+The `hasSurfacedRef` guard exists but isn't fully preventing this due to React's rendering behavior and async timing.
 
-Add `legacy-peer-deps=true` to `.npmrc` to bypass peer dependency checks. This is safe because:
-- React 19 is backward-compatible with React 18 APIs
-- Many packages haven't updated their peer deps yet but work fine
-- This was previously working (your Lovable builds succeed)
+---
 
-## Changes Required
+## Solution: Two-Layer Protection
 
-### 1. Update .npmrc
+### Layer 1: Database Unique Constraint (Primary Fix)
 
-```text
-engine-strict=true
-legacy-peer-deps=true
-```
+Add a partial unique constraint to prevent duplicates at the database level:
 
-### 2. After Syncing Changes
-
-Run these commands locally:
-
-```bash
-# Pull the changes
-git pull
-
-# Clean reinstall
-rm -rf node_modules package-lock.json
-npm install
-
-# Rebuild
-npm run build
-
-# Sync to iOS
-npx cap sync ios
+```sql
+CREATE UNIQUE INDEX idx_daily_tasks_habit_date_unique 
+ON daily_tasks (user_id, task_date, habit_source_id) 
+WHERE habit_source_id IS NOT NULL;
 ```
 
-## Technical Details
+This guarantees only one task per habit per day, regardless of frontend race conditions.
 
-| Setting | Purpose |
-|---------|---------|
-| `legacy-peer-deps=true` | Ignores peer dependency conflicts during install |
-| Why needed | React 19 isn't in peer deps of older packages like `next-themes`, `react-day-picker`, etc. |
-| Safety | These packages work with React 19 despite outdated peer deps |
+### Layer 2: Use INSERT ON CONFLICT (Application Fix)
 
-## Alternative Approaches (Not Recommended)
+Update `useHabitSurfacing.ts` to use upsert logic:
 
-1. **Downgrade to React 18** - Would require significant testing and lose React 19 features
-2. **Upgrade next-themes to v0.4.x** - May introduce breaking changes requiring code updates
-3. **Use `--force` flag** - Only works per-command, not persistent
+```typescript
+// Instead of simple insert, use ON CONFLICT to skip duplicates
+const { data, error } = await supabase
+  .from('daily_tasks')
+  .upsert(tasks, { 
+    onConflict: 'user_id,task_date,habit_source_id',
+    ignoreDuplicates: true 
+  })
+  .select('id');
+```
 
-## Result
+### Layer 3: Cleanup Existing Duplicates
 
-After this fix:
-- `npm install` will complete successfully
-- All dependencies will be properly installed
-- `npm run build` will work
-- Camera and other Capacitor features will function on iOS
+Run a one-time cleanup to remove existing duplicate tasks, keeping the earliest one:
+
+```sql
+DELETE FROM daily_tasks 
+WHERE id IN (
+  SELECT id FROM (
+    SELECT id, ROW_NUMBER() OVER (
+      PARTITION BY user_id, task_date, habit_source_id 
+      ORDER BY created_at ASC
+    ) as rn
+    FROM daily_tasks 
+    WHERE habit_source_id IS NOT NULL
+  ) dupes 
+  WHERE rn > 1
+);
+```
+
+---
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| New migration | Add unique constraint on `(user_id, task_date, habit_source_id)` |
+| `src/hooks/useHabitSurfacing.ts` | Use upsert with `ignoreDuplicates: true` |
+
+---
+
+## Technical Notes
+
+- The constraint is **partial** (only where `habit_source_id IS NOT NULL`) so it doesn't affect regular tasks
+- Supabase's JS client supports `upsert` with `ignoreDuplicates` which translates to `ON CONFLICT DO NOTHING`
+- This same pattern should also be applied to recurring task spawning (`useRecurringTaskSpawner`) for consistency
 
