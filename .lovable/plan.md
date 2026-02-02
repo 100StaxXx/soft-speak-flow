@@ -1,150 +1,150 @@
 
-# Add End Date for Recurring Quests
+# Fix Mentor Disconnection on iOS App Resume
 
-## Overview
+## Problem Summary
 
-When a user selects a recurrence pattern (Daily, Weekly, Weekdays), a new "Ends" field will appear allowing them to optionally set when the recurrence should stop.
+The mentor section appears empty when the iOS app returns from background. This happens because:
 
-## User Experience
+1. Profile data becomes stale while app is in background
+2. No explicit refresh is triggered when app resumes
+3. `resolvedMentorId` returns `null` from stale profile data
+4. Mentor image and content don't render
 
-| Step | Behavior |
-|------|----------|
-| Select recurrence | "Ends" option appears below the recurrence buttons |
-| Default | "Never" (no end date) |
-| Options | Never, On date (date picker), After X occurrences |
+## Solution
 
-**Visual Design:**
-
-```text
-┌─────────────────────────────────────────┐
-│ ↻ Recurrence                            │
-│ ┌──────┐ ┌───────┐ ┌────────┐ ┌────────┐│
-│ │ NONE │ │ DAILY │ │ WEEKLY │ │WEEKDAYS││
-│ └──────┘ └───────┘ └────────┘ └────────┘│
-│                                         │
-│ Ends                                    │
-│ ┌───────────────────────────────────────┤
-│ │ 📅  Never                         ▼  ││
-│ └───────────────────────────────────────┤
-└─────────────────────────────────────────┘
-
-When "On date" selected:
-┌───────────────────────────────────────┐
-│ Ends                                  │
-│ ┌─────────────────────────────────────┤
-│ │ 📅  On date                     ▼  ││
-│ └─────────────────────────────────────┤
-│                                       │
-│ ┌─────────────────────────────────────┤
-│ │ End Date: Feb 28, 2026          📅 ││
-│ └─────────────────────────────────────┤
-└───────────────────────────────────────┘
-```
+Add an app state change listener that refreshes critical data when the app resumes from background on iOS/Android.
 
 ## Implementation
 
-### 1. Database Migration
+### 1. Create App Resume Hook
 
-Add a new column to `daily_tasks`:
+Create a new hook that listens for Capacitor app state changes and refreshes critical queries:
 
-| Column | Type | Default | Purpose |
-|--------|------|---------|---------|
-| `recurrence_end_date` | `date` | `NULL` | Date after which recurrence stops |
-
-### 2. Update Types
-
-**File: `src/integrations/supabase/types.ts`** (auto-updated after migration)
-
-**File: `src/features/quests/types.ts`**
-- Add `recurrenceEndDate: string | null` to `QuestFormState` and `PendingTaskData`
-
-**File: `src/features/tasks/hooks/useNaturalLanguageParser.ts`**
-- Add `recurrenceEndDate: string | null` to `ParsedTask` interface
-
-### 3. Update UI Components
-
-**File: `src/features/tasks/components/TaskAdvancedEditSheet.tsx`**
-
-Add after the recurrence buttons:
-
-```tsx
-{recurrencePattern && (
-  <div className="space-y-2 mt-2">
-    <Label className="text-sm font-medium">Ends</Label>
-    <Select value={recurrenceEndType} onValueChange={setRecurrenceEndType}>
-      <SelectTrigger>
-        <SelectValue placeholder="Never" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="never">Never</SelectItem>
-        <SelectItem value="on_date">On date</SelectItem>
-      </SelectContent>
-    </Select>
-    
-    {recurrenceEndType === 'on_date' && (
-      <DatePicker 
-        date={recurrenceEndDate}
-        onSelect={setRecurrenceEndDate}
-        minDate={new Date()}
-      />
-    )}
-  </div>
-)}
-```
-
-### 4. Update Recurring Task Spawner
-
-**File: `src/hooks/useRecurringTaskSpawner.ts`**
-
-Modify the `shouldSpawnToday` function and query:
+**File: `src/hooks/useAppResumeRefresh.ts`**
 
 ```typescript
-// Add to query select
-recurrence_end_date
+import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
+import { logger } from '@/utils/logger';
 
-// Add check in filter
-const needsSpawning = (templates || []).filter((template) => {
-  // ... existing checks ...
+const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
+
+export const useAppResumeRefresh = () => {
+  const queryClient = useQueryClient();
+  const lastResumeRef = useRef<number>(0);
+
+  useEffect(() => {
+    // Only run on native platforms
+    if (!Capacitor.isNativePlatform()) return;
+
+    const handleAppStateChange = async ({ isActive }: { isActive: boolean }) => {
+      if (!isActive) return; // Only care about resume
+
+      const now = Date.now();
+      const elapsed = now - lastResumeRef.current;
+
+      // Apply cooldown to prevent refresh spam
+      if (elapsed < RESUME_COOLDOWN_MS) {
+        logger.debug('App resume refresh skipped (cooldown)');
+        return;
+      }
+
+      lastResumeRef.current = now;
+      logger.debug('App resumed - refreshing critical data');
+
+      // Refetch profile first (mentor ID depends on it)
+      await queryClient.refetchQueries({ queryKey: ['profile'] });
+      
+      // Then invalidate mentor-related queries
+      queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
+    };
+
+    App.addListener('appStateChange', handleAppStateChange);
+
+    return () => {
+      App.removeAllListeners();
+    };
+  }, [queryClient]);
+};
+```
+
+### 2. Add Hook to App.tsx
+
+**File: `src/App.tsx`**
+
+Import and use the new hook in `AppContent`:
+
+```typescript
+import { useAppResumeRefresh } from '@/hooks/useAppResumeRefresh';
+
+// Inside AppContent component:
+const AppContent = memo(() => {
+  // ... existing code ...
   
-  // Skip if recurrence has ended
-  if (template.recurrence_end_date) {
-    const endDate = parseISO(template.recurrence_end_date);
-    if (selectedDate > endDate) return false;
-  }
+  // Refresh critical data on app resume (iOS/Android)
+  useAppResumeRefresh();
   
-  return shouldSpawnToday(template, dayOfWeek);
+  // ... rest of component ...
 });
 ```
 
-### 5. Update Mutation Hooks
+### 3. Also Add Web Visibility Change Handler
 
-**File: `src/hooks/useTaskMutations.ts`**
+For web/PWA, add visibility change handling to ensure data is fresh when tab becomes visible:
 
-- Add `recurrenceEndDate?: string | null` to `AddTaskParams`
-- Include in insert and update operations
+**File: `src/hooks/useAppResumeRefresh.ts`** (extended)
 
-### 6. Update Form Hooks
+```typescript
+// Also handle web visibility changes
+useEffect(() => {
+  if (Capacitor.isNativePlatform()) return; // Skip on native
 
-**File: `src/features/quests/hooks/useQuestForm.ts`**
+  const handleVisibilityChange = () => {
+    if (document.visibilityState !== 'visible') return;
 
-- Add `recurrenceEndDate` state and setter
-- Include in `createPendingTaskData`
+    const now = Date.now();
+    const elapsed = now - lastResumeRef.current;
+
+    if (elapsed < RESUME_COOLDOWN_MS) return;
+
+    lastResumeRef.current = now;
+    logger.debug('Tab became visible - refreshing critical data');
+
+    queryClient.refetchQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
+    queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
+  };
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, [queryClient]);
+```
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| Database migration | Add `recurrence_end_date` column |
-| `src/features/quests/types.ts` | Add `recurrenceEndDate` to types |
-| `src/features/tasks/hooks/useNaturalLanguageParser.ts` | Add to `ParsedTask` |
-| `src/features/tasks/components/TaskAdvancedEditSheet.tsx` | Add end date picker UI |
-| `src/hooks/useRecurringTaskSpawner.ts` | Check end date before spawning |
-| `src/hooks/useTaskMutations.ts` | Handle `recurrenceEndDate` in mutations |
-| `src/features/quests/hooks/useQuestForm.ts` | Add state for end date |
+| File | Change |
+|------|--------|
+| `src/hooks/useAppResumeRefresh.ts` | Create new hook with app state + visibility handling |
+| `src/App.tsx` | Import and use the new hook in AppContent |
+
+## Why This Fixes It
+
+| Issue | How It's Fixed |
+|-------|----------------|
+| Stale profile data | Forced refetch on resume |
+| Null mentor ID | Fresh profile ensures `resolvedMentorId` is resolved |
+| Empty mentor section | `mentor-page-data` query re-runs with valid ID |
+| iOS background resume | Native `appStateChange` listener |
+| Web tab switch | `visibilitychange` handler |
+
+## Testing
+
+1. **iOS Test**: Open app → Switch to another app → Wait 30 seconds → Return → Mentor should appear
+2. **Web Test**: Open tab → Switch to another tab → Wait 30 seconds → Return → Mentor data should refresh
 
 ## Result
 
-- Users can set an optional end date when creating recurring quests
-- Recurring tasks automatically stop spawning after the end date
-- Clean, conditional UI that only shows when recurrence is enabled
-- Follows existing patterns for date pickers in the codebase
+The mentor will automatically reconnect and display properly when users return to the app after it's been in the background, whether on iOS native or web.
