@@ -54,7 +54,7 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
       </div>
 
       {/* Calendar Picker */}
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <Popover open={isOpen} onOpenChange={setIsOpen} modal>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -78,7 +78,11 @@ export function DeadlinePicker({ value, onChange, minDate }: DeadlinePickerProps
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent 
+          className="w-auto p-0 z-[100] pointer-events-auto" 
+          align="start"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <Calendar
             mode="single"
             selected={value}
