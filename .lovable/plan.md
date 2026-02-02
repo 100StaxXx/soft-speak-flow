@@ -1,64 +1,150 @@
 
-# Fix Camera Module Resolution on iOS
+# Add End Date for Recurring Quests
 
-## Problem
+## Overview
 
-The error "Module name, '@capacitor/camera' does not resolve to a valid URL" occurs because:
+When a user selects a recurrence pattern (Daily, Weekly, Weekdays), a new "Ends" field will appear allowing them to optionally set when the recurrence should stop.
 
-1. `@capacitor/camera` is externalized from the Vite build (correctly, for web)
-2. Your iOS app loads web content from the Lovable preview URL for hot-reload
-3. When the dynamic import runs, the browser can't find the module since it's not bundled
+## User Experience
 
-This is a conflict between:
-- **Development mode**: App loads from preview URL (needs camera bundled)
-- **Production mode**: App loads from local `dist/` folder (camera provided by native)
+| Step | Behavior |
+|------|----------|
+| Select recurrence | "Ends" option appears below the recurrence buttons |
+| Default | "Never" (no end date) |
+| Options | Never, On date (date picker), After X occurrences |
 
-## Solution
+**Visual Design:**
 
-Instead of externalizing `@capacitor/camera`, we should **bundle it normally** but only execute it on native platforms (which the code already does with `Capacitor.isNativePlatform()` check).
+```text
+┌─────────────────────────────────────────┐
+│ ↻ Recurrence                            │
+│ ┌──────┐ ┌───────┐ ┌────────┐ ┌────────┐│
+│ │ NONE │ │ DAILY │ │ WEEKLY │ │WEEKDAYS││
+│ └──────┘ └───────┘ └────────┘ └────────┘│
+│                                         │
+│ Ends                                    │
+│ ┌───────────────────────────────────────┤
+│ │ 📅  Never                         ▼  ││
+│ └───────────────────────────────────────┤
+└─────────────────────────────────────────┘
 
-The camera plugin actually has a web implementation that shows a file picker on web - so there's no need to externalize it.
-
-## Changes
-
-### File: `vite.config.ts`
-
-| Change | Description |
-|--------|-------------|
-| Remove `@capacitor/camera` from external | Allow it to be bundled normally |
-| Keep `@capacitor-community/contacts` external | This one truly has no web implementation |
-
-**Before:**
-```typescript
-external: ['@capacitor/camera', '@capacitor-community/contacts'],
+When "On date" selected:
+┌───────────────────────────────────────┐
+│ Ends                                  │
+│ ┌─────────────────────────────────────┤
+│ │ 📅  On date                     ▼  ││
+│ └─────────────────────────────────────┤
+│                                       │
+│ ┌─────────────────────────────────────┤
+│ │ End Date: Feb 28, 2026          📅 ││
+│ └─────────────────────────────────────┤
+└───────────────────────────────────────┘
 ```
 
-**After:**
-```typescript
-external: ['@capacitor-community/contacts'],
+## Implementation
+
+### 1. Database Migration
+
+Add a new column to `daily_tasks`:
+
+| Column | Type | Default | Purpose |
+|--------|------|---------|---------|
+| `recurrence_end_date` | `date` | `NULL` | Date after which recurrence stops |
+
+### 2. Update Types
+
+**File: `src/integrations/supabase/types.ts`** (auto-updated after migration)
+
+**File: `src/features/quests/types.ts`**
+- Add `recurrenceEndDate: string | null` to `QuestFormState` and `PendingTaskData`
+
+**File: `src/features/tasks/hooks/useNaturalLanguageParser.ts`**
+- Add `recurrenceEndDate: string | null` to `ParsedTask` interface
+
+### 3. Update UI Components
+
+**File: `src/features/tasks/components/TaskAdvancedEditSheet.tsx`**
+
+Add after the recurrence buttons:
+
+```tsx
+{recurrencePattern && (
+  <div className="space-y-2 mt-2">
+    <Label className="text-sm font-medium">Ends</Label>
+    <Select value={recurrenceEndType} onValueChange={setRecurrenceEndType}>
+      <SelectTrigger>
+        <SelectValue placeholder="Never" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="never">Never</SelectItem>
+        <SelectItem value="on_date">On date</SelectItem>
+      </SelectContent>
+    </Select>
+    
+    {recurrenceEndType === 'on_date' && (
+      <DatePicker 
+        date={recurrenceEndDate}
+        onSelect={setRecurrenceEndDate}
+        minDate={new Date()}
+      />
+    )}
+  </div>
+)}
 ```
 
-Also update the `manualChunks` skip list to only check for contacts.
+### 4. Update Recurring Task Spawner
 
-## Why This Works
+**File: `src/hooks/useRecurringTaskSpawner.ts`**
 
-The `@capacitor/camera` package:
-- Has a web fallback (file input picker)
-- Can be safely bundled for both web and native
-- The native implementation automatically takes over on iOS/Android
+Modify the `shouldSpawnToday` function and query:
 
-The `@capacitor-community/contacts` package:
-- Has NO web implementation
-- Must remain externalized to prevent build errors
+```typescript
+// Add to query select
+recurrence_end_date
+
+// Add check in filter
+const needsSpawning = (templates || []).filter((template) => {
+  // ... existing checks ...
+  
+  // Skip if recurrence has ended
+  if (template.recurrence_end_date) {
+    const endDate = parseISO(template.recurrence_end_date);
+    if (selectedDate > endDate) return false;
+  }
+  
+  return shouldSpawnToday(template, dayOfWeek);
+});
+```
+
+### 5. Update Mutation Hooks
+
+**File: `src/hooks/useTaskMutations.ts`**
+
+- Add `recurrenceEndDate?: string | null` to `AddTaskParams`
+- Include in insert and update operations
+
+### 6. Update Form Hooks
+
+**File: `src/features/quests/hooks/useQuestForm.ts`**
+
+- Add `recurrenceEndDate` state and setter
+- Include in `createPendingTaskData`
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `vite.config.ts` | Remove camera from external list, update manualChunks |
+| Database migration | Add `recurrence_end_date` column |
+| `src/features/quests/types.ts` | Add `recurrenceEndDate` to types |
+| `src/features/tasks/hooks/useNaturalLanguageParser.ts` | Add to `ParsedTask` |
+| `src/features/tasks/components/TaskAdvancedEditSheet.tsx` | Add end date picker UI |
+| `src/hooks/useRecurringTaskSpawner.ts` | Check end date before spawning |
+| `src/hooks/useTaskMutations.ts` | Handle `recurrenceEndDate` in mutations |
+| `src/features/quests/hooks/useQuestForm.ts` | Add state for end date |
 
 ## Result
 
-- Camera will work on iOS native app (loaded from preview URL during dev)
-- Camera will work on web (using file picker fallback)
-- No more "does not resolve to a valid URL" error
+- Users can set an optional end date when creating recurring quests
+- Recurring tasks automatically stop spawning after the end date
+- Clean, conditional UI that only shows when recurrence is enabled
+- Follows existing patterns for date pickers in the codebase
