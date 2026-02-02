@@ -122,9 +122,13 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
         is_recurring: false, // Spawned instance is not a template
       }));
 
+      // Use upsert with ignoreDuplicates to prevent race condition duplicates
       const { data, error } = await supabase
         .from('daily_tasks')
-        .insert(tasksToCreate)
+        .upsert(tasksToCreate, { 
+          onConflict: 'user_id,task_date,parent_template_id',
+          ignoreDuplicates: true 
+        })
         .select('id');
 
       if (error) throw error;

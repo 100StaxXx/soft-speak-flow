@@ -225,15 +225,19 @@ export function useHabitSurfacing(selectedDate?: Date) {
         estimated_duration: habit.estimated_minutes,
       }));
 
-      console.log('[Habit Surfacing] Inserting tasks:', tasks);
+      console.log('[Habit Surfacing] Upserting tasks:', tasks);
 
+      // Use upsert with ignoreDuplicates to prevent race condition duplicates
       const { data, error } = await supabase
         .from('daily_tasks')
-        .insert(tasks)
+        .upsert(tasks, { 
+          onConflict: 'user_id,task_date,habit_source_id',
+          ignoreDuplicates: true 
+        })
         .select('id');
 
       if (error) {
-        console.error('[Habit Surfacing] Insert error:', error);
+        console.error('[Habit Surfacing] Upsert error:', error);
         throw error;
       }
 
