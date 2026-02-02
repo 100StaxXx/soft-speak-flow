@@ -1,18 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, LogIn, Play, Star, Zap, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { PageLoader } from "@/components/PageLoader";
 import { welcomeBackground } from "@/assets/backgrounds";
-import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 
 const Welcome = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { gamma, beta, permitted, available, requestPermission } = useDeviceOrientation();
 
   // If user is already logged in, redirect them appropriately
   useEffect(() => {
@@ -23,70 +21,31 @@ const Welcome = () => {
     }
   }, [user, loading, navigate]);
 
-  // Request gyroscope permission on first interaction (iOS requirement)
-  const handleInteraction = useCallback(() => {
-    if (available && !permitted) {
-      requestPermission();
-    }
-  }, [available, permitted, requestPermission]);
-
   const features = [
     { icon: Star, text: "Personal Mentors", delay: 0.1 },
     { icon: Zap, text: "Daily Quests & XP", delay: 0.2 },
     { icon: Heart, text: "Evolving Companion", delay: 0.3 },
   ];
 
-  const backgroundImage = welcomeBackground;
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Scroll-based parallax
-  const { scrollYProgress } = useScroll();
-  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-
-  // Device motion parallax - subtle movement based on device tilt
-  // gamma: left/right tilt (-90 to 90), beta: front/back tilt (-180 to 180)
-  const gyroX = permitted ? (gamma / 45) * 15 : 0; // Max 15px movement
-  const gyroY = permitted ? Math.max(-5, Math.min(5, ((beta - 45) / 45) * 10)) : 0; // Clamped to prevent cutoff
-
   if (loading) {
     return <PageLoader message="Preparing your journey..." />;
   }
 
   return (
-    <div 
-      ref={containerRef} 
-      className="min-h-screen flex flex-col relative overflow-hidden"
-      onTouchStart={handleInteraction}
-      onClick={handleInteraction}
-    >
-      {/* Outer wrapper for gyroscope movement */}
-      <motion.div
-        className="fixed -inset-12 -z-10"
-        animate={{
-          x: gyroX,
-          y: gyroY,
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* Simple static background - no parallax, no transforms */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          backgroundImage: `url(${welcomeBackground})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center center',
         }}
-        transition={{
-          type: "spring",
-          stiffness: 100,
-          damping: 30,
-        }}
-      >
-        {/* Inner div for scroll parallax */}
-        <motion.div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url(${backgroundImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center center',
-            y: backgroundY,
-            scale: 1.15,
-            transformOrigin: 'center center',
-          }}
-        />
-      </motion.div>
+      />
+      
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />
+      
       {/* Hero Section with iOS safe areas */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 pt-safe-top pb-safe-bottom text-center">
         {/* Animated Logo/Brand */}
