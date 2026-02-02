@@ -11,14 +11,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users, Camera } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users, Camera, CalendarOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ContactPicker } from '@/components/tasks/ContactPicker';
 import { QuestImagePicker } from '@/components/QuestImagePicker';
 import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
 import { useQuestImagePicker } from '@/hooks/useQuestImagePicker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface TaskAdvancedEditSheetProps {
   open: boolean;
@@ -86,6 +99,12 @@ export function TaskAdvancedEditSheet({
   const [reminderEnabled, setReminderEnabled] = useState(parsed.reminderEnabled || false);
   const [reminderMinutes, setReminderMinutes] = useState(parsed.reminderMinutesBefore || 15);
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
+  const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'on_date'>(
+    parsed.recurrenceEndDate ? 'on_date' : 'never'
+  );
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(
+    parsed.recurrenceEndDate ? parseISO(parsed.recurrenceEndDate) : undefined
+  );
   const [contactId, setContactId] = useState<string | null>(parsed.contactId || null);
   const [autoLogInteraction, setAutoLogInteraction] = useState(parsed.autoLogInteraction ?? true);
   const [imageUrl, setImageUrl] = useState<string | null>(parsed.imageUrl || null);
@@ -94,6 +113,24 @@ export function TaskAdvancedEditSheet({
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   
   const { deleteImage } = useQuestImagePicker();
+
+  // Reset end date when recurrence is cleared
+  const handleRecurrenceChange = (pattern: string) => {
+    setRecurrencePattern(pattern);
+    if (!pattern) {
+      setRecurrenceEndType('never');
+      setRecurrenceEndDate(undefined);
+    }
+  };
+
+  // Handle end type change
+  const handleEndTypeChange = (value: string) => {
+    const endType = value as 'never' | 'on_date';
+    setRecurrenceEndType(endType);
+    if (endType === 'never') {
+      setRecurrenceEndDate(undefined);
+    }
+  };
 
   const handleRemoveImage = async () => {
     if (imageUrl) {
@@ -116,6 +153,9 @@ export function TaskAdvancedEditSheet({
       reminderEnabled,
       reminderMinutesBefore: reminderEnabled ? reminderMinutes : null,
       recurrencePattern: recurrencePattern || null,
+      recurrenceEndDate: recurrenceEndType === 'on_date' && recurrenceEndDate 
+        ? format(recurrenceEndDate, 'yyyy-MM-dd') 
+        : null,
       contactId,
       autoLogInteraction,
       imageUrl,
@@ -348,12 +388,58 @@ export function TaskAdvancedEditSheet({
                   key={pattern || 'none'}
                   variant={recurrencePattern === pattern ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setRecurrencePattern(pattern)}
+                  onClick={() => handleRecurrenceChange(pattern)}
                 >
                   {pattern === '' ? 'None' : pattern.charAt(0).toUpperCase() + pattern.slice(1)}
                 </Button>
               ))}
             </div>
+            
+            {/* End Date - only shown when recurrence is active */}
+            {recurrencePattern && (
+              <div className="space-y-2 mt-3 pl-1 border-l-2 border-indigo-500/30">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <CalendarOff className="w-3.5 h-3.5 text-muted-foreground" />
+                  Ends
+                </Label>
+                <Select value={recurrenceEndType} onValueChange={handleEndTypeChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Never" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">Never</SelectItem>
+                    <SelectItem value="on_date">On date</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {recurrenceEndType === 'on_date' && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !recurrenceEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {recurrenceEndDate ? format(recurrenceEndDate, "PPP") : <span>Pick end date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={recurrenceEndDate}
+                        onSelect={setRecurrenceEndDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Notes */}

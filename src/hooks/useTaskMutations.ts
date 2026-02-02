@@ -45,6 +45,7 @@ export interface AddTaskParams {
   estimatedDuration?: number | null;
   recurrencePattern?: string | null;
   recurrenceDays?: number[] | null;
+  recurrenceEndDate?: string | null;
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
   category?: string;
@@ -100,6 +101,7 @@ export const useTaskMutations = (taskDate: string) => {
             estimated_duration: params.estimatedDuration || null,
             recurrence_pattern: params.recurrencePattern || null,
             recurrence_days: params.recurrenceDays || null,
+            recurrence_end_date: params.recurrenceEndDate || null,
             is_recurring: !!params.recurrencePattern,
             reminder_enabled: params.reminderEnabled ?? false,
             reminder_minutes_before: params.reminderMinutesBefore ?? 15,

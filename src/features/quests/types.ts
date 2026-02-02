@@ -12,6 +12,7 @@ export interface PendingTaskData {
   estimatedDuration: number | null;
   recurrencePattern: string | null;
   recurrenceDays: number[];
+  recurrenceEndDate: string | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
   moreInformation: string | null;
@@ -25,6 +26,7 @@ export interface QuestFormState {
   estimatedDuration: number | null;
   recurrencePattern: string | null;
   recurrenceDays: number[];
+  recurrenceEndDate: string | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
   moreInformation: string | null;
