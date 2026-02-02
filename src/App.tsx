@@ -37,6 +37,7 @@ import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useAuthSync } from "@/hooks/useAuthSync";
+import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { safeSessionStorage } from "@/utils/storage";
 
 // Lazy load pages for code splitting
@@ -175,6 +176,9 @@ const AppContent = memo(() => {
   
   // Sync auth state changes with query cache to prevent stale profile data
   useAuthSync();
+  
+  // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
+  useAppResumeRefresh();
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
