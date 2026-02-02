@@ -280,7 +280,7 @@ const Journeys = () => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
   }, [toggleTask]);
   
-  const handleEditQuest = useCallback((task: {
+  const handleEditQuest = useCallback(async (task: {
     id: string;
     task_text: string;
     task_date?: string | null;
@@ -297,13 +297,22 @@ const Journeys = () => {
   }) => {
     // Route to the appropriate editor based on whether it's a ritual
     if (task.habit_source_id) {
+      // Fetch habit data to get frequency and custom_days (source of truth)
+      const { data: habit } = await supabase
+        .from('habits')
+        .select('frequency, custom_days, description')
+        .eq('id', task.habit_source_id)
+        .maybeSingle();
+      
       // This is a ritual - open the unified ritual editor
       setEditingRitual({
         habitId: task.habit_source_id,
         taskId: task.id,
         title: task.task_text,
-        description: null, // Task doesn't have description, but habit does
+        description: habit?.description || null,
         difficulty: task.difficulty || 'medium',
+        frequency: habit?.frequency || 'daily',
+        custom_days: habit?.custom_days || [],
         estimated_minutes: task.estimated_duration,
         preferred_time: task.scheduled_time,
         category: task.category as 'mind' | 'body' | 'soul' | null,
