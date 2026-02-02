@@ -197,14 +197,32 @@ Make it LEGENDARY. This is the birth of a companion.`;
       const aiData = await aiResponse.json();
       const content = aiData.choices[0].message.content;
       
-      // Parse JSON from AI response
+      // Parse JSON from AI response with robust handling
       try {
-        // Extract JSON if wrapped in markdown code blocks
-        const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || content.match(/(\{[\s\S]*\})/);
-        const jsonString = jsonMatch ? jsonMatch[1] : content;
+        let jsonString = content;
+        
+        // Extract from markdown code blocks if present
+        const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          jsonString = codeBlockMatch[1];
+        }
+        
+        // Extract JSON object
+        const jsonObjectMatch = jsonString.match(/\{[\s\S]*\}/);
+        if (jsonObjectMatch) {
+          jsonString = jsonObjectMatch[0];
+        }
+        
+        // Fix unescaped newlines within JSON string values
+        // This handles AI responses with literal line breaks in story text
+        jsonString = jsonString.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match: string) => {
+          return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+        });
+        
         cardData = JSON.parse(jsonString);
       } catch (e) {
         console.error('Failed to parse AI response:', content);
+        console.error('Parse error:', e);
         throw new Error('AI response was not valid JSON');
       }
     }
