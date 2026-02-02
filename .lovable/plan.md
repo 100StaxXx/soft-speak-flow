@@ -1,234 +1,275 @@
 
-# Realtime Subscriptions for Habits & Epics
+
+# Convert Ritual Circles to iOS-Optimized Clickable Toggles
 
 ## Overview
 
-Add instant cross-device synchronization for habits and epics, matching the existing pattern used by guild activities, shouts, and boss encounters. This ensures changes made on one device (phone, tablet, desktop) appear immediately on others without requiring a manual refresh.
+Convert the static bullet indicators in the Campaigns tab to interactive checkboxes with the **exact same iOS touch handling pattern** used in the Quests tab, ensuring identical clickability and responsiveness.
 
 ---
 
-## Current State
+## Pattern to Replicate (from TodaysAgenda.tsx lines 517-570)
 
-| Table | Realtime Enabled | Subscription Hook |
-|-------|------------------|-------------------|
-| `habits` | ❌ No | None |
-| `epics` | ❌ No | None |
-| `habit_completions` | ❌ No | None |
-| `daily_tasks` | ❌ No | None |
-| `epic_activity_feed` | ✅ Yes | `useGuildActivity` |
-| `guild_shouts` | ✅ Yes | `useGuildShouts` |
-| `guild_boss_encounters` | ✅ Yes | `useGuildBoss` |
-
----
-
-## Implementation Plan
-
-### 1. Database Migration: Enable Realtime
-
-Create a migration to add the required tables to the Supabase realtime publication.
-
-```sql
--- Enable realtime for habits and epics cross-device sync
-ALTER PUBLICATION supabase_realtime ADD TABLE public.habits;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.epics;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.habit_completions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.daily_tasks;
-```
-
----
-
-### 2. New Hook: `useHabitsRealtime.ts`
-
-Create a dedicated realtime hook for habit synchronization that can be used alongside the existing `useHabits` hook.
-
-**Location:** `src/hooks/useHabitsRealtime.ts`
-
-**Pattern:** Follow the existing `useGuildActivity` and `useCompanionMood` patterns:
-- Subscribe to postgres_changes on `habits` and `habit_completions` tables
-- Filter by `user_id=eq.${user.id}`
-- Invalidate relevant query keys on changes
-- Handle connection errors with logging
-- Proper cleanup on unmount
-
-**Query keys to invalidate:**
-- `['habits', user?.id]`
-- `['habit-completions', user?.id]`
-- `['habit-surfacing', user?.id, taskDate]`
-- `['quest-autocomplete-habits', user?.id]`
-
----
-
-### 3. New Hook: `useEpicsRealtime.ts`
-
-Create a dedicated realtime hook for epic synchronization.
-
-**Location:** `src/hooks/useEpicsRealtime.ts`
-
-**Subscribe to:**
-- `epics` table changes (INSERT, UPDATE, DELETE)
-- Filter by `user_id=eq.${user.id}`
-
-**Query keys to invalidate:**
-- `['epics', user?.id]`
-- `['epic-progress']`
-- `['habit-surfacing']` (epics affect which habits surface)
-
----
-
-### 4. New Hook: `useDailyTasksRealtime.ts`
-
-Create a realtime hook for daily tasks to sync task completion across devices.
-
-**Location:** `src/hooks/useDailyTasksRealtime.ts`
-
-**Subscribe to:**
-- `daily_tasks` table changes
-- Filter by `user_id=eq.${user.id}`
-
-**Query keys to invalidate:**
-- `['daily-tasks']`
-- `['tasks']`
-- `['calendar-tasks']`
-- `['habit-surfacing']` (task creation affects surfacing)
-
----
-
-### 5. Integration Point: `GlobalEvolutionListener.tsx` or New Provider
-
-Add the realtime hooks to a component that's always mounted when the user is authenticated. Options:
-
-**Option A:** Create a `RealtimeSyncProvider` component that wraps the app and activates all realtime subscriptions when the user is logged in.
-
-**Option B:** Add the hooks directly to an existing always-mounted component like `GlobalEvolutionListener`.
-
-**Recommended:** Option A for better separation of concerns.
-
----
-
-## Files to Create/Modify
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `supabase/migrations/[timestamp]_enable_habits_epics_realtime.sql` | Create | Enable realtime on tables |
-| `src/hooks/useHabitsRealtime.ts` | Create | Realtime sync for habits |
-| `src/hooks/useEpicsRealtime.ts` | Create | Realtime sync for epics |
-| `src/hooks/useDailyTasksRealtime.ts` | Create | Realtime sync for daily tasks |
-| `src/components/RealtimeSyncProvider.tsx` | Create | Central provider for all realtime subscriptions |
-| `src/App.tsx` | Modify | Add RealtimeSyncProvider to the component tree |
-
----
-
-## Technical Details
-
-### Hook Structure (Template)
+The Quests tab uses this optimized pattern:
 
 ```typescript
-// src/hooks/useHabitsRealtime.ts
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
-import { logger } from "@/utils/logger";
+// Touch tracking ref to detect scroll vs tap
+const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-export const useHabitsRealtime = () => {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase
-      .channel(`habits-sync-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'habits',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['habits', user.id] });
-          queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
-          queryClient.invalidateQueries({ queryKey: ['epics'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'habit_completions',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['habit-completions', user.id] });
-          queryClient.invalidateQueries({ queryKey: ['habits'] });
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          logger.warn('Habits realtime subscription error', { status, error: err?.message });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
+<button
+  data-interactive="true"
+  onClick={handleCheckboxClick}
+  onTouchStart={(e) => {
+    touchStartRef.current = { 
+      x: e.touches[0].clientX, 
+      y: e.touches[0].clientY 
     };
-  }, [user?.id, queryClient]);
-};
+  }}
+  onTouchEnd={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only trigger if finger moved less than 5px (not scrolling)
+    if (touchStartRef.current) {
+      const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+      if (dx < 5 && dy < 5) {
+        handleCheckboxClick(e as unknown as React.MouseEvent);
+      }
+    }
+    touchStartRef.current = null;
+  }}
+  className="relative flex items-center justify-center w-11 h-11 touch-manipulation active:scale-95 transition-transform select-none"
+  style={{
+    WebkitTapHighlightColor: 'transparent',
+    touchAction: 'manipulation',
+  }}
+  aria-label="Mark task as complete"
+  role="checkbox"
+  aria-checked={isComplete}
+  tabIndex={0}
+>
+  {/* Visual checkbox */}
+</button>
 ```
 
-### Provider Structure
+---
+
+## Implementation in EpicCheckInDrawer.tsx
+
+### 1. Add Required Imports
 
 ```typescript
-// src/components/RealtimeSyncProvider.tsx
-import { useHabitsRealtime } from "@/hooks/useHabitsRealtime";
-import { useEpicsRealtime } from "@/hooks/useEpicsRealtime";
-import { useDailyTasksRealtime } from "@/hooks/useDailyTasksRealtime";
-import { useAuth } from "@/hooks/useAuth";
+import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
+import { useTaskMutations } from "@/hooks/useTaskMutations";
+import { Check, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { playStrikethrough } from "@/utils/soundEffects";
+```
 
-export const RealtimeSyncProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+### 2. Add State and Refs
 
-  // Only activate realtime when user is authenticated
-  useHabitsRealtime();
-  useEpicsRealtime();
-  useDailyTasksRealtime();
+```typescript
+const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null);
+const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  return <>{children}</>;
+// Get habit surfacing data and mutations
+const taskDate = format(new Date(), 'yyyy-MM-dd');
+const { surfacedHabits, surfaceHabit } = useHabitSurfacing();
+const { toggleTask } = useTaskMutations(taskDate);
+
+// Map habit IDs to their task completion state
+const habitTaskMap = useMemo(() => {
+  const map = new Map<string, { task_id: string | null; is_completed: boolean }>();
+  surfacedHabits.forEach(sh => {
+    map.set(sh.habit_id, { task_id: sh.task_id, is_completed: sh.is_completed });
+  });
+  return map;
+}, [surfacedHabits]);
+```
+
+### 3. Add Toggle Handler with Haptics
+
+```typescript
+const triggerHaptic = async (style: ImpactStyle) => {
+  try {
+    await Haptics.impact({ style });
+  } catch (e) {
+    // Haptics not available on web
+  }
 };
+
+const handleToggleRitual = async (habitId: string, taskId: string | null, isCompleted: boolean) => {
+  if (isCompleted || togglingHabitId) return;
+  
+  setTogglingHabitId(habitId);
+  triggerHaptic(ImpactStyle.Medium);
+  playStrikethrough();
+  
+  try {
+    let activeTaskId = taskId;
+    
+    // Surface the habit as a task if not already done
+    if (!activeTaskId) {
+      await surfaceHabit(habitId);
+      // The surfaceHabit will create the task and invalidate queries
+      // The UI will update via realtime sync
+      return;
+    }
+    
+    // Toggle the task to completed
+    toggleTask.mutate({ 
+      taskId: activeTaskId, 
+      completed: true, 
+      xpReward: 25 
+    });
+  } finally {
+    setTimeout(() => setTogglingHabitId(null), 300);
+  }
+};
+```
+
+### 4. Replace Static Circle (lines 289-292) with Interactive Button
+
+**Current (static):**
+```jsx
+<div className="h-6 w-6 rounded-full border-2 border-primary/30 flex items-center justify-center flex-shrink-0">
+  <div className="w-2 h-2 rounded-full bg-primary/50" />
+</div>
+```
+
+**New (interactive with iOS optimization):**
+```jsx
+{(() => {
+  const habitState = habitTaskMap.get(habit.id);
+  const isCompleted = habitState?.is_completed || false;
+  const isTogglingThis = togglingHabitId === habit.id;
+  
+  return (
+    <button
+      data-interactive="true"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isCompleted && !isTogglingThis) {
+          handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
+        }
+      }}
+      onTouchStart={(e) => {
+        touchStartRef.current = { 
+          x: e.touches[0].clientX, 
+          y: e.touches[0].clientY 
+        };
+      }}
+      onTouchEnd={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (touchStartRef.current && !isCompleted && !isTogglingThis) {
+          const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+          const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+          if (dx < 5 && dy < 5) {
+            handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
+          }
+        }
+        touchStartRef.current = null;
+      }}
+      disabled={isCompleted}
+      className={cn(
+        "relative flex items-center justify-center w-11 h-11 -ml-2.5 touch-manipulation transition-transform select-none",
+        !isCompleted && "active:scale-95"
+      )}
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
+      }}
+      aria-label={isCompleted ? "Ritual completed" : "Mark ritual as complete"}
+      role="checkbox"
+      aria-checked={isCompleted}
+      tabIndex={0}
+    >
+      <motion.div 
+        className={cn(
+          "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+          isCompleted 
+            ? "bg-green-500 border-green-500" 
+            : "border-primary/30 hover:border-primary/60",
+          isTogglingThis && "animate-pulse border-primary"
+        )}
+        whileTap={!isCompleted ? { scale: 0.85 } : {}}
+      >
+        {isCompleted ? (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+          >
+            <Check className="w-4 h-4 text-white" />
+          </motion.div>
+        ) : isTogglingThis ? (
+          <Loader2 className="w-3 h-3 animate-spin text-primary" />
+        ) : (
+          <div className="w-2 h-2 rounded-full bg-primary/50" />
+        )}
+      </motion.div>
+    </button>
+  );
+})()}
+```
+
+### 5. Add Visual Completion State to Habit Text (line 293)
+
+```jsx
+<span className={cn(
+  "flex-1 text-sm font-medium transition-all",
+  habitTaskMap.get(habit.id)?.is_completed && "line-through text-muted-foreground"
+)}>
+  {habit.title}
+</span>
 ```
 
 ---
 
-## Expected Results
+## iOS Touch Optimization Checklist
 
-After implementation:
-
-1. **Habit updates** (create, edit, delete) sync instantly across devices
-2. **Habit completions** appear in real-time on other devices
-3. **Epic changes** (progress, status) sync without refresh
-4. **Daily tasks** (complete, create, update) sync immediately
-5. **Quests tab** updates when rituals are completed on another device
-6. **Campaigns view** reflects changes made elsewhere instantly
-
----
-
-## Performance Considerations
-
-- Realtime subscriptions are lightweight and use WebSocket connections
-- Subscriptions are scoped to user's own data (`user_id=eq.${user.id}`)
-- Connection errors are logged but don't block the app
-- Cleanup on unmount prevents memory leaks
-- The existing `staleTime` settings on queries prevent unnecessary refetches
+| Feature | Quests Tab | Campaigns Tab (New) |
+|---------|------------|---------------------|
+| 44x44px touch target | `w-11 h-11` ✓ | `w-11 h-11` ✓ |
+| Touch vs scroll detection | 5px threshold ✓ | 5px threshold ✓ |
+| `onTouchEnd` + `preventDefault` | ✓ | ✓ |
+| `WebkitTapHighlightColor: transparent` | ✓ | ✓ |
+| `touchAction: manipulation` | ✓ | ✓ |
+| `active:scale-95` feedback | ✓ | ✓ |
+| `whileTap` animation | ✓ | ✓ |
+| Haptic feedback | ✓ | ✓ |
+| Strikethrough sound | ✓ | ✓ |
+| ARIA accessibility | ✓ | ✓ |
+| Spring animation on complete | ✓ | ✓ |
 
 ---
 
-## Compatibility
+## Sync Guarantee
 
-This implementation:
-- Works alongside the existing `useAppResumeRefresh` hook (provides backup sync)
-- Follows the same patterns as existing guild realtime hooks
-- Uses the established `logger` utility for consistent logging
-- Doesn't modify existing query functions—only adds realtime invalidation
+Both tabs use the **same mutations and query invalidations**:
+- `toggleTask` mutation updates `daily_tasks` and `habit_completions`
+- Query keys invalidated: `['daily-tasks']`, `['habits']`, `['habit-surfacing']`, `['epics']`
+- Realtime subscriptions push changes instantly across devices
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/EpicCheckInDrawer.tsx` | Add imports, state, refs, handler, replace checkbox UI |
+
+---
+
+## Summary
+
+The ritual toggles on the Campaigns tab will have **identical iOS touch handling** to the Quests tab:
+- Same 44x44px touch target
+- Same scroll vs tap detection (5px threshold)
+- Same `onTouchEnd` with `preventDefault`
+- Same haptic feedback and sound effects
+- Same spring animations
+- **Perfect sync** via shared mutations and realtime subscriptions
+
