@@ -159,6 +159,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   // Track if we've already shown the tooltip this session
   const tooltipShownRef = useRef(false);
   
+  // Track touch start position to distinguish taps from scrolls
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  
   // Native task list container ref
   const nativeContainerRef = useRef<HTMLDivElement>(null);
   
@@ -514,10 +517,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             <button
               data-interactive="true"
               onClick={handleCheckboxClick}
+              onTouchStart={(e) => {
+                touchStartRef.current = { 
+                  x: e.touches[0].clientX, 
+                  y: e.touches[0].clientY 
+                };
+              }}
               onTouchEnd={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleCheckboxClick(e as unknown as React.MouseEvent);
+                // Only trigger if finger moved less than 5px (not scrolling)
+                if (touchStartRef.current) {
+                  const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                  const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                  if (dx < 5 && dy < 5) {
+                    handleCheckboxClick(e as unknown as React.MouseEvent);
+                  }
+                }
+                touchStartRef.current = null;
               }}
               className="relative flex items-center justify-center w-11 h-11 -ml-3 touch-manipulation active:scale-95 transition-transform select-none"
               style={{
