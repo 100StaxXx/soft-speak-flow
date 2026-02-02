@@ -351,6 +351,59 @@ export const useMilestones = (epicId?: string) => {
     },
   });
 
+  // Backfill legacy epics that have no milestones
+  const backfillLegacyMilestones = useMutation({
+    mutationFn: async (epicData: { 
+      epicId: string; 
+      targetDays: number; 
+      startDate: string;
+    }) => {
+      if (!user) throw new Error("Not authenticated");
+
+      // Calculate chapter count based on duration
+      let chapterCount = 5;
+      if (epicData.targetDays <= 14) chapterCount = 3;
+      else if (epicData.targetDays <= 30) chapterCount = 4;
+      else if (epicData.targetDays <= 60) chapterCount = 5;
+      else chapterCount = 6;
+      
+      const startDate = new Date(epicData.startDate);
+      const milestonesToInsert = Array.from({ length: chapterCount }, (_, i) => {
+        const percent = Math.round(((i + 1) / chapterCount) * 100);
+        const daysOffset = Math.floor((epicData.targetDays * percent) / 100);
+        const targetDate = new Date(startDate);
+        targetDate.setDate(targetDate.getDate() + daysOffset);
+        
+        return {
+          epic_id: epicData.epicId,
+          user_id: user.id,
+          title: i === chapterCount - 1 ? 'The Finale' : `Chapter ${i + 1}`,
+          description: i === chapterCount - 1 ? 'Complete your epic journey!' : `Reach ${percent}% of your goal`,
+          target_date: targetDate.toISOString().split('T')[0],
+          milestone_percent: percent,
+          is_postcard_milestone: true,
+          phase_order: i + 1,
+          chapter_number: i + 1,
+        };
+      });
+
+      const { error } = await supabase
+        .from('epic_milestones')
+        .insert(milestonesToInsert);
+
+      if (error) throw error;
+      
+      return milestonesToInsert;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['milestones', epicId] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+    },
+    onError: (error) => {
+      console.error("Failed to backfill milestones:", error);
+    },
+  });
+
   return {
     milestones,
     milestonesByPhase,
@@ -370,6 +423,8 @@ export const useMilestones = (epicId?: string) => {
     getDaysUntilMilestone,
     getNextPostcardMilestone,
     getProgressToNextPostcard,
+    backfillLegacyMilestones,
     isCompleting: completeMilestone.isPending,
+    isBackfilling: backfillLegacyMilestones.isPending,
   };
 };

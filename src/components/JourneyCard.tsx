@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useCallback } from "react";
+import { memo, useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,8 +83,11 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
   const { health } = useCompanionHealth();
   const { 
     milestones,
+    isLoading: milestonesLoading,
     getProgressToNextPostcard,
     getJourneyHealth,
+    backfillLegacyMilestones,
+    isBackfilling,
   } = useMilestones(journey.id);
   
   const daysRemaining = Math.ceil(
@@ -94,6 +97,28 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
   const isActive = journey.status === "active";
   const theme = (journey.theme_color || 'heroic') as JourneyTheme;
   const themeGradient = themeGradients[theme];
+  
+  // Track if we've attempted backfill to prevent duplicate calls
+  const backfillAttempted = useRef(false);
+  
+  // Auto-backfill milestones for legacy epics
+  useEffect(() => {
+    if (
+      isActive && 
+      journey.story_type_slug && 
+      milestones?.length === 0 && 
+      !milestonesLoading &&
+      !isBackfilling &&
+      !backfillAttempted.current
+    ) {
+      backfillAttempted.current = true;
+      backfillLegacyMilestones.mutate({
+        epicId: journey.id,
+        targetDays: journey.target_days,
+        startDate: journey.start_date,
+      });
+    }
+  }, [journey.id, journey.story_type_slug, journey.target_days, journey.start_date, milestones?.length, isActive, milestonesLoading, isBackfilling, backfillLegacyMilestones]);
   
   const postcardProgress = getProgressToNextPostcard();
   const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
