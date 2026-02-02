@@ -1,43 +1,52 @@
 
-# Fix Build Error: @capacitor/camera Version Mismatch
+
+# Fix npm Install Failure: React 19 Peer Dependency Conflicts
 
 ## Problem
 
-The build fails with:
+When running `npm install` after a clean reinstall, npm fails with:
+
 ```
-Rollup failed to resolve import "@capacitor/camera" from "src/hooks/useQuestImagePicker.ts"
+npm error ERESOLVE unable to resolve dependency tree
+npm error peer react@"^16.8 || ^17 || ^18" from next-themes@0.3.0
 ```
 
-This is caused by a **version mismatch** between Capacitor packages:
-- `@capacitor/camera@8.0.0` requires Capacitor 8.x core
-- `@capacitor/core@7.4.4` is Capacitor 7.x
+This happens because:
+- Your project uses **React 19** (`^19.2.2`)
+- `next-themes@0.3.0` declares a peer dependency on **React 16/17/18 only**
+- npm's strict dependency resolution blocks the install
 
-The camera plugin isn't compatible with the installed core version, causing Rollup to fail when trying to resolve the dynamic import.
+The failed install leaves `node_modules` incomplete, causing secondary errors like missing `@sentry/react`, `@capacitor/camera`, etc.
 
 ## Solution
 
-Downgrade `@capacitor/camera` to a version compatible with Capacitor 7.x.
+Add `legacy-peer-deps=true` to `.npmrc` to bypass peer dependency checks. This is safe because:
+- React 19 is backward-compatible with React 18 APIs
+- Many packages haven't updated their peer deps yet but work fine
+- This was previously working (your Lovable builds succeed)
 
 ## Changes Required
 
-### 1. Update package.json
+### 1. Update .npmrc
 
-Change the camera version from `^8.0.0` to `^7.0.0`:
-
-```json
-"@capacitor/camera": "^7.0.0",
+```text
+engine-strict=true
+legacy-peer-deps=true
 ```
 
 ### 2. After Syncing Changes
 
-On your local machine, run these commands:
+Run these commands locally:
 
 ```bash
-# Remove node_modules and reinstall to get correct versions
+# Pull the changes
+git pull
+
+# Clean reinstall
 rm -rf node_modules package-lock.json
 npm install
 
-# Rebuild the project
+# Rebuild
 npm run build
 
 # Sync to iOS
@@ -46,18 +55,23 @@ npx cap sync ios
 
 ## Technical Details
 
-| Package | Current | Fix |
-|---------|---------|-----|
-| `@capacitor/camera` | 8.0.0 | 7.0.0 |
-| `@capacitor/core` | 7.4.4 | No change |
-| `@capacitor/cli` | 8.0.2 | Should also be 7.x for consistency |
+| Setting | Purpose |
+|---------|---------|
+| `legacy-peer-deps=true` | Ignores peer dependency conflicts during install |
+| Why needed | React 19 isn't in peer deps of older packages like `next-themes`, `react-day-picker`, etc. |
+| Safety | These packages work with React 19 despite outdated peer deps |
 
-The CLI version (8.0.2) should also ideally match the core version, but this is less critical for the immediate build fix.
+## Alternative Approaches (Not Recommended)
 
-## Alternative Approach (If Upgrade Preferred)
-
-If you'd rather upgrade everything to Capacitor 8.x, all `@capacitor/*` packages would need to be updated together. This is a larger change that may require additional testing.
+1. **Downgrade to React 18** - Would require significant testing and lose React 19 features
+2. **Upgrade next-themes to v0.4.x** - May introduce breaking changes requiring code updates
+3. **Use `--force` flag** - Only works per-command, not persistent
 
 ## Result
 
-After this fix, `npm run build` will complete successfully and the camera functionality will work on native iOS/Android.
+After this fix:
+- `npm install` will complete successfully
+- All dependencies will be properly installed
+- `npm run build` will work
+- Camera and other Capacitor features will function on iOS
+
