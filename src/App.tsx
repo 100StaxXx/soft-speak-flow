@@ -22,6 +22,7 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
+import { RealtimeSyncProvider } from "@/components/RealtimeSyncProvider";
 import { SubscriptionGate } from "@/components/SubscriptionGate";
 import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
@@ -266,7 +267,7 @@ const AppContent = memo(() => {
         <XPProvider>
           <WeeklyRecapProvider>
             <CompanionPresenceProvider>
-                
+                <RealtimeSyncProvider>
                 {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
                 <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
@@ -322,7 +323,7 @@ const AppContent = memo(() => {
                 </AnimatePresence>
                 </Suspense>
                 {/* HIDDEN: AstralEncounterProvider closing tag removed */}
-              
+                </RealtimeSyncProvider>
             </CompanionPresenceProvider>
           </WeeklyRecapProvider>
         </XPProvider>
