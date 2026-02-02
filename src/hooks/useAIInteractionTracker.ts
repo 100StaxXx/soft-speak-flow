@@ -233,10 +233,10 @@ export function useAIInteractionTracker() {
 
       if (!epic) return;
 
-      // Get associated habits
+      // Get associated habits with full context
       const { data: epicHabits } = await supabase
         .from('epic_habits')
-        .select('habits(difficulty, frequency)')
+        .select('habits(difficulty, frequency, category, custom_days)')
         .eq('epic_id', epicId);
 
       const avgDifficulty = epicHabits?.length 

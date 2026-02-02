@@ -226,10 +226,12 @@ export const EditRitualSheet = memo(function EditRitualSheet({
         toast.success('Ritual updated everywhere!');
       }
 
-      // Invalidate queries to refresh data
+      // Invalidate queries to refresh data across all views
       queryClient.invalidateQueries({ queryKey: ['habits'] });
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['epics'] });
+      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
+      queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
 
       onSaveComplete?.();
       onOpenChange(false);

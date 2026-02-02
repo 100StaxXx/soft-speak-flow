@@ -55,7 +55,7 @@ export function useEpicProgress(epicId?: string) {
           story_type_slug,
           epic_habits(
             habit_id,
-            habits(id, title)
+            habits(id, title, frequency, custom_days)
           )
         `)
         .eq('user_id', user.id)

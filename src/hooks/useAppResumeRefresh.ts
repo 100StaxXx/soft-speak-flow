@@ -45,6 +45,12 @@ export const useAppResumeRefresh = () => {
       // Then invalidate mentor-related queries
       queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
       queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
+      
+      // Invalidate habit and epic data for cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
     };
 
     App.addListener('appStateChange', handleAppStateChange);
@@ -72,6 +78,12 @@ export const useAppResumeRefresh = () => {
       queryClient.refetchQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
       queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
+      
+      // Invalidate habit and epic data for cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['habits'] });
+      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
+      queryClient.invalidateQueries({ queryKey: ['epics'] });
+      queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
