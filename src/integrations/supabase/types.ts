@@ -2132,6 +2132,7 @@ export type Database = {
           parent_template_id: string | null
           priority: string | null
           recurrence_days: number[] | null
+          recurrence_end_date: string | null
           recurrence_pattern: string | null
           reminder_enabled: boolean | null
           reminder_minutes_before: number | null
@@ -2174,6 +2175,7 @@ export type Database = {
           parent_template_id?: string | null
           priority?: string | null
           recurrence_days?: number[] | null
+          recurrence_end_date?: string | null
           recurrence_pattern?: string | null
           reminder_enabled?: boolean | null
           reminder_minutes_before?: number | null
@@ -2216,6 +2218,7 @@ export type Database = {
           parent_template_id?: string | null
           priority?: string | null
           recurrence_days?: number[] | null
+          recurrence_end_date?: string | null
           recurrence_pattern?: string | null
           reminder_enabled?: boolean | null
           reminder_minutes_before?: number | null

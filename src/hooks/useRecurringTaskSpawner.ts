@@ -13,6 +13,7 @@ interface RecurringTask {
   category: string | null;
   recurrence_pattern: string | null;
   recurrence_days: number[] | null;
+  recurrence_end_date: string | null;
   xp_reward: number;
   epic_id: string | null;
   reminder_enabled: boolean | null;
@@ -47,6 +48,7 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
           category,
           recurrence_pattern,
           recurrence_days,
+          recurrence_end_date,
           xp_reward,
           epic_id,
           reminder_enabled,
@@ -81,6 +83,13 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
         
         // Skip if a task with the same text already exists today (fallback check)
         if (existingTaskTexts.has(template.task_text.toLowerCase())) return false;
+
+        // Skip if recurrence has ended
+        if (template.recurrence_end_date) {
+          const endDate = parseISO(template.recurrence_end_date);
+          const currentDate = selectedDate || new Date();
+          if (currentDate > endDate) return false;
+        }
 
         // Check if this template should run today based on pattern
         return shouldSpawnToday(template, dayOfWeek);
