@@ -1,72 +1,91 @@
 
-
-# Enable Custom Deadline Date Picker in Pathfinder
+# Fix Frequency Not Reflecting Current Recurrence Setting in Edit Ritual Menu
 
 ## Problem
 
-In the Pathfinder wizard (step 1), clicking the date display button showing "TUESDAY, FEBRUARY 2, 2027 (364 DAYS)" should open a calendar picker to select a custom date. While the code exists to do this, it may not be working reliably on iOS/mobile due to popover-inside-dialog issues.
+When editing a ritual from the Quests view, the "Frequency" section shows "Custom" but no days are selected. The frequency picker should show the actual recurrence setting for the ritual (e.g., if the ritual runs on specific days, those days should be highlighted).
 
-## Current Behavior
+## Root Cause
 
-- Quick preset buttons (2 weeks, 1 month, etc.) work correctly
-- The date display button is supposed to open a calendar popover
-- On mobile/iOS, the popover may not open or may render behind the dialog
+When opening the Edit Ritual sheet from a **task** in `Journeys.tsx`, the ritual data is constructed from the task object:
 
-## Solution
+```typescript
+setEditingRitual({
+  habitId: task.habit_source_id,
+  taskId: task.id,
+  title: task.task_text,
+  // ... other task fields
+  recurrence_pattern: task.recurrence_pattern,
+  recurrence_days: task.recurrence_days,
+  // ❌ MISSING: frequency and custom_days
+});
+```
 
-Update the `DeadlinePicker` component to ensure the calendar popover works correctly inside the Pathfinder dialog:
+The `frequency` and `custom_days` fields are stored on the **habit** (template), not on the task. Since they're not passed, `EditRitualSheet` defaults to `"daily"` and the day picker shows empty.
 
-1. Add `modal` prop to the Popover for proper dialog-inside-dialog handling
-2. Increase z-index on PopoverContent to ensure it appears above the dialog
-3. Ensure `pointer-events-auto` is applied to both the PopoverContent and Calendar
+In contrast, when opening from `EpicCheckInDrawer`, it correctly passes the habit's `frequency` and `custom_days`.
 
 ---
 
-## Changes
+## Solution
 
-### File: `src/components/JourneyWizard/DeadlinePicker.tsx`
+When opening the Edit Ritual sheet from a task in `Journeys.tsx`, look up the source habit to get its `frequency` and `custom_days`:
+
+### Option 1: Fetch Habit Data Inline (Recommended)
+
+When a ritual task is clicked, fetch the habit data before setting `editingRitual`:
 
 ```typescript
-// Change Popover to modal mode for proper interaction inside dialogs
-<Popover open={isOpen} onOpenChange={setIsOpen} modal>
-  {/* ... PopoverTrigger unchanged ... */}
-  
-  <PopoverContent 
-    className="w-auto p-0 z-[100] pointer-events-auto" 
-    align="start"
-    // Prevent scroll on mobile when popover is open
-    onOpenAutoFocus={(e) => e.preventDefault()}
-  >
-    <Calendar
-      mode="single"
-      selected={value}
-      onSelect={(date) => {
-        onChange(date);
-        setIsOpen(false);
-      }}
-      disabled={(date) => date < effectiveMinDate}
-      initialFocus
-      className="pointer-events-auto"
-      captionLayout="dropdown"
-      fromYear={new Date().getFullYear()}
-      toYear={new Date().getFullYear() + 10}
-    />
-  </PopoverContent>
-</Popover>
+const handleEditTask = useCallback(async (task) => {
+  if (task.habit_source_id) {
+    // Fetch the habit to get frequency and custom_days
+    const { data: habit } = await supabase
+      .from('habits')
+      .select('frequency, custom_days, description')
+      .eq('id', task.habit_source_id)
+      .single();
+    
+    setEditingRitual({
+      habitId: task.habit_source_id,
+      taskId: task.id,
+      title: task.task_text,
+      description: habit?.description || null,
+      difficulty: task.difficulty || 'medium',
+      frequency: habit?.frequency || 'daily',        // ✅ From habit
+      custom_days: habit?.custom_days || [],          // ✅ From habit
+      estimated_minutes: task.estimated_duration,
+      preferred_time: task.scheduled_time,
+      category: task.category,
+      recurrence_pattern: task.recurrence_pattern,
+      recurrence_days: task.recurrence_days,
+      reminder_enabled: task.reminder_enabled,
+      reminder_minutes_before: task.reminder_minutes_before,
+    });
+  } else {
+    setEditingTask(task);
+  }
+}, []);
 ```
 
 ---
 
-## Technical Details
+## File Changes
 
-| Change | Purpose |
-|--------|---------|
-| `modal` prop on Popover | Ensures proper focus management and event handling when nested inside a dialog |
-| `z-[100]` on PopoverContent | Higher than the dialog's z-50 to ensure calendar appears on top |
-| `pointer-events-auto` on PopoverContent | Ensures touch events work on mobile/iOS |
-| `onOpenAutoFocus={(e) => e.preventDefault()}` | Prevents scroll jumping on mobile when popover opens |
+| File | Change |
+|------|--------|
+| `src/pages/Journeys.tsx` | Update `handleEditTask` to fetch habit data for `frequency` and `custom_days` |
+
+---
+
+## Technical Notes
+
+- The fetch is fast since it's a single row lookup by primary key
+- This ensures the Edit Ritual sheet always has the source-of-truth frequency data from the habit template
+- The `recurrence_days` from the task can be used as a fallback, but `custom_days` from the habit is the authoritative source
 
 ## Result
 
-After this change, clicking the date display button will reliably open the calendar picker on all devices (desktop, iOS, Android), allowing users to select any custom deadline date.
-
+After this change:
+- Opening Edit Ritual from any task will show the correct frequency preset selected (Daily, Weekdays, Weekly, or Custom)
+- If Custom, the specific days will be highlighted in the day picker
+- The frequency setting will match what was configured when the ritual was created
