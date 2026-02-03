@@ -159,7 +159,7 @@ const EvolutionAwareContent = memo(() => {
   return (
     <>
       <GlobalEvolutionListener />
-      <SubscriptionGate />
+      {/* SubscriptionGate removed - monetization disabled */}
       <WeeklyRecapModal />
     </>
   );

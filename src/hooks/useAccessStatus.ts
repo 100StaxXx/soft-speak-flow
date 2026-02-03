@@ -79,13 +79,15 @@ export function useAccessStatus(): AccessStatus {
       hasAccess = true;
     }
 
+    // MONETIZATION DISABLED - Always grant access
+    // To re-enable: restore original hasAccess, isInTrial, trialExpired logic
     return {
-      hasAccess,
+      hasAccess: true,
       isSubscribed,
-      isInTrial: isInTrial && !isSubscribed, // Only show as "in trial" if not subscribed
-      trialExpired: trialExpired && !isSubscribed,
-      trialDaysRemaining: isSubscribed ? 0 : trialDaysRemaining,
-      accessSource,
+      isInTrial: false,
+      trialExpired: false,
+      trialDaysRemaining: 0,
+      accessSource: isSubscribed ? 'subscription' : 'none',
       trialEndsAt,
       loading: false,
     };
