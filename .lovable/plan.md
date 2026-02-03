@@ -1,78 +1,46 @@
 
 
-# Fix iOS Widget Extension Project Configuration
+# Create Missing "App" Scheme for Xcode
 
 ## Problem Summary
 
-The `project.pbxproj` file is missing the entire **CosmiqWidgetExtension** target configuration. This is causing:
-- Duplicate file references (CosmiqWidget 2, 3, 4...)
-- Broken file references (yellow "?" icons)
-- Widget extension not building properly
-
-The widget source files exist in `ios/CosmiqWidget/` but they're not properly linked in the Xcode project file.
+The **App** scheme file doesn't exist in the project. Xcode schemes are stored in `ios/App/App.xcodeproj/xcshareddata/xcschemes/` and without them, Xcode auto-generates schemes based on what it detects. Currently, only the `CosmiqWidgetExtension` scheme is showing in the scheme selector.
 
 ## Solution
 
-I'll generate a complete, clean `project.pbxproj` file that includes:
+I'll create the proper **App.xcscheme** file that:
 
-1. **Widget Extension Target** - Full `PBXNativeTarget` for CosmiqWidgetExtension
-2. **File References** - Properly linked references to all 4 widget files:
-   - `CosmiqWidget.swift`
-   - `WidgetData.swift`  
-   - `WidgetViews.swift`
-   - `CosmiqWidget.entitlements`
-3. **Build Phases** - Sources and Resources phases for the widget
-4. **Build Settings** - Correct bundle ID, entitlements path, deployment target
-5. **App Groups** - Properly configured for data sharing
-6. **Target Dependency** - Widget embedded in main app
+1. Configures the main **App** target as the buildable reference
+2. Sets up Run, Test, Profile, Analyze, and Archive actions
+3. Properly includes the widget extension as a dependency during Archive
 
 ## Changes
 
-### File: `ios/App/App.xcodeproj/project.pbxproj`
+### New File: `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`
 
-Complete replacement with properly configured widget extension:
+Create a scheme file that defines:
 
-**New sections to add:**
-- `PBXBuildFile` entries for widget Swift files
-- `PBXFileReference` entries for widget files and `.appex` product
-- `PBXGroup` for CosmiqWidget folder
-- `PBXNativeTarget` for CosmiqWidgetExtension
-- `PBXContainerItemProxy` for target dependency
-- `PBXTargetDependency` to embed widget in app
-- `PBXCopyFilesBuildPhase` to embed extension
-- `XCBuildConfiguration` for widget Debug/Release
-- `XCConfigurationList` for widget target
+- **Build Action**: Build the App target (and CosmiqWidgetExtension as dependency)
+- **Run Action**: Launch App.app
+- **Archive Action**: Archive the App target with widget embedded
 
-**Key build settings:**
+Key configuration:
+
 ```text
-PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution.CosmiqWidget
-CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements
-INFOPLIST_GENERATION = YES (auto-generate Info.plist)
-SWIFT_EMIT_LOC_STRINGS = YES
-GENERATE_INFOPLIST_FILE = YES
+BuildableReference:
+  BlueprintIdentifier = 504EC3031FED79650016851F (App target)
+  BuildableName = App.app
+  BlueprintName = App
 ```
 
 ## After Implementation
 
-1. Close Xcode completely
-2. I'll update the `project.pbxproj` file
-3. Clear derived data: `rm -rf ~/Library/Developer/Xcode/DerivedData/*`
-4. Reopen Xcode - you should see a clean structure with CosmiqWidgetExtension properly configured
-5. Build and run
-
----
+1. Pull the changes with `git pull`
+2. Close and reopen Xcode
+3. The **App** scheme will now appear in the scheme selector dropdown
+4. Select **App** → **Archive** to build the app with the widget embedded
 
 ## Technical Details
 
-The fix involves adding approximately 200 lines to the pbxproj file to properly define:
-
-```text
-CosmiqWidgetExtension (target)
-├── CosmiqWidget.swift (source)
-├── WidgetData.swift (source)  
-├── WidgetViews.swift (source)
-└── CosmiqWidget.entitlements (entitlements)
-```
-
-The main App target will include a "Copy Files" build phase to embed the `.appex` bundle, and a target dependency to ensure the widget builds before the app.
+The scheme file uses XML format and references the App target by its UUID (`504EC3031FED79650016851F`) from the project.pbxproj file. This is the standard Xcode scheme format and will be recognized automatically when Xcode opens the project.
 
