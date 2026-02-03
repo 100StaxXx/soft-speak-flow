@@ -1,57 +1,64 @@
 
-# Disable Subscription System & Remove Soft Modal
+# Automated Widget Fix Script
 
 ## Overview
+Create a post-sync script that automatically restores the CosmiqWidgetExtension configuration after running `npx cap sync ios`. This prevents the recurring build failures you've been experiencing with Info.plist settings.
 
-Disable the subscription paywall to allow all users free, unlimited access. This keeps all subscription infrastructure intact for future re-enabling.
+## What the Script Will Do
+1. Run after every `cap sync ios` command
+2. Scan the Xcode project file for widget build settings
+3. Ensure `GENERATE_INFOPLIST_FILE = NO` is set
+4. Ensure `INFOPLIST_FILE = ../CosmiqWidget/Info.plist` is correctly set
+5. Print a confirmation message showing what was fixed
 
-## Changes
+## Implementation Steps
 
-### 1. `src/hooks/useAccessStatus.ts`
+### Step 1: Create the fix-widget script
+Create a new file `scripts/fix-widget-config.js` that:
+- Reads the `ios/App/App.xcodeproj/project.pbxproj` file
+- Uses regex to find and fix the CosmiqWidgetExtension build configurations
+- Writes the corrected file back
+- Logs what was changed
 
-Modify the return to always grant access:
+### Step 2: Update npm scripts
+Modify `package.json` to chain the fix script after sync:
 
-```typescript
-return {
-  hasAccess: true, // ALWAYS grant access - monetization disabled
-  isSubscribed,
-  isInTrial: false, // No longer relevant
-  trialExpired: false, // No longer relevant
-  trialDaysRemaining: 0,
-  accessSource: isSubscribed ? 'subscription' : 'none',
-  trialEndsAt,
-  loading: false,
-};
+```text
+Current:
+  "ios:sync": "cd ios/App && npx cap sync ios"
+  "ios:testflight": "npm run build && npm run ios:sync && node scripts/open-xcode.js"
+
+Updated:
+  "ios:sync": "npx cap sync ios && node scripts/fix-widget-config.js"
+  "ios:testflight": "npm run build && npm run ios:sync && node scripts/open-xcode.js"
 ```
 
-### 2. `src/App.tsx`
+### Step 3: Enhance open-xcode.js (optional)
+Add a verification step that checks widget config before opening Xcode.
 
-Remove `SubscriptionGate` from `EvolutionAwareContent`:
+## Technical Details
 
-```typescript
-const EvolutionAwareContent = memo(() => {
-  return (
-    <>
-      <GlobalEvolutionListener />
-      {/* SubscriptionGate removed - monetization disabled */}
-      <WeeklyRecapModal />
-    </>
-  );
-});
+The script will target these specific patterns in project.pbxproj:
+
+```text
+For CosmiqWidgetExtension Debug and Release configurations:
+  - Find: GENERATE_INFOPLIST_FILE = YES (or missing)
+  - Replace: GENERATE_INFOPLIST_FILE = NO
+
+  - Find: INFOPLIST_FILE = "" (or incorrect path)
+  - Replace: INFOPLIST_FILE = ../CosmiqWidget/Info.plist
 ```
 
-## Result
+The script will identify widget configurations by looking for blocks containing `PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution.CosmiqWidget`.
 
-| Component | Status |
-|-----------|--------|
-| Hard paywall (TrialExpiredPaywall) | Disabled |
-| Soft promotional modal (SubscriptionGate) | Hidden |
-| Premium page | Still accessible (users can subscribe if they want) |
-| Apple IAP backend | Unchanged |
-| Subscription hooks | Intact for future use |
+## Usage After Implementation
+After this is set up, your workflow becomes:
+1. Pull latest code: `git pull`
+2. Run sync (automatically fixes widget): `npm run ios:sync`
+3. Build in Xcode - no manual fixes needed!
 
-## Reversing Later
-
-When ready to monetize:
-1. Restore `useAccessStatus.ts` logic
-2. Uncomment `<SubscriptionGate />` in App.tsx
+## Files to Create/Modify
+| File | Action |
+|------|--------|
+| `scripts/fix-widget-config.js` | Create new script |
+| `package.json` | Update ios:sync command |
