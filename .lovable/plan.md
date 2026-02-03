@@ -1,40 +1,46 @@
 
 
-# Automated Widget Fix Script
+# Fix ES Module Script for iOS Sync
 
 ## Overview
-Creating a post-sync script that automatically restores the CosmiqWidgetExtension configuration after running `npx cap sync ios`. This will prevent the recurring Info.plist build failures.
+Rename the widget configuration script to use the `.cjs` extension so it works with your project's ES Module configuration, and update `package.json` to reference the renamed file.
 
-## Files to Create/Modify
+---
 
-### 1. Create `scripts/fix-widget-config.js` (New File)
-A Node.js script that:
-- Reads `ios/App/App.xcodeproj/project.pbxproj`
-- Finds CosmiqWidgetExtension build configurations (identified by `PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution.CosmiqWidget`)
-- Sets `GENERATE_INFOPLIST_FILE = NO` 
-- Sets `INFOPLIST_FILE = ../CosmiqWidget/Info.plist`
-- Logs what was fixed
+## Changes Required
 
-### 2. Update `package.json`
-Change the ios:sync script from:
-```text
-"ios:sync": "cd ios/App && npx cap sync ios"
+### 1. Rename Script File
+| Current | New |
+|---------|-----|
+| `scripts/fix-widget-config.js` | `scripts/fix-widget-config.cjs` |
+
+The `.cjs` extension tells Node.js to treat the file as CommonJS, allowing `require()` to work even though your project uses `"type": "module"`.
+
+---
+
+### 2. Update package.json Scripts
+
+**Line 14 - ios:sync:**
+```json
+"ios:sync": "npx cap sync ios && node scripts/fix-widget-config.cjs",
 ```
-To:
-```text
-"ios:sync": "npx cap sync ios && node scripts/fix-widget-config.js"
+
+**Line 15 - ios:testflight (if present):**
+```json
+"ios:testflight": "npm run build && npx cap sync ios && node scripts/fix-widget-config.cjs",
 ```
 
-## How It Works
-The script runs automatically after every `cap sync ios` and ensures the widget settings are correct, regardless of what Capacitor does during sync.
+---
 
-## Your New Workflow
-1. `git pull` - Get latest code
-2. `npm run ios:sync` - Sync AND auto-fix widget config
-3. Open Xcode and build - No manual fixes needed!
+## After Implementation
 
-## Safety
-- The script only ensures correct values are set
-- If settings are already correct, it simply confirms they're good
-- Your current successful upload is not affected - this prevents future issues
+Run these commands from your **project root**:
+
+```bash
+npm run build
+npm run ios:sync
+npx cap open ios
+```
+
+Then rebuild in Xcode with Cmd+R.
 
