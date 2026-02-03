@@ -1,53 +1,57 @@
 
-# Fix Widget Extension Info.plist for App Store Submission
+# Disable Subscription System & Remove Soft Modal
 
-## Problem Summary
+## Overview
 
-The App Store upload is failing with:
-> "Missing Info.plist value. The Info.plist at 'App.app/Plugins/CosmiqWidgetExtension.appex' is missing a required value... must contain a value for the NSExtensionPointIdentifier key within the NSExtension dictionary."
-
-**Root cause**: The widget extension uses `GENERATE_INFOPLIST_FILE = YES` which auto-generates a basic Info.plist, but WidgetKit extensions require a specific `NSExtension` dictionary that Xcode's auto-generation doesn't include properly.
-
-## Solution
-
-I'll create an explicit `Info.plist` file for the widget extension and update the project configuration to use it.
+Disable the subscription paywall to allow all users free, unlimited access. This keeps all subscription infrastructure intact for future re-enabling.
 
 ## Changes
 
-### 1. Create: `ios/CosmiqWidget/Info.plist`
+### 1. `src/hooks/useAccessStatus.ts`
 
-A proper WidgetKit Info.plist containing:
+Modify the return to always grant access:
 
-- **NSExtension dictionary** with:
-  - `NSExtensionPointIdentifier` = `com.apple.widgetkit-extension` (required for WidgetKit)
-- Standard bundle keys (display name, version, etc.)
-
-### 2. Update: `ios/App/App.xcodeproj/project.pbxproj`
-
-Modify the widget build settings:
-
-- Change `GENERATE_INFOPLIST_FILE` from `YES` to `NO`
-- Set `INFOPLIST_FILE` to point to `../CosmiqWidget/Info.plist`
-- Add the Info.plist file reference to the project
-
-## After Implementation
-
-1. Pull the changes: `git pull`
-2. Clear Derived Data: `rm -rf ~/Library/Developer/Xcode/DerivedData/*`
-3. Reopen Xcode and Archive the **App** scheme
-4. Upload to App Store Connect - the validation error should be resolved
-
----
-
-## Technical Details
-
-The Info.plist will contain the critical `NSExtension` dictionary:
-
-```text
-NSExtension
-├── NSExtensionPointIdentifier: com.apple.widgetkit-extension
+```typescript
+return {
+  hasAccess: true, // ALWAYS grant access - monetization disabled
+  isSubscribed,
+  isInTrial: false, // No longer relevant
+  trialExpired: false, // No longer relevant
+  trialDaysRemaining: 0,
+  accessSource: isSubscribed ? 'subscription' : 'none',
+  trialEndsAt,
+  loading: false,
+};
 ```
 
-This tells iOS that this extension is a WidgetKit widget and should be processed accordingly. Without this key, App Store validation rejects the binary.
+### 2. `src/App.tsx`
 
-The file reference will be added to the CosmiqWidget group in the project navigator, making it visible alongside the Swift files.
+Remove `SubscriptionGate` from `EvolutionAwareContent`:
+
+```typescript
+const EvolutionAwareContent = memo(() => {
+  return (
+    <>
+      <GlobalEvolutionListener />
+      {/* SubscriptionGate removed - monetization disabled */}
+      <WeeklyRecapModal />
+    </>
+  );
+});
+```
+
+## Result
+
+| Component | Status |
+|-----------|--------|
+| Hard paywall (TrialExpiredPaywall) | Disabled |
+| Soft promotional modal (SubscriptionGate) | Hidden |
+| Premium page | Still accessible (users can subscribe if they want) |
+| Apple IAP backend | Unchanged |
+| Subscription hooks | Intact for future use |
+
+## Reversing Later
+
+When ready to monetize:
+1. Restore `useAccessStatus.ts` logic
+2. Uncomment `<SubscriptionGate />` in App.tsx
