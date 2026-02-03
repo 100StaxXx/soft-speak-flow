@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "postinstall": "patch-package",
     "cards:snapshot": "tsx scripts/cardSnapshot.ts",
-    "ios:sync": "npx cap sync ios && node scripts/fix-widget-config.js",
+    "ios:sync": "npx cap sync ios && node scripts/fix-widget-config.cjs",
     "ios:testflight": "npm run build && npm run ios:sync && node scripts/open-xcode.js"
   },
   "dependencies": {
