@@ -65,6 +65,7 @@
 		CW2000001000000000000002 /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
 		CW2000001000000000000003 /* WidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetViews.swift; sourceTree = "<group>"; };
 		CW2000001000000000000004 /* CosmiqWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CosmiqWidget.entitlements; sourceTree = "<group>"; };
+		CW2000001000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CW3000001000000000000001 /* CosmiqWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CosmiqWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -140,7 +141,7 @@
 			name = Pods;
 			sourceTree = "<group>";
 		};
-		/* Widget Extension Group */
+	/* Widget Extension Group */
 		CW8000001000000000000001 /* CosmiqWidget */ = {
 			isa = PBXGroup;
 			children = (
@@ -148,6 +149,7 @@
 				CW2000001000000000000002 /* WidgetData.swift */,
 				CW2000001000000000000003 /* WidgetViews.swift */,
 				CW2000001000000000000004 /* CosmiqWidget.entitlements */,
+				CW2000001000000000000005 /* Info.plist */,
 			);
 			path = ../CosmiqWidget;
 			sourceTree = "<group>";
@@ -539,7 +541,7 @@
 			};
 			name = Release;
 		};
-		/* Widget Extension Build Configurations */
+	/* Widget Extension Build Configurations */
 		CWD000001000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -549,8 +551,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -578,8 +580,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = B6VW78ABTR;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
