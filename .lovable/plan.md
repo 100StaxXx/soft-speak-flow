@@ -1,118 +1,195 @@
 
-# Integrate Lovable Cloud Managed Apple Sign-In
+# Add Mentor Gender Preference to Onboarding
 
 ## Summary
 
-You've enabled Apple Sign-In managed by Lovable Cloud - great choice! The button is already in the UI, and the post-auth redirect logic correctly handles new vs. existing users. We just need to wire up the web OAuth flow to use Lovable's managed integration.
+Adding an inclusive "mentor energy" preference question to the onboarding flow. This will help match users with mentors they'll connect with better by applying a gender preference boost to the scoring algorithm.
 
-## Current State Analysis
+## Current Mentor Distribution
 
-| Component | Status |
-|-----------|--------|
-| Apple button in UI | ✅ Already added |
-| Native iOS flow | ✅ Works via Capacitor plugin + edge function |
-| Post-auth redirect logic | ✅ New users → onboarding, existing → tasks |
-| Web OAuth flow | ⚠️ Needs update for Lovable Cloud |
+| Mentor | Gender | Short Title |
+|--------|--------|-------------|
+| Atlas | Masculine | Stoic Wisdom |
+| Eli | Masculine (needs DB tag) | Steady Encouragement |
+| Stryker | Masculine | High Performance |
+| Carmen | Feminine | Feminine Tough Love |
+| Reign | Feminine | Elite Performance |
+| Sienna | Feminine | Soft Healing |
+| Solace | Feminine | Warm Encouragement |
 
-## How the Redirect Logic Works
+**Final: 3 masculine, 4 feminine**
 
-Your existing `getAuthRedirectPath` function already handles the new vs. returning user logic perfectly:
+---
 
+## Question Design
+
+### Placement
+Insert as **Question 1** (before the existing focus/tone/progress questions) - this is a high-level filter that should come first.
+
+### Question Text
+> "What kind of mentor energy resonates with you?"
+
+### Options
+
+| Option | Tags | Effect |
+|--------|------|--------|
+| Feminine presence | `["feminine_preference"]` | +1.5 boost to feminine mentors |
+| Masculine presence | `["masculine_preference"]` | +1.5 boost to masculine mentors |
+| Either works for me | `[]` | No gender weighting (current behavior) |
+
+### Faction Narratives
 ```text
-User signs in with Apple
-        │
-        ▼
-┌─────────────────────────────┐
-│ Fetch profile from database │
-└─────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────┐
-│ Has profile with onboarding_      │
-│ completed = true?                 │
-└───────────────────────────────────┘
-     │                    │
-    YES                  NO
-     │                    │
-     ▼                    ▼
-  /tasks             /onboarding
-(existing user)     (new user)
+starfall: "Before you chart your course, the cosmos asks one question..."
+void: "In the stillness, a presence awaits. What form does it take?"
+stellar: "The stars align to reveal your guide. Who do you see among them?"
 ```
 
 ---
 
-## Implementation Plan
+## Technical Implementation
 
-### Step 1: Configure Lovable Cloud Social Auth
+### Step 1: Database - Add masculine tag to Eli
 
-Use the social auth configuration tool to generate the `@lovable.dev/cloud-auth-js` integration module. This creates the `src/integrations/lovable` folder with the proper OAuth helpers.
+Update Eli's tags in the `mentors` table to include `masculine` for proper matching.
 
-### Step 2: Update Web OAuth Flow in Auth.tsx
+```sql
+UPDATE public.mentors 
+SET tags = array_append(tags, 'masculine')
+WHERE slug = 'eli' AND NOT ('masculine' = ANY(tags));
+```
 
-Modify the web fallback path (lines 673-678) to use Lovable's managed OAuth for Apple Sign-In while keeping the native iOS flow unchanged.
+### Step 2: Update StoryQuestionnaire.tsx
 
-**Current code:**
+Add the new question at the beginning of the `questions` array:
+
 ```typescript
-const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
-  provider,
-  options: {
-    redirectTo: getRedirectUrlWithPath('/'),
+const questions: StoryQuestion[] = [
+  {
+    id: "mentor_energy",
+    narrative: "",
+    question: "What kind of mentor energy resonates with you?",
+    options: [
+      { text: "Feminine presence", tags: ["feminine_preference"] },
+      { text: "Masculine presence", tags: ["masculine_preference"] },
+      { text: "Either works for me", tags: [] },
+    ],
   },
+  // ... existing questions
+];
+```
+
+Update `getFactionNarrative` to handle 4 questions (add new narratives for Q1):
+
+```typescript
+const narratives: Record<FactionType, string[]> = {
+  starfall: [
+    "Before you chart your course, the cosmos asks one question...",
+    "As flames dance in the distance, your ship awaits its next destination...",
+    "The engines hum with potential energy. Your crew looks to you for direction...",
+    "Your path grows clearer with each choice...",
+  ],
+  void: [
+    "In the stillness, a presence awaits. What form does it take?",
+    "In the silent depths between stars, clarity emerges from stillness...",
+    "The void speaks to those who listen. A whisper guides your path...",
+    "The shadows reveal what light cannot...",
+  ],
+  stellar: [
+    "The stars align to reveal your guide. Who do you see among them?",
+    "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
+    "Your companion gazes at the stars with wonder. What do you see?",
+    "The constellations align to show your way...",
+  ],
+};
+```
+
+### Step 3: Update StoryOnboarding.tsx - Scoring Logic
+
+Add gender preference scoring after calculating trait scores (around line 270):
+
+```typescript
+// Extract gender preference from answers
+const genderAnswer = questionAnswers.find(a => a.questionId === "mentor_energy");
+const prefersFeminine = genderAnswer?.tags.includes("feminine_preference");
+const prefersMasculine = genderAnswer?.tags.includes("masculine_preference");
+
+// Apply gender preference boost during scoring
+mentorScores.forEach(mentorScore => {
+  const mentorTags = mentorScore.mentor.tags || [];
+  const isFeminine = mentorTags.includes("feminine");
+  const isMasculine = mentorTags.includes("masculine");
+  
+  if (prefersFeminine && isFeminine) {
+    mentorScore.score += 1.5;  // Strong boost
+  } else if (prefersMasculine && isMasculine) {
+    mentorScore.score += 1.5;  // Strong boost
+  }
+  // "Either works" = no boost applied
 });
 ```
 
-**Updated code:**
-```typescript
-// For Apple on web, use Lovable Cloud managed OAuth
-if (provider === 'apple') {
-  const { lovable } = await import("@/integrations/lovable");
-  const { error } = await lovable.auth.signInWithOAuth("apple", {
-    redirect_uri: getRedirectUrl(),
-  });
-  if (error) throw new Error(error.message);
-  return; // Redirect happens automatically
-}
+### Step 4: Update Question Weights
 
-// For other providers, use standard Supabase OAuth
-const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
-  provider,
-  options: {
-    redirectTo: getRedirectUrlWithPath('/'),
+Adjust `QUESTION_WEIGHTS` array to account for 4 questions:
+
+```typescript
+// Q1=1.0 (energy - filtered separately), Q2=1.5 (focus), Q3=1.3 (tone), Q4=1.1 (progress)
+const QUESTION_WEIGHTS = [1.0, 1.5, 1.3, 1.1];
+```
+
+### Step 5: Save Preference to Profile
+
+Store the preference in `onboarding_data` (no schema change needed):
+
+```typescript
+// In handleQuestionnaireComplete, when saving to profile:
+const genderPref = questionAnswers.find(a => a.questionId === "mentor_energy")?.answer;
+
+await supabase.from("profiles").update({
+  onboarding_data: {
+    ...existingData,
+    mentorEnergyPreference: genderPref || "no_preference",
   },
-});
+}).eq("id", user.id);
 ```
 
 ---
 
-## Flow Summary After Changes
+## Flow After Changes
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                     User clicks "Sign in with Apple"            │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-        Native iOS?                      Web browser?
-              │                               │
-              ▼                               ▼
-┌─────────────────────────┐    ┌─────────────────────────────────┐
-│ Capacitor Apple plugin  │    │ Lovable Cloud managed OAuth     │
-│ + edge function         │    │ lovable.auth.signInWithOAuth()  │
-│ (keeps working as-is)   │    │ (uses Lovable's Apple config)   │
-└─────────────────────────┘    └─────────────────────────────────┘
-              │                               │
-              └───────────────┬───────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              handlePostAuthNavigation() triggered               │
-│                                                                 │
-│   → ensureProfile() - creates profile if new user               │
-│   → getAuthRedirectPath() - determines destination              │
-│       - No profile or onboarding incomplete → /onboarding       │
-│       - Onboarding complete → /tasks                            │
-└─────────────────────────────────────────────────────────────────┘
+New User Flow:
+┌─────────────────────────────────────┐
+│ Q1: "What kind of mentor energy    │
+│      resonates with you?"           │
+│  • Feminine presence                │
+│  • Masculine presence               │
+│  • Either works for me              │
+└─────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────┐
+│ Q2: "What do you want to work on?" │
+└─────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────┐
+│ Q3: "How do you want guidance?"    │
+└─────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────┐
+│ Q4: "What helps you progress?"     │
+└─────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────┐
+│ Mentor Matching Algorithm          │
+│  • Calculate trait scores          │
+│  • Apply gender preference boost   │
+│  • Apply intensity matching        │
+│  • Select best match               │
+└─────────────────────────────────────┘
 ```
 
 ---
@@ -121,13 +198,16 @@ const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
 
 | File | Change |
 |------|--------|
-| `src/integrations/lovable/` | Generated automatically by social auth tool |
-| `src/pages/Auth.tsx` | Update web OAuth section (~line 673) to use Lovable Cloud for Apple |
+| `mentors` table | Add `masculine` tag to Eli |
+| `src/components/onboarding/StoryQuestionnaire.tsx` | Add mentor energy question as Q1, update faction narratives for 4 questions |
+| `src/components/onboarding/StoryOnboarding.tsx` | Add gender preference scoring boost, update question weights array |
 
-## Testing Recommendations
+---
 
-After implementation:
-1. **Web browser**: Click Apple Sign-In → should redirect to Apple's OAuth page
-2. **New user**: Complete Apple auth → should land on `/onboarding`
-3. **Existing user**: Sign in again → should land on `/tasks`
-4. **iOS TestFlight**: Native Apple sheet should still work as before
+## Why This Approach
+
+1. **Inclusive** - "Either works for me" is a valid first-class option, not an afterthought
+2. **Non-invasive** - Asks about mentor preference, not personal gender identity
+3. **Relevant** - Directly impacts the mentorship matching
+4. **Simple** - Uses existing tag system, no new database columns needed
+5. **Balanced** - 3 masculine vs 4 feminine mentors gives good options for both preferences
