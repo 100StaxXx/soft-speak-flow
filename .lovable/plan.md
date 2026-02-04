@@ -1,63 +1,98 @@
 
-# Fix Ritual Creation - Form Fields & Database Error
+# Fix Resist Mode Not Spawning Astral Encounters
 
 ## Problem Summary
 
-You're experiencing two issues:
-
-1. **Limited Form Fields** - When adding a new ritual, you only see a "Why" input and difficulty selector, missing options like frequency/days and scheduling
-2. **"Failed to add ritual" Error** - The creation fails because the code tries to insert data into a column that doesn't exist
+When you click "Resist" on a bad habit, no mini-game appears. The button works (no error), but nothing happens visually.
 
 ## Root Cause
 
-**For the error:** The code incorrectly tries to save `epic_id` directly to the habits table, but that column doesn't exist. The app uses a separate linking table to connect rituals to campaigns.
+The **AstralEncounterProvider** is completely disabled in App.tsx:
 
-**For limited fields:** The quick-add form is a simplified version - by design it only captures the essentials. However, we can enhance it to include the frequency picker at minimum.
+```tsx
+// Line 36 - Import commented out:
+// import { AstralEncounterProvider } from "@/components/astral-encounters";
+
+// Line 271 - Component removed from tree:
+{/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
+```
+
+This provider is responsible for:
+1. Rendering the `AstralEncounterModal` (the game UI)
+2. Managing the `showEncounterModal` state that controls visibility
+3. Coordinating between trigger events and modal display
+
+Without it, when `ResistModePanel` calls `checkEncounterTrigger()`:
+- An encounter record gets created in the database ✓
+- The hook's local `showEncounterModal` state becomes `true` ✓
+- But there's **no modal component rendered anywhere** ✗
+
+## Solution
+
+Re-enable the `AstralEncounterProvider` in App.tsx, wrapping the app content so the modal can render and respond to encounter triggers.
 
 ---
 
-## Fix Plan
+## Implementation Steps
 
-### Step 1: Fix the Database Insert
-Remove the non-existent column from the insert operation so the ritual saves successfully.
+### Step 1: Restore Import Statement
+Uncomment the import for AstralEncounterProvider at line 36.
 
-**File:** `src/components/EpicCheckInDrawer.tsx`
-
-### Step 2: Enhance the Quick-Add Form
-Add the frequency/day picker so you can specify which days the ritual should appear.
-
-**File:** `src/components/EpicCheckInDrawer.tsx`
+### Step 2: Wrap App Content with Provider
+Re-add the `<AstralEncounterProvider>` component around the main content at line 271-272, and close it at line 325.
 
 ---
 
 ## Technical Details
 
 ```text
-Current broken insert:
-┌─────────────────────────┐
-│ habits table            │
-│ - epic_id: ??? ← ERROR  │
-│ - title, difficulty...  │
-└─────────────────────────┘
+Before (broken):
+┌─────────────────────────────────────────┐
+│ App.tsx                                 │
+│ ┌─────────────────────────────────────┐ │
+│ │ RealtimeSyncProvider                │ │
+│ │ ┌─────────────────────────────────┐ │ │
+│ │ │ <Suspense>                      │ │ │
+│ │ │   <Routes>                      │ │ │
+│ │ │     /companion → ResistPanel    │ │ │
+│ │ │       ↳ calls checkEncounter()  │ │ │
+│ │ │       ↳ creates DB record       │ │ │
+│ │ │       ↳ sets local modal=true   │ │ │
+│ │ │       ↳ NO MODAL RENDERED 💔    │ │ │
+│ │ └─────────────────────────────────┘ │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
 
-Fixed approach:
-┌─────────────────────────┐    ┌──────────────────┐
-│ habits table            │───>│ epic_habits      │
-│ - title, difficulty...  │    │ - habit_id       │
-│                         │    │ - epic_id        │
-└─────────────────────────┘    └──────────────────┘
+After (fixed):
+┌─────────────────────────────────────────┐
+│ App.tsx                                 │
+│ ┌─────────────────────────────────────┐ │
+│ │ RealtimeSyncProvider                │ │
+│ │ ┌─────────────────────────────────┐ │ │
+│ │ │ AstralEncounterProvider ✨      │ │ │
+│ │ │ ┌─────────────────────────────┐ │ │ │
+│ │ │ │ <Suspense>                  │ │ │ │
+│ │ │ │   <Routes>...               │ │ │ │
+│ │ │ └─────────────────────────────┘ │ │ │
+│ │ │ <AstralEncounterModal /> ← 🎮   │ │ │
+│ │ └─────────────────────────────────┘ │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
 ```
 
-### Changes Required:
+### Files to Modify
 
-1. **Remove `epic_id` from insert** - The habits table uses a junction table (`epic_habits`) for campaign linkage, which the code already handles correctly in the second step
+**`src/App.tsx`**:
+1. Line 36: Uncomment import statement
+2. Lines 271-272: Add `<AstralEncounterProvider>` opening tag
+3. Lines 325-326: Add `</AstralEncounterProvider>` closing tag
 
-2. **Add frequency state & picker** - Include:
-   - New state: `newRitualDays` for tracking selected days
-   - `FrequencyPicker` component below the difficulty selector
-   - Pass `custom_days` and `frequency` to the insert
-
-### Expected Result:
-- Rituals will save successfully
-- You can specify which days each ritual should appear
-- Rituals will properly link to your campaign
+### Expected Behavior After Fix
+- Click "Resist" on any bad habit
+- Trigger overlay animation appears (rift/portal effect)
+- Astral Encounter modal opens with one of the four random mini-games:
+  - Energy Beam
+  - Tap Sequence  
+  - Orb Match
+  - Galactic Match
+- Completing the game updates streak, awards XP, and boosts companion
