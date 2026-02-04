@@ -1,80 +1,99 @@
 
-
-# Fix iOS WKWebView Crash - Debug Systematic Isolation
+# Fix iOS WKWebView Black Screen - Chunk Loading Order Issue
 
 ## Problem Summary
 
-The iOS app shows **"web process 0 crash"** - a complete WKWebView process failure. This is more severe than a JavaScript error; it means the entire rendering process crashed before React could mount.
+The iOS app crashes with **`TypeError: undefined is not an object (evaluating 'c.createContext')`** at Line 1. This is happening because:
 
-## Root Cause Analysis
+1. The `manualChunks` configuration in `vite.config.ts` splits React into a separate `react-vendor` chunk
+2. On iOS WKWebView, chunk loading order can differ from desktop browsers
+3. When a component chunk loads before `react-vendor`, React (`c` in minified code) is undefined
+4. Any `createContext` call fails because React isn't loaded yet
 
-The `next-themes` fix was applied, but the **build may not have been synced** to iOS, OR there are additional crash points. The main suspects are:
+## Root Cause
 
-| Suspect | Risk Level | Reason |
-|---------|------------|--------|
-| **Sentry `replayIntegration()`** | HIGH | Uses Session Replay APIs that can crash iOS WebView |
-| **Service Worker registration** | HIGH | iOS WKWebView has limited/broken service worker support |
-| **Lazy loading App.tsx** | MEDIUM | Dynamic imports can fail on iOS if paths aren't resolved correctly |
+The aggressive manual chunking strategy is incompatible with iOS WKWebView's script loading behavior. While this optimization works on desktop browsers, iOS may load chunks out of order or fail to properly sequence them.
 
-## Proposed Solution
+## Solution
 
-Implement a **systematic isolation approach** - disable potential crash points one by one until the app loads:
+### Step 1: Simplify the Chunk Strategy
 
-### Step 1: Disable Sentry Replay Integration (Most Likely Culprit)
-
-Modify `src/main.tsx` to remove the Replay integration which uses browser APIs incompatible with iOS WKWebView:
+Modify `vite.config.ts` to use a safer chunking approach that keeps React as part of the main bundle, ensuring it's always loaded first:
 
 ```typescript
-// Before (lines 14-17)
-integrations: [
-  Sentry.browserTracingIntegration(),
-  Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
-],
+// In vite.config.ts, change the manualChunks configuration
 
-// After - Remove replay integration
-integrations: [
-  Sentry.browserTracingIntegration(),
-  // replayIntegration removed - causes WKWebView crashes on iOS
-],
-```
-
-Also remove the replay sample rates:
-```typescript
-// Before (lines 19-20)
-replaysSessionSampleRate: 0.1,
-replaysOnErrorSampleRate: 1.0,
-
-// After - Remove these lines entirely
-```
-
-### Step 2: Disable Service Worker on Capacitor Native
-
-Modify `src/main.tsx` to skip service worker registration when running inside Capacitor:
-
-```typescript
-// Before (lines 33-39)
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-  });
-}
-
-// After - Only register on web, not native
-if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-  });
+manualChunks: (id) => {
+  // Skip externalized modules
+  if (id.includes('@capacitor-community/contacts')) {
+    return undefined;
+  }
+  
+  // CRITICAL: Do NOT split React into a separate chunk on iOS
+  // This causes WKWebView loading order issues where React is undefined
+  // when other chunks try to use createContext
+  
+  // Keep all vendor modules in a single chunk for iOS compatibility
+  if (id.includes('node_modules')) {
+    // Only split very large libraries that don't depend on React context
+    if (id.includes('recharts')) return 'charts-vendor';
+    if (id.includes('date-fns')) return 'date-vendor';
+    if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
+    
+    // Everything else stays in the main vendor chunk
+    return 'vendor';
+  }
 }
 ```
 
-### Step 3: Ensure Build is Properly Synced
+### Step 2: Remove `next-themes` from `package.json`
 
-After making changes, user must run:
+Even though it's not imported anywhere, having it in dependencies is unnecessary:
+
+```json
+// Remove this line from package.json dependencies
+"next-themes": "^0.3.0",
+```
+
+### Step 3: Add Capacitor Build Optimizations
+
+Add iOS-specific optimizations to ensure proper module loading:
+
+```typescript
+// In vite.config.ts, add to optimizeDeps
+optimizeDeps: {
+  include: [
+    'react', 
+    'react-dom', 
+    'react-router-dom', 
+    '@supabase/supabase-js',
+    '@tanstack/react-query',
+    'framer-motion'
+  ],
+  // Force pre-bundling of these critical dependencies
+},
+```
+
+### Step 4: Full Rebuild Sequence
+
+After the code changes, the user must run:
 
 ```bash
+# Pull latest changes
 git pull
-rm -rf dist ios/App/App/public
+
+# Clean all cached artifacts
+rm -rf node_modules/.vite
+rm -rf dist
+rm -rf ios/App/App/public
+
+# Reinstall dependencies (will remove next-themes)
+npm install
+
+# Build fresh
 npm run build
+
+# Sync to iOS
 npm run ios:sync
 ```
 
@@ -82,30 +101,56 @@ Then in Xcode:
 - **Product → Clean Build Folder** (Cmd+Shift+K)
 - **Product → Run** (Cmd+R)
 
-### Step 4: Verify with Debug Indicator
+## Why This Works
 
-The debug indicator added earlier should now show:
-- "Loading Cosmiq..." if WebView loads but JS stalls
-- Red error box if JavaScript throws
-- Nothing (it disappears) if React mounts successfully
+1. **Single vendor chunk**: Keeps React and React-dependent libraries together, ensuring React is always available when contexts are created
 
-## Why These Changes Work
+2. **Safer splitting**: Only splits libraries that don't use React contexts (recharts for charts, date-fns for dates, three.js for 3D)
 
-1. **Sentry Replay Integration** uses browser-specific APIs for session recording that don't exist in iOS WKWebView. The `browserTracingIntegration()` alone is safe.
+3. **Removed dead dependency**: Eliminates `next-themes` from the dependency tree entirely
 
-2. **Service Workers** in Capacitor iOS are problematic because WKWebView's service worker support is limited. The registration attempt can crash the process.
+4. **Pre-bundling critical deps**: Forces Vite to pre-bundle core dependencies, ensuring consistent loading order
 
-3. **Capacitor detection** via `window.Capacitor?.isNativePlatform?.()` safely checks if we're in a native app context.
+## Technical Details
+
+The original config had 12+ separate vendor chunks:
+- `react-vendor` (React, ReactDOM, React Router)
+- `supabase-vendor`
+- `query-vendor`
+- `animation-vendor`
+- `icons-vendor`
+- `radix-dialogs`
+- `radix-overlays`
+- `radix-ui`
+- `forms-vendor`
+- `charts-vendor`
+- `date-vendor`
+- `capacitor-vendor`
+
+This created a complex dependency graph where chunks could load in unpredictable order. On iOS WKWebView, the browser's parallel script loading doesn't guarantee order, causing React to be undefined when other chunks try to access it.
+
+The new config consolidates all React-dependent code into a single `vendor` chunk, with only standalone utilities split out:
+- `vendor` (React, Radix, React Query, Framer Motion, etc.)
+- `charts-vendor` (Recharts - standalone)
+- `date-vendor` (date-fns - standalone)
+- `three-vendor` (Three.js - standalone)
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/main.tsx` | Remove Sentry replay integration, skip service worker on native |
+| `vite.config.ts` | Simplify manualChunks to keep React together |
+| `package.json` | Remove `next-themes` dependency |
 
-## Cleanup After Fix Works
+## Rollback Plan
 
-Once the app loads successfully:
-1. Restore console dropping in `vite.config.ts` (change `drop: []` back to `drop: mode === 'production' ? ['console', 'debugger'] : []`)
-2. Remove the debug indicator from `index.html` (optional - it auto-hides anyway)
+If this doesn't work, the next step would be to completely disable `manualChunks` and let Vite handle chunking automatically:
 
+```typescript
+rollupOptions: {
+  external: ['@capacitor-community/contacts'],
+  // Remove manualChunks entirely
+},
+```
+
+This would create larger initial bundles but guarantee correct loading order.
