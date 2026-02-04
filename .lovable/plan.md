@@ -1,72 +1,67 @@
 
 
-# Randomize Mini-Games for Resist Mode
+# Fix Habit Surfacing Error
 
-## Overview
+## Why It's Happening Now
 
-Change the resist mode so that any habit can spawn any of the 4 active mini-games, rather than being locked to a specific game based on the habit's theme.
+The code hasn't changed - this is likely a **data timing issue**. The upsert approach works when there's no conflict, but fails when:
+- Multiple habit surfacing calls happen simultaneously (race condition)
+- The partial unique index can't be matched by the Supabase JS client
 
-## Current Behavior
+## Solution
 
-When you resist a habit, the game is determined by the habit's theme:
-- Doomscrolling (distraction) → always Tap Sequence
-- Sugar Cravings (laziness) → always Energy Beam
-- Stress Eating (anxiety) → always Orb Match
-
-## New Behavior
-
-Any resist action will randomly select from all 4 active games:
-- Energy Beam (Star Defender)
-- Tap Sequence (Cosmic Reflex)
-- Orb Match
-- Galactic Match
-
-This adds variety and prevents encounters from feeling repetitive when resisting the same habit repeatedly.
+Replace the upsert with a safer "filter-then-insert" pattern that avoids the conflict entirely.
 
 ## Technical Changes
 
-### File: `src/utils/adversaryGenerator.ts`
+### File: `src/hooks/useHabitSurfacing.ts`
 
-**Modify `generateResistAdversary` function (lines 149-173):**
-
-Replace the themed game selection:
+**Current code (lines 151-162):**
 ```typescript
-miniGameType: THEME_MINIGAME_MAP[habitTheme],
+const { data, error } = await supabase
+  .from('daily_tasks')
+  .upsert(tasks, { 
+    onConflict: 'user_id,task_date,habit_source_id',
+    ignoreDuplicates: true 
+  })
+  .select('id');
 ```
 
-With random selection from active games:
+**New approach:**
 ```typescript
-const ACTIVE_RESIST_GAMES: MiniGameType[] = [
-  'energy_beam',
-  'tap_sequence', 
-  'orb_match',
-  'galactic_match'
-];
+// First, get all existing habit tasks for today to filter duplicates
+const { data: existingTasks } = await supabase
+  .from('daily_tasks')
+  .select('habit_source_id')
+  .eq('user_id', user.id)
+  .eq('task_date', taskDate)
+  .not('habit_source_id', 'is', null);
 
-miniGameType: randomFrom(ACTIVE_RESIST_GAMES),
+const existingHabitIds = new Set(existingTasks?.map(t => t.habit_source_id) || []);
+
+// Filter out habits that already have tasks
+const newTasks = tasks.filter(t => !existingHabitIds.has(t.habit_source_id));
+
+if (newTasks.length === 0) {
+  return [];
+}
+
+// Insert only new tasks
+const { data, error } = await supabase
+  .from('daily_tasks')
+  .insert(newTasks)
+  .select('id');
 ```
 
-The theme is still preserved for:
-- Adversary name generation (naming reflects the habit being resisted)
-- Essence rewards (thematically relevant to the habit)
-- Stat boosts (mind/body/soul still mapped to habit type)
+## Why This Works
 
-### Summary of Changes
-
-| Aspect | Before | After |
-|--------|--------|-------|
-| Game selection | Based on habit theme | Random from 4 active games |
-| Adversary name | Theme-based | Theme-based (unchanged) |
-| Essence rewards | Theme-based | Theme-based (unchanged) |
-| Stat boosts | Theme-based | Theme-based (unchanged) |
+- Explicitly checks for existing tasks before inserting
+- Avoids the upsert/partial index compatibility issue entirely
+- Same end result: only one task per habit per day
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/utils/adversaryGenerator.ts` | Add ACTIVE_RESIST_GAMES array, modify generateResistAdversary to use random selection |
-
-## Result
-
-Every time you hit "Resist" on any habit, you'll get one of the 4 games at random, keeping the experience fresh while still maintaining the thematic adversary and rewards tied to the specific habit you're fighting.
+| `src/hooks/useHabitSurfacing.ts` | Replace upsert with check-then-insert pattern in `surfaceAllHabits` mutation |
 
