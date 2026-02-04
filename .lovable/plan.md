@@ -1,112 +1,83 @@
 
-# Fix iOS Widget Display Issues & Add Ritual Count
+# Fix iOS Widget Spacing and Add Quest/Ritual Distinction
 
 ## Issues Identified
 
-### Issue 1: Yellow Background with Red X
-The yellow placeholder with the red "prohibited" symbol is iOS's default widget placeholder image. This appears because:
-- The CosmiqWidget extension is missing its own `Assets.xcassets` folder
-- Widgets need a `WidgetBackground` and `AccentColor` defined in their assets
-- Without these, iOS falls back to the placeholder image in the empty state area
+### Issue 1: "Quests" Label Too Close to Top
+The current small widget layout has the header text cramped against the top edge. Looking at the screenshot, the "Quests" label appears to be clipping at the boundary.
 
-### Issue 2: "0/0" Count Missing Rituals
-Currently the widget filters out rituals entirely but also excludes them from the count. You want to show quests-only in the list, but include ritual counts in the totals.
+**Root Cause**: iOS 17+ `.containerBackground` has its own internal safe area handling, but the content uses a uniform `.padding()` that doesn't provide enough top margin for the header.
+
+### Issue 2: No Quest/Ritual Distinction
+The small widget shows "0/0 Complete" as a combined total but doesn't distinguish between quests and rituals. Users want to see their progress breakdown.
 
 ---
 
 ## Solution
 
-### Part 1: Add Widget Assets Catalog
+### Part 1: Fix Header Spacing
 
-Create an `Assets.xcassets` folder for the widget extension with:
-- `AccentColor.colorset` - Required by widget system
-- `WidgetBackground.colorset` - Required for widget backgrounds
+Update `SmallWidgetView` to add more top padding and adjust the layout:
 
-```text
-ios/CosmiqWidget/Assets.xcassets/
-├── Contents.json
-├── AccentColor.colorset/
-│   └── Contents.json (cosmic purple color)
-└── WidgetBackground.colorset/
-    └── Contents.json (cosmic dark background)
-```
-
-**AccentColor (Cosmic Purple):**
-```json
-{
-  "colors": [{
-    "color": {
-      "color-space": "srgb",
-      "components": {
-        "red": "0.55",
-        "green": "0.36",
-        "blue": "0.95",
-        "alpha": "1.0"
-      }
-    },
-    "idiom": "universal"
-  }],
-  "info": { "author": "xcode", "version": 1 }
-}
-```
-
-**WidgetBackground (Cosmic Dark):**
-```json
-{
-  "colors": [{
-    "color": {
-      "color-space": "srgb",
-      "components": {
-        "red": "0.05",
-        "green": "0.02",
-        "blue": "0.15",
-        "alpha": "1.0"
-      }
-    },
-    "idiom": "universal"
-  }],
-  "info": { "author": "xcode", "version": 1 }
-}
-```
-
-### Part 2: Add Ritual Count to Widget Data
-
-**Modify `useWidgetSync.ts`** to track both:
-- `questCount` / `questCompleted` - for the task list (quests only)
-- `totalCount` / `totalCompleted` - for the counter (includes rituals)
-
-**Modify `WidgetDataPlugin.ts`** to include:
-```typescript
-interface WidgetDataPlugin {
-  updateWidgetData(options: {
-    tasks: WidgetTask[];           // Quests only (for list)
-    completedCount: number;        // Quests completed
-    totalCount: number;            // Quests total
-    ritualCount: number;           // NEW: Rituals total
-    ritualCompleted: number;       // NEW: Rituals completed
-    date: string;
-  }): Promise<void>;
-}
-```
-
-**Modify `WidgetData.swift`** to display combined count:
 ```swift
-// In the view, show combined count
-let questsComplete = data?.completedCount ?? 0
-let questsTotal = data?.totalCount ?? 0
-let ritualsComplete = data?.ritualCompleted ?? 0
-let ritualsTotal = data?.ritualCount ?? 0
-
-let totalComplete = questsComplete + ritualsComplete
-let totalAll = questsTotal + ritualsTotal
-
-// Display: "3/7" (combines quests + rituals)
-Text("\(totalComplete)/\(totalAll)")
+var body: some View {
+    VStack(spacing: 6) {
+        // Header with increased top margin
+        HStack {
+            Text("⚔️")
+                .font(.caption)
+            Text("Today")
+                .font(.caption.bold())
+                .foregroundColor(.cosmicText)
+            Spacer()
+        }
+        .padding(.top, 4)  // Extra breathing room
+        
+        Spacer()
+        
+        // Central progress circle
+        CosmicProgressCircle(...)
+        
+        // Combined count with quest/ritual breakdown
+        ...
+        
+        Spacer()
+    }
+    .padding(.horizontal)
+    .padding(.vertical, 8)  // Asymmetric padding
+}
 ```
 
-**Optional label** to distinguish:
-- Progress ring shows overall progress
-- Subtitle could show "2 quests • 5 rituals" for clarity
+### Part 2: Add Quest/Ritual Breakdown to All Widget Sizes
+
+**Small Widget** - Show breakdown below the counter:
+```swift
+// Current: "0/0" + "Complete"
+// New:     "0/0" + "0Q • 0R" (or just "0 quests" if no rituals)
+
+VStack(spacing: 2) {
+    Text("\(completedCount)/\(totalCount)")
+        .font(.subheadline.bold())
+        .foregroundColor(.cosmicGold)
+    
+    if ritualCount > 0 {
+        Text("\(questCount)Q • \(ritualCount)R")
+            .font(.system(size: 9))
+            .foregroundColor(.cosmicSecondary)
+    } else if questCount > 0 {
+        Text("\(questCount) quests")
+            .font(.caption2)
+            .foregroundColor(.cosmicSecondary)
+    } else {
+        Text("No tasks")
+            .font(.caption2)
+            .foregroundColor(.cosmicSecondary)
+    }
+}
+```
+
+**Medium Widget** - Already has breakdown, enhance visibility
+**Large Widget** - Add breakdown to the header area
 
 ---
 
@@ -114,48 +85,53 @@ Text("\(totalComplete)/\(totalAll)")
 
 | File | Change |
 |------|--------|
-| `ios/CosmiqWidget/Assets.xcassets/` | **NEW** - Create asset catalog with AccentColor and WidgetBackground |
-| `src/hooks/useWidgetSync.ts` | Add ritual count to sync data |
-| `src/plugins/WidgetDataPlugin.ts` | Add ritualCount, ritualCompleted to interface |
-| `ios/App/App/Plugins/WidgetData/WidgetDataPlugin.swift` | Parse new ritual fields |
-| `ios/CosmiqWidget/WidgetData.swift` | Add ritualCount, ritualCompleted to WidgetTaskData struct |
-| `ios/CosmiqWidget/WidgetViews.swift` | Display combined count (quests + rituals) |
+| `ios/CosmiqWidget/WidgetViews.swift` | Fix padding in SmallWidgetView, add quest/ritual breakdown display to all sizes |
 
 ---
 
-## Technical Details
+## Detailed Changes to WidgetViews.swift
 
-### Updated useWidgetSync.ts Logic
+### SmallWidgetView Updates
 
-```typescript
-// Separate quests and rituals
-const quests = tasks.filter(task => !task.habit_source_id);
-const rituals = tasks.filter(task => !!task.habit_source_id);
+1. Add `questCount` and `ritualCount` computed properties
+2. Change padding from `.padding()` to `.padding(.horizontal).padding(.vertical, 8)` for better control
+3. Add `.padding(.top, 4)` to the header HStack
+4. Replace "Complete" text with quest/ritual breakdown
 
-await WidgetData.updateWidgetData({
-  tasks: questsOnly.slice(0, 10),  // Quests only for list
-  completedCount: quests.filter(t => t.completed).length,
-  totalCount: quests.length,
-  ritualCount: rituals.length,
-  ritualCompleted: rituals.filter(t => t.completed).length,
-  date: taskDate,
-});
+### MediumWidgetView Updates
+
+1. Already has the breakdown - no changes needed
+
+### LargeWidgetView Updates
+
+1. Add quest/ritual breakdown text near the progress circle in the header
+
+---
+
+## Visual Layout After Fix
+
+**Small Widget:**
+```
+┌────────────────────────┐
+│  ⚔️ Today              │  <- More top padding
+│                        │
+│       ┌────┐           │
+│       │ 0% │           │
+│       └────┘           │
+│         0/0            │
+│       0Q • 0R          │  <- New breakdown
+│                        │
+└────────────────────────┘
 ```
 
-### Updated Widget Display
+**When no rituals:**
+```
+│         0/0            │
+│       0 quests         │
+```
 
-The widget would show:
-- **List**: Only quest tasks (current behavior)
-- **Counter**: Combined total (e.g., "2/7" where 2 of 7 total tasks are done)
-- **Optional subtitle**: "2 quests • 5 rituals" for breakdown
-
----
-
-## Rebuild Required
-
-After these changes, you'll need to:
-1. Clean build in Xcode (Cmd + Shift + K)
-2. Delete the widget from Home Screen
-3. Re-add the widget
-
-This ensures the new Assets.xcassets are properly bundled with the widget extension.
+**When complete:**
+```
+│         5/5            │
+│      3Q • 2R ✓         │
+```
