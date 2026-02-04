@@ -34,6 +34,19 @@
   </head>
 
   <body>
+    <!-- Debug indicator - shows if WebView loads but JS fails -->
+    <div id="debug-indicator" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;z-index:9999;background:#000;padding:20px;border-radius:10px;">
+      Loading Cosmiq...
+    </div>
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        document.getElementById('debug-indicator').innerHTML = 
+          '<div style="background:red;padding:20px;border-radius:10px;">' +
+          '<strong>JS Error:</strong><br>' + msg + '<br>Line: ' + line +
+          '</div>';
+        return false;
+      };
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -163,6 +163,6 @@ export default defineConfig(({ mode }) => ({
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
-    drop: mode === 'production' ? ['console', 'debugger'] : [],
+    drop: [],  // Temporarily keep console statements to debug iOS black screen
   },
 }));
