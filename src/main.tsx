@@ -13,11 +13,9 @@ if (sentryDsn && import.meta.env.PROD) {
     environment: import.meta.env.MODE,
     integrations: [
       Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+      // replayIntegration removed - causes WKWebView crashes on iOS
     ],
     tracesSampleRate: 0.1, // 10% of transactions
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0, // 100% of errors get replay
   });
 }
 
@@ -30,8 +28,8 @@ window.addEventListener('unhandledrejection', (event) => {
   logger.error('Unhandled promise rejection:', event.reason);
 });
 
-// Register service worker for PWA with optimized caching
-if ('serviceWorker' in navigator) {
+// Register service worker for PWA - skip on Capacitor native (causes WKWebView crashes)
+if ('serviceWorker' in navigator && !(window as any).Capacitor?.isNativePlatform?.()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
       // Silent fail - not critical for app functionality
