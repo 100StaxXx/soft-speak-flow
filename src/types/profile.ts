@@ -6,6 +6,7 @@ export interface OnboardingData {
   userName?: string;
   mentorId?: string;
   mentorName?: string;
+  mentorEnergyPreference?: string;
   walkthrough_completed?: boolean;
   quests_tutorial_seen?: boolean;
   birthdate?: string;
