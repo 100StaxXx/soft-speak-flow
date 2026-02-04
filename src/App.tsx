@@ -32,8 +32,7 @@ import { lockToPortrait } from "@/utils/orientationLock";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
-// HIDDEN: Astral Encounters feature disabled
-// import { AstralEncounterProvider } from "@/components/astral-encounters";
+import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -268,7 +267,7 @@ const AppContent = memo(() => {
           <WeeklyRecapProvider>
             <CompanionPresenceProvider>
                 <RealtimeSyncProvider>
-                {/* HIDDEN: AstralEncounterProvider removed - feature disabled */}
+                <AstralEncounterProvider>
                 <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
                 <AnimatePresence mode="sync">
@@ -322,7 +321,7 @@ const AppContent = memo(() => {
                   </Routes>
                 </AnimatePresence>
                 </Suspense>
-                {/* HIDDEN: AstralEncounterProvider closing tag removed */}
+                </AstralEncounterProvider>
                 </RealtimeSyncProvider>
             </CompanionPresenceProvider>
           </WeeklyRecapProvider>
