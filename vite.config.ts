@@ -87,68 +87,19 @@ export default defineConfig(({ mode }) => ({
             return undefined;
           }
           
-          // Core React libraries
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router')) {
-            return 'react-vendor';
-          }
+          // CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
+          // iOS WKWebView can load chunks out of order, causing "createContext" errors
+          // when React isn't loaded before components that use it
           
-          // Supabase
-          if (id.includes('node_modules/@supabase')) {
-            return 'supabase-vendor';
-          }
-          
-          // React Query
-          if (id.includes('node_modules/@tanstack/react-query')) {
-            return 'query-vendor';
-          }
-          
-          // UI Libraries - Split into smaller chunks
-          if (id.includes('node_modules/framer-motion')) {
-            return 'animation-vendor';
-          }
-          
-          if (id.includes('node_modules/lucide-react')) {
-            return 'icons-vendor';
-          }
-          
-          // Radix UI - Split into logical groups
-          if (id.includes('node_modules/@radix-ui/react-dialog') || 
-              id.includes('node_modules/@radix-ui/react-alert-dialog')) {
-            return 'radix-dialogs';
-          }
-          
-          if (id.includes('node_modules/@radix-ui/react-dropdown-menu') || 
-              id.includes('node_modules/@radix-ui/react-popover') ||
-              id.includes('node_modules/@radix-ui/react-tooltip')) {
-            return 'radix-overlays';
-          }
-          
-          if (id.includes('node_modules/@radix-ui')) {
-            return 'radix-ui';
-          }
-          
-          // Form libraries
-          if (id.includes('node_modules/react-hook-form') || 
-              id.includes('node_modules/@hookform') ||
-              id.includes('node_modules/zod')) {
-            return 'forms-vendor';
-          }
-          
-          // Chart libraries
-          if (id.includes('node_modules/recharts')) {
-            return 'charts-vendor';
-          }
-          
-          // Date utilities
-          if (id.includes('node_modules/date-fns')) {
-            return 'date-vendor';
-          }
-          
-          // Capacitor core (not externalized plugins)
-          if (id.includes('node_modules/@capacitor/core') || 
-              id.includes('node_modules/@capacitor/app') ||
-              id.includes('node_modules/@capacitor/haptics')) {
-            return 'capacitor-vendor';
+          if (id.includes('node_modules')) {
+            // Only split standalone libraries that don't use React contexts
+            if (id.includes('recharts')) return 'charts-vendor';
+            if (id.includes('date-fns')) return 'date-vendor';
+            if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
+            
+            // Everything else (React, Radix, React Query, Framer Motion, etc.)
+            // stays in a single vendor chunk for iOS compatibility
+            return 'vendor';
           }
         },
       },
@@ -158,8 +109,15 @@ export default defineConfig(({ mode }) => ({
     reportCompressedSize: false, // Faster builds
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
-    exclude: ['@radix-ui/react-icons'], // Exclude if not directly used
+    include: [
+      'react', 
+      'react-dom', 
+      'react-router-dom', 
+      '@supabase/supabase-js',
+      '@tanstack/react-query',
+      'framer-motion'
+    ],
+    exclude: ['@radix-ui/react-icons'],
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
