@@ -1,127 +1,66 @@
 
-# Fix iOS Black Screen Issue - Debugging Plan
+# Fix iOS Black Screen - React Context Initialization Error
 
-## Problem Summary
+## Root Cause Identified
 
-The iOS app displays a black screen despite successful build and asset sync. The web assets ARE present in `ios/App/App/public/`, but the JavaScript application fails to render.
+The error **`TypeError: undefined is not an object (evaluating 'c.createContext')`** is caused by the `next-themes` package in `src/components/ui/sonner.tsx`.
 
-## Root Cause
+The `next-themes` library is designed specifically for Next.js and uses context patterns that fail on iOS WKWebView when bundled with Vite. In the minified production build, React (`c`) is `undefined` when `next-themes` tries to call `createContext`.
 
-A JavaScript runtime error is occurring that prevents React from mounting. Since production builds strip all `console.*` statements (via `esbuild.drop` in vite.config.ts), the error is invisible in Xcode's console.
+## The Problem
 
-## Solution: Two-Phase Approach
-
-### Phase 1: Enable Production Debugging
-
-Temporarily modify `vite.config.ts` to keep console statements in production so we can see what's failing:
-
-**File:** `vite.config.ts`
-
-Change line 166:
-```javascript
-// Before
-drop: mode === 'production' ? ['console', 'debugger'] : [],
-
-// After (temporary for debugging)
-drop: [],  // Keep console statements to debug iOS black screen
+```
+src/components/ui/sonner.tsx
+└── imports { useTheme } from "next-themes"  ← FAILS ON iOS
+    └── next-themes tries to createContext before React is ready
+        └── TypeError: c.createContext is undefined
 ```
 
-### Phase 2: Add Visible Debug Indicators
+## Solution
 
-Add a visible debug element to `index.html` that confirms the WebView is loading correctly, and add error handling to catch and display JavaScript errors:
+Replace the `next-themes` dependency with a simple hardcoded dark theme, since Cosmiq appears to always use dark mode. The Sonner toast component just needs a theme string - it doesn't need the full `next-themes` provider.
 
-**File:** `index.html`
+### Changes Required
 
-Add inside `<body>` before the root div:
-```html
-<!-- Debug indicator - shows if WebView loads but JS fails -->
-<div id="debug-indicator" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;z-index:9999;">
-  Loading Cosmiq...
-</div>
-<script>
-  // Log all errors to the DOM for debugging
-  window.onerror = function(msg, url, line, col, error) {
-    document.getElementById('debug-indicator').innerHTML = 
-      '<div style="background:red;padding:20px;border-radius:10px;">' +
-      '<strong>JS Error:</strong><br>' + msg + '<br>Line: ' + line +
-      '</div>';
-    return false;
-  };
-</script>
+**File: `src/components/ui/sonner.tsx`**
+
+Remove the `next-themes` import and hardcode the theme to "dark":
+
+```typescript
+// Before (broken)
+import { useTheme } from "next-themes";
+const { theme = "system" } = useTheme();
+
+// After (fixed)
+// Remove next-themes import entirely
+const theme = "dark"; // Cosmiq uses dark theme
 ```
 
-**File:** `src/main.tsx`
+## Why This Works
 
-Add at the top of the render to hide the debug indicator once React mounts:
-```javascript
-// Hide debug indicator once React takes over
-document.getElementById('debug-indicator')?.remove();
-```
+1. Cosmiq is a dark-themed app - it doesn't need theme switching
+2. Removes a problematic dependency that's incompatible with Vite + Capacitor
+3. Eliminates the context initialization race condition on iOS WKWebView
+4. The Sonner toast component only uses the theme string for styling - no provider needed
 
-### Phase 3: Rebuild and Test
+## After Implementation
 
-After making these changes:
-
-1. Pull the latest code: `git pull`
-2. Clean and rebuild: `rm -rf dist && npm run build`
+1. Pull the changes: `git pull`
+2. Clean rebuild: `rm -rf dist && npm run build`
 3. Sync to iOS: `npm run ios:sync`
 4. In Xcode: Clean (Cmd+Shift+K), then Build & Run (Cmd+R)
 
-The debug indicator will now show:
-- "Loading Cosmiq..." if WebView loads but JS hasn't executed
-- A red error box if JavaScript throws an error
-- Nothing (disappears) if React mounts successfully
-
-### Phase 4: Identify the Specific Error
-
-Check the Xcode console for any errors. Common culprits:
-- Capacitor plugin not properly initialized
-- Missing environment variable at runtime
-- Service worker registration failure on iOS
-- Orientation lock timing issue
-
-### Phase 5: Cleanup After Fix
-
-Once the issue is identified and fixed:
-1. Remove the debug indicator from `index.html`
-2. Restore console dropping in `vite.config.ts`:
-   ```javascript
-   drop: mode === 'production' ? ['console', 'debugger'] : [],
-   ```
-
----
+The app should now display the Welcome screen instead of the black screen with JS error.
 
 ## Technical Notes
 
-### Why This Happens
+- The `next-themes` package creates a React context at module load time
+- On iOS WKWebView, the module initialization order can differ from standard browsers
+- When `next-themes` loads before React is fully initialized, `createContext` fails
+- This is a known issue with Next.js-specific packages in Vite/Capacitor apps
 
-1. **Console stripping**: Production builds remove all `console.*` calls for performance, but this hides errors
-2. **ErrorBoundary limitations**: React's ErrorBoundary only catches errors during render, not during:
-   - Module initialization
-   - Async operations in useEffect
-   - Native plugin calls
+## Cleanup After Fix
 
-### Likely Suspects
-
-Based on code analysis, these are the most likely failure points:
-
-| Location | Issue |
-|----------|-------|
-| `src/App.tsx:340` | `lockToPortrait()` called in useEffect - may fail if plugin not ready |
-| `src/main.tsx:36` | Service worker registration may fail on iOS WKWebView |
-| `src/integrations/supabase/client.ts:10` | Throws if env vars missing at runtime |
-
-### Alternative Quick Fix
-
-If you want to skip debugging and try a quick fix, disable the orientation lock temporarily:
-
-**File:** `src/App.tsx` (lines 338-341)
-
-```javascript
-// Comment out orientation lock temporarily
-// useEffect(() => {
-//   lockToPortrait();
-// }, []);
-```
-
-This removes one potential failure point without affecting functionality.
+Once the app works, you can also:
+1. Restore the console dropping in `vite.config.ts`
+2. Remove the debug indicator from `index.html` (optional - it auto-hides)
