@@ -5,6 +5,7 @@ import {
   AdversaryTheme, 
   AdversaryTier, 
   TriggerType,
+  MiniGameType,
   THEME_MINIGAME_MAP,
   THEME_STAT_MAP,
   TIER_CONFIG,
@@ -145,6 +146,14 @@ export const getTierFromTrigger = (
   return 'common';
 };
 
+// Active games for resist mode (randomized selection)
+const ACTIVE_RESIST_GAMES: MiniGameType[] = [
+  'energy_beam',
+  'tap_sequence',
+  'orb_match',
+  'galactic_match'
+];
+
 // Generate adversary specifically for resist mode (always single phase, quick)
 export const generateResistAdversary = (habitTheme: AdversaryTheme): Adversary => {
   const tier: AdversaryTier = Math.random() > 0.7 ? 'uncommon' : 'common';
@@ -163,7 +172,7 @@ export const generateResistAdversary = (habitTheme: AdversaryTheme): Adversary =
     theme: habitTheme,
     tier,
     lore,
-    miniGameType: THEME_MINIGAME_MAP[habitTheme],
+    miniGameType: randomFrom(ACTIVE_RESIST_GAMES), // Random game selection
     phases: 1, // Always single phase for quick resist sessions
     essenceName,
     essenceDescription,
