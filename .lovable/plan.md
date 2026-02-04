@@ -1,196 +1,112 @@
 
-# Add Mentor Gender Preference to Onboarding
+# Fix iOS Widget Display Issues & Add Ritual Count
 
-## Summary
+## Issues Identified
 
-Adding an inclusive "mentor energy" preference question to the onboarding flow. This will help match users with mentors they'll connect with better by applying a gender preference boost to the scoring algorithm.
+### Issue 1: Yellow Background with Red X
+The yellow placeholder with the red "prohibited" symbol is iOS's default widget placeholder image. This appears because:
+- The CosmiqWidget extension is missing its own `Assets.xcassets` folder
+- Widgets need a `WidgetBackground` and `AccentColor` defined in their assets
+- Without these, iOS falls back to the placeholder image in the empty state area
 
-## Current Mentor Distribution
-
-| Mentor | Gender | Short Title |
-|--------|--------|-------------|
-| Atlas | Masculine | Stoic Wisdom |
-| Eli | Masculine (needs DB tag) | Steady Encouragement |
-| Stryker | Masculine | High Performance |
-| Carmen | Feminine | Feminine Tough Love |
-| Reign | Feminine | Elite Performance |
-| Sienna | Feminine | Soft Healing |
-| Solace | Feminine | Warm Encouragement |
-
-**Final: 3 masculine, 4 feminine**
+### Issue 2: "0/0" Count Missing Rituals
+Currently the widget filters out rituals entirely but also excludes them from the count. You want to show quests-only in the list, but include ritual counts in the totals.
 
 ---
 
-## Question Design
+## Solution
 
-### Placement
-Insert as **Question 1** (before the existing focus/tone/progress questions) - this is a high-level filter that should come first.
+### Part 1: Add Widget Assets Catalog
 
-### Question Text
-> "What kind of mentor energy resonates with you?"
-
-### Options
-
-| Option | Tags | Effect |
-|--------|------|--------|
-| Feminine presence | `["feminine_preference"]` | +1.5 boost to feminine mentors |
-| Masculine presence | `["masculine_preference"]` | +1.5 boost to masculine mentors |
-| Either works for me | `[]` | No gender weighting (current behavior) |
-
-### Faction Narratives
-```text
-starfall: "Before you chart your course, the cosmos asks one question..."
-void: "In the stillness, a presence awaits. What form does it take?"
-stellar: "The stars align to reveal your guide. Who do you see among them?"
-```
-
----
-
-## Technical Implementation
-
-### Step 1: Database - Add masculine tag to Eli
-
-Update Eli's tags in the `mentors` table to include `masculine` for proper matching.
-
-```sql
-UPDATE public.mentors 
-SET tags = array_append(tags, 'masculine')
-WHERE slug = 'eli' AND NOT ('masculine' = ANY(tags));
-```
-
-### Step 2: Update StoryQuestionnaire.tsx
-
-Add the new question at the beginning of the `questions` array:
-
-```typescript
-const questions: StoryQuestion[] = [
-  {
-    id: "mentor_energy",
-    narrative: "",
-    question: "What kind of mentor energy resonates with you?",
-    options: [
-      { text: "Feminine presence", tags: ["feminine_preference"] },
-      { text: "Masculine presence", tags: ["masculine_preference"] },
-      { text: "Either works for me", tags: [] },
-    ],
-  },
-  // ... existing questions
-];
-```
-
-Update `getFactionNarrative` to handle 4 questions (add new narratives for Q1):
-
-```typescript
-const narratives: Record<FactionType, string[]> = {
-  starfall: [
-    "Before you chart your course, the cosmos asks one question...",
-    "As flames dance in the distance, your ship awaits its next destination...",
-    "The engines hum with potential energy. Your crew looks to you for direction...",
-    "Your path grows clearer with each choice...",
-  ],
-  void: [
-    "In the stillness, a presence awaits. What form does it take?",
-    "In the silent depths between stars, clarity emerges from stillness...",
-    "The void speaks to those who listen. A whisper guides your path...",
-    "The shadows reveal what light cannot...",
-  ],
-  stellar: [
-    "The stars align to reveal your guide. Who do you see among them?",
-    "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
-    "Your companion gazes at the stars with wonder. What do you see?",
-    "The constellations align to show your way...",
-  ],
-};
-```
-
-### Step 3: Update StoryOnboarding.tsx - Scoring Logic
-
-Add gender preference scoring after calculating trait scores (around line 270):
-
-```typescript
-// Extract gender preference from answers
-const genderAnswer = questionAnswers.find(a => a.questionId === "mentor_energy");
-const prefersFeminine = genderAnswer?.tags.includes("feminine_preference");
-const prefersMasculine = genderAnswer?.tags.includes("masculine_preference");
-
-// Apply gender preference boost during scoring
-mentorScores.forEach(mentorScore => {
-  const mentorTags = mentorScore.mentor.tags || [];
-  const isFeminine = mentorTags.includes("feminine");
-  const isMasculine = mentorTags.includes("masculine");
-  
-  if (prefersFeminine && isFeminine) {
-    mentorScore.score += 1.5;  // Strong boost
-  } else if (prefersMasculine && isMasculine) {
-    mentorScore.score += 1.5;  // Strong boost
-  }
-  // "Either works" = no boost applied
-});
-```
-
-### Step 4: Update Question Weights
-
-Adjust `QUESTION_WEIGHTS` array to account for 4 questions:
-
-```typescript
-// Q1=1.0 (energy - filtered separately), Q2=1.5 (focus), Q3=1.3 (tone), Q4=1.1 (progress)
-const QUESTION_WEIGHTS = [1.0, 1.5, 1.3, 1.1];
-```
-
-### Step 5: Save Preference to Profile
-
-Store the preference in `onboarding_data` (no schema change needed):
-
-```typescript
-// In handleQuestionnaireComplete, when saving to profile:
-const genderPref = questionAnswers.find(a => a.questionId === "mentor_energy")?.answer;
-
-await supabase.from("profiles").update({
-  onboarding_data: {
-    ...existingData,
-    mentorEnergyPreference: genderPref || "no_preference",
-  },
-}).eq("id", user.id);
-```
-
----
-
-## Flow After Changes
+Create an `Assets.xcassets` folder for the widget extension with:
+- `AccentColor.colorset` - Required by widget system
+- `WidgetBackground.colorset` - Required for widget backgrounds
 
 ```text
-New User Flow:
-┌─────────────────────────────────────┐
-│ Q1: "What kind of mentor energy    │
-│      resonates with you?"           │
-│  • Feminine presence                │
-│  • Masculine presence               │
-│  • Either works for me              │
-└─────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────┐
-│ Q2: "What do you want to work on?" │
-└─────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────┐
-│ Q3: "How do you want guidance?"    │
-└─────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────┐
-│ Q4: "What helps you progress?"     │
-└─────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────┐
-│ Mentor Matching Algorithm          │
-│  • Calculate trait scores          │
-│  • Apply gender preference boost   │
-│  • Apply intensity matching        │
-│  • Select best match               │
-└─────────────────────────────────────┘
+ios/CosmiqWidget/Assets.xcassets/
+├── Contents.json
+├── AccentColor.colorset/
+│   └── Contents.json (cosmic purple color)
+└── WidgetBackground.colorset/
+    └── Contents.json (cosmic dark background)
 ```
+
+**AccentColor (Cosmic Purple):**
+```json
+{
+  "colors": [{
+    "color": {
+      "color-space": "srgb",
+      "components": {
+        "red": "0.55",
+        "green": "0.36",
+        "blue": "0.95",
+        "alpha": "1.0"
+      }
+    },
+    "idiom": "universal"
+  }],
+  "info": { "author": "xcode", "version": 1 }
+}
+```
+
+**WidgetBackground (Cosmic Dark):**
+```json
+{
+  "colors": [{
+    "color": {
+      "color-space": "srgb",
+      "components": {
+        "red": "0.05",
+        "green": "0.02",
+        "blue": "0.15",
+        "alpha": "1.0"
+      }
+    },
+    "idiom": "universal"
+  }],
+  "info": { "author": "xcode", "version": 1 }
+}
+```
+
+### Part 2: Add Ritual Count to Widget Data
+
+**Modify `useWidgetSync.ts`** to track both:
+- `questCount` / `questCompleted` - for the task list (quests only)
+- `totalCount` / `totalCompleted` - for the counter (includes rituals)
+
+**Modify `WidgetDataPlugin.ts`** to include:
+```typescript
+interface WidgetDataPlugin {
+  updateWidgetData(options: {
+    tasks: WidgetTask[];           // Quests only (for list)
+    completedCount: number;        // Quests completed
+    totalCount: number;            // Quests total
+    ritualCount: number;           // NEW: Rituals total
+    ritualCompleted: number;       // NEW: Rituals completed
+    date: string;
+  }): Promise<void>;
+}
+```
+
+**Modify `WidgetData.swift`** to display combined count:
+```swift
+// In the view, show combined count
+let questsComplete = data?.completedCount ?? 0
+let questsTotal = data?.totalCount ?? 0
+let ritualsComplete = data?.ritualCompleted ?? 0
+let ritualsTotal = data?.ritualCount ?? 0
+
+let totalComplete = questsComplete + ritualsComplete
+let totalAll = questsTotal + ritualsTotal
+
+// Display: "3/7" (combines quests + rituals)
+Text("\(totalComplete)/\(totalAll)")
+```
+
+**Optional label** to distinguish:
+- Progress ring shows overall progress
+- Subtitle could show "2 quests • 5 rituals" for clarity
 
 ---
 
@@ -198,16 +114,48 @@ New User Flow:
 
 | File | Change |
 |------|--------|
-| `mentors` table | Add `masculine` tag to Eli |
-| `src/components/onboarding/StoryQuestionnaire.tsx` | Add mentor energy question as Q1, update faction narratives for 4 questions |
-| `src/components/onboarding/StoryOnboarding.tsx` | Add gender preference scoring boost, update question weights array |
+| `ios/CosmiqWidget/Assets.xcassets/` | **NEW** - Create asset catalog with AccentColor and WidgetBackground |
+| `src/hooks/useWidgetSync.ts` | Add ritual count to sync data |
+| `src/plugins/WidgetDataPlugin.ts` | Add ritualCount, ritualCompleted to interface |
+| `ios/App/App/Plugins/WidgetData/WidgetDataPlugin.swift` | Parse new ritual fields |
+| `ios/CosmiqWidget/WidgetData.swift` | Add ritualCount, ritualCompleted to WidgetTaskData struct |
+| `ios/CosmiqWidget/WidgetViews.swift` | Display combined count (quests + rituals) |
 
 ---
 
-## Why This Approach
+## Technical Details
 
-1. **Inclusive** - "Either works for me" is a valid first-class option, not an afterthought
-2. **Non-invasive** - Asks about mentor preference, not personal gender identity
-3. **Relevant** - Directly impacts the mentorship matching
-4. **Simple** - Uses existing tag system, no new database columns needed
-5. **Balanced** - 3 masculine vs 4 feminine mentors gives good options for both preferences
+### Updated useWidgetSync.ts Logic
+
+```typescript
+// Separate quests and rituals
+const quests = tasks.filter(task => !task.habit_source_id);
+const rituals = tasks.filter(task => !!task.habit_source_id);
+
+await WidgetData.updateWidgetData({
+  tasks: questsOnly.slice(0, 10),  // Quests only for list
+  completedCount: quests.filter(t => t.completed).length,
+  totalCount: quests.length,
+  ritualCount: rituals.length,
+  ritualCompleted: rituals.filter(t => t.completed).length,
+  date: taskDate,
+});
+```
+
+### Updated Widget Display
+
+The widget would show:
+- **List**: Only quest tasks (current behavior)
+- **Counter**: Combined total (e.g., "2/7" where 2 of 7 total tasks are done)
+- **Optional subtitle**: "2 quests • 5 rituals" for breakdown
+
+---
+
+## Rebuild Required
+
+After these changes, you'll need to:
+1. Clean build in Xcode (Cmd + Shift + K)
+2. Delete the widget from Home Screen
+3. Re-add the widget
+
+This ensures the new Assets.xcassets are properly bundled with the widget extension.
