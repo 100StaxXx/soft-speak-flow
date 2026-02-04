@@ -23,11 +23,14 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
       return;
     }
     
+    // Filter out rituals (tasks spawned from habits/campaigns) - show only quests
+    const questsOnly = tasks.filter(task => !task.habit_source_id);
+    
     // Create a fingerprint to avoid redundant syncs
     const fingerprint = JSON.stringify({
-      count: tasks.length,
-      completed: tasks.filter(t => t.completed).length,
-      ids: tasks.slice(0, 10).map(t => t.id + ':' + t.completed),
+      count: questsOnly.length,
+      completed: questsOnly.filter(t => t.completed).length,
+      ids: questsOnly.slice(0, 10).map(t => t.id + ':' + t.completed),
       date: taskDate,
     });
     
@@ -38,8 +41,8 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     
     lastSyncRef.current = fingerprint;
     
-    // Map tasks to widget format (limit to 10 for performance)
-    const widgetTasks: WidgetTask[] = tasks.slice(0, 10).map(task => ({
+    // Map quests to widget format (limit to 10 for performance)
+    const widgetTasks: WidgetTask[] = questsOnly.slice(0, 10).map(task => ({
       id: task.id,
       text: task.task_text,
       completed: task.completed ?? false,
@@ -51,11 +54,11 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     }));
     
     try {
-      console.log('[WidgetSync] Syncing', widgetTasks.length, 'tasks for', taskDate);
+      console.log('[WidgetSync] Syncing', widgetTasks.length, 'quests for', taskDate);
       await WidgetData.updateWidgetData({
         tasks: widgetTasks,
-        completedCount: tasks.filter(t => t.completed).length,
-        totalCount: tasks.length,
+        completedCount: questsOnly.filter(t => t.completed).length,
+        totalCount: questsOnly.length,
         date: taskDate,
       });
       console.log('[WidgetSync] Sync complete');
