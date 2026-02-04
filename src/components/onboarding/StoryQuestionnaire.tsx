@@ -17,20 +17,23 @@ interface StoryQuestion {
   options: QuestionOption[];
 }
 
-// Faction-themed narratives (3 per faction for 3 questions)
+// Faction-themed narratives (4 per faction for 4 questions)
 const getFactionNarrative = (faction: FactionType, questionIndex: number): string => {
   const narratives: Record<FactionType, string[]> = {
     starfall: [
+      "Before you chart your course, the cosmos asks one question...",
       "As flames dance in the distance, your ship awaits its next destination...",
       "The engines hum with potential energy. Your crew looks to you for direction...",
       "Your path grows clearer with each choice...",
     ],
     void: [
+      "In the stillness, a presence awaits. What form does it take?",
       "In the silent depths between stars, clarity emerges from stillness...",
       "The void speaks to those who listen. A whisper guides your path...",
       "The shadows reveal what light cannot...",
     ],
     stellar: [
+      "The stars align to reveal your guide. Who do you see among them?",
       "Nebulas paint the cosmos in infinite colors. Each holds a dream...",
       "Your companion gazes at the stars with wonder. What do you see?",
       "The constellations align to show your way...",
@@ -40,6 +43,16 @@ const getFactionNarrative = (faction: FactionType, questionIndex: number): strin
 };
 
 const questions: StoryQuestion[] = [
+  {
+    id: "mentor_energy",
+    narrative: "",
+    question: "What kind of mentor energy resonates with you?",
+    options: [
+      { text: "Feminine presence", tags: ["feminine_preference"] },
+      { text: "Masculine presence", tags: ["masculine_preference"] },
+      { text: "Either works for me", tags: [] },
+    ],
+  },
   {
     id: "focus_area",
     narrative: "",

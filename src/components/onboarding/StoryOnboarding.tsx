@@ -207,9 +207,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     // Show loading screen immediately
     setStage("calculating");
 
-    // Question weights: Q1=1.5, Q2=1.4, Q3=1.3, Q4=1.2, Q5=1.1
-    // Question weights: Q1=1.5 (focus), Q2=1.3 (tone), Q3=1.1 (progress style)
-    const QUESTION_WEIGHTS = [1.5, 1.3, 1.1];
+    // Question weights: Q1=1.0 (energy - filtered separately), Q2=1.5 (focus), Q3=1.3 (tone), Q4=1.1 (progress)
+    const QUESTION_WEIGHTS = [1.0, 1.5, 1.3, 1.1];
 
     // Build canonical tag weight map instead of duplicating strings
     const canonicalTagWeights: Record<string, number> = {};
@@ -259,6 +258,20 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       const intensityMatch = mentorIntensity === desiredIntensity;
       if (intensityMatch) {
         score += 0.8;
+      }
+
+      // Apply gender preference boost
+      const genderAnswer = questionAnswers.find(a => a.questionId === "mentor_energy");
+      const prefersFeminine = genderAnswer?.tags.includes("feminine_preference");
+      const prefersMasculine = genderAnswer?.tags.includes("masculine_preference");
+      
+      const isFeminine = mentorCanonicalTags.includes("supportive") || (mentor.tags || []).includes("feminine");
+      const isMasculine = (mentor.tags || []).includes("masculine");
+      
+      if (prefersFeminine && isFeminine) {
+        score += 1.5;
+      } else if (prefersMasculine && isMasculine) {
+        score += 1.5;
       }
 
       return {
@@ -381,12 +394,16 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       const explanationToSave = explanationOverride ?? mentorExplanation;
       
+      // Get gender preference from answers
+      const genderPref = answers.find(a => a.questionId === "mentor_energy")?.answer;
+      
       await supabase.from("profiles").update({
         selected_mentor_id: mentor.id,
         onboarding_data: {
           ...existingData,
           mentorId: mentor.id,
           mentorName: mentor.name,
+          mentorEnergyPreference: genderPref || "no_preference",
           explanation: explanationToSave ? {
             title: explanationToSave.title,
             subtitle: explanationToSave.subtitle,
