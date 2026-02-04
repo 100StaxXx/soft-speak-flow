@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { format, getDay } from 'date-fns';
 import { toast } from 'sonner';
 import { categorizeQuest } from '@/utils/questCategorization';
+import { getEffectiveMissionDate, getEffectiveDayOfWeek } from '@/utils/timezone';
 
 export interface SurfacedHabit {
   id: string;
@@ -71,11 +71,13 @@ function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number): boolean {
 export function useHabitSurfacing(selectedDate?: Date) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const taskDate = format(selectedDate || new Date(), 'yyyy-MM-dd');
-  // Convert JS getDay() (0=Sunday) to our convention (0=Monday)
-  const jsDay = getDay(selectedDate || new Date());
-  const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1; // Sunday(0)->6, Mon(1)->0, ..., Sat(6)->5
-
+  
+  // Use 2 AM reset timezone logic for consistent daily reset
+  const taskDate = getEffectiveMissionDate();
+  // Get effective day of week (0=Sunday standard JS convention) respecting 2 AM reset
+  const jsDay = getEffectiveDayOfWeek();
+  // Convert to our convention: 0=Mon, 1=Tue, ..., 6=Sun
+  const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1;
   // Fetch habits that should be surfaced as tasks today
   const { data: surfacedHabits, isLoading, error } = useQuery({
     queryKey: ['habit-surfacing', user?.id, taskDate],
