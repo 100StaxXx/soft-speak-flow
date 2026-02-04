@@ -7,11 +7,11 @@ struct SmallWidgetView: View {
     let entry: TaskEntry
     
     private var completedCount: Int {
-        entry.data?.completedCount ?? 0
+        entry.data?.totalAllCompleted ?? 0
     }
     
     private var totalCount: Int {
-        entry.data?.totalCount ?? 0
+        entry.data?.totalAllCount ?? 0
     }
     
     private var progress: Double {
@@ -24,7 +24,7 @@ struct SmallWidgetView: View {
             HStack {
                 Text("⚔️")
                     .font(.caption)
-                Text("Quests")
+                Text("Today")
                     .font(.caption.bold())
                     .foregroundColor(.cosmicText)
                 Spacer()
@@ -39,7 +39,7 @@ struct SmallWidgetView: View {
             )
             .frame(width: 60, height: 60)
             
-            // Quest count
+            // Combined count
             Text("\(completedCount)/\(totalCount)")
                 .font(.subheadline.bold())
                 .foregroundColor(.cosmicGold)
@@ -60,11 +60,19 @@ struct MediumWidgetView: View {
     let entry: TaskEntry
     
     private var completedCount: Int {
-        entry.data?.completedCount ?? 0
+        entry.data?.totalAllCompleted ?? 0
     }
     
     private var totalCount: Int {
+        entry.data?.totalAllCount ?? 0
+    }
+    
+    private var questCount: Int {
         entry.data?.totalCount ?? 0
+    }
+    
+    private var ritualCount: Int {
+        entry.data?.ritualCount ?? 0
     }
     
     var body: some View {
@@ -105,9 +113,15 @@ struct MediumWidgetView: View {
                     Text("\(completedCount)/\(totalCount)")
                         .font(.caption.bold())
                         .foregroundColor(.cosmicGold)
-                    Text("Done")
-                        .font(.caption2)
-                        .foregroundColor(.cosmicSecondary)
+                    if ritualCount > 0 {
+                        Text("\(questCount)Q • \(ritualCount)R")
+                            .font(.system(size: 8))
+                            .foregroundColor(.cosmicSecondary)
+                    } else {
+                        Text("Done")
+                            .font(.caption2)
+                            .foregroundColor(.cosmicSecondary)
+                    }
                 }
             }
             .frame(width: 70)
@@ -122,11 +136,19 @@ struct LargeWidgetView: View {
     let entry: TaskEntry
     
     private var completedCount: Int {
-        entry.data?.completedCount ?? 0
+        entry.data?.totalAllCompleted ?? 0
     }
     
     private var totalCount: Int {
+        entry.data?.totalAllCount ?? 0
+    }
+    
+    private var questCount: Int {
         entry.data?.totalCount ?? 0
+    }
+    
+    private var ritualCount: Int {
+        entry.data?.ritualCount ?? 0
     }
     
     private var morningTasks: [WidgetTask] {

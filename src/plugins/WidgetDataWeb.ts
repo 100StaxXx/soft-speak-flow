@@ -6,6 +6,8 @@ export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
     tasks: WidgetTask[];
     completedCount: number;
     totalCount: number;
+    ritualCount: number;
+    ritualCompleted: number;
     date: string;
   }): Promise<void> {
     console.log('[WidgetData] Web fallback - no widget support');

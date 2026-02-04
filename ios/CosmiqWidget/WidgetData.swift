@@ -5,8 +5,20 @@ struct WidgetTaskData: Codable {
     let tasks: [WidgetTask]
     let completedCount: Int
     let totalCount: Int
+    let ritualCount: Int?
+    let ritualCompleted: Int?
     let date: String
     let updatedAt: String?
+    
+    /// Combined count of all tasks (quests + rituals)
+    var totalAllCount: Int {
+        return totalCount + (ritualCount ?? 0)
+    }
+    
+    /// Combined completed count (quests + rituals)
+    var totalAllCompleted: Int {
+        return completedCount + (ritualCompleted ?? 0)
+    }
 }
 
 /// Individual task for widget display
@@ -56,6 +68,8 @@ class WidgetDataManager {
             ],
             completedCount: 1,
             totalCount: 3,
+            ritualCount: 4,
+            ritualCompleted: 2,
             date: ISO8601DateFormatter().string(from: Date()),
             updatedAt: nil
         )

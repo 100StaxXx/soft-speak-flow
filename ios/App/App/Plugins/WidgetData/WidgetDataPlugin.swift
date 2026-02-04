@@ -24,10 +24,16 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         
+        // Get ritual counts (default to 0 if not provided)
+        let ritualCount = call.getInt("ritualCount") ?? 0
+        let ritualCompleted = call.getInt("ritualCompleted") ?? 0
+        
         let widgetData: [String: Any] = [
             "tasks": tasksArray,
             "completedCount": completedCount,
             "totalCount": totalCount,
+            "ritualCount": ritualCount,
+            "ritualCompleted": ritualCompleted,
             "date": date,
             "updatedAt": ISO8601DateFormatter().string(from: Date())
         ]
