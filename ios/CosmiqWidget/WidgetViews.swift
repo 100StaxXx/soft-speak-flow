@@ -14,13 +14,17 @@ struct SmallWidgetView: View {
         entry.data?.totalAllCount ?? 0
     }
     
-    private var progress: Double {
-        totalCount > 0 ? Double(completedCount) / Double(totalCount) : 0
+    private var questCount: Int {
+        entry.data?.totalCount ?? 0
+    }
+    
+    private var ritualCount: Int {
+        entry.data?.ritualCount ?? 0
     }
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Header
+        VStack(spacing: 6) {
+            // Header with extra top breathing room
             HStack {
                 Text("⚔️")
                     .font(.caption)
@@ -29,6 +33,7 @@ struct SmallWidgetView: View {
                     .foregroundColor(.cosmicText)
                 Spacer()
             }
+            .padding(.top, 4)
             
             Spacer()
             
@@ -39,18 +44,31 @@ struct SmallWidgetView: View {
             )
             .frame(width: 60, height: 60)
             
-            // Combined count
-            Text("\(completedCount)/\(totalCount)")
-                .font(.subheadline.bold())
-                .foregroundColor(.cosmicGold)
-            
-            Text("Complete")
-                .font(.caption2)
-                .foregroundColor(.cosmicSecondary)
+            // Combined count with quest/ritual breakdown
+            VStack(spacing: 2) {
+                Text("\(completedCount)/\(totalCount)")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.cosmicGold)
+                
+                if ritualCount > 0 {
+                    Text("\(questCount)Q • \(ritualCount)R")
+                        .font(.system(size: 9))
+                        .foregroundColor(.cosmicSecondary)
+                } else if questCount > 0 {
+                    Text("\(questCount) quests")
+                        .font(.caption2)
+                        .foregroundColor(.cosmicSecondary)
+                } else {
+                    Text("No tasks")
+                        .font(.caption2)
+                        .foregroundColor(.cosmicSecondary)
+                }
+            }
             
             Spacer()
         }
-        .padding()
+        .padding(.horizontal)
+        .padding(.vertical, 8)
     }
 }
 
