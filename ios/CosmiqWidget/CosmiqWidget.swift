@@ -1,6 +1,33 @@
 import WidgetKit
 import SwiftUI
 
+// MARK: - Cosmic Color Palette
+
+extension Color {
+    static let cosmicBackground = Color(red: 0.05, green: 0.02, blue: 0.15)
+    static let cosmicBackgroundEnd = Color(red: 0.08, green: 0.04, blue: 0.20)
+    static let cosmicPurple = Color(red: 0.55, green: 0.36, blue: 0.95)
+    static let cosmicGold = Color(red: 0.95, green: 0.75, blue: 0.30)
+    static let cosmicText = Color.white
+    static let cosmicSecondary = Color.white.opacity(0.6)
+    static let cosmicGreen = Color(red: 0.4, green: 0.9, blue: 0.5)
+}
+
+// MARK: - Cosmic Background Gradient
+
+struct CosmicGradientBackground: View {
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Color.cosmicBackground,
+                Color.cosmicBackgroundEnd
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 /// Timeline entry containing task data for a specific point in time
 struct TaskEntry: TimelineEntry {
     let date: Date
@@ -39,11 +66,13 @@ struct CosmiqWidget: Widget {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             if #available(iOS 17.0, *) {
                 CosmiqWidgetEntryView(entry: entry)
-                    .containerBackground(.fill.tertiary, for: .widget)
+                    .containerBackground(for: .widget) {
+                        CosmicGradientBackground()
+                    }
             } else {
                 CosmiqWidgetEntryView(entry: entry)
                     .padding()
-                    .background(Color(UIColor.systemBackground))
+                    .background(CosmicGradientBackground())
             }
         }
         .configurationDisplayName("Cosmiq Quests")

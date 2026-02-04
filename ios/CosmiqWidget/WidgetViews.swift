@@ -14,57 +14,43 @@ struct SmallWidgetView: View {
         entry.data?.totalCount ?? 0
     }
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header
-            HStack {
-                Text("⚔️ Quests")
-                    .font(.caption.bold())
-                    .foregroundColor(.primary)
-                Spacer()
-                Text("\(completedCount)/\(totalCount)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Task list
-            if let tasks = entry.data?.tasks.prefix(3), !tasks.isEmpty {
-                ForEach(Array(tasks), id: \.id) { task in
-                    Link(destination: URL(string: "cosmiq://task/\(task.id)")!) {
-                        SmallTaskRow(task: task)
-                    }
-                }
-            } else {
-                VStack(spacing: 4) {
-                    Text("✨")
-                        .font(.title2)
-                    Text("No quests today")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            
-            Spacer(minLength: 0)
-        }
-        .padding()
+    private var progress: Double {
+        totalCount > 0 ? Double(completedCount) / Double(totalCount) : 0
     }
-}
-
-struct SmallTaskRow: View {
-    let task: WidgetTask
     
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(task.completed ? .green : .gray)
-                .font(.caption)
-            Text(task.text)
+        VStack(spacing: 8) {
+            // Header
+            HStack {
+                Text("⚔️")
+                    .font(.caption)
+                Text("Quests")
+                    .font(.caption.bold())
+                    .foregroundColor(.cosmicText)
+                Spacer()
+            }
+            
+            Spacer()
+            
+            // Central progress circle
+            CosmicProgressCircle(
+                completed: completedCount,
+                total: totalCount
+            )
+            .frame(width: 60, height: 60)
+            
+            // Quest count
+            Text("\(completedCount)/\(totalCount)")
+                .font(.subheadline.bold())
+                .foregroundColor(.cosmicGold)
+            
+            Text("Complete")
                 .font(.caption2)
-                .lineLimit(1)
-                .strikethrough(task.completed)
-                .foregroundColor(task.completed ? .secondary : .primary)
+                .foregroundColor(.cosmicSecondary)
+            
+            Spacer()
         }
+        .padding()
     }
 }
 
@@ -81,30 +67,27 @@ struct MediumWidgetView: View {
         entry.data?.totalCount ?? 0
     }
     
-    private var progress: Double {
-        totalCount > 0 ? Double(completedCount) / Double(totalCount) : 0
-    }
-    
     var body: some View {
         HStack(spacing: 16) {
             // Left side - tasks
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("⚔️ Today's Quests")
+                    Text("⚔️")
+                        .font(.subheadline)
+                    Text("Today's Quests")
                         .font(.subheadline.bold())
+                        .foregroundColor(.cosmicText)
                     Spacer()
                 }
                 
-                if let tasks = entry.data?.tasks.prefix(5), !tasks.isEmpty {
+                if let tasks = entry.data?.tasks.prefix(4), !tasks.isEmpty {
                     ForEach(Array(tasks), id: \.id) { task in
                         Link(destination: URL(string: "cosmiq://task/\(task.id)")!) {
-                            TaskRowView(task: task)
+                            CosmicTaskRow(task: task)
                         }
                     }
                 } else {
-                    Text("No quests scheduled")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    CosmicEmptyState()
                 }
                 
                 Spacer(minLength: 0)
@@ -112,51 +95,24 @@ struct MediumWidgetView: View {
             
             // Right side - progress
             VStack(spacing: 8) {
-                ProgressCircleView(
+                CosmicProgressCircle(
                     completed: completedCount,
                     total: totalCount
                 )
+                .frame(width: 56, height: 56)
                 
                 VStack(spacing: 2) {
                     Text("\(completedCount)/\(totalCount)")
                         .font(.caption.bold())
+                        .foregroundColor(.cosmicGold)
                     Text("Done")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.cosmicSecondary)
                 }
             }
             .frame(width: 70)
         }
         .padding()
-    }
-}
-
-struct TaskRowView: View {
-    let task: WidgetTask
-    
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: task.completed ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(task.isMainQuest ? .yellow : (task.completed ? .green : .gray))
-                .font(.caption)
-            
-            Text(task.text)
-                .font(.caption)
-                .lineLimit(1)
-                .strikethrough(task.completed)
-                .foregroundColor(task.completed ? .secondary : .primary)
-            
-            if task.isMainQuest {
-                Text("⭐")
-                    .font(.caption2)
-            }
-            
-            Spacer()
-            
-            Text("+\(task.xpReward)")
-                .font(.caption2)
-                .foregroundColor(.orange)
-        }
     }
 }
 
@@ -194,48 +150,68 @@ struct LargeWidgetView: View {
             // Header with progress
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("⚔️ Daily Quests")
-                        .font(.headline.bold())
+                    HStack(spacing: 4) {
+                        Text("⚔️")
+                            .font(.headline)
+                        Text("Daily Quests")
+                            .font(.headline.bold())
+                            .foregroundColor(.cosmicText)
+                    }
                     Text(formattedDate)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.cosmicSecondary)
                 }
                 
                 Spacer()
                 
                 HStack(spacing: 8) {
-                    ProgressCircleView(completed: completedCount, total: totalCount)
+                    CosmicProgressCircle(completed: completedCount, total: totalCount)
                         .frame(width: 40, height: 40)
                     
                     VStack(alignment: .leading, spacing: 0) {
                         Text("\(completedCount)/\(totalCount)")
                             .font(.subheadline.bold())
+                            .foregroundColor(.cosmicGold)
                         Text("Complete")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.cosmicSecondary)
                     }
                 }
             }
             
-            Divider()
+            // Divider with glow
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [.cosmicPurple.opacity(0.3), .cosmicPurple.opacity(0.6), .cosmicPurple.opacity(0.3)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 1)
             
             // Sections
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if !morningTasks.isEmpty {
-                        TaskSectionView(title: "🌅 Morning", tasks: morningTasks)
+                        CosmicTaskSection(title: "🌅 Morning", tasks: morningTasks)
                     }
                     
                     if !afternoonTasks.isEmpty {
-                        TaskSectionView(title: "☀️ Afternoon", tasks: afternoonTasks)
+                        CosmicTaskSection(title: "☀️ Afternoon", tasks: afternoonTasks)
                     }
                     
                     if !eveningTasks.isEmpty {
-                        TaskSectionView(title: "🌙 Evening", tasks: eveningTasks)
+                        CosmicTaskSection(title: "🌙 Evening", tasks: eveningTasks)
                     }
                     
                     if !unscheduledTasks.isEmpty {
-                        TaskSectionView(title: "📋 Anytime", tasks: unscheduledTasks)
+                        CosmicTaskSection(title: "📋 Anytime", tasks: unscheduledTasks)
+                    }
+                    
+                    if morningTasks.isEmpty && afternoonTasks.isEmpty && eveningTasks.isEmpty && unscheduledTasks.isEmpty {
+                        CosmicEmptyState()
+                            .frame(maxWidth: .infinity)
                     }
                 }
             }
@@ -252,7 +228,60 @@ struct LargeWidgetView: View {
     }
 }
 
-struct TaskSectionView: View {
+// MARK: - Cosmic Task Row
+
+struct CosmicTaskRow: View {
+    let task: WidgetTask
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            // Cosmic checkbox
+            ZStack {
+                Circle()
+                    .stroke(checkColor.opacity(0.5), lineWidth: 1.5)
+                    .frame(width: 14, height: 14)
+                
+                if task.completed {
+                    Circle()
+                        .fill(checkColor)
+                        .frame(width: 10, height: 10)
+                    
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundColor(.cosmicBackground)
+                }
+            }
+            
+            Text(task.text)
+                .font(.caption)
+                .lineLimit(1)
+                .strikethrough(task.completed)
+                .foregroundColor(task.completed ? .cosmicSecondary : .cosmicText)
+            
+            if task.isMainQuest {
+                Text("⭐")
+                    .font(.caption2)
+            }
+            
+            Spacer()
+            
+            Text("+\(task.xpReward)")
+                .font(.caption2)
+                .foregroundColor(.cosmicGold)
+        }
+    }
+    
+    private var checkColor: Color {
+        if task.isMainQuest {
+            return .cosmicGold
+        }
+        return task.completed ? .cosmicGreen : .cosmicPurple
+    }
+}
+
+// MARK: - Cosmic Task Section
+
+struct CosmicTaskSection: View {
     let title: String
     let tasks: [WidgetTask]
     
@@ -260,20 +289,20 @@ struct TaskSectionView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption.bold())
-                .foregroundColor(.secondary)
+                .foregroundColor(.cosmicPurple)
             
             ForEach(tasks.prefix(3), id: \.id) { task in
                 Link(destination: URL(string: "cosmiq://task/\(task.id)")!) {
-                    TaskRowView(task: task)
+                    CosmicTaskRow(task: task)
                 }
             }
         }
     }
 }
 
-// MARK: - Progress Circle
+// MARK: - Cosmic Progress Circle
 
-struct ProgressCircleView: View {
+struct CosmicProgressCircle: View {
     let completed: Int
     let total: Int
     
@@ -283,21 +312,45 @@ struct ProgressCircleView: View {
     
     var body: some View {
         ZStack {
+            // Background ring
             Circle()
-                .stroke(Color.gray.opacity(0.3), lineWidth: 4)
+                .stroke(Color.cosmicPurple.opacity(0.2), lineWidth: 4)
             
+            // Progress ring with gradient
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
-                    progress >= 1.0 ? Color.green : Color.orange,
+                    AngularGradient(
+                        colors: progress >= 1.0 
+                            ? [.cosmicGold, .cosmicGold.opacity(0.8)]
+                            : [.cosmicPurple, .cosmicGold],
+                        center: .center,
+                        startAngle: .degrees(-90),
+                        endAngle: .degrees(270)
+                    ),
                     style: StrokeStyle(lineWidth: 4, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.easeInOut, value: progress)
             
+            // Percentage text
             Text("\(Int(progress * 100))%")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundColor(.cosmicText)
         }
-        .frame(width: 50, height: 50)
+    }
+}
+
+// MARK: - Cosmic Empty State
+
+struct CosmicEmptyState: View {
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("✨")
+                .font(.title2)
+            Text("No quests today")
+                .font(.caption)
+                .foregroundColor(.cosmicSecondary)
+        }
+        .padding(.vertical, 8)
     }
 }
