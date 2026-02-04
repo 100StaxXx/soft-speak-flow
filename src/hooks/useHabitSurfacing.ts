@@ -225,19 +225,31 @@ export function useHabitSurfacing(selectedDate?: Date) {
         estimated_duration: habit.estimated_minutes,
       }));
 
-      console.log('[Habit Surfacing] Upserting tasks:', tasks);
+      // Check for existing habit tasks to avoid duplicate insert errors
+      const { data: existingTasks } = await supabase
+        .from('daily_tasks')
+        .select('habit_source_id')
+        .eq('user_id', user.id)
+        .eq('task_date', taskDate)
+        .not('habit_source_id', 'is', null);
 
-      // Use upsert with ignoreDuplicates to prevent race condition duplicates
+      const existingHabitIds = new Set(existingTasks?.map(t => t.habit_source_id) || []);
+      const newTasks = tasks.filter(t => !existingHabitIds.has(t.habit_source_id));
+
+      console.log('[Habit Surfacing] Inserting new tasks:', newTasks.length, 'of', tasks.length);
+
+      if (newTasks.length === 0) {
+        console.log('[Habit Surfacing] All habits already have tasks for today');
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('daily_tasks')
-        .upsert(tasks, { 
-          onConflict: 'user_id,task_date,habit_source_id',
-          ignoreDuplicates: true 
-        })
+        .insert(newTasks)
         .select('id');
 
       if (error) {
-        console.error('[Habit Surfacing] Upsert error:', error);
+        console.error('[Habit Surfacing] Insert error:', error);
         throw error;
       }
 
