@@ -1,66 +1,111 @@
 
-# Fix iOS Black Screen - React Context Initialization Error
 
-## Root Cause Identified
+# Fix iOS WKWebView Crash - Debug Systematic Isolation
 
-The error **`TypeError: undefined is not an object (evaluating 'c.createContext')`** is caused by the `next-themes` package in `src/components/ui/sonner.tsx`.
+## Problem Summary
 
-The `next-themes` library is designed specifically for Next.js and uses context patterns that fail on iOS WKWebView when bundled with Vite. In the minified production build, React (`c`) is `undefined` when `next-themes` tries to call `createContext`.
+The iOS app shows **"web process 0 crash"** - a complete WKWebView process failure. This is more severe than a JavaScript error; it means the entire rendering process crashed before React could mount.
 
-## The Problem
+## Root Cause Analysis
 
-```
-src/components/ui/sonner.tsx
-└── imports { useTheme } from "next-themes"  ← FAILS ON iOS
-    └── next-themes tries to createContext before React is ready
-        └── TypeError: c.createContext is undefined
-```
+The `next-themes` fix was applied, but the **build may not have been synced** to iOS, OR there are additional crash points. The main suspects are:
 
-## Solution
+| Suspect | Risk Level | Reason |
+|---------|------------|--------|
+| **Sentry `replayIntegration()`** | HIGH | Uses Session Replay APIs that can crash iOS WebView |
+| **Service Worker registration** | HIGH | iOS WKWebView has limited/broken service worker support |
+| **Lazy loading App.tsx** | MEDIUM | Dynamic imports can fail on iOS if paths aren't resolved correctly |
 
-Replace the `next-themes` dependency with a simple hardcoded dark theme, since Cosmiq appears to always use dark mode. The Sonner toast component just needs a theme string - it doesn't need the full `next-themes` provider.
+## Proposed Solution
 
-### Changes Required
+Implement a **systematic isolation approach** - disable potential crash points one by one until the app loads:
 
-**File: `src/components/ui/sonner.tsx`**
+### Step 1: Disable Sentry Replay Integration (Most Likely Culprit)
 
-Remove the `next-themes` import and hardcode the theme to "dark":
+Modify `src/main.tsx` to remove the Replay integration which uses browser APIs incompatible with iOS WKWebView:
 
 ```typescript
-// Before (broken)
-import { useTheme } from "next-themes";
-const { theme = "system" } = useTheme();
+// Before (lines 14-17)
+integrations: [
+  Sentry.browserTracingIntegration(),
+  Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+],
 
-// After (fixed)
-// Remove next-themes import entirely
-const theme = "dark"; // Cosmiq uses dark theme
+// After - Remove replay integration
+integrations: [
+  Sentry.browserTracingIntegration(),
+  // replayIntegration removed - causes WKWebView crashes on iOS
+],
 ```
 
-## Why This Works
+Also remove the replay sample rates:
+```typescript
+// Before (lines 19-20)
+replaysSessionSampleRate: 0.1,
+replaysOnErrorSampleRate: 1.0,
 
-1. Cosmiq is a dark-themed app - it doesn't need theme switching
-2. Removes a problematic dependency that's incompatible with Vite + Capacitor
-3. Eliminates the context initialization race condition on iOS WKWebView
-4. The Sonner toast component only uses the theme string for styling - no provider needed
+// After - Remove these lines entirely
+```
 
-## After Implementation
+### Step 2: Disable Service Worker on Capacitor Native
 
-1. Pull the changes: `git pull`
-2. Clean rebuild: `rm -rf dist && npm run build`
-3. Sync to iOS: `npm run ios:sync`
-4. In Xcode: Clean (Cmd+Shift+K), then Build & Run (Cmd+R)
+Modify `src/main.tsx` to skip service worker registration when running inside Capacitor:
 
-The app should now display the Welcome screen instead of the black screen with JS error.
+```typescript
+// Before (lines 33-39)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  });
+}
 
-## Technical Notes
+// After - Only register on web, not native
+if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  });
+}
+```
 
-- The `next-themes` package creates a React context at module load time
-- On iOS WKWebView, the module initialization order can differ from standard browsers
-- When `next-themes` loads before React is fully initialized, `createContext` fails
-- This is a known issue with Next.js-specific packages in Vite/Capacitor apps
+### Step 3: Ensure Build is Properly Synced
 
-## Cleanup After Fix
+After making changes, user must run:
 
-Once the app works, you can also:
-1. Restore the console dropping in `vite.config.ts`
-2. Remove the debug indicator from `index.html` (optional - it auto-hides)
+```bash
+git pull
+rm -rf dist ios/App/App/public
+npm run build
+npm run ios:sync
+```
+
+Then in Xcode:
+- **Product → Clean Build Folder** (Cmd+Shift+K)
+- **Product → Run** (Cmd+R)
+
+### Step 4: Verify with Debug Indicator
+
+The debug indicator added earlier should now show:
+- "Loading Cosmiq..." if WebView loads but JS stalls
+- Red error box if JavaScript throws
+- Nothing (it disappears) if React mounts successfully
+
+## Why These Changes Work
+
+1. **Sentry Replay Integration** uses browser-specific APIs for session recording that don't exist in iOS WKWebView. The `browserTracingIntegration()` alone is safe.
+
+2. **Service Workers** in Capacitor iOS are problematic because WKWebView's service worker support is limited. The registration attempt can crash the process.
+
+3. **Capacitor detection** via `window.Capacitor?.isNativePlatform?.()` safely checks if we're in a native app context.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/main.tsx` | Remove Sentry replay integration, skip service worker on native |
+
+## Cleanup After Fix Works
+
+Once the app loads successfully:
+1. Restore console dropping in `vite.config.ts` (change `drop: []` back to `drop: mode === 'production' ? ['console', 'debugger'] : []`)
+2. Remove the debug indicator from `index.html` (optional - it auto-hides anyway)
+
