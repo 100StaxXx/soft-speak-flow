@@ -7,6 +7,7 @@ import { Sparkles, Star, ChevronDown, Clock, Calendar, Target, Pencil, Zap, Book
 import { cn } from "@/lib/utils";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
+import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -93,6 +94,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const [isAddingRitual, setIsAddingRitual] = useState(false);
   const [newRitualTitle, setNewRitualTitle] = useState("");
   const [newRitualDifficulty, setNewRitualDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [newRitualDays, setNewRitualDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]); // Default to daily
   const [isAddingLoading, setIsAddingLoading] = useState(false);
   
   // Toggle state and refs for iOS-optimized touch handling
@@ -210,15 +212,18 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
     
     setIsAddingLoading(true);
     try {
-      // Insert new habit linked to this epic
+      // Determine frequency based on days selected
+      const frequency = newRitualDays.length === 7 ? 'daily' : 'custom';
+      
+      // Insert new habit (epic_id is linked via junction table, not directly)
       const { data: newHabit, error } = await supabase
         .from('habits')
         .insert({
           user_id: user.id,
-          epic_id: epicId,
           title: newRitualTitle.trim(),
           difficulty: newRitualDifficulty,
-          frequency: 'daily',
+          frequency,
+          custom_days: newRitualDays,
           is_active: true,
         })
         .select('id')
@@ -242,6 +247,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
       toast.success('Ritual added to campaign!');
       setNewRitualTitle("");
       setNewRitualDifficulty('medium');
+      setNewRitualDays([0, 1, 2, 3, 4, 5, 6]); // Reset to daily
       setIsAddingRitual(false);
     } catch (error) {
       console.error('Error adding ritual:', error);
@@ -796,6 +802,10 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                   <HabitDifficultySelector
                     value={newRitualDifficulty}
                     onChange={setNewRitualDifficulty}
+                  />
+                  <FrequencyPicker
+                    selectedDays={newRitualDays}
+                    onDaysChange={setNewRitualDays}
                   />
                   <div className="flex gap-2">
                     <Button 
