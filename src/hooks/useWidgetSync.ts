@@ -23,14 +23,17 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
       return;
     }
     
-    // Filter out rituals (tasks spawned from habits/campaigns) - show only quests
-    const questsOnly = tasks.filter(task => !task.habit_source_id);
+    // Separate quests and rituals
+    const quests = tasks.filter(task => !task.habit_source_id);
+    const rituals = tasks.filter(task => !!task.habit_source_id);
     
     // Create a fingerprint to avoid redundant syncs
     const fingerprint = JSON.stringify({
-      count: questsOnly.length,
-      completed: questsOnly.filter(t => t.completed).length,
-      ids: questsOnly.slice(0, 10).map(t => t.id + ':' + t.completed),
+      questCount: quests.length,
+      questCompleted: quests.filter(t => t.completed).length,
+      ritualCount: rituals.length,
+      ritualCompleted: rituals.filter(t => t.completed).length,
+      ids: quests.slice(0, 10).map(t => t.id + ':' + t.completed),
       date: taskDate,
     });
     
@@ -42,7 +45,7 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     lastSyncRef.current = fingerprint;
     
     // Map quests to widget format (limit to 10 for performance)
-    const widgetTasks: WidgetTask[] = questsOnly.slice(0, 10).map(task => ({
+    const widgetTasks: WidgetTask[] = quests.slice(0, 10).map(task => ({
       id: task.id,
       text: task.task_text,
       completed: task.completed ?? false,
@@ -54,11 +57,13 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     }));
     
     try {
-      console.log('[WidgetSync] Syncing', widgetTasks.length, 'quests for', taskDate);
+      console.log('[WidgetSync] Syncing', widgetTasks.length, 'quests +', rituals.length, 'rituals for', taskDate);
       await WidgetData.updateWidgetData({
         tasks: widgetTasks,
-        completedCount: questsOnly.filter(t => t.completed).length,
-        totalCount: questsOnly.length,
+        completedCount: quests.filter(t => t.completed).length,
+        totalCount: quests.length,
+        ritualCount: rituals.length,
+        ritualCompleted: rituals.filter(t => t.completed).length,
         date: taskDate,
       });
       console.log('[WidgetSync] Sync complete');

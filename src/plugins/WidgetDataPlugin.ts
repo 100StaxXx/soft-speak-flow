@@ -16,6 +16,8 @@ export interface WidgetDataPlugin {
     tasks: WidgetTask[];
     completedCount: number;
     totalCount: number;
+    ritualCount: number;
+    ritualCompleted: number;
     date: string;
   }): Promise<void>;
   reloadWidget(): Promise<void>;
