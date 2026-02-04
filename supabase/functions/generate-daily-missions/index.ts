@@ -125,6 +125,71 @@ function getStreakBonus(streak: number): { key: string; mission: typeof BONUS_MI
   return null;
 }
 
+// Timezone utility - calculate effective date with 2 AM reset
+const RESET_HOUR = 2;
+
+function getEffectiveMissionDate(userTimezone: string): string {
+  const now = new Date();
+  const tz = userTimezone || 'UTC';
+  
+  // Get local hour in user's timezone
+  const localHour = parseInt(
+    new Intl.DateTimeFormat('en-US', { 
+      hour: 'numeric', 
+      hour12: false, 
+      timeZone: tz 
+    }).format(now)
+  );
+  
+  // Get the date in user's timezone
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: tz
+  });
+  
+  // If before reset hour, use previous day's date
+  if (localHour < RESET_HOUR) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return dateFormatter.format(yesterday);
+  }
+  
+  return dateFormatter.format(now);
+}
+
+function getEffectiveDayOfWeek(userTimezone: string): number {
+  const now = new Date();
+  const tz = userTimezone || 'UTC';
+  
+  const localHour = parseInt(
+    new Intl.DateTimeFormat('en-US', { 
+      hour: 'numeric', 
+      hour12: false, 
+      timeZone: tz 
+    }).format(now)
+  );
+  
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    timeZone: tz
+  });
+  
+  let targetDate = now;
+  if (localHour < RESET_HOUR) {
+    targetDate = new Date(now);
+    targetDate.setDate(targetDate.getDate() - 1);
+  }
+  
+  const dayName = dayFormatter.format(targetDate);
+  const dayMap: Record<string, number> = {
+    'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+  };
+  
+  return dayMap[dayName] ?? 0;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -174,9 +239,19 @@ serve(async (req) => {
       return createRateLimitResponse(rateLimit, corsHeaders);
     }
 
-    const today = new Date().toLocaleDateString('en-CA');
-    const dayOfWeek = new Date().getDay();
+    // Get user's timezone from profile for 2 AM reset logic
+    const { data: profileForTz } = await supabase
+      .from('profiles')
+      .select('timezone')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const userTimezone = profileForTz?.timezone || 'UTC';
+    const today = getEffectiveMissionDate(userTimezone);
+    const dayOfWeek = getEffectiveDayOfWeek(userTimezone);
     const themeDay = THEME_DAYS[dayOfWeek];
+    
+    console.log(`User timezone: ${userTimezone}, effective date: ${today}, day: ${dayOfWeek} (${themeDay.name})`);
 
     // Check if missions already exist for today
     const { data: existing } = await supabase

@@ -1,11 +1,25 @@
 import { useState, useEffect } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { getUserTimezone } from "@/utils/timezone";
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Save user's timezone to profile when authenticated
+  const saveUserTimezone = async (userId: string) => {
+    try {
+      const timezone = getUserTimezone();
+      await supabase
+        .from('profiles')
+        .update({ timezone })
+        .eq('id', userId);
+    } catch (error) {
+      console.error('Failed to save timezone:', error);
+    }
+  };
 
   useEffect(() => {
     // Get initial session with proper error handling
@@ -18,6 +32,11 @@ export const useAuth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Save timezone when session is available
+        if (session?.user) {
+          saveUserTimezone(session.user.id);
+        }
       })
       .catch((error) => {
         console.error('Unexpected auth error:', error);
@@ -32,6 +51,11 @@ export const useAuth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Save timezone on sign in or token refresh
+        if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+          saveUserTimezone(session.user.id);
+        }
       }
     );
 

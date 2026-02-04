@@ -6,6 +6,7 @@ import { useXPRewards } from "./useXPRewards";
 import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
 import { useState, useEffect } from "react";
+import { getEffectiveMissionDate } from "@/utils/timezone";
 
 export const useDailyMissions = () => {
   const { user } = useAuth();
@@ -13,7 +14,7 @@ export const useDailyMissions = () => {
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = getEffectiveMissionDate(); // Uses 2 AM reset in user's timezone
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
 
   const [missionTheme, setMissionTheme] = useState<{ name: string; emoji: string } | null>(null);
