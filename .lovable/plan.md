@@ -1,67 +1,132 @@
 
 
-# Fix Habit Surfacing Error
+# Change Daily Missions Reset to 2 AM User Timezone
 
-## Why It's Happening Now
+## Overview
 
-The code hasn't changed - this is likely a **data timing issue**. The upsert approach works when there's no conflict, but fails when:
-- Multiple habit surfacing calls happen simultaneously (race condition)
-- The partial unique index can't be matched by the Supabase JS client
+Shift the daily missions reset from midnight to 2 AM in the user's local timezone, providing a more predictable experience for users who may be awake past midnight.
 
-## Solution
+## Current Behavior
 
-Replace the upsert with a safer "filter-then-insert" pattern that avoids the conflict entirely.
+| Component | Time Source | Reset Point |
+|-----------|-------------|-------------|
+| Frontend query key | Device local time | Midnight local |
+| Edge function | Server UTC | Midnight UTC |
 
-## Technical Changes
+This creates inconsistencies where missions might reset at unexpected times for users in different timezones.
 
-### File: `src/hooks/useHabitSurfacing.ts`
+## New Behavior
 
-**Current code (lines 151-162):**
+Missions reset at **2 AM in the user's timezone**. This means:
+- A user in New York (EST) gets new missions at 2 AM EST
+- A user in Tokyo (JST) gets new missions at 2 AM JST
+- Users who stay up past midnight still see the same missions until 2 AM
+
+## Technical Implementation
+
+### 1. Create a Timezone Utility (`src/utils/timezone.ts`)
+
+New helper function to calculate the "effective date" for missions:
+
 ```typescript
-const { data, error } = await supabase
-  .from('daily_tasks')
-  .upsert(tasks, { 
-    onConflict: 'user_id,task_date,habit_source_id',
-    ignoreDuplicates: true 
-  })
-  .select('id');
-```
-
-**New approach:**
-```typescript
-// First, get all existing habit tasks for today to filter duplicates
-const { data: existingTasks } = await supabase
-  .from('daily_tasks')
-  .select('habit_source_id')
-  .eq('user_id', user.id)
-  .eq('task_date', taskDate)
-  .not('habit_source_id', 'is', null);
-
-const existingHabitIds = new Set(existingTasks?.map(t => t.habit_source_id) || []);
-
-// Filter out habits that already have tasks
-const newTasks = tasks.filter(t => !existingHabitIds.has(t.habit_source_id));
-
-if (newTasks.length === 0) {
-  return [];
+export function getEffectiveMissionDate(userTimezone?: string): string {
+  // Get current time in user's timezone
+  const now = new Date();
+  const tz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
+  // Get local hour in user's timezone
+  const localHour = parseInt(
+    new Intl.DateTimeFormat('en-US', { 
+      hour: 'numeric', 
+      hour12: false, 
+      timeZone: tz 
+    }).format(now)
+  );
+  
+  // If before 2 AM, use previous day's date
+  if (localHour < 2) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toLocaleDateString('en-CA');
+  }
+  
+  return now.toLocaleDateString('en-CA');
 }
-
-// Insert only new tasks
-const { data, error } = await supabase
-  .from('daily_tasks')
-  .insert(newTasks)
-  .select('id');
 ```
 
-## Why This Works
+### 2. Update Frontend Hook (`src/hooks/useDailyMissions.ts`)
 
-- Explicitly checks for existing tasks before inserting
-- Avoids the upsert/partial index compatibility issue entirely
-- Same end result: only one task per habit per day
+Replace the simple date calculation:
+
+```typescript
+// Before
+const today = new Date().toLocaleDateString('en-CA');
+
+// After
+import { getEffectiveMissionDate } from '@/utils/timezone';
+const today = getEffectiveMissionDate();
+```
+
+### 3. Store User Timezone in Profile
+
+Add a `timezone` column to the `profiles` table to persist user timezone:
+
+```sql
+ALTER TABLE profiles ADD COLUMN timezone TEXT;
+```
+
+Capture timezone on login/app load:
+
+```typescript
+const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+await supabase.from('profiles').update({ timezone }).eq('id', user.id);
+```
+
+### 4. Update Edge Function (`supabase/functions/generate-daily-missions/index.ts`)
+
+Modify the date calculation to respect user timezone:
+
+```typescript
+// Get user's timezone from profile
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('current_habit_streak, timezone')
+  .eq('id', userId)
+  .maybeSingle();
+
+const userTimezone = profile?.timezone || 'UTC';
+const today = getEffectiveMissionDate(userTimezone);
+const dayOfWeek = getEffectiveDayOfWeek(userTimezone);
+```
+
+### 5. Update Habit Surfacing Hook (`src/hooks/useHabitSurfacing.ts`)
+
+Apply the same 2 AM reset logic for consistency:
+
+```typescript
+import { getEffectiveMissionDate } from '@/utils/timezone';
+const taskDate = getEffectiveMissionDate();
+```
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/hooks/useHabitSurfacing.ts` | Replace upsert with check-then-insert pattern in `surfaceAllHabits` mutation |
+| `src/utils/timezone.ts` | **Create** - New timezone utility with `getEffectiveMissionDate()` |
+| `src/hooks/useDailyMissions.ts` | Use `getEffectiveMissionDate()` instead of raw date |
+| `src/hooks/useHabitSurfacing.ts` | Use `getEffectiveMissionDate()` for consistency |
+| `src/hooks/useAuth.ts` or similar | Capture and save user timezone to profile |
+| `supabase/functions/generate-daily-missions/index.ts` | Read user timezone and calculate effective date |
+| Database migration | Add `timezone` column to `profiles` table |
+
+## Edge Cases Handled
+
+1. **User travels across timezones**: Timezone is updated on each app load, missions adjust accordingly
+2. **No timezone stored**: Falls back to UTC on server, device timezone on client
+3. **User awake at 1:59 AM**: Still sees yesterday's missions until 2:00 AM
+4. **Day-of-week themes**: Theme is also calculated using the effective date, so "Momentum Monday" shows correctly after 2 AM
+
+## Result
+
+Users will experience a consistent 2 AM reset for daily missions in their local timezone, regardless of where the server is located.
 
