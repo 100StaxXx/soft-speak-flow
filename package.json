@@ -32,6 +32,7 @@
     "@capgo/capacitor-social-login": "^7.20.0",
     "@capgo/native-purchases": "7.15.3",
     "@hookform/resolvers": "^3.10.0",
+    "@lovable.dev/cloud-auth-js": "^0.0.2",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
