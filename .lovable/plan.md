@@ -1,82 +1,106 @@
 
 
-# Fix: iOS WKWebView "useLayoutEffect" Crash
+# Fix: iOS WKWebView Chunk Loading Race Condition
 
-## Problem Diagnosis
+## Problem Summary
 
-The error `TypeError: undefined is not an object (evaluating 'pt.useLayoutEffect')` appears on iOS when loading the app. The minified code `pt.useLayoutEffect` indicates that a library is trying to access `React.useLayoutEffect` but React itself is undefined at that moment.
+The app crashes on iOS with `TypeError: undefined is not an object (evaluating 'pt.useLayoutEffect')` at Line 3694. This occurs because JavaScript chunks load out of order in WKWebView, causing React-dependent code to execute before React is fully initialized.
 
-## Root Cause
+## Root Causes Identified
 
-The issue is in `vite.config.ts` where `recharts` is split into a separate chunk:
-
+### 1. `@react-three/fiber` Still in Separate Chunk
 ```javascript
-// Line 96 - vite.config.ts
-if (id.includes('recharts')) return 'charts-vendor';
+// vite.config.ts line 98
+if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
 ```
+The `@react-three/fiber` library uses React hooks (`useFrame`, `useThree`, `useLayoutEffect`). Splitting it into a separate chunk causes the same race condition we just fixed for recharts.
 
-The `chart.tsx` component uses `React.useLayoutEffect` (line 115):
+### 2. Main App is Lazy-Loaded
 ```javascript
-React.useLayoutEffect(() => {
-  if (!colorConfig.length || !styleRef.current) return;
-  // ...
-}, [colorConfig, safeId]);
+// main.tsx line 41
+const App = lazy(() => import("./App.tsx"));
 ```
-
-On iOS WKWebView, JavaScript chunks can load out of order. When `charts-vendor.js` loads before the main `vendor.js` chunk (which contains React), the `React.useLayoutEffect` call fails because React is undefined.
-
-## Solution
-
-Remove `recharts` from the separate chunk split so it stays in the main `vendor` chunk alongside React:
-
-```text
-File: vite.config.ts
-Location: Line 96
-
-Before:
-  if (id.includes('recharts')) return 'charts-vendor';
-
-After:
-  // REMOVED - recharts uses React.useLayoutEffect and must load with React
-```
-
-## Changes Required
-
-### 1. Update vite.config.ts
-
-Remove line 96 that separates recharts into its own chunk. The updated `manualChunks` function will only split:
-- `date-fns` (pure utility, no React dependency)
-- `three` / `@react-three` (optional 3D visualization)
-
-All other libraries (React, Radix, React Query, Framer Motion, and now Recharts) will stay in the single `vendor` chunk for iOS compatibility.
+This creates an additional chunk boundary. When this chunk loads on iOS, libraries within it may try to access React before it's ready.
 
 ---
 
-## Technical Context
+## Solution
 
-The vite.config.ts already has a comment explaining this pattern (lines 90-92):
+### Change 1: Remove `@react-three/fiber` from Chunk Split
 
-```javascript
-// CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
-// iOS WKWebView can load chunks out of order, causing "createContext" errors
-// when React isn't loaded before components that use it
+Update `vite.config.ts` to only split `three` (the pure 3D library) but NOT `@react-three` (which uses React):
+
+```typescript
+// Before (line 98):
+if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
+
+// After:
+// Only split pure three.js - NOT @react-three/fiber which uses React hooks
+if (id.includes('node_modules/three/')) return 'three-vendor';
 ```
 
-The `recharts` line was likely added later without recognizing that recharts also uses React hooks internally.
+### Change 2: Remove Lazy Loading of Main App
+
+Update `main.tsx` to import App directly instead of lazy loading:
+
+```typescript
+// Before:
+const App = lazy(() => import("./App.tsx"));
+
+// After:
+import App from "./App";
+```
+
+This ensures the App and all its React dependencies load synchronously with the main bundle, preventing race conditions.
+
+---
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `vite.config.ts` | Remove `@react-three` from separate chunk split |
+| `src/main.tsx` | Replace `lazy(() => import("./App.tsx"))` with direct import |
+
+---
+
+## Technical Details
+
+### Why This Fixes the Issue
+
+1. **Single Vendor Chunk**: By keeping `@react-three/fiber` in the main vendor chunk alongside React, we guarantee React is initialized before any React Three components execute.
+
+2. **Synchronous App Loading**: Removing the lazy load of App.tsx eliminates a critical chunk boundary. The App and all its providers now load in the same execution context as React.
+
+3. **Route-Level Code Splitting Preserved**: Individual pages (Home, Auth, Onboarding, etc.) inside App.tsx are still lazy-loaded, maintaining good bundle splitting for actual navigation.
+
+### Build Impact
+
+- **Bundle Size**: Slightly larger initial load (~50-100KB more)
+- **Load Time**: Minimal impact since iOS loads from local disk
+- **Stability**: Eliminates the WKWebView chunk race condition
 
 ---
 
 ## Verification Steps
 
-After the fix:
+After implementation:
 
-1. Run `npm run build` to verify the build succeeds
-2. Run `npm run ios:testflight` to sync and test in Xcode
-3. Deploy to TestFlight and verify no crash on iOS launch
+1. Run `npm run build` - verify build succeeds
+2. Run `npm run ios:testflight` - sync to Xcode
+3. Increment build number (40 → 41)
+4. Run on iOS Simulator or device
+5. Verify app loads without crash
+6. Test navigation to various routes
 
-## Expected Outcome
+---
 
-- The `charts-vendor.js` chunk will no longer be generated
-- `recharts` will be bundled in the main `vendor.js` chunk alongside React
-- iOS will load React before recharts initializes, preventing the undefined access
+## Alternative Considered (Not Recommended)
+
+We could disable ALL chunk splitting with `manualChunks: {}`, but this would:
+- Create a massive single bundle (2-3MB+)
+- Lose benefits of route-level code splitting
+- Not address the root cause
+
+The targeted fix above is more surgical and preserves performance benefits.
 
