@@ -15,13 +15,24 @@ interface CompanionAttributesProps {
   companion: Record<string, any>;
 }
 
-const GRID_STATS: AttributeType[] = ['vitality', 'power', 'wisdom', 'discipline', 'resolve', 'connection'];
+// All 6 stats in a clean 2x3 grid
+const GRID_STATS: AttributeType[] = ['vitality', 'wisdom', 'discipline', 'resolve', 'creativity', 'alignment'];
+
+// Stats are on a 100-1000 scale
+const STAT_MIN = 100;
+const STAT_MAX = 1000;
+const STAT_DEFAULT = 300;
 
 export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => {
   const [selectedAttribute, setSelectedAttribute] = useState<AttributeType | null>(null);
   
   const getStatValue = (key: AttributeType): number => {
-    return companion[key] ?? 30;
+    return companion[key] ?? STAT_DEFAULT;
+  };
+
+  const getStatPercentage = (value: number): number => {
+    // Convert 100-1000 scale to 0-100% for progress bar
+    return ((value - STAT_MIN) / (STAT_MAX - STAT_MIN)) * 100;
   };
 
   const attributeDetails = selectedAttribute ? ATTRIBUTE_DESCRIPTIONS[selectedAttribute] : null;
@@ -34,11 +45,12 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
             Companion Stats
           </h3>
           
-          {/* 2-column grid for 6 stats */}
+          {/* 2-column grid for all 6 stats */}
           <div className="grid grid-cols-2 gap-2">
             {GRID_STATS.map((key) => {
               const info = ATTRIBUTE_DESCRIPTIONS[key];
               const value = getStatValue(key);
+              const percentage = getStatPercentage(value);
               
               return (
                 <button
@@ -51,40 +63,18 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
                       <span className="text-sm">{info.icon}</span>
                       <span className={cn("text-xs font-medium", info.color)}>{info.name}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground font-mono">{value}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{value}</span>
                   </div>
                   <div className="relative h-1.5 bg-secondary/50 rounded-full overflow-hidden">
                     <div 
                       className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-500", info.progressColor)}
-                      style={{ width: `${value}%` }}
+                      style={{ width: `${percentage}%` }}
                     />
                   </div>
                 </button>
               );
             })}
           </div>
-
-          {/* Alignment stat - full width at bottom */}
-          <button
-            onClick={() => setSelectedAttribute('alignment')}
-            className="w-full p-2 rounded-lg bg-background/50 hover:bg-background/80 transition-all text-left space-y-1.5 border border-transparent hover:border-primary/20"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">{ATTRIBUTE_DESCRIPTIONS.alignment.icon}</span>
-                <span className={cn("text-xs font-medium", ATTRIBUTE_DESCRIPTIONS.alignment.color)}>
-                  {ATTRIBUTE_DESCRIPTIONS.alignment.name}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground font-mono">{getStatValue('alignment')}</span>
-            </div>
-            <div className="relative h-1.5 bg-secondary/50 rounded-full overflow-hidden">
-              <div 
-                className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-500", ATTRIBUTE_DESCRIPTIONS.alignment.progressColor)}
-                style={{ width: `${getStatValue('alignment')}%` }}
-              />
-            </div>
-          </button>
           
           <p className="text-[10px] text-center text-muted-foreground/70 italic">
             Tap a stat to learn more
@@ -103,8 +93,13 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
             </DialogDescription>
           </DialogHeader>
           
-          {attributeDetails && (
+          {attributeDetails && selectedAttribute && (
             <div className="space-y-4 text-sm">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Current Level:</span>
+                <span className="font-mono font-semibold">{getStatValue(selectedAttribute)} / {STAT_MAX}</span>
+              </div>
+              
               <div>
                 <h4 className="font-semibold text-foreground mb-1">What it means:</h4>
                 <p className="text-muted-foreground">{attributeDetails.whatItMeans}</p>

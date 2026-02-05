@@ -5074,6 +5074,9 @@ export type Database = {
           last_encounter_quest_count: number | null
           last_streak_freeze_used: string | null
           last_weekly_encounter: string | null
+          life_status: string
+          life_status_expires_at: string | null
+          life_status_set_at: string | null
           longest_habit_streak: number | null
           mars_sign: string | null
           mercury_sign: string | null
@@ -5090,6 +5093,8 @@ export type Database = {
           referred_by_code: string | null
           rising_sign: string | null
           selected_mentor_id: string | null
+          stat_mode: string
+          stats_enabled: boolean
           streak_at_risk: boolean | null
           streak_at_risk_since: string | null
           streak_freezes_available: number | null
@@ -5130,6 +5135,9 @@ export type Database = {
           last_encounter_quest_count?: number | null
           last_streak_freeze_used?: string | null
           last_weekly_encounter?: string | null
+          life_status?: string
+          life_status_expires_at?: string | null
+          life_status_set_at?: string | null
           longest_habit_streak?: number | null
           mars_sign?: string | null
           mercury_sign?: string | null
@@ -5146,6 +5154,8 @@ export type Database = {
           referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
+          stat_mode?: string
+          stats_enabled?: boolean
           streak_at_risk?: boolean | null
           streak_at_risk_since?: string | null
           streak_freezes_available?: number | null
@@ -5186,6 +5196,9 @@ export type Database = {
           last_encounter_quest_count?: number | null
           last_streak_freeze_used?: string | null
           last_weekly_encounter?: string | null
+          life_status?: string
+          life_status_expires_at?: string | null
+          life_status_set_at?: string | null
           longest_habit_streak?: number | null
           mars_sign?: string | null
           mercury_sign?: string | null
@@ -5202,6 +5215,8 @@ export type Database = {
           referred_by_code?: string | null
           rising_sign?: string | null
           selected_mentor_id?: string | null
+          stat_mode?: string
+          stats_enabled?: boolean
           streak_at_risk?: boolean | null
           streak_at_risk_since?: string | null
           streak_freezes_available?: number | null
@@ -6527,6 +6542,7 @@ export type Database = {
           connection: number | null
           core_element: string
           created_at: string
+          creativity: number | null
           current_image_url: string | null
           current_mood: string | null
           current_stage: number
@@ -6555,6 +6571,7 @@ export type Database = {
           last_energy_update: string | null
           last_interaction_at: string | null
           last_mood_update: string | null
+          last_weekly_maintenance_date: string | null
           legacy_traits: Json | null
           mind: number | null
           neglected_image_url: string | null
@@ -6591,6 +6608,7 @@ export type Database = {
           connection?: number | null
           core_element: string
           created_at?: string
+          creativity?: number | null
           current_image_url?: string | null
           current_mood?: string | null
           current_stage?: number
@@ -6619,6 +6637,7 @@ export type Database = {
           last_energy_update?: string | null
           last_interaction_at?: string | null
           last_mood_update?: string | null
+          last_weekly_maintenance_date?: string | null
           legacy_traits?: Json | null
           mind?: number | null
           neglected_image_url?: string | null
@@ -6655,6 +6674,7 @@ export type Database = {
           connection?: number | null
           core_element?: string
           created_at?: string
+          creativity?: number | null
           current_image_url?: string | null
           current_mood?: string | null
           current_stage?: number
@@ -6683,6 +6703,7 @@ export type Database = {
           last_energy_update?: string | null
           last_interaction_at?: string | null
           last_mood_update?: string | null
+          last_weekly_maintenance_date?: string | null
           legacy_traits?: Json | null
           mind?: number | null
           neglected_image_url?: string | null

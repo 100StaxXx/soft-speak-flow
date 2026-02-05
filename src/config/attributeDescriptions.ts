@@ -14,21 +14,6 @@ export const ATTRIBUTE_DESCRIPTIONS = {
     ],
     whenGrows: "You build raw power and endurance. Your body becomes a vessel of strength and vitality."
   },
-  power: {
-    icon: "⚡",
-    name: "Power",
-    color: "text-amber-400",
-    progressColor: "bg-amber-400",
-    whatItMeans: "Your ability to make things happen in the world. Work output and execution.",
-    boostedBy: [
-      "Career and work quests",
-      "Deep work sessions (Pomodoro)",
-      "Business and side project progress",
-      "Shipping work and completing projects",
-      "Financial goal progress"
-    ],
-    whenGrows: "You execute and produce results. Your ability to shape the world around you strengthens."
-  },
   wisdom: {
     icon: "📚",
     name: "Wisdom",
@@ -55,7 +40,7 @@ export const ATTRIBUTE_DESCRIPTIONS = {
       "Maintaining streaks",
       "Showing up on hard days",
       "Following through on plans",
-      "Time-blocking and scheduling"
+      "Deep work and Pomodoro sessions"
     ],
     whenGrows: "You become someone who follows through. Your word to yourself becomes unbreakable."
   },
@@ -74,20 +59,20 @@ export const ATTRIBUTE_DESCRIPTIONS = {
     ],
     whenGrows: "You become unshakeable. Pressure forges you into something stronger."
   },
-  connection: {
-    icon: "💜",
-    name: "Connection",
-    color: "text-pink-400",
-    progressColor: "bg-pink-400",
-    whatItMeans: "Ability to bond and maintain relationships. The heart of human experience.",
+  creativity: {
+    icon: "🎨",
+    name: "Creativity",
+    color: "text-orange-400",
+    progressColor: "bg-orange-400",
+    whatItMeans: "Your ability to imagine, create, and express. The spark of originality.",
     boostedBy: [
-      "Relationship-focused quests",
-      "Check-ins with loved ones",
-      "Gratitude practices",
-      "Acts of kindness",
-      "Quality time with others"
+      "Shipping and building things",
+      "Writing and journaling",
+      "Art and design projects",
+      "Music and creative hobbies",
+      "Problem-solving and brainstorming"
     ],
-    whenGrows: "Your relationships deepen. You feel connected to what truly matters."
+    whenGrows: "You see possibilities others miss. Your unique voice emerges."
   },
   alignment: {
     icon: "✨",
@@ -111,10 +96,9 @@ export type AttributeType = keyof typeof ATTRIBUTE_DESCRIPTIONS;
 // Echo gains map - when a stat is boosted, related stats get small passive gains
 export const ECHO_MAP: Record<AttributeType, AttributeType[]> = {
   vitality: ['discipline', 'alignment'],
-  power: ['discipline'],
-  wisdom: ['alignment'],
+  wisdom: ['creativity', 'alignment'],
   discipline: ['resolve'],
   resolve: ['discipline', 'alignment'],
-  connection: ['alignment'],
+  creativity: ['wisdom', 'discipline'],
   alignment: ['resolve'],
 };
