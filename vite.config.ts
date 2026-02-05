@@ -95,7 +95,8 @@ export default defineConfig(({ mode }) => ({
             // Only split standalone libraries that don't use React contexts/hooks
             // NOTE: recharts was removed - it uses React.useLayoutEffect and must stay with React
             if (id.includes('date-fns')) return 'date-vendor';
-            if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
+            // Only split pure three.js - NOT @react-three/fiber which uses React hooks
+            if (id.includes('node_modules/three/')) return 'three-vendor';
             
             // Everything else (React, Radix, React Query, Framer Motion, etc.)
             // stays in a single vendor chunk for iOS compatibility
