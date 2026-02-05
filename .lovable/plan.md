@@ -1,117 +1,123 @@
 
+# Fix: Resist Button Not Triggering Astral Encounter
 
-# Restrict Astral Encounters to Resist Mode Only
+## Problem Diagnosis
 
-## Overview
+The Resist button calls `checkEncounterTrigger` but no game appears. This is a **state isolation bug**:
 
-This plan addresses the user's request to ensure astral encounter mini-games **only** trigger from the "Resist" mode in the Companion tab - not from quest completions, ritual completions, or epic check-ins.
+| Component | Calls `useAstralEncounters()` | Has Modal? |
+|-----------|------------------------------|------------|
+| `AstralEncounterProvider` | ✅ Own instance | ✅ Renders modal |
+| `ResistModePanel` | ✅ **Separate instance** | ❌ No modal |
 
-The RPG-style companion talk popup already exists (with portrait + speech bubble like Battle Symphony). The focus is on restricting when encounters trigger.
+When `ResistModePanel` triggers an encounter, it updates state in its **isolated hook instance**. The modal is rendered by `AstralEncounterProvider`, which has a completely **separate state** that never updates.
 
----
+## Root Cause
 
-## Current Trigger Points
-
-| Source | Current Behavior | Desired Behavior |
-|--------|------------------|------------------|
-| Quest completion | Triggers encounter after X quests | **No encounter** |
-| Ritual completion | Triggers encounter after X rituals | **No encounter** |
-| Epic progress checkpoint | Triggers encounter on progress | **No encounter** |
-| Morning check-in | Triggers encounter check | **No encounter** |
-| **Resist Mode** | Triggers encounter immediately | **Keep as-is** |
-
----
-
-## Changes Required
-
-### 1. Remove Quest Completion Trigger
-
-**File:** `src/components/astral-encounters/AstralEncounterProvider.tsx`
-
-Remove the event listener for `quest-completed`:
-
-```text
-Lines 189-193: DELETE
-// Listen for quest-completed events
-useEffect(() => {
-  window.addEventListener('quest-completed', handleQuestCompleted);
-  ...
+The `useAstralEncounters` hook uses internal `useState`:
+```typescript
+// useAstralEncounters.ts lines 38-43
+const [activeEncounter, setActiveEncounter] = useState<...>(null);
+const [showEncounterModal, setShowEncounterModal] = useState(false);
 ```
 
-Also remove the `handleQuestCompleted` function (lines 175-177).
+Each component calling this hook gets its own copy of these state values.
 
 ---
 
-### 2. Remove Epic Check-In Trigger
+## Solution: Create Shared Context
 
-**File:** `src/components/astral-encounters/AstralEncounterProvider.tsx`
+Wrap the encounter state in a React Context so all components share the same instance.
 
-Remove the event listener for `epic-progress-checkpoint`:
+### Files to Create/Modify
 
-```text
-Lines 195-201: DELETE
-// Listen for epic check-in events
-useEffect(() => {
-  const listener = (event: Event) => ...
-  window.addEventListener('epic-progress-checkpoint', listener);
-  ...
+| File | Action |
+|------|--------|
+| `src/contexts/AstralEncounterContext.tsx` | **Create** - New context provider |
+| `src/components/astral-encounters/AstralEncounterProvider.tsx` | **Modify** - Use context internally |
+| `src/components/companion/ResistModePanel.tsx` | **Modify** - Use context instead of hook |
+| `src/hooks/useAstralEncounters.ts` | **Keep** - Core logic remains, used by context |
+
+---
+
+## Implementation Details
+
+### 1. Create `AstralEncounterContext.tsx`
+
+New context that wraps the hook and exposes its values:
+
+```typescript
+// src/contexts/AstralEncounterContext.tsx
+import { createContext, useContext } from 'react';
+import { useAstralEncounters } from '@/hooks/useAstralEncounters';
+
+// Create context with the return type of the hook
+type AstralEncounterContextType = ReturnType<typeof useAstralEncounters>;
+
+const AstralEncounterContext = createContext<AstralEncounterContextType | null>(null);
+
+export const AstralEncounterContextProvider = ({ children }) => {
+  const encounterState = useAstralEncounters();
+  return (
+    <AstralEncounterContext.Provider value={encounterState}>
+      {children}
+    </AstralEncounterContext.Provider>
+  );
+};
+
+export const useAstralEncounterContext = () => {
+  const context = useContext(AstralEncounterContext);
+  if (!context) {
+    throw new Error('useAstralEncounterContext must be used within AstralEncounterContextProvider');
+  }
+  return context;
+};
 ```
 
-Also remove the `handleEpicCheckin` function (lines 180-187).
+### 2. Update `AstralEncounterProvider.tsx`
+
+- Wrap children with the new context provider
+- Use `useAstralEncounterContext()` instead of `useAstralEncounters()` for modal rendering
+
+### 3. Update `ResistModePanel.tsx`
+
+Change from:
+```typescript
+const { checkEncounterTrigger } = useAstralEncounters();
+```
+
+To:
+```typescript
+const { checkEncounterTrigger } = useAstralEncounterContext();
+```
+
+This ensures the `ResistModePanel` uses the **same state instance** as the provider that renders the modal.
 
 ---
 
-### 3. Keep Resist Mode Trigger (Unchanged)
+## Data Flow After Fix
 
-**File:** `src/components/companion/ResistModePanel.tsx`
-
-This file correctly calls `checkEncounterTrigger('urge_resist', ...)` directly when user presses "Resist" - **no changes needed**.
-
----
-
-### 4. Clean Up Unused Code
-
-**File:** `src/components/astral-encounters/AstralEncounterProvider.tsx`
-
-After removing quest/epic triggers:
-- Remove `handleActivityCompleted` function (no longer needed)
-- Remove `checkActivityMilestone` import and usage
-- Remove `ActivityType` import
-- Remove `EpicCheckinEventDetail` interface
-
-The provider will become simpler - it only renders the modal and handles resist-triggered encounters.
-
----
-
-### 5. Optional: Keep Activity Counter (for potential future use)
-
-The `useEncounterTrigger` hook and activity counting logic can remain for now (tracking quests completed), as it might be useful for other features. However, it won't trigger encounters.
-
----
-
-## Summary of File Changes
-
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/components/astral-encounters/AstralEncounterProvider.tsx` | Simplify | Remove quest/ritual/epic event listeners and handlers |
-
----
-
-## Companion Talk Popup Note
-
-The current `CompanionTalkPopup` component already implements an RPG-style dialogue similar to Battle Symphony:
-- Portrait on the left (64x64px with glow effect)
-- Quote bubble with companion name
-- Auto-dismiss progress bar
-- Tap anywhere to dismiss
-
-If you want the popup to look more like the pixel-art style in Battle Symphony (with a speech bubble "tail" pointing to the portrait), let me know and I can create a follow-up enhancement.
+```text
+User presses "Resist"
+        ↓
+ResistModePanel.handleResist()
+        ↓
+useAstralEncounterContext().checkEncounterTrigger()
+        ↓
+Shared context state updates:
+  - activeEncounter = { adversary, encounter }
+  - showEncounterModal = true (via effect in provider)
+        ↓
+AstralEncounterProvider re-renders
+        ↓
+AstralEncounterModal opens with game
+```
 
 ---
 
 ## Expected Behavior After Fix
 
-1. **Quests/Rituals** → Companion talk popup may still appear (based on Living Companion system), but **no astral encounter game**
-2. **Epic Check-ins** → Same as above, no encounter game
-3. **Resist Mode** → Pressing "Resist" immediately launches the astral encounter mini-game with a random game type
-
+1. Press **Resist** button on any habit
+2. Trigger overlay animation appears
+3. Mini-game modal opens with randomly selected game
+4. Complete game → rewards applied, habit stats updated
