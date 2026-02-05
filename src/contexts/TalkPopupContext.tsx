@@ -139,3 +139,17 @@
    }
    return context;
  };
+
+// Safe version that returns no-op functions when context is unavailable
+// Use this in hooks/components that may render outside the provider
+export const useTalkPopupContextSafe = () => {
+  const context = useContext(TalkPopupContext);
+  if (!context) {
+    return {
+      show: async () => {},
+      dismiss: () => {},
+      isVisible: false,
+    };
+  }
+  return context;
+};
