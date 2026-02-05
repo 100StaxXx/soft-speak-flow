@@ -1,264 +1,177 @@
 
+# Bug Fixes and Improvements for 6-Stat System
 
-# Implementation Tightening: 5 Final Nits
+## Issues Found (Your Feedback Was Accurate)
 
-This plan addresses the 5 implementation details you identified before shipping the 6-stat Engagement Gate system.
+### A) Migration Not Idempotent ⚠️ CRITICAL
+**Current code (lines 38-43):**
+```sql
+UPDATE public.user_companion SET
+  vitality = LEAST(1000, GREATEST(100, ROUND(COALESCE(vitality, 50) * 10)::INTEGER)),
+  ...
+```
+This will multiply **already-scaled** values (e.g., 500) by 10 again on re-run, clamping them to 1000.
 
----
-
-## Nit 1: Verify `profiles.created_at` Exists
-
-**Status**: ✅ Already exists
-
-The `profiles` table already has `created_at: string | null` (confirmed in types.ts line 5061).
-
-**Minor adjustment needed**: Handle null gracefully in `isNewUser()`:
-
-```typescript
-async function isNewUser(supabase: any, userId: string): Promise<boolean> {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('created_at')
-    .eq('id', userId)
-    .single();
-    
-  // If no profile or no created_at, treat as new user (safe default)
-  if (!profile?.created_at) return true;
-  
-  const accountAge = Math.floor(
-    (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)
-  );
-  return accountAge < 7;
-}
+**Fix:** Only scale rows where stats are in legacy range (≤100):
+```sql
+UPDATE public.user_companion SET
+  vitality   = LEAST(1000, GREATEST(100, ROUND(vitality * 10)::INTEGER)),
+  wisdom     = LEAST(1000, GREATEST(100, ROUND(wisdom * 10)::INTEGER)),
+  discipline = LEAST(1000, GREATEST(100, ROUND(discipline * 10)::INTEGER)),
+  resolve    = LEAST(1000, GREATEST(100, ROUND(resolve * 10)::INTEGER)),
+  alignment  = LEAST(1000, GREATEST(100, ROUND(alignment * 10)::INTEGER))
+WHERE GREATEST(
+  COALESCE(vitality, 0),
+  COALESCE(wisdom, 0),
+  COALESCE(discipline, 0),
+  COALESCE(resolve, 0),
+  COALESCE(alignment, 0)
+) <= 100;
 ```
 
 ---
 
-## Nit 2: Rotate `last_7_days_activity` Before Sunday Logic
-
-**Status**: ⚠️ Needs explicit sequencing
-
-**Current behavior**: 
-- `handleActiveDay` rotates array correctly
-- `handleInactiveDay` rotates array correctly
-- But Sunday reset could overwrite before counting
-
-**Correct sequence for Sunday**:
-
-```text
-STEP 1: Rotate array first (add today's activity)
-        → activeDays count is now accurate
-
-STEP 2: Run Sunday maintenance check
-        → Uses accurate activeDays
-
-STEP 3: Reset array for new week
-        → last_7_days_activity = [false, false, false, false, false, false, false]
-```
-
-**Code adjustment** (in edge function Sunday path):
-
+### B) `attributeDescriptions.ts` ✅ ALREADY CORRECT
+**Current code (lines 97-104):**
 ```typescript
-// STEP 1: Rotate array first (before Sunday check)
-const last7Days = companion.last_7_days_activity ?? [];
-const todayActivity = wasActive; // true or false
-const updated7Days = [todayActivity, ...last7Days.slice(0, 6)];
-
-// STEP 2: Count active days from the ROTATED array
-const activeDays = updated7Days.filter(Boolean).length;
-
-// STEP 3: Run Sunday maintenance using activeDays
-if (isSunday) {
-  // ... engagement gate + maintenance logic using activeDays ...
-  
-  // STEP 4: Reset for new week (only after maintenance processed)
-  await supabase
-    .from("user_companion")
-    .update({
-      last_7_days_activity: [false, false, false, false, false, false, false],
-      last_weekly_maintenance_date: todayISO,
-      // ... other updates
-    })
-    .eq("id", companion.id);
-}
+export const ECHO_MAP: Record<AttributeType, AttributeType[]> = {
+  vitality: ['discipline', 'alignment'],
+  ...
+};
 ```
+This is **valid TypeScript** with proper generics. No fix needed.
 
 ---
 
-## Nit 3: User-Local Sunday (MVP Acceptable)
+### C) `CompanionAttributes.tsx` ✅ ALREADY CORRECT
+The component is **complete and functional**:
+- Has Card wrapper (line 42)
+- Has Dialog with open state (line 85)
+- Uses `getStatPercentage()` correctly in `style={{ width: `${percentage}%` }}` (line 71)
+- Progress bar renders correctly
 
-**Status**: ⚠️ MVP acceptable, document for future
+No fix needed.
 
-**Current behavior**: Edge function uses UTC via `new Date().toISOString()`
+---
 
-**Why UTC is acceptable for MVP**:
-- Most users won't notice Sunday boundary edge cases
-- Maintenance is weekly, not daily, so slight timezone misalignment is minor
-- `profiles.timezone` already exists for future use
+### D) `useCompanionAttributes.ts` - Gain Numbers Mismatch ⚠️
+**Current gains (lines 92-138):**
+| Method | Current | Plan Says |
+|--------|---------|-----------|
+| Fitness → Vitality | +50 | +12 |
+| Learning → Wisdom | +40 | +8 |
+| Ritual → Discipline | +30 | +15 |
+| Work → Discipline | +50 | +10/+15 |
+| Resist → Resolve | +80 | +20 |
+| Shipping → Creativity | +50 | +10 |
+| Reflection → Alignment | +30 | +6 |
 
-**Future improvement** (post-MVP):
+**Decision needed:** Slow-grind (+12/+15 etc.) or medium gains (+30/+50)?
 
+**Recommendation:** Use slow-grind numbers to match the "months to max" feel.
+
+**Fix:** Update the activity methods with slow-grind values.
+
+---
+
+### E) Edge Function - Missing Life Status Expiry ⚠️
+**Current code (lines 300-308):**
 ```typescript
-function isUserLocalSunday(timezone: string | null): boolean {
-  const tz = timezone || 'UTC';
-  const formatter = new Intl.DateTimeFormat('en-US', { 
-    weekday: 'short', 
-    timeZone: tz 
-  });
-  const dayName = formatter.format(new Date());
-  return dayName === 'Sun';
-}
-
-// Usage
 const { data: profile } = await supabase
   .from('profiles')
-  .select('timezone')
-  .eq('id', companion.user_id)
+  .select('stat_mode, stats_enabled, life_status')  // Missing life_status_expires_at!
+  .eq('id', userId)
   .single();
 
-const isSunday = isUserLocalSunday(profile?.timezone);
+const lifeStatus = profile?.life_status ?? 'active';  // Never checks expiry
 ```
 
-**For now**: Add a comment in the code noting this is a known limitation.
-
----
-
-## Nit 4: Skip Logs/Messages When `stats_enabled=false`
-
-**Status**: ✅ Plan handles it, verify no side effects
-
-**Current plan** (correct):
-
+**Fix:** Add expiry check:
 ```typescript
-if (!engagement.statsEnabled) {
-  // Skip all stat logic entirely - no logging, no messages
-  return;
-}
-```
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('stat_mode, stats_enabled, life_status, life_status_expires_at')
+  .eq('id', userId)
+  .single();
 
-**Verification checklist**:
-- No `console.log()` before the early return
-- No toast/notification triggered
-- No database writes for maintenance tracking
-- Function exits cleanly
+let lifeStatus = profile?.life_status ?? 'active';
 
-**Code pattern**:
-
-```typescript
-async function handleSundayMaintenance(supabase: any, companion: UserCompanion) {
-  const engagement = await getEngagementStatus(supabase, companion.user_id);
-  
-  // Silent exit for stats-disabled users
-  if (!engagement.statsEnabled) {
-    return; // No logs, no messages, no DB updates
-  }
-  
-  // ... rest of logic ...
+// Auto-expire life status
+if (profile?.life_status_expires_at && 
+    new Date(profile.life_status_expires_at) < new Date()) {
+  lifeStatus = 'active';
+  // Update profile to reset expired status
+  await supabase
+    .from('profiles')
+    .update({ life_status: 'active', life_status_expires_at: null })
+    .eq('id', userId);
 }
 ```
 
 ---
 
-## Nit 5: Rename Function File (Optional)
+## Additional Improvements
 
-**Status**: ⚠️ Recommended but not blocking
-
-**Current**: `supabase/functions/process-daily-decay/index.ts`
-**Recommended**: `supabase/functions/process-weekly-maintenance/index.ts`
-
-**Why rename**:
-- "Decay" implies daily punishment (old mental model)
-- "Maintenance" aligns with new "Maintenance Check" language
-- Reduces confusion for future development
-
-**Migration steps** (if doing this):
-1. Create new folder `supabase/functions/process-weekly-maintenance/`
-2. Copy/refactor index.ts
-3. Update any cron jobs or function invocations
-4. Delete old function folder
-5. Redeploy
-
-**Recommendation**: Do this as a separate follow-up PR, not part of the main 6-stat migration. The function name doesn't affect functionality.
-
----
-
-## Summary of Changes
-
-| Nit | Status | Action |
-|-----|--------|--------|
-| 1. `profiles.created_at` | ✅ Already exists | Handle null gracefully |
-| 2. Rotate array before Sunday | ⚠️ Needs fix | Explicit 4-step sequence |
-| 3. User-local Sunday | ⚠️ MVP acceptable | Add TODO comment |
-| 4. `stats_enabled=false` silent | ✅ Plan correct | Verify no side effects |
-| 5. Rename function | ⚠️ Optional | Follow-up PR |
-
----
-
-## Updated Edge Function Pseudocode (Final)
-
-```typescript
-serve(async (req) => {
-  // ... setup ...
-
-  for (const companion of companions) {
-    const wasActive = checkIfActiveYesterday(companion);
-    
-    // ALWAYS rotate array first (before any Sunday logic)
-    const last7Days = companion.last_7_days_activity ?? [];
-    const updated7Days = [wasActive, ...last7Days.slice(0, 6)];
-    const activeDays = updated7Days.filter(Boolean).length;
-    
-    const isSunday = new Date().getDay() === 0; // UTC for MVP
-    
-    if (isSunday) {
-      // Check if already processed today
-      if (companion.last_weekly_maintenance_date === todayISO) {
-        continue;
-      }
-      
-      // Get engagement status
-      const engagement = await getEngagementStatus(supabase, companion.user_id);
-      
-      // Silent exit for stats-disabled users
-      if (!engagement.statsEnabled) {
-        continue; // No logs, no messages
-      }
-      
-      // Grace period for new users
-      if (await isNewUser(supabase, companion.user_id)) {
-        console.log(`[Maintenance] User ${companion.user_id} in grace period`);
-        await updateMaintenanceRecord(supabase, companion.id, todayISO);
-        continue;
-      }
-      
-      // Check engagement gate
-      if (!engagement.isEngaged) {
-        console.log(`[Maintenance] User ${companion.user_id} not engaged. Stats held steady.`);
-        await updateMaintenanceRecord(supabase, companion.id, todayISO);
-        continue;
-      }
-      
-      // Apply maintenance based on activeDays
-      await applyWeeklyMaintenance(supabase, companion, activeDays, engagement, todayISO);
-    } else {
-      // Not Sunday - just update daily tracking
-      await supabase
-        .from("user_companion")
-        .update({ last_7_days_activity: updated7Days })
-        .eq("id", companion.id);
-    }
-    
-    // ... rest of daily companion processing ...
-  }
-});
+### F) Add Maintenance Summary Storage
+**Add columns for user-visible maintenance feedback:**
+```sql
+ALTER TABLE public.user_companion
+  ADD COLUMN IF NOT EXISTS last_maintenance_summary TEXT NULL,
+  ADD COLUMN IF NOT EXISTS last_maintenance_at TIMESTAMPTZ NULL;
 ```
+
+**Update edge function to store summary:**
+```typescript
+// In applyWeeklyMaintenance(), determine message:
+let summary = '';
+if (finalMult === 0) {
+  summary = 'Maintenance Check: Great training week! No maintenance needed.';
+} else if (activeDays >= 2) {
+  summary = `Maintenance Check: You trained ${activeDays} days. Some skills need attention.`;
+} else {
+  summary = 'Maintenance Check: Low training week. Skills need attention.';
+}
+
+// Include in update:
+updates.last_maintenance_summary = summary;
+updates.last_maintenance_at = new Date().toISOString();
+```
+
+---
+
+## File Changes Summary
+
+| File | Action | Changes |
+|------|--------|---------|
+| `supabase/migrations/...` | New migration | Fix idempotent scaling + add maintenance columns |
+| `supabase/functions/process-daily-decay/index.ts` | Modify | Add life_status_expires_at check, store maintenance summary |
+| `src/hooks/useCompanionAttributes.ts` | Modify | Update gain values to slow-grind numbers |
+
+---
+
+## Slow-Grind Gain Values (Final)
+
+| Activity | Primary Stat | Gain | Echo Gains |
+|----------|--------------|------|------------|
+| Fitness quest | Vitality | +12 | Discipline +2, Alignment +2 |
+| Learning/reading | Wisdom | +8 | Creativity +2, Alignment +2 |
+| Daily ritual | Discipline | +15 | Resolve +3 |
+| Deep work/Pomodoro | Discipline | +10 | Resolve +2 |
+| Resist victory | Resolve | +20 | Discipline +4, Alignment +4 |
+| Shipping/building | Creativity | +10 | Wisdom +2, Discipline +2 |
+| Reflection/journal | Alignment | +6 | Resolve +1 |
+| Streak 7 days | Discipline | +15 | - |
+| Streak 14 days | Discipline | +25 | - |
+| Streak 30 days | Discipline | +40 | - |
+| Perfect day | Alignment | +8 | Resolve +2 |
+
+With base weekly maintenance of -40 discipline at full scale, users need ~3 activities per week just to break even. That's the "slow grind."
 
 ---
 
 ## Implementation Order
 
-1. **First**: Apply database migrations (add creativity, stat_mode, etc.)
-2. **Second**: Update edge function with Nits 1-4 integrated
-3. **Third**: Update frontend (6 stats, 2x3 grid)
-4. **Later**: Rename function file (Nit 5) in follow-up PR
+1. **New migration** - Fix scaling + add maintenance columns
+2. **Edge function fixes** - Life status expiry + maintenance summary storage
+3. **Hook updates** - Slow-grind gain values
 
