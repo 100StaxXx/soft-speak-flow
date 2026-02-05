@@ -1,177 +1,163 @@
 
-# Bug Fixes and Improvements for 6-Stat System
+# Final Fixes for 6-Stat System - Ship-Ready
 
-## Issues Found (Your Feedback Was Accurate)
-
-### A) Migration Not Idempotent ⚠️ CRITICAL
-**Current code (lines 38-43):**
-```sql
-UPDATE public.user_companion SET
-  vitality = LEAST(1000, GREATEST(100, ROUND(COALESCE(vitality, 50) * 10)::INTEGER)),
-  ...
-```
-This will multiply **already-scaled** values (e.g., 500) by 10 again on re-run, clamping them to 1000.
-
-**Fix:** Only scale rows where stats are in legacy range (≤100):
-```sql
-UPDATE public.user_companion SET
-  vitality   = LEAST(1000, GREATEST(100, ROUND(vitality * 10)::INTEGER)),
-  wisdom     = LEAST(1000, GREATEST(100, ROUND(wisdom * 10)::INTEGER)),
-  discipline = LEAST(1000, GREATEST(100, ROUND(discipline * 10)::INTEGER)),
-  resolve    = LEAST(1000, GREATEST(100, ROUND(resolve * 10)::INTEGER)),
-  alignment  = LEAST(1000, GREATEST(100, ROUND(alignment * 10)::INTEGER))
-WHERE GREATEST(
-  COALESCE(vitality, 0),
-  COALESCE(wisdom, 0),
-  COALESCE(discipline, 0),
-  COALESCE(resolve, 0),
-  COALESCE(alignment, 0)
-) <= 100;
-```
+Based on my review of the actual code, here's what needs to be fixed before shipping:
 
 ---
 
-### B) `attributeDescriptions.ts` ✅ ALREADY CORRECT
-**Current code (lines 97-104):**
+## Status Summary
+
+| Item | Current Status | Action Required |
+|------|----------------|-----------------|
+| **A) Edge function Record types** | `Record<string, number>` (lines 78, 87) | Change to typed generics |
+| **B) attributeDescriptions.ts ECHO_MAP** | `Record<AttributeType, AttributeType[]>` (line 97) | Already correct |
+| **C) CompanionAttributes.tsx** | Complete and functional | Already correct |
+| **D) useCompanionAttributes.ts gains** | +12/+8/+15/+10/+20/+10/+6 (slow-grind) | Already correct |
+| **E) Edge function return types** | `Promise<boolean>`, `Promise<EngagementStatus>` (lines 277, 293) | Already correct |
+| **F) Migration creativity seeding** | Hardcoded 300 instead of using power/connection | Need to use legacy values |
+| **G) EngagementStatus.lifeStatus type** | `string` instead of typed union | Need to fix |
+
+---
+
+## Fix 1: Edge Function - Typed Record Constants (Lines 78-92)
+
+**Current code has loose types:**
 ```typescript
-export const ECHO_MAP: Record<AttributeType, AttributeType[]> = {
-  vitality: ['discipline', 'alignment'],
-  ...
+const BASE_WEEKLY_MAINTENANCE: Record<string, number> = { ... }
+const LIFE_STATUS_MULTIPLIERS: Record<string, number> = { ... }
+```
+
+**Fix:** Add proper type definitions and use them:
+```typescript
+type StatAttribute = 'vitality' | 'wisdom' | 'discipline' | 'resolve' | 'creativity' | 'alignment';
+type LifeStatus = 'active' | 'transition' | 'vacation' | 'sick';
+
+const BASE_WEEKLY_MAINTENANCE: Record<StatAttribute, number> = {
+  discipline: 40,
+  vitality: 30,
+  creativity: 25,
+  resolve: 20,
+  wisdom: 15,
+  alignment: 15,
+};
+
+const LIFE_STATUS_MULTIPLIERS: Record<LifeStatus, number> = {
+  active: 1,
+  transition: 0.5,
+  vacation: 0.25,
+  sick: 0.1,
 };
 ```
-This is **valid TypeScript** with proper generics. No fix needed.
 
 ---
 
-### C) `CompanionAttributes.tsx` ✅ ALREADY CORRECT
-The component is **complete and functional**:
-- Has Card wrapper (line 42)
-- Has Dialog with open state (line 85)
-- Uses `getStatPercentage()` correctly in `style={{ width: `${percentage}%` }}` (line 71)
-- Progress bar renders correctly
+## Fix 2: Edge Function - EngagementStatus Interface (Line 274)
 
-No fix needed.
-
----
-
-### D) `useCompanionAttributes.ts` - Gain Numbers Mismatch ⚠️
-**Current gains (lines 92-138):**
-| Method | Current | Plan Says |
-|--------|---------|-----------|
-| Fitness → Vitality | +50 | +12 |
-| Learning → Wisdom | +40 | +8 |
-| Ritual → Discipline | +30 | +15 |
-| Work → Discipline | +50 | +10/+15 |
-| Resist → Resolve | +80 | +20 |
-| Shipping → Creativity | +50 | +10 |
-| Reflection → Alignment | +30 | +6 |
-
-**Decision needed:** Slow-grind (+12/+15 etc.) or medium gains (+30/+50)?
-
-**Recommendation:** Use slow-grind numbers to match the "months to max" feel.
-
-**Fix:** Update the activity methods with slow-grind values.
-
----
-
-### E) Edge Function - Missing Life Status Expiry ⚠️
-**Current code (lines 300-308):**
+**Current:**
 ```typescript
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('stat_mode, stats_enabled, life_status')  // Missing life_status_expires_at!
-  .eq('id', userId)
-  .single();
-
-const lifeStatus = profile?.life_status ?? 'active';  // Never checks expiry
+interface EngagementStatus {
+  lifeStatus: string;  // Too loose
+}
 ```
 
-**Fix:** Add expiry check:
+**Fix:**
 ```typescript
-const { data: profile } = await supabase
-  .from('profiles')
-  .select('stat_mode, stats_enabled, life_status, life_status_expires_at')
-  .eq('id', userId)
-  .single();
+type LifeStatus = 'active' | 'transition' | 'vacation' | 'sick';
 
-let lifeStatus = profile?.life_status ?? 'active';
-
-// Auto-expire life status
-if (profile?.life_status_expires_at && 
-    new Date(profile.life_status_expires_at) < new Date()) {
-  lifeStatus = 'active';
-  // Update profile to reset expired status
-  await supabase
-    .from('profiles')
-    .update({ life_status: 'active', life_status_expires_at: null })
-    .eq('id', userId);
+interface EngagementStatus {
+  isEngaged: boolean;
+  resistDays: number;
+  ritualDays: number;
+  statMode: 'casual' | 'rpg';
+  statsEnabled: boolean;
+  lifeStatus: LifeStatus;
 }
 ```
 
 ---
 
-## Additional Improvements
+## Fix 3: Migration - Seed Creativity from Legacy Values
 
-### F) Add Maintenance Summary Storage
-**Add columns for user-visible maintenance feedback:**
+**Current (line 22-24):**
 ```sql
-ALTER TABLE public.user_companion
-  ADD COLUMN IF NOT EXISTS last_maintenance_summary TEXT NULL,
-  ADD COLUMN IF NOT EXISTS last_maintenance_at TIMESTAMPTZ NULL;
+UPDATE public.user_companion SET
+  creativity = LEAST(1000, GREATEST(100, 300))
+WHERE creativity IS NULL OR creativity = 0;
 ```
 
-**Update edge function to store summary:**
+This ignores the existing `power` and `connection` columns that we confirmed exist in the database.
+
+**Fix:** Create a new migration to properly seed creativity:
+```sql
+-- Seed creativity from average of legacy power + connection, scaled to 1000
+UPDATE public.user_companion
+SET creativity = LEAST(1000, GREATEST(100,
+  ROUND(((COALESCE(power, 30) + COALESCE(connection, 30)) / 2) * 10)::INTEGER
+))
+WHERE (creativity IS NULL OR creativity = 0 OR creativity = 300)
+  AND (power IS NOT NULL OR connection IS NOT NULL);
+
+-- Fallback for rows with no legacy values
+UPDATE public.user_companion
+SET creativity = 300
+WHERE creativity IS NULL OR creativity = 0;
+```
+
+---
+
+## Fix 4: Edge Function - Type-safe Lookup for Life Status Multiplier
+
+**Current (line 442):**
 ```typescript
-// In applyWeeklyMaintenance(), determine message:
-let summary = '';
-if (finalMult === 0) {
-  summary = 'Maintenance Check: Great training week! No maintenance needed.';
-} else if (activeDays >= 2) {
-  summary = `Maintenance Check: You trained ${activeDays} days. Some skills need attention.`;
-} else {
-  summary = 'Maintenance Check: Low training week. Skills need attention.';
-}
-
-// Include in update:
-updates.last_maintenance_summary = summary;
-updates.last_maintenance_at = new Date().toISOString();
+const statusMult = LIFE_STATUS_MULTIPLIERS[engagement.lifeStatus] ?? 1;
 ```
 
----
+With proper typing, this needs to handle the type coercion:
 
-## File Changes Summary
+**Fix:**
+```typescript
+const statusMult = LIFE_STATUS_MULTIPLIERS[engagement.lifeStatus as LifeStatus] ?? 1;
+```
 
-| File | Action | Changes |
-|------|--------|---------|
-| `supabase/migrations/...` | New migration | Fix idempotent scaling + add maintenance columns |
-| `supabase/functions/process-daily-decay/index.ts` | Modify | Add life_status_expires_at check, store maintenance summary |
-| `src/hooks/useCompanionAttributes.ts` | Modify | Update gain values to slow-grind numbers |
-
----
-
-## Slow-Grind Gain Values (Final)
-
-| Activity | Primary Stat | Gain | Echo Gains |
-|----------|--------------|------|------------|
-| Fitness quest | Vitality | +12 | Discipline +2, Alignment +2 |
-| Learning/reading | Wisdom | +8 | Creativity +2, Alignment +2 |
-| Daily ritual | Discipline | +15 | Resolve +3 |
-| Deep work/Pomodoro | Discipline | +10 | Resolve +2 |
-| Resist victory | Resolve | +20 | Discipline +4, Alignment +4 |
-| Shipping/building | Creativity | +10 | Wisdom +2, Discipline +2 |
-| Reflection/journal | Alignment | +6 | Resolve +1 |
-| Streak 7 days | Discipline | +15 | - |
-| Streak 14 days | Discipline | +25 | - |
-| Streak 30 days | Discipline | +40 | - |
-| Perfect day | Alignment | +8 | Resolve +2 |
-
-With base weekly maintenance of -40 discipline at full scale, users need ~3 activities per week just to break even. That's the "slow grind."
+Or better, since we're properly typing the interface now:
+```typescript
+const statusMult = LIFE_STATUS_MULTIPLIERS[engagement.lifeStatus] ?? 1;
+```
 
 ---
 
 ## Implementation Order
 
-1. **New migration** - Fix scaling + add maintenance columns
-2. **Edge function fixes** - Life status expiry + maintenance summary storage
-3. **Hook updates** - Slow-grind gain values
+1. **New database migration** - Fix creativity seeding with power/connection average
+2. **Edge function updates** - Add type definitions and fix loose types
+3. **Deploy edge function** - Redeploy after changes
 
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `supabase/migrations/[new]` | Seed creativity from power/connection legacy values |
+| `supabase/functions/process-daily-decay/index.ts` | Add `StatAttribute` and `LifeStatus` types, update Record generics and interface |
+
+---
+
+## Verification Checklist (After Fixes)
+
+1. **TypeScript builds without errors** - Run `npm run build` or check for red squiggles
+2. **Stats UI shows 6 tiles** - vitality, wisdom, discipline, resolve, creativity, alignment
+3. **Progress bar math is correct** - 100 = 0%, 550 = 50%, 1000 = 100%
+4. **Tap stat opens dialog** - Shows description, boosted by list, and when it grows
+5. **Test stat update** - Call `updateDisciplineFromWork(companionId)` and verify +10 discipline, +2 resolve echo
+
+---
+
+## What's Already Correct (No Changes Needed)
+
+- `attributeDescriptions.ts` - ECHO_MAP has proper generics
+- `CompanionAttributes.tsx` - Full component with Card, Dialog, progress bars
+- `useCompanionAttributes.ts` - Slow-grind values (+12/+8/+15/+10/+20/+10/+6)
+- Edge function core logic - Engagement gate, maintenance scaling, activity tiers
+- `getEngagementStatus()` - Already has `Promise<EngagementStatus>` return type
+- `isNewUser()` - Already has `Promise<boolean>` return type
