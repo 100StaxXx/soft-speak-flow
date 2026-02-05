@@ -1439,6 +1439,45 @@ export type Database = {
           },
         ]
       }
+      companion_reactions: {
+        Row: {
+          channel: string
+          context_tags: string[] | null
+          cooldown_hours: number | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          moment_types: string[] | null
+          source_systems: string[] | null
+          text: string
+          tone_tag: string | null
+        }
+        Insert: {
+          channel?: string
+          context_tags?: string[] | null
+          cooldown_hours?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          moment_types?: string[] | null
+          source_systems?: string[] | null
+          text: string
+          tone_tag?: string | null
+        }
+        Update: {
+          channel?: string
+          context_tags?: string[] | null
+          cooldown_hours?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          moment_types?: string[] | null
+          source_systems?: string[] | null
+          text?: string
+          tone_tag?: string | null
+        }
+        Relationships: []
+      }
       companion_skins: {
         Row: {
           created_at: string | null
@@ -6475,6 +6514,7 @@ export type Database = {
           body: number | null
           bond_level: number | null
           bond_portrait_urls: Json | null
+          cached_creature_name: string | null
           care_balance: number | null
           care_consistency: number | null
           care_intent: number | null
@@ -6531,6 +6571,7 @@ export type Database = {
           body?: number | null
           bond_level?: number | null
           bond_portrait_urls?: Json | null
+          cached_creature_name?: string | null
           care_balance?: number | null
           care_consistency?: number | null
           care_intent?: number | null
@@ -6587,6 +6628,7 @@ export type Database = {
           body?: number | null
           bond_level?: number | null
           bond_portrait_urls?: Json | null
+          cached_creature_name?: string | null
           care_balance?: number | null
           care_consistency?: number | null
           care_intent?: number | null
@@ -6962,6 +7004,86 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_reaction_budget: {
+        Row: {
+          budget_date: string
+          id: string
+          mentor_count: number | null
+          pomodoro_count: number | null
+          quest_count: number | null
+          resist_count: number | null
+          ritual_count: number | null
+          total_count: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          budget_date?: string
+          id?: string
+          mentor_count?: number | null
+          pomodoro_count?: number | null
+          quest_count?: number | null
+          resist_count?: number | null
+          ritual_count?: number | null
+          total_count?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          budget_date?: string
+          id?: string
+          mentor_count?: number | null
+          pomodoro_count?: number | null
+          quest_count?: number | null
+          resist_count?: number | null
+          ritual_count?: number | null
+          total_count?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_reaction_history: {
+        Row: {
+          id: string
+          moment_type: string | null
+          reaction_id: string | null
+          reaction_text_snapshot: string | null
+          shown_at: string | null
+          source_system: string
+          tone_tag: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          moment_type?: string | null
+          reaction_id?: string | null
+          reaction_text_snapshot?: string | null
+          shown_at?: string | null
+          source_system: string
+          tone_tag?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          moment_type?: string | null
+          reaction_id?: string | null
+          reaction_text_snapshot?: string | null
+          shown_at?: string | null
+          source_system?: string
+          tone_tag?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_reaction_history_reaction_id_fkey"
+            columns: ["reaction_id"]
+            isOneToOne: false
+            referencedRelation: "companion_reactions"
             referencedColumns: ["id"]
           },
         ]
