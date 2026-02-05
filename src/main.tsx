@@ -1,9 +1,10 @@
 import { createRoot } from "react-dom/client";
-import { Suspense, lazy, useEffect } from "react";
+import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
 import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
+import App from "./App";
 
 // Initialize Sentry error tracking (only in production with valid DSN)
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
@@ -37,9 +38,6 @@ if ('serviceWorker' in navigator && !(window as any).Capacitor?.isNativePlatform
   });
 }
 
-// Lazy load the main app for code splitting
-const App = lazy(() => import("./App.tsx"));
-
 // Wrapper component to handle Capacitor initialization
 const AppWrapper = () => {
   useEffect(() => {
@@ -53,14 +51,5 @@ const AppWrapper = () => {
 document.getElementById('debug-indicator')?.remove();
 
 createRoot(document.getElementById("root")!).render(
-  <Suspense fallback={
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center space-y-4">
-        <div className="h-12 w-12 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    </div>
-  }>
-    <AppWrapper />
-  </Suspense>
+  <AppWrapper />
 );
