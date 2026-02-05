@@ -92,8 +92,8 @@ export default defineConfig(({ mode }) => ({
           // when React isn't loaded before components that use it
           
           if (id.includes('node_modules')) {
-            // Only split standalone libraries that don't use React contexts
-            if (id.includes('recharts')) return 'charts-vendor';
+            // Only split standalone libraries that don't use React contexts/hooks
+            // NOTE: recharts was removed - it uses React.useLayoutEffect and must stay with React
             if (id.includes('date-fns')) return 'date-vendor';
             if (id.includes('three') || id.includes('@react-three')) return 'three-vendor';
             
