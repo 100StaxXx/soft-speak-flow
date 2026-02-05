@@ -5,12 +5,12 @@ import { Shield, Flame, Target, Zap } from 'lucide-react';
 import { HabitResistCard } from './HabitResistCard';
 import { AddBadHabitDialog } from './AddBadHabitDialog';
 import { useResistMode, BadHabit } from '@/hooks/useResistMode';
-import { useAstralEncounters } from '@/hooks/useAstralEncounters';
+import { useAstralEncounterContext } from '@/contexts/AstralEncounterContext';
 import { AdversaryTheme } from '@/types/astralEncounters';
 
 export const ResistModePanel = memo(() => {
   const { habits, stats, isLoading, addHabit, removeHabit, isAddingHabit } = useResistMode();
-  const { checkEncounterTrigger } = useAstralEncounters();
+  const { checkEncounterTrigger } = useAstralEncounterContext();
   const [resistingHabitId, setResistingHabitId] = useState<string | null>(null);
 
   const handleResist = useCallback(async (habit: BadHabit) => {

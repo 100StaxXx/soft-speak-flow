@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
-import { useAstralEncounters } from '@/hooks/useAstralEncounters';
+import { AstralEncounterContextProvider, useAstralEncounterContext } from '@/contexts/AstralEncounterContext';
 import { useEncounterPasses } from '@/hooks/useEncounterPasses';
 import { AstralEncounterModal } from './AstralEncounterModal';
 import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
@@ -22,7 +22,8 @@ interface AstralEncounterProviderProps {
   children: React.ReactNode;
 }
 
-export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
+// Inner component that consumes the context
+const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps) => {
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
   const [queuedEncounter, setQueuedEncounter] = useState<QueuedEncounter | null>(null);
@@ -31,7 +32,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
 
   const { user } = useAuth();
   const { isEvolvingLoading } = useEvolution();
-  const { passCount, recordPass, shouldPromptDisable } = useEncounterPasses();
+  const { passCount, recordPass } = useEncounterPasses();
 
   const {
     activeEncounter,
@@ -41,7 +42,7 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     completeEncounter,
     closeEncounter,
     passEncounter,
-  } = useAstralEncounters();
+  } = useAstralEncounterContext();
 
   // Track evolution state in ref for immediate access
   useEffect(() => {
@@ -73,24 +74,6 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
 
     window.addEventListener('evolution-modal-closed', handleEvolutionClosed);
     return () => window.removeEventListener('evolution-modal-closed', handleEvolutionClosed);
-  }, [checkEncounterTrigger]);
-
-  // Wrap checkEncounterTrigger to show overlay first (and queue if evolution active)
-  const triggerEncounterWithOverlay = useCallback(async (
-    triggerType: TriggerType,
-    sourceId?: string,
-    epicProgress?: number,
-    epicCategory?: string,
-    activityInterval?: number
-  ) => {
-    // If evolution is active, queue the encounter
-    if (isEvolutionActiveRef.current) {
-      console.log('[AstralEncounterProvider] Evolution in progress, queueing encounter:', triggerType);
-      setQueuedEncounter({ triggerType, sourceId, epicProgress, epicCategory, activityInterval });
-      return;
-    }
-    // Start by triggering the encounter logic (which generates the adversary)
-    await checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, activityInterval);
   }, [checkEncounterTrigger]);
 
   // Watch for activeEncounter changes to show overlay
@@ -189,5 +172,16 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
         passCount={passCount}
       />
     </>
+  );
+};
+
+// Outer component that provides the context
+export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
+  return (
+    <AstralEncounterContextProvider>
+      <AstralEncounterProviderInner>
+        {children}
+      </AstralEncounterProviderInner>
+    </AstralEncounterContextProvider>
   );
 };
