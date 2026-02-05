@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useXPRewards } from '@/hooks/useXPRewards';
 import { FOCUS_XP_REWARDS } from '@/config/xpRewards';
+ import { useLivingCompanion } from '@/hooks/useLivingCompanion';
 
 export interface FocusSession {
   id: string;
@@ -50,6 +51,15 @@ export function useFocusSession() {
   const { awardFocusSessionComplete } = useXPRewards();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+ 
+   // Living companion reaction system
+   let triggerPomodoroComplete: ((durationMinutes: number) => Promise<boolean>) | null = null;
+   try {
+     const livingCompanion = useLivingCompanion();
+     triggerPomodoroComplete = livingCompanion.triggerPomodoroComplete;
+   } catch {
+     // Context not available (e.g., outside provider) - reactions disabled
+   }
 
   const [timerState, setTimerState] = useState<FocusTimerState>({
     isRunning: false,
@@ -192,6 +202,13 @@ export function useFocusSession() {
       // Award XP through centralized system
       awardFocusSessionComplete(isPerfect, underCap);
       
+       // Trigger companion reaction for sessions >= 15 minutes
+       if (session.planned_duration >= 15 && triggerPomodoroComplete) {
+         triggerPomodoroComplete(session.planned_duration).catch(err => 
+           console.log('[LivingCompanion] Pomodoro trigger failed:', err)
+         );
+       }
+       
       // Start cooldown
       startCooldown();
     },
