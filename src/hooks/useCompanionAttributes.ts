@@ -88,66 +88,66 @@ export const useCompanionAttributes = () => {
     },
   });
 
-  // Specific update methods for different activities (scaled for 1000 range)
+  // Specific update methods for different activities (slow-grind values)
   const updateVitalityFromFitness = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'vitality', amount: 50 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'vitality', amount: 12 });
     },
   });
 
   const updateWisdomFromLearning = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'wisdom', amount: 40 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'wisdom', amount: 8 });
     },
   });
 
   const updateDisciplineFromRitual = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'discipline', amount: 30 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'discipline', amount: 15 });
     },
   });
 
   const updateDisciplineFromWork = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'discipline', amount: 50 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'discipline', amount: 10 });
     },
   });
 
   const updateResolveFromResist = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'resolve', amount: 80 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'resolve', amount: 20 });
     },
   });
 
   const updateCreativityFromShipping = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'creativity', amount: 50 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'creativity', amount: 10 });
     },
   });
 
   const updateAlignmentFromReflection = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
-      await updateAttribute.mutateAsync({ companionId, attribute: 'alignment', amount: 30 });
+      await updateAttribute.mutateAsync({ companionId, attribute: 'alignment', amount: 6 });
     },
   });
 
-  // Streak milestone rewards (scaled for 1000 range)
+  // Streak milestone rewards (slow-grind values)
   const updateFromStreakMilestone = useMutation({
     mutationFn: async ({ companionId, streakDays }: { companionId: string; streakDays: number }) => {
       if (!user) throw new Error("Not authenticated");
 
       let disciplineGain = 0;
-      if (streakDays === 7) disciplineGain = 50;
-      else if (streakDays === 14) disciplineGain = 80;
-      else if (streakDays === 30) disciplineGain = 120;
-      else if (streakDays % 7 === 0) disciplineGain = 20;
+      if (streakDays === 7) disciplineGain = 15;
+      else if (streakDays === 14) disciplineGain = 25;
+      else if (streakDays === 30) disciplineGain = 40;
+      else if (streakDays % 7 === 0) disciplineGain = 5;
 
       if (disciplineGain > 0) {
         await updateAttribute.mutateAsync({ 
@@ -159,14 +159,14 @@ export const useCompanionAttributes = () => {
     },
   });
 
-  // Perfect day bonus - small boost to alignment
+  // Perfect day bonus - small boost to alignment (slow-grind)
   const updateFromPerfectDay = useMutation({
     mutationFn: async (companionId: string) => {
       if (!user) throw new Error("Not authenticated");
       await updateAttribute.mutateAsync({ 
         companionId, 
         attribute: 'alignment', 
-        amount: 30,
+        amount: 8,
         applyEchoGains: true 
       });
     },

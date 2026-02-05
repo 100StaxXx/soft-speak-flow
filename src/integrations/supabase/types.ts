@@ -6570,6 +6570,8 @@ export type Database = {
           last_activity_date: string | null
           last_energy_update: string | null
           last_interaction_at: string | null
+          last_maintenance_at: string | null
+          last_maintenance_summary: string | null
           last_mood_update: string | null
           last_weekly_maintenance_date: string | null
           legacy_traits: Json | null
@@ -6636,6 +6638,8 @@ export type Database = {
           last_activity_date?: string | null
           last_energy_update?: string | null
           last_interaction_at?: string | null
+          last_maintenance_at?: string | null
+          last_maintenance_summary?: string | null
           last_mood_update?: string | null
           last_weekly_maintenance_date?: string | null
           legacy_traits?: Json | null
@@ -6702,6 +6706,8 @@ export type Database = {
           last_activity_date?: string | null
           last_energy_update?: string | null
           last_interaction_at?: string | null
+          last_maintenance_at?: string | null
+          last_maintenance_summary?: string | null
           last_mood_update?: string | null
           last_weekly_maintenance_date?: string | null
           legacy_traits?: Json | null

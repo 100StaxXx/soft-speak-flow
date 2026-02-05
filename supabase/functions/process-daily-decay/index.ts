@@ -296,16 +296,27 @@ async function getEngagementStatus(supabase: any, userId: string): Promise<Engag
   const cutoff = sevenDaysAgo.toISOString();
   const cutoffDate = sevenDaysAgo.toISOString().split('T')[0];
 
-  // Get profile settings
+  // Get profile settings (including life_status_expires_at for auto-expiry)
   const { data: profile } = await supabase
     .from('profiles')
-    .select('stat_mode, stats_enabled, life_status')
+    .select('stat_mode, stats_enabled, life_status, life_status_expires_at')
     .eq('id', userId)
     .single();
 
   const statMode = (profile?.stat_mode ?? 'casual') as 'casual' | 'rpg';
   const statsEnabled = profile?.stats_enabled ?? true;
-  const lifeStatus = profile?.life_status ?? 'active';
+  let lifeStatus = profile?.life_status ?? 'active';
+
+  // Auto-expire life status if past expiry date
+  if (profile?.life_status_expires_at && 
+      new Date(profile.life_status_expires_at) < new Date()) {
+    lifeStatus = 'active';
+    // Update profile to reset expired status
+    await supabase
+      .from('profiles')
+      .update({ life_status: 'active', life_status_expires_at: null })
+      .eq('id', userId);
+  }
 
   // If stats disabled, never engaged
   if (!statsEnabled) {
@@ -391,13 +402,19 @@ async function handleSundayMaintenance(
   return { applied: true, reason: 'maintenance_applied' };
 }
 
-async function updateMaintenanceRecord(supabase: any, companionId: string, todayISO: string) {
+async function updateMaintenanceRecord(
+  supabase: any, 
+  companionId: string, 
+  todayISO: string,
+  summary: string = 'Maintenance Check: Stats held steady this week.'
+) {
   await supabase
     .from("user_companion")
     .update({
       last_weekly_maintenance_date: todayISO,
-      // Proper 7-length reset for new week
       last_7_days_activity: [false, false, false, false, false, false, false],
+      last_maintenance_summary: summary,
+      last_maintenance_at: new Date().toISOString(),
     })
     .eq("id", companionId);
 }
@@ -425,10 +442,22 @@ async function applyWeeklyMaintenance(
   const statusMult = LIFE_STATUS_MULTIPLIERS[engagement.lifeStatus] ?? 1;
   const finalMult = activityMult * statusMult;
 
+  // Determine maintenance summary message
+  let summary = '';
+  if (finalMult === 0) {
+    summary = 'Maintenance Check: Great training week! No maintenance needed.';
+  } else if (activeDays >= 2) {
+    summary = `Maintenance Check: You trained ${activeDays} days. Some skills need attention.`;
+  } else {
+    summary = 'Maintenance Check: Low training week. Skills need attention.';
+  }
+
   // Build update object
   const updates: Record<string, any> = {
     last_weekly_maintenance_date: todayISO,
     last_7_days_activity: [false, false, false, false, false, false, false],
+    last_maintenance_summary: summary,
+    last_maintenance_at: new Date().toISOString(),
   };
 
   // If no maintenance needed
