@@ -309,7 +309,12 @@ async function getEngagementStatus(supabase: any, userId: string): Promise<Engag
 
   const statMode = (profile?.stat_mode ?? 'casual') as 'casual' | 'rpg';
   const statsEnabled = profile?.stats_enabled ?? true;
-  let lifeStatus: LifeStatus = (profile?.life_status ?? 'active') as LifeStatus;
+  // Normalize life status to prevent invalid values from DB
+  const rawLifeStatus = profile?.life_status ?? 'active';
+  let lifeStatus: LifeStatus = 
+    rawLifeStatus === 'transition' || rawLifeStatus === 'vacation' || rawLifeStatus === 'sick'
+      ? rawLifeStatus
+      : 'active';
 
   // Auto-expire life status if past expiry date
   if (profile?.life_status_expires_at && 
