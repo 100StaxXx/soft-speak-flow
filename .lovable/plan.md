@@ -1,189 +1,82 @@
 
 
-# Living Companion Talk Popup - Integration Fixes
+# Fix: iOS WKWebView "useLayoutEffect" Crash
 
-## Overview
+## Problem Diagnosis
 
-This plan addresses four refinement issues identified in the Living Companion Talk Popup system:
+The error `TypeError: undefined is not an object (evaluating 'pt.useLayoutEffect')` appears on iOS when loading the app. The minified code `pt.useLayoutEffect` indicates that a library is trying to access `React.useLayoutEffect` but React itself is undefined at that moment.
 
-1. **Gating Bypass** - Direct `triggerReaction()` calls bypass "first-of-day" checks
-2. **Duplicate Trigger Logic** - EpicCheckInDrawer has redundant reaction calls
-3. **Unused `triggerComeback()`** - Never integrated into WelcomeBackModal
-4. **Unused `mentor` Source** - Check-in completion doesn't trigger mentor reactions
+## Root Cause
 
----
+The issue is in `vite.config.ts` where `recharts` is split into a separate chunk:
 
-## Changes Summary
-
-### File 1: `src/hooks/useXPRewards.ts`
-
-**Current Problem:**
-```typescript
-// Line 103 - Bypasses triggerQuestComplete's isFirstToday check
-triggerReaction('quest', { momentType: 'momentum_gain' }).catch(...)
+```javascript
+// Line 96 - vite.config.ts
+if (id.includes('recharts')) return 'charts-vendor';
 ```
 
-**Fix:**
-- Replace direct `triggerReaction` call with `triggerQuestComplete`
-- Track "first quest today" status by checking if this is the first habit completion of the day
-- Use `triggerQuestComplete(true)` only when it's the first completion
-
-**Implementation:**
-- Add a query to check today's completed quest/habit count before awarding XP
-- Call `triggerQuestComplete(isFirstQuestToday)` instead of raw `triggerReaction`
-
----
-
-### File 2: `src/components/EpicCheckInDrawer.tsx`
-
-**Current Problem (Lines 147-163):**
-```typescript
-// Duplicate trigger in both branches
-if (!taskId) {
-  surfaceHabit(habitId);
-  triggerReaction('ritual', { momentType: 'discipline_win' }); // Call 1
-  return;
-}
-toggleTask({ taskId, completed: true, xpReward: 25 });
-triggerReaction('ritual', { momentType: 'discipline_win' }); // Call 2
+The `chart.tsx` component uses `React.useLayoutEffect` (line 115):
+```javascript
+React.useLayoutEffect(() => {
+  if (!colorConfig.length || !styleRef.current) return;
+  // ...
+}, [colorConfig, safeId]);
 ```
 
-**Fix:**
-- Replace both `triggerReaction` calls with single `triggerRitualComplete`
-- Track ritual completion state to determine `isFirstToday` and `completedAllRituals`
-- Move the trigger call to after the toggle/surface logic
+On iOS WKWebView, JavaScript chunks can load out of order. When `charts-vendor.js` loads before the main `vendor.js` chunk (which contains React), the `React.useLayoutEffect` call fails because React is undefined.
 
-**Implementation:**
-- Use `triggerRitualComplete` instead of direct `triggerReaction`
-- Add logic to track if this is the first ritual completion today
-- Check if all rituals are now complete for the `breakthrough` moment type
+## Solution
 
----
+Remove `recharts` from the separate chunk split so it stays in the main `vendor` chunk alongside React:
 
-### File 3: `src/components/WelcomeBackModal.tsx`
+```text
+File: vite.config.ts
+Location: Line 96
 
-**Current Problem:**
-- `triggerComeback()` is defined but never used
-- WelcomeBackModal should show a special companion reaction when user returns after 3+ days
+Before:
+  if (id.includes('recharts')) return 'charts-vendor';
 
-**Fix:**
-- Import `useLivingCompanionSafe` hook
-- Call `triggerComeback()` after successful reunion (inside `handleWelcomeBack`)
-- This triggers the `comeback` moment type for returning users
-
-**Implementation:**
-```typescript
-const { triggerComeback } = useLivingCompanionSafe();
-
-const handleWelcomeBack = async () => {
-  setShowReunion(true);
-  await markUserActive();
-  
-  if (!hasAwarded) {
-    await awardCustomXP(...);
-    setHasAwarded(true);
-  }
-  
-  // Trigger comeback reaction for returning users
-  if (health.daysInactive >= 3) {
-    triggerComeback().catch(err => console.log('[LivingCompanion] Comeback reaction failed:', err));
-  }
-  
-  setTimeout(() => { onClose(); setShowReunion(false); }, 2000);
-};
+After:
+  // REMOVED - recharts uses React.useLayoutEffect and must load with React
 ```
 
+## Changes Required
+
+### 1. Update vite.config.ts
+
+Remove line 96 that separates recharts into its own chunk. The updated `manualChunks` function will only split:
+- `date-fns` (pure utility, no React dependency)
+- `three` / `@react-three` (optional 3D visualization)
+
+All other libraries (React, Radix, React Query, Framer Motion, and now Recharts) will stay in the single `vendor` chunk for iOS compatibility.
+
 ---
 
-### File 4: `src/components/MorningCheckIn.tsx`
+## Technical Context
 
-**Current Problem:**
-- `mentor` source reactions exist in database but no trigger point
-- Check-in completion is a perfect moment for mentor encouragement
+The vite.config.ts already has a comment explaining this pattern (lines 90-92):
 
-**Fix:**
-- Import `useLivingCompanionSafe` hook
-- Call `triggerReaction('mentor', { momentType: 'discipline_win' })` after check-in success
-- This enables mentor-specific companion reactions
-
-**Implementation:**
-```typescript
-const { triggerReaction } = useLivingCompanionSafe();
-
-// After awardCheckInComplete() succeeds
-triggerReaction('mentor', { momentType: 'discipline_win' }).catch(err => 
-  console.log('[LivingCompanion] Mentor reaction failed:', err)
-);
+```javascript
+// CRITICAL: Keep React and all React-dependent libraries in a SINGLE chunk
+// iOS WKWebView can load chunks out of order, causing "createContext" errors
+// when React isn't loaded before components that use it
 ```
 
----
-
-## Technical Details
-
-### First-of-Day Tracking Logic
-
-For `useXPRewards.ts`, add a helper to check if this is the first quest completion today:
-
-```typescript
-// Query to check today's completions before this one
-const checkIsFirstQuestToday = async (): Promise<boolean> => {
-  if (!user?.id) return false;
-  const today = new Date().toISOString().split('T')[0];
-  
-  const { count } = await supabase
-    .from('daily_tasks')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('task_date', today)
-    .eq('completed', true);
-  
-  // First if count is 0 (this will be the first) or 1 (just completed)
-  return (count ?? 0) <= 1;
-};
-```
-
-### Ritual Completion Detection for EpicCheckInDrawer
-
-```typescript
-// Check if all today's rituals are now complete
-const checkAllRitualsComplete = (): boolean => {
-  const completedCount = todayHabits.filter(h => 
-    habitTaskMap.get(h.id)?.is_completed
-  ).length;
-  // After this toggle, all will be complete if we're at (total - 1)
-  return completedCount === todayHabits.length - 1;
-};
-
-// Check if this is the first ritual completion today
-const checkIsFirstRitualToday = (): boolean => {
-  const completedCount = todayHabits.filter(h => 
-    habitTaskMap.get(h.id)?.is_completed
-  ).length;
-  return completedCount === 0;
-};
-```
+The `recharts` line was likely added later without recognizing that recharts also uses React hooks internally.
 
 ---
 
-## Files to Modify
+## Verification Steps
 
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/hooks/useXPRewards.ts` | Refactor | Use `triggerQuestComplete` with first-of-day tracking |
-| `src/components/EpicCheckInDrawer.tsx` | Refactor | Use `triggerRitualComplete` with proper gating |
-| `src/components/WelcomeBackModal.tsx` | Add Feature | Integrate `triggerComeback()` on reunion |
-| `src/components/MorningCheckIn.tsx` | Add Feature | Add `mentor` source reaction trigger |
+After the fix:
 
----
+1. Run `npm run build` to verify the build succeeds
+2. Run `npm run ios:testflight` to sync and test in Xcode
+3. Deploy to TestFlight and verify no crash on iOS launch
 
-## Expected Behavior After Fix
+## Expected Outcome
 
-| Trigger Point | Companion Reaction |
-|---------------|-------------------|
-| First quest/habit completion of day | "momentum_gain" moment |
-| Subsequent quest completions | No reaction (budget respected) |
-| First ritual completion of day | "discipline_win" moment |
-| All rituals completed | "breakthrough" moment |
-| User returns after 3+ day lapse | "comeback" moment |
-| Morning check-in complete | "discipline_win" mentor moment |
+- The `charts-vendor.js` chunk will no longer be generated
+- `recharts` will be bundled in the main `vendor.js` chunk alongside React
+- iOS will load React before recharts initializes, preventing the undefined access
 
