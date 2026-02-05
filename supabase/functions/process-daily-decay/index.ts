@@ -75,7 +75,11 @@ const STAT_FLOOR = 100;
 const STAT_MAX = 1000;
 const NEW_USER_GRACE_DAYS = 7;
 
-const BASE_WEEKLY_MAINTENANCE: Record<string, number> = {
+// Type definitions for 6-stat system
+type StatAttribute = 'vitality' | 'wisdom' | 'discipline' | 'resolve' | 'creativity' | 'alignment';
+type LifeStatus = 'active' | 'transition' | 'vacation' | 'sick';
+
+const BASE_WEEKLY_MAINTENANCE: Record<StatAttribute, number> = {
   discipline: 40,
   vitality: 30,
   creativity: 25,
@@ -84,7 +88,7 @@ const BASE_WEEKLY_MAINTENANCE: Record<string, number> = {
   alignment: 15,
 };
 
-const LIFE_STATUS_MULTIPLIERS: Record<string, number> = {
+const LIFE_STATUS_MULTIPLIERS: Record<LifeStatus, number> = {
   active: 1,
   transition: 0.5,
   vacation: 0.25,
@@ -271,7 +275,7 @@ interface EngagementStatus {
   ritualDays: number;
   statMode: 'casual' | 'rpg';
   statsEnabled: boolean;
-  lifeStatus: string;
+  lifeStatus: LifeStatus;
 }
 
 async function isNewUser(supabase: any, userId: string): Promise<boolean> {
@@ -305,7 +309,7 @@ async function getEngagementStatus(supabase: any, userId: string): Promise<Engag
 
   const statMode = (profile?.stat_mode ?? 'casual') as 'casual' | 'rpg';
   const statsEnabled = profile?.stats_enabled ?? true;
-  let lifeStatus = profile?.life_status ?? 'active';
+  let lifeStatus: LifeStatus = (profile?.life_status ?? 'active') as LifeStatus;
 
   // Auto-expire life status if past expiry date
   if (profile?.life_status_expires_at && 
