@@ -1,6 +1,5 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useAstralEncounters } from '@/hooks/useAstralEncounters';
-import { useEncounterTrigger, ActivityType } from '@/hooks/useEncounterTrigger';
 import { useEncounterPasses } from '@/hooks/useEncounterPasses';
 import { AstralEncounterModal } from './AstralEncounterModal';
 import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
@@ -23,25 +22,12 @@ interface AstralEncounterProviderProps {
   children: React.ReactNode;
 }
 
-interface EpicCheckinEventDetail {
-  epicId: string;
-  previousProgress?: number;  // Not used but included for compatibility
-  currentProgress?: number;
-}
-
-// Session warmup period before encounters can trigger (30 seconds)
-const SESSION_WARMUP_MS = 30000;
-
 export const AstralEncounterProvider = ({ children }: AstralEncounterProviderProps) => {
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
   const [queuedEncounter, setQueuedEncounter] = useState<QueuedEncounter | null>(null);
   const [showDisableDialog, setShowDisableDialog] = useState(false);
   const isEvolutionActiveRef = useRef(false);
-  
-  // Session protection: require warmup + interaction before encounters can trigger
-  const sessionStartTime = useRef(Date.now());
-  const hasInteractedThisSession = useRef(false);
 
   const { user } = useAuth();
   const { isEvolvingLoading } = useEvolution();
@@ -56,15 +42,6 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
     closeEncounter,
     passEncounter,
   } = useAstralEncounters();
-
-  const { checkActivityMilestone } = useEncounterTrigger();
-
-  // Check if session is ready for encounters (warmup + interaction)
-  const isSessionReady = useCallback(() => {
-    const warmedUp = Date.now() - sessionStartTime.current > SESSION_WARMUP_MS;
-    const interacted = hasInteractedThisSession.current;
-    return warmedUp && interacted;
-  }, []);
 
   // Track evolution state in ref for immediate access
   useEffect(() => {
@@ -140,65 +117,6 @@ export const AstralEncounterProvider = ({ children }: AstralEncounterProviderPro
 
     setShowEncounterModal(true);
   }, [closeEncounter, setShowEncounterModal]);
-
-  // Unified handler for activity milestones (quests + epic check-ins)
-  const handleActivityCompleted = useCallback(async (
-    activityType: ActivityType,
-    epicId?: string,
-    epicProgress?: number
-  ) => {
-    // Mark that user has interacted this session
-    hasInteractedThisSession.current = true;
-    
-    console.log('[AstralEncounterProvider] Activity completed:', activityType, epicId);
-    
-    // Always check milestone (updates activity count), but only trigger encounter if session ready
-    const result = await checkActivityMilestone(activityType, epicId, epicProgress);
-    
-    if (!isSessionReady()) {
-      console.log('[AstralEncounterProvider] Session not ready, skipping encounter trigger');
-      return;
-    }
-    
-    if (result.shouldTrigger && result.triggerType) {
-      triggerEncounterWithOverlay(
-        result.triggerType,
-        result.sourceId,
-        result.epicProgress,
-        result.epicCategory,
-        result.activityInterval
-      );
-    }
-  }, [checkActivityMilestone, triggerEncounterWithOverlay, isSessionReady]);
-
-  // Listen for quest completion events
-  const handleQuestCompleted = useCallback(async () => {
-    await handleActivityCompleted('quest');
-  }, [handleActivityCompleted]);
-
-  // Listen for epic check-in events (any progress update counts as +1 activity)
-  const handleEpicCheckin = useCallback(
-    async (event: CustomEvent<EpicCheckinEventDetail>) => {
-      if (!event.detail) return;
-      const { epicId, currentProgress } = event.detail;
-      await handleActivityCompleted('epic_checkin', epicId, currentProgress);
-    },
-    [handleActivityCompleted]
-  );
-
-  // Listen for quest-completed events
-  useEffect(() => {
-    window.addEventListener('quest-completed', handleQuestCompleted);
-    return () => window.removeEventListener('quest-completed', handleQuestCompleted);
-  }, [handleQuestCompleted]);
-
-  // Listen for epic check-in events (replaces old epic-progress-checkpoint)
-  useEffect(() => {
-    const listener = (event: Event) =>
-      handleEpicCheckin(event as CustomEvent<EpicCheckinEventDetail>);
-    window.addEventListener('epic-progress-checkpoint', listener as EventListener);
-    return () => window.removeEventListener('epic-progress-checkpoint', listener as EventListener);
-  }, [handleEpicCheckin]);
 
   const handleComplete = useCallback((params: {
     encounterId: string;
