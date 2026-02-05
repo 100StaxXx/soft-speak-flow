@@ -1,123 +1,127 @@
 
-# Fix: Resist Button Not Triggering Astral Encounter
+# 7-Stat Grid Display Implementation
 
-## Problem Diagnosis
+## Current State
 
-The Resist button calls `checkEncounterTrigger` but no game appears. This is a **state isolation bug**:
+Looking at your screenshot and the code, I found that:
 
-| Component | Calls `useAstralEncounters()` | Has Modal? |
-|-----------|------------------------------|------------|
-| `AstralEncounterProvider` | ✅ Own instance | ✅ Renders modal |
-| `ResistModePanel` | ✅ **Separate instance** | ❌ No modal |
+1. **`CompanionAttributes` exists** but is **not being rendered** anywhere in the Companion page
+2. The current UI shows a 3-column grid with: **Color | Spirit | Element**
+3. The stats section needs to be added to `CompanionDisplay.tsx`
 
-When `ResistModePanel` triggers an encounter, it updates state in its **isolated hook instance**. The modal is rendered by `AstralEncounterProvider`, which has a completely **separate state** that never updates.
+## Proposed Placement
 
-## Root Cause
+The 7-stat grid will be displayed **below the Color/Spirit/Element badges**, right after the current grid (around line 486 in `CompanionDisplay.tsx`).
 
-The `useAstralEncounters` hook uses internal `useState`:
-```typescript
-// useAstralEncounters.ts lines 38-43
-const [activeEncounter, setActiveEncounter] = useState<...>(null);
-const [showEncounterModal, setShowEncounterModal] = useState(false);
+## Visual Layout
+
+```text
+┌─────────────────────────────────────────────────┐
+│           [Companion Image]                     │
+│                                                 │
+│        🔥 Fire • Egg    🌱 Acquaintance Lvl 1  │
+│                                                 │
+│         0 / 10 XP to next evolution             │
+│         ════════════════════════════            │
+│                                                 │
+│   Color      │    Spirit    │    Element        │
+│   Purple     │     Cat      │     Fire          │
+├─────────────────────────────────────────────────┤
+│              COMPANION STATS                    │
+│  ┌─────────────────┐  ┌─────────────────┐      │
+│  │ 💪 Vitality  78 │  │ ⚡ Power     52 │      │
+│  │ ████████░░░░░░░ │  │ ██████░░░░░░░░░ │      │
+│  ├─────────────────┤  ├─────────────────┤      │
+│  │ 📚 Wisdom    65 │  │ 🎯 Discipline 88│      │
+│  │ ███████░░░░░░░░ │  │ █████████░░░░░░ │      │
+│  ├─────────────────┤  ├─────────────────┤      │
+│  │ 🛡️ Resolve   41 │  │ 💜 Connection 55│      │
+│  │ █████░░░░░░░░░░ │  │ ██████░░░░░░░░░ │      │
+│  ├─────────────────┴──┴─────────────────┤      │
+│  │        ✨ Alignment        70        │      │
+│  │        ███████░░░░░░░░░░░░          │      │
+│  └──────────────────────────────────────┘      │
+│            Tap a stat to learn more             │
+├─────────────────────────────────────────────────┤
+│   ⚠️ "Hello, friend."                          │
+│      "We're just getting to know each other."  │
+└─────────────────────────────────────────────────┘
 ```
 
-Each component calling this hook gets its own copy of these state values.
+## Technical Implementation
 
----
+### Database Changes
 
-## Solution: Create Shared Context
+Add 7 new columns to `user_companion` table:
 
-Wrap the encounter state in a React Context so all components share the same instance.
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `vitality` | integer | 50 | Life force, health |
+| `power` | integer | 30 | Work output, execution |
+| `wisdom` | integer | 30 | Learning, understanding |
+| `discipline` | integer | 30 | Consistency |
+| `resolve` | integer | 30 | Resistance to urges |
+| `connection` | integer | 30 | Relational capacity |
+| `alignment` | integer | 30 | Purpose, identity |
 
-### Files to Create/Modify
+Migration will convert existing stats:
+- `body` → `vitality`
+- `mind` → splits to `wisdom` (60%) + `discipline` (40%)
+- `soul` → splits to `connection` (40%) + `alignment` (60%)
+
+### File Changes
 
 | File | Action |
 |------|--------|
-| `src/contexts/AstralEncounterContext.tsx` | **Create** - New context provider |
-| `src/components/astral-encounters/AstralEncounterProvider.tsx` | **Modify** - Use context internally |
-| `src/components/companion/ResistModePanel.tsx` | **Modify** - Use context instead of hook |
-| `src/hooks/useAstralEncounters.ts` | **Keep** - Core logic remains, used by context |
+| `src/config/attributeDescriptions.ts` | **Rewrite** - 7 stat definitions |
+| `src/components/CompanionAttributes.tsx` | **Rewrite** - 2-column grid UI |
+| `src/components/CompanionDisplay.tsx` | **Add** - Import and render CompanionAttributes |
+| `src/hooks/useCompanionAttributes.ts` | **Rewrite** - 7 stat mutations + echo gains |
+| `src/integrations/supabase/types.ts` | Auto-updated after migration |
 
----
+### UI Specifications
 
-## Implementation Details
+**2-Column Grid Layout:**
+- 6 stats in 3 rows of 2 columns
+- 1 stat (Alignment) centered at bottom spanning full width
+- Thin progress bars (`h-1.5`)
+- Compact padding (`p-2`)
+- Tap any stat to see detail modal
 
-### 1. Create `AstralEncounterContext.tsx`
+**Color Scheme per Stat:**
 
-New context that wraps the hook and exposes its values:
+| Stat | Color Class |
+|------|-------------|
+| Vitality | `text-red-400` |
+| Power | `text-amber-400` |
+| Wisdom | `text-blue-400` |
+| Discipline | `text-green-400` |
+| Resolve | `text-purple-400` |
+| Connection | `text-pink-400` |
+| Alignment | `text-celestial-blue` |
+
+### Component Props
+
+The new `CompanionAttributes` will accept:
 
 ```typescript
-// src/contexts/AstralEncounterContext.tsx
-import { createContext, useContext } from 'react';
-import { useAstralEncounters } from '@/hooks/useAstralEncounters';
-
-// Create context with the return type of the hook
-type AstralEncounterContextType = ReturnType<typeof useAstralEncounters>;
-
-const AstralEncounterContext = createContext<AstralEncounterContextType | null>(null);
-
-export const AstralEncounterContextProvider = ({ children }) => {
-  const encounterState = useAstralEncounters();
-  return (
-    <AstralEncounterContext.Provider value={encounterState}>
-      {children}
-    </AstralEncounterContext.Provider>
-  );
-};
-
-export const useAstralEncounterContext = () => {
-  const context = useContext(AstralEncounterContext);
-  if (!context) {
-    throw new Error('useAstralEncounterContext must be used within AstralEncounterContextProvider');
-  }
-  return context;
-};
+interface CompanionAttributesProps {
+  companion: {
+    vitality?: number;
+    power?: number;
+    wisdom?: number;
+    discipline?: number;
+    resolve?: number;
+    connection?: number;
+    alignment?: number;
+  };
+}
 ```
 
-### 2. Update `AstralEncounterProvider.tsx`
+## Phase Order
 
-- Wrap children with the new context provider
-- Use `useAstralEncounterContext()` instead of `useAstralEncounters()` for modal rendering
-
-### 3. Update `ResistModePanel.tsx`
-
-Change from:
-```typescript
-const { checkEncounterTrigger } = useAstralEncounters();
-```
-
-To:
-```typescript
-const { checkEncounterTrigger } = useAstralEncounterContext();
-```
-
-This ensures the `ResistModePanel` uses the **same state instance** as the provider that renders the modal.
-
----
-
-## Data Flow After Fix
-
-```text
-User presses "Resist"
-        ↓
-ResistModePanel.handleResist()
-        ↓
-useAstralEncounterContext().checkEncounterTrigger()
-        ↓
-Shared context state updates:
-  - activeEncounter = { adversary, encounter }
-  - showEncounterModal = true (via effect in provider)
-        ↓
-AstralEncounterProvider re-renders
-        ↓
-AstralEncounterModal opens with game
-```
-
----
-
-## Expected Behavior After Fix
-
-1. Press **Resist** button on any habit
-2. Trigger overlay animation appears
-3. Mini-game modal opens with randomly selected game
-4. Complete game → rewards applied, habit stats updated
+1. **Database migration** - Add 7 columns with defaults + conversion
+2. **Config update** - New attribute descriptions
+3. **Hook update** - 7-stat mutations with echo gains
+4. **Component rewrite** - New 2-column grid UI
+5. **Integration** - Add to CompanionDisplay
