@@ -6,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
+ import { useTalkPopupContext } from "@/contexts/TalkPopupContext";
+ import { useReactionBudget } from "@/hooks/useReactionBudget";
+ import { useReactionSelector } from "@/hooks/useReactionSelector";
 import {
   FOCUS_XP_REWARDS,
   SUBTASK_XP_REWARDS,
@@ -45,6 +48,39 @@ export const useXPRewards = () => {
     updateSoulFromReflection,
     updateSoulFromStreak,
   } = useCompanionAttributes();
+ 
+   // Living companion reaction system - wrap in try/catch for cases where context isn't available
+   let talkPopupContext: { show: (options: { message: string }) => Promise<void> } | null = null;
+   let reactionBudget: ReturnType<typeof useReactionBudget> | null = null;
+   let reactionSelector: ReturnType<typeof useReactionSelector> | null = null;
+   try {
+     talkPopupContext = useTalkPopupContext();
+     reactionBudget = useReactionBudget();
+     reactionSelector = useReactionSelector();
+   } catch {
+     // Context not available (e.g., outside provider) - reactions disabled
+   }
+ 
+   // Helper to trigger quest/habit reaction
+   const triggerQuestReaction = async () => {
+     if (!talkPopupContext || !reactionBudget || !reactionSelector || !user?.id) return;
+     
+     try {
+       const budget = await reactionBudget.checkBudget('quest');
+       if (!budget.canShow) return;
+       
+       const { reaction } = await reactionSelector.selectReaction('quest', 'momentum_gain', []);
+       if (!reaction) return;
+       
+       await talkPopupContext.show({ message: reaction.text });
+       await Promise.all([
+         reactionSelector.recordReaction(reaction, 'quest', 'momentum_gain'),
+         reactionBudget.incrementBudget('quest'),
+       ]);
+     } catch (err) {
+       logger.log('[LivingCompanion] Quest reaction failed:', err);
+     }
+   };
 
   const applyStreakMultiplier = (baseAmount: number) => {
     const normalizedMultiplier = streakMultiplier ?? 1;
@@ -94,6 +130,9 @@ export const useXPRewards = () => {
           logger.error('Body update failed:', err);
         });
       }
+       
+       // Trigger companion reaction (fire and forget)
+       triggerQuestReaction();
     } catch (error) {
       logger.error('Error awarding habit completion:', error);
     }

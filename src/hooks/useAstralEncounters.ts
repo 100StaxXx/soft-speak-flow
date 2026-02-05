@@ -23,6 +23,7 @@ import {
   getResultFromAccuracy 
 } from '@/utils/adversaryGenerator';
 import { toast } from 'sonner';
+ import { useLivingCompanion } from '@/hooks/useLivingCompanion';
 
 export const useAstralEncounters = () => {
   const { user } = useAuth();
@@ -30,6 +31,15 @@ export const useAstralEncounters = () => {
   const { awardCustomXP } = useXPRewards();
   const { checkAdversaryDefeatAchievements } = useAchievements();
   const queryClient = useQueryClient();
+   
+   // Living companion reaction system
+   let triggerResistVictory: (() => Promise<boolean>) | null = null;
+   try {
+     const livingCompanion = useLivingCompanion();
+     triggerResistVictory = livingCompanion.triggerResistVictory;
+   } catch {
+     // Context not available (e.g., outside provider) - reactions disabled
+   }
   
   const [activeEncounter, setActiveEncounter] = useState<{
     encounter: AstralEncounter;
@@ -396,6 +406,11 @@ export const useAstralEncounters = () => {
       if (result !== 'fail' && activeEncounter?.encounter.trigger_type !== 'urge_resist') {
         toast.success(`Victory! +${xpEarned} XP`);
       }
+       
+       // Trigger companion reaction on resist victory
+       if (result !== 'fail' && activeEncounter?.encounter.trigger_type === 'urge_resist' && triggerResistVictory) {
+         triggerResistVictory().catch(err => console.log('[LivingCompanion] Resist trigger failed:', err));
+       }
     },
     onError: (error) => {
       console.error('Failed to complete encounter:', error);

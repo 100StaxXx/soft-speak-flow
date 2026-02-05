@@ -18,6 +18,9 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { playStrikethrough } from "@/utils/soundEffects";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
+ import { useTalkPopupContext } from "@/contexts/TalkPopupContext";
+ import { useReactionBudget } from "@/hooks/useReactionBudget";
+ import { useReactionSelector } from "@/hooks/useReactionSelector";
 interface Habit {
   id: string;
   title: string;
@@ -105,6 +108,39 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const taskDate = format(new Date(), 'yyyy-MM-dd');
   const { surfacedHabits, surfaceHabit } = useHabitSurfacing();
   const { toggleTask } = useTaskMutations(taskDate);
+   
+   // Living companion reaction system
+   let talkPopupContext: { show: (options: { message: string }) => Promise<void> } | null = null;
+   let reactionBudget: ReturnType<typeof useReactionBudget> | null = null;
+   let reactionSelector: ReturnType<typeof useReactionSelector> | null = null;
+   try {
+     talkPopupContext = useTalkPopupContext();
+     reactionBudget = useReactionBudget();
+     reactionSelector = useReactionSelector();
+   } catch {
+     // Context not available - reactions disabled
+   }
+   
+   // Helper to trigger ritual reaction
+   const triggerRitualReaction = async () => {
+     if (!talkPopupContext || !reactionBudget || !reactionSelector || !user?.id) return;
+     
+     try {
+       const budget = await reactionBudget.checkBudget('ritual');
+       if (!budget.canShow) return;
+       
+       const { reaction } = await reactionSelector.selectReaction('ritual', 'discipline_win', []);
+       if (!reaction) return;
+       
+       await talkPopupContext.show({ message: reaction.text });
+       await Promise.all([
+         reactionSelector.recordReaction(reaction, 'ritual', 'discipline_win'),
+         reactionBudget.incrementBudget('ritual'),
+       ]);
+     } catch (err) {
+       console.log('[LivingCompanion] Ritual reaction failed:', err);
+     }
+   };
   
   // Map habit IDs to their task completion state
   const habitTaskMap = useMemo(() => {
@@ -138,6 +174,9 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
         surfaceHabit(habitId);
         // The surfaceHabit will create the task and invalidate queries
         // The UI will update via realtime sync
+         
+         // Trigger companion reaction for ritual completion
+         triggerRitualReaction();
         return;
       }
       
@@ -147,6 +186,9 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
         completed: true, 
         xpReward: 25 
       });
+       
+       // Trigger companion reaction for ritual completion
+       triggerRitualReaction();
     } finally {
       setTimeout(() => setTogglingHabitId(null), 300);
     }
