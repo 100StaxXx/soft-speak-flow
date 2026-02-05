@@ -1,203 +1,189 @@
 
 
-# Implementation Review: Living Companion Talk Popup System
+# Living Companion Talk Popup - Integration Fixes
 
-## Critical Issues Found
+## Overview
 
-### 1. **React Rules of Hooks Violation** 🔴 CRITICAL
+This plan addresses four refinement issues identified in the Living Companion Talk Popup system:
 
-The implementation calls React hooks inside try/catch blocks in multiple files:
-
-**Files Affected:**
-- `src/hooks/useAstralEncounters.ts` (lines 36-42)
-- `src/hooks/useXPRewards.ts` (lines 53-62)
-- `src/components/EpicCheckInDrawer.tsx` (lines 116-122)
-- `src/features/tasks/hooks/useFocusSession.ts` (lines 55-62)
-
-**Problem:**
-```typescript
-// ❌ WRONG - Hooks inside try/catch
-let triggerResistVictory = null;
-try {
-  const livingCompanion = useLivingCompanion();  // Hook inside try block!
-  triggerResistVictory = livingCompanion.triggerResistVictory;
-} catch {
-  // Context not available
-}
-```
-
-React hooks must be called unconditionally at the top level. Wrapping them in try/catch means they may not be called on every render, which breaks React's hook ordering.
-
-**Fix:** Call hooks unconditionally and handle missing context gracefully inside the returned functions:
-```typescript
-// ✅ CORRECT - Hook called unconditionally, context check inside function
-const { show } = useTalkPopupContext(); // Will throw if no provider
-// OR create a safe version that returns null if no context
-```
+1. **Gating Bypass** - Direct `triggerReaction()` calls bypass "first-of-day" checks
+2. **Duplicate Trigger Logic** - EpicCheckInDrawer has redundant reaction calls
+3. **Unused `triggerComeback()`** - Never integrated into WelcomeBackModal
+4. **Unused `mentor` Source** - Check-in completion doesn't trigger mentor reactions
 
 ---
 
-### 2. **Inconsistent Integration Patterns** 🟡 MEDIUM
+## Changes Summary
 
-The integrations use two different approaches:
+### File 1: `src/hooks/useXPRewards.ts`
 
-**Pattern A (useAstralEncounters, useFocusSession):**
-Uses `useLivingCompanion()` hook directly
-
-**Pattern B (useXPRewards, EpicCheckInDrawer):**
-Manually imports and calls `useTalkPopupContext`, `useReactionBudget`, `useReactionSelector` separately
-
-**Problem:** This duplication creates maintenance burden and inconsistent error handling. The `useLivingCompanion` hook was designed as the central orchestration layer, but it's not being used consistently.
-
-**Fix:** All integrations should use `useLivingCompanion()` as the single entry point.
-
----
-
-### 3. **Missing "focus_proof" in Config Types** 🟡 MEDIUM
-
-In `src/config/reactionPools.ts`, the `MomentType` union includes `focus_proof`:
+**Current Problem:**
 ```typescript
-export type MomentType = 
-  | 'momentum_gain'
-  | 'quiet_consistency'
-  | 'discipline_win'
-  | 'urge_defeated'
-  | 'comeback'
-  | 'breakthrough'
-  | 'focus_proof';  // ✅ Present
+// Line 103 - Bypasses triggerQuestComplete's isFirstToday check
+triggerReaction('quest', { momentType: 'momentum_gain' }).catch(...)
 ```
 
-However, `useLivingCompanion.ts` has a `triggerPomodoroComplete` function that uses this correctly. This is fine.
+**Fix:**
+- Replace direct `triggerReaction` call with `triggerQuestComplete`
+- Track "first quest today" status by checking if this is the first habit completion of the day
+- Use `triggerQuestComplete(true)` only when it's the first completion
+
+**Implementation:**
+- Add a query to check today's completed quest/habit count before awarding XP
+- Call `triggerQuestComplete(isFirstQuestToday)` instead of raw `triggerReaction`
 
 ---
 
-### 4. **Duplicate Reaction Trigger in EpicCheckInDrawer** 🟡 MEDIUM
+### File 2: `src/components/EpicCheckInDrawer.tsx`
 
-In `EpicCheckInDrawer.tsx`, the `handleToggleRitual` function calls `triggerRitualReaction()` in two places (lines 179 and 191):
-
+**Current Problem (Lines 147-163):**
 ```typescript
-// Line 179 - when surfacing a new habit
+// Duplicate trigger in both branches
 if (!taskId) {
   surfaceHabit(habitId);
-  triggerRitualReaction();  // First call
+  triggerReaction('ritual', { momentType: 'discipline_win' }); // Call 1
   return;
 }
-
-// Line 191 - when toggling existing task
 toggleTask({ taskId, completed: true, xpReward: 25 });
-triggerRitualReaction();  // Second call (also executed after surfaceHabit returns!)
+triggerReaction('ritual', { momentType: 'discipline_win' }); // Call 2
 ```
 
-**Problem:** The early return on line 180 prevents the duplicate, but the code structure is confusing. The reaction should only trigger once per ritual completion.
+**Fix:**
+- Replace both `triggerReaction` calls with single `triggerRitualComplete`
+- Track ritual completion state to determine `isFirstToday` and `completedAllRituals`
+- Move the trigger call to after the toggle/surface logic
+
+**Implementation:**
+- Use `triggerRitualComplete` instead of direct `triggerReaction`
+- Add logic to track if this is the first ritual completion today
+- Check if all rituals are now complete for the `breakthrough` moment type
 
 ---
 
-### 5. **No Safe Context Hook Pattern** 🟡 MEDIUM
+### File 3: `src/components/WelcomeBackModal.tsx`
 
-The `useTalkPopupContext` throws an error if used outside `TalkPopupProvider`:
+**Current Problem:**
+- `triggerComeback()` is defined but never used
+- WelcomeBackModal should show a special companion reaction when user returns after 3+ days
+
+**Fix:**
+- Import `useLivingCompanionSafe` hook
+- Call `triggerComeback()` after successful reunion (inside `handleWelcomeBack`)
+- This triggers the `comeback` moment type for returning users
+
+**Implementation:**
 ```typescript
-export const useTalkPopupContext = () => {
-  const context = useContext(TalkPopupContext);
-  if (!context) {
-    throw new Error('useTalkPopupContext must be used within TalkPopupProvider');
-  }
-  return context;
-};
-```
+const { triggerComeback } = useLivingCompanionSafe();
 
-**Problem:** This is why try/catch was used (incorrectly). A better pattern is to create a safe version that returns a no-op function when context is unavailable.
-
-**Fix:** Add a safe hook variant:
-```typescript
-export const useTalkPopupContextSafe = () => {
-  const context = useContext(TalkPopupContext);
-  if (!context) {
-    return {
-      show: async () => {},
-      dismiss: () => {},
-      isVisible: false,
-    };
+const handleWelcomeBack = async () => {
+  setShowReunion(true);
+  await markUserActive();
+  
+  if (!hasAwarded) {
+    await awardCustomXP(...);
+    setHasAwarded(true);
   }
-  return context;
+  
+  // Trigger comeback reaction for returning users
+  if (health.daysInactive >= 3) {
+    triggerComeback().catch(err => console.log('[LivingCompanion] Comeback reaction failed:', err));
+  }
+  
+  setTimeout(() => { onClose(); setShowReunion(false); }, 2000);
 };
 ```
 
 ---
 
-## Recommended Fixes
+### File 4: `src/components/MorningCheckIn.tsx`
 
-### Fix 1: Create Safe Hook Variants
+**Current Problem:**
+- `mentor` source reactions exist in database but no trigger point
+- Check-in completion is a perfect moment for mentor encouragement
 
-Create `useLivingCompanionSafe()` that returns no-op functions when context is unavailable:
+**Fix:**
+- Import `useLivingCompanionSafe` hook
+- Call `triggerReaction('mentor', { momentType: 'discipline_win' })` after check-in success
+- This enables mentor-specific companion reactions
 
-```typescript
-export const useLivingCompanionSafe = () => {
-  const talkPopup = useContext(TalkPopupContext);
-  // If no context, return no-op versions
-  if (!talkPopup) {
-    return {
-      triggerReaction: async () => false,
-      triggerResistVictory: async () => false,
-      triggerQuestComplete: async () => false,
-      triggerRitualComplete: async () => false,
-      triggerPomodoroComplete: async () => false,
-      triggerComeback: async () => false,
-      isLateNight: () => false,
-    };
-  }
-  // Otherwise use the full implementation
-  return useLivingCompanion();
-};
-```
-
-### Fix 2: Update All Integrations
-
-Replace try/catch hook patterns with safe hooks:
-
-**useAstralEncounters.ts:**
-```typescript
-const { triggerResistVictory } = useLivingCompanionSafe();
-```
-
-**useXPRewards.ts:**
+**Implementation:**
 ```typescript
 const { triggerReaction } = useLivingCompanionSafe();
-// Use triggerReaction('quest', { momentType: 'momentum_gain' })
+
+// After awardCheckInComplete() succeeds
+triggerReaction('mentor', { momentType: 'discipline_win' }).catch(err => 
+  console.log('[LivingCompanion] Mentor reaction failed:', err)
+);
 ```
-
-**EpicCheckInDrawer.tsx:**
-```typescript
-const { triggerRitualComplete } = useLivingCompanionSafe();
-```
-
-**useFocusSession.ts:**
-```typescript
-const { triggerPomodoroComplete } = useLivingCompanionSafe();
-```
-
-### Fix 3: Simplify Integration Code
-
-Remove the duplicate manual budget/selector logic from `useXPRewards` and `EpicCheckInDrawer`. They should use `useLivingCompanion` functions that already handle budget, selection, and recording internally.
 
 ---
 
-## Summary Table
+## Technical Details
 
-| Issue | Severity | Impact | Files Affected |
-|-------|----------|--------|----------------|
-| Hooks in try/catch | 🔴 Critical | React errors, unpredictable behavior | 4 files |
-| Inconsistent patterns | 🟡 Medium | Maintenance burden | 4 files |
-| Duplicate trigger | 🟡 Medium | Potential double popups | 1 file |
-| Missing safe hook | 🟡 Medium | Forces bad patterns | 1 file |
+### First-of-Day Tracking Logic
+
+For `useXPRewards.ts`, add a helper to check if this is the first quest completion today:
+
+```typescript
+// Query to check today's completions before this one
+const checkIsFirstQuestToday = async (): Promise<boolean> => {
+  if (!user?.id) return false;
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { count } = await supabase
+    .from('daily_tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('task_date', today)
+    .eq('completed', true);
+  
+  // First if count is 0 (this will be the first) or 1 (just completed)
+  return (count ?? 0) <= 1;
+};
+```
+
+### Ritual Completion Detection for EpicCheckInDrawer
+
+```typescript
+// Check if all today's rituals are now complete
+const checkAllRitualsComplete = (): boolean => {
+  const completedCount = todayHabits.filter(h => 
+    habitTaskMap.get(h.id)?.is_completed
+  ).length;
+  // After this toggle, all will be complete if we're at (total - 1)
+  return completedCount === todayHabits.length - 1;
+};
+
+// Check if this is the first ritual completion today
+const checkIsFirstRitualToday = (): boolean => {
+  const completedCount = todayHabits.filter(h => 
+    habitTaskMap.get(h.id)?.is_completed
+  ).length;
+  return completedCount === 0;
+};
+```
 
 ---
 
-## Implementation Order
+## Files to Modify
 
-1. **Create safe hook variants** in `TalkPopupContext.tsx` and `useLivingCompanion.ts`
-2. **Update useAstralEncounters.ts** - replace try/catch with safe hook
-3. **Update useFocusSession.ts** - replace try/catch with safe hook  
-4. **Update useXPRewards.ts** - replace manual logic with safe hook
-5. **Update EpicCheckInDrawer.tsx** - replace manual logic with safe hook
-6. **Test all trigger points** - Quest, Ritual, Resist, Pomodoro
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/hooks/useXPRewards.ts` | Refactor | Use `triggerQuestComplete` with first-of-day tracking |
+| `src/components/EpicCheckInDrawer.tsx` | Refactor | Use `triggerRitualComplete` with proper gating |
+| `src/components/WelcomeBackModal.tsx` | Add Feature | Integrate `triggerComeback()` on reunion |
+| `src/components/MorningCheckIn.tsx` | Add Feature | Add `mentor` source reaction trigger |
+
+---
+
+## Expected Behavior After Fix
+
+| Trigger Point | Companion Reaction |
+|---------------|-------------------|
+| First quest/habit completion of day | "momentum_gain" moment |
+| Subsequent quest completions | No reaction (budget respected) |
+| First ritual completion of day | "discipline_win" moment |
+| All rituals completed | "breakthrough" moment |
+| User returns after 3+ day lapse | "comeback" moment |
+| Morning check-in complete | "discipline_win" mentor moment |
 
