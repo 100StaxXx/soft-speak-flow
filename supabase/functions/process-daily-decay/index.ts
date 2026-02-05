@@ -27,7 +27,6 @@ interface UserCompanion {
   core_element: string | null;
   current_stage: number | null;
   created_at: string | null;
-  // New care signal fields
   care_consistency: number | null;
   care_responsiveness: number | null;
   care_balance: number | null;
@@ -35,17 +34,22 @@ interface UserCompanion {
   care_recovery: number | null;
   care_pattern: Record<string, any> | null;
   last_7_days_activity: boolean[] | null;
-  // Evolution path fields
   evolution_path: string | null;
   evolution_path_locked: boolean | null;
   path_determination_date: string | null;
-  // Dormancy fields
   dormant_since: string | null;
   dormancy_count: number | null;
   dormancy_recovery_days: number | null;
-  // Bond fields
   bond_level: number | null;
   total_interactions: number | null;
+  // 6-stat system (100-1000 scale)
+  vitality: number | null;
+  wisdom: number | null;
+  discipline: number | null;
+  resolve: number | null;
+  creativity: number | null;
+  alignment: number | null;
+  last_weekly_maintenance_date: string | null;
 }
 
 interface BehaviorLogEntry {
@@ -66,6 +70,37 @@ const SCAR_THRESHOLD_DAYS = 5;
 const RECOVERY_PER_DAY = 25;
 const DORMANCY_RECOVERY_DAYS_REQUIRED = 5;
 
+// 6-stat system constants
+const STAT_FLOOR = 100;
+const STAT_MAX = 1000;
+const NEW_USER_GRACE_DAYS = 7;
+
+const BASE_WEEKLY_MAINTENANCE: Record<string, number> = {
+  discipline: 40,
+  vitality: 30,
+  creativity: 25,
+  resolve: 20,
+  wisdom: 15,
+  alignment: 15,
+};
+
+const LIFE_STATUS_MULTIPLIERS: Record<string, number> = {
+  active: 1,
+  transition: 0.5,
+  vacation: 0.25,
+  sick: 0.1,
+};
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function scaledMaintenance(current: number, base: number): number {
+  const above = Math.max(0, current - STAT_FLOOR);
+  const factor = clamp(above / 600, 0.35, 1.25);
+  return Math.round(base * factor);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -78,8 +113,10 @@ serve(async (req) => {
 
     const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    // TODO: For MVP, we use UTC Sunday. Future: use user-local timezone from profiles.timezone
+    const isSunday = new Date().getDay() === 0;
 
-    console.log(`[Daily Decay] Processing for date: ${today}`);
+    console.log(`[Daily Processing] Date: ${today}, Sunday: ${isSunday}`);
 
     // Get all ALIVE (and non-dormant) user companions
     const { data: companions, error: companionsError } = await supabase
@@ -92,7 +129,7 @@ serve(async (req) => {
       throw companionsError;
     }
 
-    console.log(`[Daily Decay] Found ${companions?.length || 0} alive companions to process`);
+    console.log(`[Daily Processing] Found ${companions?.length || 0} alive companions to process`);
 
     let processedCount = 0;
     let decayedCount = 0;
@@ -102,6 +139,8 @@ serve(async (req) => {
     let scarsAdded = 0;
     let pathsUpdated = 0;
     let consequencesQueued = 0;
+    let maintenanceApplied = 0;
+    let maintenanceSkipped = 0;
 
     for (const companion of (companions as UserCompanion[]) || []) {
       try {
@@ -122,9 +161,14 @@ serve(async (req) => {
         // Calculate updated care signals
         const newCareSignals = await calculateCareSignals(supabase, companion, hadActivity, activityData);
 
+        // ALWAYS rotate last_7_days_activity first (before any Sunday logic)
+        const last7Days = companion.last_7_days_activity ?? [];
+        const updated7Days = [hadActivity, ...last7Days.slice(0, 6)];
+        const activeDays = updated7Days.filter(Boolean).length;
+
         if (hadActivity) {
           // User was active - apply recovery and care improvements
-          const result = await handleActiveDay(supabase, companion, newCareSignals, today);
+          await handleActiveDay(supabase, companion, newCareSignals, today, updated7Days);
           recoveredCount++;
           
           // Check for evolution path update (weekly)
@@ -136,8 +180,8 @@ serve(async (req) => {
             }
           }
         } else {
-          // User was inactive - apply decay
-          const result = await handleInactiveDay(supabase, companion, newCareSignals, today);
+          // User was inactive - handle decay
+          const result = await handleInactiveDay(supabase, companion, newCareSignals, today, updated7Days);
           
           if (result.becameDormant) {
             dormanciesTriggered++;
@@ -154,6 +198,21 @@ serve(async (req) => {
           consequencesQueued += result.consequencesQueued;
         }
 
+        // SUNDAY: Weekly maintenance check (Engagement Gate)
+        if (isSunday) {
+          const maintenanceResult = await handleSundayMaintenance(
+            supabase, 
+            companion, 
+            activeDays, 
+            today
+          );
+          if (maintenanceResult.applied) {
+            maintenanceApplied++;
+          } else {
+            maintenanceSkipped++;
+          }
+        }
+
         processedCount++;
       } catch (userError) {
         console.error(`Error processing user ${companion.user_id}:`, userError);
@@ -166,7 +225,10 @@ serve(async (req) => {
     // Reset streak freezes for users whose reset date has passed
     await resetExpiredStreakFreezes(supabase, today);
 
-    console.log(`[Daily Decay] Complete: ${processedCount} processed, ${decayedCount} decayed, ${recoveredCount} recovered, ${dormanciesTriggered} dormancies, ${deathsCount} deaths, ${scarsAdded} scars, ${pathsUpdated} paths updated, ${consequencesProcessed} consequences processed`);
+    console.log(`[Daily Processing] Complete: ${processedCount} processed, ${decayedCount} decayed, ${recoveredCount} recovered, ${dormanciesTriggered} dormancies, ${deathsCount} deaths, ${scarsAdded} scars, ${pathsUpdated} paths updated, ${consequencesProcessed} consequences processed`);
+    if (isSunday) {
+      console.log(`[Sunday Maintenance] Applied: ${maintenanceApplied}, Skipped: ${maintenanceSkipped}`);
+    }
 
     return new Response(
       JSON.stringify({
@@ -179,13 +241,15 @@ serve(async (req) => {
         scarsAdded,
         pathsUpdated,
         consequencesProcessed,
+        maintenanceApplied,
+        maintenanceSkipped,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
-    console.error("[Daily Decay] Error:", error);
+    console.error("[Daily Processing] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
@@ -196,6 +260,198 @@ serve(async (req) => {
     );
   }
 });
+
+// =============================================
+// ENGAGEMENT GATE & WEEKLY MAINTENANCE (NEW)
+// =============================================
+
+interface EngagementStatus {
+  isEngaged: boolean;
+  resistDays: number;
+  ritualDays: number;
+  statMode: 'casual' | 'rpg';
+  statsEnabled: boolean;
+  lifeStatus: string;
+}
+
+async function isNewUser(supabase: any, userId: string): Promise<boolean> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('created_at')
+    .eq('id', userId)
+    .single();
+    
+  // If no profile or no created_at, treat as new user (safe default)
+  if (!profile?.created_at) return true;
+  
+  const accountAge = Math.floor(
+    (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  return accountAge < NEW_USER_GRACE_DAYS;
+}
+
+async function getEngagementStatus(supabase: any, userId: string): Promise<EngagementStatus> {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const cutoff = sevenDaysAgo.toISOString();
+  const cutoffDate = sevenDaysAgo.toISOString().split('T')[0];
+
+  // Get profile settings
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('stat_mode, stats_enabled, life_status')
+    .eq('id', userId)
+    .single();
+
+  const statMode = (profile?.stat_mode ?? 'casual') as 'casual' | 'rpg';
+  const statsEnabled = profile?.stats_enabled ?? true;
+  const lifeStatus = profile?.life_status ?? 'active';
+
+  // If stats disabled, never engaged
+  if (!statsEnabled) {
+    return { isEngaged: false, resistDays: 0, ritualDays: 0, statMode, statsEnabled, lifeStatus };
+  }
+
+  // Count DISTINCT DAYS with successful resist wins in last 7 days
+  const { data: resistLogs } = await supabase
+    .from('resist_log')
+    .select('created_at')
+    .eq('user_id', userId)
+    .neq('result', 'fail')
+    .gte('created_at', cutoff);
+
+  const resistDays = new Set(
+    (resistLogs ?? []).map((r: any) => r.created_at?.split('T')[0])
+  ).size;
+
+  // Count DISTINCT DAYS with ritual completions in last 7 days
+  const { data: ritualCompletions } = await supabase
+    .from('habit_completions')
+    .select('date')
+    .eq('user_id', userId)
+    .gte('date', cutoffDate);
+
+  const ritualDays = new Set(
+    (ritualCompletions ?? []).map((r: any) => r.date)
+  ).size;
+
+  // Engagement thresholds based on mode
+  let isEngaged = false;
+  if (statMode === 'rpg') {
+    // Lower threshold for RPG mode
+    isEngaged = resistDays >= 1 || ritualDays >= 1;
+  } else {
+    // Standard threshold for casual mode
+    isEngaged = resistDays >= 1 || ritualDays >= 2;
+  }
+
+  return { isEngaged, resistDays, ritualDays, statMode, statsEnabled, lifeStatus };
+}
+
+interface MaintenanceResult {
+  applied: boolean;
+  reason: string;
+}
+
+async function handleSundayMaintenance(
+  supabase: any,
+  companion: UserCompanion,
+  activeDays: number,
+  todayISO: string
+): Promise<MaintenanceResult> {
+  // Already processed today?
+  if (companion.last_weekly_maintenance_date === todayISO) {
+    return { applied: false, reason: 'already_processed' };
+  }
+
+  // Get engagement status
+  const engagement = await getEngagementStatus(supabase, companion.user_id);
+
+  // Silent exit for stats-disabled users (no logs, no messages)
+  if (!engagement.statsEnabled) {
+    return { applied: false, reason: 'stats_disabled' };
+  }
+
+  // New user grace period
+  if (await isNewUser(supabase, companion.user_id)) {
+    console.log(`[Maintenance] User ${companion.user_id} in grace period. Stats held steady.`);
+    await updateMaintenanceRecord(supabase, companion.id, todayISO);
+    return { applied: false, reason: 'grace_period' };
+  }
+
+  // Check engagement gate
+  if (!engagement.isEngaged) {
+    console.log(`[Maintenance] User ${companion.user_id} not engaged (resist days: ${engagement.resistDays}, ritual days: ${engagement.ritualDays}). Stats held steady.`);
+    await updateMaintenanceRecord(supabase, companion.id, todayISO);
+    return { applied: false, reason: 'not_engaged' };
+  }
+
+  // Apply maintenance based on activity tier and life status
+  await applyWeeklyMaintenance(supabase, companion, activeDays, engagement, todayISO);
+  return { applied: true, reason: 'maintenance_applied' };
+}
+
+async function updateMaintenanceRecord(supabase: any, companionId: string, todayISO: string) {
+  await supabase
+    .from("user_companion")
+    .update({
+      last_weekly_maintenance_date: todayISO,
+      // Proper 7-length reset for new week
+      last_7_days_activity: [false, false, false, false, false, false, false],
+    })
+    .eq("id", companionId);
+}
+
+async function applyWeeklyMaintenance(
+  supabase: any,
+  companion: UserCompanion,
+  activeDays: number,
+  engagement: EngagementStatus,
+  todayISO: string
+) {
+  // Activity tier multiplier
+  let activityMult = 1;
+  if (activeDays >= 4) {
+    activityMult = 0; // No maintenance needed for good training week
+    console.log(`[Maintenance] User ${companion.user_id} trained ${activeDays} days. Great week! No maintenance needed.`);
+  } else if (activeDays >= 2) {
+    activityMult = 0.5; // 50% maintenance
+    console.log(`[Maintenance] User ${companion.user_id} trained ${activeDays} days. Partial maintenance applied.`);
+  } else {
+    console.log(`[Maintenance] User ${companion.user_id} trained ${activeDays} days. Full maintenance applied.`);
+  }
+
+  // Life status multiplier
+  const statusMult = LIFE_STATUS_MULTIPLIERS[engagement.lifeStatus] ?? 1;
+  const finalMult = activityMult * statusMult;
+
+  // Build update object
+  const updates: Record<string, any> = {
+    last_weekly_maintenance_date: todayISO,
+    last_7_days_activity: [false, false, false, false, false, false, false],
+  };
+
+  // If no maintenance needed
+  if (finalMult === 0) {
+    await supabase
+      .from("user_companion")
+      .update(updates)
+      .eq("id", companion.id);
+    return;
+  }
+
+  // Apply scaled maintenance to 6 stats
+  for (const [stat, base] of Object.entries(BASE_WEEKLY_MAINTENANCE)) {
+    const current = (companion as any)[stat] ?? 300;
+    const maintenance = Math.round(scaledMaintenance(current, base) * finalMult);
+    updates[stat] = clamp(current - maintenance, STAT_FLOOR, STAT_MAX);
+  }
+
+  await supabase
+    .from("user_companion")
+    .update(updates)
+    .eq("id", companion.id);
+}
 
 // =============================================
 // CARE SIGNAL CALCULATION
@@ -233,7 +489,6 @@ async function getDetailedActivityData(supabase: any, userId: string, date: stri
 
   const completionTimestamps: string[] = [];
   
-  // Collect all completion timestamps
   for (const task of tasks.data || []) {
     if (task.completed_at) completionTimestamps.push(task.completed_at);
   }
@@ -258,7 +513,6 @@ async function getDetailedActivityData(supabase: any, userId: string, date: stri
 }
 
 async function logBehavior(supabase: any, userId: string, date: string, activity: ActivityData) {
-  // Calculate completion velocity (avg seconds between completions)
   let velocity: number | null = null;
   if (activity.completionTimestamps.length > 1) {
     const timestamps = activity.completionTimestamps.map(t => new Date(t).getTime());
@@ -269,7 +523,6 @@ async function logBehavior(supabase: any, userId: string, date: string, activity
     velocity = totalGap / (timestamps.length - 1);
   }
 
-  // Detect binge pattern (10+ completions in rapid succession)
   const isBinge = activity.totalActivity >= 10 && velocity !== null && velocity < 30;
 
   await supabase
@@ -301,7 +554,6 @@ async function calculateCareSignals(
   wasActive: boolean,
   activity: ActivityData
 ): Promise<CareSignals> {
-  // Get last 14 days of behavior logs
   const { data: behaviorLogs } = await supabase
     .from("companion_behavior_log")
     .select("*")
@@ -311,15 +563,13 @@ async function calculateCareSignals(
 
   const logs = (behaviorLogs || []) as BehaviorLogEntry[];
   
-  // Current values (with defaults)
   const currentConsistency = companion.care_consistency ?? 0.5;
   const currentResponsiveness = companion.care_responsiveness ?? 0.5;
   const currentBalance = companion.care_balance ?? 0.5;
   const currentIntent = companion.care_intent ?? 0.5;
   const currentRecovery = companion.care_recovery ?? 0.5;
 
-  // ===== CONSISTENCY =====
-  // Rolling average of active days (weighted toward recent)
+  // CONSISTENCY
   let consistencyScore = currentConsistency;
   if (logs.length > 0) {
     const weights = logs.map((_, i) => 1 + (0.1 * (logs.length - i)));
@@ -331,7 +581,6 @@ async function calculateCareSignals(
       totalWeight += weights[i];
     });
     const targetConsistency = totalWeight > 0 ? weightedSum / totalWeight : 0.5;
-    // Smooth transition
     consistencyScore = currentConsistency * 0.7 + targetConsistency * 0.3;
   }
   if (wasActive) {
@@ -340,12 +589,10 @@ async function calculateCareSignals(
     consistencyScore = Math.max(0, consistencyScore - 0.08);
   }
 
-  // ===== RESPONSIVENESS =====
-  // Based on time of day for completions (morning = responsive)
+  // RESPONSIVENESS
   let responsivenessScore = currentResponsiveness;
   if (wasActive && activity.firstActivityTime) {
     const hour = parseInt(activity.firstActivityTime.split(":")[0]);
-    // Morning (5-11) = high responsiveness, afternoon (12-17) = medium, evening (18+) = lower
     if (hour >= 5 && hour < 12) {
       responsivenessScore = Math.min(1, responsivenessScore + 0.1);
     } else if (hour >= 12 && hour < 18) {
@@ -357,25 +604,21 @@ async function calculateCareSignals(
     responsivenessScore = Math.max(0, responsivenessScore - 0.05);
   }
 
-  // ===== BALANCE =====
-  // Detect overloading or neglecting patterns
+  // BALANCE
   let balanceScore = currentBalance;
   if (logs.length >= 3) {
     const recentActivity = logs.slice(0, 3).map(l => l.tasks_completed + l.habits_completed);
     const avg = recentActivity.reduce((a, b) => a + b, 0) / recentActivity.length;
     const variance = recentActivity.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / recentActivity.length;
     
-    // Low variance + reasonable avg = balanced
     if (variance < 5 && avg >= 2 && avg <= 10) {
       balanceScore = Math.min(1, balanceScore + 0.05);
     } else if (variance > 20 || avg > 15 || avg < 1) {
-      // Erratic or extreme
       balanceScore = Math.max(0, balanceScore - 0.08);
     }
   }
 
-  // ===== INTENT =====
-  // Based on completion velocity (rushed = low intent)
+  // INTENT
   let intentScore = currentIntent;
   if (wasActive && activity.completionTimestamps.length > 1) {
     const timestamps = activity.completionTimestamps.map(t => new Date(t).getTime());
@@ -387,29 +630,24 @@ async function calculateCareSignals(
     const rapidRatio = rapidCount / (timestamps.length - 1);
     
     if (rapidRatio > 0.5) {
-      // Lots of rapid completions = gaming
       intentScore = Math.max(0.1, intentScore - 0.15);
     } else if (rapidRatio < 0.2) {
-      // Thoughtful completions
       intentScore = Math.min(1, intentScore + 0.05);
     }
   }
 
-  // ===== RECOVERY =====
-  // How well user bounces back after misses
+  // RECOVERY
   let recoveryScore = currentRecovery;
   if (!wasActive && companion.inactive_days === 0) {
-    // First miss after active period - recovery potential
-    recoveryScore = currentRecovery; // No change yet
+    recoveryScore = currentRecovery;
   } else if (wasActive && (companion.inactive_days ?? 0) > 0) {
-    // Came back after missing days
     const daysAway = companion.inactive_days ?? 0;
     if (daysAway === 1) {
-      recoveryScore = Math.min(1, recoveryScore + 0.1); // Quick recovery
+      recoveryScore = Math.min(1, recoveryScore + 0.1);
     } else if (daysAway === 2) {
       recoveryScore = Math.min(1, recoveryScore + 0.05);
     } else {
-      recoveryScore = Math.max(0, recoveryScore - 0.05); // Slow recovery
+      recoveryScore = Math.max(0, recoveryScore - 0.05);
     }
   } else if (!wasActive && (companion.inactive_days ?? 0) >= 2) {
     recoveryScore = Math.max(0, recoveryScore - 0.05);
@@ -435,28 +673,24 @@ function shouldUpdateEvolutionPath(companion: UserCompanion): boolean {
   
   const lastDetermination = new Date(companion.path_determination_date);
   const daysSince = Math.floor((Date.now() - lastDetermination.getTime()) / (1000 * 60 * 60 * 24));
-  return daysSince >= 7; // Update weekly
+  return daysSince >= 7;
 }
 
 function determineEvolutionPath(careSignals: CareSignals): string {
   const { consistency, responsiveness, balance, intent, recovery } = careSignals;
   
-  // Balanced Architect - Rarest, all signals high
   if (consistency > 0.75 && responsiveness > 0.75 && balance > 0.75 && intent > 0.75 && recovery > 0.75) {
     return "balanced_architect";
   }
   
-  // Steady Guardian - Consistent, reliable care
   if (consistency > 0.65 && balance > 0.6 && recovery > 0.55) {
     return "steady_guardian";
   }
   
-  // Volatile Ascendant - High intensity but erratic
   if (intent > 0.5 && (consistency < 0.4 || balance < 0.35)) {
     return "volatile_ascendant";
   }
   
-  // Neglected Wanderer - Default for poor care
   return "neglected_wanderer";
 }
 
@@ -480,7 +714,8 @@ async function handleActiveDay(
   supabase: any,
   companion: UserCompanion,
   careSignals: CareSignals,
-  today: string
+  today: string,
+  updated7Days: boolean[]
 ) {
   const currentRecovery = companion.recovery_progress ?? 100;
   const currentCareScore = companion.care_score ?? 100;
@@ -488,20 +723,12 @@ async function handleActiveDay(
   const currentHappiness = companion.happiness ?? 100;
   const currentBond = companion.bond_level ?? 0;
 
-  // Recovery progress increases by 25% per active day
   const newRecovery = Math.min(100, currentRecovery + RECOVERY_PER_DAY);
-  
-  // Care score increases with consistent activity
   const newCareScore = Math.min(100, currentCareScore + 5);
-  
-  // Hunger and happiness replenish
   const newHunger = Math.min(100, currentHunger + 30);
   const newHappiness = Math.min(100, currentHappiness + 20);
-
-  // Bond increases with interaction
   const newBond = currentBond + 2;
 
-  // Determine new mood based on overall care
   const overallCare = (careSignals.consistency + careSignals.responsiveness + careSignals.balance + careSignals.intent + careSignals.recovery) / 5;
   let newMood = "happy";
   if (overallCare < 0.3) {
@@ -512,14 +739,9 @@ async function handleActiveDay(
     newMood = "content";
   }
 
-  // Recovery bonus to stats
   const newBody = Math.min(100, (companion.body ?? 100) + 10);
   const newMind = Math.min(100, (companion.mind ?? 0) + 10);
   const newSoul = Math.min(100, (companion.soul ?? 0) + 10);
-
-  // Update last 7 days activity
-  const last7Days = companion.last_7_days_activity ?? [];
-  const updated7Days = [true, ...last7Days.slice(0, 6)];
 
   console.log(`[Recovery] User ${companion.user_id} was active. Recovery: ${currentRecovery}% -> ${newRecovery}%, Care signals updated`);
 
@@ -539,7 +761,6 @@ async function handleActiveDay(
       bond_level: newBond,
       total_interactions: (companion.total_interactions ?? 0) + 1,
       last_interaction_at: new Date().toISOString(),
-      // Update care signals
       care_consistency: careSignals.consistency,
       care_responsiveness: careSignals.responsiveness,
       care_balance: careSignals.balance,
@@ -567,7 +788,8 @@ async function handleInactiveDay(
   supabase: any,
   companion: UserCompanion,
   careSignals: CareSignals,
-  today: string
+  today: string,
+  updated7Days: boolean[]
 ): Promise<InactiveDayResult> {
   const newInactiveDays = (companion.inactive_days ?? 0) + 1;
   const currentCareScore = companion.care_score ?? 100;
@@ -576,7 +798,7 @@ async function handleInactiveDay(
   const currentScars = companion.scars ?? [];
   const dormancyCount = companion.dormancy_count ?? 0;
 
-  console.log(`[Decay] User ${companion.user_id} inactive for ${newInactiveDays} days`);
+  console.log(`[Inactive] User ${companion.user_id} inactive for ${newInactiveDays} days`);
 
   let result: InactiveDayResult = {
     becameDormant: false,
@@ -588,20 +810,17 @@ async function handleInactiveDay(
   // Check for DORMANCY or DEATH at 7 days
   if (newInactiveDays >= DORMANCY_THRESHOLD_DAYS) {
     if (dormancyCount >= DEATH_THRESHOLD_DORMANCIES - 1) {
-      // Third offense = actual death
       console.log(`[DEATH] Companion for user ${companion.user_id} has died after ${dormancyCount + 1} dormancies`);
       
       await triggerCompanionDeath(supabase, companion, today);
       result.died = true;
       return result;
     } else {
-      // Enter dormancy
       console.log(`[DORMANCY] Companion for user ${companion.user_id} entering dormancy (count: ${dormancyCount + 1})`);
       
       await enterDormancy(supabase, companion, today, dormancyCount);
       result.becameDormant = true;
       
-      // Add scar for dormancy
       await addScar(supabase, companion.id, today, `Fell into dormancy after ${newInactiveDays} days of absence`);
       result.scarAdded = true;
       
@@ -624,24 +843,21 @@ async function handleInactiveDay(
 
   // Queue delayed consequences
   if (newInactiveDays === 2) {
-    // Schedule mood shift for 2 days from now
     await queueConsequence(supabase, companion, "mood_shift", 2, { new_mood: "worried", reason: "absence" });
     result.consequencesQueued++;
   }
   
   if (newInactiveDays === 4) {
-    // Schedule dialogue change
     await queueConsequence(supabase, companion, "dialogue_change", 1, { tone: "reserved", reason: "prolonged_absence" });
     result.consequencesQueued++;
   }
 
   if (newInactiveDays === 5) {
-    // Schedule dormancy warning
     await queueConsequence(supabase, companion, "dormancy_warning", 1, { days_until_dormancy: 2 });
     result.consequencesQueued++;
   }
 
-  // Apply stat decay
+  // Apply stat decay (care-related, not RPG stats)
   const newCareScore = Math.max(0, currentCareScore - 10);
   const newHunger = Math.max(0, currentHunger - 15);
   const newHappiness = Math.max(0, currentHappiness - 20);
@@ -659,10 +875,6 @@ async function handleInactiveDay(
   // Recovery decline
   const currentRecovery = companion.recovery_progress ?? 100;
   const newRecovery = newInactiveDays >= 3 ? Math.max(0, currentRecovery - 25) : currentRecovery;
-
-  // Update last 7 days activity
-  const last7Days = companion.last_7_days_activity ?? [];
-  const updated7Days = [false, ...last7Days.slice(0, 6)];
 
   await supabase
     .from("user_companion")
@@ -707,7 +919,6 @@ async function handleInactiveDay(
 // =============================================
 
 async function enterDormancy(supabase: any, companion: UserCompanion, today: string, currentCount: number) {
-  // Lock evolution path to wanderer on dormancy
   await supabase
     .from("user_companion")
     .update({
@@ -720,7 +931,6 @@ async function enterDormancy(supabase: any, companion: UserCompanion, today: str
     })
     .eq("id", companion.id);
 
-  // Trigger dormant image generation
   try {
     await supabase.functions.invoke("generate-dormant-companion-image", {
       body: { companionId: companion.id, userId: companion.user_id },
@@ -735,13 +945,11 @@ async function handleDormantCompanion(supabase: any, companion: UserCompanion, t
   const hadActivity = activityData.totalActivity > 0;
 
   if (hadActivity) {
-    // User is trying to wake companion
     const recoveryDays = (companion.dormancy_recovery_days ?? 0) + 1;
     
     console.log(`[Dormancy Recovery] User ${companion.user_id} active while dormant. Recovery day ${recoveryDays}/${DORMANCY_RECOVERY_DAYS_REQUIRED}`);
 
     if (recoveryDays >= DORMANCY_RECOVERY_DAYS_REQUIRED) {
-      // Companion wakes up!
       console.log(`[Dormancy Recovery] Companion ${companion.id} waking up after ${recoveryDays} consecutive active days`);
       
       await supabase
@@ -755,7 +963,6 @@ async function handleDormantCompanion(supabase: any, companion: UserCompanion, t
         })
         .eq("id", companion.id);
 
-      // Create memory of dormancy
       await supabase.from("companion_memories").insert({
         user_id: companion.user_id,
         companion_id: companion.id,
@@ -764,14 +971,12 @@ async function handleDormantCompanion(supabase: any, companion: UserCompanion, t
         memory_context: { dormancy_count: companion.dormancy_count },
       });
     } else {
-      // Continue recovery
       await supabase
         .from("user_companion")
         .update({ dormancy_recovery_days: recoveryDays })
         .eq("id", companion.id);
     }
   } else {
-    // User still inactive - reset recovery progress
     if ((companion.dormancy_recovery_days ?? 0) > 0) {
       console.log(`[Dormancy Recovery] User ${companion.user_id} missed a day, resetting recovery progress`);
       await supabase
@@ -790,7 +995,6 @@ async function triggerCompanionDeath(supabase: any, companion: UserCompanion, to
   const createdAt = companion.created_at ? new Date(companion.created_at) : new Date();
   const daysTogether = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Create memorial
   await supabase.from("companion_memorials").insert({
     user_id: companion.user_id,
     companion_name: `The ${companion.spirit_animal || "Companion"}`,
@@ -803,7 +1007,6 @@ async function triggerCompanionDeath(supabase: any, companion: UserCompanion, to
     final_image_url: companion.current_image_url,
   });
 
-  // Mark companion as dead
   await supabase
     .from("user_companion")
     .update({
@@ -838,7 +1041,6 @@ async function addScar(supabase: any, companionId: string, date: string, context
     })
     .eq("id", companionId);
 
-  // Trigger scar image generation
   try {
     await supabase.functions.invoke("generate-companion-scar", {
       body: { companionId, scarContext: context },
@@ -895,7 +1097,6 @@ async function processPendingConsequences(supabase: any, today: string): Promise
           break;
 
         case "dialogue_change":
-          // Store in care_pattern for dialogue system to pick up
           const { data: comp } = await supabase
             .from("user_companion")
             .select("care_pattern")
@@ -924,7 +1125,6 @@ async function processPendingConsequences(supabase: any, today: string): Promise
           break;
 
         case "dormancy_warning":
-          // Store warning in care_pattern for UI to display
           const { data: comp2 } = await supabase
             .from("user_companion")
             .select("care_pattern")
@@ -944,7 +1144,6 @@ async function processPendingConsequences(supabase: any, today: string): Promise
           break;
       }
 
-      // Mark as processed
       await supabase
         .from("companion_pending_consequences")
         .update({ processed: true, processed_at: new Date().toISOString() })
@@ -960,7 +1159,7 @@ async function processPendingConsequences(supabase: any, today: string): Promise
 }
 
 // =============================================
-// STREAK FREEZE (existing logic)
+// STREAK FREEZE
 // =============================================
 
 async function handleStreakFreeze(supabase: any, userId: string) {
@@ -1016,17 +1215,17 @@ async function resetExpiredStreakFreezes(supabase: any, today: string) {
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, streak_freezes_reset_at")
-    .lt("streak_freezes_reset_at", new Date().toISOString());
+    .lt("streak_freezes_reset_at", today);
 
   for (const profile of profiles || []) {
     const nextReset = new Date();
     nextReset.setDate(nextReset.getDate() + 7);
-
+    
     await supabase
       .from("profiles")
       .update({
         streak_freezes_available: 1,
-        streak_freezes_reset_at: nextReset.toISOString(),
+        streak_freezes_reset_at: nextReset.toISOString().split("T")[0],
       })
       .eq("id", profile.id);
   }
