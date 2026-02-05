@@ -41,10 +41,10 @@ export const useXPRewards = () => {
   const queryClient = useQueryClient();
   const { multiplier: streakMultiplier } = useStreakMultiplier();
   const {
-    updateBodyFromActivity,
-    updateMindFromHabit,
-    updateSoulFromReflection,
-    updateSoulFromStreak,
+    updateDisciplineFromRitual,
+    updateWisdomFromLearning,
+    updateAlignmentFromReflection,
+    updateFromStreakMilestone,
   } = useCompanionAttributes();
  
    // Living companion reaction system - safe hook returns no-op when outside provider
@@ -107,11 +107,11 @@ export const useXPRewards = () => {
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateMindFromHabit(companionId).catch(err => {
-          logger.error('Mind update failed:', err);
+        updateWisdomFromLearning(companionId).catch(err => {
+          logger.error('Wisdom update failed:', err);
         });
-        updateBodyFromActivity(companionId).catch(err => {
-          logger.error('Body update failed:', err);
+        updateDisciplineFromRitual(companionId).catch(err => {
+          logger.error('Discipline update failed:', err);
         });
       }
        
@@ -204,11 +204,11 @@ export const useXPRewards = () => {
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateSoulFromReflection(companionId).catch(err => {
-          logger.error('Soul update failed:', err);
+        updateAlignmentFromReflection(companionId).catch(err => {
+          logger.error('Alignment update failed:', err);
         });
-        updateBodyFromActivity(companionId).catch(err => {
-          logger.error('Body update failed:', err);
+        updateDisciplineFromRitual(companionId).catch(err => {
+          logger.error('Discipline update failed:', err);
         });
       }
     } catch (error) {
@@ -231,10 +231,10 @@ export const useXPRewards = () => {
       // Update soul in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateSoulFromStreak({
+        updateFromStreakMilestone({
           companionId,
           streakDays: milestone,
-        }).catch(err => logger.error('Soul streak update failed:', err));
+        }).catch(err => logger.error('Discipline streak update failed:', err));
         
         // Create streak memory for significant milestones (7, 30, 100 days)
         if (milestone === 7 || milestone === 30 || milestone === 100) {
@@ -275,8 +275,8 @@ export const useXPRewards = () => {
       // Update soul in background without waiting - verify companion exists at call time
       const companionId = companion.id;
       if (companionId) {
-        updateSoulFromReflection(companionId).catch(err => 
-          logger.error('Soul update failed:', err)
+        updateAlignmentFromReflection(companionId).catch(err => 
+          logger.error('Alignment update failed:', err)
         );
       }
     } catch (error) {

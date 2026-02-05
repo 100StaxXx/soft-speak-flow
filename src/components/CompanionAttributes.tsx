@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Brain, Dumbbell, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -12,77 +10,52 @@ import {
 } from "@/components/ui/dialog";
 import { ATTRIBUTE_DESCRIPTIONS, AttributeType } from "@/config/attributeDescriptions";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface CompanionAttributesProps {
-  companion: {
-    body?: number;
-    mind?: number;
-    soul?: number;
-  };
+  companion: Record<string, any>;
 }
 
-const ATTRIBUTE_INFO = {
-  body: {
-    icon: Dumbbell,
-    label: "Body",
-    color: "text-category-body",
-    progressColor: "bg-category-body"
-  },
-  mind: {
-    icon: Brain,
-    label: "Mind",
-    color: "text-category-mind",
-    progressColor: "bg-category-mind"
-  },
-  soul: {
-    icon: Sparkles,
-    label: "Soul",
-    color: "text-celestial-blue",
-    progressColor: "bg-celestial-blue"
-  },
-};
+const GRID_STATS: AttributeType[] = ['vitality', 'power', 'wisdom', 'discipline', 'resolve', 'connection'];
 
 export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => {
   const [selectedAttribute, setSelectedAttribute] = useState<AttributeType | null>(null);
   
-  const attributes = [
-    { key: 'body' as AttributeType, value: companion.body ?? 100 },
-    { key: 'mind' as AttributeType, value: companion.mind ?? 0 },
-    { key: 'soul' as AttributeType, value: companion.soul ?? 0 },
-  ];
+  const getStatValue = (key: AttributeType): number => {
+    return companion[key] ?? 30;
+  };
 
   const attributeDetails = selectedAttribute ? ATTRIBUTE_DESCRIPTIONS[selectedAttribute] : null;
 
   return (
     <>
-      <Card className="p-4 bg-gradient-to-br from-secondary/30 to-secondary/10 border-primary/20">
+      <Card className="p-3 bg-gradient-to-br from-secondary/30 to-secondary/10 border-primary/20">
         <div className="space-y-3">
-          <h3 className="text-sm font-bold text-center text-muted-foreground">Companion Attributes</h3>
+          <h3 className="text-xs font-bold text-center text-muted-foreground uppercase tracking-wide">
+            Companion Stats
+          </h3>
           
-          <div className="space-y-3">
-            {attributes.map(({ key, value }) => {
-              const info = ATTRIBUTE_INFO[key];
-              const Icon = info.icon;
+          {/* 2-column grid for 6 stats */}
+          <div className="grid grid-cols-2 gap-2">
+            {GRID_STATS.map((key) => {
+              const info = ATTRIBUTE_DESCRIPTIONS[key];
+              const value = getStatValue(key);
               
               return (
                 <button
                   key={key}
                   onClick={() => setSelectedAttribute(key)}
-                  className="w-full space-y-1.5 cursor-pointer hover:opacity-80 transition-opacity text-left"
+                  className="p-2 rounded-lg bg-background/50 hover:bg-background/80 transition-all text-left space-y-1.5 border border-transparent hover:border-primary/20"
                 >
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Icon className={`h-3.5 w-3.5 ${info.color}`} />
-                      <span className="font-medium">{info.label}</span>
+                      <span className="text-sm">{info.icon}</span>
+                      <span className={cn("text-xs font-medium", info.color)}>{info.name}</span>
                     </div>
-                    <span className="text-muted-foreground font-mono">{value}/100</span>
+                    <span className="text-xs text-muted-foreground font-mono">{value}</span>
                   </div>
-                  <div className="relative">
-                    <Progress 
-                      value={value} 
-                      className="h-1.5"
-                    />
+                  <div className="relative h-1.5 bg-secondary/50 rounded-full overflow-hidden">
                     <div 
-                      className={cn("absolute inset-0 rounded-full", info.progressColor)}
+                      className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-500", info.progressColor)}
                       style={{ width: `${value}%` }}
                     />
                   </div>
@@ -90,9 +63,31 @@ export const CompanionAttributes = ({ companion }: CompanionAttributesProps) => 
               );
             })}
           </div>
+
+          {/* Alignment stat - full width at bottom */}
+          <button
+            onClick={() => setSelectedAttribute('alignment')}
+            className="w-full p-2 rounded-lg bg-background/50 hover:bg-background/80 transition-all text-left space-y-1.5 border border-transparent hover:border-primary/20"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">{ATTRIBUTE_DESCRIPTIONS.alignment.icon}</span>
+                <span className={cn("text-xs font-medium", ATTRIBUTE_DESCRIPTIONS.alignment.color)}>
+                  {ATTRIBUTE_DESCRIPTIONS.alignment.name}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground font-mono">{getStatValue('alignment')}</span>
+            </div>
+            <div className="relative h-1.5 bg-secondary/50 rounded-full overflow-hidden">
+              <div 
+                className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-500", ATTRIBUTE_DESCRIPTIONS.alignment.progressColor)}
+                style={{ width: `${getStatValue('alignment')}%` }}
+              />
+            </div>
+          </button>
           
           <p className="text-[10px] text-center text-muted-foreground/70 italic">
-            Tap an attribute to learn more
+            Tap a stat to learn more
           </p>
         </div>
       </Card>
