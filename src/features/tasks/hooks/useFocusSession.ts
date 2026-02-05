@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useXPRewards } from '@/hooks/useXPRewards';
 import { FOCUS_XP_REWARDS } from '@/config/xpRewards';
- import { useLivingCompanion } from '@/hooks/useLivingCompanion';
+ import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 
 export interface FocusSession {
   id: string;
@@ -52,14 +52,8 @@ export function useFocusSession() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
  
-   // Living companion reaction system
-   let triggerPomodoroComplete: ((durationMinutes: number) => Promise<boolean>) | null = null;
-   try {
-     const livingCompanion = useLivingCompanion();
-     triggerPomodoroComplete = livingCompanion.triggerPomodoroComplete;
-   } catch {
-     // Context not available (e.g., outside provider) - reactions disabled
-   }
+   // Living companion reaction system - safe hook returns no-op when outside provider
+   const { triggerPomodoroComplete } = useLivingCompanionSafe();
 
   const [timerState, setTimerState] = useState<FocusTimerState>({
     isRunning: false,
@@ -203,7 +197,7 @@ export function useFocusSession() {
       awardFocusSessionComplete(isPerfect, underCap);
       
        // Trigger companion reaction for sessions >= 15 minutes
-       if (session.planned_duration >= 15 && triggerPomodoroComplete) {
+       if (session.planned_duration >= 15) {
          triggerPomodoroComplete(session.planned_duration).catch(err => 
            console.log('[LivingCompanion] Pomodoro trigger failed:', err)
          );

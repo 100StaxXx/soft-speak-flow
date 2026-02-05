@@ -23,7 +23,7 @@ import {
   getResultFromAccuracy 
 } from '@/utils/adversaryGenerator';
 import { toast } from 'sonner';
- import { useLivingCompanion } from '@/hooks/useLivingCompanion';
+ import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 
 export const useAstralEncounters = () => {
   const { user } = useAuth();
@@ -32,14 +32,8 @@ export const useAstralEncounters = () => {
   const { checkAdversaryDefeatAchievements } = useAchievements();
   const queryClient = useQueryClient();
    
-   // Living companion reaction system
-   let triggerResistVictory: (() => Promise<boolean>) | null = null;
-   try {
-     const livingCompanion = useLivingCompanion();
-     triggerResistVictory = livingCompanion.triggerResistVictory;
-   } catch {
-     // Context not available (e.g., outside provider) - reactions disabled
-   }
+   // Living companion reaction system - safe hook returns no-op when outside provider
+   const { triggerResistVictory } = useLivingCompanionSafe();
   
   const [activeEncounter, setActiveEncounter] = useState<{
     encounter: AstralEncounter;
@@ -408,7 +402,7 @@ export const useAstralEncounters = () => {
       }
        
        // Trigger companion reaction on resist victory
-       if (result !== 'fail' && activeEncounter?.encounter.trigger_type === 'urge_resist' && triggerResistVictory) {
+       if (result !== 'fail' && activeEncounter?.encounter.trigger_type === 'urge_resist') {
          triggerResistVictory().catch(err => console.log('[LivingCompanion] Resist trigger failed:', err));
        }
     },
