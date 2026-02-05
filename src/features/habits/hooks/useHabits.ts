@@ -20,7 +20,7 @@ export function useHabits() {
   const queryClient = useQueryClient();
   const { profile } = useProfile();
   const { companion } = useCompanion();
-  const { updateMindFromHabit, updateBodyFromActivity } = useCompanionAttributes();
+  const { updateWisdomFromLearning, updateDisciplineFromRitual } = useCompanionAttributes();
   const { awardCustomXP, awardAllHabitsComplete } = useXPRewards();
   const { checkStreakAchievements } = useAchievements();
 
@@ -190,11 +190,11 @@ export function useHabits() {
           
           // Update companion attributes in background
           if (companion?.id) {
-            updateMindFromHabit(companion.id).catch((e) => {
-              console.warn('Failed to update mind from habit:', e);
+            updateDisciplineFromRitual(companion.id).catch((e) => {
+              console.warn('Failed to update discipline from habit:', e);
             });
-            updateBodyFromActivity(companion.id).catch((e) => {
-              console.warn('Failed to update body from activity:', e);
+            updateWisdomFromLearning(companion.id).catch((e) => {
+              console.warn('Failed to update wisdom from learning:', e);
             });
           }
           

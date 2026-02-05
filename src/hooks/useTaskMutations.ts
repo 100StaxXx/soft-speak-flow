@@ -61,7 +61,7 @@ export const useTaskMutations = (taskDate: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { companion } = useCompanion();
-  const { updateBodyFromActivity } = useCompanionAttributes();
+  const { updateDisciplineFromRitual } = useCompanionAttributes();
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
@@ -383,7 +383,7 @@ export const useTaskMutations = (taskDate: string) => {
           showXPToast(xpAwarded, toastReason || 'Task Complete!');
         }
         if (companion?.id) {
-          updateBodyFromActivity(companion.id).catch(console.error);
+          updateDisciplineFromRitual(companion.id).catch(console.error);
         }
         window.dispatchEvent(new CustomEvent('mission-completed'));
         window.dispatchEvent(new CustomEvent('quest-completed'));

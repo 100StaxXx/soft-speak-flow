@@ -6511,6 +6511,7 @@ export type Database = {
       }
       user_companion: {
         Row: {
+          alignment: number | null
           body: number | null
           bond_level: number | null
           bond_portrait_urls: Json | null
@@ -6523,6 +6524,7 @@ export type Database = {
           care_responsiveness: number | null
           care_score: number | null
           completion_timestamps: Json | null
+          connection: number | null
           core_element: string
           created_at: string
           current_image_url: string | null
@@ -6531,6 +6533,7 @@ export type Database = {
           current_xp: number
           death_cause: string | null
           death_date: string | null
+          discipline: number | null
           dormancy_count: number | null
           dormancy_recovery_days: number | null
           dormant_image_url: string | null
@@ -6556,7 +6559,9 @@ export type Database = {
           mind: number | null
           neglected_image_url: string | null
           path_determination_date: string | null
+          power: number | null
           recovery_progress: number | null
+          resolve: number | null
           scar_history: Json | null
           scarred_image_url: string | null
           scars: Json | null
@@ -6566,8 +6571,11 @@ export type Database = {
           total_interactions: number | null
           updated_at: string
           user_id: string
+          vitality: number | null
+          wisdom: number | null
         }
         Insert: {
+          alignment?: number | null
           body?: number | null
           bond_level?: number | null
           bond_portrait_urls?: Json | null
@@ -6580,6 +6588,7 @@ export type Database = {
           care_responsiveness?: number | null
           care_score?: number | null
           completion_timestamps?: Json | null
+          connection?: number | null
           core_element: string
           created_at?: string
           current_image_url?: string | null
@@ -6588,6 +6597,7 @@ export type Database = {
           current_xp?: number
           death_cause?: string | null
           death_date?: string | null
+          discipline?: number | null
           dormancy_count?: number | null
           dormancy_recovery_days?: number | null
           dormant_image_url?: string | null
@@ -6613,7 +6623,9 @@ export type Database = {
           mind?: number | null
           neglected_image_url?: string | null
           path_determination_date?: string | null
+          power?: number | null
           recovery_progress?: number | null
+          resolve?: number | null
           scar_history?: Json | null
           scarred_image_url?: string | null
           scars?: Json | null
@@ -6623,8 +6635,11 @@ export type Database = {
           total_interactions?: number | null
           updated_at?: string
           user_id: string
+          vitality?: number | null
+          wisdom?: number | null
         }
         Update: {
+          alignment?: number | null
           body?: number | null
           bond_level?: number | null
           bond_portrait_urls?: Json | null
@@ -6637,6 +6652,7 @@ export type Database = {
           care_responsiveness?: number | null
           care_score?: number | null
           completion_timestamps?: Json | null
+          connection?: number | null
           core_element?: string
           created_at?: string
           current_image_url?: string | null
@@ -6645,6 +6661,7 @@ export type Database = {
           current_xp?: number
           death_cause?: string | null
           death_date?: string | null
+          discipline?: number | null
           dormancy_count?: number | null
           dormancy_recovery_days?: number | null
           dormant_image_url?: string | null
@@ -6670,7 +6687,9 @@ export type Database = {
           mind?: number | null
           neglected_image_url?: string | null
           path_determination_date?: string | null
+          power?: number | null
           recovery_progress?: number | null
+          resolve?: number | null
           scar_history?: Json | null
           scarred_image_url?: string | null
           scars?: Json | null
@@ -6680,6 +6699,8 @@ export type Database = {
           total_interactions?: number | null
           updated_at?: string
           user_id?: string
+          vitality?: number | null
+          wisdom?: number | null
         }
         Relationships: [
           {

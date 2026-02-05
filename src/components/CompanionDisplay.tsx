@@ -23,6 +23,7 @@ import { DormancyWarning, DormantOverlay } from "@/components/companion/Dormancy
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { NursingMode } from "@/components/companion/NursingMode";
+import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
 import {
   useState,
@@ -482,8 +483,11 @@ export const CompanionDisplay = memo(() => {
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Element</p>
                 <p className="font-medium text-sm capitalize">{companion.core_element}</p>
-              </div>
             </div>
+
+            {/* 7-Stat Companion Attributes Grid */}
+            <CompanionAttributes companion={companion} />
+          </div>
           </div>
 
           {/* Evolution Path Badge - visible indicator of care patterns */}
