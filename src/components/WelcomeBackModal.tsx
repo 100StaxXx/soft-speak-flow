@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionHealth, CompanionMoodState } from "@/hooks/useCompanionHealth";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 
 interface WelcomeBackModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const { health, markUserActive } = useCompanionHealth();
   const { companion } = useCompanion();
   const { awardCustomXP, XP_REWARDS } = useXPRewards();
+  const { triggerComeback } = useLivingCompanionSafe();
   const [showReunion, setShowReunion] = useState(false);
   const [hasAwarded, setHasAwarded] = useState(false);
 
@@ -50,6 +52,13 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
         { days_inactive: health.daysInactive }
       );
       setHasAwarded(true);
+    }
+    
+    // Trigger comeback reaction for returning users (3+ days inactive)
+    if (health.daysInactive >= 3) {
+      triggerComeback().catch(err => 
+        console.log('[LivingCompanion] Comeback reaction failed:', err)
+      );
     }
     
     // Close after animation

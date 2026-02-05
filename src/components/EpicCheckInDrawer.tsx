@@ -108,7 +108,25 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   const { toggleTask } = useTaskMutations(taskDate);
    
    // Living companion reaction system - safe hook returns no-op when outside provider
-   const { triggerReaction } = useLivingCompanionSafe();
+   const { triggerRitualComplete } = useLivingCompanionSafe();
+   
+   // Helper to check if this is the first ritual completion today
+   const checkIsFirstRitualToday = (): boolean => {
+     const completedCount = todayHabits.filter(h => 
+       habitTaskMap.get(h.id)?.is_completed
+     ).length;
+     return completedCount === 0;
+   };
+   
+   // Helper to check if all rituals will be complete after this toggle
+   const checkWillCompleteAllRituals = (): boolean => {
+     if (todayHabits.length === 0) return false;
+     const completedCount = todayHabits.filter(h => 
+       habitTaskMap.get(h.id)?.is_completed
+     ).length;
+     // After this toggle, all will be complete if we're at (total - 1)
+     return completedCount === todayHabits.length - 1;
+   };
   
   // Map habit IDs to their task completion state
   const habitTaskMap = useMemo(() => {
@@ -136,31 +154,29 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
     triggerHaptic(ImpactStyle.Medium);
     playStrikethrough();
     
+    // Calculate state BEFORE the toggle for accurate detection
+    const isFirstRitualToday = checkIsFirstRitualToday();
+    const willCompleteAllRituals = checkWillCompleteAllRituals();
+    
     try {
       // Surface the habit as a task if not already done
       if (!taskId) {
         surfaceHabit(habitId);
         // The surfaceHabit will create the task and invalidate queries
         // The UI will update via realtime sync
-         
-         // Trigger companion reaction for ritual completion
-         triggerReaction('ritual', { momentType: 'discipline_win' }).catch(err => 
-           console.log('[LivingCompanion] Ritual reaction failed:', err)
-         );
-        return;
+      } else {
+        // Toggle the task to completed - toggleTask is already the mutate function
+        toggleTask({ 
+          taskId, 
+          completed: true, 
+          xpReward: 25 
+        });
       }
       
-      // Toggle the task to completed - toggleTask is already the mutate function
-      toggleTask({ 
-        taskId, 
-        completed: true, 
-        xpReward: 25 
-      });
-       
-       // Trigger companion reaction for ritual completion
-       triggerReaction('ritual', { momentType: 'discipline_win' }).catch(err => 
-         console.log('[LivingCompanion] Ritual reaction failed:', err)
-       );
+      // Trigger companion reaction for ritual completion (single consolidated call)
+      triggerRitualComplete(isFirstRitualToday, willCompleteAllRituals).catch(err => 
+        console.log('[LivingCompanion] Ritual reaction failed:', err)
+      );
     } finally {
       setTimeout(() => setTogglingHabitId(null), 300);
     }
