@@ -15,6 +15,7 @@ import { MentorAvatar } from "@/components/MentorAvatar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
+import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ const MorningCheckInContent = () => {
   const queryClient = useQueryClient();
   const { awardCheckInComplete, XP_REWARDS } = useXPRewards();
   const { checkFirstTimeAchievements } = useAchievements();
+  const { triggerReaction } = useLivingCompanionSafe();
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,6 +124,11 @@ const MorningCheckInContent = () => {
 
       // Award XP only on successful INSERT (not update)
       awardCheckInComplete();
+      
+      // Trigger mentor companion reaction for check-in completion
+      triggerReaction('mentor', { momentType: 'discipline_win' }).catch(err => 
+        logger.log('[LivingCompanion] Mentor reaction failed:', err)
+      );
       
       // Check for first check-in achievement
       const { count } = await supabase
