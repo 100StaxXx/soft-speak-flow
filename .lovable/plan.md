@@ -1,85 +1,99 @@
 
-# Fix: Remove Body Dependency and Reset Incorrectly Scaled Vitality
+# Fix: Companion Dialogue Icon Should Show Companion Image
 
-## Problem Analysis
-
-The `vitality` stat is maxed at 1000 because of a cascading migration issue:
+## Problem
+The "Hello, friend." dialogue at the bottom of the Companion page shows a **yellow caution icon** (AlertTriangle from Lucide) instead of the companion's actual image. This is inconsistent with the talk popups that appear during activities, which correctly show the companion's portrait.
 
 ```text
-Current State:
+Current Behavior:
 ┌──────────────────────────────────────────────────────────────────┐
-│ Column    │ Current Value │ Expected Value │ Status              │
-├───────────┼───────────────┼────────────────┼─────────────────────┤
-│ vitality  │ 1000          │ 300            │ BROKEN              │
-│ body      │ 100           │ (legacy)       │ Should be removed   │
-│ wisdom    │ 150           │ 300            │ Low                 │
-│ discipline│ 150           │ 300            │ Low                 │
-│ alignment │ 150           │ 300            │ Low                 │
-│ resolve   │ 300           │ 300            │ OK                  │
-│ creativity│ 220           │ 300            │ Low                 │
+│  ⚠️  "Hello, friend."                                           │
+│ (AlertTriangle icon for "concerned" mood)                        │
+└──────────────────────────────────────────────────────────────────┘
+
+Expected Behavior:
+┌──────────────────────────────────────────────────────────────────┐
+│  🐋  "Hello, friend."                                           │
+│ (Companion image with mood-colored ring/glow)                   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Root Cause**: The stat scaling migration (`20260205232716`) ran after your companion was created and **unconditionally** multiplied all stats by 10. Since `body` defaulted to 100, vitality was set to 100 (from body), then scaled to 1000.
+## Root Cause
+The `CompanionDialogue` component uses a `moodConfig` that maps dialogue moods to Lucide icons:
+- `thriving` → Sparkles (gold)
+- `content` → MessageCircle (blue)
+- `concerned` → **AlertTriangle (amber)** ← This is showing
+- `desperate` → Heart (red)
+- `recovering` → RefreshCw (green)
+
+Since the companion's care level is "concerned" (based on care signals), the AlertTriangle icon is rendered.
 
 ## Solution
+Update `CompanionDialogue` to display the companion's actual image (like `CompanionTalkPopup` does) instead of static mood icons.
 
-### Part 1: Fix existing companions with incorrect stat scaling
+### Changes to `src/components/companion/CompanionDialogue.tsx`
 
-Create a one-time data fix migration that:
-1. Resets all 6 stats to proper starting values for companions that haven't progressed
-2. Only affects companions at stage 0 with minimal XP (fresh companions)
+1. **Import companion hook and Avatar components**
+   ```typescript
+   import { useCompanion } from "@/hooks/useCompanion";
+   import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+   ```
 
-```sql
--- Reset stats for fresh companions that were incorrectly scaled
-UPDATE public.user_companion SET
-  vitality   = 300,
-  wisdom     = 300,
-  discipline = 300,
-  resolve    = 300,
-  creativity = 300,
-  alignment  = 300
-WHERE current_stage = 0 
-  AND current_xp < 50
-  AND (vitality = 1000 OR wisdom < 200 OR discipline < 200);
-```
+2. **Get companion data in the component**
+   ```typescript
+   const { companion } = useCompanion();
+   const companionImageUrl = companion?.current_image_url;
+   const companionName = companion?.spirit_animal || "Companion";
+   ```
 
-### Part 2: Remove legacy `body`, `mind`, `soul` columns
+3. **Simplify moodConfig** (remove icons, keep just colors)
+   ```typescript
+   const moodConfig: Record<DialogueMood, MoodConfig> = {
+     thriving: { color: "text-cosmiq-glow", ringColor: "ring-cosmiq-glow/50" },
+     content: { color: "text-celestial-blue", ringColor: "ring-celestial-blue/50" },
+     concerned: { color: "text-amber-400", ringColor: "ring-amber-400/50" },
+     desperate: { color: "text-destructive", ringColor: "ring-destructive/50" },
+     recovering: { color: "text-green-400", ringColor: "ring-green-400/50" },
+   };
+   ```
 
-The old attribute system (body/mind/soul) is no longer used and causes confusion. However, this needs careful handling because:
-- Some code still references these columns for card generation
-- The `create_companion_if_not_exists` function returns these columns
-
-**Files to update:**
-1. `supabase/functions/_shared/cardMath.ts` - Update to use new 6-stat system
-2. `src/hooks/useCompanion.ts` - Remove body/mind/soul references in edge function calls
-3. Edge functions that use `userAttributes: { body, mind, soul }` - Update to new stats
-
-### Part 3: Database cleanup (optional, can be done later)
-
-After code is updated:
-1. Drop `body`, `mind`, `soul` columns from `user_companion`
-2. Update `create_companion_if_not_exists` function to not return these columns
-
-## Implementation Order
-
-1. **Migration**: Reset stats for fresh companions (immediate fix)
-2. **Code update**: Remove body/mind/soul references from card generation
-3. **Testing**: Verify your companion shows vitality = 300
-4. **Later**: Drop legacy columns once confirmed working
+4. **Replace the icon div with Avatar** (like CompanionTalkPopup)
+   ```tsx
+   <div className={cn(
+     "flex-shrink-0 rounded-lg overflow-hidden",
+     "ring-2", config.ringColor
+   )}>
+     <Avatar className="h-10 w-10 rounded-lg">
+       {companionImageUrl ? (
+         <AvatarImage 
+           src={companionImageUrl} 
+           alt={companionName}
+           className="object-cover"
+         />
+       ) : null}
+       <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
+         {companionName.charAt(0).toUpperCase()}
+       </AvatarFallback>
+     </Avatar>
+   </div>
+   ```
 
 ## Files to Change
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/[new]_fix_companion_stats.sql` | Reset incorrectly scaled stats |
-| `src/hooks/useCompanion.ts` | Remove body/mind/soul from edge function calls |
-| `supabase/functions/_shared/cardMath.ts` | Update to use 6-stat system (vitality, wisdom, etc.) |
+| `src/components/companion/CompanionDialogue.tsx` | Replace Lucide icons with companion Avatar image |
 
-## Expected Result
+## Technical Details
+
+- The Avatar uses the companion's `current_image_url` from `useCompanion()`
+- Mood is still reflected through the ring color around the avatar (gold for thriving, amber for concerned, etc.)
+- Falls back to showing the first letter of `spirit_animal` if no image is available
+- Matches the visual style used in `CompanionTalkPopup` for consistency
+
+## Visual Result
 
 After the fix:
-- Your companion's vitality will show **300** (proper starting value)
-- All 6 stats will start at 300 for fresh companions
-- The `body` column will no longer impact new companions
-- Card generation will use the new stat system
+- The dialogue section will show the companion's actual portrait
+- The portrait will have a colored ring indicating mood (amber ring for "concerned")
+- Matches the same aesthetic as activity completion popups
