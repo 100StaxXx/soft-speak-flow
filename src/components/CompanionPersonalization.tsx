@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
+import { CompanionCreationLoader } from "./CompanionCreationLoader";
 import {
   Select,
   SelectContent,
@@ -63,6 +64,11 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
   const [selectedTone, setSelectedTone] = useState<string>("epic_adventure");
 
   const isComplete = selectedColor && selectedAnimal && selectedElement && selectedTone;
+
+  // Show dedicated loading screen when creating companion
+  if (isLoading) {
+    return <CompanionCreationLoader />;
+  }
 
   return (
     <div className="min-h-screen p-4 pt-safe-top safe-area-bottom flex items-center justify-center relative z-10">
