@@ -280,7 +280,7 @@ const AppContent = memo(() => {
                   <Route path="/auth/reset-password" element={<ResetPassword />} />
                   <Route path="/creator" element={<Creator />} />
                   <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
-                  <Route path="/onboarding" element={<ProtectedRoute requireMentor={false}><Onboarding /></ProtectedRoute>} />
+                  <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                   <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
                   
