@@ -1,122 +1,54 @@
 
-# Move Campaigns and Add Journey Path Viewer
 
-## Overview
+# Fix Duplicate Journey Path Image Generation
 
-Move the campaign strip to the bottom of the Quests page and add a way for users to tap and view their full journey path progress image.
+## Problem
+
+Two images are being generated because the path generation is triggered from **two different places**:
+
+1. **On Epic Creation** (`src/hooks/useEpics.ts` line 414): Immediately calls the edge function when the epic is created
+2. **On Component Mount** (`src/components/ConstellationTrail.tsx` line 858): A `useEffect` calls `generateInitialPath()` when it detects no image exists
+
+This causes a race condition where both fire before either knows the other has started.
+
+## Solution
+
+Remove the auto-generation from `ConstellationTrail.tsx` since epic creation already handles it. The component should only **display** the path, not trigger generation.
 
 ## Changes
 
-### 1. Move CampaignStrip to Bottom
-
-Currently the `CampaignStrip` renders at line 623, right after the header and before the date selector. We'll move it to after the `TodaysAgenda` component (around line 687).
-
-**File:** `src/pages/Journeys.tsx`
-
-```text
-BEFORE (Current Order):
-┌─────────────────────────────┐
-│  QUESTS Header              │
-│  CampaignStrip ← HERE       │
-│  Date Selector              │
-│  TodaysAgenda               │
-└─────────────────────────────┘
-
-AFTER (New Order):
-┌─────────────────────────────┐
-│  QUESTS Header              │
-│  Date Selector              │
-│  TodaysAgenda               │
-│  CampaignStrip ← MOVED      │
-└─────────────────────────────┘
-```
-
-### 2. Add Journey Path Viewer to Campaign Cards
-
-When users tap a campaign in the strip, instead of opening the `JourneyDetailDrawer` (which shows milestones), we'll create a new drawer that shows the beautiful `ConstellationTrail` with the AI-generated journey path image.
-
-**New Component:** `src/components/JourneyPathDrawer.tsx`
-
-Features:
-- Opens as a drawer when tapping a campaign in CampaignStrip
-- Displays the `ConstellationTrail` component with the AI-generated path image
-- Shows companion walking along the path with current progress
-- Quick stats (days left, rituals today, % complete)
-- Button to "View Milestones" that opens the existing JourneyDetailDrawer
-
-### 3. Update CampaignCard to Use New Drawer
-
-**File:** `src/components/CampaignStrip.tsx`
-
-Change the `CampaignCard` component to:
-- Wrap with new `JourneyPathDrawer` instead of `JourneyDetailDrawer`
-- Pass epic data including milestones for the ConstellationTrail
-
-## File Changes Summary
-
 | File | Change |
 |------|--------|
-| `src/pages/Journeys.tsx` | Move `<CampaignStrip>` from line 623 to after `TodaysAgenda` (~line 687) |
-| `src/components/JourneyPathDrawer.tsx` | New component - drawer showing ConstellationTrail with path image |
-| `src/components/CampaignStrip.tsx` | Update `CampaignCard` to use `JourneyPathDrawer` |
+| `src/components/ConstellationTrail.tsx` | Remove the `useEffect` that auto-generates the path (lines 856-860) |
+| `src/components/ConstellationTrail.tsx` | Keep using the hook to fetch and display the image, just don't trigger generation |
 
-## New Component: JourneyPathDrawer
+## Code Change
 
-```text
-┌─────────────────────────────────────────┐
-│ ─────── (drawer handle)                 │
-│                                         │
-│  📍 Run a Marathon                      │
-│  ━━━━━━━━━━━━━○ 45%  ·  87d left        │
-│                                         │
-│ ┌─────────────────────────────────────┐ │
-│ │                                     │ │
-│ │    [AI-Generated Journey Path]      │ │
-│ │    [ConstellationTrail with         │ │
-│ │     companion walking along         │ │
-│ │     the cosmic path]                │ │
-│ │                                     │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│  🔥 5 rituals today  ·  ⭐ 12 milestones │
-│                                         │
-│  [ View Milestones ]  [ Check-In ]      │
-│                                         │
-└─────────────────────────────────────────┘
-```
-
-## Technical Details
-
-**JourneyPathDrawer props:**
+**Before** (ConstellationTrail.tsx lines 855-860):
 ```tsx
-interface JourneyPathDrawerProps {
-  epic: {
-    id: string;
-    title: string;
-    description?: string;
-    progress_percentage: number;
-    target_days: number;
-    start_date: string;
-    end_date: string;
-    epic_habits?: Array<{...}>;
-  };
-  children?: React.ReactNode;
-}
+// Auto-generate initial path when no image exists for this epic
+useEffect(() => {
+  if (epicId && !pathImageUrl && !isPathLoading && !isGenerating) {
+    generateInitialPath();
+  }
+}, [epicId, pathImageUrl, isPathLoading, isGenerating, generateInitialPath]);
 ```
 
-**Integration with existing hooks:**
-- Uses `useJourneyPathImage(epicId)` for the path image
-- Uses `useMilestones(epicId)` for milestone count and trail data
-- Uses `useCompanion()` for companion display on trail
+**After:**
+```tsx
+// Path generation is handled by useEpics when epic is created
+// This component only displays the generated path
+```
 
-**Reuses existing components:**
-- `ConstellationTrail` - the main star path visualization
-- `JourneyDetailDrawer` - linked via "View Milestones" button
-- `EpicCheckInDrawer` - linked via "Check-In" button
+The hook will still be used to fetch the `pathImageUrl` - we just remove the auto-generation trigger.
+
+## Why This Works
+
+- Epic creation in `useEpics.ts` already handles initial generation (milestone 0)
+- Milestone completion in `JourneyDetailDrawer.tsx` handles regeneration for subsequent milestones
+- `ConstellationTrail` should be a display-only component, not a trigger
 
 ## Result
 
-Users will:
-1. See campaigns at the bottom of their daily quests (less intrusive)
-2. Tap a campaign to see a beautiful full-width view of their AI-generated journey path with their companion walking along it
-3. Have quick access to "View Milestones" and "Check-In" from this view
+Only **one** image generated per epic creation, eliminating the duplicate generation and saving API calls.
+
