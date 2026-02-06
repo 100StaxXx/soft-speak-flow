@@ -290,3 +290,6 @@ verify_jwt = false
 
 [functions.generate-companion-scar]
 verify_jwt = false
+
+[functions.sync-daily-pep-talk-transcript]
+verify_jwt = false
