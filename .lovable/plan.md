@@ -2,62 +2,42 @@
 # Fix: Tutorial Modals Not Showing for New Users
 
 ## Problem Summary
-Tutorial modals (Companion, Mentor, Epics, etc.) are not appearing for new users after completing onboarding, despite the code looking correct.
+Tutorial modals are not appearing for new users after completing onboarding, despite being properly wired up in the code.
+
+## Current Tab Structure (Bottom Navigation)
+| Tab | Route | Tutorial Modal | Tab Key Used |
+|-----|-------|----------------|--------------|
+| **Mentor** | `/mentor` | `MentorTutorialModal` | `'mentor'` |
+| **Companion** | `/companion` | `CompanionTutorialModal` | `'companion'` |
+| **Quests** | `/journeys` | `QuestHubTutorial` | `'journeys'` |
+| **Campaigns** | `/campaigns` | `EpicsTutorialModal` | `'epics'` |
+| **Command** | `/profile` | None (not needed) | N/A |
 
 ## Root Cause
-The `useFirstTimeModal` hook at `src/hooks/useFirstTimeModal.ts` has a **module-level cache** (`checkedModals`) that causes problems:
+The `useFirstTimeModal` hook at `src/hooks/useFirstTimeModal.ts` has a **module-level cache** that breaks the modal display logic:
 
 ```typescript
-// Module-level cache to track which modals have been checked this session
+// This Set persists across navigation and HMR
 const checkedModals = new Set<string>();
 ```
 
-**Issues with this approach:**
-1. The Set persists across navigation and Hot Module Replacement (HMR)
-2. Once a key is added, it's never removed - even if the modal didn't actually show
-3. The early return `if (!userId) return;` prevents the modal from showing, but subsequent effect runs skip due to the cache
+**Why this breaks modals:**
+1. On first render, `userId` might be `null` (auth still loading), so the effect returns early
+2. The tab key gets added to `checkedModals` anyway when userId arrives
+3. On subsequent navigations, the Set already has the key, so it skips the localStorage check
+4. The modal never shows because the effect returns early due to the cached key
 
 ## Solution
-Remove the module-level cache entirely. The localStorage check is sufficient - we don't need session-level caching because:
-- localStorage already prevents showing the modal twice
-- The effect should run fresh on each component mount
-- Users expect modals on first visit to each page after onboarding
-
-## Code Changes
+Remove the module-level cache and use a component-level ref instead:
 
 ### File: `src/hooks/useFirstTimeModal.ts`
 
-```text
-BEFORE:
-┌─────────────────────────────────────────────────────────┐
-│ const checkedModals = new Set<string>();                │
-│                                                         │
-│ useEffect(() => {                                       │
-│   if (!userId) return;                                  │
-│   const cacheKey = `${tabName}_${userId}`;              │
-│   if (checkedModals.has(cacheKey)) return;  ← Problem!  │
-│   checkedModals.add(cacheKey);                          │
-│   ...                                                   │
-│ }, [userId, tabName]);                                  │
-└─────────────────────────────────────────────────────────┘
+**Changes:**
+1. Remove the module-level `checkedModals` Set
+2. Add a `useRef` to prevent double-execution within the same mount cycle
+3. Reset the ref when userId changes (for user switching scenarios)
 
-AFTER:
-┌─────────────────────────────────────────────────────────┐
-│ // Remove module-level cache entirely                   │
-│ // Use ref to prevent double-execution in same mount    │
-│                                                         │
-│ useEffect(() => {                                       │
-│   if (!userId) return;                                  │
-│   const storageKey = `tab_intro_${tabName}_${userId}`;  │
-│   const hasSeenModal = safeLocalStorage.getItem(...);   │
-│   if (!hasSeenModal) {                                  │
-│     setShowModal(true);                                 │
-│   }                                                     │
-│ }, [userId, tabName]);                                  │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Full Implementation:**
+**Updated Implementation:**
 ```typescript
 import { useState, useEffect, useCallback, useRef } from "react";
 import { safeLocalStorage } from "@/utils/storage";
@@ -103,29 +83,16 @@ export function useFirstTimeModal(tabName: string) {
 }
 ```
 
-## Key Changes
-1. **Removed module-level `checkedModals` Set** - This was causing persistence across HMR and navigation
-2. **Added component-level `useRef`** - Prevents double-execution within the same mount cycle
-3. **Added ref reset on userId change** - Ensures the check runs again if user changes
+## Files Changed
+- `src/hooks/useFirstTimeModal.ts` - Remove module-level cache, add component-level ref
 
 ## Testing Steps
 After implementation:
-1. Clear localStorage (or use incognito)
-2. Complete onboarding as a new user
-3. Verify Journeys tutorial modal appears
-4. Navigate to Companion tab → modal should appear
-5. Navigate to Mentor tab → modal should appear
-6. Navigate to Campaigns tab → modal should appear
-7. Navigate to Search tab → modal should appear
-
-## Alternative: Debug Reset Button (Optional)
-For testing, add a temporary button in Profile settings to clear tutorial flags:
-```typescript
-const clearTutorialFlags = () => {
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('tab_intro_')) {
-      localStorage.removeItem(key);
-    }
-  });
-};
-```
+1. Clear localStorage (or use incognito window)
+2. Create a new account or log in as a user who hasn't seen the modals
+3. Complete onboarding
+4. Navigate to **Companion** tab - `CompanionTutorialModal` should appear
+5. Navigate to **Mentor** tab - `MentorTutorialModal` should appear  
+6. Navigate to **Quests** tab - `QuestHubTutorial` should appear
+7. Navigate to **Campaigns** tab - `EpicsTutorialModal` should appear
+8. After dismissing each modal, refreshing the page should NOT show the modal again
