@@ -1,70 +1,125 @@
 
-# Fix: Reset Corrupted Companion Stats (168 Affected)
 
-## Problem Summary
+# Consolidate Campaigns into Quests Tab
 
-From the database analysis:
-- **168 companions** have corrupted stats where vitality is too high (500-1000) and/or other stats are too low (150)
-- The previous fix migration only targeted companions with `current_xp < 50`, missing users who had earned 50+ XP
+## Overview
 
-### What Went Wrong
+Remove the **Campaigns** bottom nav tab and integrate campaign management into the **Quests** page. This eliminates navigation redundancy since campaign rituals already surface in the Quests tab daily.
 
-1. **Migration 20260205232723** scaled old stats from 0-100 to 100-1000 range by multiplying by 10
-2. Some companions had already been migrated to the new 300 default for some stats (e.g., vitality=100) but not others (e.g., wisdom=15)
-3. The scaling created these broken distributions:
-   - `vitality = 100 * 10 = 1000` (max, incorrect)
-   - `wisdom = 15 * 10 = 150` (floor, too low)
-4. **Migration 20260206003944** attempted a fix but only for `current_xp < 50`, excluding 168 users with 50+ XP
+## Current Architecture
 
-### Current Data (Your Screenshot)
-
-Your Phoenix companion shows:
-- Vitality: 1000 (should be ~300)
-- Wisdom: 150 (should be ~300)
-- Discipline: 150 (should be ~300)
-- Current XP: 198 (excluded from the fix)
-
-## Solution
-
-Create a migration that resets ALL companions with corrupted stats, regardless of XP:
-
-```sql
--- Fix remaining companions with corrupted stat distributions
--- Applies to 168 companions where vitality > 500 or wisdom/discipline < 200
-UPDATE public.user_companion SET
-  vitality   = 300,
-  wisdom     = 300,
-  discipline = 300,
-  resolve    = 300,
-  creativity = 300,
-  alignment  = 300
-WHERE vitality > 500 
-   OR wisdom < 200 
-   OR discipline < 200;
+```text
+Bottom Nav (5 tabs):
+┌──────────┬───────────┬──────────┬───────────┬─────────┐
+│  Mentor  │ Companion │  Quests  │ Campaigns │ Command │
+└──────────┴───────────┴──────────┴───────────┴─────────┘
 ```
 
-## Why This Works
+**The overlap**: Campaign rituals already appear in Quests, grouped by campaign name. Users toggle completion there. Visiting Campaigns separately is only needed for:
+1. Viewing the constellation trail progress
+2. Creating/managing campaigns
+3. Seeing milestones and story chapters
 
-1. **Catches all affected companions** - No XP filter this time
-2. **Resets to fair baseline** - 300 is the intended starting point (30% of 1000-point scale)
-3. **No data loss** - Stats haven't been meaningfully earned yet; they were corrupted by migration
-4. **Safe condition** - Normal gameplay cannot produce vitality > 500 with wisdom < 200, so this only targets corrupted records
+## Proposed Design
+
+### 1. Add Campaigns Header Section in Quests
+
+Above the date pills, show a compact "active campaigns" strip that expands to full campaign cards:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│                      QUESTS                          │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────┐ │
+│  │ ★ Active Campaigns (1/2)                    [+] │ │  ← Tappable header
+│  │ ┌─────────────────────────────────────────────┐ │ │
+│  │ │ 🌟 Morning Routine Master  ━━━━━━━━○  67%  │ │ │  ← Collapsed card
+│  │ │    3 rituals today • 12 days left          │ │ │
+│  │ └─────────────────────────────────────────────┘ │ │
+│  └─────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────┤
+│  [MON] [TUE] [WED] [THU] [FRI] [SAT] [SUN]          │  ← Date pills
+├─────────────────────────────────────────────────────┤
+│  Today's Tasks...                                    │
+└─────────────────────────────────────────────────────┘
+```
+
+### 2. Expand to Full Campaign View
+
+Tapping a campaign card expands it inline or opens the `JourneyDetailDrawer`:
+
+- Show constellation trail with companion
+- Milestones/chapters progress  
+- Rituals list with today's completion status
+- "Adjust Plan" and "Complete Journey" actions
+
+### 3. Campaign Creation from Quests
+
+The `[+]` button in the campaigns header opens the existing `Pathfinder` wizard.
+
+### 4. Updated Bottom Nav (4 tabs)
+
+```text
+┌──────────┬───────────┬──────────┬─────────┐
+│  Mentor  │ Companion │  Quests  │ Command │
+└──────────┴───────────┴──────────┴─────────┘
+```
+
+More breathing room, cleaner navigation, touch targets slightly larger.
 
 ## File Changes
 
 | File | Change |
 |------|--------|
-| New migration | Reset stats for all 168 affected companions |
+| `src/components/BottomNav.tsx` | Remove Campaigns NavLink (lines 140-156) |
+| `src/pages/Journeys.tsx` | Add campaigns section header, import `EpicsTab` logic, add Pathfinder wizard state |
+| `src/components/TodaysAgenda.tsx` | Add compact campaign cards above content |
+| `src/App.tsx` | Keep `/campaigns` route but redirect to `/journeys` for backwards compatibility |
+| New: `src/components/CampaignStrip.tsx` | Compact collapsible campaign overview component |
 
-## Technical Details
+## Component: CampaignStrip
 
-- Stats use a 100-1000 scale with 300 as the default/baseline
-- The corrupted state (vitality: 1000, wisdom: 150) is impossible through normal gameplay
-- Weekly maintenance and stat gains will resume normally after the fix
+A new component that shows:
+- Active campaign count badge (e.g., "1/2")
+- Collapsed view: horizontal cards with title, progress bar, rituals count
+- Add button to create new campaign (opens Pathfinder)
+- Tap to expand inline or open JourneyDetailDrawer
 
-## Expected Result
+## Implementation Steps
 
-After the migration:
-- All 168 companions reset to balanced 300 stats
-- Your Phoenix companion: All stats = 300
-- Stats will grow naturally from user activity going forward
+1. **Create CampaignStrip component**
+   - Use existing `useEpics` hook for data
+   - Reuse `ConstellationTrail` for inline progress visualization
+   - Show ritual count for today using existing grouping logic
+
+2. **Integrate into Journeys page**
+   - Add CampaignStrip above DatePillsScroller
+   - Wire up Pathfinder wizard for creating new campaigns
+   - Connect campaign card taps to JourneyDetailDrawer
+
+3. **Update BottomNav**
+   - Remove Campaigns tab
+   - Adjust spacing for 4 tabs
+
+4. **Route redirect**
+   - Change `/campaigns` to redirect to `/journeys`
+   - Update any deep links or internal navigation
+
+5. **Clean up**
+   - Keep `src/pages/Campaigns.tsx` temporarily for redirect
+   - Update any tour/tutorial references
+
+## Benefits
+
+- **Reduces cognitive load**: One place for all daily activity
+- **Eliminates redundancy**: Campaign rituals already live in Quests
+- **Cleaner nav**: 4 tabs instead of 5
+- **Better flow**: See campaign progress *while* completing rituals
+- **Faster access**: No tab switching to check campaign status
+
+## Considerations
+
+- Users with completed campaigns history can still see them in the expanded view
+- The "2 active campaigns max" rule continues to apply
+- First-time campaign tutorial (`EpicsTutorialModal`) moves to Quests context
+
