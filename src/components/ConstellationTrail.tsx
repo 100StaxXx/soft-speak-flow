@@ -852,12 +852,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     generateInitialPath 
   } = useJourneyPathImage(epicId);
   
-  // Auto-generate initial path when no image exists for this epic
-  useEffect(() => {
-    if (epicId && !pathImageUrl && !isPathLoading && !isGenerating) {
-      generateInitialPath();
-    }
-  }, [epicId, pathImageUrl, isPathLoading, isGenerating, generateInitialPath]);
+  // Path generation is handled by useEpics when epic is created
+  // This component only displays the generated path
   
   // Sort milestones by percentage and include start (0%)
   const sortedMilestones = useMemo(() => {
