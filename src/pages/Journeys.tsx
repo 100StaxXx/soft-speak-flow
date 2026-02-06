@@ -45,7 +45,7 @@ import { logger } from "@/utils/logger";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
 import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
-import { CampaignStrip } from "@/components/CampaignStrip";
+
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { Wand2 } from "lucide-react";
@@ -683,8 +683,6 @@ const Journeys = () => {
           />
         </motion.div>
 
-        {/* Campaign Strip - Active campaigns overview (moved to bottom) */}
-        <CampaignStrip onAddCampaign={() => setShowPathfinder(true)} />
 
         {/* Add Quest Sheet */}
         <AddQuestSheet
