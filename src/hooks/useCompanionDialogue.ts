@@ -36,16 +36,14 @@ export function useCompanionDialogue() {
   const { companion } = useCompanion();
   const { care, isLoading: careLoading } = useCompanionCareSignals();
   
-  const species = companion?.spirit_animal?.toLowerCase() || 'wolf';
-  
-  // Fetch voice template for companion's species
+  // Fetch universal voice template (same for all species)
   const { data: voiceTemplate, isLoading: templateLoading } = useQuery({
-    queryKey: ['companion-voice-template', species],
+    queryKey: ['companion-voice-template'],
     queryFn: async (): Promise<VoiceTemplate | null> => {
       const { data, error } = await supabase
         .from('companion_voice_templates')
         .select('*')
-        .eq('species', species)
+        .eq('species', 'universal')
         .maybeSingle();
       
       if (error) {
@@ -71,7 +69,6 @@ export function useCompanionDialogue() {
         bond_level_dialogue: (data.bond_level_dialogue as Record<string, string[]>) || {},
       };
     },
-    enabled: !!species,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -109,12 +106,14 @@ export function useCompanionDialogue() {
   }, [care?.dormancy]);
 
   // Stable random picker that varies by day but is consistent within a session
+  // Uses spirit_animal for variety even though template is universal
+  const spiritAnimal = companion?.spirit_animal || 'companion';
   const pickRandom = useCallback((arr: string[], contextKey: string): string => {
     if (!arr || arr.length === 0) return "";
-    const seed = `${new Date().toDateString()}-${contextKey}-${species}`;
+    const seed = `${new Date().toDateString()}-${contextKey}-${spiritAnimal}`;
     const index = Math.floor(getStableRandom(seed) * arr.length);
     return arr[index];
-  }, [species]);
+  }, [spiritAnimal]);
 
   // Select appropriate greeting based on care level and path
   const currentGreeting = useMemo(() => {
