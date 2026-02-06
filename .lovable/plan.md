@@ -1,238 +1,164 @@
 
 
-# Merge Rituals with Campaign Headers (Option 4)
+# Inline Chevron Dropdown for Rituals
 
 ## Overview
 
-Remove the standalone "RITUALS" header badge and integrate campaign-level stats directly into each campaign group header in the daily agenda. Users will still access the full journey path image and stats by tapping the campaign header, which opens the `JourneyPathDrawer`.
+Replace the separate "Show rituals / Hide rituals" toggle with the chevron icon in the campaign header row. Clicking the chevron will expand/collapse the rituals, while clicking the rest of the header will still open the `JourneyPathDrawer`.
 
-## What You'll Get
+## Visual Change
 
-**Campaign-level stats preserved:**
-- Days left until deadline
-- Progress percentage  
-- Today's ritual completion count (3/5 today)
-- Access to the full journey path image (by tapping campaign header)
-
-**New visual layout:**
+**Before:**
 ```text
-┌────────────────────────────────────────────────┐
-│  QUESTS                                        │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━           │
-│  [ ] Walk 10,000 steps                    +15  │
-│  [ ] Review weekly goals                  +20  │
-│                                                │
-│  ┌──────────────────────────────────────────┐  │
-│  │ 📍 Run a Marathon    45%  · 87d   3/5 ▶ │  │
-│  └──────────────────────────────────────────┘  │
-│      [ Show rituals / Hide rituals ]           │
-│      [ ] Morning stretches                +10  │
-│      [✓] Hydration tracking               +10  │
-│      [ ] Evening run                      +15  │
-│                                                │
-│  ┌──────────────────────────────────────────┐  │
-│  │ 📍 Read 12 Books     20%  · 120d  2/2 ▶ │  │
-│  └──────────────────────────────────────────┘  │
-│      [✓] Read 20 pages                    +10  │
-│      [✓] Book notes                       +10  │
-│                                                │
-└────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ 📍 Run a Marathon   0%  · 90d    0/5  ▶     │
+└─────────────────────────────────────────────┘
+    [ Show rituals  ▼ ]
+    [ ] Morning stretches                 +10
 ```
 
-## Changes Summary
+**After:**
+```text
+┌─────────────────────────────────────────────────┐
+│ 📍 Run a Marathon   0%  · 90d    0/5    ▼       │  ← chevron toggles rituals
+└─────────────────────────────────────────────────┘
+    [ ] Morning stretches                     +10
+```
+
+## Changes
 
 | File | Change |
 |------|--------|
-| `src/components/TodaysAgenda.tsx` | (1) Expand `activeEpics` prop type to include full epic metadata, (2) Remove "RITUALS" badge header (lines 986-1008), (3) Enhance campaign group headers with stats + wrap with `JourneyPathDrawer`, (4) Separate expand/collapse to a toggle below header |
-| `src/pages/Journeys.tsx` | (1) Remove `<CampaignStrip />` (line 687), (2) Pass full epic objects to `TodaysAgenda` |
-| `src/components/CampaignStrip.tsx` | No changes needed - will be unused after CampaignStrip removal |
+| `src/components/TodaysAgenda.tsx` | (1) Replace `ChevronRight` with `ChevronDown` that rotates based on expansion state, (2) Add `onClick` + `stopPropagation` to chevron, (3) Remove "Show/Hide rituals" toggle row, (4) Move `CollapsibleContent` directly under header |
 
 ---
 
 ## Technical Details
 
-### 1. Update `TodaysAgenda.tsx` Props (line 105)
+### 1. Update the Header Row (lines 1027-1035)
+
+Replace the current `ChevronRight` with a clickable `ChevronDown` that toggles expansion:
 
 **Current:**
 ```tsx
-activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
+<div className="flex items-center gap-2 shrink-0">
+  <Badge variant="outline" className={...}>
+    {group.completedCount}/{group.totalCount}
+  </Badge>
+  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+</div>
 ```
 
 **New:**
 ```tsx
-activeEpics?: Array<{
-  id: string;
-  title: string;
-  description?: string | null;
-  progress_percentage?: number | null;
-  target_days: number;
-  start_date: string;
-  end_date: string;
-  epic_habits?: Array<{
-    habit_id: string;
-    habits: {
-      id: string;
-      title: string;
-      difficulty: string;
-      description?: string | null;
-      frequency?: string;
-      estimated_minutes?: number | null;
-      custom_days?: number[] | null;
-    };
-  }>;
-}>;
+<div className="flex items-center gap-2 shrink-0">
+  <Badge variant="outline" className={...}>
+    {group.completedCount}/{group.totalCount}
+  </Badge>
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      toggleCampaign(campaignId);
+    }}
+    className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
+    aria-label={isExpanded ? "Hide rituals" : "Show rituals"}
+  >
+    <ChevronDown className={cn(
+      "w-4 h-4 text-muted-foreground transition-transform duration-200",
+      !isExpanded && "-rotate-90"
+    )} />
+  </button>
+</div>
 ```
 
-### 2. Add Helper Functions (near top of file)
+### 2. Remove Separate Toggle Row (lines 1063-1073)
+
+Delete the `<CollapsibleTrigger>` with "Show rituals / Hide rituals" text:
 
 ```tsx
-import { differenceInDays } from "date-fns";
-
-const getDaysLeft = (endDate?: string) => {
-  if (!endDate) return null;
-  return Math.max(0, differenceInDays(new Date(endDate), new Date()));
-};
-```
-
-### 3. Remove RITUALS Badge Header (lines 986-1008)
-
-Delete the entire `<TooltipProvider>` block that renders:
-- The "Rituals" label
-- The badge showing ritual count
-- The "New!" tooltip
-
-### 4. Enhance Campaign Group Headers (lines 1011-1058)
-
-Transform the current collapsible trigger from a simple expand/collapse to:
-
-**A) Tappable header that opens `JourneyPathDrawer`:**
-```tsx
-import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
-
-// Inside the map over ritualsByCampaign:
-const epicData = activeEpics?.find(e => e.id === campaignId);
-const progress = Math.round(epicData?.progress_percentage ?? 0);
-const daysLeft = getDaysLeft(epicData?.end_date);
-
-return (
-  <div key={campaignId}>
-    {/* Tappable header opens journey path drawer */}
-    {epicData && campaignId !== 'standalone' ? (
-      <JourneyPathDrawer epic={epicData}>
-        <button className="w-full text-left">
-          <div className="flex items-center justify-between py-1.5 px-2 rounded-lg 
-            hover:bg-muted/30 border border-border/20 bg-card/30">
-            <div className="flex items-center gap-2 min-w-0">
-              {isComplete ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-              ) : (
-                <Target className="w-3.5 h-3.5 text-primary" />
-              )}
-              <span className="text-xs font-medium truncate">
-                {group.title}
-              </span>
-              <span className="text-primary font-bold text-xs">
-                {progress}%
-              </span>
-              {daysLeft !== null && (
-                <span className="text-muted-foreground text-xs">
-                  · {daysLeft}d
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="h-4 px-1.5 text-xs">
-                {group.completedCount}/{group.totalCount}
-              </Badge>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
-        </button>
-      </JourneyPathDrawer>
-    ) : (
-      // Standalone rituals - no drawer, just show header
-      <div className="flex items-center justify-between py-1.5 px-2">
-        <span className="text-xs font-medium">{group.title}</span>
-        <Badge variant="outline">{group.totalCount}</Badge>
-      </div>
-    )}
-    
-    {/* Separate expand/collapse toggle */}
-    <Collapsible open={isExpanded} onOpenChange={() => toggleCampaign(campaignId)}>
-      <CollapsibleTrigger className="w-full">
-        <div className="flex items-center justify-between px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
-          <span>{isExpanded ? "Hide rituals" : "Show rituals"}</span>
-          <ChevronDown className={cn(
-            "h-3 w-3 transition-transform",
-            isExpanded ? "" : "-rotate-90"
-          )} />
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="pl-4 border-l border-accent/20 ml-2 pb-2">
-          {group.tasks.map((task) => renderTaskItem(task))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+// DELETE THIS BLOCK:
+<CollapsibleTrigger className="w-full">
+  <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+    <span>{isExpanded ? "Hide rituals" : "Show rituals"}</span>
+    <ChevronDown className={cn(...)} />
   </div>
-);
+</CollapsibleTrigger>
 ```
 
-### 5. Update `Journeys.tsx`
+### 3. Simplify Collapsible Structure (lines 1064-1079)
 
-**A) Remove CampaignStrip import and usage (lines 48 and 687):**
+Keep only the `CollapsibleContent` (no trigger needed since we handle toggle manually):
+
+**Current:**
 ```tsx
-// Remove this import:
-import { CampaignStrip } from "@/components/CampaignStrip";
-
-// Remove this component (line 687):
-<CampaignStrip onAddCampaign={() => setShowPathfinder(true)} />
+<Collapsible open={isExpanded} onOpenChange={() => toggleCampaign(campaignId)}>
+  <CollapsibleTrigger className="w-full">
+    ...
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    <div className="pl-4 border-l border-accent/20 ml-3 pb-2">
+      {group.tasks.map((task) => renderTaskItem(task))}
+    </div>
+  </CollapsibleContent>
+</Collapsible>
 ```
 
-**B) Update activeEpics passed to TodaysAgenda (line 680):**
+**New:**
+```tsx
+<Collapsible open={isExpanded}>
+  <CollapsibleContent>
+    <div className="pl-4 border-l border-accent/20 ml-3 pb-2 pt-2">
+      {group.tasks.map((task) => renderTaskItem(task))}
+    </div>
+  </CollapsibleContent>
+</Collapsible>
+```
 
-Currently passes minimal data. The `useEpics` hook already fetches full epic data with habits, so we just pass the full objects:
+### 4. Handle Standalone Rituals (lines 1041-1060)
+
+For standalone rituals (not part of a campaign), add the same chevron toggle pattern to the standalone header so they can also expand/collapse:
 
 ```tsx
-// The activeEpics already has the full data from useEpics query
-// Current (line 110-112):
-const activeEpics = useMemo(() =>
-  epics?.filter(e => e.status === 'active').slice(0, 5) || [],
-  [epics]
-);
-
-// Already passes to TodaysAgenda at line 680:
-activeEpics={activeEpics}
+<div className={cn(
+  "flex items-center justify-between py-2 px-3 rounded-xl",
+  "border border-border/30 bg-card/30",
+  isComplete && "bg-green-500/10 border-green-500/20"
+)}>
+  <div className="flex items-center gap-2 min-w-0">
+    {/* ... icon and title ... */}
+  </div>
+  <div className="flex items-center gap-2">
+    <Badge variant="outline" className={...}>
+      {group.completedCount}/{group.totalCount}
+    </Badge>
+    <button
+      type="button"
+      onClick={() => toggleCampaign(campaignId)}
+      className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
+    >
+      <ChevronDown className={cn(
+        "w-4 h-4 text-muted-foreground transition-transform duration-200",
+        !isExpanded && "-rotate-90"
+      )} />
+    </button>
+  </div>
+</div>
 ```
-
-This already works - `useEpics` fetches `target_days`, `start_date`, `end_date`, `progress_percentage`, and `epic_habits` with full habit data.
-
-### 6. Add Campaign Action Button
-
-Since we're removing `CampaignStrip`, we need an alternate way to add campaigns. Options:
-- Add a "+" button in the header area
-- Add "Start a Campaign" as the first item when no campaigns exist
-- Keep a minimal floating action
-
-I'll add a subtle "Add Campaign" row when the user has fewer than 2 active campaigns, appearing after the last campaign group.
 
 ---
 
-## User Experience Flow
+## User Experience
 
-1. User sees daily quests at top (unchanged)
-2. Below quests, campaign groups appear with enhanced headers showing:
-   - Campaign name + progress % + days left + completion count
-   - Tap header → Opens `JourneyPathDrawer` with full journey path image
-   - Below header: "Show/Hide rituals" toggle
-3. When less than 2 campaigns, show "Start a Campaign" option
-4. Clean, unified view - no more competing sections
+| Action | Result |
+|--------|--------|
+| Tap campaign title/stats | Opens `JourneyPathDrawer` with path image |
+| Tap chevron (▼) | Expands/collapses ritual list |
+| Chevron rotates | Points down when expanded, right when collapsed |
 
 ## Result
 
-- Rituals now grouped under campaign headers with stats
-- One tap on campaign header shows beautiful journey path visualization
-- Expand/collapse rituals is a separate action (no gesture conflict)
-- Removed redundant Campaign Strip at bottom
-- Cleaner, more integrated daily view
+- Cleaner UI with one less row per campaign
+- Intuitive chevron toggle behavior matching standard UI patterns
+- No gesture conflicts between drawer and expand/collapse
 
