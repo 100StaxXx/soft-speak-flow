@@ -1,110 +1,48 @@
 
 
-# Inline Chevron Dropdown for Rituals
+# Reorder Rituals Within Campaign Groups
 
 ## Overview
 
-Replace the separate "Show rituals / Hide rituals" toggle with the chevron icon in the campaign header row. Clicking the chevron will expand/collapse the rituals, while clicking the rest of the header will still open the `JourneyPathDrawer`.
+Enable drag-and-drop reordering of rituals within each campaign group using the **exact same** `DraggableTaskList` component that already works for quests. The only difference is where the order gets persisted - rituals update `habits.sort_order` via the existing `reorderHabits` mutation.
 
-## Visual Change
+## Current Quest Implementation (What We're Reusing)
 
-**Before:**
-```text
-┌─────────────────────────────────────────────┐
-│ 📍 Run a Marathon   0%  · 90d    0/5  ▶     │
-└─────────────────────────────────────────────┘
-    [ Show rituals  ▼ ]
-    [ ] Morning stretches                 +10
-```
+| Component | Purpose |
+|-----------|---------|
+| `DraggableTaskList` | Long-press to activate drag, visual reorder with haptic feedback |
+| `handleQuestReorder` | Maps reordered tasks to `{ id, sort_order }` updates |
+| `reorderTasks` from `useDailyTasks` | Persists to `tasks.sort_order` |
 
-**After:**
-```text
-┌─────────────────────────────────────────────────┐
-│ 📍 Run a Marathon   0%  · 90d    0/5    ▼       │  ← chevron toggles rituals
-└─────────────────────────────────────────────────┘
-    [ ] Morning stretches                     +10
-```
+**Key insight**: Rituals are spawned tasks with a `habit_source_id` field. We persist order to `habits.sort_order` so the order carries forward to future days.
 
-## Changes
+---
+
+## Changes Required
 
 | File | Change |
 |------|--------|
-| `src/components/TodaysAgenda.tsx` | (1) Replace `ChevronRight` with `ChevronDown` that rotates based on expansion state, (2) Add `onClick` + `stopPropagation` to chevron, (3) Remove "Show/Hide rituals" toggle row, (4) Move `CollapsibleContent` directly under header |
+| `src/components/TodaysAgenda.tsx` | (1) Add `onReorderRituals` prop, (2) Replace ritual `{group.tasks.map()}` with `DraggableTaskList` |
+| `src/pages/Journeys.tsx` | (1) Import `useHabits`, (2) Create `handleReorderRituals` callback that maps to habit IDs and calls `reorderHabits` |
 
 ---
 
 ## Technical Details
 
-### 1. Update the Header Row (lines 1027-1035)
+### 1. Update TodaysAgenda Props (line ~104)
 
-Replace the current `ChevronRight` with a clickable `ChevronDown` that toggles expansion:
-
-**Current:**
-```tsx
-<div className="flex items-center gap-2 shrink-0">
-  <Badge variant="outline" className={...}>
-    {group.completedCount}/{group.totalCount}
-  </Badge>
-  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-</div>
-```
-
-**New:**
-```tsx
-<div className="flex items-center gap-2 shrink-0">
-  <Badge variant="outline" className={...}>
-    {group.completedCount}/{group.totalCount}
-  </Badge>
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      toggleCampaign(campaignId);
-    }}
-    className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
-    aria-label={isExpanded ? "Hide rituals" : "Show rituals"}
-  >
-    <ChevronDown className={cn(
-      "w-4 h-4 text-muted-foreground transition-transform duration-200",
-      !isExpanded && "-rotate-90"
-    )} />
-  </button>
-</div>
-```
-
-### 2. Remove Separate Toggle Row (lines 1063-1073)
-
-Delete the `<CollapsibleTrigger>` with "Show rituals / Hide rituals" text:
+Add new callback prop:
 
 ```tsx
-// DELETE THIS BLOCK:
-<CollapsibleTrigger className="w-full">
-  <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-    <span>{isExpanded ? "Hide rituals" : "Show rituals"}</span>
-    <ChevronDown className={cn(...)} />
-  </div>
-</CollapsibleTrigger>
+interface TodaysAgendaProps {
+  // ... existing props
+  onReorderRituals?: (reorderedTasks: Task[]) => void;
+}
 ```
 
-### 3. Simplify Collapsible Structure (lines 1064-1079)
+### 2. Replace Ritual Mapping with DraggableTaskList (lines 1091-1092)
 
-Keep only the `CollapsibleContent` (no trigger needed since we handle toggle manually):
-
-**Current:**
-```tsx
-<Collapsible open={isExpanded} onOpenChange={() => toggleCampaign(campaignId)}>
-  <CollapsibleTrigger className="w-full">
-    ...
-  </CollapsibleTrigger>
-  <CollapsibleContent>
-    <div className="pl-4 border-l border-accent/20 ml-3 pb-2">
-      {group.tasks.map((task) => renderTaskItem(task))}
-    </div>
-  </CollapsibleContent>
-</Collapsible>
-```
-
-**New:**
+**Current (simple map):**
 ```tsx
 <Collapsible open={isExpanded}>
   <CollapsibleContent>
@@ -115,50 +53,101 @@ Keep only the `CollapsibleContent` (no trigger needed since we handle toggle man
 </Collapsible>
 ```
 
-### 4. Handle Standalone Rituals (lines 1041-1060)
+**New (reuse DraggableTaskList):**
+```tsx
+<Collapsible open={isExpanded}>
+  <CollapsibleContent>
+    <div className="pl-4 border-l border-accent/20 ml-3 pb-2 pt-2">
+      <DraggableTaskList
+        tasks={group.tasks}
+        onReorder={(reorderedTasks) => onReorderRituals?.(reorderedTasks)}
+        disabled={!onReorderRituals}
+        renderItem={(task, dragProps) => (
+          <div key={task.id}>
+            {renderTaskItem(task, dragProps)}
+          </div>
+        )}
+      />
+    </div>
+  </CollapsibleContent>
+</Collapsible>
+```
 
-For standalone rituals (not part of a campaign), add the same chevron toggle pattern to the standalone header so they can also expand/collapse:
+### 3. Add Handler in Journeys.tsx
+
+Import the habits hook and create the handler:
 
 ```tsx
-<div className={cn(
-  "flex items-center justify-between py-2 px-3 rounded-xl",
-  "border border-border/30 bg-card/30",
-  isComplete && "bg-green-500/10 border-green-500/20"
-)}>
-  <div className="flex items-center gap-2 min-w-0">
-    {/* ... icon and title ... */}
-  </div>
-  <div className="flex items-center gap-2">
-    <Badge variant="outline" className={...}>
-      {group.completedCount}/{group.totalCount}
-    </Badge>
-    <button
-      type="button"
-      onClick={() => toggleCampaign(campaignId)}
-      className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
-    >
-      <ChevronDown className={cn(
-        "w-4 h-4 text-muted-foreground transition-transform duration-200",
-        !isExpanded && "-rotate-90"
-      )} />
-    </button>
-  </div>
-</div>
+import { useHabits } from "@/features/habits/hooks/useHabits";
+
+// Inside component:
+const { reorderHabits } = useHabits();
+
+// Handler for ritual reordering - maps task.habit_source_id to habit updates
+const handleReorderRituals = useCallback((reorderedTasks: typeof dailyTasks) => {
+  // Filter to only rituals (have habit_source_id) and map to habit updates
+  const habitUpdates = reorderedTasks
+    .filter(task => task.habit_source_id)
+    .map((task, index) => ({
+      id: task.habit_source_id!,
+      sort_order: index,
+    }));
+  
+  if (habitUpdates.length > 0) {
+    reorderHabits(habitUpdates);
+  }
+}, [reorderHabits]);
+```
+
+### 4. Pass to TodaysAgenda (line ~655)
+
+```tsx
+<TodaysAgenda
+  // ... existing props
+  onReorderRituals={handleReorderRituals}
+/>
 ```
 
 ---
 
-## User Experience
+## Data Flow (Same Pattern as Quests)
 
-| Action | Result |
-|--------|--------|
-| Tap campaign title/stats | Opens `JourneyPathDrawer` with path image |
-| Tap chevron (▼) | Expands/collapses ritual list |
-| Chevron rotates | Points down when expanded, right when collapsed |
+```text
+User long-presses ritual row
+       ↓
+DraggableTaskList activates drag (same component as quests)
+       ↓
+Visual reorder with haptic feedback
+       ↓
+onReorder callback fires
+       ↓
+TodaysAgenda.onReorderRituals(reorderedTasks)
+       ↓
+Journeys.handleReorderRituals → maps task.habit_source_id to habit IDs
+       ↓
+useHabits.reorderHabits(habitUpdates)
+       ↓
+Database: UPDATE habits SET sort_order = X WHERE id = Y
+       ↓
+React Query invalidates ['habits'] → ritual order persists
+```
 
-## Result
+---
 
-- Cleaner UI with one less row per campaign
-- Intuitive chevron toggle behavior matching standard UI patterns
-- No gesture conflicts between drawer and expand/collapse
+## Why This Works Reliably
+
+| Aspect | Implementation |
+|--------|---------------|
+| **Drag mechanism** | Reuses proven `DraggableTaskList` - same long-press, haptics, visual feedback |
+| **No new code paths** | Just wiring existing components together |
+| **Persistence** | Updates `habits.sort_order` so order persists across days |
+| **Campaign scoping** | Each campaign group is a separate `DraggableTaskList` instance |
+
+---
+
+## Edge Cases
+
+- **Single ritual in group**: `DraggableTaskList` auto-disables when `tasks.length <= 1`
+- **Mixed campaigns**: Rituals only reorder within their own campaign group (no cross-campaign)
+- **Standalone rituals**: Same drag behavior, just grouped under "Standalone" header
 
