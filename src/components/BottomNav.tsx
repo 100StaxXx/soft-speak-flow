@@ -1,6 +1,6 @@
 import { memo, useCallback } from "react";
 import { PawPrint, User, Compass, Command } from "lucide-react";
-import { NorthStar } from "@/components/icons/NorthStar";
+
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +17,6 @@ const prefetchMap: Record<string, () => Promise<unknown>> = {
   mentor: () => import('@/pages/Mentor'),
   companion: () => import('@/pages/Companion'),
   journeys: () => import('@/pages/Journeys'),
-  campaigns: () => import('@/pages/Campaigns'),
   profile: () => import('@/pages/Profile'),
 };
 
@@ -132,24 +131,6 @@ export const BottomNav = memo(() => {
                 <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
                 <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
                   Quests
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/campaigns"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-            activeClassName="bg-gradient-to-br from-sky-500/20 to-sky-500/5 shadow-soft"
-            onClick={() => haptics.light()}
-            onMouseEnter={() => handlePrefetch('campaigns')}
-            onFocus={() => handlePrefetch('campaigns')}
-          >
-            {({ isActive }) => (
-              <>
-                <NorthStar size={24} className={`transition-all duration-300 ${isActive ? 'text-sky-400 drop-shadow-[0_0_8px_hsl(200,90%,60%)]' : 'text-muted-foreground'}`} />
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-sky-400' : 'text-muted-foreground/80'}`}>
-                  Campaigns
                 </span>
               </>
             )}

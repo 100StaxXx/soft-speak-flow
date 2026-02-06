@@ -72,7 +72,7 @@ const Journeys = lazy(() => import("./pages/Journeys"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
-const Campaigns = lazy(() => import("./pages/Campaigns"));
+// Campaigns consolidated into Journeys - redirect only
 // HIDDEN: Astral Encounters feature disabled
 // const AstralArcade = lazy(() => import("./pages/AstralArcade"));
 // const Horoscope = lazy(() => import("./pages/Horoscope")); // Shelved
@@ -311,7 +311,7 @@ const AppContent = memo(() => {
                   <Route path="/account-deletion" element={<AccountDeletionHelp />} />
                   <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
                   <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
-                  <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+                  <Route path="/campaigns" element={<Navigate to="/journeys" replace />} />
                   <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
                   <Route path="/iap-test" element={<IAPTest />} />
                   <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />

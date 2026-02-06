@@ -45,12 +45,20 @@ import { logger } from "@/utils/logger";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
 import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
+import { CampaignStrip } from "@/components/CampaignStrip";
+import { Pathfinder } from "@/components/Pathfinder";
+import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { Wand2 } from "lucide-react";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
+
+interface CreatedCampaignData {
+  title: string;
+  habits: Array<{ title: string }>;
+}
 
 const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -61,6 +69,12 @@ const Journeys = () => {
   const [showHourlyModal, setShowHourlyModal] = useState(false);
   const [showDayPlannerWizard, setShowDayPlannerWizard] = useState(false);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
+  
+  // Campaign creation state
+  const [showPathfinder, setShowPathfinder] = useState(false);
+  const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
+  const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
+  
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for onboarding
@@ -91,9 +105,9 @@ const Journeys = () => {
   // AI interaction tracking
   const { trackDailyPlanOutcome } = useAIInteractionTracker();
   
-  // Epics for plan my day questions
-  const { epics } = useEpics();
-  const activeEpics = useMemo(() => 
+  // Epics for plan my day questions and campaign strip
+  const { epics, createEpic, isCreating: isCreatingCampaign } = useEpics();
+  const activeEpics = useMemo(() =>
     epics?.filter(e => e.status === 'active').slice(0, 5) || [],
     [epics]
   );
@@ -561,6 +575,26 @@ const Journeys = () => {
     }
   }, [generateWeeklyPlan, refetchWeeklyPlan, refetchPlan, queryClient]);
 
+  // Handle campaign creation
+  const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
+    try {
+      await createEpic(data);
+      setShowPathfinder(false);
+      setCreatedCampaignData({
+        title: data.title,
+        habits: data.habits.map(h => ({ title: h.title })),
+      });
+      setShowCreatedAnimation(true);
+    } catch (error) {
+      console.error('Failed to create campaign:', error);
+    }
+  }, [createEpic]);
+
+  const handleAnimationComplete = useCallback(() => {
+    setShowCreatedAnimation(false);
+    setCreatedCampaignData(null);
+  }, []);
+
   return (
     <TaskDragProvider>
     <PageTransition>
@@ -585,6 +619,9 @@ const Journeys = () => {
           </p>
         </motion.div>
 
+        {/* Campaign Strip - Active campaigns overview */}
+        <CampaignStrip onAddCampaign={() => setShowPathfinder(true)} />
+
         {/* Date Selector */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -599,7 +636,6 @@ const Journeys = () => {
             onTaskDrop={handleMoveTaskToDate}
           />
         </motion.div>
-
 
         {/* Main Content Area */}
         <motion.div
@@ -783,6 +819,23 @@ const Journeys = () => {
             queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
             setShowQuickAdjust(false);
           }}
+        />
+
+        {/* Pathfinder - Campaign Creation Wizard */}
+        <Pathfinder
+          open={showPathfinder}
+          onOpenChange={setShowPathfinder}
+          onCreateEpic={handleCreateCampaign}
+          isCreating={isCreatingCampaign}
+          showTemplatesFirst={false}
+        />
+
+        {/* Campaign Created Celebration */}
+        <CampaignCreatedAnimation
+          isVisible={showCreatedAnimation}
+          campaignTitle={createdCampaignData?.title || ''}
+          habits={createdCampaignData?.habits || []}
+          onComplete={handleAnimationComplete}
         />
       </div>
 
