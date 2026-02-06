@@ -13,7 +13,6 @@ import {
   Repeat,
   ChevronDown,
   ChevronUp,
-  ChevronRight,
   Rocket,
   CheckCircle2,
   Target,
@@ -36,7 +35,7 @@ import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
@@ -1031,7 +1030,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                                 )}>
                                   {group.completedCount}/{group.totalCount}
                                 </Badge>
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleCampaign(campaignId);
+                                  }}
+                                  className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
+                                  aria-label={isExpanded ? "Hide rituals" : "Show rituals"}
+                                >
+                                  <ChevronDown className={cn(
+                                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                                    !isExpanded && "-rotate-90"
+                                  )} />
+                                </button>
                               </div>
                             </div>
                           </button>
@@ -1051,28 +1063,32 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             )}
                             <span className="text-sm font-medium">{group.title}</span>
                           </div>
-                          <Badge variant="outline" className={cn(
-                            "h-5 px-2 text-xs",
-                            isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
-                          )}>
-                            {group.completedCount}/{group.totalCount}
-                          </Badge>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline" className={cn(
+                              "h-5 px-2 text-xs",
+                              isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
+                            )}>
+                              {group.completedCount}/{group.totalCount}
+                            </Badge>
+                            <button
+                              type="button"
+                              onClick={() => toggleCampaign(campaignId)}
+                              className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
+                              aria-label={isExpanded ? "Hide rituals" : "Show rituals"}
+                            >
+                              <ChevronDown className={cn(
+                                "w-4 h-4 text-muted-foreground transition-transform duration-200",
+                                !isExpanded && "-rotate-90"
+                              )} />
+                            </button>
+                          </div>
                         </div>
                       )}
                       
-                      {/* Separate expand/collapse toggle */}
-                      <Collapsible open={isExpanded} onOpenChange={() => toggleCampaign(campaignId)}>
-                        <CollapsibleTrigger className="w-full">
-                          <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                            <span>{isExpanded ? "Hide rituals" : "Show rituals"}</span>
-                            <ChevronDown className={cn(
-                              "h-3.5 w-3.5 transition-transform duration-200",
-                              isExpanded ? "" : "-rotate-90"
-                            )} />
-                          </div>
-                        </CollapsibleTrigger>
+                      {/* Rituals list */}
+                      <Collapsible open={isExpanded}>
                         <CollapsibleContent>
-                          <div className="pl-4 border-l border-accent/20 ml-3 pb-2">
+                          <div className="pl-4 border-l border-accent/20 ml-3 pb-2 pt-2">
                             {group.tasks.map((task) => renderTaskItem(task))}
                           </div>
                         </CollapsibleContent>
