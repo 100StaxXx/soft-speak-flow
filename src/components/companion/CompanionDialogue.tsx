@@ -1,21 +1,22 @@
 import { memo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, Heart, Sparkles, AlertTriangle, RefreshCw, LucideIcon } from "lucide-react";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
+import { useCompanion } from "@/hooks/useCompanion";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 interface MoodConfig {
-  icon: LucideIcon;
   color: string;
+  ringColor: string;
   bgColor: string;
 }
 
 const moodConfig: Record<DialogueMood, MoodConfig> = {
-  thriving: { icon: Sparkles, color: "text-cosmiq-glow", bgColor: "bg-cosmiq-glow/10" },
-  content: { icon: MessageCircle, color: "text-celestial-blue", bgColor: "bg-celestial-blue/10" },
-  concerned: { icon: AlertTriangle, color: "text-amber-400", bgColor: "bg-amber-400/10" },
-  desperate: { icon: Heart, color: "text-destructive", bgColor: "bg-destructive/10" },
-  recovering: { icon: RefreshCw, color: "text-green-400", bgColor: "bg-green-400/10" },
+  thriving: { color: "text-cosmiq-glow", ringColor: "ring-cosmiq-glow/50", bgColor: "bg-cosmiq-glow/10" },
+  content: { color: "text-celestial-blue", ringColor: "ring-celestial-blue/50", bgColor: "bg-celestial-blue/10" },
+  concerned: { color: "text-amber-400", ringColor: "ring-amber-400/50", bgColor: "bg-amber-400/10" },
+  desperate: { color: "text-destructive", ringColor: "ring-destructive/50", bgColor: "bg-destructive/10" },
+  recovering: { color: "text-green-400", ringColor: "ring-green-400/50", bgColor: "bg-green-400/10" },
 };
 
 interface CompanionDialogueProps {
@@ -30,6 +31,10 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
     dialogueMood, 
     isLoading 
   } = useCompanionDialogue();
+  
+  const { companion } = useCompanion();
+  const companionImageUrl = companion?.current_image_url;
+  const companionName = companion?.spirit_animal || "Companion";
   
   const [displayText, setDisplayText] = useState(greeting);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -53,7 +58,6 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
   }
 
   const config = moodConfig[dialogueMood];
-  const IconComponent = config.icon;
   
   // Decide what secondary text to show
   const secondaryText = showBondInfo ? bondDialogue : null;
@@ -74,12 +78,23 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
       
       <div className="relative p-4">
         <div className="flex items-start gap-3">
-          {/* Mood icon */}
+          {/* Companion portrait with mood-colored ring */}
           <div className={cn(
-            "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-            config.bgColor
+            "flex-shrink-0 rounded-lg overflow-hidden",
+            "ring-2", config.ringColor
           )}>
-            <IconComponent className={cn("w-4 h-4", config.color)} />
+            <Avatar className="h-10 w-10 rounded-lg">
+              {companionImageUrl ? (
+                <AvatarImage 
+                  src={companionImageUrl} 
+                  alt={companionName}
+                  className="object-cover"
+                />
+              ) : null}
+              <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
+                {companionName.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
           
           {/* Dialogue text */}
