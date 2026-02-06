@@ -1,59 +1,50 @@
 
 
-# Ship-Ready Polish: Life Status Normalization
+# Fix: Deploy `generate-companion-image` Edge Function
 
-## What I Found
-The current `getEngagementStatus()` at **line 312** does:
-```typescript
-let lifeStatus: LifeStatus = (profile?.life_status ?? 'active') as LifeStatus;
+## Problem Identified
+
+The `generate-companion-image` edge function is returning a **404 Not Found** error because it hasn't been deployed:
+
+```text
+Error: Failed to send a request to the Edge Function
+Network Request: POST /functions/v1/generate-companion-image → Error: Failed to fetch
+Direct Test: 404 - "Requested function was not found"
 ```
 
-This is a **type assertion** that tells TypeScript "trust me, this is valid" — but if the database contains a typo or legacy value (e.g., `"Vacation"` with capital V, or `"paused"`), the lookup will fail silently.
+The function code exists at `supabase/functions/generate-companion-image/index.ts` (932 lines) and is configured in `config.toml`, but it's not running in the edge environment.
 
 ---
 
-## The Fix: Safe Normalization
+## Root Cause
 
-Replace line 312 with:
-```typescript
-// Normalize life status to prevent invalid values from DB
-const rawLifeStatus = profile?.life_status ?? 'active';
-const lifeStatus: LifeStatus = 
-  rawLifeStatus === 'transition' || rawLifeStatus === 'vacation' || rawLifeStatus === 'sick'
-    ? rawLifeStatus
-    : 'active';
-```
-
-This ensures:
-- Valid values pass through unchanged
-- Invalid/legacy/typo values default to `'active'`
-- No runtime errors from undefined multiplier lookups
+The function was likely never deployed, or a previous deployment failed. The recent work focused on `process-daily-decay` but this function wasn't explicitly redeployed.
 
 ---
 
-## Files to Modify
+## Solution
 
-| File | Line | Change |
-|------|------|--------|
-| `supabase/functions/process-daily-decay/index.ts` | 312 | Replace cast with normalization |
+**Deploy the `generate-companion-image` edge function** to make companion creation work again.
 
----
-
-## Ship Sequence (Complete)
-
-1. ✅ Migration for creativity seeding — **Done**
-2. ✅ Edge function type definitions — **Done**  
-3. 🔧 **Add life status normalization** — This fix
-4. 🚀 Redeploy edge function
-5. ✅ Run 5 verification checks
+This is a zero-code-change fix — the function code is already complete and correct.
 
 ---
 
-## Verification Checklist (Unchanged)
+## What Happens After Deployment
 
-1. TypeScript builds without errors
-2. Stats UI shows 6 tiles in correct order
-3. Progress bar math: 100 = 0%, 550 = 50%, 1000 = 100%
-4. Tap stat opens dialog with description
-5. Test stat update: `updateDisciplineFromWork(companionId)` → +10 discipline, +2 resolve echo
+1. User clicks "Begin Your Journey" on onboarding
+2. Frontend calls `supabase.functions.invoke('generate-companion-image', { body: {...} })`
+3. Edge function generates companion image using Lovable AI gateway
+4. Image is uploaded to storage, URL returned
+5. Companion is created in database
+
+---
+
+## Verification Steps
+
+After deployment:
+1. Navigate to `/onboarding`
+2. Complete the onboarding flow (select color, animal, element, story tone)
+3. Click "Begin Your Journey"
+4. Companion should be created successfully with generated image
 
