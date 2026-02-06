@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo } from "react";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { 
@@ -13,6 +13,7 @@ import {
   Repeat,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Rocket,
   CheckCircle2,
   Target,
@@ -47,8 +48,15 @@ import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { SwipeableTaskItem } from "./SwipeableTaskItem";
 import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
 import { MarqueeText } from "@/components/ui/marquee-text";
+import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
+
+// Helper to calculate days remaining
+const getDaysLeft = (endDate?: string | null) => {
+  if (!endDate) return null;
+  return Math.max(0, differenceInDays(new Date(endDate), new Date()));
+};
 
 interface Task {
   id: string;
@@ -102,7 +110,27 @@ interface TodaysAgendaProps {
   onQuickAdd?: (parsed: ParsedTask) => void;
   onPlanMyDay?: () => void;
   onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
-  activeEpics?: Array<{ id: string; title: string; progress_percentage?: number | null }>;
+  activeEpics?: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    progress_percentage?: number | null;
+    target_days: number;
+    start_date: string;
+    end_date: string;
+    epic_habits?: Array<{
+      habit_id: string;
+      habits: {
+        id: string;
+        title: string;
+        difficulty: string;
+        description?: string | null;
+        frequency?: string;
+        estimated_minutes?: number | null;
+        custom_days?: number[] | null;
+      };
+    }>;
+  }>;
   habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
@@ -150,14 +178,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   });
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
-  const [showRitualsTooltip, setShowRitualsTooltip] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
-  
-  // Track if we've already shown the tooltip this session
-  const tooltipShownRef = useRef(false);
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -310,23 +334,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     onReorder: handleNativeReorder,
     onToggle: handleNativeToggle,
   });
-
-  // Show first-time tooltip for rituals grouping feature
-  useEffect(() => {
-    if (tooltipShownRef.current) return;
-    const seen = localStorage.getItem('rituals_grouping_seen');
-    if (!seen && ritualTasks.length > 0) {
-      tooltipShownRef.current = true;
-      setShowRitualsTooltip(true);
-      // Auto-dismiss after 5 seconds
-      const timer = setTimeout(() => {
-        setShowRitualsTooltip(false);
-        localStorage.setItem('rituals_grouping_seen', 'true');
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [ritualTasks.length]);
-
   // Group ritual tasks by campaign
   const ritualsByCampaign = useMemo(() => {
     const groups = new Map<string, { 
@@ -963,123 +970,120 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               </>
             )}
             
-            {/* Rituals Section - Grouped by Campaign */}
+            {/* Rituals Section - Grouped by Campaign (integrated into campaign headers) */}
             {ritualTasks.length > 0 && (
-              <>
-                {/* Rituals header with first-time tooltip */}
-                <TooltipProvider>
-                  <Tooltip open={showRitualsTooltip} onOpenChange={setShowRitualsTooltip}>
-                    <TooltipTrigger asChild>
-                      <div 
-                        className="flex items-center gap-2 py-1.5 px-1 mt-2 cursor-default"
-                        onClick={() => {
-                          if (showRitualsTooltip) {
-                            setShowRitualsTooltip(false);
-                            localStorage.setItem('rituals_grouping_seen', 'true');
-                          }
-                        }}
-                      >
-                        <motion.div 
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/15 border border-accent/30"
-                          animate={showRitualsTooltip ? { 
-                            boxShadow: ['0 0 0 0 hsl(var(--accent) / 0.4)', '0 0 0 6px hsl(var(--accent) / 0)', '0 0 0 0 hsl(var(--accent) / 0.4)']
-                          } : {}}
-                          transition={{ duration: 1.5, repeat: showRitualsTooltip ? Infinity : 0 }}
-                        >
-                          <Sparkles className="w-4 h-4 text-accent" />
-                          <span className="text-sm font-semibold text-accent uppercase tracking-wide">
-                            Rituals
-                          </span>
-                          <Badge variant="secondary" className="h-5 px-2 text-sm bg-accent/20 text-accent border-0">
-                            {ritualTasks.length}
-                          </Badge>
-                          {showRitualsTooltip && (
-                            <Badge variant="default" className="h-4 px-1.5 text-[10px] bg-accent text-accent-foreground animate-pulse">
-                              New!
-                            </Badge>
-                          )}
-                        </motion.div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[200px] text-center">
-                      <p className="text-xs">Rituals are now grouped by campaign! Tap a campaign to expand.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                
-                {/* Campaign groups - each collapsible */}
+              <div className="mt-3 space-y-2">
+                {/* Campaign groups with enhanced headers */}
                 {Array.from(ritualsByCampaign.entries()).map(([campaignId, group]) => {
                   const isExpanded = expandedCampaigns.has(campaignId);
                   const isComplete = group.completedCount === group.totalCount;
                   
+                  // Find matching epic data for stats
+                  const epicData = activeEpics?.find(e => e.id === campaignId);
+                  const progress = Math.round(epicData?.progress_percentage ?? 0);
+                  const daysLeft = getDaysLeft(epicData?.end_date);
+                  
                   return (
-                    <Collapsible 
-                      key={campaignId} 
-                      open={isExpanded} 
-                      onOpenChange={() => toggleCampaign(campaignId)}
-                    >
-                      <CollapsibleTrigger className="w-full">
+                    <div key={campaignId}>
+                      {/* Tappable header opens JourneyPathDrawer (for epics only) */}
+                      {epicData && campaignId !== 'standalone' ? (
+                        <JourneyPathDrawer epic={{
+                          id: epicData.id,
+                          title: epicData.title,
+                          description: epicData.description ?? undefined,
+                          progress_percentage: epicData.progress_percentage ?? 0,
+                          target_days: epicData.target_days,
+                          start_date: epicData.start_date,
+                          end_date: epicData.end_date,
+                          epic_habits: epicData.epic_habits,
+                        }}>
+                          <button className="w-full text-left" aria-label={`Open ${group.title} journey path`}>
+                            <div className={cn(
+                              "flex items-center justify-between py-2 px-3 rounded-xl transition-colors",
+                              "hover:bg-muted/30 border border-border/30 bg-card/30",
+                              isComplete && "bg-green-500/10 border-green-500/20"
+                            )}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isComplete ? (
+                                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                ) : (
+                                  <Target className="w-4 h-4 text-primary shrink-0" />
+                                )}
+                                <span className={cn(
+                                  "text-sm font-medium truncate max-w-[120px]",
+                                  isComplete && "text-green-500"
+                                )}>
+                                  {group.title}
+                                </span>
+                                <span className="text-primary font-bold text-xs shrink-0">
+                                  {progress}%
+                                </span>
+                                {daysLeft !== null && (
+                                  <span className="text-muted-foreground text-xs shrink-0">
+                                    · {daysLeft}d
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Badge variant="outline" className={cn(
+                                  "h-5 px-2 text-xs",
+                                  isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
+                                )}>
+                                  {group.completedCount}/{group.totalCount}
+                                </Badge>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            </div>
+                          </button>
+                        </JourneyPathDrawer>
+                      ) : (
+                        // Standalone rituals - no drawer, just a simple header
                         <div className={cn(
-                          "flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer transition-colors",
-                          "hover:bg-muted/30",
-                          isComplete && "bg-green-500/10"
+                          "flex items-center justify-between py-2 px-3 rounded-xl",
+                          "border border-border/30 bg-card/30",
+                          isComplete && "bg-green-500/10 border-green-500/20"
                         )}>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             {isComplete ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                              <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                             ) : (
-                              <Target className="w-3.5 h-3.5 text-accent/70" />
+                              <Sparkles className="w-4 h-4 text-accent shrink-0" />
                             )}
-                            <span className={cn(
-                              "text-xs font-medium truncate max-w-[160px]",
-                              isComplete && "text-green-500"
-                            )}>
-                              {group.title}
-                            </span>
-                            <Badge variant="outline" className={cn(
-                              "h-4 px-1.5 text-xs border-muted-foreground/30",
-                              isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
-                            )}>
-                              {group.completedCount}/{group.totalCount}
-                            </Badge>
+                            <span className="text-sm font-medium">{group.title}</span>
                           </div>
-                          <ChevronDown className={cn(
-                            "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                            isExpanded ? "" : "-rotate-90"
-                          )} />
+                          <Badge variant="outline" className={cn(
+                            "h-5 px-2 text-xs",
+                            isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
+                          )}>
+                            {group.completedCount}/{group.totalCount}
+                          </Badge>
                         </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="pl-4 border-l border-accent/20 ml-2 pb-2">
-                          {group.tasks.map((task) => renderTaskItem(task))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                      )}
+                      
+                      {/* Separate expand/collapse toggle */}
+                      <Collapsible open={isExpanded} onOpenChange={() => toggleCampaign(campaignId)}>
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                            <span>{isExpanded ? "Hide rituals" : "Show rituals"}</span>
+                            <ChevronDown className={cn(
+                              "h-3.5 w-3.5 transition-transform duration-200",
+                              isExpanded ? "" : "-rotate-90"
+                            )} />
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="pl-4 border-l border-accent/20 ml-3 pb-2">
+                            {group.tasks.map((task) => renderTaskItem(task))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
                   );
                 })}
                 {/* Safe area for bottom navigation */}
                 <div className="h-4" />
-              </>
+              </div>
             )}
-          </div>
-        )}
-
-        {/* Journey Progress Indicators */}
-        {activeJourneys.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-border/50">
-            <p className="text-xs text-muted-foreground mb-2">Journey Progress</p>
-            <div className="flex gap-2 flex-wrap">
-              {activeJourneys.map((journey) => (
-                <div
-                  key={journey.id}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 border border-primary/20"
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <span className="text-xs truncate max-w-[100px]">{journey.title}</span>
-                  <span className="text-xs text-muted-foreground">{Math.round(journey.progress_percentage)}%</span>
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>
