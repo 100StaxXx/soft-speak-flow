@@ -1,97 +1,122 @@
 
-# Enhanced Loading Feedback for Companion Creation
+# Move Campaigns and Add Journey Path Viewer
 
 ## Overview
 
-Add a dedicated loading screen with animated progress phases and messaging that sets expectations during companion creation. This is a **display-only change** - no modifications to the actual generation logic.
+Move the campaign strip to the bottom of the Quests page and add a way for users to tap and view their full journey path progress image.
 
-## Current Experience
+## Changes
 
-```text
-┌─────────────────────────────────────────┐
-│   Button: [⟳ Creating your companion...]│
-│                                         │
-│   "Please wait while we create..."      │
-│   "This may take up to 30 seconds"      │
-└─────────────────────────────────────────┘
-```
+### 1. Move CampaignStrip to Bottom
 
-**Problem**: Minimal feedback during a 15-60+ second wait feels like the app is frozen.
+Currently the `CampaignStrip` renders at line 623, right after the header and before the date selector. We'll move it to after the `TodaysAgenda` component (around line 687).
 
-## Proposed Experience
-
-When `isLoading=true`, replace the form with a full-screen loading experience:
+**File:** `src/pages/Journeys.tsx`
 
 ```text
-┌─────────────────────────────────────────┐
-│           ✨                            │
-│     [Cosmic Pulse Animation]            │
-│                                         │
-│   "Weaving magical essence..."          │
-│   ━━━━━━━━━━━━━━━━━━━━○ 60%            │
-│                                         │
-│   "Your companion is being brought      │
-│    to life. This takes 20-40 seconds."  │
-│                                         │
-│   💡 Tip: Each companion is unique!     │
-└─────────────────────────────────────────┘
+BEFORE (Current Order):
+┌─────────────────────────────┐
+│  QUESTS Header              │
+│  CampaignStrip ← HERE       │
+│  Date Selector              │
+│  TodaysAgenda               │
+└─────────────────────────────┘
+
+AFTER (New Order):
+┌─────────────────────────────┐
+│  QUESTS Header              │
+│  Date Selector              │
+│  TodaysAgenda               │
+│  CampaignStrip ← MOVED      │
+└─────────────────────────────┘
 ```
 
-## What Changes
+### 2. Add Journey Path Viewer to Campaign Cards
+
+When users tap a campaign in the strip, instead of opening the `JourneyDetailDrawer` (which shows milestones), we'll create a new drawer that shows the beautiful `ConstellationTrail` with the AI-generated journey path image.
+
+**New Component:** `src/components/JourneyPathDrawer.tsx`
+
+Features:
+- Opens as a drawer when tapping a campaign in CampaignStrip
+- Displays the `ConstellationTrail` component with the AI-generated path image
+- Shows companion walking along the path with current progress
+- Quick stats (days left, rituals today, % complete)
+- Button to "View Milestones" that opens the existing JourneyDetailDrawer
+
+### 3. Update CampaignCard to Use New Drawer
+
+**File:** `src/components/CampaignStrip.tsx`
+
+Change the `CampaignCard` component to:
+- Wrap with new `JourneyPathDrawer` instead of `JourneyDetailDrawer`
+- Pass epic data including milestones for the ConstellationTrail
+
+## File Changes Summary
 
 | File | Change |
 |------|--------|
-| `src/components/CompanionPersonalization.tsx` | Show `CompanionCreationLoader` when `isLoading=true` |
-| New: `src/components/CompanionCreationLoader.tsx` | Full-screen loading component with phases and tips |
+| `src/pages/Journeys.tsx` | Move `<CampaignStrip>` from line 623 to after `TodaysAgenda` (~line 687) |
+| `src/components/JourneyPathDrawer.tsx` | New component - drawer showing ConstellationTrail with path image |
+| `src/components/CampaignStrip.tsx` | Update `CampaignCard` to use `JourneyPathDrawer` |
 
-## Component: CompanionCreationLoader
+## New Component: JourneyPathDrawer
 
-Features:
-- Reuses the `PageLoader` cosmic pulse animation
-- Cycles through encouraging messages every 4 seconds
-- Shows a simulated progress bar (not tied to actual progress, just visual comfort)
-- Displays helpful tips to keep users engaged
-- Sets expectation: "This takes 20-40 seconds"
-
-Messages cycle:
-1. "Preparing the summoning ritual..."
-2. "Weaving magical essence..."
-3. "Shaping elemental energy..."
-4. "Your companion is taking form..."
-5. "Adding final touches..."
-6. "Almost there..."
-
-Tips cycle:
-- "Each companion is uniquely generated just for you"
-- "Your choices shape their appearance and personality"
-- "They'll grow and evolve as you complete quests"
-
-## Implementation
-
-**CompanionCreationLoader.tsx**
-```tsx
-// Full-screen loading with cosmic animation
-// Cycles through phases every 4 seconds
-// Shows progress bar (visual only, advances over ~40s)
-// Displays rotating tips
+```text
+┌─────────────────────────────────────────┐
+│ ─────── (drawer handle)                 │
+│                                         │
+│  📍 Run a Marathon                      │
+│  ━━━━━━━━━━━━━○ 45%  ·  87d left        │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │                                     │ │
+│ │    [AI-Generated Journey Path]      │ │
+│ │    [ConstellationTrail with         │ │
+│ │     companion walking along         │ │
+│ │     the cosmic path]                │ │
+│ │                                     │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│  🔥 5 rituals today  ·  ⭐ 12 milestones │
+│                                         │
+│  [ View Milestones ]  [ Check-In ]      │
+│                                         │
+└─────────────────────────────────────────┘
 ```
 
-**CompanionPersonalization.tsx change**
+## Technical Details
+
+**JourneyPathDrawer props:**
 ```tsx
-if (isLoading) {
-  return <CompanionCreationLoader />;
+interface JourneyPathDrawerProps {
+  epic: {
+    id: string;
+    title: string;
+    description?: string;
+    progress_percentage: number;
+    target_days: number;
+    start_date: string;
+    end_date: string;
+    epic_habits?: Array<{...}>;
+  };
+  children?: React.ReactNode;
 }
-// ... rest of form
 ```
 
-## Why This Approach
+**Integration with existing hooks:**
+- Uses `useJourneyPathImage(epicId)` for the path image
+- Uses `useMilestones(epicId)` for milestone count and trail data
+- Uses `useCompanion()` for companion display on trail
 
-- **Zero logic changes**: No touching the edge function, polling, or retries
-- **Minimal disruption**: Single new component + one conditional render
-- **Sets expectations**: Users know it takes time upfront
-- **Keeps users engaged**: Rotating messages prevent "frozen app" feeling
-- **Reuses existing patterns**: Uses `PageLoader` animation style
+**Reuses existing components:**
+- `ConstellationTrail` - the main star path visualization
+- `JourneyDetailDrawer` - linked via "View Milestones" button
+- `EpicCheckInDrawer` - linked via "Check-In" button
 
 ## Result
 
-Users see an engaging, animated loading experience that explains what's happening and sets the expectation that companion creation takes 20-40 seconds. No actual speed changes, just better UX.
+Users will:
+1. See campaigns at the bottom of their daily quests (less intrusive)
+2. Tap a campaign to see a beautiful full-width view of their AI-generated journey path with their companion walking along it
+3. Have quick access to "View Milestones" and "Check-In" from this view
