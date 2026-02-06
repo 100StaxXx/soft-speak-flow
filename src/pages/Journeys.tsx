@@ -619,9 +619,6 @@ const Journeys = () => {
           </p>
         </motion.div>
 
-        {/* Campaign Strip - Active campaigns overview */}
-        <CampaignStrip onAddCampaign={() => setShowPathfinder(true)} />
-
         {/* Date Selector */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -686,7 +683,9 @@ const Journeys = () => {
           />
         </motion.div>
 
-        
+        {/* Campaign Strip - Active campaigns overview (moved to bottom) */}
+        <CampaignStrip onAddCampaign={() => setShowPathfinder(true)} />
+
         {/* Add Quest Sheet */}
         <AddQuestSheet
           open={showAddSheet}

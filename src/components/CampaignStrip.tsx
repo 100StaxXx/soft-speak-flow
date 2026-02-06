@@ -5,8 +5,7 @@ import { differenceInDays } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { JourneyDetailDrawer } from "@/components/JourneyDetailDrawer";
-import { EpicCheckInDrawer } from "@/components/EpicCheckInDrawer";
+import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { useEpics } from "@/hooks/useEpics";
 import { cn } from "@/lib/utils";
 
@@ -170,12 +169,7 @@ const CampaignCard = memo(function CampaignCard({ epic }: CampaignCardProps) {
   }, [epic.epic_habits]);
 
   return (
-    <JourneyDetailDrawer
-      epicId={epic.id}
-      epicTitle={epic.title}
-      epicGoal={epic.description}
-      currentDeadline={epic.end_date}
-    >
+    <JourneyPathDrawer epic={epic}>
       <motion.div
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
@@ -216,6 +210,6 @@ const CampaignCard = memo(function CampaignCard({ epic }: CampaignCardProps) {
           </span>
         </div>
       </motion.div>
-    </JourneyDetailDrawer>
+    </JourneyPathDrawer>
   );
 });
