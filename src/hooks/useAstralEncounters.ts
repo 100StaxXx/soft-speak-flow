@@ -292,23 +292,33 @@ export const useAstralEncounters = () => {
         }
 
         // Update companion stats - validate statType is a valid field
-        const statField = activeEncounter.adversary.statType as 'mind' | 'body' | 'soul';
-        if (!['mind', 'body', 'soul'].includes(statField)) {
-          console.error('Invalid stat type:', statField);
+        // Map old stat types to new 6-stat system
+        const statTypeMapping: Record<string, keyof typeof companionStatsNew> = {
+          'mind': 'wisdom',
+          'body': 'vitality', 
+          'soul': 'resolve',
+        };
+        const oldStatField = activeEncounter.adversary.statType as 'mind' | 'body' | 'soul';
+        const newStatField = statTypeMapping[oldStatField];
+        if (!newStatField) {
+          console.error('Invalid stat type:', oldStatField);
           return { result, xpEarned };
         }
-        // Type-safe stat access using object lookup
-        const companionStats = {
-          mind: companion?.mind ?? 0,
-          body: companion?.body ?? 0,
-          soul: companion?.soul ?? 0,
+        // Type-safe stat access using new 6-stat system
+        const companionStatsNew = {
+          vitality: companion?.vitality ?? 300,
+          wisdom: companion?.wisdom ?? 300,
+          discipline: companion?.discipline ?? 300,
+          resolve: companion?.resolve ?? 300,
+          creativity: companion?.creativity ?? 300,
+          alignment: companion?.alignment ?? 300,
         };
-        const currentStat = companionStats[statField];
-        const newStat = Math.min(100, currentStat + activeEncounter.adversary.statBoost);
+        const currentStat = companionStatsNew[newStatField];
+        const newStat = Math.min(1000, currentStat + activeEncounter.adversary.statBoost * 3);
 
         await supabase
           .from('user_companion')
-          .update({ [statField]: newStat })
+          .update({ [newStatField]: newStat })
           .eq('id', companion.id);
 
         // Award XP

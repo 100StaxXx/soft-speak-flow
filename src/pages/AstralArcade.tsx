@@ -394,11 +394,12 @@ export default function AstralArcade() {
     onDamageDealt: handleDamageDealt,
   });
 
+  // Map 6-stat system to card combat stats for arcade
   const companionStats = companion ? {
-    mind: companion.mind ?? 10,
-    body: companion.body ?? 10,
-    soul: companion.soul ?? 10,
-  } : { mind: 10, body: 10, soul: 10 };
+    mind: Math.floor(((companion.wisdom ?? 300) + (companion.creativity ?? 300)) / 12),
+    body: Math.floor(((companion.vitality ?? 300) + (companion.discipline ?? 300)) / 12),
+    soul: Math.floor(((companion.resolve ?? 300) + (companion.alignment ?? 300)) / 12),
+  } : { mind: 50, body: 50, soul: 50 };
 
   const handleSelectGame = useCallback((gameType: MiniGameType) => {
     setActiveGame(gameType);

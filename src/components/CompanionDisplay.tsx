@@ -369,7 +369,7 @@ export const CompanionDisplay = memo(() => {
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
               style={{
-                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(companion.body ?? 100) / 200}), hsl(var(--nebula-pink) / ${(companion.body ?? 100) / 200}), transparent)`,
+                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(companion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(companion.vitality ?? 300) / 600}), transparent)`,
               }}
               aria-hidden="true" 
             />
