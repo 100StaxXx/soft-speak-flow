@@ -1,38 +1,49 @@
-export type AttributeInput = {
-  mind?: number | null;
-  body?: number | null;
-  soul?: number | null;
+// New 6-stat system for companions
+export type StatInput = {
+  vitality?: number | null;
+  wisdom?: number | null;
+  discipline?: number | null;
+  resolve?: number | null;
+  creativity?: number | null;
+  alignment?: number | null;
 };
 
-const clampAttribute = (value?: number | null) => {
+const clampStat = (value?: number | null, defaultValue = 300) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
-    return 0;
+    return defaultValue;
   }
-  return Math.max(0, Math.min(100, value));
+  return Math.max(0, Math.min(1000, value));
 };
 
-export const normalizeAttributes = (attributes: AttributeInput = {}) => ({
-  mind: clampAttribute(attributes.mind),
-  body: clampAttribute(attributes.body),
-  soul: clampAttribute(attributes.soul),
+export const normalizeStats = (stats: StatInput = {}) => ({
+  vitality: clampStat(stats.vitality),
+  wisdom: clampStat(stats.wisdom),
+  discipline: clampStat(stats.discipline),
+  resolve: clampStat(stats.resolve),
+  creativity: clampStat(stats.creativity),
+  alignment: clampStat(stats.alignment),
 });
 
 export const calculateBaseStat = (stage: number) => 20 + stage * 8;
 
-const buildStatValue = (base: number, primary: number, secondaryA: number, secondaryB: number) => {
-  const primaryContribution = primary * 0.4;
-  const supportContribution = ((secondaryA + secondaryB) / 2) * 0.1;
-  return Math.floor(base + primaryContribution + supportContribution);
-};
-
-export const calculateStats = (stage: number, attributes: AttributeInput = {}) => {
-  const { mind, body, soul } = normalizeAttributes(attributes);
+// Card stats derived from companion's 6 stats
+// Maps companion stats to card combat stats (mind/body/soul for cards)
+export const calculateCardStats = (stage: number, stats: StatInput = {}) => {
+  const { vitality, wisdom, discipline, resolve, creativity, alignment } = normalizeStats(stats);
   const base = calculateBaseStat(stage);
 
+  // Card stats are derived from companion stats:
+  // - Card Mind = base + (wisdom + creativity) contribution
+  // - Card Body = base + (vitality + discipline) contribution  
+  // - Card Soul = base + (resolve + alignment) contribution
+  const mindValue = Math.floor(base + ((wisdom + creativity) / 2) * 0.15);
+  const bodyValue = Math.floor(base + ((vitality + discipline) / 2) * 0.15);
+  const soulValue = Math.floor(base + ((resolve + alignment) / 2) * 0.15);
+
   return {
-    mind: buildStatValue(base, mind, body, soul),
-    body: buildStatValue(base, body, mind, soul),
-    soul: buildStatValue(base, soul, mind, body),
+    mind: mindValue,
+    body: bodyValue,
+    soul: soulValue,
   };
 };
 
@@ -42,8 +53,15 @@ export const calculateEnergyCost = (stage: number) => {
   return 3;
 };
 
-export const calculateBondLevel = (stage: number, attributes: AttributeInput = {}) => {
-  const { mind, body, soul } = normalizeAttributes(attributes);
-  const totalAttributes = mind + body + soul;
-  return Math.min(100, Math.floor(10 + totalAttributes / 3 + stage * 2));
+export const calculateBondLevel = (stage: number, stats: StatInput = {}) => {
+  const { vitality, wisdom, discipline, resolve, creativity, alignment } = normalizeStats(stats);
+  // Average of all 6 stats, normalized to 0-100 range
+  const avgStat = (vitality + wisdom + discipline + resolve + creativity + alignment) / 6;
+  const normalizedAvg = avgStat / 10; // 300 default = 30
+  return Math.min(100, Math.floor(10 + normalizedAvg + stage * 2));
 };
+
+// Legacy exports for backward compatibility (deprecated)
+export type AttributeInput = StatInput;
+export const normalizeAttributes = normalizeStats;
+export const calculateStats = calculateCardStats;

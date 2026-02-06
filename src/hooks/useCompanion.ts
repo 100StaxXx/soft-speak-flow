@@ -26,9 +26,13 @@ export interface Companion {
   dormant_image_url?: string | null;
   eye_color?: string;
   fur_color?: string;
-  body?: number;
-  mind?: number;
-  soul?: number;
+  // New 6-stat system
+  vitality?: number;
+  wisdom?: number;
+  discipline?: number;
+  resolve?: number;
+  creativity?: number;
+  alignment?: number;
   current_mood?: string | null;
   last_mood_update?: string | null;
   last_activity_date?: string | null;
@@ -212,9 +216,12 @@ export const useCompanion = () => {
                 element: companionData.core_element,
                 color: companionData.favorite_color,
                 userAttributes: {
-                  body: fullCompanionData?.body || 0,
-                  mind: fullCompanionData?.mind || 0,
-                  soul: fullCompanionData?.soul || 0,
+                  vitality: fullCompanionData?.vitality || 300,
+                  wisdom: fullCompanionData?.wisdom || 300,
+                  discipline: fullCompanionData?.discipline || 300,
+                  resolve: fullCompanionData?.resolve || 300,
+                  creativity: fullCompanionData?.creativity || 300,
+                  alignment: fullCompanionData?.alignment || 300,
                 },
               },
             });
@@ -608,9 +615,12 @@ export const useCompanion = () => {
                   element: companion.core_element,
                   color: companion.favorite_color,
                   userAttributes: {
-                    body: companion.body || 0,
-                    mind: companion.mind || 0,
-                    soul: companion.soul || 0,
+                    vitality: companion.vitality || 300,
+                    wisdom: companion.wisdom || 300,
+                    discipline: companion.discipline || 300,
+                    resolve: companion.resolve || 300,
+                    creativity: companion.creativity || 300,
+                    alignment: companion.alignment || 300,
                   },
                 },
               });

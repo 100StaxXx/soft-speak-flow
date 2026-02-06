@@ -177,10 +177,11 @@ export const AstralEncounterModal = ({
     enabled: !!adversary && open,
   });
 
+  // Map 6-stat system to card combat stats for encounters
   const companionStats = {
-    mind: companion?.mind || 50,
-    body: companion?.body || 50,
-    soul: companion?.soul || 50,
+    mind: Math.floor(((companion?.wisdom ?? 300) + (companion?.creativity ?? 300)) / 12),
+    body: Math.floor(((companion?.vitality ?? 300) + (companion?.discipline ?? 300)) / 12),
+    soul: Math.floor(((companion?.resolve ?? 300) + (companion?.alignment ?? 300)) / 12),
   };
 
   // Get current mini-game type for instructions (only active games: galactic_match, orb_match, tap_sequence, energy_beam)
