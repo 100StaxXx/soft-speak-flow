@@ -89,6 +89,24 @@ export const BottomNav = memo(() => {
             )}
           </NavLink>
 
+          <NavLink
+            to="/journeys"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
+            activeClassName="bg-gradient-to-br from-cosmiq-glow/20 to-cosmiq-glow/5 shadow-soft"
+            data-tour="quests-tab"
+            onClick={() => haptics.light()}
+            onMouseEnter={() => handlePrefetch('journeys')}
+            onFocus={() => handlePrefetch('journeys')}
+          >
+            {({ isActive }) => (
+              <>
+                <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-cosmiq-glow drop-shadow-[0_0_8px_hsl(270,70%,55%)]' : 'text-muted-foreground'}`} />
+                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/80'}`}>
+                  Quests
+                </span>
+              </>
+            )}
+          </NavLink>
 
           <NavLink
             to="/companion"
