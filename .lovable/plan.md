@@ -1,25 +1,10 @@
 
-# Add Back Button to Journey Path Drawer
+
+# Remove Check-In Button from Journey Path Drawer
 
 ## Summary
 
-Add a visible close button to the `JourneyPathDrawer` component header so users can easily dismiss the drawer and return to the main Quests view.
-
----
-
-## Current Behavior
-
-The drawer can only be closed by:
-- Swiping down on the handle
-- Tapping the darkened overlay area
-
-This is not intuitive for many users, especially on mobile.
-
----
-
-## Proposed Solution
-
-Add an X (close) button in the top-right corner of the `JourneyPathDrawer` header that closes the drawer when tapped.
+Remove the "Check-In" button from the `JourneyPathDrawer` and center the remaining "View Milestones" button.
 
 ---
 
@@ -27,60 +12,58 @@ Add an X (close) button in the top-right corner of the `JourneyPathDrawer` heade
 
 | File | Change |
 |------|--------|
-| `src/components/JourneyPathDrawer.tsx` | Add DrawerClose button to the header |
+| `src/components/JourneyPathDrawer.tsx` | Remove Check-In button and center View Milestones |
 
 ---
 
-## Implementation Details
-
-### Add DrawerClose import
+## Current Code (lines 187-199)
 
 ```tsx
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-  DrawerClose,  // Add this
-} from "@/components/ui/drawer";
-```
-
-### Add X icon import
-
-```tsx
-import { Target, Flame, Star, Map, Sparkles, Calendar, X } from "lucide-react";
-```
-
-### Update DrawerHeader (lines 118-137)
-
-Add a close button in the header with absolute positioning:
-
-```tsx
-<DrawerHeader className="pb-2 relative">
-  {/* Close button */}
-  <DrawerClose asChild>
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      className="absolute right-2 top-2 h-8 w-8 rounded-full"
-    >
-      <X className="w-4 h-4" />
-      <span className="sr-only">Close</span>
+{/* Action Buttons */}
+<div className="flex gap-3">
+  <JourneyDetailDrawer ...>
+    <Button variant="outline" className="flex-1 gap-2">
+      <Map className="w-4 h-4" />
+      View Milestones
     </Button>
-  </DrawerClose>
+  </JourneyDetailDrawer>
   
-  <DrawerTitle className="flex items-center gap-2 pr-10">
-    <Target className="w-5 h-5 text-primary" />
-    {epic.title}
-  </DrawerTitle>
-  
-  {/* Progress bar with stats */}
-  <div className="mt-3 space-y-2">
-    ...
-  </div>
-</DrawerHeader>
+  <EpicCheckInDrawer ...>
+    ...Check-In button...
+  </EpicCheckInDrawer>
+</div>
 ```
+
+---
+
+## New Code
+
+```tsx
+{/* Action Button */}
+<div className="flex justify-center">
+  <JourneyDetailDrawer
+    epicId={epic.id}
+    epicTitle={epic.title}
+    epicGoal={epic.description}
+    currentDeadline={epic.end_date}
+  >
+    <Button variant="outline" className="gap-2">
+      <Map className="w-4 h-4" />
+      View Milestones
+    </Button>
+  </JourneyDetailDrawer>
+</div>
+```
+
+---
+
+## Additional Cleanup
+
+Since the `EpicCheckInDrawer` import and related code will no longer be used:
+
+1. Remove unused import: `EpicCheckInDrawer`
+2. Remove unused `habits` memo (lines 68-80) - no longer needed
+3. Remove unused `todayRitualCount` memo (lines 83-93) - no longer needed
 
 ---
 
@@ -88,17 +71,16 @@ Add a close button in the header with absolute positioning:
 
 ```text
 ┌────────────────────────────────────────┐
-│  🎯 RUN A MARATHON                 [X] │  ← X button in top right
+│  🎯 RUN A MARATHON                 [X] │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━          │
 │  0% Complete           🔥 86d left     │
 │                                        │
 │  [Journey Path Image]                  │
 │                                        │
-│  🔥 5 rituals  ⭐ 7 milestones         │
+│  ⭐ 7 milestones  📅 90d journey       │
 │                                        │
-│  [VIEW MILESTONES]  [CHECK-IN]         │
+│        [VIEW MILESTONES]               │  ← Centered button
+│                                        │
 └────────────────────────────────────────┘
 ```
-
-Tapping the X button will close the drawer and return the user to the main Quests page.
 
