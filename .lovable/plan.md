@@ -1,45 +1,83 @@
 
-
-# Fix Quests Tab Missing Glow Effect
+# Fix Double Image Rendering in Journey Path
 
 ## Problem
 
-The Quests tab uses `text-cosmiq-glow` for its active glow, but **`cosmiq-glow` is not defined in `tailwind.config.ts`**. 
+The journey path image is appearing **twice** (stacked) because both `JourneyPathDrawer` AND `ConstellationTrail` are fetching and rendering the same AI-generated path image.
 
-While the CSS variable `--cosmiq-glow: 270 80% 65%` exists in `index.css`, Tailwind doesn't know about it, so the utility classes like `text-cosmiq-glow`, `from-cosmiq-glow/20`, etc. don't work.
+**Current flow:**
+1. `JourneyPathDrawer` fetches `pathImageUrl` via `useJourneyPathImage(epic.id)`
+2. `JourneyPathDrawer` renders the image in a `h-48` container
+3. `JourneyPathDrawer` passes `epicId={epic.id}` to `ConstellationTrail`
+4. `ConstellationTrail` also fetches `pathImageUrl` via `useJourneyPathImage(epicId)`
+5. `ConstellationTrail` also renders the same image as its background
+
+**Result:** Two identical images stacked on top of each other, as visible in the screenshot.
 
 ---
 
-## Fix Required
+## Solution
 
-Add `cosmiq-glow` to the Tailwind config colors section.
+Remove the `epicId` prop when calling `ConstellationTrail` from `JourneyPathDrawer`. This prevents `ConstellationTrail` from fetching/rendering the image since the parent component already handles that.
 
 | File | Change |
 |------|--------|
-| `tailwind.config.ts` | Add `'cosmiq-glow': 'hsl(var(--cosmiq-glow))'` to the colors object |
+| `src/components/JourneyPathDrawer.tsx` | Remove `epicId={epic.id}` from line 175 |
 
 ---
 
 ## Code Change
 
-In `tailwind.config.ts`, add after line 71 (after `'deep-space': 'hsl(var(--deep-space))'`):
-
-```typescript
-'cosmiq-glow': 'hsl(var(--cosmiq-glow))',
+**Before (line 168-177):**
+```tsx
+<ConstellationTrail
+  progress={epic.progress_percentage}
+  targetDays={epic.target_days}
+  companionImageUrl={companion?.current_image_url}
+  companionMood={companion?.current_mood}
+  showCompanion={true}
+  milestones={trailMilestones}
+  epicId={epic.id}           // ← REMOVE THIS
+  className="h-40"
+/>
 ```
 
-This will enable these Tailwind utilities to work properly:
-- `text-cosmiq-glow` - purple text color
-- `bg-cosmiq-glow` - purple background
-- `from-cosmiq-glow/20` - gradient start with opacity
-- `to-cosmiq-glow/5` - gradient end with opacity
+**After:**
+```tsx
+<ConstellationTrail
+  progress={epic.progress_percentage}
+  targetDays={epic.target_days}
+  companionImageUrl={companion?.current_image_url}
+  companionMood={companion?.current_mood}
+  showCompanion={true}
+  milestones={trailMilestones}
+  className="h-40"
+/>
+```
+
+---
+
+## Why This Works
+
+When `epicId` is undefined/not passed:
+- `useJourneyPathImage(undefined)` returns `pathImageUrl: undefined`
+- `ConstellationTrail` skips rendering the path image (line 924 condition fails)
+- `ConstellationTrail` shows its fallback gradient background instead
+
+The parent `JourneyPathDrawer` already renders the path image above the trail, so there's no visual loss.
 
 ---
 
 ## Result
 
-The Quests tab will have its signature purple glow when active:
-- Purple icon with drop shadow
-- Purple text label
-- Purple gradient background on the tab
+```text
+Before:                          After:
+┌──────────────────────┐        ┌──────────────────────┐
+│    [Path Image 1]    │        │    [Path Image]      │
+├──────────────────────┤        │        ↓             │
+│    [Path Image 2]    │   →    │ [Constellation Trail]│
+│  Constellation Trail │        │   (no bg image)      │
+└──────────────────────┘        └──────────────────────┘
+```
 
+This aligns with the architecture note: *"Removing the 'epicId' prop from 'ConstellationTrail' within 'JourneyPathDrawer' prevents stacked/double-rendering of the path background."*
