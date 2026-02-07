@@ -11,11 +11,9 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ConstellationTrail } from "@/components/ConstellationTrail";
 import { JourneyDetailDrawer } from "@/components/JourneyDetailDrawer";
-import { EpicCheckInDrawer } from "@/components/EpicCheckInDrawer";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { useMilestones } from "@/hooks/useMilestones";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -60,39 +58,6 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
   const daysRemaining = useMemo(() => {
     return Math.max(0, differenceInDays(new Date(epic.end_date), new Date()));
   }, [epic.end_date]);
-
-  const ritualCount = epic.epic_habits?.filter(eh => eh.habits)?.length || 0;
-
-  // Extract habits for check-in drawer
-  const habits = useMemo(() => {
-    if (!epic.epic_habits) return [];
-    return epic.epic_habits
-      .filter(eh => eh.habits)
-      .map(eh => ({
-        id: eh.habits.id,
-        title: eh.habits.title,
-        difficulty: eh.habits.difficulty,
-        description: eh.habits.description || null,
-        frequency: eh.habits.frequency,
-        estimated_minutes: eh.habits.estimated_minutes || null,
-        custom_days: eh.habits.custom_days || null,
-      }));
-  }, [epic.epic_habits]);
-
-  // Count today's rituals
-  const todayRitualCount = useMemo(() => {
-    if (!epic.epic_habits) return 0;
-    const today = new Date().getDay();
-    return epic.epic_habits.filter(eh => {
-      if (!eh.habits) return false;
-      const freq = eh.habits.frequency;
-      if (freq === 'daily') return true;
-      if (freq === 'custom' && eh.habits.custom_days) {
-        return eh.habits.custom_days.includes(today);
-      }
-      return true;
-    }).length;
-  }, [epic.epic_habits]);
 
   // Convert milestones to trail format
   const trailMilestones = useMemo(() => {
@@ -189,12 +154,6 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
 
           {/* Quick Stats */}
           <div className="flex items-center justify-center gap-6 mb-6 text-sm text-muted-foreground">
-            {todayRitualCount > 0 && (
-              <span className="flex items-center gap-1.5">
-                <Flame className="w-4 h-4 text-orange-500" />
-                <span>{todayRitualCount} rituals today</span>
-              </span>
-            )}
             <span className="flex items-center gap-1.5">
               <Star className="w-4 h-4 text-purple-400" />
               <span>{totalCount} milestones</span>
@@ -205,31 +164,19 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
             </span>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
+          {/* Action Button */}
+          <div className="flex justify-center">
             <JourneyDetailDrawer
               epicId={epic.id}
               epicTitle={epic.title}
               epicGoal={epic.description}
               currentDeadline={epic.end_date}
             >
-              <Button variant="outline" className="flex-1 gap-2">
+              <Button variant="outline" className="gap-2">
                 <Map className="w-4 h-4" />
                 View Milestones
               </Button>
             </JourneyDetailDrawer>
-            
-            <EpicCheckInDrawer 
-              epicId={epic.id}
-              habits={habits}
-              isActive={true}
-              renderTrigger={() => (
-                <Button variant="default" className="flex-1 gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  Check-In
-                </Button>
-              )}
-            />
           </div>
         </div>
       </DrawerContent>
