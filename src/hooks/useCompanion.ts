@@ -26,6 +26,7 @@ export interface Companion {
   dormant_image_url?: string | null;
   eye_color?: string;
   fur_color?: string;
+  cached_creature_name?: string | null;
   // New 6-stat system
   vitality?: number;
   wisdom?: number;
