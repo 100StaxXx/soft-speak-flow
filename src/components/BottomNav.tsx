@@ -1,5 +1,5 @@
 import { memo, useCallback } from "react";
-import { PawPrint, User, Compass, Command } from "lucide-react";
+import { PawPrint, User, Compass } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
@@ -15,9 +15,8 @@ import { CompanionNavPresence } from "@/components/companion/CompanionNavPresenc
 // Prefetch page modules on hover for instant navigation
 const prefetchMap: Record<string, () => Promise<unknown>> = {
   mentor: () => import('@/pages/Mentor'),
-  companion: () => import('@/pages/Companion'),
   journeys: () => import('@/pages/Journeys'),
-  profile: () => import('@/pages/Profile'),
+  companion: () => import('@/pages/Companion'),
 };
 
 export const BottomNav = memo(() => {
@@ -90,6 +89,7 @@ export const BottomNav = memo(() => {
             )}
           </NavLink>
 
+
           <NavLink
             to="/companion"
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px] relative"
@@ -112,43 +112,6 @@ export const BottomNav = memo(() => {
                 </div>
                 <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/80'}`}>
                   Companion
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/journeys"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-            activeClassName="bg-gradient-to-br from-purple-500/20 to-purple-500/5 shadow-soft"
-            data-tour="tasks-tab"
-            onClick={() => haptics.light()}
-            onMouseEnter={() => handlePrefetch('journeys')}
-            onFocus={() => handlePrefetch('journeys')}
-          >
-            {({ isActive }) => (
-              <>
-                <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-purple-400 drop-shadow-[0_0_8px_hsl(270,70%,60%)]' : 'text-muted-foreground'}`} />
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-purple-400' : 'text-muted-foreground/80'}`}>
-                  Quests
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
-            to="/profile"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-            activeClassName="bg-gradient-to-br from-primary/20 to-primary/5 shadow-soft"
-            onClick={() => haptics.light()}
-            onMouseEnter={() => handlePrefetch('profile')}
-            onFocus={() => handlePrefetch('profile')}
-          >
-            {({ isActive }) => (
-              <>
-                <Command className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-primary drop-shadow-glow' : 'text-muted-foreground'}`} />
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-primary' : 'text-muted-foreground/80'}`}>
-                  Command
                 </span>
               </>
             )}
