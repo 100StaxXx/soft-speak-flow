@@ -6,7 +6,7 @@ import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer } from "lucide-react";
+import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer, Settings } from "lucide-react";
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 
@@ -14,11 +14,11 @@ import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
 
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { PageInfoButton } from "@/components/PageInfoButton";
-import { PageInfoModal } from "@/components/PageInfoModal";
+import { Button } from "@/components/ui/button";
 import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
 import { CompanionPageSkeleton } from "@/components/skeletons/CompanionPageSkeleton";
 import { useState, memo, lazy, Suspense } from "react";
+import { useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -86,9 +86,9 @@ const OverviewSkeleton = () => (
 
 const Companion = () => {
   const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
-  const [showPageInfo, setShowPageInfo] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
+  const navigate = useNavigate();
 
   // Render persistent layout - header/nav always visible, content swaps smoothly
   const renderContent = () => {
@@ -227,7 +227,15 @@ const Companion = () => {
           <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
             <div className="container flex items-center justify-between py-4">
               <h1 className="font-heading font-black text-2xl">Companion</h1>
-              <PageInfoButton onClick={() => setShowPageInfo(true)} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/profile')}
+                className="h-8 w-8 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
             </div>
           </header>
           
@@ -238,21 +246,6 @@ const Companion = () => {
         </div>
       </CompanionErrorBoundary>
       <BottomNav />
-      
-      <PageInfoModal
-        open={showPageInfo}
-        onClose={() => setShowPageInfo(false)}
-        title="About Your Companion"
-        icon={Sparkles}
-        description="Your companion evolves as you complete quests and build habits. Watch it grow through 21 stages!"
-        features={[
-          "Earn XP from quests and habits to level up",
-          "Unlock trading cards at major evolution stages",
-          "Read unique stories for each evolution",
-          "Collect companion cards in your gallery"
-        ]}
-        tip="Your companion's element and personality are based on your zodiac sign and choices during onboarding."
-      />
       
       <CompanionTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </PageTransition>
