@@ -404,12 +404,12 @@ export const CompanionDisplay = memo(() => {
           </div>
 
           {/* Companion Name - Centered */}
-          <p className="text-center text-xl font-semibold text-primary/90 tracking-wide">
+          <p className="text-center text-2xl font-semibold text-primary/90 tracking-wide -mt-1">
             {creatureName || 'Companion'}
           </p>
 
           {/* Companion Image */}
-          <div className="flex justify-center py-4 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
+          <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
             {/* Cosmiq orbital glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
