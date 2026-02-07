@@ -165,16 +165,15 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                 "relative",
                 pathImageUrl ? "-mt-20" : "mt-0"
               )}>
-                <ConstellationTrail
-                  progress={epic.progress_percentage}
-                  targetDays={epic.target_days}
-                  companionImageUrl={companion?.current_image_url}
-                  companionMood={companion?.current_mood}
-                  showCompanion={true}
-                  milestones={trailMilestones}
-                  epicId={epic.id}
-                  className="h-40"
-                />
+              <ConstellationTrail
+                progress={epic.progress_percentage}
+                targetDays={epic.target_days}
+                companionImageUrl={companion?.current_image_url}
+                companionMood={companion?.current_mood}
+                showCompanion={true}
+                milestones={trailMilestones}
+                className="h-40"
+              />
               </div>
 
               {/* Loading state for path */}
