@@ -148,38 +148,36 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
             className="mb-4"
           >
             <div className="rounded-xl overflow-hidden border border-border/30 bg-card/30 backdrop-blur-sm">
-              {/* AI-Generated Path Image Background */}
-              {pathImageUrl && (
-                <div className="relative h-48 w-full overflow-hidden">
-                  <img
-                    src={pathImageUrl}
-                    alt="Your journey path"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-                </div>
-              )}
-              
-              {/* Constellation Trail */}
-              <div className={cn(
-                "relative",
-                pathImageUrl ? "-mt-20" : "mt-0"
-              )}>
-              <ConstellationTrail
-                progress={epic.progress_percentage}
-                targetDays={epic.target_days}
-                companionImageUrl={companion?.current_image_url}
-                companionMood={companion?.current_mood}
-                showCompanion={true}
-                milestones={trailMilestones}
-                transparentBackground={!!pathImageUrl}
-                className="h-40"
-              />
+              {/* Combined Journey Visualization */}
+              <div className="relative h-56 w-full overflow-hidden">
+                {/* AI-Generated Path Image Background */}
+                {pathImageUrl && (
+                  <>
+                    <img
+                      src={pathImageUrl}
+                      alt="Your journey path"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
+                  </>
+                )}
+                
+                {/* Constellation Trail Overlay */}
+                <ConstellationTrail
+                  progress={epic.progress_percentage}
+                  targetDays={epic.target_days}
+                  companionImageUrl={companion?.current_image_url}
+                  companionMood={companion?.current_mood}
+                  showCompanion={true}
+                  milestones={trailMilestones}
+                  transparentBackground={!!pathImageUrl}
+                  className="absolute inset-0"
+                />
               </div>
 
               {/* Loading state for path */}
               {isLoadingPath && !pathImageUrl && (
-                <div className="h-48 flex items-center justify-center">
+                <div className="h-56 flex items-center justify-center">
                   <div className="text-center space-y-2">
                     <Sparkles className="w-8 h-8 text-primary/50 mx-auto animate-pulse" />
                     <p className="text-xs text-muted-foreground">Loading journey path...</p>
