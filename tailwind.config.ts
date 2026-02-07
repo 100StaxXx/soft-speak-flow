@@ -87,6 +87,7 @@ export default {
         'stardust-gold': 'hsl(var(--stardust-gold))',
         'nebula-pink': 'hsl(var(--nebula-pink))',
         'deep-space': 'hsl(var(--deep-space))',
+        'cosmiq-glow': 'hsl(var(--cosmiq-glow))',
       },
       fontFamily: {
         'heading': ['Bebas Neue', 'Oswald', 'sans-serif'],
