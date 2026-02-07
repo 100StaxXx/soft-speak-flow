@@ -913,14 +913,14 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         !transparentBackground && !pathImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
-      style={{
+      style={!transparentBackground ? {
         boxShadow: `
           0 0 10px ${colors.glowStrong},
           0 0 20px ${colors.glowMedium},
           0 0 40px ${colors.glowSoft},
           inset 0 0 15px ${colors.glowInner}
         `
-      }}
+      } : undefined}
     >
       {/* AI-generated journey path background */}
       {pathImageUrl && (
