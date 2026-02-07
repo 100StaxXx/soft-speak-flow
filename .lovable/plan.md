@@ -1,86 +1,93 @@
 
 
-# Remove Check-In Button from Journey Path Drawer
+# Add Companion Name to Companion Display
 
 ## Summary
 
-Remove the "Check-In" button from the `JourneyPathDrawer` and center the remaining "View Milestones" button.
+Add the companion's unique name below "Stage X" and above the companion image, centered with clean, simple styling.
 
 ---
 
-## File to Change
+## Current Layout
+
+```text
+┌────────────────────────────────────────┐
+│  EGG                              ✨   │
+│  Stage 0                               │
+│                                        │
+│         [Companion Image]              │
+└────────────────────────────────────────┘
+```
+
+---
+
+## Proposed Layout
+
+```text
+┌────────────────────────────────────────┐
+│  EGG                              ✨   │
+│  Stage 0                               │
+│               Aerion                   │  ← Centered name, clean styling
+│                                        │
+│         [Companion Image]              │
+└────────────────────────────────────────┘
+```
+
+---
+
+## Files to Change
 
 | File | Change |
 |------|--------|
-| `src/components/JourneyPathDrawer.tsx` | Remove Check-In button and center View Milestones |
+| `src/hooks/useCompanion.ts` | Add `cached_creature_name` to the Companion interface |
+| `src/components/CompanionDisplay.tsx` | Add centered name display below "Stage X" |
 
 ---
 
-## Current Code (lines 187-199)
+## Technical Implementation
 
-```tsx
-{/* Action Buttons */}
-<div className="flex gap-3">
-  <JourneyDetailDrawer ...>
-    <Button variant="outline" className="flex-1 gap-2">
-      <Map className="w-4 h-4" />
-      View Milestones
-    </Button>
-  </JourneyDetailDrawer>
-  
-  <EpicCheckInDrawer ...>
-    ...Check-In button...
-  </EpicCheckInDrawer>
-</div>
+### 1. Update Companion Interface
+
+Add `cached_creature_name` to the interface in `useCompanion.ts`:
+
+```typescript
+export interface Companion {
+  // ... existing fields
+  cached_creature_name?: string | null;
+}
 ```
 
----
+### 2. Add Name Display to CompanionDisplay
 
-## New Code
+Add name resolution using the fallback chain:
+1. `cached_creature_name`
+2. Capitalized `spirit_animal`
+3. Default "Companion"
+
+Insert after the "Stage X" line, centered with simple styling:
 
 ```tsx
-{/* Action Button */}
-<div className="flex justify-center">
-  <JourneyDetailDrawer
-    epicId={epic.id}
-    epicTitle={epic.title}
-    epicGoal={epic.description}
-    currentDeadline={epic.end_date}
-  >
-    <Button variant="outline" className="gap-2">
-      <Map className="w-4 h-4" />
-      View Milestones
-    </Button>
-  </JourneyDetailDrawer>
-</div>
+{/* Companion Name */}
+<p className="text-center text-base font-semibold text-primary/90 tracking-wide">
+  {companionName}
+</p>
 ```
 
----
-
-## Additional Cleanup
-
-Since the `EpicCheckInDrawer` import and related code will no longer be used:
-
-1. Remove unused import: `EpicCheckInDrawer`
-2. Remove unused `habits` memo (lines 68-80) - no longer needed
-3. Remove unused `todayRitualCount` memo (lines 83-93) - no longer needed
+Styling:
+- Centered text
+- Semibold weight for subtle emphasis
+- Primary color at 90% opacity
+- Wide letter spacing for a name-like feel
+- No decorations or accents
 
 ---
 
 ## Visual Result
 
-```text
-┌────────────────────────────────────────┐
-│  🎯 RUN A MARATHON                 [X] │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━          │
-│  0% Complete           🔥 86d left     │
-│                                        │
-│  [Journey Path Image]                  │
-│                                        │
-│  ⭐ 7 milestones  📅 90d journey       │
-│                                        │
-│        [VIEW MILESTONES]               │  ← Centered button
-│                                        │
-└────────────────────────────────────────┘
-```
+The companion's name appears cleanly centered below the stage info:
+
+- **EGG** (gradient heading)
+- Stage 0 (muted text)
+- Aerion (centered, clean, eye-catching)
+- [Companion Image]
 
