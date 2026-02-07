@@ -1,93 +1,147 @@
 
-# Fix Spacing and Blue Focus Ring Issues
 
-## Problems Identified
+# Merge Profile into Companion Page - Navigation Simplification
 
-### 1. Missing Separator Between Quests and Campaigns/Rituals
-Looking at `TodaysAgenda.tsx` line 974, the rituals section has only `mt-3` (12px margin-top) which creates insufficient visual separation from the quests list above.
+## Summary
 
-### 2. Blue Focus Ring on Campaign Header
-The blue outline appearing around "Money in the Bank" is caused by the `<button>` element wrapping the campaign header (line 999). When tapped on mobile (iOS), the native `:focus-visible` state applies the ring color defined in CSS (`--ring: 270 70% 55%` which is purple, but iOS Safari can render this with a blue tint due to how it handles focus states on touch).
+Transform the navigation from **4 tabs to 3 tabs** by:
+1. **Removing** the "Command" tab from the bottom nav
+2. **Moving Companion to the right** position (where Command currently is)
+3. **Keeping Quests centered** and **Mentor on the left**
+4. **Replacing the "ⓘ" info icon** on Companion page with a **⚙️ settings gear** that navigates to the Command Center (Profile page)
 
-The solution is to remove focus-visible ring styling from this specific button since it's a touch target that opens a drawer, not a keyboard-focusable interactive element.
+This keeps the Command Center **fully intact** as its own page - it's just accessed via a gear icon instead of a nav tab.
 
 ---
 
 ## Visual Change
 
-**Before:**
+**Before (4 tabs):**
 ```text
-[ ] Quest 1
-[ ] Quest 2
-📍 Money in the Bank    0%  0/3  >  ← Blue ring appears
-📍 Bulk up a Captain... 1%  0/5  >
+┌─────────────────────────────────────────────────────────────────┐
+│  [Mentor]    [Companion]    [Quests]    [Command]               │
+│     🧔          🐾            🧭           ⌘                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**After:**
+**After (3 tabs):**
 ```text
-[ ] Quest 1
-[ ] Quest 2
+┌─────────────────────────────────────────────────────────────────┐
+│     [Mentor]           [Quests]           [Companion]           │
+│        🧔                 🧭                  🐾                │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-────────── CAMPAIGNS ──────────
-
-📍 Money in the Bank    0%  0/3  >  ← No ring
-📍 Bulk up a Captain... 1%  0/5  >
+**Companion Page Header Change:**
+```text
+Before:  "Companion"                                    [ⓘ]
+After:   "Companion"                                    [⚙️]
+                                                        ↓
+                                            Navigates to /profile
 ```
 
 ---
 
-## Changes
+## Changes Overview
 
 | File | Change |
 |------|--------|
-| `src/components/TodaysAgenda.tsx` | (1) Add visual separator before campaigns section, (2) Remove focus-visible ring from campaign header buttons |
+| `src/components/BottomNav.tsx` | Remove Command tab, reorder tabs (Mentor → Quests → Companion), update prefetch map |
+| `src/pages/Companion.tsx` | Replace PageInfoButton with Settings button that navigates to /profile, remove PageInfoModal |
 
 ---
 
 ## Technical Details
 
-### 1. Add Separator Before Campaigns Section (line 974)
+### 1. Update BottomNav.tsx
 
-Add more spacing and a subtle visual divider:
+**Remove the Command tab entirely and reorder:**
 
-**Current:**
 ```tsx
-{ritualTasks.length > 0 && (
-  <div className="mt-3 space-y-2">
+// Current order: Mentor → Companion → Quests → Command
+// New order: Mentor → Quests → Companion
+
+// Update prefetch map - remove profile, keep the rest
+const prefetchMap: Record<string, () => Promise<unknown>> = {
+  mentor: () => import('@/pages/Mentor'),
+  journeys: () => import('@/pages/Journeys'),
+  companion: () => import('@/pages/Companion'),
+};
+
+// Nav items in new order:
+// 1. Mentor (left) - unchanged
+// 2. Quests (center) - move up from position 3
+// 3. Companion (right) - move from position 2, gets gold glow treatment
 ```
 
-**New:**
+The tabs will render in this order:
+1. **Mentor** (left) - unchanged styling (orange theme)
+2. **Quests** (center) - unchanged styling (purple theme)  
+3. **Companion** (right) - unchanged styling (gold theme)
+
+### 2. Update Companion.tsx Header
+
+**Replace the info button with a settings gear:**
+
 ```tsx
-{ritualTasks.length > 0 && (
-  <div className="mt-6 pt-4 border-t border-border/20 space-y-2">
-```
+// Current:
+import { PageInfoButton } from "@/components/PageInfoButton";
+<PageInfoButton onClick={() => setShowPageInfo(true)} />
 
-This adds:
-- `mt-6` (24px) top margin for breathing room
-- `pt-4` (16px) top padding inside the container
-- `border-t border-border/20` subtle horizontal line separator
+// New:
+import { Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-### 2. Remove Focus Ring from Campaign Header Button (line 999)
+const navigate = useNavigate();
 
-**Current:**
-```tsx
-<button className="w-full text-left" aria-label={`Open ${group.title} journey path`}>
-```
-
-**New:**
-```tsx
-<button 
-  className="w-full text-left focus:outline-none focus-visible:outline-none" 
-  aria-label={`Open ${group.title} journey path`}
+// In header:
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={() => navigate('/profile')}
+  className="h-8 w-8 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+  aria-label="Settings"
 >
+  <Settings className="h-4 w-4" />
+</Button>
 ```
 
-This removes the browser's default focus ring that was appearing on touch interactions.
+**Remove these (no longer needed):**
+- `PageInfoModal` import and component
+- `showPageInfo` state
+- The `PageInfoModal` at bottom of component
 
 ---
 
-## Result
+## What Stays the Same
 
-- Clear visual separation between quests (one-time tasks) and campaigns/rituals (recurring habit systems)
-- No more unexpected blue focus outlines when tapping campaign headers
-- Maintains accessibility (aria-labels still present, keyboard users can still navigate)
+| Element | Status |
+|---------|--------|
+| `/profile` route | Unchanged - still accessible at /profile |
+| Profile page content | Unchanged - all tabs, settings, sign out work as before |
+| Companion page functionality | Unchanged - all tabs (Overview, Focus, Stories, Postcards, Collection) work |
+| Companion tutorial modal | Unchanged - still shows for first-time users |
+| App initial redirect | Unchanged - still redirects to /journeys on first load |
+
+---
+
+## User Flow After Change
+
+1. **User opens app** → Lands on Quests (center tab) 
+2. **User taps Companion** → Sees companion with ⚙️ gear in header
+3. **User taps ⚙️** → Navigates to Command Center (full Profile page)
+4. **User navigates back** → Returns to Companion
+
+This is exactly like Instagram/TikTok where profile settings are behind a gear icon, not a main tab.
+
+---
+
+## Route Considerations
+
+The `/profile` route remains valid and accessible:
+- Via the gear icon on Companion page
+- Via direct URL
+- Via any existing navigation in the app (e.g., from Help Center deep links)
+
+The Profile page's "hidden dev trigger" (long-press header → IAP test) also remains functional.
+
