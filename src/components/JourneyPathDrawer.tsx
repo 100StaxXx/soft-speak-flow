@@ -172,6 +172,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                 companionMood={companion?.current_mood}
                 showCompanion={true}
                 milestones={trailMilestones}
+                transparentBackground={!!pathImageUrl}
                 className="h-40"
               />
               </div>
