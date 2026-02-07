@@ -1,132 +1,104 @@
 
-# Fix Constellation Trail Overlay on Journey Path Image
+# Add Back Button to Journey Path Drawer
 
-## Problem
+## Summary
 
-The constellation trail and AI-generated path image appear as **two separate stacked elements** rather than a proper overlay. The current layout uses:
-- Path image in a `h-48` container
-- Constellation trail below with `-mt-20` to slightly overlap
-
-This creates the visual "double image" appearance with a visible boundary between them.
-
-## Solution
-
-Restructure the layout so the constellation trail is **absolutely positioned** inside the same container as the path image, creating a true overlay effect.
+Add a visible close button to the `JourneyPathDrawer` component header so users can easily dismiss the drawer and return to the main Quests view.
 
 ---
 
-## Files to Change
+## Current Behavior
+
+The drawer can only be closed by:
+- Swiping down on the handle
+- Tapping the darkened overlay area
+
+This is not intuitive for many users, especially on mobile.
+
+---
+
+## Proposed Solution
+
+Add an X (close) button in the top-right corner of the `JourneyPathDrawer` header that closes the drawer when tapped.
+
+---
+
+## File to Change
 
 | File | Change |
 |------|--------|
-| `src/components/JourneyPathDrawer.tsx` | Restructure to use absolute positioning for overlay |
+| `src/components/JourneyPathDrawer.tsx` | Add DrawerClose button to the header |
 
 ---
 
-## Layout Change
+## Implementation Details
 
-**Current structure (stacked):**
-```text
-┌────────────────────────┐
-│ [Path Image h-48]      │
-│                        │
-└────────────────────────┘
-       ↕ -mt-20
-┌────────────────────────┐
-│ [Constellation Trail]  │
-│ h-40                   │
-└────────────────────────┘
-```
+### Add DrawerClose import
 
-**New structure (true overlay):**
-```text
-┌────────────────────────┐
-│ [Path Image]           │
-│ position: relative     │
-│                        │
-│  ┌──────────────────┐  │
-│  │ ConstellationTrail  │
-│  │ position: absolute  │
-│  │ covers full area    │
-│  └──────────────────┘  │
-│                        │
-└────────────────────────┘
-```
-
----
-
-## Code Changes
-
-### `JourneyPathDrawer.tsx` (lines 150-178)
-
-**Before:**
 ```tsx
-<div className="rounded-xl overflow-hidden border border-border/30 bg-card/30 backdrop-blur-sm">
-  {/* AI-Generated Path Image Background */}
-  {pathImageUrl && (
-    <div className="relative h-48 w-full overflow-hidden">
-      <img src={pathImageUrl} ... />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-    </div>
-  )}
-  
-  {/* Constellation Trail */}
-  <div className={cn("relative", pathImageUrl ? "-mt-20" : "mt-0")}>
-    <ConstellationTrail ... className="h-40" />
-  </div>
-</div>
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  DrawerClose,  // Add this
+} from "@/components/ui/drawer";
 ```
 
-**After:**
+### Add X icon import
+
 ```tsx
-<div className="rounded-xl overflow-hidden border border-border/30 bg-card/30 backdrop-blur-sm">
-  {/* Combined Journey Visualization */}
-  <div className="relative h-56 w-full overflow-hidden">
-    {/* AI-Generated Path Image Background */}
-    {pathImageUrl && (
-      <>
-        <img 
-          src={pathImageUrl} 
-          alt="Your journey path"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
-      </>
-    )}
-    
-    {/* Constellation Trail Overlay */}
-    <ConstellationTrail
-      progress={epic.progress_percentage}
-      targetDays={epic.target_days}
-      companionImageUrl={companion?.current_image_url}
-      companionMood={companion?.current_mood}
-      showCompanion={true}
-      milestones={trailMilestones}
-      transparentBackground={!!pathImageUrl}
-      className="absolute inset-0"
-    />
-  </div>
+import { Target, Flame, Star, Map, Sparkles, Calendar, X } from "lucide-react";
+```
+
+### Update DrawerHeader (lines 118-137)
+
+Add a close button in the header with absolute positioning:
+
+```tsx
+<DrawerHeader className="pb-2 relative">
+  {/* Close button */}
+  <DrawerClose asChild>
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      className="absolute right-2 top-2 h-8 w-8 rounded-full"
+    >
+      <X className="w-4 h-4" />
+      <span className="sr-only">Close</span>
+    </Button>
+  </DrawerClose>
   
-  {/* Loading state for path */}
-  {isLoadingPath && !pathImageUrl && (
-    <div className="h-48 flex items-center justify-center">
-      ...
-    </div>
-  )}
-</div>
+  <DrawerTitle className="flex items-center gap-2 pr-10">
+    <Target className="w-5 h-5 text-primary" />
+    {epic.title}
+  </DrawerTitle>
+  
+  {/* Progress bar with stats */}
+  <div className="mt-3 space-y-2">
+    ...
+  </div>
+</DrawerHeader>
 ```
 
 ---
 
-## Key Improvements
+## Visual Result
 
-1. **Single container** - Both path image and constellation share the same `h-56` parent
-2. **Absolute positioning** - Constellation is `absolute inset-0` to cover the entire area
-3. **Proper z-ordering** - Image renders first, gradient overlay second, constellation on top
-4. **Cleaner gradient** - Adjusted opacity for better visibility of constellation elements over the image
+```text
+┌────────────────────────────────────────┐
+│  🎯 RUN A MARATHON                 [X] │  ← X button in top right
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━          │
+│  0% Complete           🔥 86d left     │
+│                                        │
+│  [Journey Path Image]                  │
+│                                        │
+│  🔥 5 rituals  ⭐ 7 milestones         │
+│                                        │
+│  [VIEW MILESTONES]  [CHECK-IN]         │
+└────────────────────────────────────────┘
+```
 
----
+Tapping the X button will close the drawer and return the user to the main Quests page.
 
-## Result
-
-The constellation stars, milestones, and companion will render **on top of** the AI-generated landscape image as a seamless visual, eliminating the horizontal boundary line.
