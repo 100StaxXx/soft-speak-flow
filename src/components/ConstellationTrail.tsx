@@ -30,6 +30,7 @@ interface ConstellationTrailProps {
   showCompanion?: boolean;
   milestones?: TrailMilestone[]; // Actual milestones from database
   epicId?: string; // For fetching journey path background
+  transparentBackground?: boolean; // Skip background when parent handles path image
 }
 
 // Fixed constellation pattern - wave with more vertical variation for taller container
@@ -842,7 +843,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   companionMood,
   showCompanion = true,
   milestones: propMilestones,
-  epicId
+  epicId,
+  transparentBackground = false
 }: ConstellationTrailProps) {
   // Fetch journey path image for this epic
   const { 
@@ -908,7 +910,7 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     <div 
       className={cn(
         "relative w-full h-56 rounded-xl overflow-hidden",
-        !pathImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        !transparentBackground && !pathImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
       style={{
@@ -948,8 +950,8 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         </div>
       )}
 
-      {/* Nebula glow effect - show when no path image */}
-      {!pathImageUrl && (
+      {/* Nebula glow effect - show when no path image and not transparent mode */}
+      {!pathImageUrl && !transparentBackground && (
         <div className="absolute inset-0 opacity-40">
           <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/30 rounded-full blur-xl" />
           <div className="absolute top-1/3 right-1/4 w-16 h-16 bg-purple-500/20 rounded-full blur-lg" />
