@@ -971,7 +971,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             
             {/* Rituals Section - Grouped by Campaign (integrated into campaign headers) */}
             {ritualTasks.length > 0 && (
-              <div className="mt-3 space-y-2">
+              <div className="mt-6 pt-4 border-t border-border/20 space-y-2">
                 {/* Campaign groups with enhanced headers */}
                 {Array.from(ritualsByCampaign.entries()).map(([campaignId, group]) => {
                   const isExpanded = expandedCampaigns.has(campaignId);
@@ -996,7 +996,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           end_date: epicData.end_date,
                           epic_habits: epicData.epic_habits,
                         }}>
-                          <button className="w-full text-left" aria-label={`Open ${group.title} journey path`}>
+                          <button className="w-full text-left focus:outline-none focus-visible:outline-none" aria-label={`Open ${group.title} journey path`}>
                             <div className={cn(
                               "flex items-center justify-between py-2 px-3 rounded-xl transition-colors",
                               "hover:bg-muted/30 border border-border/30 bg-card/30",
