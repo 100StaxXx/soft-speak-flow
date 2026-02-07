@@ -25,6 +25,7 @@ import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { NursingMode } from "@/components/companion/NursingMode";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useState,
   useEffect,
@@ -134,6 +135,7 @@ export const CompanionDisplay = memo(() => {
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [creatureName, setCreatureName] = useState<string | null>(null);
   
   // Long press detection refs
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -321,6 +323,44 @@ export const CompanionDisplay = memo(() => {
     };
   }, []);
 
+  // Fetch creature name from evolution cards if not cached
+  useEffect(() => {
+    const fetchCreatureName = async () => {
+      if (!companion) return;
+      
+      // Use cached name if available
+      if (companion.cached_creature_name) {
+        setCreatureName(companion.cached_creature_name);
+        return;
+      }
+      
+      // Fetch from evolution cards
+      const { data } = await supabase
+        .from('companion_evolution_cards')
+        .select('creature_name')
+        .eq('companion_id', companion.id)
+        .eq('evolution_stage', companion.current_stage)
+        .maybeSingle();
+      
+      if (data?.creature_name) {
+        setCreatureName(data.creature_name);
+        // Cache it for next time (fire and forget)
+        supabase
+          .from('user_companion')
+          .update({ cached_creature_name: data.creature_name })
+          .eq('id', companion.id);
+      } else {
+        // Final fallback to capitalized spirit animal
+        setCreatureName(
+          companion.spirit_animal.charAt(0).toUpperCase() + 
+          companion.spirit_animal.slice(1)
+        );
+      }
+    };
+    
+    fetchCreatureName();
+  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name]);
+
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;
 
@@ -357,20 +397,19 @@ export const CompanionDisplay = memo(() => {
               <p className="text-sm text-muted-foreground font-medium">
                 Stage {companion.current_stage}
               </p>
-              {/* Companion Name */}
-              <p className="text-center text-base font-semibold text-primary/90 tracking-wide mt-2">
-                {companion.cached_creature_name || 
-                  companion.spirit_animal.charAt(0).toUpperCase() + companion.spirit_animal.slice(1) || 
-                  'Companion'}
-              </p>
             </div>
             <div className={`h-14 w-14 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-glow ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true">
               <Sparkles className="h-7 w-7 text-primary" />
             </div>
           </div>
 
+          {/* Companion Name - Centered */}
+          <p className="text-center text-xl font-semibold text-primary/90 tracking-wide">
+            {creatureName || 'Companion'}
+          </p>
+
           {/* Companion Image */}
-          <div className="flex justify-center py-8 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
+          <div className="flex justify-center py-4 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
             {/* Cosmiq orbital glow effect */}
             <div 
               className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
