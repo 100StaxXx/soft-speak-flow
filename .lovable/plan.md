@@ -1,60 +1,45 @@
 
 
-# Fix Missing Quests Tab in Bottom Navigation
+# Fix Quests Tab Missing Glow Effect
 
 ## Problem
 
-The Quests tab was accidentally removed during the previous edit. Currently the BottomNav only has 2 tabs:
-1. Mentor (line 61-90)
-2. Companion (line 93-118)
+The Quests tab uses `text-cosmiq-glow` for its active glow, but **`cosmiq-glow` is not defined in `tailwind.config.ts`**. 
 
-**The Quests tab is completely missing!**
+While the CSS variable `--cosmiq-glow: 270 80% 65%` exists in `index.css`, Tailwind doesn't know about it, so the utility classes like `text-cosmiq-glow`, `from-cosmiq-glow/20`, etc. don't work.
 
 ---
 
 ## Fix Required
 
-Add the Quests NavLink between Mentor and Companion tabs.
+Add `cosmiq-glow` to the Tailwind config colors section.
 
 | File | Change |
 |------|--------|
-| `src/components/BottomNav.tsx` | Add Quests NavLink between Mentor (line 90) and Companion (line 93) |
+| `tailwind.config.ts` | Add `'cosmiq-glow': 'hsl(var(--cosmiq-glow))'` to the colors object |
 
 ---
 
-## Code to Add (after line 90, before Companion)
+## Code Change
 
-```tsx
-<NavLink
-  to="/journeys"
-  className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-  activeClassName="bg-gradient-to-br from-cosmiq-glow/20 to-cosmiq-glow/5 shadow-soft"
-  data-tour="quests-tab"
-  onClick={() => haptics.light()}
-  onMouseEnter={() => handlePrefetch('journeys')}
-  onFocus={() => handlePrefetch('journeys')}
->
-  {({ isActive }) => (
-    <>
-      <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-cosmiq-glow drop-shadow-[0_0_8px_hsl(270,70%,55%)]' : 'text-muted-foreground'}`} />
-      <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/80'}`}>
-        Quests
-      </span>
-    </>
-  )}
-</NavLink>
+In `tailwind.config.ts`, add after line 71 (after `'deep-space': 'hsl(var(--deep-space))'`):
+
+```typescript
+'cosmiq-glow': 'hsl(var(--cosmiq-glow))',
 ```
+
+This will enable these Tailwind utilities to work properly:
+- `text-cosmiq-glow` - purple text color
+- `bg-cosmiq-glow` - purple background
+- `from-cosmiq-glow/20` - gradient start with opacity
+- `to-cosmiq-glow/5` - gradient end with opacity
 
 ---
 
-## Result After Fix
+## Result
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│     [Mentor]           [Quests]           [Companion]           │
-│        🧔                 🧭                  🐾                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-The `Compass` icon is already imported (line 2) but not being used - it was intended for the Quests tab.
+The Quests tab will have its signature purple glow when active:
+- Purple icon with drop shadow
+- Purple text label
+- Purple gradient background on the tab
 
