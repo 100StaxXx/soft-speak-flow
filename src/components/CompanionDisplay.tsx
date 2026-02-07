@@ -357,6 +357,12 @@ export const CompanionDisplay = memo(() => {
               <p className="text-sm text-muted-foreground font-medium">
                 Stage {companion.current_stage}
               </p>
+              {/* Companion Name */}
+              <p className="text-center text-base font-semibold text-primary/90 tracking-wide mt-2">
+                {companion.cached_creature_name || 
+                  companion.spirit_animal.charAt(0).toUpperCase() + companion.spirit_animal.slice(1) || 
+                  'Companion'}
+              </p>
             </div>
             <div className={`h-14 w-14 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-glow ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true">
               <Sparkles className="h-7 w-7 text-primary" />
