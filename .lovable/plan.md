@@ -1,66 +1,93 @@
 
-# Fix Double Journey Path Image
+# Fix Spacing and Blue Focus Ring Issues
 
-## Problem
+## Problems Identified
 
-The `JourneyPathDrawer` shows the journey path image twice because:
+### 1. Missing Separator Between Quests and Campaigns/Rituals
+Looking at `TodaysAgenda.tsx` line 974, the rituals section has only `mt-3` (12px margin-top) which creates insufficient visual separation from the quests list above.
 
-1. **Parent shows image** (lines 152-161): `JourneyPathDrawer` fetches `pathImageUrl` via `useJourneyPathImage(epic.id)` and renders it
-2. **Child shows same image** (lines 168-177): `ConstellationTrail` receives `epicId={epic.id}` and independently fetches + renders the exact same image
+### 2. Blue Focus Ring on Campaign Header
+The blue outline appearing around "Money in the Bank" is caused by the `<button>` element wrapping the campaign header (line 999). When tapped on mobile (iOS), the native `:focus-visible` state applies the ring color defined in CSS (`--ring: 270 70% 55%` which is purple, but iOS Safari can render this with a blue tint due to how it handles focus states on touch).
 
-Both components display the same AI-generated path image, creating the stacked appearance visible in the screenshot.
+The solution is to remove focus-visible ring styling from this specific button since it's a touch target that opens a drawer, not a keyboard-focusable interactive element.
 
-## Solution
+---
 
-Stop passing `epicId` to `ConstellationTrail` within `JourneyPathDrawer`. The parent already displays the background image, so the child doesn't need to fetch and display it again.
+## Visual Change
+
+**Before:**
+```text
+[ ] Quest 1
+[ ] Quest 2
+📍 Money in the Bank    0%  0/3  >  ← Blue ring appears
+📍 Bulk up a Captain... 1%  0/5  >
+```
+
+**After:**
+```text
+[ ] Quest 1
+[ ] Quest 2
+
+────────── CAMPAIGNS ──────────
+
+📍 Money in the Bank    0%  0/3  >  ← No ring
+📍 Bulk up a Captain... 1%  0/5  >
+```
+
+---
 
 ## Changes
 
 | File | Change |
 |------|--------|
-| `src/components/JourneyPathDrawer.tsx` | Remove `epicId={epic.id}` prop from `ConstellationTrail` (line 175) |
+| `src/components/TodaysAgenda.tsx` | (1) Add visual separator before campaigns section, (2) Remove focus-visible ring from campaign header buttons |
 
 ---
 
 ## Technical Details
 
-### Update ConstellationTrail Call (line 168-177)
+### 1. Add Separator Before Campaigns Section (line 974)
+
+Add more spacing and a subtle visual divider:
 
 **Current:**
 ```tsx
-<ConstellationTrail
-  progress={epic.progress_percentage}
-  targetDays={epic.target_days}
-  companionImageUrl={companion?.current_image_url}
-  companionMood={companion?.current_mood}
-  showCompanion={true}
-  milestones={trailMilestones}
-  epicId={epic.id}           // <-- REMOVE THIS
-  className="h-40"
-/>
+{ritualTasks.length > 0 && (
+  <div className="mt-3 space-y-2">
 ```
 
 **New:**
 ```tsx
-<ConstellationTrail
-  progress={epic.progress_percentage}
-  targetDays={epic.target_days}
-  companionImageUrl={companion?.current_image_url}
-  companionMood={companion?.current_mood}
-  showCompanion={true}
-  milestones={trailMilestones}
-  className="h-40"
-/>
+{ritualTasks.length > 0 && (
+  <div className="mt-6 pt-4 border-t border-border/20 space-y-2">
 ```
 
-Without `epicId`, `ConstellationTrail` will:
-- Not call `useJourneyPathImage`
-- Not render its own background image
-- Use a subtle fallback gradient instead
-- Still render the constellation path, milestones, and companion avatar as an overlay
+This adds:
+- `mt-6` (24px) top margin for breathing room
+- `pt-4` (16px) top padding inside the container
+- `border-t border-border/20` subtle horizontal line separator
+
+### 2. Remove Focus Ring from Campaign Header Button (line 999)
+
+**Current:**
+```tsx
+<button className="w-full text-left" aria-label={`Open ${group.title} journey path`}>
+```
+
+**New:**
+```tsx
+<button 
+  className="w-full text-left focus:outline-none focus-visible:outline-none" 
+  aria-label={`Open ${group.title} journey path`}
+>
+```
+
+This removes the browser's default focus ring that was appearing on touch interactions.
+
+---
 
 ## Result
 
-- Single journey path image displayed by the parent
-- Constellation trail overlays on top with transparent background
-- No duplicate images
+- Clear visual separation between quests (one-time tasks) and campaigns/rituals (recurring habit systems)
+- No more unexpected blue focus outlines when tapping campaign headers
+- Maintains accessibility (aria-labels still present, keyboard users can still navigate)
