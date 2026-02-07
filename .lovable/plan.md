@@ -1,34 +1,91 @@
 
-# Fix Double Image Rendering in Journey Path
 
-## Problem
+# Fix Double Image in Journey Path Drawer
 
-The journey path image is appearing **twice** (stacked) because both `JourneyPathDrawer` AND `ConstellationTrail` are fetching and rendering the same AI-generated path image.
+## Problem Identified
 
-**Current flow:**
-1. `JourneyPathDrawer` fetches `pathImageUrl` via `useJourneyPathImage(epic.id)`
-2. `JourneyPathDrawer` renders the image in a `h-48` container
-3. `JourneyPathDrawer` passes `epicId={epic.id}` to `ConstellationTrail`
-4. `ConstellationTrail` also fetches `pathImageUrl` via `useJourneyPathImage(epicId)`
-5. `ConstellationTrail` also renders the same image as its background
+The visual shows two stacked elements:
+1. **Top layer**: AI-generated landscape image from `JourneyPathDrawer` (lines 152-160)
+2. **Bottom layer**: `ConstellationTrail` SVG visualization with its own gradient background
 
-**Result:** Two identical images stacked on top of each other, as visible in the screenshot.
+When `epicId` was removed from `ConstellationTrail`, it stopped fetching its own path image. However, `ConstellationTrail` still renders a fallback gradient background (`bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950`) which creates the visual appearance of "double images".
 
 ---
 
 ## Solution
 
-Remove the `epicId` prop when calling `ConstellationTrail` from `JourneyPathDrawer`. This prevents `ConstellationTrail` from fetching/rendering the image since the parent component already handles that.
+Add a `transparentBackground` prop to `ConstellationTrail` so that when the parent component handles the path image, the constellation can overlay it cleanly without adding its own background.
+
+---
+
+## Files to Change
 
 | File | Change |
 |------|--------|
-| `src/components/JourneyPathDrawer.tsx` | Remove `epicId={epic.id}` from line 175 |
+| `src/components/ConstellationTrail.tsx` | Add `transparentBackground?: boolean` prop to interface and conditionally skip background rendering |
+| `src/components/JourneyPathDrawer.tsx` | Pass `transparentBackground={!!pathImageUrl}` when path image exists |
 
 ---
 
-## Code Change
+## Technical Details
 
-**Before (line 168-177):**
+### 1. Update ConstellationTrail interface (lines 24-33)
+
+```tsx
+interface ConstellationTrailProps {
+  progress: number;
+  targetDays: number;
+  className?: string;
+  companionImageUrl?: string;
+  companionMood?: string;
+  showCompanion?: boolean;
+  milestones?: TrailMilestone[];
+  epicId?: string;
+  transparentBackground?: boolean; // NEW: Skip background when parent handles it
+}
+```
+
+### 2. Update ConstellationTrail component (line 837+)
+
+```tsx
+export const ConstellationTrail = memo(function ConstellationTrail({ 
+  progress, 
+  targetDays,
+  className,
+  companionImageUrl,
+  companionMood,
+  showCompanion = true,
+  milestones: propMilestones,
+  epicId,
+  transparentBackground = false // NEW
+}: ConstellationTrailProps) {
+```
+
+### 3. Update background rendering logic (lines 909-911)
+
+```tsx
+<div 
+  className={cn(
+    "relative w-full h-56 rounded-xl overflow-hidden",
+    // Only add background gradient if not transparent mode and no path image
+    !transparentBackground && !pathImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+    className
+  )}
+```
+
+### 4. Skip nebula glow when transparent (lines 951-957)
+
+```tsx
+{/* Nebula glow effect - show when no path image AND not transparent */}
+{!pathImageUrl && !transparentBackground && (
+  <div className="absolute inset-0 opacity-40">
+    ...
+  </div>
+)}
+```
+
+### 5. Update JourneyPathDrawer call (lines 168-176)
+
 ```tsx
 <ConstellationTrail
   progress={epic.progress_percentage}
@@ -37,47 +94,25 @@ Remove the `epicId` prop when calling `ConstellationTrail` from `JourneyPathDraw
   companionMood={companion?.current_mood}
   showCompanion={true}
   milestones={trailMilestones}
-  epicId={epic.id}           // ← REMOVE THIS
-  className="h-40"
-/>
-```
-
-**After:**
-```tsx
-<ConstellationTrail
-  progress={epic.progress_percentage}
-  targetDays={epic.target_days}
-  companionImageUrl={companion?.current_image_url}
-  companionMood={companion?.current_mood}
-  showCompanion={true}
-  milestones={trailMilestones}
+  transparentBackground={!!pathImageUrl}  // NEW: Transparent when path image exists
   className="h-40"
 />
 ```
 
 ---
 
-## Why This Works
-
-When `epicId` is undefined/not passed:
-- `useJourneyPathImage(undefined)` returns `pathImageUrl: undefined`
-- `ConstellationTrail` skips rendering the path image (line 924 condition fails)
-- `ConstellationTrail` shows its fallback gradient background instead
-
-The parent `JourneyPathDrawer` already renders the path image above the trail, so there's no visual loss.
-
----
-
-## Result
+## Visual Result
 
 ```text
-Before:                          After:
+Before (double layer):           After (clean overlay):
 ┌──────────────────────┐        ┌──────────────────────┐
-│    [Path Image 1]    │        │    [Path Image]      │
-├──────────────────────┤        │        ↓             │
-│    [Path Image 2]    │   →    │ [Constellation Trail]│
-│  Constellation Trail │        │   (no bg image)      │
+│ [AI Path Image]      │        │                      │
+│                      │        │   [AI Path Image]    │
+├──────────────────────┤   →    │   with transparent   │
+│ [Gradient Background]│        │   constellation      │
+│ [Constellation SVG]  │        │   overlay            │
 └──────────────────────┘        └──────────────────────┘
 ```
 
-This aligns with the architecture note: *"Removing the 'epicId' prop from 'ConstellationTrail' within 'JourneyPathDrawer' prevents stacked/double-rendering of the path background."*
+The constellation path (stars, milestones, companion) will cleanly overlay on the AI-generated image without its own background creating visual separation.
+
