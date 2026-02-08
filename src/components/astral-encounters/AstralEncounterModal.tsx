@@ -387,7 +387,7 @@ export const AstralEncounterModal = ({
       <Dialog open={open && !needsFullscreen} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
           <motion.div 
-            className="relative min-h-[500px] max-h-[90dvh] overflow-y-auto"
+            className="relative min-h-[500px] max-h-[90dvh] overflow-hidden flex flex-col"
             style={{ paddingBottom: 'env(safe-area-inset-bottom, 24px)' }}
             animate={showScreenShake ? { x: [0, -4, 4, -2, 2, 0] } : {}}
             transition={{ duration: 0.3 }}
@@ -399,7 +399,7 @@ export const AstralEncounterModal = ({
               <DamageNumberContainer damageEvents={damageEvents} className="z-50" />
             )}
             
-            <div className="relative z-10">
+            <div className="relative z-10 flex flex-col h-full min-h-[500px]">
               <AnimatePresence mode="wait">
                 {/* Boss Battle Intro Phase */}
                 {phase === 'boss_intro' && isBossBattle && bossBattleContext && (
@@ -473,6 +473,7 @@ export const AstralEncounterModal = ({
                     initial={{ opacity: 0, x: 50 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -50 }}
+                    className="flex flex-col flex-1 min-h-0"
                   >
                     {/* Battle HP Overlay */}
                     <BattleOverlay
@@ -497,7 +498,11 @@ export const AstralEncounterModal = ({
                         ))}
                       </div>
                     )}
-                    {renderMiniGame()}
+                    
+                    {/* Game container - flex-1 to fill remaining space */}
+                    <div className="flex-1 min-h-0">
+                      {renderMiniGame()}
+                    </div>
                   </motion.div>
                 )}
 
