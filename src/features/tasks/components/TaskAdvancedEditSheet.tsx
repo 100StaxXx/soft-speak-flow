@@ -187,7 +187,7 @@ export function TaskAdvancedEditSheet({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-celestial-blue" />
+                <CalendarIcon className="w-3.5 h-3.5 text-celestial-blue" />
                 Date
               </Label>
               <Input
