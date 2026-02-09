@@ -1,80 +1,96 @@
 
 
-# Two-Step Quest Creation with Campaign Link in Footer
+# Redesign Add Quest Step 2 to Match Structured Style
 
 ## Overview
 
-Redesign AddQuestSheet into a two-step wizard flow, skip the CreationPickerSheet entirely, and add a "Create Campaign" link in the footer.
+Redesign the scheduling step (Step 2) of the Add Quest wizard to match the Structured app's visual style: a colored header banner with task info, a scrollable time wheel picker, and duration chip buttons.
 
-## Step-by-Step Flow
+## Visual Layout (Top to Bottom)
 
 ```text
-FAB tap
-  |
-  v
-[Step 1: Title + Difficulty]
-- Quest name input (auto-focused)
-- Difficulty selector (circular icons from HabitDifficultySelector)
-- "Advanced Settings" collapsible (contact, recurrence, reminders, location, photo)
-- "Next" button
-  |
-  v
-[Step 2: Date/Time Selection]
-- Date picker (calendar popover, defaulting to selectedDate)
-- Time picker (scrollable time wheel inspired by the Structured reference image)
-- Duration quick-select chips (15m, 30, 45, 1h, 1.5h)
-- Suggested Time Slots (smart scheduling)
-- Footer: "Schedule Quest" button + "Add to Inbox" link (skips date/time)
-- Small "Or create a Campaign" link at bottom
++------------------------------------------+
+| [X]                                      |  <- Close button
+| [Difficulty Icon]  9:45 - 10:30 AM (45m) |  <- Colored banner with
+|                    Quest Title            |     difficulty-based color
++------------------------------------------+
+| [Calendar] Mon, Feb 9, 2026   Today >    |  <- Date row
++------------------------------------------+
+| Time                              [...]  |  <- Section label
+| +--------------------------------------+ |
+| |         9:00 AM                      | |  <- Scrollable time wheel
+| |         9:15 AM                      | |     (15-min increments)
+| |       [ 9:45 - 10:30 AM ]           | |  <- Selected = highlighted pill
+| |        10:45 AM                      | |
+| |        11:00 AM                      | |
+| +--------------------------------------+ |
++------------------------------------------+
+| Duration                          [...]  |
+| [ 1 ] [ 15 ] [ 30 ] [45m] [ 1h ] [1.5h] |  <- Chip buttons
++------------------------------------------+
+| (Advanced Settings - collapsible)        |
++------------------------------------------+
+|         [ Add Quest ]                    |  <- Primary action
+|     Add to Inbox instead                 |
+|     Or create a Campaign                 |
++------------------------------------------+
 ```
 
-## File Changes
+## Changes
 
-### 1. Redesign `src/components/AddQuestSheet.tsx`
+### File: `src/components/AddQuestSheet.tsx` -- Step 2 Redesign
 
-- Remove the minimal/expanded two-mode pattern entirely
-- Introduce a `step` state: `1` (title + settings) and `2` (date/time)
-- **Step 1**: Full-height Sheet (matching EditQuestDialog style) with:
-  - Quest Name input (labeled, auto-focused)
-  - `HabitDifficultySelector` (same circular icons as Edit Quest)
-  - Collapsible "Advanced Settings" section containing: recurrence, reminders, contact linking, location
-  - "Next" button in footer (disabled until title is non-empty)
-- **Step 2**: Same Sheet, content swaps to date/time selection:
-  - Date row with Calendar popover (same pattern as EditQuestDialog)
-  - Time input and Duration input in side-by-side grid (same as EditQuestDialog)
-  - SuggestedTimeSlots component
-  - Footer: "Add Quest" primary button + "Add to Inbox" secondary button (sets sendToInbox=true, skips date/time)
-  - Small subtle "Or create a Campaign" text link at the very bottom
-- Back button on Step 2 to return to Step 1
+**1. Colored Header Banner**
+- Add a banner at the top of Step 2 with a background color based on difficulty (easy=green, medium=amber/coral, hard=red)
+- Show the difficulty icon (from HabitDifficultySelector), time range text (e.g., "9:45 - 10:30 AM (45 min)"), and the quest title
+- Include an X close button in the top-left corner
 
-### 2. Update `src/pages/Journeys.tsx`
+**2. Date Row**
+- Replace the current Popover-based date picker button with a horizontal row:
+  - Left: Calendar emoji/icon + formatted date ("Mon, Feb 9, 2026")
+  - Right: "Today >" shortcut button that jumps to today's date
+- Tapping the date text still opens the Calendar popover
+- Styled as a dark card/row with rounded corners (matching Structured's dark cards)
 
-- FAB `onTap` opens AddQuestSheet directly (remove `showCreationPicker` state and `CreationPickerSheet` usage)
-- Add a `showPathfinder` handler that can be triggered from AddQuestSheet's "Create Campaign" link
-- Pass an `onCreateCampaign` callback prop to AddQuestSheet
+**3. Scrollable Time Wheel**
+- Replace the HTML `<input type="time">` with a custom scrollable time picker
+- Generate time slots in 15-minute increments (6:00 AM through 11:45 PM)
+- Display as a vertical scrollable list inside a rounded dark container
+- Selected time is highlighted with a colored pill (matching difficulty color)
+- Show time range (start time - end time based on duration) on the selected pill
+- Auto-scroll to center the selected time on mount
+- Unselected times fade out proportionally from center (opacity gradient)
 
-### 3. Update `src/pages/Inbox.tsx`
+**4. Duration Chip Buttons**
+- Replace the number `<input>` with a horizontal row of pill/chip buttons
+- Options: 1m, 15m, 30m, 45m, 1h, 1.5h (mapping to 1, 15, 30, 45, 60, 90 minutes)
+- Selected chip gets the difficulty accent color
+- Styled inside a dark rounded container to match the time picker aesthetic
 
-- Same change: FAB opens AddQuestSheet directly, remove CreationPickerSheet usage
+**5. Footer**
+- Keep "Add Quest" primary button, "Add to Inbox instead", and "Or create a Campaign" link
+- Style the primary button with the difficulty accent color (coral/salmon like Structured)
 
-### 4. `src/components/CreationPickerSheet.tsx`
+**6. Advanced Settings**
+- Keep the collapsible section below duration, before footer
+- No visual changes needed
 
-- No longer imported anywhere in the default flow (can be kept for future use or removed)
+### File: `src/components/AddQuestSheet.tsx` -- Step 1 Minor Adjustments
+
+- No major changes, but the "Next" button could adopt the difficulty accent color for consistency
 
 ## Technical Details
 
+- The time wheel is a scrollable `div` with `overflow-y: auto` and `snap-type: y mandatory` for smooth snapping
+- Each time slot is a button with `scroll-snap-align: center`
+- Use `useEffect` + `scrollIntoView` to auto-center the selected time
+- Difficulty color map: `{ easy: 'emerald', medium: 'rose/coral', hard: 'red' }`
+- The header banner dynamically updates its time range text as time/duration change
+- Duration chips are simple toggle buttons in a flex row
+
+## Files Changed
+
 | File | Change |
 |---|---|
-| `src/components/AddQuestSheet.tsx` | Full rewrite: two-step wizard (title+settings then date/time), match EditQuestDialog styling, add "Add to Inbox" and "Create Campaign" links |
-| `src/pages/Journeys.tsx` | FAB opens AddQuestSheet directly; pass `onCreateCampaign` prop; remove CreationPickerSheet |
-| `src/pages/Inbox.tsx` | FAB opens AddQuestSheet directly; remove CreationPickerSheet |
-| `src/components/CreationPickerSheet.tsx` | No longer used in default flow |
-
-## What Stays the Same
-
-- All form data fields (difficulty, time, recurrence, reminders, contacts, inbox toggle)
-- `onAdd` callback and submit logic
-- EditQuestDialog (unchanged)
-- Database schema
-- FAB component itself
+| `src/components/AddQuestSheet.tsx` | Redesign Step 2: colored banner header, date row with "Today" shortcut, scrollable time wheel, duration chips, accent-colored footer button |
 
