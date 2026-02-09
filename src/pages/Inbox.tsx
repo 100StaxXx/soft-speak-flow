@@ -1,7 +1,7 @@
 import { useState, useCallback, memo } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Inbox as InboxIcon, Plus, Check, CalendarDays, Trash2, Circle } from "lucide-react";
+import { Inbox as InboxIcon, Plus, Check, CalendarDays, Trash2, Circle, Pencil } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
@@ -14,8 +14,10 @@ import { cn } from "@/lib/utils";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { DraggableFAB } from "@/components/DraggableFAB";
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
+import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
@@ -27,6 +29,15 @@ const InboxPage = memo(function InboxPage() {
 
   const [showAddQuest, setShowAddQuest] = useState(false);
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<typeof inboxTasks[number] | null>(null);
+
+  const { updateTask, deleteTask, isUpdating, isDeleting } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
+
+  const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
+    await updateTask({ taskId, updates });
+    queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
+    setEditingTask(null);
+  }, [updateTask, queryClient]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     if (!user?.id) return;
@@ -147,6 +158,17 @@ const InboxPage = memo(function InboxPage() {
 
                       <button
                         onClick={() => {
+                          setEditingTask(task);
+                          haptics.light();
+                        }}
+                        className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+                        aria-label="Edit task"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => {
                           deleteInboxTask(task.id);
                           haptics.light();
                         }}
@@ -171,6 +193,19 @@ const InboxPage = memo(function InboxPage() {
           onOpenChange={setShowAddQuest}
           selectedDate={new Date()}
           onAdd={handleAddQuest}
+        />
+
+        <EditQuestDialog
+          task={editingTask}
+          open={!!editingTask}
+          onOpenChange={(open) => !open && setEditingTask(null)}
+          onSave={handleSaveEdit}
+          isSaving={isUpdating}
+          onDelete={async (taskId) => {
+            deleteInboxTask(taskId);
+            setEditingTask(null);
+          }}
+          isDeleting={false}
         />
 
         <BottomNav />
