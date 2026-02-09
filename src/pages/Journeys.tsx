@@ -49,7 +49,7 @@ import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/Quick
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { DraggableFAB } from "@/components/DraggableFAB";
-import { CreationPickerSheet } from "@/components/CreationPickerSheet";
+
 import { Wand2 } from "lucide-react";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
@@ -66,7 +66,7 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
-  const [showCreationPicker, setShowCreationPicker] = useState(false);
+  
   const [showQuestClear, setShowQuestClear] = useState(false);
   
   const [showHourlyModal, setShowHourlyModal] = useState(false);
@@ -645,7 +645,7 @@ const Journeys = () => {
             tasks={dailyTasks}
             selectedDate={selectedDate}
             onToggle={handleToggleTask}
-            onAddQuest={() => setShowCreationPicker(true)}
+            onAddQuest={() => setShowAddSheet(true)}
             completedCount={completedCount}
             totalCount={totalCount}
             currentStreak={currentStreak}
@@ -692,6 +692,7 @@ const Journeys = () => {
           onAdd={handleAddQuest}
           isAdding={isAdding}
           prefilledTime={null}
+          onCreateCampaign={() => setShowPathfinder(true)}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}
@@ -834,16 +835,8 @@ const Journeys = () => {
           habits={createdCampaignData?.habits || []}
           onComplete={handleAnimationComplete}
         />
-        {/* Creation Picker Sheet */}
-        <CreationPickerSheet
-          open={showCreationPicker}
-          onOpenChange={setShowCreationPicker}
-          onSelectQuest={() => setShowAddSheet(true)}
-          onSelectCampaign={() => setShowPathfinder(true)}
-        />
-
         {/* Draggable FAB */}
-        <DraggableFAB onTap={() => setShowCreationPicker(true)} />
+        <DraggableFAB onTap={() => setShowAddSheet(true)} />
       </div>
 
       <BottomNav />

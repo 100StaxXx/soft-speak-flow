@@ -13,7 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { DraggableFAB } from "@/components/DraggableFAB";
-import { CreationPickerSheet } from "@/components/CreationPickerSheet";
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +25,6 @@ const InboxPage = memo(function InboxPage() {
   const queryClient = useQueryClient();
   const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask, scheduleTask } = useInboxTasks();
 
-  const [showCreationPicker, setShowCreationPicker] = useState(false);
   const [showAddQuest, setShowAddQuest] = useState(false);
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
 
@@ -90,7 +88,7 @@ const InboxPage = memo(function InboxPage() {
               title="Inbox is empty"
               description="Capture tasks with the + button — schedule them later when you're ready."
               actionLabel="Add a task"
-              onAction={() => setShowCreationPicker(true)}
+              onAction={() => setShowAddQuest(true)}
             />
           ) : (
             <div className="space-y-2">
@@ -166,20 +164,7 @@ const InboxPage = memo(function InboxPage() {
         </div>
 
         {/* FAB */}
-        <DraggableFAB onTap={() => setShowCreationPicker(true)} />
-
-        {/* Creation sheets */}
-        <CreationPickerSheet
-          open={showCreationPicker}
-          onOpenChange={setShowCreationPicker}
-          onSelectQuest={() => {
-            setShowCreationPicker(false);
-            setShowAddQuest(true);
-          }}
-          onSelectCampaign={() => {
-            setShowCreationPicker(false);
-          }}
-        />
+        <DraggableFAB onTap={() => setShowAddQuest(true)} />
 
         <AddQuestSheet
           open={showAddQuest}
