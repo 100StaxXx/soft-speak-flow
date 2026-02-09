@@ -11,18 +11,18 @@ interface TimelineTaskRowProps {
 const formatTime12h = (time: string) => {
   const [hours, minutes] = time.split(':');
   const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const ampm = hour >= 12 ? 'p' : 'a';
   const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes} ${ampm}`;
+  return `${displayHour}:${minutes}${ampm}`;
 };
 
 export function TimelineTaskRow({ time, showLine = true, isLast = false, children }: TimelineTaskRowProps) {
   return (
-    <div className="relative flex gap-3">
+    <div className="relative flex gap-2">
       {/* Time label column - fixed width */}
-      <div className="w-16 flex-shrink-0 pt-4 text-right pr-1">
+      <div className="w-14 flex-shrink-0 pt-4 text-right">
         {time && (
-          <span className="text-[11px] font-medium text-muted-foreground leading-none">
+          <span className="text-[10px] font-medium text-muted-foreground leading-none">
             {formatTime12h(time)}
           </span>
         )}
@@ -38,7 +38,7 @@ export function TimelineTaskRow({ time, showLine = true, isLast = false, childre
         
         {/* Dot */}
         <div className={cn(
-          "w-2.5 h-2.5 rounded-full flex-shrink-0 z-10",
+          "w-2 h-2 rounded-full flex-shrink-0 z-10",
           time 
             ? "bg-primary/70 ring-2 ring-primary/20" 
             : "bg-muted-foreground/40 ring-2 ring-muted/30"
