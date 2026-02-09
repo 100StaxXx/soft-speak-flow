@@ -23,7 +23,8 @@ import {
   Brain,
   Heart,
   Dumbbell,
-  ArrowUpDown
+  ArrowUpDown,
+  Inbox,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -39,15 +40,17 @@ import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
-import { useNativeTaskList } from "@/hooks/useNativeTaskList";
+
 import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
 
-import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
+import { type DragHandleProps } from "./DraggableTaskList";
 import { SwipeableTaskItem } from "./SwipeableTaskItem";
-import { CompactSmartInput } from "@/features/tasks/components/CompactSmartInput";
 import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
+import { TimelineTaskRow } from "@/components/TimelineTaskRow";
+import { ProgressRing } from "@/features/tasks/components/ProgressRing";
+import { useInboxTasks } from "@/hooks/useInboxTasks";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
@@ -171,12 +174,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
   
-  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem('expanded_ritual_campaigns');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [showAllTasks, setShowAllTasks] = useState(false);
   const [showMonthView, setShowMonthView] = useState(false);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
@@ -184,14 +182,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  
-  // Native task list container ref
-  const nativeContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Persist expanded campaigns to localStorage
-  useEffect(() => {
-    localStorage.setItem('expanded_ritual_campaigns', JSON.stringify([...expandedCampaigns]));
-  }, [expandedCampaigns]);
   
   // Clean up optimistic state when server confirms completion
   useEffect(() => {
@@ -202,18 +192,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
-  
-  const toggleCampaign = (campaignId: string) => {
-    setExpandedCampaigns(prev => {
-      const next = new Set(prev);
-      if (next.has(campaignId)) {
-        next.delete(campaignId);
-      } else {
-        next.add(campaignId);
-      }
-      return next;
-    });
-  };
 
   // Find onboarding tasks
   const onboardingTasks = useMemo(() => 
@@ -240,10 +218,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   }, [tasks]);
   
-// Display limits
-  const QUEST_LIMIT_WITH_RITUALS = 6;
-  const QUEST_LIMIT_SOLO = 6;
-  const RITUAL_LIMIT = 6;
 
   // Priority weight for sorting
   const getPriorityWeight = (priority: string | null | undefined) => {
@@ -274,10 +248,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           case 'priority':
             return getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
           case 'xp':
-            return b.xp_reward - a.xp_reward; // Higher XP first
+            return b.xp_reward - a.xp_reward;
           case 'custom':
           default:
-            // Sort by sort_order, then by scheduled time, then by ID for deterministic ordering
             const orderA = a.sort_order ?? 9999;
             const orderB = b.sort_order ?? 9999;
             if (orderA !== orderB) return orderA - orderB;
@@ -286,12 +259,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             }
             if (a.scheduled_time) return -1;
             if (b.scheduled_time) return 1;
-            // Final tiebreaker - sort by ID for deterministic ordering
             return a.id.localeCompare(b.id);
         }
       });
       
-      // If setting is off, move completed tasks to bottom
       if (!keepInPlace) {
         const incomplete = sorted.filter(t => !t.completed);
         const complete = sorted.filter(t => t.completed);
@@ -306,59 +277,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       questTasks: sortGroup(quests),
     };
   }, [tasks, sortBy, keepInPlace]);
-  
-  // Handle native task list reorder callback
-  const handleNativeReorder = useCallback((taskIds: string[]) => {
-    if (!onReorderTasks) return;
-    // Reconstruct tasks in the new order from IDs
-    const taskMap = new Map(questTasks.map(t => [t.id, t]));
-    const reorderedTasks = taskIds
-      .map(id => taskMap.get(id))
-      .filter((t): t is Task => !!t);
-    onReorderTasks(reorderedTasks);
-  }, [onReorderTasks, questTasks]);
-  
-  // Handle native task toggle callback  
-  const handleNativeToggle = useCallback((taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      onToggle(taskId, !task.completed, task.xp_reward);
-    }
-  }, [tasks, onToggle]);
-  
-  // Use native task list on iOS
-  const { isNative } = useNativeTaskList({
-    tasks: questTasks,
-    containerRef: nativeContainerRef,
-    onReorder: handleNativeReorder,
-    onToggle: handleNativeToggle,
-  });
-  // Group ritual tasks by campaign
-  const ritualsByCampaign = useMemo(() => {
-    const groups = new Map<string, { 
-      title: string; 
-      tasks: Task[];
-      completedCount: number;
-      totalCount: number;
-    }>();
-    
-    ritualTasks.forEach(task => {
-      const key = task.epic_id || 'standalone';
-      const title = task.epic_title || 'Standalone Rituals';
-      
-      if (!groups.has(key)) {
-        groups.set(key, { title, tasks: [], completedCount: 0, totalCount: 0 });
-      }
-      const group = groups.get(key)!;
-      group.tasks.push(task);
-      group.totalCount++;
-      if (task.completed) group.completedCount++;
-    });
-    
-    return groups;
-  }, [ritualTasks]);
 
-  const questLimit = ritualTasks.length > 0 ? QUEST_LIMIT_WITH_RITUALS : QUEST_LIMIT_SOLO;
+  // Merge all tasks (quests + rituals) into a unified timeline
+  const { scheduledItems, anytimeItems } = useMemo(() => {
+    const all = [...questTasks, ...ritualTasks];
+    const scheduled = all.filter(t => !!t.scheduled_time).sort((a, b) => 
+      (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
+    );
+    const anytime = all.filter(t => !t.scheduled_time);
+    return { scheduledItems: scheduled, anytimeItems: anytime };
+  }, [questTasks, ritualTasks]);
+
+  // Inbox
+  const { inboxTasks, inboxCount, toggleInboxTask, deleteInboxTask, scheduleTask } = useInboxTasks();
+  const [inboxExpanded, setInboxExpanded] = useState(false);
+  
+  
+  
+  
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
@@ -761,17 +697,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return taskContent;
   }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, keepInPlace, optimisticCompleted, tasks]);
 
-  // Handle reordering of quest tasks
-  const handleQuestReorder = useCallback((reorderedTasks: Task[]) => {
-    if (onReorderTasks) {
-      onReorderTasks(reorderedTasks);
-    }
-  }, [onReorderTasks]);
 
   return (
     <div className="relative">
       <div className="relative px-4 py-2 overflow-visible">
-        {/* Header */}
+        {/* Compact Header: Date + Progress Ring + XP */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <button 
@@ -797,34 +727,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-base">
-            <Trophy className={cn(
-              "h-5 w-5",
-              allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
-            )} />
-            <span className="font-semibold text-stardust-gold">{totalXP} XP</span>
+          <div className="flex items-center gap-2">
+            {/* Compact progress ring */}
+            {totalCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {completedCount}/{totalCount}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-sm">
+              <Trophy className={cn(
+                "h-4 w-4",
+                allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
+              )} />
+              <span className="font-semibold text-stardust-gold">{totalXP}</span>
+            </div>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden mb-3">
-          <motion.div
-            className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progressPercent}%` }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          />
-          {allComplete && (
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-          )}
-        </div>
-
-        <div className="flex justify-between mb-4 text-sm text-muted-foreground">
-          <span>{completedCount} of {totalCount} completed</span>
-          <span>{Math.round(progressPercent)}%</span>
-        </div>
-
-        {/* Task Lists */}
+        {/* Timeline Content */}
         {tasks.length === 0 ? (
           <div className="text-center py-6">
             <Circle className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
@@ -836,27 +759,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
-            {/* Quest Header Row */}
-            <div className="flex items-center gap-2 py-1.5 px-1">
-              {questTasks.length > 0 && ritualTasks.length > 0 && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                    Quests
-                  </span>
-                  <Badge variant="secondary" className="h-5 px-2 text-sm bg-muted text-muted-foreground border-0">
-                    {questTasks.length}
-                  </Badge>
-                </div>
-              )}
-              {questTasks.length === 0 && ritualTasks.length > 0 && (
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex-shrink-0">
-                  Add Quest
-                </span>
-              )}
-              
-              {/* Sort dropdown - only show when quests exist */}
-              {questTasks.length > 0 && (
+          <div>
+            {/* Sort dropdown */}
+            <div className="flex items-center gap-2 mb-1">
+              {tasks.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
@@ -892,186 +798,134 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </DropdownMenu>
               )}
             </div>
-            
-            {/* Input removed - FAB is now the entry point */}
-            
-            {/* Quests List Section */}
-            {questTasks.length > 0 && (
-              <>
-                {/* Native iOS uses overlay, web uses DraggableTaskList directly */}
-                {isNative ? (
-                  <div 
-                    ref={nativeContainerRef}
-                    className="min-h-[200px] pointer-events-none"
-                    style={{ height: Math.max(200, questTasks.length * 72) }}
-                  />
-                ) : (
-                  <DraggableTaskList
-                    tasks={showAllTasks ? questTasks : questTasks.slice(0, questLimit)}
-                    onReorder={handleQuestReorder}
-                    disabled={false}
-                    renderItem={(task, dragProps) => (
-                      <div>
-                        {renderTaskItem(task, dragProps)}
-                        <div className="mx-8 border-b border-muted-foreground/20 last:hidden" />
-                      </div>
-                    )}
-                  />
-                )}
-                {questTasks.length > questLimit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllTasks(!showAllTasks)}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground py-1 h-8"
+
+            {/* Scheduled Tasks Timeline */}
+            {scheduledItems.length > 0 && (
+              <div>
+                {scheduledItems.map((task, index) => (
+                  <TimelineTaskRow
+                    key={task.id}
+                    time={task.scheduled_time}
+                    showLine={index > 0}
+                    isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
                   >
-                    {showAllTasks ? (
-                      <>
-                        <ChevronUp className="w-3 h-3 mr-1" />
-                        Show less
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-3 h-3 mr-1" />
-                        View all {questTasks.length} quests
-                      </>
-                    )}
-                  </Button>
-                )}
-              </>
-            )}
-            
-            {/* Rituals Section - Grouped by Campaign (integrated into campaign headers) */}
-            {ritualTasks.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-border/20 space-y-2">
-                {/* Campaign groups with enhanced headers */}
-                {Array.from(ritualsByCampaign.entries()).map(([campaignId, group]) => {
-                  const isExpanded = expandedCampaigns.has(campaignId);
-                  const isComplete = group.completedCount === group.totalCount;
-                  
-                  // Find matching epic data for stats
-                  const epicData = activeEpics?.find(e => e.id === campaignId);
-                  const progress = Math.round(epicData?.progress_percentage ?? 0);
-                  const daysLeft = getDaysLeft(epicData?.end_date);
-                  
-                  return (
-                    <div key={campaignId}>
-                      {/* Tappable header opens JourneyPathDrawer (for epics only) */}
-                      {epicData && campaignId !== 'standalone' ? (
-                        <JourneyPathDrawer epic={{
-                          id: epicData.id,
-                          title: epicData.title,
-                          description: epicData.description ?? undefined,
-                          progress_percentage: epicData.progress_percentage ?? 0,
-                          target_days: epicData.target_days,
-                          start_date: epicData.start_date,
-                          end_date: epicData.end_date,
-                          epic_habits: epicData.epic_habits,
-                        }}>
-                          <button className="w-full text-left focus:outline-none focus-visible:outline-none" aria-label={`Open ${group.title} journey path`}>
-                            <div className={cn(
-                              "flex items-center justify-between py-2 px-3 rounded-xl transition-colors",
-                              "hover:bg-muted/30 border border-border/30 bg-card/30",
-                              isComplete && "bg-green-500/10 border-green-500/20"
-                            )}>
-                              <div className="flex items-center gap-2 min-w-0">
-                                {isComplete ? (
-                                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                                ) : (
-                                  <Target className="w-4 h-4 text-primary shrink-0" />
-                                )}
-                                <span className={cn(
-                                  "text-sm font-medium truncate max-w-[120px]",
-                                  isComplete && "text-green-500"
-                                )}>
-                                  {group.title}
-                                </span>
-                                <span className="text-primary font-bold text-xs shrink-0">
-                                  {progress}%
-                                </span>
-                                {daysLeft !== null && (
-                                  <span className="text-muted-foreground text-xs shrink-0">
-                                    · {daysLeft}d
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Badge variant="outline" className={cn(
-                                  "h-5 px-2 text-xs",
-                                  isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
-                                )}>
-                                  {group.completedCount}/{group.totalCount}
-                                </Badge>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleCampaign(campaignId);
-                                  }}
-                                  className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
-                                  aria-label={isExpanded ? "Hide rituals" : "Show rituals"}
-                                >
-                                  <ChevronDown className={cn(
-                                    "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                                    !isExpanded && "-rotate-90"
-                                  )} />
-                                </button>
-                              </div>
-                            </div>
-                          </button>
-                        </JourneyPathDrawer>
-                      ) : (
-                        // Standalone rituals - no drawer, just a simple header
-                        <div className={cn(
-                          "flex items-center justify-between py-2 px-3 rounded-xl",
-                          "border border-border/30 bg-card/30",
-                          isComplete && "bg-green-500/10 border-green-500/20"
-                        )}>
-                          <div className="flex items-center gap-2 min-w-0">
-                            {isComplete ? (
-                              <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                            ) : (
-                              <Sparkles className="w-4 h-4 text-accent shrink-0" />
-                            )}
-                            <span className="text-sm font-medium">{group.title}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge variant="outline" className={cn(
-                              "h-5 px-2 text-xs",
-                              isComplete && "bg-green-500/20 text-green-500 border-green-500/30"
-                            )}>
-                              {group.completedCount}/{group.totalCount}
-                            </Badge>
-                            <button
-                              type="button"
-                              onClick={() => toggleCampaign(campaignId)}
-                              className="p-1 -m-1 hover:bg-muted/50 rounded transition-colors"
-                              aria-label={isExpanded ? "Hide rituals" : "Show rituals"}
-                            >
-                              <ChevronDown className={cn(
-                                "w-4 h-4 text-muted-foreground transition-transform duration-200",
-                                !isExpanded && "-rotate-90"
-                              )} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Rituals list */}
-                      <Collapsible open={isExpanded}>
-                        <CollapsibleContent>
-                          <div className="pl-4 border-l border-accent/20 ml-3 pb-2 pt-2">
-                            {group.tasks.map((task) => renderTaskItem(task))}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  );
-                })}
-                {/* Safe area for bottom navigation */}
-                <div className="h-4" />
+                    {renderTaskItem(task)}
+                  </TimelineTaskRow>
+                ))}
               </div>
             )}
+
+            {/* Anytime Divider + Unscheduled Tasks */}
+            {anytimeItems.length > 0 && (
+              <div>
+                {/* Divider */}
+                <div className="flex items-center gap-2 py-2 mt-1">
+                  <div className="w-16 flex-shrink-0" />
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <Clock className="h-3 w-3" />
+                    Anytime
+                  </div>
+                  <div className="flex-1 border-t border-dashed border-border/40" />
+                </div>
+
+                {anytimeItems.map((task, index) => (
+                  <TimelineTaskRow
+                    key={task.id}
+                    showLine={true}
+                    isLast={index === anytimeItems.length - 1}
+                  >
+                    {renderTaskItem(task)}
+                  </TimelineTaskRow>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Inbox Section */}
+        {inboxCount > 0 && (
+          <div className="mt-4 pt-3 border-t border-dashed border-border/40">
+            <button
+              onClick={() => setInboxExpanded(!inboxExpanded)}
+              className="flex items-center gap-2 w-full py-1.5 text-left"
+            >
+              <Inbox className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Inbox</span>
+              <Badge variant="secondary" className="h-5 px-2 text-xs bg-muted text-muted-foreground border-0">
+                {inboxCount}
+              </Badge>
+              <ChevronDown className={cn(
+                "w-4 h-4 text-muted-foreground ml-auto transition-transform duration-200",
+                !inboxExpanded && "-rotate-90"
+              )} />
+            </button>
+            
+            <Collapsible open={inboxExpanded}>
+              <CollapsibleContent>
+                <div className="space-y-1 mt-2">
+                  {inboxTasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-3 py-2 px-1">
+                      <button
+                        onClick={() => toggleInboxTask({ taskId: task.id, completed: !task.completed })}
+                        className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-muted-foreground/40 hover:border-primary transition-colors flex-shrink-0"
+                      >
+                        {task.completed && <Check className="w-4 h-4 text-primary" />}
+                      </button>
+                      <span className={cn(
+                        "text-sm flex-1 min-w-0 truncate",
+                        task.completed && "line-through text-muted-foreground"
+                      )}>
+                        {task.task_text}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const today = format(selectedDate, 'yyyy-MM-dd');
+                          scheduleTask({ taskId: task.id, targetDate: today });
+                        }}
+                        className="text-xs text-primary hover:underline flex-shrink-0"
+                      >
+                        Schedule
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
+
+        {/* Campaign Headers (for epics with no rituals today, still show as strip) */}
+        {activeEpics && activeEpics.length > 0 && ritualTasks.length === 0 && (
+          <div className="mt-4 pt-3 border-t border-border/20 space-y-2">
+            {activeEpics.map(epic => {
+              const progress = Math.round(epic.progress_percentage ?? 0);
+              const daysLeft = getDaysLeft(epic.end_date);
+              return (
+                <JourneyPathDrawer key={epic.id} epic={{
+                  id: epic.id,
+                  title: epic.title,
+                  description: epic.description ?? undefined,
+                  progress_percentage: epic.progress_percentage ?? 0,
+                  target_days: epic.target_days,
+                  start_date: epic.start_date,
+                  end_date: epic.end_date,
+                  epic_habits: epic.epic_habits,
+                }}>
+                  <button className="w-full text-left focus:outline-none">
+                    <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-muted/30 border border-border/30 bg-card/30">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Target className="w-4 h-4 text-primary shrink-0" />
+                        <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
+                        <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
+                        {daysLeft !== null && (
+                          <span className="text-muted-foreground text-xs shrink-0">· {daysLeft}d</span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                </JourneyPathDrawer>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1103,7 +957,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </p>
         </motion.div>
       )}
-      
+
       <HourlyViewModal
         open={showMonthView}
         onOpenChange={setShowMonthView}
