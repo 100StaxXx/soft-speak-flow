@@ -150,7 +150,7 @@ export const useTaskMutations = (taskDate: string) => {
         user_id: user?.id,
         task_text: params.taskText,
         difficulty: params.difficulty,
-        task_date: params.taskDate || taskDate,
+        task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
         completed: false,
         completed_at: null,
         is_main_quest: params.isMainQuest ?? false,
@@ -201,6 +201,7 @@ export const useTaskMutations = (taskDate: string) => {
       // Refetch to sync with server
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] });
     },
     onSuccess: (data) => {
       toast({ title: "Task added successfully!" });
