@@ -1,14 +1,14 @@
 
 
-# Lower Time Labels to Center with Purple Icon
+# Center Time Labels with Purple Icon
 
 ## Change
 
 ### File: `src/components/TimelineTaskRow.tsx`
 
-- Increase the top padding on the time column from `pt-[18px]` to `pt-[26px]` to vertically center the time text with the purple category icon circle in the task card
+- Split the difference: change `pt-[26px]` to `pt-[22px]` on the time column to vertically center the time text with the purple category icon
 
 | File | Change |
 |---|---|
-| `src/components/TimelineTaskRow.tsx` | Change `pt-[18px]` to `pt-[26px]` on the time column |
+| `src/components/TimelineTaskRow.tsx` | Change `pt-[26px]` to `pt-[22px]` |
 
