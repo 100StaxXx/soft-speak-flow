@@ -76,11 +76,19 @@ export const useTaskMutations = (taskDate: string) => {
       try {
         if (!user?.id) throw new Error('User not authenticated');
         
-        const { data: existingTasks, error: countError } = await supabase
+        const effectiveDate = params.taskDate !== undefined ? params.taskDate : taskDate;
+        let countQuery = supabase
           .from('daily_tasks')
           .select('id')
-          .eq('user_id', user.id)
-          .eq('task_date', params.taskDate || taskDate);
+          .eq('user_id', user.id);
+        
+        if (effectiveDate === null) {
+          countQuery = countQuery.is('task_date', null);
+        } else {
+          countQuery = countQuery.eq('task_date', effectiveDate);
+        }
+        
+        const { data: existingTasks, error: countError } = await countQuery;
 
         if (countError) throw countError;
 
@@ -95,7 +103,7 @@ export const useTaskMutations = (taskDate: string) => {
             task_text: params.taskText,
             difficulty: params.difficulty,
             xp_reward: xpReward,
-            task_date: params.taskDate || taskDate,
+            task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
             is_main_quest: params.isMainQuest ?? false,
             scheduled_time: params.scheduledTime || null,
             estimated_duration: params.estimatedDuration || null,
