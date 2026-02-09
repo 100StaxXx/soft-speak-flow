@@ -31,9 +31,8 @@ const triggerHaptic = async (style: ImpactStyle) => {
 };
 
 const ROW_HEIGHT = 56; // Fixed row height for calculations
-const LONG_PRESS_DURATION = 400;
+const LONG_PRESS_DURATION = 500;
 const SWAP_THRESHOLD = 0.6; // 60% hysteresis
-const LIFT_HINT_DURATION = 200; // Show lift hint before full activation
 
 function DraggableTaskListInner<T extends { id: string }>({
   tasks,
@@ -48,7 +47,6 @@ function DraggableTaskListInner<T extends { id: string }>({
   
   // Drag state
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [liftHintId, setLiftHintId] = useState<string | null>(null);
   const [visualOrder, setVisualOrder] = useState<T[]>(tasks);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
@@ -66,7 +64,6 @@ function DraggableTaskListInner<T extends { id: string }>({
   const lastSwapIndexRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingOffsetRef = useRef({ x: 0, y: 0 });
-  const liftHintTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Autoscroll hook
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -266,11 +263,6 @@ function DraggableTaskListInner<T extends { id: string }>({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    if (liftHintTimerRef.current) {
-      clearTimeout(liftHintTimerRef.current);
-      liftHintTimerRef.current = null;
-    }
-    setLiftHintId(null);
     touchStartPosRef.current = null;
   }, []);
 
@@ -280,22 +272,14 @@ function DraggableTaskListInner<T extends { id: string }>({
     // Skip long-press detection if tapping on interactive elements (checkbox, buttons)
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="checkbox"]') || target.closest('[data-interactive]')) {
-      return;
+      return; // Let the button handle the tap directly
     }
     
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     
-    // Show lift hint at 200ms
-    liftHintTimerRef.current = setTimeout(() => {
-      setLiftHintId(taskId);
-      triggerHaptic(ImpactStyle.Light);
-    }, LIFT_HINT_DURATION);
-    
-    // Activate drag at 400ms
     longPressTimerRef.current = setTimeout(() => {
       isLongPressActiveRef.current = true;
-      setLiftHintId(null);
       startDrag(taskId, index, touch.clientY);
     }, LONG_PRESS_DURATION);
   }, [disabled, draggingId, startDrag]);
@@ -323,20 +307,16 @@ function DraggableTaskListInner<T extends { id: string }>({
   const handlePointerDown = useCallback((e: React.PointerEvent, taskId: string, index: number) => {
     if (disabled || draggingId || e.pointerType === 'touch') return;
     
+    // Skip long-press detection if clicking on interactive elements
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="checkbox"]') || target.closest('[data-interactive]')) {
-      return;
+      return; // Let the button handle the click directly
     }
     
     touchStartPosRef.current = { x: e.clientX, y: e.clientY };
     
-    liftHintTimerRef.current = setTimeout(() => {
-      setLiftHintId(taskId);
-    }, LIFT_HINT_DURATION);
-    
     longPressTimerRef.current = setTimeout(() => {
       isLongPressActiveRef.current = true;
-      setLiftHintId(null);
       startDrag(taskId, index, e.clientY);
     }, LONG_PRESS_DURATION);
   }, [disabled, draggingId, startDrag]);
@@ -367,7 +347,6 @@ function DraggableTaskListInner<T extends { id: string }>({
     <div ref={containerRef} className="space-y-0 relative">
       {visualOrder.map((task, index) => {
         const isThisDragging = draggingId === task.id;
-        const isLiftHint = liftHintId === task.id;
         const isAnyDragging = isDragging;
         const isJustDropped = justDroppedId === task.id;
         
@@ -402,20 +381,17 @@ function DraggableTaskListInner<T extends { id: string }>({
               WebkitTouchCallout: 'none',
               touchAction: isThisDragging ? 'none' : 'pan-y',
               pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+              // Direct CSS transform for dragged item (instant, no animation lag)
               transform: isThisDragging 
                 ? `translateY(${dragOffset.y}px) scale(1.03)` 
-                : isLiftHint
-                  ? 'scale(1.015)'
-                  : undefined,
+                : undefined,
               opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
               boxShadow: isThisDragging 
                 ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                : isLiftHint
-                  ? "0 4px 12px -2px rgba(0, 0, 0, 0.15)"
-                  : "none",
-              backgroundColor: isThisDragging || isLiftHint ? "hsl(var(--background))" : "transparent",
-              borderRadius: isThisDragging || isLiftHint ? 12 : 0,
-              transition: isThisDragging ? 'none' : 'transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease',
+                : "none",
+              backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
+              borderRadius: isThisDragging ? 12 : 0,
+              transition: 'none',
             }}
             // Touch handlers
             onTouchStart={(e) => handleTouchStart(e, task.id, index)}
@@ -435,7 +411,7 @@ function DraggableTaskListInner<T extends { id: string }>({
           >
             {renderItem(task, {
               isDragging: isThisDragging,
-              isPressed: isLiftHint,
+              isPressed: false,
               isActivated: isThisDragging,
               dragHandleRef: { current: null },
               onDragStart: () => startDrag(task.id, index, currentYRef.current),

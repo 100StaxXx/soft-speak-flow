@@ -494,11 +494,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
         <div
           className={cn(
-            "flex items-center gap-3 relative group",
+            "flex items-center gap-3 transition-all relative group",
             "select-none min-h-[52px]",
             isRitual ? "py-4" : "py-3",
             isComplete && "opacity-60",
-            justCompletedTasks.has(task.id) && "quest-row-complete",
             isDragging && "cursor-grabbing",
                 isActivated && !isDragging && "bg-muted/30 rounded-lg",
                 isOnboarding && !isComplete && "bg-primary/5 rounded-lg"
@@ -555,18 +554,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             >
               <motion.div 
                 className={cn(
-                  "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                  "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                   isComplete 
                     ? "bg-primary border-primary" 
                     : isOnboarding
                       ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
-                      : "border-muted-foreground/40 hover:border-primary",
-                  isComplete && "quest-checkbox-fill"
+                      : "border-muted-foreground/40 hover:border-primary"
                 )}
                 whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
               >
                 {isComplete && (
-                  <Check className="w-4 h-4 text-primary-foreground quest-check-icon" />
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                  >
+                    <Check className="w-4 h-4 text-primary-foreground" />
+                  </motion.div>
                 )}
               </motion.div>
             </button>
@@ -802,13 +806,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         </div>
 
-        {/* Progress bar - thin Structured-style */}
-        <div className="relative h-1 bg-muted/30 rounded-full overflow-hidden mb-3">
+        {/* Progress bar */}
+        <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden mb-3">
           <motion.div
-            className="h-full bg-gradient-to-r from-primary to-accent rounded-full shadow-glow"
+            className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${progressPercent}%` }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           />
           {allComplete && (
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />

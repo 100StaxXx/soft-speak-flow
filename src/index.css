@@ -425,33 +425,7 @@
   width: 100%;
   background: currentColor;
   transform: translateY(-50%);
-  animation: strikethrough-sweep 0.3s ease-out forwards;
-}
-
-/* ===== QUEST CHECKBOX INSTANT FILL ===== */
-@keyframes quest-check-pop {
-  0% { transform: scale(0); opacity: 0; }
-  60% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-.quest-checkbox-fill {
-  animation: none;
-}
-
-.quest-check-icon {
-  animation: quest-check-pop 0.15s ease-out both;
-}
-
-/* ===== QUEST ROW COMPLETION PULSE ===== */
-@keyframes quest-complete-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.01); }
-  100% { transform: scale(1); }
-}
-
-.quest-row-complete {
-  animation: quest-complete-pulse 0.3s ease-out;
+  animation: strikethrough-sweep 0.4s ease-out forwards;
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
