@@ -1,6 +1,5 @@
 import { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -18,7 +17,7 @@ export const EmptyState = ({
   onAction 
 }: EmptyStateProps) => {
   return (
-    <Card className="p-12 text-center space-y-6 bg-gradient-to-br from-celestial-blue/5 via-muted/20 to-stardust-gold/5 border-dashed border-celestial-blue/20">
+    <div className="flex flex-col items-center justify-center text-center space-y-6 py-20">
       <div className="mx-auto w-20 h-20 rounded-full bg-celestial-blue/10 flex items-center justify-center">
         <Icon className="h-10 w-10 text-celestial-blue" />
       </div>
@@ -31,6 +30,6 @@ export const EmptyState = ({
           {actionLabel}
         </Button>
       )}
-    </Card>
+    </div>
   );
 };
