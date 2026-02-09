@@ -1,14 +1,23 @@
 
 
-# Center Time Labels with Purple Icon
+# Fix Difficulty Labels and Remove Duplicate Close Button
 
-## Change
+## Two Changes
 
-### File: `src/components/TimelineTaskRow.tsx`
+### 1. Rename Difficulty Labels (AddQuestSheet.tsx)
+- "Chill" -> "Easy"
+- "Steady" -> "Medium"  
+- "Beast" -> "Hard"
 
-- Split the difference: change `pt-[26px]` to `pt-[22px]` on the time column to vertically center the time text with the purple category icon
+### 2. Remove Duplicate X Button
+The Sheet component (`sheet.tsx`) has a **built-in close button** (X) that always renders in the top-right corner. The AddQuestSheet also adds its **own custom X button** on both Step 1 and Step 2 headers, resulting in two X icons stacked in the top-right.
+
+**Fix:** Remove the built-in close button from `SheetContent` in `sheet.tsx` by deleting the `SheetPrimitive.Close` element. This preserves the custom-styled close buttons already in `AddQuestSheet` and avoids affecting other sheets that also have their own close buttons.
+
+### Technical Details
 
 | File | Change |
 |---|---|
-| `src/components/TimelineTaskRow.tsx` | Change `pt-[26px]` to `pt-[22px]` |
+| `src/components/AddQuestSheet.tsx` (lines 320-322) | Rename labels: "Chill" to "Easy", "Steady" to "Medium", "Beast" to "Hard" |
+| `src/components/ui/sheet.tsx` (lines 60-63) | Remove the built-in `SheetPrimitive.Close` element from `SheetContent` |
 
