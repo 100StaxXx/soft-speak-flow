@@ -1,114 +1,71 @@
 
 
-# Redesign Quests Tab as a Loose Timeline (Structured-style)
+# Add Inbox as a New Bottom Nav Tab
 
-## Concept
+## Overview
 
-Replace the current flat task list in `TodaysAgenda` with a **loose vertical timeline** inspired by Structured. This means:
+Add an "Inbox" tab to the left of Quests in the bottom navigation. This gives undated tasks their own dedicated page instead of being a collapsible section inside the Quests timeline.
 
-- A thin dashed vertical line running down the left side
-- Tasks positioned along it with time labels on the left and task cards on the right
-- Unscheduled/anytime tasks grouped at the bottom without time markers
-- Inbox tasks in a collapsible section at the very end
-- Campaign rituals woven into the timeline at their scheduled times (not in a separate section)
+## Navigation Order (left to right)
 
-Unlike Outlook's rigid hour-by-hour grid, this is **event-driven** -- only showing time slots where tasks actually exist, with natural spacing between them.
+Mentor | Inbox | Quests | Companion
 
-## What Changes
+## Changes
 
-### 1. Restructure TodaysAgenda Layout
+### 1. Create Inbox Page
 
-Replace the current progress-bar-and-flat-list layout with a timeline layout:
+**New file: `src/pages/Inbox.tsx`**
 
-- **Remove** the large progress bar header (replace with a minimal "3/7" pill in the top-right)
-- **Add** a vertical dashed line on the left (~48px from edge)
-- **Group tasks by time**: Scheduled tasks show with their time label on the left of the line, task card on the right
-- **Unscheduled tasks** appear under an "Anytime" divider at the bottom
-- **Inbox section** collapses below everything
+A simple page that:
+- Uses the existing `useInboxTasks` hook for data
+- Renders a list of undated tasks with toggle, delete, and "schedule" actions
+- Has a header with the inbox count
+- Includes the FAB (+) button for adding new tasks (reuses `CreationPickerSheet`)
+- Each task card has a "Schedule" action that lets users pick a date, moving it to the Quests timeline
+- Empty state: friendly message like "Your inbox is empty -- capture tasks with the + button"
 
-**File:** `src/components/TodaysAgenda.tsx` -- major layout refactor of the render section (lines ~790-1076)
+### 2. Add Route
 
-### 2. Timeline Task Row Component
+**File: `src/App.tsx` (or router config)**
 
-Create a reusable row component for the timeline:
+Add route: `<Route path="/inbox" element={<Inbox />} />`
 
-```
-  9:30 AM  ---o--- [ Task Card                    ]
-                   [ difficulty badge | duration   ]
-```
+### 3. Update Bottom Nav
 
-Each row shows:
-- Time label (left of line) or empty for unscheduled
-- A small dot/circle on the timeline line
-- The task card (right of line) with existing swipe/tap/drag behavior
+**File: `src/components/BottomNav.tsx`**
 
-**New file:** `src/components/TimelineTaskRow.tsx`
+- Add a new `NavLink` for `/inbox` between Mentor and Quests
+- Icon: `Inbox` from lucide-react
+- Show unread count badge when inbox has tasks
+- Add prefetch entry for the Inbox page
+- Color accent: a distinct color (e.g., cyan/teal) to differentiate from Quests purple
 
-### 3. Merge Rituals Into Timeline
+### 4. Remove Inbox Section from TodaysAgenda
 
-Currently, rituals are in a separate "Campaigns" section at the bottom. In the timeline view, rituals with scheduled times should appear **inline** with quests at their appropriate time position. Campaign headers become subtle group dividers within the timeline rather than standalone sections.
+**File: `src/components/TodaysAgenda.tsx`**
 
-- Rituals with `scheduled_time` appear in chronological order mixed with quests
-- Campaign affiliation shown as a small colored dot or tag on the task card
-- Unscheduled rituals go in the "Anytime" section
+- Remove the collapsible "Inbox" section at the bottom of the timeline since it now has its own tab
+- Keep the timeline focused on scheduled + anytime tasks only
 
-### 4. Compact Progress Indicator
+### 5. Update AddQuestSheet "Send to Inbox"
 
-Replace the large progress bar with a minimal indicator:
-- Small circular progress ring or "3/7" badge in the date header area
-- XP total shown as a subtle label next to it
-- Keeps all progress info but uses ~20px of vertical space instead of ~100px
+**File: `src/components/AddQuestSheet.tsx`**
 
-### 5. Inbox Section
+- The "Send to Inbox" toggle stays as-is; tasks created with it will appear on the new Inbox page
 
-Add the collapsible inbox section (from previous plan) at the very bottom of the timeline, below "Anytime" tasks.
+## Technical Details
 
----
-
-## Visual Structure (top to bottom)
-
-```text
-[ Date Pills Scroller                              ]
-[ Mon Feb 9, 2026                        3/7  42XP ]
-                                                    
-  |                                                 
-  9:30 AM ---- o ---- [ Morning Review        ]    
-  |                                                 
-  10:00 AM --- o ---- [ CRM Updates     30min ]    
-  |                    [ Medium +16 | Campaign ]    
-  |                                                 
-  2:00 PM ---- o ---- [ Team Standup          ]    
-  |                                                 
-  ---- Anytime ----                                 
-  |                                                 
-  o ---- [ Read chapter 5              ]           
-  o ---- [ Buy groceries               ]           
-  |                                                 
-  ---- Inbox (3) ----                               
-  |                                                 
-  o ---- [ Research topic              ]           
-  o ---- [ Call dentist                ]           
-```
-
-## Files Changed
-
-| File | Change |
+| File | Action |
 |---|---|
-| `src/components/TimelineTaskRow.tsx` | **New** -- Single timeline row with time label, dot, and task card |
-| `src/components/TodaysAgenda.tsx` | Refactor render to timeline layout: remove progress bar, add vertical line, sort all tasks by time, merge rituals inline |
-| `src/components/TodaysAgenda.tsx` | Add Inbox section at bottom using `useInboxTasks` hook |
+| `src/pages/Inbox.tsx` | **New** -- Dedicated inbox page with task list, schedule actions, FAB |
+| `src/App.tsx` | Add `/inbox` route |
+| `src/components/BottomNav.tsx` | Add Inbox NavLink between Mentor and Quests, with count badge |
+| `src/components/TodaysAgenda.tsx` | Remove collapsible inbox section |
 
 ## What Stays the Same
 
-- Date pills scroller at top (already working)
-- Swipe actions on task cards (delete, move to next day)
-- Long-press drag reordering
-- Campaign headers (simplified to inline tags)
-- FAB button for adding quests/campaigns
-- All existing task mutation hooks
-
-## Considerations
-
-- The existing `calendar/TimelineView.tsx` already has similar timeline logic but is designed for the calendar tab. We will borrow its visual patterns (dashed line, time labels) but keep the Quests tab's richer task cards with XP, difficulty badges, and swipe actions.
-- Campaign rituals mixing into the timeline means the separate "Campaigns" section disappears -- campaigns are visible via small tags on ritual cards and via the campaign strip (when no rituals are scheduled today).
+- `useInboxTasks` hook (already built, no changes needed)
+- Database schema (already supports `task_date = NULL`)
+- FAB and CreationPickerSheet flow
+- All existing task mutation logic
 
