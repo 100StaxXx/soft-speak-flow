@@ -15,7 +15,7 @@ import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { DraggableFAB } from "@/components/DraggableFAB";
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
-import { supabase } from "@/integrations/supabase/client";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,11 +27,12 @@ const InboxPage = memo(function InboxPage() {
   const queryClient = useQueryClient();
   const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask, scheduleTask } = useInboxTasks();
 
+  const [selectedDate] = useState(() => new Date());
   const [showAddQuest, setShowAddQuest] = useState(false);
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<typeof inboxTasks[number] | null>(null);
 
-  const { updateTask, deleteTask, isUpdating, isDeleting } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
+  const { addTask, updateTask, deleteTask, isUpdating, isDeleting } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     await updateTask({ taskId, updates });
@@ -41,21 +42,27 @@ const InboxPage = memo(function InboxPage() {
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     if (!user?.id) return;
-    const { error } = await supabase.from("daily_tasks").insert({
-      user_id: user.id,
-      task_text: data.text,
-      xp_reward: 10,
-      task_date: null, // Always inbox
-      completed: false,
+    const taskDate = data.sendToInbox ? null : format(selectedDate, 'yyyy-MM-dd');
+    await addTask({
+      taskText: data.text,
+      difficulty: data.difficulty,
+      taskDate: taskDate,
+      isMainQuest: false,
+      scheduledTime: data.scheduledTime,
+      estimatedDuration: data.estimatedDuration,
+      recurrencePattern: data.recurrencePattern,
+      recurrenceDays: data.recurrenceDays,
+      reminderEnabled: data.reminderEnabled,
+      reminderMinutesBefore: data.reminderMinutesBefore,
+      contactId: data.contactId,
+      autoLogInteraction: data.autoLogInteraction,
     });
-    if (error) {
-      toast.error("Failed to add task");
-    } else {
-      toast.success("Added to inbox");
-      queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
+    if (!data.sendToInbox) {
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     }
+    queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     setShowAddQuest(false);
-  }, [user?.id, queryClient]);
+  }, [user?.id, selectedDate, addTask, queryClient]);
 
   const handleSchedule = useCallback((taskId: string, date: Date) => {
     const targetDate = format(date, "yyyy-MM-dd");
