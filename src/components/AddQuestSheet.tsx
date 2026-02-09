@@ -1,23 +1,26 @@
-import { useState, useRef, useEffect, memo } from "react";
-import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send, Users, Inbox } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { format } from "date-fns";
+import { Plus, Sliders, ArrowLeft, ArrowRight, CalendarIcon, Inbox, Map } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { QUEST_XP_REWARDS } from "@/config/xpRewards";
+import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { SuggestedTimeSlots } from "@/components/SuggestedTimeSlots";
 import { ContactPicker } from "@/components/tasks/ContactPicker";
-import { useIOSKeyboardAvoidance } from "@/hooks/useIOSKeyboardAvoidance";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Users } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 
 export interface AddQuestData {
   text: string;
@@ -42,6 +45,7 @@ interface AddQuestSheetProps {
   prefilledTime?: string | null;
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
+  onCreateCampaign?: () => void;
 }
 
 export const AddQuestSheet = memo(function AddQuestSheet({
@@ -51,7 +55,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   prefilledTime,
   onAdd,
   isAdding = false,
+  onCreateCampaign,
 }: AddQuestSheetProps) {
+  const [step, setStep] = useState<1 | 2>(1);
   const [taskText, setTaskText] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -65,73 +71,49 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [location, setLocation] = useState<string | null>(null);
   const [contactId, setContactId] = useState<string | null>(null);
   const [autoLogInteraction, setAutoLogInteraction] = useState(true);
-  const [sendToInbox, setSendToInbox] = useState(false);
-  
-  // Expanded mode - starts minimal, expands when user wants more options
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [taskDate, setTaskDate] = useState<string | null>(format(selectedDate, "yyyy-MM-dd"));
 
-  // Input ref for delayed focus
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // iOS keyboard avoidance
-  const { containerStyle, inputStyle, scrollInputIntoView } = useIOSKeyboardAvoidance({ 
-    offsetBuffer: 10 
-  });
-
-  // Update scheduled time when prefilledTime changes
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
   }, [prefilledTime]);
 
-  // Reset expanded state when drawer closes (no auto-focus to avoid race condition)
+  // Reset when sheet closes
   useEffect(() => {
     if (!open) {
-      setIsExpanded(false);
+      setStep(1);
+      setTaskText("");
+      setDifficulty("medium");
+      setShowAdvanced(false);
+      setScheduledTime(null);
+      setEstimatedDuration(null);
+      setRecurrencePattern(null);
+      setRecurrenceDays([]);
+      setReminderEnabled(false);
+      setReminderMinutesBefore(15);
+      setMoreInformation(null);
+      setLocation(null);
+      setContactId(null);
+      setAutoLogInteraction(true);
+    } else {
+      setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
-  }, [open]);
+  }, [open, selectedDate]);
 
-  // Swipe-up gesture tracking for expanding
-  const touchStartY = useRef<number>(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touchEnd = e.changedTouches[0].clientY;
-    const swipeDistance = touchStartY.current - touchEnd;
-    
-    // Swipe up detected (minimum 50px threshold)
-    if (swipeDistance > 50 && !isExpanded) {
-      setIsExpanded(true);
+  // Auto-focus input on step 1
+  useEffect(() => {
+    if (open && step === 1) {
+      setTimeout(() => inputRef.current?.focus(), 300);
     }
-  };
+  }, [open, step]);
 
-  const resetForm = () => {
-    setTaskText("");
-    setDifficulty("medium");
-    setShowAdvanced(false);
-    setScheduledTime(null);
-    setEstimatedDuration(null);
-    setRecurrencePattern(null);
-    setRecurrenceDays([]);
-    setReminderEnabled(false);
-    setReminderMinutesBefore(15);
-    setMoreInformation(null);
-    setLocation(null);
-    setContactId(null);
-    setAutoLogInteraction(true);
-    setSendToInbox(false);
-    setIsExpanded(false);
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!taskText.trim()) return;
-    
     await onAdd({
       text: taskText,
       difficulty,
-      scheduledTime: sendToInbox ? null : scheduledTime,
+      scheduledTime,
       estimatedDuration,
       recurrencePattern,
       recurrenceDays,
@@ -141,234 +123,282 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       location,
       contactId,
       autoLogInteraction,
-      sendToInbox,
+      sendToInbox: false,
     });
-    
-    resetForm();
     onOpenChange(false);
-  };
+  }, [taskText, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, onAdd, onOpenChange]);
 
-  const handleExpand = () => {
-    setIsExpanded(true);
-  };
+  const handleAddToInbox = useCallback(async () => {
+    if (!taskText.trim()) return;
+    await onAdd({
+      text: taskText,
+      difficulty,
+      scheduledTime: null,
+      estimatedDuration,
+      recurrencePattern,
+      recurrenceDays,
+      reminderEnabled,
+      reminderMinutesBefore,
+      moreInformation,
+      location,
+      contactId,
+      autoLogInteraction,
+      sendToInbox: true,
+    });
+    onOpenChange(false);
+  }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, onAdd, onOpenChange]);
 
-  // Minimal mode: just input + quick submit
-  if (!isExpanded) {
-    return (
-      <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
-        <DrawerContent 
-          className="max-h-[200px]"
-          style={containerStyle}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="px-4 py-3 space-y-3" data-vaul-no-drag>
-            {/* Compact input row with send button */}
-            <div className="flex items-center gap-2">
-              <Input
-                ref={inputRef}
-                placeholder="What's your quest?"
-                value={taskText}
-                onChange={(e) => setTaskText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                onFocus={() => scrollInputIntoView(inputRef)}
-                disabled={isAdding}
-                className="flex-1"
-                style={inputStyle}
-              />
-              <Button 
-                size="icon"
-                onClick={handleSubmit}
-                disabled={isAdding || !taskText.trim()}
-                className="shrink-0"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* Expand button */}
-            <button
-              onClick={handleExpand}
-              className="flex items-center justify-center gap-2 w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronUp className="w-4 h-4" />
-              <span>More options (difficulty, time, reminders)</span>
-            </button>
-          </div>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
-  // Expanded mode: full form
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} handleOnly={true} repositionInputs={false}>
-      <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader className="text-left">
-          <DrawerTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-primary" />
-            Add New Quest
-          </DrawerTitle>
-          <DrawerDescription>
-            Create a new quest for {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-          </DrawerDescription>
-        </DrawerHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="h-[85vh] rounded-t-xl flex flex-col">
+        {/* Step 1: Title + Difficulty */}
+        {step === 1 && (
+          <>
+            <SheetHeader className="pb-2 flex-shrink-0">
+              <SheetTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5 text-primary" />
+                Add New Quest
+              </SheetTitle>
+            </SheetHeader>
 
-        <div 
-          className="px-4 pb-4 space-y-4 overflow-y-auto" 
-          data-vaul-no-drag
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div data-vaul-no-drag>
-            <Input
-              ref={inputRef}
-              placeholder="What's your quest?"
-              value={taskText}
-              onChange={(e) => setTaskText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !showAdvanced && handleSubmit()}
-              onFocus={() => scrollInputIntoView(inputRef)}
-              disabled={isAdding}
-              style={inputStyle}
-            />
-          </div>
-
-          {/* Difficulty Buttons */}
-          <div className="flex gap-2">
-            <Button
-              variant={difficulty === 'easy' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setDifficulty('easy')}
-              className="flex-1 gap-1"
-            >
-              <Zap className="h-4 w-4" />
-              Easy
-              <span className="text-xs text-muted-foreground">+{QUEST_XP_REWARDS.EASY}</span>
-            </Button>
-            <Button
-              variant={difficulty === 'medium' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setDifficulty('medium')}
-              className="flex-1 gap-1"
-            >
-              <Flame className="h-4 w-4" />
-              Medium
-              <span className="text-xs text-muted-foreground">+{QUEST_XP_REWARDS.MEDIUM}</span>
-            </Button>
-            <Button
-              variant={difficulty === 'hard' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setDifficulty('hard')}
-              className="flex-1 gap-1"
-            >
-              <Mountain className="h-4 w-4" />
-              Hard
-              <span className="text-xs text-muted-foreground">+{QUEST_XP_REWARDS.HARD}</span>
-            </Button>
-          </div>
-
-          {/* Send to Inbox toggle */}
-          <button
-            onClick={() => setSendToInbox(!sendToInbox)}
-            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors w-fit ${
-              sendToInbox 
-                ? 'bg-accent/15 border-accent/30 text-accent-foreground' 
-                : 'border-border/50 text-muted-foreground hover:bg-muted/30'
-            }`}
-          >
-            <Inbox className="w-4 h-4" />
-            <span>{sendToInbox ? "Sending to Inbox (no date)" : "Add to Inbox"}</span>
-          </button>
-
-          {/* Smart Time Suggestions - show when no time is set and not inbox */}
-          {!scheduledTime && !sendToInbox && (
-            <SuggestedTimeSlots
-              date={selectedDate}
-              duration={estimatedDuration || 30}
-              difficulty={difficulty}
-              onSelectTime={(time) => {
-                setScheduledTime(time);
-                setShowAdvanced(true);
-              }}
-              disabled={isAdding}
-            />
-          )}
-
-          {/* Advanced Toggle */}
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors border border-primary/20 rounded-lg hover:bg-primary/5 w-fit"
-          >
-            <Sliders className="w-3 h-3" />
-            {showAdvanced ? "Hide Advanced" : "Advanced Options"}
-          </button>
-
-          {showAdvanced && (
-            <div data-vaul-no-drag className="space-y-4">
-              <AdvancedQuestOptions
-                scheduledTime={scheduledTime}
-                estimatedDuration={estimatedDuration}
-                recurrencePattern={recurrencePattern}
-                recurrenceDays={recurrenceDays}
-                reminderEnabled={reminderEnabled}
-                reminderMinutesBefore={reminderMinutesBefore}
-                onScheduledTimeChange={setScheduledTime}
-                onEstimatedDurationChange={setEstimatedDuration}
-                onRecurrencePatternChange={setRecurrencePattern}
-                onRecurrenceDaysChange={setRecurrenceDays}
-                onReminderEnabledChange={setReminderEnabled}
-                onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                moreInformation={moreInformation}
-                onMoreInformationChange={setMoreInformation}
-                location={location}
-                onLocationChange={setLocation}
-                selectedDate={selectedDate}
-                taskDifficulty={difficulty}
-              />
-              
-              {/* Contact Linking Section */}
-              <div className="space-y-3 pt-2 border-t border-border/50">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Users className="w-4 h-4" />
-                  <span>Link to Contact</span>
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6 py-4">
+                {/* Quest Name */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quest Name</label>
+                  <Input
+                    ref={inputRef}
+                    placeholder="What quest will you conquer?"
+                    value={taskText}
+                    onChange={(e) => setTaskText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && taskText.trim() && setStep(2)}
+                    disabled={isAdding}
+                  />
                 </div>
-                <ContactPicker
-                  value={contactId}
-                  onChange={setContactId}
-                  placeholder="Select a contact..."
-                />
-                {contactId && (
-                  <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
-                    <Label htmlFor="auto-log" className="text-sm cursor-pointer">
-                      Log as interaction when completed
-                    </Label>
-                    <Switch
-                      id="auto-log"
-                      checked={autoLogInteraction}
-                      onCheckedChange={setAutoLogInteraction}
+
+                {/* Difficulty */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Difficulty</label>
+                  <HabitDifficultySelector
+                    value={difficulty}
+                    onChange={setDifficulty}
+                  />
+                </div>
+
+                {/* Advanced Settings */}
+                <div className="pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full justify-between text-muted-foreground"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4" />
+                      Advanced Settings
+                    </span>
+                    <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
+                  </Button>
+
+                  {showAdvanced && (
+                    <div className="mt-4 space-y-4">
+                      {/* Contact Linking */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <Users className="w-4 h-4" />
+                          <span>Link to Contact</span>
+                        </div>
+                        <ContactPicker
+                          value={contactId}
+                          onChange={setContactId}
+                          placeholder="Select a contact..."
+                        />
+                        {contactId && (
+                          <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
+                            <Label htmlFor="auto-log-add" className="text-sm cursor-pointer">
+                              Log as interaction when completed
+                            </Label>
+                            <Switch
+                              id="auto-log-add"
+                              checked={autoLogInteraction}
+                              onCheckedChange={setAutoLogInteraction}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Recurrence, Reminders, Location, Notes */}
+                      <AdvancedQuestOptions
+                        scheduledTime={scheduledTime}
+                        estimatedDuration={estimatedDuration}
+                        recurrencePattern={recurrencePattern}
+                        recurrenceDays={recurrenceDays}
+                        reminderEnabled={reminderEnabled}
+                        reminderMinutesBefore={reminderMinutesBefore}
+                        onScheduledTimeChange={setScheduledTime}
+                        onEstimatedDurationChange={setEstimatedDuration}
+                        onRecurrencePatternChange={setRecurrencePattern}
+                        onRecurrenceDaysChange={setRecurrenceDays}
+                        onReminderEnabledChange={setReminderEnabled}
+                        onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                        moreInformation={moreInformation}
+                        onMoreInformationChange={setMoreInformation}
+                        location={location}
+                        onLocationChange={setLocation}
+                        selectedDate={selectedDate}
+                        taskDifficulty={difficulty}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+
+            <SheetFooter className="pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t">
+              <Button
+                onClick={() => setStep(2)}
+                disabled={!taskText.trim()}
+                className="w-full"
+              >
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              {onCreateCampaign && (
+                <button
+                  onClick={() => {
+                    onOpenChange(false);
+                    onCreateCampaign();
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-1"
+                >
+                  <Map className="w-3.5 h-3.5" />
+                  Or create a Campaign
+                </button>
+              )}
+            </SheetFooter>
+          </>
+        )}
+
+        {/* Step 2: Date/Time Selection */}
+        {step === 2 && (
+          <>
+            <SheetHeader className="pb-2 flex-shrink-0">
+              <SheetTitle className="flex items-center gap-2">
+                <button
+                  onClick={() => setStep(1)}
+                  className="p-1 -ml-1 rounded-lg hover:bg-muted/50 transition-colors"
+                  aria-label="Back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                Schedule Quest
+              </SheetTitle>
+              <p className="text-sm text-muted-foreground truncate">
+                {taskText}
+              </p>
+            </SheetHeader>
+
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6 py-4">
+                {/* Date Picker */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !taskDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {taskDate
+                          ? format(new Date(taskDate + "T00:00:00"), "PPP")
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={taskDate ? new Date(taskDate + "T00:00:00") : undefined}
+                        onSelect={(date) => setTaskDate(date ? format(date, "yyyy-MM-dd") : null)}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Time + Duration side by side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Scheduled Time</label>
+                    <Input
+                      type="time"
+                      value={scheduledTime || ""}
+                      onChange={(e) => setScheduledTime(e.target.value || null)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Duration (min)</label>
+                    <Input
+                      type="number"
+                      value={estimatedDuration || ""}
+                      onChange={(e) =>
+                        setEstimatedDuration(e.target.value ? parseInt(e.target.value) : null)
+                      }
+                      placeholder="30"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                {/* Suggested Time Slots */}
+                {!scheduledTime && (
+                  <SuggestedTimeSlots
+                    date={selectedDate}
+                    duration={estimatedDuration || 30}
+                    difficulty={difficulty}
+                    onSelectTime={(time) => setScheduledTime(time)}
+                    disabled={isAdding}
+                  />
                 )}
               </div>
-            </div>
-          )}
-        </div>
+            </ScrollArea>
 
-        <DrawerFooter className="pt-2">
-          <Button 
-            onClick={handleSubmit}
-            disabled={isAdding || !taskText.trim()}
-            className="w-full"
-          >
-            {isAdding ? "Adding..." : "Add Quest"}
-          </Button>
-          <DrawerClose asChild>
-            <Button variant="outline" className="w-full">
-              Cancel
-            </Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+            <SheetFooter className="pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t">
+              <Button
+                onClick={handleSubmit}
+                disabled={isAdding || !taskText.trim()}
+                className="w-full"
+              >
+                {isAdding ? "Adding..." : "Add Quest"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleAddToInbox}
+                disabled={isAdding || !taskText.trim()}
+                className="w-full"
+              >
+                <Inbox className="mr-2 h-4 w-4" />
+                Add to Inbox instead
+              </Button>
+              {onCreateCampaign && (
+                <button
+                  onClick={() => {
+                    onOpenChange(false);
+                    onCreateCampaign();
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-1"
+                >
+                  <Map className="w-3.5 h-3.5" />
+                  Or create a Campaign
+                </button>
+              )}
+            </SheetFooter>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 });
