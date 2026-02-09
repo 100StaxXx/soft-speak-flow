@@ -1,47 +1,45 @@
 
-# Split Add Quest into Two-Step Wizard
+
+# Add Custom/All Day Duration Options and Soften Colors
 
 ## Overview
 
-Split the current single-screen layout back into a two-step wizard, and remove the duplicated duration/time fields from Advanced Settings.
+Add "All Day" and "Custom" duration options to the duration chip selector, and change the difficulty color palette from harsh reds/roses to softer tones.
 
-## Step 1: Title and Difficulty
+## Changes
 
-The colored banner with:
-- Quest title input (auto-focused)
-- Difficulty circle selector (easy/medium/hard)
-- "Next" button in footer (disabled until title is non-empty)
+### File: `src/components/AddQuestSheet.tsx`
 
-## Step 2: Scheduling and Details
+**1. Add "All Day" and "Custom" duration chips**
 
-Everything else:
-- Duration row (tappable, expands to chips)
-- Date and Time chips (side by side)
-- Time wheel (when time chip tapped)
-- Subtasks + Notes card
-- Advanced Settings collapsible (recurrence, reminders, contact linking, location -- **without** the `scheduledTime`, `estimatedDuration`, and `moreInformation` fields since those are already on this page)
-- Footer: "Create Task" (disabled without date+time), "Add to Inbox", "Or create a Campaign"
-- Back button to return to Step 1
+- Add two new entries to `DURATION_OPTIONS`: `{ label: "All Day", value: 1440 }` and a special `{ label: "Custom", value: -1 }` sentinel
+- When "Custom" is selected, show a numeric input field below the chips where the user can type any number of minutes
+- Add state `customDurationInput` for the free-form input
+- When the user types a custom value, update `estimatedDuration` accordingly
+- "All Day" simply sets duration to 1440 (24 hours)
 
-## Technical Details
+**2. Update `durationLabel` memo**
 
-### `src/components/AddQuestSheet.tsx`
+- Handle 1440 as "All Day"
+- Handle custom values that don't match predefined chips gracefully (e.g., "25 min")
 
-- Add `step` state (`1 | 2`), default to `1`
-- **Step 1** renders: colored banner (title + difficulty) + "Next" footer button
-- **Step 2** renders: colored banner (read-only summary) + duration, date/time, subtasks, notes, advanced settings, footer
-- Back arrow on Step 2 header to go to Step 1
-- Reset `step` to `1` on close
+**3. Soften the difficulty color palette**
 
-### `src/components/AdvancedQuestOptions.tsx`
+Replace the current harsh colors in `DIFFICULTY_COLORS`:
+- **Easy**: Keep emerald (already soft)
+- **Medium**: Change from `rose-500` (hot pink/red) to `amber-500` / `orange-400` (warm, soft amber)
+- **Hard**: Change from `red-600` to `violet-500` / `purple-500` (soft purple instead of aggressive red)
 
-- Add optional props `hideScheduledTime`, `hideDuration`, `hideMoreInformation` (all default `false`)
-- When `true`, skip rendering the corresponding sections
-- `AddQuestSheet` passes all three as `true` since those fields already exist on the main Step 2 UI
+Updated map:
+```
+easy:   bg-emerald-600, pill bg-emerald-500
+medium: bg-amber-500, pill bg-amber-500
+hard:   bg-violet-500, pill bg-violet-500
+```
 
-### Files Changed
+## Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/AddQuestSheet.tsx` | Add `step` state, split render into Step 1 (title+difficulty) and Step 2 (scheduling+details), back button on Step 2 |
-| `src/components/AdvancedQuestOptions.tsx` | Add `hideScheduledTime`, `hideDuration`, `hideMoreInformation` props to conditionally skip those sections |
+| `src/components/AddQuestSheet.tsx` | Add "All Day" + "Custom" to duration chips with custom input, soften difficulty colors to amber/violet |
+
