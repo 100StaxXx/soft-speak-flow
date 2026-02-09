@@ -1,21 +1,47 @@
 
 
-# Fix "Add to Inbox Instead" from Quests Page
+# Add Edit Button to Inbox Tasks (Replace Calendar with Edit + Schedule)
 
 ## Problem
+Inbox tasks only show a calendar (schedule) button and a delete button. There is no way to edit a task's text or details from the Inbox. The user expects an edit button.
 
-When clicking "Add to Inbox Instead" from the Quests/Journeys page, the task still gets a date instead of going to the Inbox. Two issues cause this:
+## Solution
+Add an edit button (pencil icon) to each inbox task row, alongside the existing schedule and delete buttons. Tapping edit will open the `EditQuestDialog` (same one used on the Quests page).
 
-1. **`AddTaskParams.taskDate` is typed as `string`** (line 42 in `useTaskMutations.ts`), not `string | null`. This means `null` can't be passed properly.
+## Changes
 
-2. **`Journeys.tsx` line 255** casts `null` to `string` with `taskDate as string`, which silently loses the `null` value.
+### 1. `src/pages/Inbox.tsx`
+- Import `Pencil` from lucide-react
+- Import `EditQuestDialog` from `src/features/quests/components/EditQuestDialog`
+- Import `useTaskMutations` to get `updateTask` and `deleteTask` with proper save handling
+- Add `editingTask` state to track which task is being edited
+- Add a pencil/edit button between the calendar and trash buttons for each task
+- Clicking edit opens `EditQuestDialog` pre-filled with the task data
+- Wire up `onSave` to update the task via `updateTask` mutation and invalidate inbox-tasks cache
+- Render the `EditQuestDialog` component at the bottom of the page
 
-## Fix
+### Technical Details
 
-| File | Change |
-|---|---|
-| `src/hooks/useTaskMutations.ts` (line 42) | Change `taskDate?: string` to `taskDate?: string \| null` in `AddTaskParams` |
-| `src/pages/Journeys.tsx` (line 255) | Remove the `as string` cast so `null` flows through correctly: change to `taskDate: taskDate,` |
+**New state:**
+```typescript
+const [editingTask, setEditingTask] = useState<DailyTask | null>(null);
+```
 
-These two small changes will allow `null` to propagate all the way to the database insert, correctly creating an inbox task (no date).
+**New button per task row (between calendar and trash):**
+```tsx
+<button onClick={() => setEditingTask(task)} aria-label="Edit task">
+  <Pencil className="w-4 h-4" />
+</button>
+```
+
+**EditQuestDialog rendered once, controlled by `editingTask` state:**
+```tsx
+<EditQuestDialog
+  task={editingTask}
+  open={!!editingTask}
+  onOpenChange={(open) => !open && setEditingTask(null)}
+  onSave={handleSaveEdit}
+  isSaving={isUpdating}
+/>
+```
 
