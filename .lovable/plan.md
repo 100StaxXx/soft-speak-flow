@@ -1,24 +1,27 @@
 
-
-# Add Short Difficulty Labels to Quest Creation
+# Tighten Timeline Layout Slightly
 
 ## Overview
 
-The difficulty selector currently shows only icons (Zap, Flame, Mountain) with no text. Add a very short label under each icon so users instantly understand what each means.
+Keep the time in both spots (timeline column + inside card). Just shrink things slightly and shift the timeline times left for better alignment.
 
 ## Changes
 
-### File: `src/components/AddQuestSheet.tsx` (lines 319-334)
+### 1. TimelineTaskRow.tsx
 
-Replace the icon-only circle buttons with slightly wider pill buttons that include a tiny label beneath the icon:
+- **Compact time format**: Change from "9:30 AM" to "9:30a" (lowercase, no space) so it never wraps in the narrow column
+- **Reduce font**: `text-[11px]` to `text-[10px]`
+- **Shift left**: Reduce column width from `w-16` to `w-14` and remove `pr-1` padding
+- **Tighten gap**: `gap-3` to `gap-2`
+- **Shrink dot**: `w-2.5 h-2.5` to `w-2 h-2`
 
-- **Easy** -- label: "Chill"
-- **Medium** -- label: "Steady"  
-- **Hard** -- label: "Beast"
+### 2. TodaysAgenda.tsx
 
-Each button becomes a small vertical stack (icon + label) instead of just an icon circle. The buttons widen slightly from `w-9 h-9` to roughly `w-14 h-12` rounded pills, keeping the compact feel.
+- **Shrink task title**: `text-base` (16px) to `text-sm` (14px)
+- **Shrink in-card time**: `text-sm` to `text-xs`, clock icon from `w-4 h-4` to `w-3 h-3`
+- **Update "Anytime" divider spacer**: from `w-16` to `w-14` to match new column width
 
 | File | Change |
 |---|---|
-| `src/components/AddQuestSheet.tsx` | Add short text labels ("Chill", "Steady", "Beast") below each difficulty icon |
-
+| `src/components/TimelineTaskRow.tsx` | Compact time format, smaller font/dot, narrower column, tighter gap |
+| `src/components/TodaysAgenda.tsx` | Shrink task title and in-card time text slightly; update divider spacer |
