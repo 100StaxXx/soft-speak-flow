@@ -51,8 +51,8 @@ interface AddQuestSheetProps {
 // --- Difficulty color helpers ---
 const DIFFICULTY_COLORS = {
   easy: { bg: "bg-emerald-600", text: "text-emerald-400", pill: "bg-emerald-500", border: "border-emerald-500/40" },
-  medium: { bg: "bg-rose-500", text: "text-rose-400", pill: "bg-rose-500", border: "border-rose-500/40" },
-  hard: { bg: "bg-red-600", text: "text-red-400", pill: "bg-red-500", border: "border-red-500/40" },
+  medium: { bg: "bg-amber-500", text: "text-amber-400", pill: "bg-amber-500", border: "border-amber-500/40" },
+  hard: { bg: "bg-violet-500", text: "text-violet-400", pill: "bg-violet-500", border: "border-violet-500/40" },
 } as const;
 
 const DifficultyIcon = ({ difficulty }: { difficulty: "easy" | "medium" | "hard" }) => {
@@ -87,6 +87,8 @@ const DURATION_OPTIONS = [
   { label: "45m", value: 45 },
   { label: "1h", value: 60 },
   { label: "1.5h", value: 90 },
+  { label: "All Day", value: 1440 },
+  { label: "Custom", value: -1 },
 ];
 
 export const AddQuestSheet = memo(function AddQuestSheet({
@@ -116,6 +118,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [showDurationChips, setShowDurationChips] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [subtasks, setSubtasks] = useState<string[]>([]);
+  const [customDurationInput, setCustomDurationInput] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const timeWheelRef = useRef<HTMLDivElement>(null);
@@ -173,8 +176,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     return format(addMinutes(base, estimatedDuration), "HH:mm");
   }, [scheduledTime, estimatedDuration]);
 
+  const isCustomDuration = estimatedDuration !== null && !DURATION_OPTIONS.some(o => o.value === estimatedDuration);
+
   const durationLabel = useMemo(() => {
     if (!estimatedDuration) return "No duration";
+    if (estimatedDuration === 1440) return "All Day";
     if (estimatedDuration >= 60) return `${estimatedDuration / 60}h`;
     return `${estimatedDuration} min`;
   }, [estimatedDuration]);
@@ -385,21 +391,59 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 </button>
 
                 {showDurationChips && (
-                  <div className="flex gap-2 flex-wrap px-1">
-                    {DURATION_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setEstimatedDuration(opt.value)}
-                        className={cn(
-                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
-                          estimatedDuration === opt.value
-                            ? cn(colors.pill, "text-white shadow-md")
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                  <div className="space-y-2 px-1">
+                    <div className="flex gap-2 flex-wrap">
+                      {DURATION_OPTIONS.map((opt) => {
+                        const isSelected = opt.value === -1
+                          ? isCustomDuration
+                          : estimatedDuration === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => {
+                              if (opt.value === -1) {
+                                setCustomDurationInput("");
+                                setEstimatedDuration(null);
+                              } else {
+                                setCustomDurationInput("");
+                                setEstimatedDuration(opt.value);
+                              }
+                            }}
+                            className={cn(
+                              "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
+                              isSelected
+                                ? cn(colors.pill, "text-white shadow-md")
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                            )}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          placeholder="Minutes"
+                          value={customDurationInput}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomDurationInput(val);
+                            const num = parseInt(val, 10);
+                            if (!isNaN(num) && num > 0) {
+                              setEstimatedDuration(num);
+                            } else {
+                              setEstimatedDuration(null);
+                            }
+                          }}
+                          className="w-28 h-9 text-sm"
+                          autoFocus
+                        />
+                        <span className="text-xs text-muted-foreground">min</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
