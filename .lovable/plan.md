@@ -1,47 +1,67 @@
 
 
-# Add Edit Button to Inbox Tasks (Replace Calendar with Edit + Schedule)
+# Redesign Edit Quest Dialog to Match Add Quest Layout
 
 ## Problem
-Inbox tasks only show a calendar (schedule) button and a delete button. There is no way to edit a task's text or details from the Inbox. The user expects an edit button.
+The Edit Quest dialog uses a traditional form layout (labeled inputs, date picker, etc.) that looks different from the Add Quest sheet's step 2. The user wants them to match visually.
 
 ## Solution
-Add an edit button (pencil icon) to each inbox task row, alongside the existing schedule and delete buttons. Tapping edit will open the `EditQuestDialog` (same one used on the Quests page).
+Rewrite the `EditQuestDialog` to mirror the Add Quest sheet's step 2 layout, with an editable title in the header.
+
+## Key UI Elements to Copy from AddQuestSheet Step 2
+
+1. **Difficulty-colored header banner** with back arrow, editable title (instead of read-only), summary line (duration + date), and close button
+2. **Duration row** -- tappable, expands to duration chips (1m, 15m, 30m, 45m, 1h, 1.5h, All Day, Custom)
+3. **Date and Time chips** side by side (calendar popover + time wheel picker)
+4. **Subtasks + Notes card** -- subtask rows with checkboxes, "Add Subtask" row, and notes textarea
+5. **Advanced Settings** collapsible section (recurrence, reminders, location, contact linking)
+6. **Footer** with "Save Changes" button (replaces "Create Task") and "Delete" button (replaces "Add to Inbox")
 
 ## Changes
 
-### 1. `src/pages/Inbox.tsx`
-- Import `Pencil` from lucide-react
-- Import `EditQuestDialog` from `src/features/quests/components/EditQuestDialog`
-- Import `useTaskMutations` to get `updateTask` and `deleteTask` with proper save handling
-- Add `editingTask` state to track which task is being edited
-- Add a pencil/edit button between the calendar and trash buttons for each task
-- Clicking edit opens `EditQuestDialog` pre-filled with the task data
-- Wire up `onSave` to update the task via `updateTask` mutation and invalidate inbox-tasks cache
-- Render the `EditQuestDialog` component at the bottom of the page
+### `src/features/quests/components/EditQuestDialog.tsx` -- Full Rewrite
 
-### Technical Details
+**Header**: Difficulty-colored banner with:
+- Back/close buttons
+- Editable Input for task title (instead of static text)
+- Summary line showing duration + date
 
-**New state:**
-```typescript
-const [editingTask, setEditingTask] = useState<DailyTask | null>(null);
-```
+**Body** (scrollable, matches AddQuestSheet step 2):
+- Duration row (tappable, expands to chip selector with same DURATION_OPTIONS)
+- Date + Time chips side by side (same calendar popover + time wheel)
+- Subtasks card (fetch existing subtasks via `useSubtasks` hook, allow add/edit/delete)
+- Notes textarea
+- Photo section (existing QuestImagePicker)
+- Advanced Settings collapsible (recurrence, reminders, location)
 
-**New button per task row (between calendar and trash):**
-```tsx
-<button onClick={() => setEditingTask(task)} aria-label="Edit task">
-  <Pencil className="w-4 h-4" />
-</button>
-```
+**Footer**:
+- "Save Changes" primary button (difficulty-colored)
+- "Delete" destructive button (if onDelete provided)
 
-**EditQuestDialog rendered once, controlled by `editingTask` state:**
-```tsx
-<EditQuestDialog
-  task={editingTask}
-  open={!!editingTask}
-  onOpenChange={(open) => !open && setEditingTask(null)}
-  onSave={handleSaveEdit}
-  isSaving={isUpdating}
-/>
-```
+### Dependencies to Import
+- Reuse same helper functions: `formatTime12`, `generateTimeSlots`, `DURATION_OPTIONS`, `DIFFICULTY_COLORS`, `DifficultyIcon` from AddQuestSheet (or extract shared constants)
+- Import `useSubtasks` from `@/features/tasks/hooks` to load/manage subtasks for the task being edited
+- Import `Collapsible` components, `Textarea`, `Checkbox` same as AddQuestSheet
 
+### What Stays the Same
+- Props interface (`EditQuestDialogProps`) stays the same
+- `onSave` callback signature stays the same
+- Delete confirmation dialog stays the same
+- Sheet-based bottom drawer stays the same
+
+### Technical Notes
+- No step wizard needed (edit goes straight to the "step 2" view)
+- Title is editable in the header Input field (not read-only like AddQuestSheet step 2)
+- Difficulty selector: small icons in header (same as AddQuestSheet step 1's compact selector) since users need to change difficulty too
+- Subtasks: load existing subtasks on open via `useSubtasks(task.id)`, wire up add/edit/delete
+- The constants (DIFFICULTY_COLORS, DURATION_OPTIONS, TIME_SLOTS, formatTime12) should be extracted to a shared file to avoid duplication
+
+### New Shared File: `src/components/quest-shared.ts`
+Extract from AddQuestSheet:
+- `DIFFICULTY_COLORS`
+- `DifficultyIcon`
+- `formatTime12`
+- `generateTimeSlots` / `TIME_SLOTS`
+- `DURATION_OPTIONS`
+
+Update AddQuestSheet to import from this shared file instead of defining inline.
