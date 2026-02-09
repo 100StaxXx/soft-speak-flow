@@ -20,7 +20,7 @@ export function TimelineTaskRow({ time, showLine = true, isLast = false, childre
   return (
     <div className="relative flex gap-2">
       {/* Time label column - fixed width */}
-      <div className="w-9 flex-shrink-0 pt-[26px] text-left">
+      <div className="w-9 flex-shrink-0 pt-[22px] text-left">
         {time && (
           <span className="text-[10px] font-medium text-muted-foreground leading-none">
             {formatTime12h(time)}
