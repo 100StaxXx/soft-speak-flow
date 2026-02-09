@@ -50,7 +50,7 @@ import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
-import { useInboxTasks } from "@/hooks/useInboxTasks";
+
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
@@ -288,12 +288,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return { scheduledItems: scheduled, anytimeItems: anytime };
   }, [questTasks, ritualTasks]);
 
-  // Inbox
-  const { inboxTasks, inboxCount, toggleInboxTask, deleteInboxTask, scheduleTask } = useInboxTasks();
-  const [inboxExpanded, setInboxExpanded] = useState(false);
-  
-  
-  
+
+
   
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
@@ -842,57 +838,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         )}
 
-        {/* Inbox Section */}
-        {inboxCount > 0 && (
-          <div className="mt-4 pt-3 border-t border-dashed border-border/40">
-            <button
-              onClick={() => setInboxExpanded(!inboxExpanded)}
-              className="flex items-center gap-2 w-full py-1.5 text-left"
-            >
-              <Inbox className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Inbox</span>
-              <Badge variant="secondary" className="h-5 px-2 text-xs bg-muted text-muted-foreground border-0">
-                {inboxCount}
-              </Badge>
-              <ChevronDown className={cn(
-                "w-4 h-4 text-muted-foreground ml-auto transition-transform duration-200",
-                !inboxExpanded && "-rotate-90"
-              )} />
-            </button>
-            
-            <Collapsible open={inboxExpanded}>
-              <CollapsibleContent>
-                <div className="space-y-1 mt-2">
-                  {inboxTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-3 py-2 px-1">
-                      <button
-                        onClick={() => toggleInboxTask({ taskId: task.id, completed: !task.completed })}
-                        className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-muted-foreground/40 hover:border-primary transition-colors flex-shrink-0"
-                      >
-                        {task.completed && <Check className="w-4 h-4 text-primary" />}
-                      </button>
-                      <span className={cn(
-                        "text-sm flex-1 min-w-0 truncate",
-                        task.completed && "line-through text-muted-foreground"
-                      )}>
-                        {task.task_text}
-                      </span>
-                      <button
-                        onClick={() => {
-                          const today = format(selectedDate, 'yyyy-MM-dd');
-                          scheduleTask({ taskId: task.id, targetDate: today });
-                        }}
-                        className="text-xs text-primary hover:underline flex-shrink-0"
-                      >
-                        Schedule
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
+        {/* Inbox section removed - now has its own tab */}
 
         {/* Campaign Headers (for epics with no rituals today, still show as strip) */}
         {activeEpics && activeEpics.length > 0 && ritualTasks.length === 0 && (

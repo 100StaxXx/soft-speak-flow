@@ -69,6 +69,7 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 const Epics = lazy(() => import("./pages/Epics"));
 const Journeys = lazy(() => import("./pages/Journeys"));
+const Inbox = lazy(() => import("./pages/Inbox"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
@@ -293,6 +294,7 @@ const AppContent = memo(() => {
                   <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
                   <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
                   <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
+                  <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
                   <Route path="/join/:code" element={<JoinEpic />} />
                   <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                   {/* HIDDEN: Arcade route disabled */}
