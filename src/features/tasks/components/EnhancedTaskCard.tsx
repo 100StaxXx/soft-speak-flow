@@ -257,7 +257,7 @@ export function EnhancedTaskCard({
                 </DropdownMenuItem>
                 {onEdit && (
                   <DropdownMenuItem onClick={() => onEdit(task.id)}>
-                    Edit task
+                    Edit quest
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -266,7 +266,7 @@ export function EnhancedTaskCard({
                     onClick={() => onDelete(task.id)}
                     className="text-destructive focus:text-destructive"
                   >
-                    Delete task
+                    Delete quest
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

@@ -627,7 +627,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   canCreateTask ? cn(colors.pill, "hover:opacity-90") : ""
                 )}
               >
-                {isAdding ? "Creating..." : "Create Task"}
+                {isAdding ? "Creating..." : "Create Quest"}
               </Button>
               <Button
                 variant="outline"

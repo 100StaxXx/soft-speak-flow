@@ -55,7 +55,7 @@ export function TaskManagerPanel({
         <CardContent className="p-4">
           <SmartTaskInput 
             onSubmit={handleTaskAdd}
-            placeholder="Add a task... (try 'Call mom tomorrow at 2pm #personal !high')"
+            placeholder="Add a quest... (try 'Call mom tomorrow at 2pm #personal !high')"
           />
         </CardContent>
       </Card>

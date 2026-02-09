@@ -195,7 +195,7 @@ export const useTaskMutations = (taskDate: string) => {
           queryClient.setQueryData(queryKey, data);
         });
       }
-      toast({ title: "Failed to add task", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to add quest", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
       // Refetch to sync with server
@@ -204,7 +204,7 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] });
     },
     onSuccess: (data) => {
-      toast({ title: "Task added successfully!" });
+      toast({ title: "Quest added!" });
       window.dispatchEvent(new CustomEvent('task-added'));
       
       // Track task creation for learning
@@ -389,7 +389,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       if (completed && !wasAlreadyCompleted) {
         if (xpAwarded > 0) {
-          showXPToast(xpAwarded, toastReason || 'Task Complete!');
+          showXPToast(xpAwarded, toastReason || 'Quest Complete!');
         }
         if (companion?.id) {
           updateDisciplineFromRitual(companion.id).catch(console.error);
@@ -455,7 +455,7 @@ export const useTaskMutations = (taskDate: string) => {
         ? 'Network error. Please check your connection and try again.'
         : error.message;
       
-      toast({ title: "Failed to toggle task", description: errorMessage, variant: "destructive" });
+      toast({ title: "Failed to toggle quest", description: errorMessage, variant: "destructive" });
     },
     retry: 2,
     retryDelay: 1000,
@@ -477,10 +477,10 @@ export const useTaskMutations = (taskDate: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast({ title: "Task deleted successfully!" });
+      toast({ title: "Quest deleted!" });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to delete task", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to delete quest", description: error.message, variant: "destructive" });
     },
   });
 
@@ -544,7 +544,7 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to restore task", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to restore quest", description: error.message, variant: "destructive" });
     },
   });
 
@@ -747,7 +747,7 @@ export const useTaskMutations = (taskDate: string) => {
           queryClient.setQueryData(queryKey, data);
         });
       }
-      toast({ title: "Failed to reorder tasks", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to reorder quests", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
       // Sync with server after mutation settles
@@ -790,7 +790,7 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to move task", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
     },
   });
 
@@ -843,14 +843,14 @@ export const useTaskMutations = (taskDate: string) => {
       if (context?.previousCalendar) {
         context.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
       }
-      toast({ title: "Failed to move task", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
     onSuccess: (_data, variables) => {
-      toast({ title: `Task moved to ${format(new Date(variables.targetDate + 'T00:00:00'), 'MMM d')}` });
+      toast({ title: `Quest moved to ${format(new Date(variables.targetDate + 'T00:00:00'), 'MMM d')}` });
     },
   });
 

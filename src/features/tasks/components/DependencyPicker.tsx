@@ -82,9 +82,9 @@ export const DependencyPicker: React.FC<DependencyPickerProps> = ({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
             <Command>
-              <CommandInput placeholder="Search tasks..." />
+              <CommandInput placeholder="Search quests..." />
               <CommandList>
-                <CommandEmpty>No tasks found.</CommandEmpty>
+                <CommandEmpty>No quests found.</CommandEmpty>
                 <CommandGroup>
                   {availableTasks.map((task) => (
                     <CommandItem

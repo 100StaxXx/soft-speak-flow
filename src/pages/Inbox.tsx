@@ -104,8 +104,8 @@ const InboxPage = memo(function InboxPage() {
             <EmptyState
               icon={InboxIcon}
               title="Inbox is empty"
-              description="Capture tasks with the + button — schedule them later when you're ready."
-              actionLabel="Add a task"
+              description="Capture quests with the + button — schedule them later when you're ready."
+              actionLabel="Add a quest"
               onAction={() => setShowAddQuest(true)}
             />
           ) : (
@@ -148,7 +148,7 @@ const InboxPage = memo(function InboxPage() {
                           haptics.light();
                         }}
                         className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
-                        aria-label="Edit task"
+                        aria-label="Edit quest"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -159,7 +159,7 @@ const InboxPage = memo(function InboxPage() {
                           haptics.light();
                         }}
                         className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
-                        aria-label="Delete task"
+                        aria-label="Delete quest"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

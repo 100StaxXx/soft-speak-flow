@@ -312,13 +312,13 @@ export function SmartTaskInput({
       });
       
       success();
-      toast.success(`Created ${tasks.length} tasks!`);
+      toast.success(`Created ${tasks.length} quests!`);
       setShowBatchPreview(false);
       reset();
       resetClassification();
       setOriginalBrainDump('');
     } catch (error) {
-      toast.error('Failed to create tasks');
+      toast.error('Failed to create quests');
     } finally {
       setIsCreatingBatch(false);
     }
@@ -333,7 +333,7 @@ export function SmartTaskInput({
       const subtasks = await decompose(textToBreakdown);
       setSuggestedSubtasks(subtasks);
     } catch (error) {
-      toast.error('Failed to break down task. Please try again.');
+      toast.error('Failed to break down quest. Please try again.');
     }
   };
 

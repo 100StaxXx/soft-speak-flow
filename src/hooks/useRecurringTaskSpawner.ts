@@ -146,7 +146,7 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
     },
     onError: (error: Error) => {
       console.error('[RecurringSpawner] Failed to spawn recurring tasks:', error);
-      toast.error('Failed to create recurring tasks');
+      toast.error('Failed to create recurring quests');
     },
   });
 

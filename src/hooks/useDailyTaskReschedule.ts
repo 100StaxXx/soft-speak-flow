@@ -143,11 +143,11 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       
       const kept = incompleteTasks.length - toMove.length;
-      toast.success(`Focused on ${kept} essentials, moved ${toMove.length} to tomorrow`);
+      toast.success(`Focused on ${kept} essentials, moved ${toMove.length} quests to tomorrow`);
     } catch (error) {
       console.error('Error prioritizing tasks:', error);
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      toast.error('Failed to prioritize tasks');
+      toast.error('Failed to prioritize quests');
     } finally {
       setIsRescheduling(false);
     }
@@ -180,11 +180,11 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
 
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast.success(`Moved ${incompleteTasks.length} tasks to tomorrow`);
+      toast.success(`Moved ${incompleteTasks.length} quests to tomorrow`);
     } catch (error) {
       console.error('Error moving tasks:', error);
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-      toast.error('Failed to move tasks');
+      toast.error('Failed to move quests');
     } finally {
       setIsRescheduling(false);
     }

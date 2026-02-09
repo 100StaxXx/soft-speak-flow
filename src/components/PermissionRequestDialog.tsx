@@ -117,7 +117,7 @@ export function PermissionRequestDialog({
             Enable Voice Input?
           </AlertDialogTitle>
           <AlertDialogDescription className="text-center">
-            Allow microphone access to create tasks and chat using your voice. This makes adding tasks faster and easier!
+            Allow microphone access to create quests and chat using your voice. This makes adding quests faster and easier!
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col sm:flex-col gap-2">
