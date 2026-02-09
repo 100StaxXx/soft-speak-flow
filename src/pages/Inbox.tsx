@@ -134,27 +134,6 @@ const InboxPage = memo(function InboxPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <Popover
-                        open={schedulingTaskId === task.id}
-                        onOpenChange={(open) => setSchedulingTaskId(open ? task.id : null)}
-                      >
-                        <PopoverTrigger asChild>
-                          <button
-                            className="p-2 rounded-lg hover:bg-muted/50 text-celestial-blue transition-colors touch-manipulation"
-                            aria-label="Schedule task"
-                          >
-                            <CalendarDays className="w-4 h-4" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                          <Calendar
-                            mode="single"
-                            selected={undefined}
-                            onSelect={(date) => date && handleSchedule(task.id, date)}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                          />
-                        </PopoverContent>
-                      </Popover>
 
                       <button
                         onClick={() => {
