@@ -185,72 +185,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   />
                 </div>
 
-                {/* Advanced Settings */}
-                <div className="pt-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="w-full justify-between text-muted-foreground"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Sliders className="w-4 h-4" />
-                      Advanced Settings
-                    </span>
-                    <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
-                  </Button>
-
-                  {showAdvanced && (
-                    <div className="mt-4 space-y-4">
-                      {/* Contact Linking */}
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                          <Users className="w-4 h-4" />
-                          <span>Link to Contact</span>
-                        </div>
-                        <ContactPicker
-                          value={contactId}
-                          onChange={setContactId}
-                          placeholder="Select a contact..."
-                        />
-                        {contactId && (
-                          <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
-                            <Label htmlFor="auto-log-add" className="text-sm cursor-pointer">
-                              Log as interaction when completed
-                            </Label>
-                            <Switch
-                              id="auto-log-add"
-                              checked={autoLogInteraction}
-                              onCheckedChange={setAutoLogInteraction}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Recurrence, Reminders, Location, Notes */}
-                      <AdvancedQuestOptions
-                        scheduledTime={scheduledTime}
-                        estimatedDuration={estimatedDuration}
-                        recurrencePattern={recurrencePattern}
-                        recurrenceDays={recurrenceDays}
-                        reminderEnabled={reminderEnabled}
-                        reminderMinutesBefore={reminderMinutesBefore}
-                        onScheduledTimeChange={setScheduledTime}
-                        onEstimatedDurationChange={setEstimatedDuration}
-                        onRecurrencePatternChange={setRecurrencePattern}
-                        onRecurrenceDaysChange={setRecurrenceDays}
-                        onReminderEnabledChange={setReminderEnabled}
-                        onReminderMinutesBeforeChange={setReminderMinutesBefore}
-                        moreInformation={moreInformation}
-                        onMoreInformationChange={setMoreInformation}
-                        location={location}
-                        onLocationChange={setLocation}
-                        selectedDate={selectedDate}
-                        taskDifficulty={difficulty}
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
             </ScrollArea>
 
@@ -363,6 +297,73 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     disabled={isAdding}
                   />
                 )}
+
+                {/* Advanced Settings */}
+                <div className="pt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full justify-between text-muted-foreground"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4" />
+                      Advanced Settings
+                    </span>
+                    <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
+                  </Button>
+
+                  {showAdvanced && (
+                    <div className="mt-4 space-y-4">
+                      {/* Contact Linking */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <Users className="w-4 h-4" />
+                          <span>Link to Contact</span>
+                        </div>
+                        <ContactPicker
+                          value={contactId}
+                          onChange={setContactId}
+                          placeholder="Select a contact..."
+                        />
+                        {contactId && (
+                          <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
+                            <Label htmlFor="auto-log-add" className="text-sm cursor-pointer">
+                              Log as interaction when completed
+                            </Label>
+                            <Switch
+                              id="auto-log-add"
+                              checked={autoLogInteraction}
+                              onCheckedChange={setAutoLogInteraction}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Recurrence, Reminders, Location, Notes */}
+                      <AdvancedQuestOptions
+                        scheduledTime={scheduledTime}
+                        estimatedDuration={estimatedDuration}
+                        recurrencePattern={recurrencePattern}
+                        recurrenceDays={recurrenceDays}
+                        reminderEnabled={reminderEnabled}
+                        reminderMinutesBefore={reminderMinutesBefore}
+                        onScheduledTimeChange={setScheduledTime}
+                        onEstimatedDurationChange={setEstimatedDuration}
+                        onRecurrencePatternChange={setRecurrencePattern}
+                        onRecurrenceDaysChange={setRecurrenceDays}
+                        onReminderEnabledChange={setReminderEnabled}
+                        onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                        moreInformation={moreInformation}
+                        onMoreInformationChange={setMoreInformation}
+                        location={location}
+                        onLocationChange={setLocation}
+                        selectedDate={selectedDate}
+                        taskDifficulty={difficulty}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </ScrollArea>
 
