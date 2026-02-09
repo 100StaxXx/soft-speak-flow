@@ -35,6 +35,10 @@ interface AdvancedQuestOptionsProps {
   taskDifficulty?: 'easy' | 'medium' | 'hard';
   // Hide recurrence for rituals (they use FrequencyPresets instead)
   hideRecurrence?: boolean;
+  // Hide fields that are already shown on the parent form
+  hideScheduledTime?: boolean;
+  hideDuration?: boolean;
+  hideMoreInformation?: boolean;
 }
 
 // Helper to format 24h time to 12h
@@ -102,6 +106,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   return (
     <div className="space-y-4 border-t pt-4">
       {/* Scheduled Time with Suggest Button */}
+      {!props.hideScheduledTime && (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-muted-foreground" />
@@ -171,8 +176,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           )}
         </div>
       </div>
+      )}
 
       {/* Estimated Duration */}
+      {!props.hideDuration && (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -213,6 +220,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           )}
         </div>
       </div>
+      )}
 
       {/* Reminder Section - Only show if scheduled time is set */}
       {props.scheduledTime && (
@@ -333,6 +341,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       </div>
 
       {/* More Information */}
+      {!props.hideMoreInformation && (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-muted-foreground" />
@@ -347,6 +356,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           data-vaul-no-drag
         />
       </div>
+      )}
     </div>
   );
 };
