@@ -828,28 +828,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {tasks.length === 0 ? (
           <div className="text-center py-6">
             <Circle className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-2">
               No tasks for this day
             </p>
-            
-            {/* CompactSmartInput for empty state */}
-            {onQuickAdd ? (
-              <div className="max-w-md mx-auto px-4">
-                <CompactSmartInput
-                  onSubmit={onQuickAdd}
-                  onPlanMyDay={onPlanMyDay}
-                  onPlanMyWeek={onPlanMyWeek}
-                  activeEpics={activeEpics}
-                  habitsAtRisk={habitsAtRisk}
-                  placeholder="Add your first quest..."
-                />
-              </div>
-            ) : (
-              <Button size="sm" onClick={onAddQuest} className="gap-1">
-                <Plus className="w-4 h-4" />
-                Add Quest
-              </Button>
-            )}
+            <p className="text-xs text-muted-foreground/70">
+              Tap <Plus className="w-3 h-3 inline" /> to add your first quest
+            </p>
           </div>
         ) : (
           <div className="space-y-1">
@@ -909,19 +893,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               )}
             </div>
             
-            {/* Compact Smart Input - Separate row for full width */}
-            {onQuickAdd && (
-              <div className="px-1">
-                <CompactSmartInput
-                  onSubmit={onQuickAdd}
-                  onPlanMyDay={onPlanMyDay}
-                  onPlanMyWeek={onPlanMyWeek}
-                  activeEpics={activeEpics}
-                  habitsAtRisk={habitsAtRisk}
-                  placeholder="Add quest..."
-                />
-              </div>
-            )}
+            {/* Input removed - FAB is now the entry point */}
             
             {/* Quests List Section */}
             {questTasks.length > 0 && (

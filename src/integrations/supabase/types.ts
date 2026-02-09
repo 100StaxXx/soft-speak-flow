@@ -2180,7 +2180,7 @@ export type Database = {
           sort_order: number | null
           source: string | null
           start_notification_sent: boolean | null
-          task_date: string
+          task_date: string | null
           task_text: string
           user_id: string
           xp_reward: number
@@ -2223,7 +2223,7 @@ export type Database = {
           sort_order?: number | null
           source?: string | null
           start_notification_sent?: boolean | null
-          task_date?: string
+          task_date?: string | null
           task_text: string
           user_id: string
           xp_reward?: number
@@ -2266,7 +2266,7 @@ export type Database = {
           sort_order?: number | null
           source?: string | null
           start_notification_sent?: boolean | null
-          task_date?: string
+          task_date?: string | null
           task_text?: string
           user_id?: string
           xp_reward?: number

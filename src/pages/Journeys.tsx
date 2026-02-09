@@ -48,6 +48,8 @@ import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/Quick
 
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
+import { DraggableFAB } from "@/components/DraggableFAB";
+import { CreationPickerSheet } from "@/components/CreationPickerSheet";
 import { Wand2 } from "lucide-react";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
 import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
@@ -64,6 +66,7 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showCreationPicker, setShowCreationPicker] = useState(false);
   const [showQuestClear, setShowQuestClear] = useState(false);
   
   const [showHourlyModal, setShowHourlyModal] = useState(false);
@@ -245,11 +248,11 @@ const Journeys = () => {
   }, [allCalendarTasks]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
-    const taskDate = format(selectedDate, 'yyyy-MM-dd');
+    const taskDate = data.sendToInbox ? null : format(selectedDate, 'yyyy-MM-dd');
     await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
-      taskDate,
+      taskDate: taskDate as string, // null for inbox tasks
       isMainQuest: false,
       scheduledTime: data.scheduledTime,
       estimatedDuration: data.estimatedDuration,
@@ -645,7 +648,7 @@ const Journeys = () => {
             tasks={dailyTasks}
             selectedDate={selectedDate}
             onToggle={handleToggleTask}
-            onAddQuest={() => setShowAddSheet(true)}
+            onAddQuest={() => setShowCreationPicker(true)}
             completedCount={completedCount}
             totalCount={totalCount}
             currentStreak={currentStreak}
@@ -834,6 +837,16 @@ const Journeys = () => {
           habits={createdCampaignData?.habits || []}
           onComplete={handleAnimationComplete}
         />
+        {/* Creation Picker Sheet */}
+        <CreationPickerSheet
+          open={showCreationPicker}
+          onOpenChange={setShowCreationPicker}
+          onSelectQuest={() => setShowAddSheet(true)}
+          onSelectCampaign={() => setShowPathfinder(true)}
+        />
+
+        {/* Draggable FAB */}
+        <DraggableFAB onTap={() => setShowCreationPicker(true)} />
       </div>
 
       <BottomNav />

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from "react";
-import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send, Users } from "lucide-react";
+import { Plus, Zap, Flame, Mountain, Sliders, ChevronUp, Send, Users, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -32,6 +32,7 @@ export interface AddQuestData {
   location: string | null;
   contactId: string | null;
   autoLogInteraction: boolean;
+  sendToInbox: boolean;
 }
 
 interface AddQuestSheetProps {
@@ -64,6 +65,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [location, setLocation] = useState<string | null>(null);
   const [contactId, setContactId] = useState<string | null>(null);
   const [autoLogInteraction, setAutoLogInteraction] = useState(true);
+  const [sendToInbox, setSendToInbox] = useState(false);
   
   // Expanded mode - starts minimal, expands when user wants more options
   const [isExpanded, setIsExpanded] = useState(false);
@@ -119,6 +121,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setLocation(null);
     setContactId(null);
     setAutoLogInteraction(true);
+    setSendToInbox(false);
     setIsExpanded(false);
   };
 
@@ -128,7 +131,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     await onAdd({
       text: taskText,
       difficulty,
-      scheduledTime,
+      scheduledTime: sendToInbox ? null : scheduledTime,
       estimatedDuration,
       recurrencePattern,
       recurrenceDays,
@@ -138,6 +141,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       location,
       contactId,
       autoLogInteraction,
+      sendToInbox,
     });
     
     resetForm();
@@ -263,8 +267,21 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             </Button>
           </div>
 
-          {/* Smart Time Suggestions - show when no time is set */}
-          {!scheduledTime && (
+          {/* Send to Inbox toggle */}
+          <button
+            onClick={() => setSendToInbox(!sendToInbox)}
+            className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors w-fit ${
+              sendToInbox 
+                ? 'bg-accent/15 border-accent/30 text-accent-foreground' 
+                : 'border-border/50 text-muted-foreground hover:bg-muted/30'
+            }`}
+          >
+            <Inbox className="w-4 h-4" />
+            <span>{sendToInbox ? "Sending to Inbox (no date)" : "Add to Inbox"}</span>
+          </button>
+
+          {/* Smart Time Suggestions - show when no time is set and not inbox */}
+          {!scheduledTime && !sendToInbox && (
             <SuggestedTimeSlots
               date={selectedDate}
               duration={estimatedDuration || 30}
