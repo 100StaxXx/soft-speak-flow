@@ -358,6 +358,7 @@ export function EditQuestDialog({
                     onMoreInformationChange={setMoreInformation}
                     location={location}
                     onLocationChange={setLocation}
+                    hideScheduledTime
                   />
                 </div>
               )}
