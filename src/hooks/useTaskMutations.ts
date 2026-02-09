@@ -39,7 +39,7 @@ function detectCategory(taskText: string, providedCategory?: string): TaskCatego
 export interface AddTaskParams {
   taskText: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  taskDate?: string;
+  taskDate?: string | null;
   isMainQuest?: boolean;
   scheduledTime?: string | null;
   estimatedDuration?: number | null;
