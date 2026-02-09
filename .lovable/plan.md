@@ -1,16 +1,14 @@
 
 
-# Remove Grey Box Background from Empty State
+# Remove Scheduled Time from Advanced Options in Edit Quest
 
 ## Change
 
-**File: `src/components/EmptyState.tsx`**
+**File: `src/features/quests/components/EditQuestDialog.tsx`**
 
-- Replace the `<Card>` wrapper (line 21) with a plain `<div>` that has no background, no border, and centers content
-- Remove the `Card` import (line 3)
-- New wrapper class: `flex flex-col items-center justify-center text-center space-y-6 py-20`
+The "Scheduled Time" field already appears in the main form (above the advanced section). It is duplicated inside `AdvancedQuestOptions`. Add the `hideScheduledTime` prop to the `AdvancedQuestOptions` component to hide the duplicate.
 
 | File | Change |
 |---|---|
-| `src/components/EmptyState.tsx` | Remove `Card` import; replace `<Card className="...">` with `<div className="flex flex-col items-center justify-center text-center space-y-6 py-20">` and closing `</Card>` with `</div>` |
+| `src/features/quests/components/EditQuestDialog.tsx` (line ~344) | Add `hideScheduledTime` prop to `<AdvancedQuestOptions>` |
 
