@@ -1,100 +1,47 @@
 
-
-# Redesign Add Quest Wizard to Match Structured Reference
+# Split Add Quest into Two-Step Wizard
 
 ## Overview
 
-Consolidate the wizard into a single-screen layout (matching the uploaded Structured screenshot), add subtask support with dynamic rows, and conditionally disable the "Create Task" button when no date/time is selected.
+Split the current single-screen layout back into a two-step wizard, and remove the duplicated duration/time fields from Advanced Settings.
 
-## New Layout (Single Screen, Top to Bottom)
+## Step 1: Title and Difficulty
 
-```text
-+------------------------------------------+
-| [X]                                      |
-|                                          |
-| [Difficulty Icon]  15 min - Inbox        |
-|                    Quest Title (editable) |
-|        [Difficulty circle selector]      |
-+------ colored banner --------------------+
-|                                          |
-| [clock] 15 min                        >  |  <- Duration row (tappable, opens chips)
-|                                          |
-| [Date chip]  [Time chip]                 |  <- Side-by-side pill buttons
-|                                          |
-| +--------------------------------------+ |
-| | [ ] Add Subtask                      | |  <- Checkbox + inline input
-| |--------------------------------------|  |
-| | Add notes, meeting links or          | |  <- Notes textarea
-| | phone numbers...                     | |
-| +--------------------------------------+ |
-|                                          |
-| (Advanced Settings - collapsible)        |
-|                                          |
-|       [ Create Task ]                    |  <- Disabled if no date AND time
-|    Add to Inbox instead                  |
-|    Or create a Campaign                  |
-+------------------------------------------+
-```
+The colored banner with:
+- Quest title input (auto-focused)
+- Difficulty circle selector (easy/medium/hard)
+- "Next" button in footer (disabled until title is non-empty)
 
-## Key Changes
+## Step 2: Scheduling and Details
 
-### 1. Remove the Two-Step Wizard
+Everything else:
+- Duration row (tappable, expands to chips)
+- Date and Time chips (side by side)
+- Time wheel (when time chip tapped)
+- Subtasks + Notes card
+- Advanced Settings collapsible (recurrence, reminders, contact linking, location -- **without** the `scheduledTime`, `estimatedDuration`, and `moreInformation` fields since those are already on this page)
+- Footer: "Create Task" (disabled without date+time), "Add to Inbox", "Or create a Campaign"
+- Back button to return to Step 1
 
-Merge Steps 1 and 2 into a single screen. The colored banner at top contains the title input (editable inline), difficulty selector, and summary info. Below the banner: duration, date/time chips, subtasks, notes, advanced settings, and footer buttons.
+## Technical Details
 
-### 2. Colored Header Banner (Editable)
+### `src/components/AddQuestSheet.tsx`
 
-- Difficulty icon + summary line ("15 min - Inbox" or "15 min - Mon, Feb 9")
-- Quest title as an editable input field inside the banner
-- Difficulty circle selector below the title (same HabitDifficultySelector)
+- Add `step` state (`1 | 2`), default to `1`
+- **Step 1** renders: colored banner (title + difficulty) + "Next" footer button
+- **Step 2** renders: colored banner (read-only summary) + duration, date/time, subtasks, notes, advanced settings, footer
+- Back arrow on Step 2 header to go to Step 1
+- Reset `step` to `1` on close
 
-### 3. Duration Row
+### `src/components/AdvancedQuestOptions.tsx`
 
-- A tappable row showing "[clock icon] 15 min >" that expands to show duration chips when tapped
-- Replaces the current dedicated Duration section
+- Add optional props `hideScheduledTime`, `hideDuration`, `hideMoreInformation` (all default `false`)
+- When `true`, skip rendering the corresponding sections
+- `AddQuestSheet` passes all three as `true` since those fields already exist on the main Step 2 UI
 
-### 4. Date and Time Chips
-
-- Two side-by-side pill buttons: "Date" and "Time"
-- Date chip opens a Calendar popover; shows "Date" when unset, formatted date when set
-- Time chip opens a time picker popover or inline selector; shows "Time" when unset
-- Both are optional -- user can skip them entirely
-
-### 5. Subtask Section
-
-- A dark card containing:
-  - A checkbox + "Add Subtask" placeholder input
-  - When the user types and presses Enter (or moves to next line), a new empty subtask row appears below
-  - Each subtask row: checkbox (unchecked) + text input + delete button on hover/tap
-  - Subtasks are stored in local state as `string[]` and passed to the `onAdd` callback
-- Add `subtasks: string[]` to `AddQuestData` interface
-
-### 6. Notes Textarea
-
-- Below subtasks in the same card: a "Add notes, meeting links or phone numbers..." textarea
-- Maps to existing `moreInformation` field
-
-### 7. Conditional "Create Task" Button
-
-- "Create Task" (renamed from "Add Quest") is **disabled** unless both date AND time are selected
-- "Add to Inbox instead" always available (requires only title)
-- "Or create a Campaign" link stays at bottom
-
-### 8. Advanced Settings
-
-- Collapsible dropdown below notes, containing recurrence, reminders, contact linking, location
-
-## Data Changes
-
-- Add `subtasks: string[]` to `AddQuestData` interface
-- Consumers (`Journeys.tsx`, `Inbox.tsx`, `Community.tsx`) will receive `subtasks` and can use the existing `useSubtasks` hook's `bulkAddSubtasks` to persist them after task creation
-
-## Files Changed
+### Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/AddQuestSheet.tsx` | Full redesign: single screen, inline title in banner, duration row, date/time chips, subtask rows, notes, conditional button state |
-| `src/pages/Journeys.tsx` | Handle new `subtasks` field from `AddQuestData` -- call `bulkAddSubtasks` after task insert |
-| `src/pages/Inbox.tsx` | Same: handle `subtasks` field |
-| `src/pages/Community.tsx` | Same: handle `subtasks` field |
-
+| `src/components/AddQuestSheet.tsx` | Add `step` state, split render into Step 1 (title+difficulty) and Step 2 (scheduling+details), back button on Step 2 |
+| `src/components/AdvancedQuestOptions.tsx` | Add `hideScheduledTime`, `hideDuration`, `hideMoreInformation` props to conditionally skip those sections |
