@@ -1,16 +1,15 @@
-import { useState, useEffect } from "react";
-import { format } from "date-fns";
-import { CalendarIcon, Pencil, Repeat, Trash2, MapPin } from "lucide-react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { format, isToday, addMinutes, parse } from "date-fns";
+import { X, ArrowLeft, Clock, ChevronRight, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,21 +20,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
-import { NaturalLanguageEditor } from "./NaturalLanguageEditor";
 import { QuestImageThumbnail } from "@/components/QuestImageThumbnail";
 import { QuestImagePicker } from "@/components/QuestImagePicker";
 import { useQuestImagePicker } from "@/hooks/useQuestImagePicker";
-import { QuestDifficulty } from "../types";
-import { ParsedTask } from "@/features/tasks/hooks";
+import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
+import { DIFFICULTY_COLORS, DifficultyIconMap, formatTime12, TIME_SLOTS, DURATION_OPTIONS } from "@/components/quest-shared";
+import type { QuestDifficulty } from "../types";
 
 interface Task {
   id: string;
@@ -89,8 +80,8 @@ export function EditQuestDialog({
   const [taskText, setTaskText] = useState("");
   const [taskDate, setTaskDate] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<QuestDifficulty>("medium");
-  const [scheduledTime, setScheduledTime] = useState<string>("");
-  const [estimatedDuration, setEstimatedDuration] = useState<number | null>(null);
+  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
+  const [estimatedDuration, setEstimatedDuration] = useState<number | null>(30);
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -100,16 +91,25 @@ export function EditQuestDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
-  
-  const { deleteImage } = useQuestImagePicker();
+  const [showDurationChips, setShowDurationChips] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [customDurationInput, setCustomDurationInput] = useState("");
+  const [newSubtaskText, setNewSubtaskText] = useState("");
 
+  const timeWheelRef = useRef<HTMLDivElement>(null);
+  const selectedTimeRef = useRef<HTMLButtonElement>(null);
+
+  const { deleteImage } = useQuestImagePicker();
+  const { subtasks, addSubtask, toggleSubtask, deleteSubtask, isAdding: isAddingSubtask } = useSubtasks(task?.id ?? null);
+
+  // Initialize state from task
   useEffect(() => {
-    if (task) {
+    if (task && open) {
       setTaskText(task.task_text);
       setTaskDate(task.task_date || null);
       setDifficulty((task.difficulty as QuestDifficulty) || "medium");
-      setScheduledTime(task.scheduled_time || "");
-      setEstimatedDuration(task.estimated_duration || null);
+      setScheduledTime(task.scheduled_time || null);
+      setEstimatedDuration(task.estimated_duration ?? 30);
       setRecurrencePattern(task.recurrence_pattern || null);
       setRecurrenceDays(task.recurrence_days || []);
       setReminderEnabled(task.reminder_enabled || false);
@@ -117,49 +117,55 @@ export function EditQuestDialog({
       setMoreInformation(task.category || null);
       setImageUrl(task.image_url || null);
       setLocation(task.location || null);
-      // Auto-expand advanced if any advanced fields are set
+      setShowDurationChips(false);
+      setShowTimePicker(false);
       setShowAdvanced(
-        !!task.recurrence_pattern || 
-        !!task.reminder_enabled || 
-        !!task.category ||
+        !!task.recurrence_pattern ||
+        !!task.reminder_enabled ||
         !!task.location
       );
     }
-  }, [task]);
+  }, [task, open]);
 
-  const handleNaturalLanguageApply = (parsed: ParsedTask) => {
-    if (parsed.text && parsed.text !== taskText) {
-      setTaskText(parsed.text);
+  // Auto-scroll time wheel
+  useEffect(() => {
+    if (showTimePicker && selectedTimeRef.current) {
+      setTimeout(() => {
+        selectedTimeRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 150);
     }
-    // Handle setting values
-    if (parsed.scheduledTime) {
-      setScheduledTime(parsed.scheduledTime);
-    }
-    if (parsed.estimatedDuration) {
-      setEstimatedDuration(parsed.estimatedDuration);
-    }
-    if (parsed.difficulty) {
-      setDifficulty(parsed.difficulty);
-    }
-    if (parsed.recurrencePattern) {
-      setRecurrencePattern(parsed.recurrencePattern);
-    }
-    // Handle clearing values
-    if (parsed.clearTime) {
-      setScheduledTime('');
-    }
-    if (parsed.clearDuration) {
-      setEstimatedDuration(null);
-    }
-    if (parsed.clearRecurrence) {
-      setRecurrencePattern(null);
-      setRecurrenceDays([]);
-    }
-  };
+  }, [showTimePicker, scheduledTime]);
 
-  const handleSave = async () => {
+  const endTime = useMemo(() => {
+    if (!scheduledTime || !estimatedDuration) return null;
+    const base = parse(scheduledTime, "HH:mm", new Date());
+    return format(addMinutes(base, estimatedDuration), "HH:mm");
+  }, [scheduledTime, estimatedDuration]);
+
+  const isCustomDuration = estimatedDuration !== null && !DURATION_OPTIONS.some(o => o.value === estimatedDuration);
+
+  const durationLabel = useMemo(() => {
+    if (!estimatedDuration) return "No duration";
+    if (estimatedDuration === 1440) return "All Day";
+    if (estimatedDuration >= 60) return `${estimatedDuration / 60}h`;
+    return `${estimatedDuration} min`;
+  }, [estimatedDuration]);
+
+  const summaryLine = useMemo(() => {
+    const dur = durationLabel;
+    if (taskDate) {
+      const d = new Date(taskDate + "T00:00:00");
+      if (isToday(d)) return `${dur} · Today`;
+      return `${dur} · ${format(d, "EEE, MMM d")}`;
+    }
+    return `${dur} · Inbox`;
+  }, [durationLabel, taskDate]);
+
+  const colors = DIFFICULTY_COLORS[difficulty];
+  const dateObj = taskDate ? new Date(taskDate + "T00:00:00") : new Date();
+
+  const handleSave = useCallback(async () => {
     if (!task || !taskText.trim()) return;
-    
     await onSave(task.id, {
       task_text: taskText.trim(),
       task_date: taskDate,
@@ -174,13 +180,11 @@ export function EditQuestDialog({
       image_url: imageUrl,
       location,
     });
-    
     onOpenChange(false);
-  };
+  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, imageUrl, location, onSave, onOpenChange]);
 
   const handleRemoveImage = async () => {
     if (imageUrl) {
-      // Delete from storage if it was uploaded
       await deleteImage(imageUrl);
       setImageUrl(null);
     }
@@ -193,191 +197,361 @@ export function EditQuestDialog({
     onOpenChange(false);
   };
 
-  const isRitual = !!task?.habit_source_id;
+  const handleAddSubtask = useCallback(() => {
+    if (newSubtaskText.trim()) {
+      addSubtask(newSubtaskText.trim());
+      setNewSubtaskText("");
+    }
+  }, [newSubtaskText, addSubtask]);
+
+  const DifficultyIcon = DifficultyIconMap[difficulty];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-xl flex flex-col">
-        <SheetHeader className="pb-2 flex-shrink-0">
-          <SheetTitle className="flex items-center gap-2">
-            {isRitual ? (
-              <>
-                <Repeat className="h-5 w-5 text-accent" />
-                Edit Ritual
-              </>
-            ) : (
-              <>
-                <Pencil className="h-5 w-5" />
-                Edit Quest
-              </>
-            )}
-          </SheetTitle>
-          {isRitual && (
-            <p className="text-xs text-muted-foreground">
-              This is a daily ritual from your habits
-            </p>
-          )}
-        </SheetHeader>
-        
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-6 py-4">
-            {/* Natural Language Quick Edit */}
-            <NaturalLanguageEditor onApply={handleNaturalLanguageApply} />
+      <SheetContent side="bottom" className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden">
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Quest Name</label>
+        {/* Header Banner - difficulty colored, editable title */}
+        <div className={cn("relative px-5 pt-3 pb-3 flex-shrink-0", colors.bg)}>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onOpenChange(false)}
+              className="p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white"
+              aria-label="Close"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div className="flex-1 min-w-0">
               <Input
                 value={taskText}
                 onChange={(e) => setTaskText(e.target.value)}
-                placeholder="What quest will you conquer?"
+                className="text-base font-bold bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/30 h-9"
+                placeholder="Quest title"
               />
+              <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
             </div>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Difficulty</label>
-              <HabitDifficultySelector
-                value={difficulty}
-                onChange={setDifficulty}
-              />
-            </div>
+          {/* Compact Difficulty Selector */}
+          <div className="flex justify-center gap-3 mt-2">
+            {([
+              { value: "easy" as const, icon: Zap, label: "Easy" },
+              { value: "medium" as const, icon: Flame, label: "Medium" },
+              { value: "hard" as const, icon: Mountain, label: "Hard" },
+            ]).map(({ value, icon: Icon, label }) => (
+              <button
+                key={value}
+                onClick={() => setDifficulty(value)}
+                className={cn(
+                  "w-14 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all border-2",
+                  difficulty === value
+                    ? "bg-white/30 border-white scale-110"
+                    : "bg-white/10 border-transparent hover:bg-white/20"
+                )}
+              >
+                <Icon className="h-4 w-4 text-white" />
+                <span className="text-[10px] font-medium text-white/80 leading-none">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-            {/* Date Picker */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date</label>
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 py-4 space-y-3">
+
+            {/* Duration Row */}
+            <button
+              onClick={() => setShowDurationChips(!showDurationChips)}
+              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2.5 text-sm font-medium">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>{durationLabel}</span>
+              </div>
+              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
+            </button>
+
+            {showDurationChips && (
+              <div className="space-y-2 px-1">
+                <div className="flex gap-2 flex-wrap">
+                  {DURATION_OPTIONS.map((opt) => {
+                    const isSelected = opt.value === -1
+                      ? isCustomDuration
+                      : estimatedDuration === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          if (opt.value === -1) {
+                            setCustomDurationInput("");
+                            setEstimatedDuration(null);
+                          } else {
+                            setCustomDurationInput("");
+                            setEstimatedDuration(opt.value);
+                          }
+                        }}
+                        className={cn(
+                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
+                          isSelected
+                            ? cn(colors.pill, "text-white shadow-md")
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Minutes"
+                      value={customDurationInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomDurationInput(val);
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num) && num > 0) {
+                          setEstimatedDuration(num);
+                        } else {
+                          setEstimatedDuration(null);
+                        }
+                      }}
+                      className="w-28 h-9 text-sm"
+                      autoFocus
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Date & Time Chips side by side */}
+            <div className="flex gap-2">
+              {/* Date Chip */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !taskDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {taskDate ? format(new Date(taskDate + 'T00:00:00'), "PPP") : "Pick a date"}
-                  </Button>
+                  <button className={cn(
+                    "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
+                    taskDate
+                      ? "bg-card border-border/50 text-foreground"
+                      : "bg-muted/30 border-dashed border-border/50 text-muted-foreground"
+                  )}>
+                    <CalendarIcon className="h-4 w-4" />
+                    {taskDate ? format(dateObj, "MMM d") : "Date"}
+                  </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-[100]" align="start">
                   <Calendar
                     mode="single"
-                    selected={taskDate ? new Date(taskDate + 'T00:00:00') : undefined}
-                    onSelect={(date) => setTaskDate(date ? format(date, 'yyyy-MM-dd') : null)}
+                    selected={dateObj}
+                    onSelect={(date) => setTaskDate(date ? format(date, "yyyy-MM-dd") : null)}
                     className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
+
+              {/* Time Chip */}
+              <button
+                onClick={() => {
+                  if (!scheduledTime) {
+                    const now = new Date();
+                    const rm = Math.ceil(now.getMinutes() / 15) * 15;
+                    const rounded = new Date(now);
+                    rounded.setMinutes(rm, 0, 0);
+                    if (rm >= 60) rounded.setHours(rounded.getHours() + 1, 0, 0, 0);
+                    setScheduledTime(format(rounded, "HH:mm"));
+                  }
+                  setShowTimePicker(!showTimePicker);
+                }}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
+                  scheduledTime
+                    ? "bg-card border-border/50 text-foreground"
+                    : "bg-muted/30 border-dashed border-border/50 text-muted-foreground"
+                )}
+              >
+                <Clock className="h-4 w-4" />
+                {scheduledTime ? formatTime12(scheduledTime) : "Time"}
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Scheduled Time</label>
-                <Input
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Duration (min)</label>
-                <Input
-                  type="number"
-                  value={estimatedDuration || ""}
-                  onChange={(e) => setEstimatedDuration(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="30"
-                  min="1"
-                />
-              </div>
-            </div>
+            {/* Time Wheel */}
+            {showTimePicker && (
+              <div
+                ref={timeWheelRef}
+                className="relative h-[180px] overflow-y-auto rounded-xl bg-card border border-border/50 snap-y snap-mandatory scrollbar-none"
+                style={{ scrollbarWidth: "none" }}
+              >
+                <div className="sticky top-0 h-12 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none" />
+                <div className="flex flex-col items-center py-1">
+                  {TIME_SLOTS.map((slot) => {
+                    const isSelected = scheduledTime === slot;
+                    const selectedIdx = scheduledTime ? TIME_SLOTS.indexOf(scheduledTime) : -1;
+                    const slotIdx = TIME_SLOTS.indexOf(slot);
+                    const distance = selectedIdx >= 0 ? Math.abs(slotIdx - selectedIdx) : 0;
+                    const opacity = isSelected ? 1 : Math.max(0.25, 1 - distance * 0.15);
 
-            {/* Location Section */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                Location
-              </label>
-              <Input
-                value={location || ''}
-                onChange={(e) => setLocation(e.target.value || null)}
-                placeholder="Where will this happen? (optional)"
+                    return (
+                      <button
+                        key={slot}
+                        ref={isSelected ? selectedTimeRef : undefined}
+                        onClick={() => setScheduledTime(slot)}
+                        className={cn(
+                          "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",
+                          isSelected
+                            ? cn(colors.pill, "text-white shadow-lg scale-[1.02]")
+                            : "text-foreground hover:bg-muted/50"
+                        )}
+                        style={{ opacity: isSelected ? 1 : opacity }}
+                      >
+                        {isSelected && endTime
+                          ? `${formatTime12(slot)} – ${formatTime12(endTime)}`
+                          : formatTime12(slot)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
+              </div>
+            )}
+
+            {/* Subtasks + Notes Card */}
+            <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
+              {subtasks.map((st) => (
+                <div key={st.id} className="flex items-center gap-2 px-3 py-2 border-b border-border/30 group">
+                  <Checkbox
+                    checked={st.completed}
+                    onCheckedChange={(checked) => toggleSubtask({ subtaskId: st.id, completed: !!checked })}
+                    className="h-4 w-4"
+                  />
+                  <span className={cn("flex-1 text-sm", st.completed && "line-through text-muted-foreground")}>{st.title}</span>
+                  <button
+                    onClick={() => deleteSubtask(st.id)}
+                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              {/* Add subtask row */}
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
+                <Checkbox disabled className="h-4 w-4 opacity-30" />
+                <input
+                  value={newSubtaskText}
+                  onChange={(e) => setNewSubtaskText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newSubtaskText.trim()) {
+                      e.preventDefault();
+                      handleAddSubtask();
+                    }
+                  }}
+                  placeholder="Add Subtask"
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                />
+              </div>
+
+              <Textarea
+                value={moreInformation || ""}
+                onChange={(e) => setMoreInformation(e.target.value || null)}
+                placeholder="Add notes, meeting links or phone numbers..."
+                className="min-h-[70px] border-0 rounded-none bg-transparent resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
+                data-vaul-no-drag
               />
             </div>
 
             {/* Photo Section */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Photo</label>
-              <div className="flex items-center gap-3">
-                {imageUrl ? (
-                  <div className="flex items-center gap-3">
-                    <QuestImageThumbnail
-                      imageUrl={imageUrl}
-                      size="lg"
-                      onRemove={handleRemoveImage}
-                    />
-                    <QuestImagePicker
-                      onImageSelected={(url) => setImageUrl(url)}
-                      variant="button"
-                    />
-                  </div>
-                ) : (
+            <div className="flex items-center gap-3 px-1">
+              {imageUrl ? (
+                <div className="flex items-center gap-3">
+                  <QuestImageThumbnail
+                    imageUrl={imageUrl}
+                    size="lg"
+                    onRemove={handleRemoveImage}
+                  />
                   <QuestImagePicker
                     onImageSelected={(url) => setImageUrl(url)}
                     variant="button"
                   />
-                )}
-              </div>
+                </div>
+              ) : (
+                <QuestImagePicker
+                  onImageSelected={(url) => setImageUrl(url)}
+                  variant="button"
+                />
+              )}
             </div>
 
-            {/* Advanced Options */}
-            <div className="pt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full justify-between text-muted-foreground"
-              >
-                Advanced Options
-                <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
-              </Button>
-              
-              {showAdvanced && (
-                <div className="mt-4">
+            {/* Advanced Settings */}
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between text-muted-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4" />
+                    Advanced Settings
+                  </span>
+                  <span className="text-xs">{showAdvanced ? "▲" : "▼"}</span>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-3">
                   <AdvancedQuestOptions
-                    scheduledTime={scheduledTime || null}
+                    scheduledTime={scheduledTime}
                     estimatedDuration={estimatedDuration}
                     recurrencePattern={recurrencePattern}
                     recurrenceDays={recurrenceDays}
                     reminderEnabled={reminderEnabled}
                     reminderMinutesBefore={reminderMinutesBefore}
-                    moreInformation={moreInformation}
                     onScheduledTimeChange={setScheduledTime}
                     onEstimatedDurationChange={setEstimatedDuration}
                     onRecurrencePatternChange={setRecurrencePattern}
                     onRecurrenceDaysChange={setRecurrenceDays}
                     onReminderEnabledChange={setReminderEnabled}
                     onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                    moreInformation={moreInformation}
                     onMoreInformationChange={setMoreInformation}
                     location={location}
                     onLocationChange={setLocation}
                     hideScheduledTime
+                    hideDuration
+                    hideMoreInformation
                   />
                 </div>
-              )}
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
-        </ScrollArea>
+        </div>
 
-        <SheetFooter className="pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t">
-          <div className="flex gap-2 w-full">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving || !taskText.trim()} className="flex-1">
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
+        {/* Footer */}
+        <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || !taskText.trim()}
+            className={cn(
+              "w-full text-white",
+              taskText.trim() ? cn(colors.pill, "hover:opacity-90") : ""
+            )}
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
+          </Button>
           {onDelete && (
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
               className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -386,7 +560,7 @@ export function EditQuestDialog({
               Delete
             </Button>
           )}
-        </SheetFooter>
+        </div>
       </SheetContent>
 
       {/* Delete Confirmation Dialog */}
