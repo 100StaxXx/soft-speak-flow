@@ -317,9 +317,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               {/* Compact Difficulty Selector */}
               <div className="flex justify-center gap-3 mt-3">
                 {([
-                  { value: "easy" as const, icon: Zap, label: "Chill" },
-                  { value: "medium" as const, icon: Flame, label: "Steady" },
-                  { value: "hard" as const, icon: Mountain, label: "Beast" },
+                  { value: "easy" as const, icon: Zap, label: "Easy" },
+                  { value: "medium" as const, icon: Flame, label: "Medium" },
+                  { value: "hard" as const, icon: Mountain, label: "Hard" },
                 ]).map(({ value, icon: Icon, label }) => (
                   <button
                     key={value}
