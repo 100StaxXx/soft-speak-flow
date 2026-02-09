@@ -316,20 +316,23 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
               {/* Compact Difficulty Selector */}
               <div className="flex justify-center gap-3 mt-3">
-                {(["easy", "medium", "hard"] as const).map((d) => (
+                {([
+                  { value: "easy" as const, icon: Zap, label: "Chill" },
+                  { value: "medium" as const, icon: Flame, label: "Steady" },
+                  { value: "hard" as const, icon: Mountain, label: "Beast" },
+                ]).map(({ value, icon: Icon, label }) => (
                   <button
-                    key={d}
-                    onClick={() => setDifficulty(d)}
+                    key={value}
+                    onClick={() => setDifficulty(value)}
                     className={cn(
-                      "w-9 h-9 rounded-full flex items-center justify-center transition-all border-2",
-                      difficulty === d
+                      "w-14 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all border-2",
+                      difficulty === value
                         ? "bg-white/30 border-white scale-110"
                         : "bg-white/10 border-transparent hover:bg-white/20"
                     )}
                   >
-                    {d === "easy" && <Zap className="h-4 w-4 text-white" />}
-                    {d === "medium" && <Flame className="h-4 w-4 text-white" />}
-                    {d === "hard" && <Mountain className="h-4 w-4 text-white" />}
+                    <Icon className="h-4 w-4 text-white" />
+                    <span className="text-[10px] font-medium text-white/80 leading-none">{label}</span>
                   </button>
                 ))}
               </div>
