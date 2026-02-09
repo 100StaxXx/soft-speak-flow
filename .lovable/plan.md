@@ -1,42 +1,80 @@
 
 
-# Remove Day View from Calendar Modal -- Go Straight to Month View
+# Two-Step Quest Creation with Campaign Link in Footer
 
 ## Overview
 
-When users tap the date header in the Quests tab, the modal currently opens in "Day View" with an option to switch to "Month View". The change removes the Day View entirely so the modal opens directly into Month View.
+Redesign AddQuestSheet into a two-step wizard flow, skip the CreationPickerSheet entirely, and add a "Create Campaign" link in the footer.
 
-## Changes
+## Step-by-Step Flow
 
-### 1. HourlyViewModal: Remove Day View
+```text
+FAB tap
+  |
+  v
+[Step 1: Title + Difficulty]
+- Quest name input (auto-focused)
+- Difficulty selector (circular icons from HabitDifficultySelector)
+- "Advanced Settings" collapsible (contact, recurrence, reminders, location, photo)
+- "Next" button
+  |
+  v
+[Step 2: Date/Time Selection]
+- Date picker (calendar popover, defaulting to selectedDate)
+- Time picker (scrollable time wheel inspired by the Structured reference image)
+- Duration quick-select chips (15m, 30, 45, 1h, 1.5h)
+- Suggested Time Slots (smart scheduling)
+- Footer: "Schedule Quest" button + "Add to Inbox" link (skips date/time)
+- Small "Or create a Campaign" link at bottom
+```
 
-**File: `src/components/HourlyViewModal.tsx`**
+## File Changes
 
-- Remove the `ViewMode` type and `viewMode` state -- always render Month View
-- Remove the Day/Month dropdown `Select` in the header
-- Remove the day navigation chevrons (prev/next day buttons)
-- Remove the `CalendarDayView` import and its rendering branch
-- Remove day-specific auto-scroll logic
-- Simplify header to just show "Month View" title with close button
-- When a date is tapped in month view, close the modal and navigate to that date on the Quests timeline (instead of switching to day view)
-- Keep the Year View flow intact (accessible from month view)
+### 1. Redesign `src/components/AddQuestSheet.tsx`
 
-### 2. Update TodaysAgenda Integration
+- Remove the minimal/expanded two-mode pattern entirely
+- Introduce a `step` state: `1` (title + settings) and `2` (date/time)
+- **Step 1**: Full-height Sheet (matching EditQuestDialog style) with:
+  - Quest Name input (labeled, auto-focused)
+  - `HabitDifficultySelector` (same circular icons as Edit Quest)
+  - Collapsible "Advanced Settings" section containing: recurrence, reminders, contact linking, location
+  - "Next" button in footer (disabled until title is non-empty)
+- **Step 2**: Same Sheet, content swaps to date/time selection:
+  - Date row with Calendar popover (same pattern as EditQuestDialog)
+  - Time input and Duration input in side-by-side grid (same as EditQuestDialog)
+  - SuggestedTimeSlots component
+  - Footer: "Add Quest" primary button + "Add to Inbox" secondary button (sets sendToInbox=true, skips date/time)
+  - Small subtle "Or create a Campaign" text link at the very bottom
+- Back button on Step 2 to return to Step 1
 
-**File: `src/components/TodaysAgenda.tsx`**
+### 2. Update `src/pages/Journeys.tsx`
 
-- When a date is selected from the month modal, close the modal and set the selected date (scrolling the timeline to that day)
-- No other changes needed since TodaysAgenda already has `onDateSelect`
+- FAB `onTap` opens AddQuestSheet directly (remove `showCreationPicker` state and `CreationPickerSheet` usage)
+- Add a `showPathfinder` handler that can be triggered from AddQuestSheet's "Create Campaign" link
+- Pass an `onCreateCampaign` callback prop to AddQuestSheet
 
-### 3. Cleanup
+### 3. Update `src/pages/Inbox.tsx`
 
-- Remove `CalendarDayView` import from `HourlyViewModal.tsx`
-- The `CalendarDayView` component file itself stays (it may be used elsewhere like the Community/Calendar page)
+- Same change: FAB opens AddQuestSheet directly, remove CreationPickerSheet usage
 
-## Files Changed
+### 4. `src/components/CreationPickerSheet.tsx`
+
+- No longer imported anywhere in the default flow (can be kept for future use or removed)
+
+## Technical Details
 
 | File | Change |
 |---|---|
-| `src/components/HourlyViewModal.tsx` | Remove day view mode, default to month, simplify header |
-| `src/components/TodaysAgenda.tsx` | Minor: ensure date selection from modal closes it and navigates |
+| `src/components/AddQuestSheet.tsx` | Full rewrite: two-step wizard (title+settings then date/time), match EditQuestDialog styling, add "Add to Inbox" and "Create Campaign" links |
+| `src/pages/Journeys.tsx` | FAB opens AddQuestSheet directly; pass `onCreateCampaign` prop; remove CreationPickerSheet |
+| `src/pages/Inbox.tsx` | FAB opens AddQuestSheet directly; remove CreationPickerSheet |
+| `src/components/CreationPickerSheet.tsx` | No longer used in default flow |
+
+## What Stays the Same
+
+- All form data fields (difficulty, time, recurrence, reminders, contacts, inbox toggle)
+- `onAdd` callback and submit logic
+- EditQuestDialog (unchanged)
+- Database schema
+- FAB component itself
 
