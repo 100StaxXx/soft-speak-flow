@@ -356,7 +356,7 @@ export const TaskCard = ({
                   onEdit();
                 }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label="Edit task"
+                aria-label="Edit quest"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -388,7 +388,7 @@ export const TaskCard = ({
                   onDelete();
                 }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                aria-label="Delete task"
+                aria-label="Delete quest"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

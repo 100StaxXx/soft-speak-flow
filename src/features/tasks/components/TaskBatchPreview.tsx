@@ -154,7 +154,7 @@ export function TaskBatchPreview({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            Review Tasks
+            Review Quests
           </DialogTitle>
           {detectedContext?.dayOfWeek && (
             <p className="text-sm text-muted-foreground">
@@ -171,7 +171,7 @@ export function TaskBatchPreview({
               <div className="space-y-2">
                 <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Check className="w-4 h-4 text-primary" />
-                  Detected Tasks ({tasks.filter(t => !t.isSuggestion).length})
+                  Detected Quests ({tasks.filter(t => !t.isSuggestion).length})
                 </h3>
                 <div className="space-y-1.5">
                   {tasks.filter(t => !t.isSuggestion).map((task) => (
@@ -221,7 +221,7 @@ export function TaskBatchPreview({
               <Input
                 value={newTaskInput}
                 onChange={(e) => setNewTaskInput(e.target.value)}
-                placeholder="Add another task..."
+                placeholder="Add another quest..."
                 className="h-9 text-sm"
                 onKeyDown={(e) => e.key === 'Enter' && addTask()}
               />
@@ -261,7 +261,7 @@ export function TaskBatchPreview({
                   Creating...
                 </>
               ) : (
-                `Create ${selectedTasks.length} Task${selectedTasks.length !== 1 ? 's' : ''}`
+                `Create ${selectedTasks.length} Quest${selectedTasks.length !== 1 ? 's' : ''}`
               )}
             </Button>
           </div>

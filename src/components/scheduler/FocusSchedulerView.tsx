@@ -102,7 +102,7 @@ export function FocusSchedulerView({
       {unscheduledTasks.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            {scheduledTasks.length > 0 ? "Anytime" : "Tasks"}
+            {scheduledTasks.length > 0 ? "Anytime" : "Quests"}
           </h3>
           <div className="space-y-2">
             {unscheduledTasks.map((task) => (
@@ -125,10 +125,10 @@ export function FocusSchedulerView({
       {/* Empty state */}
       {tasks.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground text-sm mb-4">No tasks for this day</p>
+          <p className="text-muted-foreground text-sm mb-4">No quests for this day</p>
           <Button variant="outline" size="sm" onClick={onAddQuest} className="gap-2">
             <Plus className="h-4 w-4" />
-            Add Task
+            Add Quest
           </Button>
         </div>
       )}
@@ -145,7 +145,7 @@ export function FocusSchedulerView({
           )}
         >
           <Plus className="h-4 w-4" />
-          Add Task
+          Add Quest
         </Button>
       )}
     </div>
