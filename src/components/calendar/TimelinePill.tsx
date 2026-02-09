@@ -17,7 +17,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export function TimelinePill({ duration, category, isCompleted }: TimelinePillProps) {
   // Calculate height based on duration: 15 min = 24px base
-  const height = Math.max(24, (duration / 15) * 24);
+  const height = Math.max(24, Math.min((duration / 15) * 24, 96));
   
   const colorClass = isCompleted 
     ? "bg-muted-foreground/30" 

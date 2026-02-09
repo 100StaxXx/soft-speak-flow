@@ -36,6 +36,7 @@ function formatTimeDisplay(time: string): string {
 
 function getDurationText(durationMinutes: number | null): string {
   if (!durationMinutes) return "";
+  if (durationMinutes === 1440) return "All Day";
   if (durationMinutes < 60) return `${durationMinutes} min`;
   const hours = Math.floor(durationMinutes / 60);
   const mins = durationMinutes % 60;
