@@ -252,7 +252,7 @@ const Journeys = () => {
     await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
-      taskDate: taskDate as string, // null for inbox tasks
+      taskDate: taskDate,
       isMainQuest: false,
       scheduledTime: data.scheduledTime,
       estimatedDuration: data.estimatedDuration,
