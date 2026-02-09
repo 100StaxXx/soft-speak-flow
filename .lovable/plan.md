@@ -1,22 +1,25 @@
 
 
-# Fix Timeline Time Label Alignment
+# Push Timeline Times Closer to Left Edge
 
 ## Problem
 
-Looking at the screenshot, two issues:
-1. The time labels ("9:30a", "10:30a") are right-aligned in a wide column, pushing them too far from the left edge of the screen
-2. The time labels sit slightly above the task content -- they need to vertically center with the checkbox/icon row
+The parent container (`TodaysAgenda.tsx` line 699) applies `px-4` (16px) padding, and the time column is `w-11` (44px). Combined, the time labels start ~16px from the edge -- they need to be tighter.
 
 ## Changes
 
 ### File: `src/components/TimelineTaskRow.tsx`
 
-- **Left-align times**: Change `text-right` to `text-left` on the time column so times hug the left edge of the screen
-- **Reduce column width**: Shrink from `w-14` (56px) to `w-11` (44px) -- just enough for "10:30a"
-- **Fix vertical alignment**: Change `pt-4` to `pt-[18px]` so the time text vertically centers with the checkbox and task title row beside it
+- Reduce the time column width from `w-11` to `w-9` (36px) -- still enough for "10:30a" at 10px font
+- This pulls times ~8px closer to the left
+
+### File: `src/components/TodaysAgenda.tsx`
+
+- Reduce the container padding from `px-4` to `px-2` on the section wrapping the timeline rows (line 699), pulling everything closer to the left edge
+- Update the "Anytime" divider spacer from `w-14` to `w-9` to match the new column width
 
 | File | Change |
 |---|---|
-| `src/components/TimelineTaskRow.tsx` | Left-align time text, narrow column to `w-11`, adjust vertical padding for alignment |
+| `src/components/TimelineTaskRow.tsx` | Shrink time column from `w-11` to `w-9` |
+| `src/components/TodaysAgenda.tsx` | Reduce container left padding from `px-4` to `px-2`; update anytime divider spacer to `w-9` |
 
