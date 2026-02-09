@@ -526,15 +526,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <MarqueeText
                 text={task.task_text}
                 className={cn(
-                  "text-base flex-1",
+                  "text-sm flex-1",
                   isComplete && "text-muted-foreground",
                   isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
                 )}
               />
             </div>
             {task.scheduled_time && (
-              <span className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Clock className="w-4 h-4" />
+              <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Clock className="w-3 h-3" />
                 {formatTime(task.scheduled_time)}
               </span>
             )}
@@ -816,7 +816,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <div>
                 {/* Divider */}
                 <div className="flex items-center gap-2 py-2 mt-1">
-                  <div className="w-16 flex-shrink-0" />
+                  <div className="w-14 flex-shrink-0" />
                   <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     <Clock className="h-3 w-3" />
                     Anytime
