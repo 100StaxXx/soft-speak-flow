@@ -5,6 +5,7 @@ import { Clock, Plus, ChevronRight } from "lucide-react";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { WeekStrip } from "./WeekStrip";
 import { TimelineTaskCard } from "./TimelineTaskCard";
+import { AllDayTaskBanner } from "./AllDayTaskBanner";
 import { MilestoneCalendarCard } from "../MilestoneCalendarCard";
 import { Button } from "../ui/button";
 
@@ -70,8 +71,9 @@ export function TimelineView({
       });
   }, [tasks, dateStr]);
 
-  const scheduledTasks = dayTasks.filter((t) => t.scheduled_time);
-  const unscheduledTasks = dayTasks.filter((t) => !t.scheduled_time);
+  const allDayTasks = dayTasks.filter((t) => t.estimated_duration === 1440);
+  const scheduledTasks = dayTasks.filter((t) => t.scheduled_time && t.estimated_duration !== 1440);
+  const unscheduledTasks = dayTasks.filter((t) => !t.scheduled_time && t.estimated_duration !== 1440);
   const dayMilestones = milestones.filter((m) => m.target_date === dateStr);
 
   // Drag handlers
@@ -153,6 +155,19 @@ export function TimelineView({
                   />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* All Day Tasks */}
+          {allDayTasks.length > 0 && (
+            <div className="py-3 space-y-1.5">
+              {allDayTasks.map((task) => (
+                <AllDayTaskBanner
+                  key={task.id}
+                  task={task}
+                  onClick={onTaskClick}
+                />
+              ))}
             </div>
           )}
 
