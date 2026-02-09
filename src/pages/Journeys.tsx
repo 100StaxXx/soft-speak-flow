@@ -617,9 +617,6 @@ const Journeys = () => {
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
             Quests
           </h1>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Daily quests. Your path to progress.
-          </p>
         </motion.div>
 
         {/* Date Selector */}
