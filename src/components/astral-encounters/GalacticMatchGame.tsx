@@ -511,7 +511,7 @@ export const GalacticMatchGame = ({
   }), [config.cols, config.rows]);
 
   return (
-    <div className={`flex flex-col items-center ${compact ? 'gap-1 p-2' : 'gap-2 p-3'} select-none touch-none`}>
+    <div className={`flex flex-col items-center flex-1 min-h-0 ${compact ? 'gap-1 p-1' : 'gap-2 p-3'} select-none touch-none`}>
       {/* Header with level, lives, and score - compact mode support */}
       <div className="w-full flex items-center justify-between text-xs">
         <div className="flex items-center gap-1">
@@ -833,8 +833,8 @@ export const GalacticMatchGame = ({
         </div>
       </div>
 
-      {/* Practice indicator */}
-      {isPractice && (
+      {/* Practice indicator - hidden in compact */}
+      {isPractice && !compact && (
         <div className="text-xs text-muted-foreground">
           Practice Round - Get familiar with the mechanics!
         </div>

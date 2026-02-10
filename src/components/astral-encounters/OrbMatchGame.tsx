@@ -1231,7 +1231,7 @@ export const OrbMatchGame = ({
   const isUrgent = timeLeft <= 5 && gameState === 'playing';
 
   return (
-    <div className="flex flex-col items-center relative">
+    <div className="flex flex-col items-center relative flex-1 min-h-0">
       {gameState === 'countdown' && <CountdownOverlay count={3} onComplete={handleCountdownComplete} />}
       <AnimatePresence>{gameState === 'paused' && <PauseOverlay onResume={() => setGameState('playing')} />}</AnimatePresence>
       <AnimatePresence>
@@ -1276,9 +1276,11 @@ export const OrbMatchGame = ({
         )}
       </div>
 
-      <button className="text-xs text-muted-foreground mb-2 underline" onClick={() => setShowAccessibility(!showAccessibility)}>
-        {showAccessibility ? 'Show Emojis' : 'Show Shapes'}
-      </button>
+      {!compact && (
+        <button className="text-xs text-muted-foreground mb-2 underline" onClick={() => setShowAccessibility(!showAccessibility)}>
+          {showAccessibility ? 'Show Emojis' : 'Show Shapes'}
+        </button>
+      )}
 
       <div
         ref={gridRef}
@@ -1333,16 +1335,19 @@ export const OrbMatchGame = ({
         <AnimatePresence>{showLevelUp && <LevelUpBanner />}</AnimatePresence>
       </div>
 
-      <div className="flex flex-wrap justify-center gap-3 mt-4 text-xs">
-        {availableColors.slice(0, 4).map(color => (
-          <div key={color} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
-            <span className="text-sm">{showAccessibility ? ORB_SHAPES[color] : ORB_COLORS[color].emoji}</span>
-            <span className="capitalize text-white/60 font-medium">{color}</span>
+      {!compact && (
+        <>
+          <div className="flex flex-wrap justify-center gap-3 mt-4 text-xs">
+            {availableColors.slice(0, 4).map(color => (
+              <div key={color} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+                <span className="text-sm">{showAccessibility ? ORB_SHAPES[color] : ORB_COLORS[color].emoji}</span>
+                <span className="capitalize text-white/60 font-medium">{color}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-
-      <p className="text-xs text-white/40 mt-3 text-center font-medium">Match 4+ for specials • T/L shapes = ★ Star • Match specials for big damage!</p>
+          <p className="text-xs text-white/40 mt-3 text-center font-medium">Match 4+ for specials • T/L shapes = ★ Star • Match specials for big damage!</p>
+        </>
+      )}
 
       <style>{`
         .orb-base {

@@ -9,6 +9,8 @@ interface BattleOverlayProps {
   adversaryImageUrl?: string;
   adversaryName: string;
   showScreenShake?: boolean;
+  battleTimeLeft?: number;
+  battleTimeTotal?: number;
 }
 
 export const BattleOverlay = memo(function BattleOverlay({
@@ -16,6 +18,8 @@ export const BattleOverlay = memo(function BattleOverlay({
   adversaryImageUrl,
   adversaryName,
   showScreenShake = false,
+  battleTimeLeft,
+  battleTimeTotal,
 }: BattleOverlayProps) {
   const isLowHP = battleState.playerHPPercent < 25;
   
@@ -85,6 +89,32 @@ export const BattleOverlay = memo(function BattleOverlay({
               showNumbers={true}
             />
           </div>
+          
+          {/* Battle Timer */}
+          {battleTimeLeft !== undefined && battleTimeTotal !== undefined && (
+            <div className="w-full px-1 mt-1">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${(battleTimeLeft / battleTimeTotal) * 100}%`,
+                      background: battleTimeLeft <= 10 
+                        ? 'linear-gradient(90deg, #ef4444, #f87171)' 
+                        : 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)))',
+                    }}
+                    animate={battleTimeLeft <= 10 ? { opacity: [1, 0.6, 1] } : {}}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  />
+                </div>
+                <span className={`text-xs font-mono font-bold min-w-[32px] text-right ${
+                  battleTimeLeft <= 10 ? 'text-red-400' : 'text-muted-foreground'
+                }`}>
+                  {battleTimeLeft}s
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, lazy, Suspense, useRef } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { DamageEvent, calculateResultFromHP } from '@/types/battleSystem';
+import { DamageEvent, calculateResultFromHP, TIER_BATTLE_DURATION } from '@/types/battleSystem';
 import { BattleVSScreen } from './BattleVSScreen';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
@@ -73,7 +73,8 @@ export const AstralEncounterModal = ({
     tiltBonus?: boolean;
   } | null>(null);
   const [showScreenShake, setShowScreenShake] = useState(false);
-  
+  const [battleTimeLeft, setBattleTimeLeft] = useState(0);
+  const [battleTimeTotal, setBattleTimeTotal] = useState(0);
   const { companion, refetch: refetchCompanion } = useCompanion();
   const battleEndedRef = useRef(false);
 
@@ -166,8 +167,37 @@ export const AstralEncounterModal = ({
       setUsedTiltControls(false);
       battleEndedRef.current = false;
       resetBattle();
+      // Initialize battle timer based on adversary tier
+      const tier = (adversary?.tier as AdversaryTier) || 'common';
+      const duration = TIER_BATTLE_DURATION[tier];
+      setBattleTimeLeft(duration);
+      setBattleTimeTotal(duration);
     }
-  }, [open, isBossBattle, resetBattle]);
+  }, [open, isBossBattle, resetBattle, adversary?.tier]);
+
+  // Battle countdown timer
+  useEffect(() => {
+    if (phase !== 'battle' || battleEndedRef.current) return;
+    
+    if (battleTimeLeft <= 0) {
+      // Time expired - auto-resolve based on HP comparison
+      if (!battleEndedRef.current) {
+        battleEndedRef.current = true;
+        const adversaryDamagePercent = 100 - battleState.adversaryHPPercent;
+        const playerDamagePercent = 100 - battleState.playerHPPercent;
+        // Player wins if they dealt more % damage to adversary
+        const outcome = adversaryDamagePercent > playerDamagePercent ? 'victory' : 'fail';
+        handleBattleEnd(outcome);
+      }
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      setBattleTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [phase, battleTimeLeft, battleState.adversaryHPPercent, battleState.playerHPPercent, handleBattleEnd]);
 
   // Fetch/generate adversary image
   const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
@@ -298,6 +328,7 @@ export const AstralEncounterModal = ({
       questIntervalScale: intervalScale,
       onDamage: handleDamage,
       tierAttackDamage,
+      compact: true,
     };
 
     const GameComponent = (() => {
@@ -353,6 +384,8 @@ export const AstralEncounterModal = ({
                 adversaryImageUrl={adversaryImageUrl || undefined}
                 adversaryName={adversary.name}
                 showScreenShake={showScreenShake}
+                battleTimeLeft={battleTimeLeft}
+                battleTimeTotal={battleTimeTotal}
               />
               
               {/* Floating damage numbers */}
@@ -480,6 +513,8 @@ export const AstralEncounterModal = ({
                       battleState={battleState}
                       adversaryImageUrl={adversaryImageUrl || undefined}
                       adversaryName={adversary.name}
+                      battleTimeLeft={battleTimeLeft}
+                      battleTimeTotal={battleTimeTotal}
                     />
 
                     {adversary.phases > 1 && (

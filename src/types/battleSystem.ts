@@ -28,6 +28,15 @@ export interface TierBattleConfig {
   attackDamage: number; // Damage adversary deals per hit
 }
 
+// Battle duration limits by tier (in seconds) - 45-120 second battles
+export const TIER_BATTLE_DURATION: Record<AdversaryTier, number> = {
+  common: 45,
+  uncommon: 60,
+  rare: 75,
+  epic: 90,
+  legendary: 120,
+};
+
 // HP configurations by tier - REBALANCED for 2-5 minute battles
 export const TIER_BATTLE_CONFIG: Record<AdversaryTier, TierBattleConfig> = {
   common: {
