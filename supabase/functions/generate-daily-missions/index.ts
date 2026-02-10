@@ -35,76 +35,26 @@ const BONUS_MISSIONS: Record<string, { text: string; xp: number; category: strin
   streak_30: { text: "30-day legend! Write a note to your future self", xp: 15, category: 'identity', difficulty: 'medium' },
 };
 
-const CATEGORY_GUIDELINES = `**MISSION CATEGORIES:**
+const CATEGORY_GUIDELINES = `**MISSION CATEGORIES — Use these as creative direction, NOT templates to copy:**
 
-1. **Connection Mission** (Good Human Day)
-   Purpose: light positive interaction.
-   Approved patterns:
-   - "Text someone you appreciate and let them know why."
-   - "Send a simple check-in message to a friend or family member."
-   - "Give someone a small compliment today."
-   - "Express gratitude to someone who helped you recently."
-   - "Really listen to someone today without thinking about your response."
-   XP: 5-10
-   Difficulty: easy
+1. **Connection** — Light positive human interaction. Could be: reaching out, active listening, appreciating someone, small acts of kindness. Think beyond texting — maybe it's making eye contact, learning someone's name, asking a real question. XP: 5-10, Difficulty: easy
 
-2. **Quick Win Mission** (Momentum Builder)
-   Purpose: create an instant sense of progress or order. Should take 1-5 minutes.
-   Approved patterns:
-   - "Do one tiny task you've been avoiding."
-   - "Organize one small area for two minutes."
-   - "Take care of something that will take less than five minutes."
-   - "Make your bed to start the day with a win."
-   - "Throw away or delete one thing you no longer need."
-   - "Reply to one message you've been putting off."
-   XP: 5-10
-   Difficulty: easy or medium
+2. **Quick Win** — Instant sense of progress in 1-5 minutes. Could be: clearing clutter, replying to something, fixing a tiny annoyance, organizing one shelf, deleting old photos. Get specific — "clean out your wallet" beats "organize something." XP: 5-10, Difficulty: easy/medium
 
-3. **Identity Mission** (Discipline & Future Self)
-   Purpose: something that reinforces the person they want to become.
-   These can be larger or all-day missions.
-   Approved patterns:
-   - "Complete all your quests today."
-   - "Plan tomorrow before you go to bed."
-   - "Schedule something you've been putting off."
-   - "Take one action your future self would thank you for."
-   - "Act for two minutes as the most disciplined version of yourself."
-   XP: 10-15
-   Difficulty: medium or hard
+3. **Identity** — Reinforces the person they want to become. Bigger, all-day vibes. Could be: planning ahead, acting as their future self for an hour, making a decision they've been avoiding, writing a personal rule. XP: 10-15, Difficulty: medium/hard
 
-4. **Wellness Mission** (Self-Care & Body)
-   Purpose: physical and mental well-being check-ins.
-   Approved patterns:
-   - "Take 3 deep breaths and notice how you feel."
-   - "Drink a full glass of water mindfully."
-   - "Stretch your body for 60 seconds."
-   - "Take a short walk, even just around your space."
-   - "Check and correct your posture right now."
-   - "Take a 5-minute break from all screens."
-   XP: 5-10
-   Difficulty: easy
+4. **Wellness** — Physical and mental well-being. Could be: breathwork, hydration, posture, stretching, sensory grounding, screen breaks, cold water on face, sunlight exposure. Get creative with body awareness. XP: 5-10, Difficulty: easy
 
-5. **Gratitude Mission** (Appreciation & Reflection)
-   Purpose: cultivate appreciation and positive mindset.
-   Approved patterns:
-   - "Write down one thing you're grateful for today."
-   - "Notice one beautiful thing around you right now."
-   - "Thank your body for something it does well."
-   - "Appreciate one simple pleasure in your day."
-   - "Thank your past self for one decision they made."
-   XP: 5-10
-   Difficulty: easy
+5. **Gratitude** — Appreciation and positive reframing. Could be: thanking someone specific, noticing beauty, writing about a challenge that taught you something, appreciating a body part, savoring a meal. XP: 5-10, Difficulty: easy
 
-6. **Growth Mission** (Learning & Challenge)
-   Purpose: expand knowledge and comfort zone.
-   Approved patterns:
-   - "Learn one new word or fact today."
-   - "Try something small outside your comfort zone."
-   - "Ask one question you've been curious about."
-   - "Read one article or chapter about something new."
-   - "Practice a skill you want to improve for 5 minutes."
-   XP: 10-15
-   Difficulty: medium or hard`;
+6. **Growth** — Learning and comfort-zone expansion. Be SPECIFIC: "Look up why we dream," "Find out what the capital of a random country is," "Learn one word in a language you don't speak," "Watch a 2-min video about how something is made." Never say "learn something new" — always say WHAT to learn. XP: 10-15, Difficulty: medium/hard
+
+**CREATIVE RULES:**
+- Each mission MUST feel distinct from the others — vary the verb, the object, and the framing
+- Use concrete, specific language (not vague "do something nice")
+- Surprise the user — missions should feel like a fresh idea, not a checklist
+- Never start two missions with the same word
+- Growth missions MUST include a specific topic or question to explore`;
 
 // Category-specific XP and difficulty validation
 const CATEGORY_RULES: Record<string, { xpRange: [number, number]; difficulties: string[] }> = {
@@ -276,6 +226,38 @@ serve(async (req) => {
 
     const streak = profile?.current_habit_streak || 0;
 
+    // Fetch recent mission history (last 7 days) for deduplication
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+    const [recentMissionsResult, activeEpicsResult, activeHabitsResult] = await Promise.all([
+      supabase
+        .from('daily_missions')
+        .select('mission_text')
+        .eq('user_id', userId)
+        .gte('mission_date', sevenDaysAgoStr)
+        .neq('mission_date', today),
+      supabase
+        .from('epics')
+        .select('title')
+        .eq('user_id', userId)
+        .eq('status', 'active'),
+      supabase
+        .from('habits')
+        .select('title')
+        .eq('user_id', userId)
+        .is('archived_at', null),
+    ]);
+
+    const recentMissions = (recentMissionsResult.data || []).map(m => m.mission_text);
+    const activeGoals = [
+      ...(activeEpicsResult.data || []).map(e => e.title),
+      ...(activeHabitsResult.data || []).map(h => h.title),
+    ];
+
+    console.log(`Context: ${recentMissions.length} recent missions, ${activeGoals.length} active goals`);
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY not configured');
@@ -296,13 +278,23 @@ serve(async (req) => {
       userContext += ' Make them encouraging to help build momentum.';
     }
 
+    // Build recent history block for dedup
+    const recentHistoryBlock = recentMissions.length > 0
+      ? `\n\nThe user has seen these missions in the last 7 days — generate COMPLETELY DIFFERENT ones. Do not repeat or closely paraphrase any of these:\n${recentMissions.map(m => `- "${m}"`).join('\n')}`
+      : '';
+
+    // Build active goals context
+    const activeGoalsBlock = activeGoals.length > 0
+      ? `\n\nThe user is currently working on these goals/habits: ${activeGoals.join(', ')}. You may optionally reference one of these to make a mission feel personal — but don't force it.`
+      : '';
+
     const { systemPrompt, userPrompt, validationRules, outputConstraints } = await promptBuilder.build({
       templateKey: 'daily_missions',
       userId: userId,
       variables: {
         missionCount: 3,
         userStreak: streak,
-        userContext,
+        userContext: userContext + recentHistoryBlock + activeGoalsBlock,
         categoryGuidelines: CATEGORY_GUIDELINES,
         requiredCategories: themeDay.categories
       }
