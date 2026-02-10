@@ -78,7 +78,7 @@ const InboxPage = memo(function InboxPage() {
         <StarfieldBackground />
 
         {/* Header */}
-        <div className="sticky z-30 bg-background/80 backdrop-blur-xl border-b border-border/30" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="sticky z-30 bg-background/80 backdrop-blur-xl border-b border-border/30" style={{ top: 0, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <InboxIcon className="h-5 w-5 text-celestial-blue" />
