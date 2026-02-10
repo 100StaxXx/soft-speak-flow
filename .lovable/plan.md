@@ -1,49 +1,22 @@
 
+# Add "QUESTS" Divider Header
 
-# Fix Bad Habits Not Appearing After Adding
+## Change
+**File: `src/components/TodaysAgenda.tsx`** (lines 818-819)
 
-## Problem
-When you add a bad habit, the toast says "Bad habit added!" but the list still shows "No habits tracked yet." The data saves correctly to the database (confirmed in network logs and DB), but the UI never updates.
+Insert a "QUESTS" divider header right before the timeline content, using the exact same styling as the "CAMPAIGNS" divider (lines 961-967):
 
-## Root Cause
-The mutation's `onSuccess` calls `invalidateQueries({ queryKey: ['bad-habits'] })`, which should trigger a refetch for the active query keyed as `['bad-habits', userId]`. However, the refetch is not firing (zero GET requests appear in the network after any POST). This is likely due to the component being wrapped in `memo` combined with the Dialog portal interaction preventing React Query from recognizing the query as actively observed.
-
-## Fix
-
-**File: `src/hooks/useResistMode.ts`** (lines 77-103, the `addHabitMutation`)
-
-Update the `onSuccess` callback to directly update the query cache with the returned data from the mutation, then invalidate as a background refresh:
-
-```typescript
-onSuccess: (newHabit) => {
-  // Immediately add the new habit to the cache
-  queryClient.setQueryData(
-    ['bad-habits', user?.id],
-    (old: BadHabit[] | undefined) => [newHabit, ...(old ?? [])]
-  );
-  // Also invalidate to ensure full consistency
-  queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
-  toast.success('Bad habit added! Ready to resist.');
-},
+```
+<div className="flex items-center gap-2 mb-3">
+  <div className="w-9 flex-shrink-0" />
+  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+    <Target className="h-3 w-3" />
+    Quests
+  </div>
+  <div className="flex-1 border-t border-dashed border-border/40" />
+</div>
 ```
 
-Also apply the same pattern to `removeHabitMutation` for consistency -- optimistically remove from cache before the invalidation:
+This goes between the XP summary row and the timeline content (line 818-819), so it always shows -- whether there are quests or not. The empty state below it (lines 820-829) stays as-is and renders underneath the header when there are no quests.
 
-```typescript
-onSuccess: (_data, habitId) => {
-  queryClient.setQueryData(
-    ['bad-habits', user?.id],
-    (old: BadHabit[] | undefined) => (old ?? []).filter(h => h.id !== habitId)
-  );
-  queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
-  toast.success('Habit removed');
-},
-```
-
-## Why This Works
-Instead of relying on `invalidateQueries` to trigger a refetch (which isn't firing), we directly update the cached data with `setQueryData`. This guarantees the UI updates immediately since React Query notifies all subscribers when cache data changes. The background `invalidateQueries` still runs to ensure eventual consistency.
-
-## Technical Details
-- One file changed: `src/hooks/useResistMode.ts`
-- Two mutations updated: `addHabitMutation` and `removeHabitMutation`
-- The mutation already returns the new habit data via `.select().single()`, so no additional DB calls needed
+One file, one insertion. Matches the campaigns header exactly.
