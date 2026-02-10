@@ -77,19 +77,24 @@ const InboxPage = memo(function InboxPage() {
       <div className="min-h-screen bg-transparent pb-24 pt-safe">
         <StarfieldBackground />
 
-        {/* Header */}
-        <div className="sticky z-30 bg-background/80 backdrop-blur-xl border-b border-border/30" style={{ top: 0, paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <InboxIcon className="h-5 w-5 text-celestial-blue" />
-              <h1 className="text-lg font-bold">Inbox</h1>
-              {inboxCount > 0 && (
-                <Badge variant="celestial" className="text-xs">
-                  {inboxCount}
-                </Badge>
-              )}
-            </div>
-          </div>
+        {/* Hero Title */}
+        <div className="max-w-lg mx-auto px-4 pt-6" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 0px))' }}>
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-6"
+          >
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-celestial-blue to-blue-400 bg-clip-text text-transparent">
+              Inbox
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Capture now. Conquer later.</p>
+            {inboxCount > 0 && (
+              <Badge variant="celestial" className="text-xs mt-2">
+                {inboxCount} quests
+              </Badge>
+            )}
+          </motion.div>
         </div>
 
         {/* Content */}
