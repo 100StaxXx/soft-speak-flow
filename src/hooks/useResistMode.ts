@@ -92,7 +92,11 @@ export const useResistMode = () => {
       if (error) throw error;
       return data as BadHabit;
     },
-    onSuccess: () => {
+    onSuccess: (newHabit) => {
+      queryClient.setQueryData(
+        ['bad-habits', user?.id],
+        (old: BadHabit[] | undefined) => [newHabit, ...(old ?? [])]
+      );
       queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
       toast.success('Bad habit added! Ready to resist.');
     },
@@ -115,7 +119,11 @@ export const useResistMode = () => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, habitId) => {
+      queryClient.setQueryData(
+        ['bad-habits', user?.id],
+        (old: BadHabit[] | undefined) => (old ?? []).filter(h => h.id !== habitId)
+      );
       queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
       toast.success('Habit removed');
     },
