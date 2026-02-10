@@ -179,6 +179,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -278,15 +279,75 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     };
   }, [tasks, sortBy, keepInPlace]);
 
-  // Merge all tasks (quests + rituals) into a unified timeline
+  // Only quests go into the unified timeline (rituals grouped by campaign below)
   const { scheduledItems, anytimeItems } = useMemo(() => {
-    const all = [...questTasks, ...ritualTasks];
-    const scheduled = all.filter(t => !!t.scheduled_time).sort((a, b) => 
+    const scheduled = questTasks.filter(t => !!t.scheduled_time).sort((a, b) => 
       (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
     );
-    const anytime = all.filter(t => !t.scheduled_time);
+    const anytime = questTasks.filter(t => !t.scheduled_time);
     return { scheduledItems: scheduled, anytimeItems: anytime };
-  }, [questTasks, ritualTasks]);
+  }, [questTasks]);
+
+  // Group rituals by campaign
+  const campaignRitualGroups = useMemo(() => {
+    const groups: Array<{
+      epicId: string;
+      title: string;
+      progress: number;
+      daysLeft: number | null;
+      rituals: Task[];
+      completedCount: number;
+      epic: typeof activeEpics[0];
+    }> = [];
+
+    const ritualsByEpic = new Map<string, Task[]>();
+    for (const task of ritualTasks) {
+      const epicId = task.epic_id;
+      if (!epicId) continue;
+      if (!ritualsByEpic.has(epicId)) ritualsByEpic.set(epicId, []);
+      ritualsByEpic.get(epicId)!.push(task);
+    }
+
+    for (const epic of activeEpics) {
+      const rituals = ritualsByEpic.get(epic.id);
+      if (!rituals || rituals.length === 0) continue;
+      groups.push({
+        epicId: epic.id,
+        title: epic.title,
+        progress: Math.round(epic.progress_percentage ?? 0),
+        daysLeft: getDaysLeft(epic.end_date),
+        rituals,
+        completedCount: rituals.filter(r => !!r.completed).length,
+        epic,
+      });
+    }
+
+    return groups;
+  }, [ritualTasks, activeEpics]);
+
+  // Keep expanded campaigns in sync when new epics appear
+  useEffect(() => {
+    setExpandedCampaigns(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const epic of activeEpics) {
+        if (!next.has(epic.id)) {
+          next.add(epic.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [activeEpics]);
+
+  const toggleCampaignExpanded = useCallback((epicId: string) => {
+    setExpandedCampaigns(prev => {
+      const next = new Set(prev);
+      if (next.has(epicId)) next.delete(epicId);
+      else next.add(epicId);
+      return next;
+    });
+  }, []);
 
 
 
@@ -840,7 +901,83 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         {/* Inbox section removed - now has its own tab */}
 
-        {/* Campaign Headers (for epics with no rituals today, still show as strip) */}
+        {/* Campaign Dropdown Folders with Rituals */}
+        {campaignRitualGroups.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-border/30">
+            {/* Campaigns divider */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-9 flex-shrink-0" />
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <Target className="h-3 w-3" />
+                Campaigns
+              </div>
+              <div className="flex-1 border-t border-dashed border-border/40" />
+            </div>
+
+            <div className="space-y-2">
+              {campaignRitualGroups.map(group => {
+                const isCampaignExpanded = expandedCampaigns.has(group.epicId);
+                return (
+                  <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
+                    {/* Campaign Header */}
+                    <div className="flex items-center gap-2 px-3 py-2.5">
+                      <JourneyPathDrawer epic={{
+                        id: group.epic.id,
+                        title: group.epic.title,
+                        description: group.epic.description ?? undefined,
+                        progress_percentage: group.epic.progress_percentage ?? 0,
+                        target_days: group.epic.target_days,
+                        start_date: group.epic.start_date,
+                        end_date: group.epic.end_date,
+                        epic_habits: group.epic.epic_habits,
+                      }}>
+                        <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
+                          <Target className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-sm font-medium truncate">{group.title}</span>
+                        </button>
+                      </JourneyPathDrawer>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                        {group.daysLeft !== null && (
+                          <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
+                        )}
+                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                          {group.completedCount}/{group.rituals.length}
+                        </Badge>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCampaignExpanded(group.epicId);
+                          }}
+                          className="p-1 -m-1 focus:outline-none"
+                        >
+                          {isCampaignExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Collapsible Rituals */}
+                    {isCampaignExpanded && (
+                      <div className="border-t border-border/20 px-2 pb-1">
+                        {group.rituals.map(task => (
+                          <div key={task.id}>
+                            {renderTaskItem(task)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Campaign Strip (for epics with no rituals today) */}
         {activeEpics && activeEpics.length > 0 && ritualTasks.length === 0 && (
           <div className="mt-4 pt-3 border-t border-border/20 space-y-2">
             {activeEpics.map(epic => {
