@@ -1,38 +1,72 @@
 
-# Restore Campaign Dropdown Folders for Rituals
 
-## Problem
-Rituals from campaigns used to be grouped under collapsible campaign headers (showing campaign name, progress, days remaining, and a chevron to expand/collapse). Now they're mixed into the flat timeline alongside regular quests because all tasks are merged into a single list (lines 281-289 in `TodaysAgenda.tsx`).
+# Drag-to-Reschedule: Adjust Quest Time by Dragging
 
-## Solution
-Restore the campaign-grouped collapsible sections so rituals appear under their campaign headers as dropdown folders, while regular quests remain in the timeline.
+## Overview
+Long-press a quest card, then drag it vertically to change its scheduled time. The time label on the left updates live in 10-minute increments as you drag. On release, the new time is persisted.
 
-## Changes in `src/components/TodaysAgenda.tsx`
+## Approach: Extend Existing Patterns (Not a New Component)
 
-### 1. Remove rituals from the unified timeline
-- Update the merge logic (lines 281-289) to only include `questTasks` (not `ritualTasks`) in `scheduledItems` and `anytimeItems`.
+Rather than creating a brand new `DraggableTimeline` component, we'll add time-reschedule logic **directly into the existing scheduled items rendering** in `TodaysAgenda.tsx`. This keeps things simple and reuses the proven long-press + drag patterns from `DraggableTaskList`.
 
-### 2. Group rituals by campaign
-- Add a `useMemo` that groups `ritualTasks` by their `epic_id`, matching against `activeEpics` to get campaign metadata (title, progress, days remaining).
+## How It Works
 
-### 3. Add collapsible campaign sections after the quest timeline
-- Add a "Campaigns" separator (similar to the "ANYTIME" divider) below the quest timeline.
-- For each campaign with rituals today, render a collapsible header showing:
-  - Campaign name (with `Target` icon)
-  - Progress percentage and days remaining
-  - Completion count for today's rituals (e.g., "2/5")
-  - Chevron toggle button (with `event.stopPropagation()` to avoid conflicts)
-- Inside each collapsible, render the grouped ritual tasks using the existing `renderTaskItem`.
+1. **Long-press (500ms)** a scheduled quest card -- haptic fires, card lifts with scale + shadow
+2. **Drag vertically** -- the time label in the left column updates in real-time, snapping to 10-minute intervals (e.g., 9:00a, 9:10a, 9:20a)
+3. **Release** -- card settles, `updateTask` mutation fires with the new `scheduled_time`, timeline re-sorts
+4. Dragging an **anytime quest** into the scheduled zone gives it a time (based on drag position relative to existing scheduled items)
 
-### 4. Track expanded campaign state
-- Add a `useState<Set<string>>` for `expandedCampaigns`, defaulting all campaigns to expanded.
-- Chevron toggles the campaign ID in/out of the set.
+## Technical Changes
 
-### 5. Update the empty-campaign strip condition
-- The existing campaign strip (line 843-876) already only shows when `ritualTasks.length === 0`, so it will continue to work as a fallback for campaigns with no rituals surfaced today.
+### 1. New hook: `src/hooks/useTimelineDrag.ts`
 
-## Visual Result
-- Quests appear in the timeline as they do now
-- Below quests, a "Campaigns" section shows each active campaign as a collapsible dropdown
-- Each campaign header shows real-time stats and a chevron to expand/collapse its rituals
-- Tapping the campaign header name opens the Journey Path Drawer (existing behavior)
+A self-contained hook that manages the drag-to-reschedule interaction:
+
+- **State**: `draggingTaskId`, `previewTime` (the snapped time string shown during drag), `dragOffsetY`
+- **Long-press detection**: 500ms timer, cancels on >10px scroll movement (same proven pattern as `DraggableTaskList`)
+- **Time calculation**: Maps vertical drag delta to 10-minute intervals:
+  - Each 10-minute slot = 40px of vertical movement
+  - `newMinutes = originalMinutes + Math.round(deltaY / 40) * 10`
+  - Clamp between 00:00 and 23:50
+- **Haptics**: Light impact on each 10-minute snap, medium on drop
+- **Auto-scroll**: Reuses `useAutoscroll` hook for edge scrolling
+- **Returns**: `{ startDrag, handlers, draggingTaskId, previewTime, dragOffsetY, isDragging }`
+
+### 2. Update `src/components/TimelineTaskRow.tsx`
+
+- Add `overrideTime` prop -- when set, displays this time instead of the task's actual time (used during drag preview)
+- Add `isDragTarget` prop for subtle highlight styling when the row is being dragged
+
+### 3. Update `src/components/TodaysAgenda.tsx`
+
+- Import and use `useTimelineDrag` hook
+- Add `onUpdateScheduledTime` prop (wired to `updateTask` mutation)
+- Wrap each `TimelineTaskRow` in the scheduled section (lines 862-871) with long-press handlers from the hook
+- Pass `overrideTime={previewTime}` to the actively dragged row
+- Apply the lifted card styling (scale, shadow, z-index) to the dragged item via inline styles (same pattern as `DraggableTaskList` lines 384-394)
+- On drag end, call `onUpdateScheduledTime(taskId, newTime)` and let the timeline re-sort
+
+### 4. Update `src/pages/Journeys.tsx`
+
+- Pass `onUpdateScheduledTime` callback that calls `updateTask.mutateAsync({ taskId, updates: { scheduled_time: newTime } })`
+
+## Interaction Details (Matching Existing Feel)
+
+| Aspect | Implementation |
+|--------|---------------|
+| Long-press threshold | 500ms (matches `DraggableTaskList`) |
+| Scroll cancel | 10px vertical movement before activation cancels |
+| Card lift | `scale(1.03)`, elevated box-shadow (same as `DraggableTaskList` line 386-391) |
+| Other items | `opacity: 0.7`, `pointerEvents: none` (same pattern) |
+| Time snap | Every 40px = 10 minutes, light haptic on each snap |
+| Drop | Medium haptic, bounce animation (`scale [1, 1.02, 0.98, 1]`) |
+| Touch handling | Both pointer events (desktop) AND touch events (iOS) on window, `{ passive: false }` for touch move |
+| Transform | Direct CSS `transform: translateY()` on dragged item -- no framer-motion animation lag |
+
+## Why This Works
+
+- Reuses the exact interaction model users already know from reorder drag
+- No new component needed -- just a hook + minor prop additions
+- Time calculation is pure math (no complex DOM measurement)
+- The `useAutoscroll` hook handles edge-of-screen scrolling automatically
+- Proven touch handling pattern prevents conflicts with page scroll
