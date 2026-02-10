@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo } from "react";
+import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays } from "date-fns";
 import { motion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -136,6 +137,7 @@ interface TodaysAgendaProps {
   habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
+  onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -170,9 +172,19 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   habitsAtRisk = [],
   onDeleteQuest,
   onMoveQuestToNextDay,
+  onUpdateScheduledTime,
 }: TodaysAgendaProps) {
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
+
+  // Timeline drag-to-reschedule
+  const timelineDragContainerRef = useRef<HTMLDivElement>(null);
+  const timelineDrag = useTimelineDrag({
+    containerRef: timelineDragContainerRef,
+    onDrop: (taskId, newTime) => {
+      onUpdateScheduledTime?.(taskId, newTime);
+    },
+  });
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showMonthView, setShowMonthView] = useState(false);
@@ -858,17 +870,58 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
             {/* Scheduled Tasks Timeline */}
             {scheduledItems.length > 0 && (
-              <div>
-                {scheduledItems.map((task, index) => (
-                  <TimelineTaskRow
-                    key={task.id}
-                    time={task.scheduled_time}
-                    showLine={index > 0}
-                    isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
-                  >
-                    {renderTaskItem(task)}
-                  </TimelineTaskRow>
-                ))}
+              <div ref={timelineDragContainerRef}>
+                {scheduledItems.map((task, index) => {
+                  const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                  const isAnyDragging = timelineDrag.isDragging;
+                  const isJustDropped = timelineDrag.justDroppedId === task.id;
+                  const rowHandlers = task.scheduled_time
+                    ? timelineDrag.getRowHandlers(task.id, task.scheduled_time)
+                    : {};
+
+                  return (
+                    <motion.div
+                      key={task.id}
+                      className={cn("relative", isThisDragging && "z-50")}
+                      animate={isJustDropped ? {
+                        scale: [1, 1.02, 0.98, 1],
+                        y: [0, -2, 1, 0],
+                      } : { scale: 1, y: 0 }}
+                      transition={isJustDropped ? {
+                        duration: 0.25,
+                        ease: [0.25, 0.1, 0.25, 1],
+                      } : { duration: 0 }}
+                      style={{
+                        WebkitUserSelect: 'none',
+                        userSelect: 'none',
+                        WebkitTouchCallout: 'none',
+                        touchAction: isThisDragging ? 'none' : 'pan-y',
+                        pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+                        transform: isThisDragging
+                          ? `translateY(${timelineDrag.dragOffsetY}px) scale(1.03)`
+                          : undefined,
+                        opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                        boxShadow: isThisDragging
+                          ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                          : "none",
+                        backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
+                        borderRadius: isThisDragging ? 12 : 0,
+                        transition: 'none',
+                      }}
+                      {...rowHandlers}
+                    >
+                      <TimelineTaskRow
+                        time={task.scheduled_time}
+                        overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
+                        showLine={index > 0}
+                        isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
+                        isDragTarget={isThisDragging}
+                      >
+                        {renderTaskItem(task)}
+                      </TimelineTaskRow>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
 

@@ -681,6 +681,9 @@ const Journeys = () => {
             activeEpics={activeEpics}
             onDeleteQuest={handleSwipeDeleteQuest}
             onMoveQuestToNextDay={handleSwipeMoveToNextDay}
+            onUpdateScheduledTime={(taskId, newTime) => {
+              updateTask({ taskId, updates: { scheduled_time: newTime } });
+            }}
           />
         </motion.div>
 
