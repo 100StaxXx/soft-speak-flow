@@ -1,19 +1,32 @@
 
-# Add Hero Title to Inbox Page (Matching Quests Style)
 
-## What Changes
-Replace the current small sticky header with a hero-style animated title matching the Quests page layout.
+# Fix Mentor Disconnection on App Resume
 
-## Details
+## Problem
+When you switch away from the app and come back (or your token refreshes), the mentor vanishes because mentor queries are invalidated *before* the profile data they depend on finishes loading. The profile contains your `selected_mentor_id` -- without it, mentor queries resolve to `null`.
 
-**File: `src/pages/Inbox.tsx`**
+The retry fix you applied from ChatGPT improves **chat message reliability** (retrying on network errors). This fix addresses the separate **mentor disappearing** issue.
 
-Replace the current sticky header (lines 80-93) with a centered, animated hero title block:
+## Changes
 
-- Large gradient heading: **"Inbox"** using `text-4xl font-bold` with a `from-celestial-blue to-blue-400` gradient (blue theme to match the Inbox's celestial-blue accent, vs the purple gradient on Quests)
-- Tagline underneath: **"Capture now. Conquer later."** in `text-sm text-muted-foreground`
-- Badge showing inbox count inline below the tagline (when count > 0)
-- Wrapped in a `motion.div` with the same fade-in animation as Quests (`opacity: 0, y: -20` to `opacity: 1, y: 0`)
-- Centered layout with `text-center` and `mb-6`, matching the Quests hero spacing
+### 1. `src/hooks/useAppResumeRefresh.ts` -- Web/PWA handler (line 67)
 
-This removes the sticky bar in favor of the same open, spacious hero pattern used on the Quests page.
+Make the visibility change handler `async` and `await` the profile refetch before invalidating mentor queries. The native (iOS/Android) handler on line 43 already does this correctly -- this makes the web handler match.
+
+```
+Before:  queryClient.refetchQueries(...)   // fire-and-forget
+After:   await queryClient.refetchQueries(...)  // wait for profile
+```
+
+### 2. `src/hooks/useAuthSync.ts` -- Auth state handler (line 18)
+
+Same fix inside the `setTimeout` callback: make it `async` and `await` the profile refetch before invalidating mentor queries.
+
+```
+Before:  setTimeout(() => { queryClient.refetchQueries(...); ... }, 0)
+After:   setTimeout(async () => { await queryClient.refetchQueries(...); ... }, 0)
+```
+
+## Why This Works
+Mentor queries use `resolvedMentorId` from the profile as their query key and `enabled` flag. If they refetch while the profile is still loading, they see `null` and return nothing -- the mentor disappears. Awaiting the profile ensures the mentor ID is available when mentor queries run.
+
