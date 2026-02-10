@@ -1,32 +1,49 @@
 
 
-# Fix Mentor Disconnection on App Resume
+# Fix Bad Habits Not Appearing After Adding
 
 ## Problem
-When you switch away from the app and come back (or your token refreshes), the mentor vanishes because mentor queries are invalidated *before* the profile data they depend on finishes loading. The profile contains your `selected_mentor_id` -- without it, mentor queries resolve to `null`.
+When you add a bad habit, the toast says "Bad habit added!" but the list still shows "No habits tracked yet." The data saves correctly to the database (confirmed in network logs and DB), but the UI never updates.
 
-The retry fix you applied from ChatGPT improves **chat message reliability** (retrying on network errors). This fix addresses the separate **mentor disappearing** issue.
+## Root Cause
+The mutation's `onSuccess` calls `invalidateQueries({ queryKey: ['bad-habits'] })`, which should trigger a refetch for the active query keyed as `['bad-habits', userId]`. However, the refetch is not firing (zero GET requests appear in the network after any POST). This is likely due to the component being wrapped in `memo` combined with the Dialog portal interaction preventing React Query from recognizing the query as actively observed.
 
-## Changes
+## Fix
 
-### 1. `src/hooks/useAppResumeRefresh.ts` -- Web/PWA handler (line 67)
+**File: `src/hooks/useResistMode.ts`** (lines 77-103, the `addHabitMutation`)
 
-Make the visibility change handler `async` and `await` the profile refetch before invalidating mentor queries. The native (iOS/Android) handler on line 43 already does this correctly -- this makes the web handler match.
+Update the `onSuccess` callback to directly update the query cache with the returned data from the mutation, then invalidate as a background refresh:
 
+```typescript
+onSuccess: (newHabit) => {
+  // Immediately add the new habit to the cache
+  queryClient.setQueryData(
+    ['bad-habits', user?.id],
+    (old: BadHabit[] | undefined) => [newHabit, ...(old ?? [])]
+  );
+  // Also invalidate to ensure full consistency
+  queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
+  toast.success('Bad habit added! Ready to resist.');
+},
 ```
-Before:  queryClient.refetchQueries(...)   // fire-and-forget
-After:   await queryClient.refetchQueries(...)  // wait for profile
-```
 
-### 2. `src/hooks/useAuthSync.ts` -- Auth state handler (line 18)
+Also apply the same pattern to `removeHabitMutation` for consistency -- optimistically remove from cache before the invalidation:
 
-Same fix inside the `setTimeout` callback: make it `async` and `await` the profile refetch before invalidating mentor queries.
-
-```
-Before:  setTimeout(() => { queryClient.refetchQueries(...); ... }, 0)
-After:   setTimeout(async () => { await queryClient.refetchQueries(...); ... }, 0)
+```typescript
+onSuccess: (_data, habitId) => {
+  queryClient.setQueryData(
+    ['bad-habits', user?.id],
+    (old: BadHabit[] | undefined) => (old ?? []).filter(h => h.id !== habitId)
+  );
+  queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
+  toast.success('Habit removed');
+},
 ```
 
 ## Why This Works
-Mentor queries use `resolvedMentorId` from the profile as their query key and `enabled` flag. If they refetch while the profile is still loading, they see `null` and return nothing -- the mentor disappears. Awaiting the profile ensures the mentor ID is available when mentor queries run.
+Instead of relying on `invalidateQueries` to trigger a refetch (which isn't firing), we directly update the cached data with `setQueryData`. This guarantees the UI updates immediately since React Query notifies all subscribers when cache data changes. The background `invalidateQueries` still runs to ensure eventual consistency.
 
+## Technical Details
+- One file changed: `src/hooks/useResistMode.ts`
+- Two mutations updated: `addHabitMutation` and `removeHabitMutation`
+- The mutation already returns the new habit data via `.select().single()`, so no additional DB calls needed
