@@ -1,72 +1,80 @@
 
+# Make Daily Missions Creative and Non-Repetitive
 
-# Drag-to-Reschedule: Adjust Quest Time by Dragging
+## Problem
+The AI is copy-pasting the same 5-6 mission texts every single day because:
+1. The prompt includes "approved patterns" which the AI treats as the only options
+2. No recent mission history is sent to the AI, so it can't avoid repeats
+3. The database prompt template is stale (only lists 3 categories instead of all 6)
+4. Temperature is 0.9 but the prompt is so constrained it doesn't matter
 
-## Overview
-Long-press a quest card, then drag it vertically to change its scheduled time. The time label on the left updates live in 10-minute increments as you drag. On release, the new time is persisted.
+## Solution: Three Changes
 
-## Approach: Extend Existing Patterns (Not a New Component)
+### 1. Feed Recent Mission History into the Prompt (Edge Function)
 
-Rather than creating a brand new `DraggableTimeline` component, we'll add time-reschedule logic **directly into the existing scheduled items rendering** in `TodaysAgenda.tsx`. This keeps things simple and reuses the proven long-press + drag patterns from `DraggableTaskList`.
+In `supabase/functions/generate-daily-missions/index.ts`:
+- Query the last 7 days of missions for this user (up to ~21 texts)
+- Add them to the user prompt as a "DO NOT REPEAT" list
+- This single change will force the AI to generate fresh variations every day
 
-## How It Works
+### 2. Rewrite the Prompt to Encourage Creativity (Database Update)
 
-1. **Long-press (500ms)** a scheduled quest card -- haptic fires, card lifts with scale + shadow
-2. **Drag vertically** -- the time label in the left column updates in real-time, snapping to 10-minute intervals (e.g., 9:00a, 9:10a, 9:20a)
-3. **Release** -- card settles, `updateTask` mutation fires with the new `scheduled_time`, timeline re-sorts
-4. Dragging an **anytime quest** into the scheduled zone gives it a time (based on drag position relative to existing scheduled items)
+Update the `prompt_templates` row for `daily_missions`:
 
-## Technical Changes
+**System prompt changes:**
+- Remove the rigid "approved patterns" lists -- replace with category *intent* descriptions and example *styles* (not exact texts)
+- Add explicit instruction: "Never repeat or closely paraphrase any mission from the recent history list"
+- Add creative direction: "Each mission should feel fresh -- vary the action, framing, and specificity. Use concrete details (e.g., 'Name 3 sounds you can hear right now' instead of generic 'be mindful')"
+- Expand categories in `output_constraints` from `[connection, quick_win, identity]` to all 6: `[connection, quick_win, identity, wellness, gratitude, growth]`
+- Add a "learning-focused" nudge for growth missions: encourage specific micro-learning prompts (e.g., "Look up why the sky is blue", "Find out what your name means")
 
-### 1. New hook: `src/hooks/useTimelineDrag.ts`
+**User prompt changes:**
+- Include the recent history block: "The user has seen these missions recently -- generate completely different ones: [list]"
+- Add the user's active campaigns/habits as context so missions can reference what they're actually working on
 
-A self-contained hook that manages the drag-to-reschedule interaction:
+### 3. Make Missions Context-Aware (Edge Function)
 
-- **State**: `draggingTaskId`, `previewTime` (the snapped time string shown during drag), `dragOffsetY`
-- **Long-press detection**: 500ms timer, cancels on >10px scroll movement (same proven pattern as `DraggableTaskList`)
-- **Time calculation**: Maps vertical drag delta to 10-minute intervals:
-  - Each 10-minute slot = 40px of vertical movement
-  - `newMinutes = originalMinutes + Math.round(deltaY / 40) * 10`
-  - Clamp between 00:00 and 23:50
-- **Haptics**: Light impact on each 10-minute snap, medium on drop
-- **Auto-scroll**: Reuses `useAutoscroll` hook for edge scrolling
-- **Returns**: `{ startDrag, handlers, draggingTaskId, previewTime, dragOffsetY, isDragging }`
+In the edge function, before calling the AI:
+- Query the user's active epic titles and habit titles
+- Pass them as context variables so the AI can generate missions like "Do one thing that supports your [campaign name] journey" or "Practice [habit name] in a new way today"
+- This makes missions feel personal and tied to what the user cares about
 
-### 2. Update `src/components/TimelineTaskRow.tsx`
+## Technical Details
 
-- Add `overrideTime` prop -- when set, displays this time instead of the task's actual time (used during drag preview)
-- Add `isDragTarget` prop for subtle highlight styling when the row is being dragged
+### Edge Function Changes (`supabase/functions/generate-daily-missions/index.ts`)
 
-### 3. Update `src/components/TodaysAgenda.tsx`
+```text
+New queries to add before AI call:
+1. Recent missions: SELECT mission_text FROM daily_missions 
+   WHERE user_id = X AND mission_date > (today - 7 days)
+2. Active epics: SELECT title FROM epics 
+   WHERE user_id = X AND status = 'active'
+3. Active habits: SELECT title FROM habits 
+   WHERE user_id = X AND archived_at IS NULL
+```
 
-- Import and use `useTimelineDrag` hook
-- Add `onUpdateScheduledTime` prop (wired to `updateTask` mutation)
-- Wrap each `TimelineTaskRow` in the scheduled section (lines 862-871) with long-press handlers from the hook
-- Pass `overrideTime={previewTime}` to the actively dragged row
-- Apply the lifted card styling (scale, shadow, z-index) to the dragged item via inline styles (same pattern as `DraggableTaskList` lines 384-394)
-- On drag end, call `onUpdateScheduledTime(taskId, newTime)` and let the timeline re-sort
+Pass these into the prompt as:
+- `recentMissions`: string[] of last 7 days' mission texts
+- `activeGoals`: string[] of epic + habit titles
 
-### 4. Update `src/pages/Journeys.tsx`
+### Database Migration (prompt_templates update)
 
-- Pass `onUpdateScheduledTime` callback that calls `updateTask.mutateAsync({ taskId, updates: { scheduled_time: newTime } })`
+Update the system prompt and user prompt template for `daily_missions` to:
+- Reference `recentMissions` variable
+- Reference `activeGoals` variable  
+- Use category intents instead of approved patterns
+- Update `output_constraints.categoriesRequired` to include all 6 categories
+- Add `variables` entry for `recentMissions` and `activeGoals`
 
-## Interaction Details (Matching Existing Feel)
+### Files Changed
 
-| Aspect | Implementation |
-|--------|---------------|
-| Long-press threshold | 500ms (matches `DraggableTaskList`) |
-| Scroll cancel | 10px vertical movement before activation cancels |
-| Card lift | `scale(1.03)`, elevated box-shadow (same as `DraggableTaskList` line 386-391) |
-| Other items | `opacity: 0.7`, `pointerEvents: none` (same pattern) |
-| Time snap | Every 40px = 10 minutes, light haptic on each snap |
-| Drop | Medium haptic, bounce animation (`scale [1, 1.02, 0.98, 1]`) |
-| Touch handling | Both pointer events (desktop) AND touch events (iOS) on window, `{ passive: false }` for touch move |
-| Transform | Direct CSS `transform: translateY()` on dragged item -- no framer-motion animation lag |
+| File | Change |
+|------|--------|
+| `supabase/functions/generate-daily-missions/index.ts` | Add recent history + active goals queries, pass to prompt |
+| Database: `prompt_templates` | Update system/user prompts for creativity + dedup |
 
-## Why This Works
-
-- Reuses the exact interaction model users already know from reorder drag
-- No new component needed -- just a hook + minor prop additions
-- Time calculation is pure math (no complex DOM measurement)
-- The `useAutoscroll` hook handles edge-of-screen scrolling automatically
-- Proven touch handling pattern prevents conflicts with page scroll
+## Expected Result
+- Missions will never repeat within a 7-day window
+- Missions will reference the user's actual campaigns and habits
+- Growth/learning missions will be specific and interesting (e.g., "Look up one thing about a country you've never visited" instead of "Learn one new word or fact today")
+- Each day genuinely feels different
