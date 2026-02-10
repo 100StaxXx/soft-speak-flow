@@ -1214,7 +1214,7 @@ export function EnergyBeamGame({
   }, [gameState, lives, difficulty, onComplete, getResult, score]);
   
   return (
-    <div className="relative w-full h-full min-h-[500px] flex flex-col items-center overflow-hidden select-none">
+    <div className="relative w-full h-full flex-1 min-h-0 flex flex-col items-center overflow-hidden select-none">
       <StarfieldBackground />
       
       {/* HUD - No timer, show wave without max - compact mode support */}

@@ -454,7 +454,7 @@ export const TapSequenceGame = ({
   }, [gameState, currentOrder, orbCount]);
 
   return (
-    <div className={`flex flex-col items-center relative ${shake ? 'animate-shake' : ''}`}>
+    <div className={`flex flex-col items-center relative flex-1 min-h-0 ${shake ? 'animate-shake' : ''}`}>
       {/* Countdown Overlay */}
       {gameState === 'countdown' && (
         <CountdownOverlay count={3} onComplete={handleCountdownComplete} />
@@ -482,31 +482,42 @@ export const TapSequenceGame = ({
       />
 
       {/* Lives and Level display - compact */}
-      <div className="w-full max-w-[280px] mb-1 flex items-center justify-between">
-        <LivesDisplay lives={lives} />
-        <motion.div 
-          key={level}
-          initial={{ scale: 1.2, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="px-2 py-0.5 bg-primary/20 rounded-full border border-primary/40"
-        >
-          <span className="text-xs font-bold text-primary">Level {level}</span>
-        </motion.div>
-      </div>
+      {!compact && (
+        <div className="w-full max-w-[280px] mb-1 flex items-center justify-between">
+          <LivesDisplay lives={lives} />
+          <motion.div 
+            key={level}
+            initial={{ scale: 1.2, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="px-2 py-0.5 bg-primary/20 rounded-full border border-primary/40"
+          >
+            <span className="text-xs font-bold text-primary">Level {level}</span>
+          </motion.div>
+        </div>
+      )}
+      {compact && (
+        <div className="w-full max-w-[280px] mb-0.5 flex items-center justify-between text-xs">
+          <LivesDisplay lives={lives} />
+          <span className="font-bold text-primary text-[10px]">Lv{level}</span>
+          <span className="text-muted-foreground text-[10px]">{orbCount} orbs</span>
+        </div>
+      )}
 
-      {/* Difficulty indicator - compact */}
-      <div className="mb-0.5 flex items-center gap-1.5">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-          difficulty === 'beginner' ? 'bg-blue-500/20 text-blue-400' :
-          difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
-          difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
-          difficulty === 'hard' ? 'bg-orange-500/20 text-orange-400' :
-          'bg-red-500/20 text-red-400'
-        }`}>
-          {difficulty.toUpperCase()}
-        </span>
-        <span className="text-[10px] text-muted-foreground">{orbCount} orbs</span>
-      </div>
+      {/* Difficulty indicator - hidden in compact */}
+      {!compact && (
+        <div className="mb-0.5 flex items-center gap-1.5">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+            difficulty === 'beginner' ? 'bg-blue-500/20 text-blue-400' :
+            difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+            difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+            difficulty === 'hard' ? 'bg-orange-500/20 text-orange-400' :
+            'bg-red-500/20 text-red-400'
+          }`}>
+            {difficulty.toUpperCase()}
+          </span>
+          <span className="text-[10px] text-muted-foreground">{orbCount} orbs</span>
+        </div>
+      )}
 
       {/* Game area */}
       <div 
@@ -603,24 +614,28 @@ export const TapSequenceGame = ({
         </AnimatePresence>
       </div>
       
-      {/* Instructions - compact */}
-      <motion.p 
-        className="mt-2 text-xs text-muted-foreground text-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        {gameState === 'showing' || gameState === 'reshowing'
-          ? '👀 Memorize the sequence...' 
-          : gameState === 'playing' 
-            ? '👆 Tap the orbs in order!' 
-            : ''}
-      </motion.p>
+      {/* Instructions - hidden in compact mode */}
+      {!compact && (
+        <motion.p 
+          className="mt-2 text-xs text-muted-foreground text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {gameState === 'showing' || gameState === 'reshowing'
+            ? '👀 Memorize the sequence...' 
+            : gameState === 'playing' 
+              ? '👆 Tap the orbs in order!' 
+              : ''}
+        </motion.p>
+      )}
 
-      {/* Game info - compact */}
-      <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
-        <span>{diffConfig.startLives} lives • Endless</span>
-        <span className="text-primary">No time limit</span>
-      </div>
+      {/* Game info - hidden in compact mode */}
+      {!compact && (
+        <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span>{diffConfig.startLives} lives • Endless</span>
+          <span className="text-primary">No time limit</span>
+        </div>
+      )}
 
       {/* CSS animations */}
       <style>{`
