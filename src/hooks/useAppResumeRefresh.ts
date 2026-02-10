@@ -64,7 +64,7 @@ export const useAppResumeRefresh = () => {
   useEffect(() => {
     if (Capacitor.isNativePlatform()) return; // Skip on native
 
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.visibilityState !== 'visible') return;
 
       const now = Date.now();
@@ -75,7 +75,8 @@ export const useAppResumeRefresh = () => {
       lastResumeRef.current = now;
       logger.debug('Tab became visible - refreshing critical data');
 
-      queryClient.refetchQueries({ queryKey: ['profile'] });
+      // Await profile first (mentor depends on resolvedMentorId from it)
+      await queryClient.refetchQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
       queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
       

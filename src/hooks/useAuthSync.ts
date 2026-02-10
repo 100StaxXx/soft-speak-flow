@@ -15,9 +15,9 @@ export const useAuthSync = () => {
         // On sign in or token refresh, refetch profile immediately to get fresh data
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           // Use setTimeout to avoid deadlock - defer Supabase calls
-          setTimeout(() => {
-            // Use refetchQueries for immediate fresh data before redirect decisions
-            queryClient.refetchQueries({ queryKey: ["profile"] });
+          setTimeout(async () => {
+            // Await profile so mentor queries have resolvedMentorId ready
+            await queryClient.refetchQueries({ queryKey: ["profile"] });
             queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] });
             queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
           }, 0);
