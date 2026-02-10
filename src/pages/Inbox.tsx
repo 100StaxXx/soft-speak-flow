@@ -74,7 +74,7 @@ const InboxPage = memo(function InboxPage() {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-background pb-24 pt-safe">
+      <div className="min-h-screen bg-transparent pb-24 pt-safe">
         <StarfieldBackground />
 
         {/* Header */}
