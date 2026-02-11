@@ -1015,7 +1015,11 @@ export const OrbMatchGame = ({
         setOrbs([...orbsToProcess]);
         orbsRef.current = [...orbsToProcess];
         
-        matched.size >= 5 || specialsActivated.length > 0 ? triggerHaptic('heavy') : triggerHaptic('success');
+        if (matched.size >= 5 || specialsActivated.length > 0) {
+          triggerHaptic('heavy');
+        } else {
+          triggerHaptic('success');
+        }
         
         await new Promise(resolve => setTimeout(resolve, specialsActivated.length > 0 ? 350 : 200));
         orbsToProcess = dropAndFill(orbsToProcess, specialsToCreate);

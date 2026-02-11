@@ -54,6 +54,7 @@ export interface AddTaskParams {
   autoLogInteraction?: boolean;
   imageUrl?: string | null;
   location?: string | null;
+  subtasks?: string[];
 }
 
 export const useTaskMutations = (taskDate: string) => {
@@ -130,6 +131,34 @@ export const useTaskMutations = (taskDate: string) => {
           }
           throw error;
         }
+
+        const cleanedSubtasks = (params.subtasks || [])
+          .map((title) => title.trim())
+          .filter((title) => title.length > 0);
+
+        if (cleanedSubtasks.length > 0 && data?.id) {
+          const { error: subtasksError } = await supabase
+            .from('subtasks')
+            .insert(
+              cleanedSubtasks.map((title, index) => ({
+                task_id: data.id,
+                user_id: user.id,
+                title,
+                sort_order: index,
+              }))
+            );
+
+          if (subtasksError) {
+            // Best-effort rollback to keep create behavior predictable.
+            await supabase
+              .from('daily_tasks')
+              .delete()
+              .eq('id', data.id)
+              .eq('user_id', user.id);
+            throw subtasksError;
+          }
+        }
+
         return data;
       } finally {
         addInProgress.current = false;
@@ -167,19 +196,17 @@ export const useTaskMutations = (taskDate: string) => {
         reminder_minutes_before: params.reminderMinutesBefore ?? 15,
         reminder_sent: false,
         parent_template_id: null,
+        notes: params.notes || null,
+        location: params.location || null,
       };
 
-      // Update all matching daily-tasks queries
-      queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return [optimisticTask, ...old];
-      });
-
-      // Update all matching calendar-tasks queries
-      queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return [optimisticTask, ...old];
-      });
+      // Only update the specific day query to avoid cross-day cache pollution
+      if (optimisticTask.task_date) {
+        queryClient.setQueryData(['daily-tasks', user?.id, optimisticTask.task_date], (old: any) => {
+          if (!old || !Array.isArray(old)) return old;
+          return [optimisticTask, ...old];
+        });
+      }
 
       return { previousDailyTasks, previousCalendarTasks };
     },
@@ -477,7 +504,6 @@ export const useTaskMutations = (taskDate: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast({ title: "Quest deleted!" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to delete quest", description: error.message, variant: "destructive" });
@@ -488,7 +514,7 @@ export const useTaskMutations = (taskDate: string) => {
   const restoreTask = useMutation({
     mutationFn: async (taskData: {
       task_text: string;
-      task_date: string;
+      task_date: string | null;
       xp_reward?: number;
       difficulty?: string | null;
       scheduled_time?: string | null;
@@ -601,6 +627,7 @@ export const useTaskMutations = (taskDate: string) => {
         reminder_enabled?: boolean;
         reminder_minutes_before?: number;
         category?: string | null;
+        notes?: string | null;
         image_url?: string | null;
         location?: string | null;
       }
@@ -636,6 +663,9 @@ export const useTaskMutations = (taskDate: string) => {
       }
       if (updates.reminder_minutes_before !== undefined) {
         updateData.reminder_minutes_before = updates.reminder_minutes_before;
+      }
+      if (updates.notes !== undefined) {
+        updateData.notes = updates.notes;
       }
       
       // Handle category with validation
@@ -786,7 +816,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks', taskDate] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
     onError: (error: Error) => {
@@ -814,7 +844,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (error) throw error;
       return { taskId, targetDate };
     },
-    onMutate: async ({ taskId, targetDate }) => {
+    onMutate: async () => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
       await queryClient.cancelQueries({ queryKey: ['calendar-tasks'] });
@@ -822,16 +852,6 @@ export const useTaskMutations = (taskDate: string) => {
       // Snapshot previous values
       const previousDaily = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
       const previousCalendar = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
-
-      // Optimistically update task date in cache
-      queryClient.setQueriesData({ queryKey: ['daily-tasks'] }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map(t => t.id === taskId ? { ...t, task_date: targetDate } : t);
-      });
-      queryClient.setQueriesData({ queryKey: ['calendar-tasks'] }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map(t => t.id === taskId ? { ...t, task_date: targetDate } : t);
-      });
 
       return { previousDaily, previousCalendar };
     },
@@ -849,16 +869,13 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
-    onSuccess: (_data, variables) => {
-      toast({ title: `Quest moved to ${format(new Date(variables.targetDate + 'T00:00:00'), 'MMM d')}` });
-    },
   });
 
   return {
-    addTask: addTask.mutate,
+    addTask: addTask.mutateAsync,
     toggleTask: toggleTask.mutate,
-    deleteTask: deleteTask.mutate,
-    restoreTask: restoreTask.mutate,
+    deleteTask: deleteTask.mutateAsync,
+    restoreTask: restoreTask.mutateAsync,
     setMainQuest: setMainQuest.mutate,
     updateTask: updateTask.mutateAsync,
     reorderTasks: reorderTasks.mutate,

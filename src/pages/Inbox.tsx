@@ -42,7 +42,10 @@ const InboxPage = memo(function InboxPage() {
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     if (!user?.id) return;
-    const taskDate = data.sendToInbox ? null : format(selectedDate, 'yyyy-MM-dd');
+    const taskDate = data.sendToInbox
+      ? null
+      : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
+
     await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
@@ -54,8 +57,11 @@ const InboxPage = memo(function InboxPage() {
       recurrenceDays: data.recurrenceDays,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      notes: data.moreInformation,
+      location: data.location,
       contactId: data.contactId,
       autoLogInteraction: data.autoLogInteraction,
+      subtasks: data.subtasks,
     });
     if (!data.sendToInbox) {
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });

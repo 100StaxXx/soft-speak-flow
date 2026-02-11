@@ -152,7 +152,7 @@ const Horoscope = () => {
 
   useEffect(() => {
     generateHoroscope();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []); // Run once on mount
 
   // Update birth details when profile changes

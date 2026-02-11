@@ -198,7 +198,7 @@ export const useDailyMissions = () => {
   return {
     missions: missions || [],
     isLoading,
-    completeMission: completeMission.mutate,
+    completeMission: completeMission.mutateAsync,
     isCompleting: completeMission.isPending,
     completedCount,
     totalCount,

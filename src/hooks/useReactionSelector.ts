@@ -132,11 +132,11 @@
      }
  
      // 1. Get all active reactions for this source
-     let query = supabase
-       .from('companion_reactions')
-       .select('id, text, tone_tag, context_tags, cooldown_hours')
-       .eq('is_active', true)
-       .contains('source_systems', [source]);
+    const query = supabase
+      .from('companion_reactions')
+      .select('id, text, tone_tag, context_tags, cooldown_hours')
+      .eq('is_active', true)
+      .contains('source_systems', [source]);
  
      const { data: allReactions, error } = await query;
  

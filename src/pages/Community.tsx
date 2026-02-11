@@ -13,6 +13,7 @@ import { useCalendarMilestones } from "@/hooks/useCalendarMilestones";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { CalendarTask } from "@/types/quest";
 import { PageTransition } from "@/components/PageTransition";
+import { toast } from "sonner";
 
 const Community = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -102,7 +103,10 @@ const Community = () => {
   }, [handleTaskReschedule]);
 
   const handleAddQuest = async (data: AddQuestData) => {
-    const taskDate = format(selectedDate, 'yyyy-MM-dd');
+    const taskDate = data.sendToInbox
+      ? null
+      : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
+
     await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
@@ -114,6 +118,11 @@ const Community = () => {
       recurrenceDays: data.recurrenceDays,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      notes: data.moreInformation,
+      location: data.location,
+      contactId: data.contactId,
+      autoLogInteraction: data.autoLogInteraction,
+      subtasks: data.subtasks,
     });
     setShowAddSheet(false);
     setPrefilledTime(null);
@@ -129,6 +138,7 @@ const Community = () => {
     recurrence_days: number[];
     reminder_enabled: boolean;
     reminder_minutes_before: number;
+    notes: string | null;
     category: string | null;
     image_url: string | null;
     location: string | null;
@@ -139,6 +149,7 @@ const Community = () => {
 
   const handleDeleteQuest = async (taskId: string) => {
     await deleteTask(taskId);
+    toast.success("Quest deleted");
     setEditingTask(null);
   };
 

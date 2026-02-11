@@ -91,7 +91,7 @@ export const useReferrals = () => {
       // SECURITY FIX: Use secure RPC that handles everything server-side
       // This RPC validates the code, checks for self-referral, and applies it
       // without ever exposing owner_user_id or other sensitive data to the client
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const { data: result, error } = await (supabase.rpc as any)(
         "apply_referral_code_secure",
         { p_user_id: user.id, p_referral_code: normalizedCode }

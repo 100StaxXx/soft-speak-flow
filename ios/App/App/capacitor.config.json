@@ -30,7 +30,11 @@
 	},
 	"packageClassList": [
 		"SignInWithApple",
+		"ContactsPlugin",
+		"AppPlugin",
+		"CAPCameraPlugin",
 		"FilesystemPlugin",
+		"HapticsPlugin",
 		"PushNotificationsPlugin",
 		"ScreenOrientationPlugin",
 		"SharePlugin",

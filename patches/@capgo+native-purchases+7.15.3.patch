@@ -34,7 +34,7 @@ index 7cb921e..fbd2ce5 100644
          self.transactionUpdatesTask?.cancel()
          self.transactionUpdatesTask = nil
      }
-@@ -50,7 +53,10 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+@@ -50,29 +53,34 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
      private func startTransactionUpdatesListener() {
          // Ensure only one listener is running
          cancelTransactionUpdatesListener()
@@ -43,10 +43,14 @@ index 7cb921e..fbd2ce5 100644
 +            guard let self else { return }
 +
 +            defer { self.transactionUpdatesTask = nil }
- 
              for await result in Transaction.updates {
                  guard !Task.isCancelled else { break }
-@@ -63,17 +69,19 @@ public class NativePurchasesPlugin: CAPPlugin, CAPBridgedPlugin {
+                 switch result {
+                 case .verified(let transaction):
+                     // Build payload similar to purchase response
+                     let payload = await TransactionHelpers.buildTransactionResponse(from: transaction, jwsRepresentation: result.jwsRepresentation, alwaysIncludeWillCancel: true)
+ 
+                     // Finish the transaction to avoid blocking future purchases
                      await transaction.finish()
  
                      // Notify JS listeners on main thread, after slight delay

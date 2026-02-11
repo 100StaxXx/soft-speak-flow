@@ -57,7 +57,7 @@ export const MemoryWhisper = memo(({ className, chance = 0.15 }: MemoryWhisperPr
 
     return () => clearTimeout(timer);
     // Only depend on stable values to prevent re-triggering
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [memories.length, presence.isPresent, presence.mood, chance]);
 
   if (!memoryLine || !isVisible) {

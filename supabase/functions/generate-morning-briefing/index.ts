@@ -43,6 +43,19 @@ interface XPEventData {
   created_at: string;
 }
 
+const formatDateInTimezone = (date: Date, timezone: string): string => {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch {
+    return date.toISOString().split("T")[0];
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -73,7 +86,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Resolve profile and timezone first so "today" matches the user's configured timezone.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('selected_mentor_id, timezone')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const userTimezone = profile?.timezone || "UTC";
+    const today = formatDateInTimezone(new Date(), userTimezone);
 
     // Check if briefing already exists for today
     const { data: existingBriefing } = await supabase
@@ -92,13 +113,6 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Get user's mentor
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('selected_mentor_id')
-      .eq('id', user.id)
-      .single();
 
     let mentor = null;
     if (profile?.selected_mentor_id) {
@@ -131,7 +145,7 @@ Deno.serve(async (req) => {
     // Gather comprehensive user activity data
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+    const sevenDaysAgoStr = formatDateInTimezone(sevenDaysAgo, userTimezone);
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -263,7 +277,7 @@ const challenges: ChallengeData[] = (challengesResult.data || []).map(c => ({
     const calculateXPSummary = () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = formatDateInTimezone(yesterday, userTimezone);
       
       const yesterdayXP = xpEvents
         .filter(e => e.created_at.startsWith(yesterdayStr))

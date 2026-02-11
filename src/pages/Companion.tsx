@@ -16,13 +16,13 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
 import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
-import { CompanionPageSkeleton } from "@/components/skeletons/CompanionPageSkeleton";
 import { useState, memo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
+import type { Companion as CompanionData } from "@/hooks/useCompanion";
 
 // Memoized tab content to prevent unnecessary re-renders
 const OverviewTab = memo(({ 
@@ -30,7 +30,7 @@ const OverviewTab = memo(({
   nextEvolutionXP, 
   progressToNext,
 }: { 
-  companion: any; 
+  companion: CompanionData | null;
   nextEvolutionXP: number; 
   progressToNext: number;
 }) => (
@@ -85,7 +85,7 @@ const OverviewSkeleton = () => (
 );
 
 const Companion = () => {
-  const { companion, nextEvolutionXP, progressToNext, isLoading, error } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, isLoading, error, refetch } = useCompanion();
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
   const navigate = useNavigate();
@@ -103,10 +103,12 @@ const Companion = () => {
               {error instanceof Error ? error.message : 'Unable to load your companion data. Please try refreshing the page.'}
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                void refetch();
+              }}
               className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
             >
-              Refresh Page
+              Retry
             </button>
           </div>
         </div>
@@ -124,7 +126,7 @@ const Companion = () => {
               It looks like you haven't created your companion yet. Please complete the onboarding process to get started.
             </p>
             <button
-              onClick={() => window.location.href = '/onboarding'}
+              onClick={() => navigate('/onboarding')}
               className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
             >
               Start Onboarding

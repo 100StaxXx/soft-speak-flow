@@ -23,6 +23,7 @@ import {
 
 export interface AddQuestData {
   text: string;
+  taskDate: string | null;
   difficulty: "easy" | "medium" | "hard";
   scheduledTime: string | null;
   estimatedDuration: number | null;
@@ -205,6 +206,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     if (!taskText.trim()) return;
     await onAdd({
       text: taskText,
+      taskDate,
       difficulty,
       scheduledTime,
       estimatedDuration,
@@ -220,12 +222,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       subtasks: subtasks.filter(s => s.trim()),
     });
     onOpenChange(false);
-  }, [taskText, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, onAdd, onOpenChange]);
+  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, onAdd, onOpenChange]);
 
   const handleAddToInbox = useCallback(async () => {
     if (!taskText.trim()) return;
     await onAdd({
       text: taskText,
+      taskDate: null,
       difficulty,
       scheduledTime: null,
       estimatedDuration,

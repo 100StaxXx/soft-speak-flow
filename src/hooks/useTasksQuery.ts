@@ -50,6 +50,9 @@ export interface DailyTask {
   } | null;
   // Photo attachment
   image_url: string | null;
+  // Additional metadata
+  notes: string | null;
+  location: string | null;
 }
 
 export const useTasksQuery = (selectedDate?: Date) => {

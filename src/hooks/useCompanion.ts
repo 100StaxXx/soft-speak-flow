@@ -713,7 +713,8 @@ export const useCompanion = () => {
 
   const progressToNext = useMemo(() => {
     if (!companion || !nextEvolutionXP) return 0;
-    return ((companion.current_xp / nextEvolutionXP) * 100);
+    const progress = (companion.current_xp / nextEvolutionXP) * 100;
+    return Math.min(100, Math.max(0, progress));
   }, [companion, nextEvolutionXP]);
 
   // Check if companion can evolve (XP meets threshold for next stage)

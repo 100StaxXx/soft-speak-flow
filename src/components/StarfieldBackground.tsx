@@ -204,14 +204,14 @@ export const StarfieldBackground = memo(() => {
     <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
       {/* Layer 1: Time-based deep space gradient */}
       <div 
-        className="absolute inset-0 transition-all duration-[3000ms]"
+        className="absolute inset-0 transition-all [transition-duration:3000ms]"
         style={{ background: baseGradient }}
       />
 
       {/* Layer 2: Deep background nebulae with time-based colors */}
       <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.deepNebulae)}>
         <div 
-          className="absolute w-[900px] h-[900px] rounded-full blur-[150px] transition-colors duration-[5000ms]"
+          className="absolute w-[900px] h-[900px] rounded-full blur-[150px] transition-colors [transition-duration:5000ms]"
           style={{
             top: '-15%',
             right: '-10%',
@@ -220,7 +220,7 @@ export const StarfieldBackground = memo(() => {
           }}
         />
         <div 
-          className="absolute w-[800px] h-[800px] rounded-full blur-[140px] transition-colors duration-[5000ms]"
+          className="absolute w-[800px] h-[800px] rounded-full blur-[140px] transition-colors [transition-duration:5000ms]"
           style={{
             bottom: '-20%',
             left: '-15%',
@@ -235,7 +235,7 @@ export const StarfieldBackground = memo(() => {
         {dustParticles.map((particle) => (
           <div
             key={`dust-${particle.id}`}
-            className="absolute rounded-full transition-colors duration-[3000ms]"
+            className="absolute rounded-full transition-colors [transition-duration:3000ms]"
             style={{
               left: `${particle.x}%`,
               top: `${particle.y}%`,
@@ -255,7 +255,7 @@ export const StarfieldBackground = memo(() => {
           return (
             <div
               key={`bg-star-${star.id}`}
-              className="absolute rounded-full transition-colors duration-[2000ms]"
+              className="absolute rounded-full transition-colors [transition-duration:2000ms]"
               style={{
                 left: `${star.x}%`,
                 top: `${star.y}%`,
@@ -276,7 +276,7 @@ export const StarfieldBackground = memo(() => {
       {/* Layer 5: Mid-layer nebula wisps with time-based colors */}
       <div className="absolute inset-0 opacity-30" style={getParallaxStyle(PARALLAX.midNebulae)}>
         <div 
-          className="absolute w-[600px] h-[300px] blur-[100px] -rotate-12 transition-colors duration-[5000ms]"
+          className="absolute w-[600px] h-[300px] blur-[100px] -rotate-12 transition-colors [transition-duration:5000ms]"
           style={{
             top: '10%',
             right: '5%',
@@ -284,7 +284,7 @@ export const StarfieldBackground = memo(() => {
           }}
         />
         <div 
-          className="absolute w-[500px] h-[250px] blur-[90px] rotate-12 transition-colors duration-[5000ms]"
+          className="absolute w-[500px] h-[250px] blur-[90px] rotate-12 transition-colors [transition-duration:5000ms]"
           style={{
             bottom: '15%',
             left: '10%',
@@ -300,7 +300,7 @@ export const StarfieldBackground = memo(() => {
           return (
             <div
               key={`mid-star-${star.id}`}
-              className="absolute rounded-full transition-colors duration-[2000ms]"
+              className="absolute rounded-full transition-colors [transition-duration:2000ms]"
               style={{
                 left: `${star.x}%`,
                 top: `${star.y}%`,
@@ -318,7 +318,7 @@ export const StarfieldBackground = memo(() => {
       {/* Layer 7: Foreground nebula highlights */}
       <div className="absolute inset-0 opacity-25" style={getParallaxStyle(PARALLAX.foregroundNebulae)}>
         <div 
-          className="absolute w-[350px] h-[350px] rounded-full blur-[70px] transition-colors duration-[5000ms]"
+          className="absolute w-[350px] h-[350px] rounded-full blur-[70px] transition-colors [transition-duration:5000ms]"
           style={{
             top: '25%',
             right: '20%',
@@ -327,7 +327,7 @@ export const StarfieldBackground = memo(() => {
           }}
         />
         <div 
-          className="absolute w-[300px] h-[300px] rounded-full blur-[60px] transition-colors duration-[5000ms]"
+          className="absolute w-[300px] h-[300px] rounded-full blur-[60px] transition-colors [transition-duration:5000ms]"
           style={{
             bottom: '30%',
             left: '25%',
@@ -345,7 +345,7 @@ export const StarfieldBackground = memo(() => {
           return (
             <div
               key={`bright-star-${star.id}`}
-              className="absolute rounded-full transition-colors duration-[2000ms]"
+              className="absolute rounded-full transition-colors [transition-duration:2000ms]"
               style={{
                 left: `${star.x}%`,
                 top: `${star.y}%`,

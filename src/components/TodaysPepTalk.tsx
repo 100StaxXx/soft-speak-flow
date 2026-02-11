@@ -1,7 +1,5 @@
 import { useEffect, useState, useRef, useCallback, memo } from "react";
-import { safeLocalStorage } from "@/utils/storage";
 import { Card } from "@/components/ui/card";
-import { SkeletonPepTalk } from "@/components/SkeletonCard";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -41,7 +39,7 @@ export const TodaysPepTalk = memo(() => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
   const navigate = useNavigate();
-  const { awardPepTalkListened, XP_REWARDS } = useXPRewards();
+  const { awardPepTalkListened } = useXPRewards();
   const [pepTalk, setPepTalk] = useState<DailyPepTalk | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -122,12 +120,14 @@ export const TodaysPepTalk = memo(() => {
         setMentorSlug(mentor.slug);
 
         // First try today's pep talk
-        let { data, error: pepTalkError } = await supabase
+        const { data: todayPepTalk, error: pepTalkError } = await supabase
           .from("daily_pep_talks")
           .select("*")
           .eq("for_date", today)
           .eq("mentor_slug", mentor.slug)
           .maybeSingle();
+
+        let data = todayPepTalk;
 
         if (pepTalkError) {
           console.error("Error fetching pep talk:", pepTalkError);
@@ -330,9 +330,10 @@ export const TodaysPepTalk = memo(() => {
     const updateTime = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
+      const currentDuration = audio.duration;
       
       // Award XP when user has listened to 80% (only once per pep talk)
-      if (!hasAwardedXP && duration > 0 && time >= duration * 0.8 && pepTalk?.id && profile?.id) {
+      if (!hasAwardedXP && currentDuration > 0 && time >= currentDuration * 0.8 && pepTalk?.id && profile?.id) {
         setHasAwardedXP(true);
         awardPepTalkListened({ pep_talk_id: pepTalk.id });
       }
@@ -342,8 +343,10 @@ export const TodaysPepTalk = memo(() => {
         const wordIndex = pepTalk.transcript.findIndex((w: CaptionWord) => 
           time >= w.start && time <= w.end
         );
-        if (wordIndex !== activeWordIndex && wordIndex >= 0) {
-          setActiveWordIndex(wordIndex);
+        if (wordIndex >= 0) {
+          setActiveWordIndex((previousIndex) => (
+            wordIndex !== previousIndex ? wordIndex : previousIndex
+          ));
         }
       }
     };
@@ -363,7 +366,7 @@ export const TodaysPepTalk = memo(() => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [pepTalk?.transcript, activeWordIndex, hasAwardedXP, duration, awardPepTalkListened, pepTalk?.id, profile?.id]);
+  }, [pepTalk?.transcript, hasAwardedXP, awardPepTalkListened, pepTalk?.id, profile?.id]);
 
   // Cleanup seek debounce on unmount
   useEffect(() => {

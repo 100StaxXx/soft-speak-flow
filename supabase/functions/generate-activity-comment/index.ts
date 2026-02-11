@@ -4,6 +4,7 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { PromptBuilder } from "../_shared/promptBuilder.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireRequestAuth } from "../_shared/auth.ts";
 
 const ActivityCommentSchema = z.object({
   activityId: z.string().uuid(),
@@ -19,6 +20,11 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
+    const auth = await requireRequestAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     const body = await req.json();
     const validation = ActivityCommentSchema.safeParse(body);
     
@@ -39,11 +45,16 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get activity details and user's mentor
-    const { data: activity, error: activityError } = await supabase
+    const activityQuery = supabase
       .from('activity_feed')
       .select('*')
-      .eq('id', activityId)
-      .single()
+      .eq('id', activityId);
+
+    const { data: activity, error: activityError } = await (
+      auth.isServiceRole
+        ? activityQuery
+        : activityQuery.eq('user_id', auth.userId)
+    ).single();
 
     if (activityError) throw activityError
 

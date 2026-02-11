@@ -105,7 +105,7 @@ export function useVoiceInput({
   const createRecognition = useCallback((): SpeechRecognitionInstance | null => {
     if (!isSupported) return null;
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) return null;
     

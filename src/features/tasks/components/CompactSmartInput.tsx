@@ -274,7 +274,9 @@ export function CompactSmartInput({
         label: format(parseISO(parsed.scheduledDate), 'MMM d'), 
         color: 'text-blue-500 bg-blue-500/10 border-blue-500/30' 
       });
-    } catch {}
+    } catch {
+      // Ignore invalid date strings from NLP parsing.
+    }
   }
   if (parsed?.scheduledTime) {
     badges.push({ 

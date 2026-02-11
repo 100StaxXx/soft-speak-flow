@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { requireRequestAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +37,11 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireRequestAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     // Parse and validate input
     const rawInput = await req.json();
     const parseResult = AdjustEpicPlanSchema.safeParse(rawInput);
@@ -61,7 +67,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch the epic with its habits
-    const { data: epic, error: epicError } = await supabase
+    const epicQuery = supabase
       .from('epics')
       .select(`
         *,
@@ -81,8 +87,13 @@ serve(async (req) => {
           completed_at
         )
       `)
-      .eq('id', epicId)
-      .single();
+      .eq('id', epicId);
+
+    const { data: epic, error: epicError } = await (
+      auth.isServiceRole
+        ? epicQuery
+        : epicQuery.eq('user_id', auth.userId)
+    ).single();
 
     if (epicError || !epic) {
       console.error('Epic fetch error:', epicError);

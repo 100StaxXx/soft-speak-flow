@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireRequestAuth } from "../_shared/auth.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -10,6 +11,11 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
+    const auth = await requireRequestAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
     const body = await req.json().catch(() => ({}));
     const { id, mentor_slug, for_date } = body as { id?: string; mentor_slug?: string; for_date?: string };
 

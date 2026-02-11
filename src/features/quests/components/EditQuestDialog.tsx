@@ -40,6 +40,7 @@ interface Task {
   reminder_enabled?: boolean | null;
   reminder_minutes_before?: number | null;
   category?: string | null;
+  notes?: string | null;
   habit_source_id?: string | null;
   image_url?: string | null;
   location?: string | null;
@@ -59,6 +60,7 @@ interface EditQuestDialogProps {
     recurrence_days: number[];
     reminder_enabled: boolean;
     reminder_minutes_before: number;
+    notes: string | null;
     category: string | null;
     image_url: string | null;
     location: string | null;
@@ -114,7 +116,7 @@ export function EditQuestDialog({
       setRecurrenceDays(task.recurrence_days || []);
       setReminderEnabled(task.reminder_enabled || false);
       setReminderMinutesBefore(task.reminder_minutes_before || 15);
-      setMoreInformation(task.category || null);
+      setMoreInformation(task.notes || null);
       setImageUrl(task.image_url || null);
       setLocation(task.location || null);
       setShowDurationChips(false);
@@ -176,7 +178,8 @@ export function EditQuestDialog({
       recurrence_days: recurrenceDays,
       reminder_enabled: reminderEnabled,
       reminder_minutes_before: reminderMinutesBefore,
-      category: moreInformation,
+      notes: moreInformation,
+      category: task.category || null,
       image_url: imageUrl,
       location,
     });

@@ -1,17 +1,17 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { EnergyBeamGame } from './EnergyBeamGame';
-import { TapSequenceGame } from './TapSequenceGame';
-import { AstralFrequencyGame } from './AstralFrequencyGame';
-import { EclipseTimingGame } from './EclipseTimingGame';
-import { StarfallDodgeGame } from './StarfallDodgeGame';
-
-import { SoulSerpentGame } from './SoulSerpentGame';
-import { OrbMatchGame } from './OrbMatchGame';
-import { GalacticMatchGame } from './GalacticMatchGame';
 import { Button } from '@/components/ui/button';
 import { Play, SkipForward } from 'lucide-react';
+
+const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
+const TapSequenceGame = lazy(() => import('./TapSequenceGame').then(m => ({ default: m.TapSequenceGame })));
+const AstralFrequencyGame = lazy(() => import('./AstralFrequencyGame').then(m => ({ default: m.AstralFrequencyGame })));
+const EclipseTimingGame = lazy(() => import('./EclipseTimingGame').then(m => ({ default: m.EclipseTimingGame })));
+const StarfallDodgeGame = lazy(() => import('./StarfallDodgeGame').then(m => ({ default: m.StarfallDodgeGame })));
+const SoulSerpentGame = lazy(() => import('./SoulSerpentGame').then(m => ({ default: m.SoulSerpentGame })));
+const OrbMatchGame = lazy(() => import('./OrbMatchGame').then(m => ({ default: m.OrbMatchGame })));
+const GalacticMatchGame = lazy(() => import('./GalacticMatchGame').then(m => ({ default: m.GalacticMatchGame })));
 
 interface PracticeRoundWrapperProps {
   gameType: MiniGameType;
@@ -188,6 +188,16 @@ const PracticeComplete = memo(({ onContinue }: { onContinue: () => void }) => {
 });
 PracticeComplete.displayName = 'PracticeComplete';
 
+const PracticeLoadingFallback = memo(() => (
+  <div className="pt-2 min-h-[400px] flex items-center justify-center">
+    <div className="flex items-center gap-2 text-sm text-muted-foreground/70">
+      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <span>Loading practice game...</span>
+    </div>
+  </div>
+));
+PracticeLoadingFallback.displayName = 'PracticeLoadingFallback';
+
 export const PracticeRoundWrapper = ({
   gameType,
   companionStats,
@@ -263,15 +273,17 @@ export const PracticeRoundWrapper = ({
             className={isFullscreenGame ? "relative h-full" : "relative"}
           >
             <PracticeBanner />
-            {isFullscreenGame ? (
-              // Fullscreen games render without constraints
-              renderPracticeGame()
-            ) : (
-              // Non-fullscreen games keep the scroll container
-              <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
-                {renderPracticeGame()}
-              </div>
-            )}
+            <Suspense fallback={<PracticeLoadingFallback />}>
+              {isFullscreenGame ? (
+                // Fullscreen games render without constraints
+                renderPracticeGame()
+              ) : (
+                // Non-fullscreen games keep the scroll container
+                <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
+                  {renderPracticeGame()}
+                </div>
+              )}
+            </Suspense>
           </motion.div>
         )}
 

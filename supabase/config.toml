@@ -4,10 +4,10 @@ project_id = "tffrgsaawvletgiztfry"
 verify_jwt = false
 
 [functions.generate-journey-schedule]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-adversary-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.delete-user]
 verify_jwt = true
@@ -79,7 +79,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-evolution-voice]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-inspire-quote]
 verify_jwt = false
@@ -142,7 +142,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-activity-comment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-check-in-response]
 verify_jwt = false
@@ -187,7 +187,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-rhythm-track]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-tomorrow-pep-talks]
 verify_jwt = false
@@ -229,13 +229,13 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-epic-suggestions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.classify-task-intent]
-verify_jwt = false
+verify_jwt = true
 
 [functions.adjust-epic-plan]
-verify_jwt = false
+verify_jwt = true
 
 [functions.apply-epic-adjustments]
 verify_jwt = true
@@ -292,4 +292,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.sync-daily-pep-talk-transcript]
-verify_jwt = false
+verify_jwt = true

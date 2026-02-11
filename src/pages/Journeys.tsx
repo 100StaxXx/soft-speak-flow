@@ -20,7 +20,6 @@ import { toast } from "sonner";
 
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
-import { TaskDragProvider } from "@/contexts/TaskDragContext";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
@@ -31,17 +30,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 
-import { safeLocalStorage } from "@/utils/storage";
 import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
-import { useDailyPlanOptimization } from "@/hooks/useDailyPlanOptimization";
-import { useWeeklyPlanOptimization } from "@/hooks/useWeeklyPlanOptimization";
-import { useWeeklyPlanGeneration } from "@/hooks/useWeeklyPlanGeneration";
 import { useEpics } from "@/hooks/useEpics";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
 
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
-import { SmartDayPlannerWizard } from "@/components/SmartDayPlanner/SmartDayPlannerWizard";
 import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
 
 import { Pathfinder } from "@/components/Pathfinder";
@@ -50,8 +44,6 @@ import { DraggableFAB } from "@/components/DraggableFAB";
 import { QuestsErrorBoundary } from "@/components/SectionErrorBoundary";
 
 import { Wand2 } from "lucide-react";
-import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
-import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
@@ -67,7 +59,6 @@ const Journeys = () => {
   const [showAddSheet, setShowAddSheet] = useState(false);
   
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
-  const [showDayPlannerWizard, setShowDayPlannerWizard] = useState(false);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
   
   // Campaign creation state
@@ -95,13 +86,6 @@ const Journeys = () => {
   // Combo tracking
   
   
-  // Daily plan optimization & generation
-  const { refetch: refetchPlan, generatePlan, isGenerating } = useDailyPlanOptimization();
-  
-  // Weekly plan optimization & generation
-  const { refetch: refetchWeeklyPlan, optimizeWithAnswers: optimizeWeekWithAnswers } = useWeeklyPlanOptimization();
-  const { generateWeeklyPlan, isGenerating: isGeneratingWeek } = useWeeklyPlanGeneration();
-  
   // AI interaction tracking
   const { trackDailyPlanOutcome } = useAIInteractionTracker();
   
@@ -126,13 +110,12 @@ const Journeys = () => {
 
   const { 
     tasks: dailyTasks,
+    isLoading: dailyTasksLoading,
     addTask,
     toggleTask,
     updateTask,
     deleteTask,
     restoreTask,
-    reorderTasks,
-    moveTaskToSection,
     moveTaskToDate,
     completedCount,
     totalCount,
@@ -155,8 +138,10 @@ const Journeys = () => {
     reminder_enabled?: boolean | null;
     reminder_minutes_before?: number | null;
     category?: string | null;
+    notes?: string | null;
     habit_source_id?: string | null;
     image_url?: string | null;
+    location?: string | null;
   } | null>(null);
   
   // Edit ritual state (for tasks linked to habits)
@@ -216,8 +201,10 @@ const Journeys = () => {
     reminder_enabled?: boolean | null;
     reminder_minutes_before?: number | null;
     category?: string | null;
+    notes?: string | null;
     habit_source_id?: string | null;
     image_url?: string | null;
+    location?: string | null;
   }) => {
     // Route to the appropriate editor based on whether it's a ritual
     if (task.habit_source_id) {
@@ -261,8 +248,8 @@ const Journeys = () => {
       return;
     }
     
-    // Wait for tasks to load
-    if (dailyTasks.length === 0) {
+    // Wait for tasks query to resolve
+    if (dailyTasksLoading) {
       return;
     }
     
@@ -280,7 +267,7 @@ const Journeys = () => {
       deepLinkProcessedRef.current = pendingTaskId;
       clearPendingTask();
     }
-  }, [pendingTaskId, dailyTasks, clearPendingTask, handleEditQuest]);
+  }, [pendingTaskId, dailyTasks, dailyTasksLoading, clearPendingTask, handleEditQuest]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -292,7 +279,10 @@ const Journeys = () => {
   }, [allCalendarTasks]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
-    const taskDate = data.sendToInbox ? null : format(selectedDate, 'yyyy-MM-dd');
+    const taskDate = data.sendToInbox
+      ? null
+      : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
+
     await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
@@ -304,8 +294,11 @@ const Journeys = () => {
       recurrenceDays: data.recurrenceDays,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      notes: data.moreInformation,
+      location: data.location,
       contactId: data.contactId,
       autoLogInteraction: data.autoLogInteraction,
+      subtasks: data.subtasks,
     });
     setShowAddSheet(false);
   }, [selectedDate, addTask]);
@@ -351,6 +344,7 @@ const Journeys = () => {
     recurrence_days: number[];
     reminder_enabled: boolean;
     reminder_minutes_before: number;
+    notes: string | null;
     category: string | null;
     image_url: string | null;
     location: string | null;
@@ -365,6 +359,7 @@ const Journeys = () => {
       trackDailyPlanOutcome(taskId, 'deleted');
     }
     await deleteTask(taskId);
+    toast.success("Quest deleted");
     setEditingTask(null);
   }, [deleteTask, trackDailyPlanOutcome]);
 
@@ -404,21 +399,6 @@ const Journeys = () => {
     }
     setEditingRitual(null);
   }, [user?.id, queryClient]);
-
-  // Handle task reordering from drag and drop
-  const handleReorderTasks = useCallback((reorderedTasks: typeof dailyTasks) => {
-    const updates = reorderedTasks.map((task, index) => ({
-      id: task.id,
-      sort_order: index,
-    }));
-    reorderTasks(updates);
-  }, [reorderTasks]);
-
-  // Handle moving task to a different date (cross-day drag)
-  const handleMoveTaskToDate = useCallback((taskId: string, targetDate: Date) => {
-    const targetDateStr = format(targetDate, 'yyyy-MM-dd');
-    moveTaskToDate({ taskId, targetDate: targetDateStr });
-  }, [moveTaskToDate]);
 
   // Handle date pill click - just navigate to that day
   const handleDatePillClick = useCallback((date: Date) => {
@@ -465,9 +445,13 @@ const Journeys = () => {
       duration: 4000,
       action: {
         label: "Undo",
-        onClick: () => {
-          restoreTask(taskData);
-          toast.success("Quest restored");
+        onClick: async () => {
+          try {
+            await restoreTask(taskData);
+            toast.success("Quest restored");
+          } catch {
+            toast.error("Failed to restore quest");
+          }
         },
       },
     });
@@ -504,44 +488,6 @@ const Journeys = () => {
     });
   }, [dailyTasks, selectedDate, moveTaskToDate]);
 
-  // Handle Plan My Day command - opens wizard
-  const handlePlanMyDay = useCallback(() => {
-    setShowDayPlannerWizard(true);
-  }, []);
-
-  // Handle wizard completion
-  const handleDayPlannerComplete = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-    queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-    refetchPlan();
-    toast.success('Your day is planned!');
-  }, [queryClient, refetchPlan]);
-
-  // Handle Plan My Week command with clarification answers - generates actual tasks
-  const handlePlanMyWeek = useCallback(async (answers: PlanMyWeekAnswers) => {
-    try {
-      const result = await generateWeeklyPlan(answers);
-      
-      if (result?.weeklyTasks && result.weeklyTasks.length > 0) {
-        const dayCount = new Set(result.weeklyTasks.map(t => t.task_date)).size;
-        toast.success(`Week planned! ${result.weeklyTasks.length} tasks across ${dayCount} days`, {
-          description: result.summaryMessage || `Balance score: ${result.balanceScore || 0}%`,
-        });
-        
-        // Refresh data
-        refetchWeeklyPlan();
-        refetchPlan();
-        queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-        queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      } else {
-        toast.info("Your week looks open. Add some tasks to plan!");
-      }
-    } catch (error) {
-      console.error('Weekly plan generation failed:', error);
-      toast.error("Couldn't generate weekly plan. Try again later.");
-    }
-  }, [generateWeeklyPlan, refetchWeeklyPlan, refetchPlan, queryClient]);
-
   // Handle campaign creation
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
     try {
@@ -563,7 +509,6 @@ const Journeys = () => {
   }, []);
 
   return (
-    <TaskDragProvider>
     <PageTransition>
       <StarfieldBackground />
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
@@ -596,7 +541,6 @@ const Journeys = () => {
               selectedDate={selectedDate}
               onDateSelect={handleDatePillClick}
               tasksPerDay={tasksPerDay}
-              onTaskDrop={handleMoveTaskToDate}
             />
           </motion.div>
 
@@ -618,34 +562,11 @@ const Journeys = () => {
             completedCount={completedCount}
             totalCount={totalCount}
             currentStreak={currentStreak}
-            activeJourneys={[]}
             onUndoToggle={handleUndoToggle}
             onEditQuest={handleEditQuest}
-            onReorderTasks={handleReorderTasks}
-            hideIndicator={showTutorial}
             calendarTasks={allCalendarTasks}
             calendarMilestones={[]}
             onDateSelect={setSelectedDate}
-            onQuickAdd={async (parsed) => {
-              const taskDate = parsed.scheduledDate || format(selectedDate, 'yyyy-MM-dd');
-              await addTask({
-                taskText: parsed.text,
-                difficulty: parsed.difficulty || 'medium',
-                taskDate,
-                isMainQuest: false,
-                scheduledTime: parsed.scheduledTime,
-                estimatedDuration: parsed.estimatedDuration,
-                recurrencePattern: parsed.recurrencePattern,
-                reminderEnabled: parsed.reminderEnabled,
-                reminderMinutesBefore: parsed.reminderMinutesBefore,
-                notes: parsed.notes,
-                imageUrl: parsed.imageUrl,
-                contactId: parsed.contactId,
-                autoLogInteraction: parsed.autoLogInteraction ?? true,
-              });
-            }}
-            onPlanMyDay={handlePlanMyDay}
-            onPlanMyWeek={handlePlanMyWeek}
             activeEpics={activeEpics}
             onDeleteQuest={handleSwipeDeleteQuest}
             onMoveQuestToNextDay={handleSwipeMoveToNextDay}
@@ -733,15 +654,6 @@ const Journeys = () => {
           onSkip={skipInteraction}
         />
         
-        
-        {/* Smart Day Planner Wizard */}
-        <SmartDayPlannerWizard
-          open={showDayPlannerWizard}
-          onOpenChange={setShowDayPlannerWizard}
-          planDate={selectedDate}
-          onComplete={handleDayPlannerComplete}
-        />
-
         {/* Quick Adjust Floating Button + Drawer */}
         {dailyTasks.some(t => t.ai_generated) && (
           <motion.button
@@ -790,7 +702,6 @@ const Journeys = () => {
 
       <BottomNav />
     </PageTransition>
-    </TaskDragProvider>
   );
 };
 

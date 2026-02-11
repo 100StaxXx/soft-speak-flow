@@ -147,8 +147,8 @@ function parseNumericDate(match: RegExpMatchArray): string {
   const first = parseInt(match[1]);
   const second = parseInt(match[2]);
   
-  let month = first - 1;
-  let day = second;
+  const month = first - 1;
+  const day = second;
   
   if (month < 0 || month > 11 || day < 1 || day > 31) {
     return format(new Date(), 'yyyy-MM-dd');
@@ -203,7 +203,7 @@ const DATE_PATTERNS = [
   { regex: /\b(?:in\s*a\s*)?fortnight\b/i, handler: () => format(addDays(new Date(), 14), 'yyyy-MM-dd') },
   { regex: /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i, handler: parseMonthDay },
   { regex: /\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i, handler: parseDayMonth },
-  { regex: /\b(\d{1,2})[\/\-](\d{1,2})\b/, handler: parseNumericDate },
+  { regex: /\b(\d{1,2})[/-](\d{1,2})\b/, handler: parseNumericDate },
   { regex: /\bnext\s+monday\b/i, handler: () => format(nextMonday(new Date()), 'yyyy-MM-dd') },
   { regex: /\bnext\s+tuesday\b/i, handler: () => format(nextTuesday(new Date()), 'yyyy-MM-dd') },
   { regex: /\bnext\s+wednesday\b/i, handler: () => format(nextWednesday(new Date()), 'yyyy-MM-dd') },

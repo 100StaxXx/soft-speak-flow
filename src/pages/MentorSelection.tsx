@@ -55,7 +55,7 @@ const MentorSelection = () => {
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [user?.id]); // fetchData depends on user indirectly via user.id check
 
   const handleSelectMentor = async (mentorId: string) => {

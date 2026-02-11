@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      minify: false,
       includeAssets: ['favicon.ico', 'icon-192.svg', 'icon-512.svg'],
       manifest: {
         name: 'Cosmiq - Your Personal AI Mentor',
@@ -42,6 +43,8 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
+        mode: 'development',
+        sourcemap: false,
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
@@ -105,7 +108,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1300,
     sourcemap: false, // Disable source maps in production for smaller bundle
     reportCompressedSize: false, // Faster builds
   },
