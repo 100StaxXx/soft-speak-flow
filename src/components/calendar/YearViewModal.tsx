@@ -22,6 +22,16 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
+const parseValidDate = (dateString?: string | null) => {
+  if (!dateString) return null;
+  try {
+    const parsed = new Date(`${dateString}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  } catch {
+    return null;
+  }
+};
+
 export function YearView({ 
   selectedDate, 
   onMonthSelect, 
@@ -63,7 +73,8 @@ export function YearView({
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
     
     return tasks.filter(task => {
-      const taskDate = new Date(task.task_date);
+      const taskDate = parseValidDate(task.task_date);
+      if (!taskDate) return false;
       return monthDays.some(day => 
         format(day, 'yyyy-MM-dd') === format(taskDate, 'yyyy-MM-dd')
       );
@@ -76,7 +87,8 @@ export function YearView({
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
     
     return milestones.filter(m => {
-      const mDate = new Date(m.target_date);
+      const mDate = parseValidDate(m.target_date);
+      if (!mDate) return false;
       return monthDays.some(day => 
         format(day, 'yyyy-MM-dd') === format(mDate, 'yyyy-MM-dd')
       );

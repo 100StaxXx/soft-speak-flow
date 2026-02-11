@@ -58,7 +58,22 @@ import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekCl
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
   if (!endDate) return null;
-  return Math.max(0, differenceInDays(new Date(endDate), new Date()));
+  try {
+    const parsed = new Date(endDate);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return Math.max(0, differenceInDays(parsed, new Date()));
+  } catch {
+    return null;
+  }
+};
+
+const safeFormat = (date: Date, fmt: string, fallback = "") => {
+  try {
+    if (Number.isNaN(date.getTime())) return fallback;
+    return format(date, fmt);
+  } catch {
+    return fallback;
+  }
 };
 
 interface Task {
@@ -138,6 +153,7 @@ interface TodaysAgendaProps {
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
+  onTimeSlotLongPress?: (date: Date, time: string) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -173,6 +189,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onDeleteQuest,
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
+  onTimeSlotLongPress,
 }: TodaysAgendaProps) {
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -263,7 +280,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           case 'xp':
             return b.xp_reward - a.xp_reward;
           case 'custom':
-          default:
+          default: {
             const orderA = a.sort_order ?? 9999;
             const orderB = b.sort_order ?? 9999;
             if (orderA !== orderB) return orderA - orderB;
@@ -273,6 +290,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             if (a.scheduled_time) return -1;
             if (b.scheduled_time) return 1;
             return a.id.localeCompare(b.id);
+          }
         }
       });
       
@@ -367,7 +385,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+  const isToday = safeFormat(selectedDate, "yyyy-MM-dd") === safeFormat(new Date(), "yyyy-MM-dd");
   const allComplete = totalCount > 0 && completedCount === totalCount;
 
   const triggerHaptic = async (style: ImpactStyle) => {
@@ -764,7 +782,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, keepInPlace, optimisticCompleted, tasks]);
+  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, tasks]);
 
 
   return (
@@ -778,7 +796,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
             >
               <span className="text-lg font-bold">
-                {format(selectedDate, "MMM d, yyyy")}
+                {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
               </span>
             </button>
             {currentStreak > 0 && (
@@ -1104,6 +1122,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         tasks={calendarTasks}
         milestones={calendarMilestones}
         onTaskDrop={() => {}}
+        onTimeSlotLongPress={onTimeSlotLongPress}
       />
     </div>
   );

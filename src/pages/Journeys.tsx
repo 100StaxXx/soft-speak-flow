@@ -13,12 +13,10 @@ import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { QuestHubTutorial } from "@/components/QuestHubTutorial";
-import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { QuestClearCelebration } from "@/components/QuestClearCelebration";
 
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
@@ -49,6 +47,7 @@ import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/Quick
 import { Pathfinder } from "@/components/Pathfinder";
 import { CampaignCreatedAnimation } from "@/components/CampaignCreatedAnimation";
 import { DraggableFAB } from "@/components/DraggableFAB";
+import { QuestsErrorBoundary } from "@/components/SectionErrorBoundary";
 
 import { Wand2 } from "lucide-react";
 import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
@@ -67,9 +66,7 @@ const Journeys = () => {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
   
-  const [showQuestClear, setShowQuestClear] = useState(false);
-  
-  const [showHourlyModal, setShowHourlyModal] = useState(false);
+  const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [showDayPlannerWizard, setShowDayPlannerWizard] = useState(false);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
   
@@ -207,6 +204,53 @@ const Journeys = () => {
   
   useOnboardingSchedule(user?.id, hasCompletedWalkthrough, profileLoading);
   
+  const handleEditQuest = useCallback(async (task: {
+    id: string;
+    task_text: string;
+    task_date?: string | null;
+    difficulty?: string | null;
+    scheduled_time?: string | null;
+    estimated_duration?: number | null;
+    recurrence_pattern?: string | null;
+    recurrence_days?: number[] | null;
+    reminder_enabled?: boolean | null;
+    reminder_minutes_before?: number | null;
+    category?: string | null;
+    habit_source_id?: string | null;
+    image_url?: string | null;
+  }) => {
+    // Route to the appropriate editor based on whether it's a ritual
+    if (task.habit_source_id) {
+      // Fetch habit data to get frequency and custom_days (source of truth)
+      const { data: habit } = await supabase
+        .from('habits')
+        .select('frequency, custom_days, description')
+        .eq('id', task.habit_source_id)
+        .maybeSingle();
+      
+      // This is a ritual - open the unified ritual editor
+      setEditingRitual({
+        habitId: task.habit_source_id,
+        taskId: task.id,
+        title: task.task_text,
+        description: habit?.description || null,
+        difficulty: task.difficulty || 'medium',
+        frequency: habit?.frequency || 'daily',
+        custom_days: habit?.custom_days || [],
+        estimated_minutes: task.estimated_duration,
+        preferred_time: task.scheduled_time,
+        category: task.category as 'mind' | 'body' | 'soul' | null,
+        recurrence_pattern: task.recurrence_pattern,
+        recurrence_days: task.recurrence_days,
+        reminder_enabled: task.reminder_enabled,
+        reminder_minutes_before: task.reminder_minutes_before,
+      });
+    } else {
+      // Regular quest - use the standard edit dialog
+      setEditingTask(task);
+    }
+  }, []);
+
   // Deep link handling - open task from widget tap
   const { pendingTaskId, clearPendingTask } = useDeepLink();
   const deepLinkProcessedRef = useRef<string | null>(null);
@@ -236,13 +280,13 @@ const Journeys = () => {
       deepLinkProcessedRef.current = pendingTaskId;
       clearPendingTask();
     }
-  }, [pendingTaskId, dailyTasks, clearPendingTask]);
+  }, [pendingTaskId, dailyTasks, clearPendingTask, handleEditQuest]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
-    allCalendarTasks.forEach((task: any) => {
-      const dateKey = task.task_date;
-      map[dateKey] = (map[dateKey] || 0) + 1;
+    allCalendarTasks.forEach((task: { task_date?: string | null }) => {
+      if (!task.task_date) return;
+      map[task.task_date] = (map[task.task_date] || 0) + 1;
     });
     return map;
   }, [allCalendarTasks]);
@@ -296,53 +340,6 @@ const Journeys = () => {
   const handleUndoToggle = useCallback((taskId: string, xpReward: number) => {
     toggleTask({ taskId, completed: false, xpReward, forceUndo: true });
   }, [toggleTask]);
-  
-  const handleEditQuest = useCallback(async (task: {
-    id: string;
-    task_text: string;
-    task_date?: string | null;
-    difficulty?: string | null;
-    scheduled_time?: string | null;
-    estimated_duration?: number | null;
-    recurrence_pattern?: string | null;
-    recurrence_days?: number[] | null;
-    reminder_enabled?: boolean | null;
-    reminder_minutes_before?: number | null;
-    category?: string | null;
-    habit_source_id?: string | null;
-    image_url?: string | null;
-  }) => {
-    // Route to the appropriate editor based on whether it's a ritual
-    if (task.habit_source_id) {
-      // Fetch habit data to get frequency and custom_days (source of truth)
-      const { data: habit } = await supabase
-        .from('habits')
-        .select('frequency, custom_days, description')
-        .eq('id', task.habit_source_id)
-        .maybeSingle();
-      
-      // This is a ritual - open the unified ritual editor
-      setEditingRitual({
-        habitId: task.habit_source_id,
-        taskId: task.id,
-        title: task.task_text,
-        description: habit?.description || null,
-        difficulty: task.difficulty || 'medium',
-        frequency: habit?.frequency || 'daily',
-        custom_days: habit?.custom_days || [],
-        estimated_minutes: task.estimated_duration,
-        preferred_time: task.scheduled_time,
-        category: task.category as 'mind' | 'body' | 'soul' | null,
-        recurrence_pattern: task.recurrence_pattern,
-        recurrence_days: task.recurrence_days,
-        reminder_enabled: task.reminder_enabled,
-        reminder_minutes_before: task.reminder_minutes_before,
-      });
-    } else {
-      // Regular quest - use the standard edit dialog
-      setEditingTask(task);
-    }
-  }, []);
   
   const handleSaveEdit = useCallback(async (taskId: string, updates: {
     task_text: string;
@@ -507,39 +504,6 @@ const Journeys = () => {
     });
   }, [dailyTasks, selectedDate, moveTaskToDate]);
 
-  // Format tasks for HourlyViewModal (CalendarTask format)
-  const formattedTasksForModal = useMemo(() => 
-    dailyTasks.map(task => ({
-      id: task.id,
-      task_text: task.task_text,
-      task_date: task.task_date,
-      scheduled_time: task.scheduled_time,
-      estimated_duration: task.estimated_duration,
-      completed: task.completed ?? false,
-      is_main_quest: task.is_main_quest ?? false,
-      difficulty: task.difficulty,
-      xp_reward: task.xp_reward ?? 0,
-      category: task.category,
-    })),
-    [dailyTasks]
-  );
-
-  // Handle task drop from modal (reschedule time and/or date)
-  const handleModalTaskDrop = useCallback((taskId: string, newDate: Date, newTime?: string) => {
-    const updates: Record<string, unknown> = {};
-    if (newTime) {
-      updates.scheduled_time = newTime;
-    }
-    const newDateStr = format(newDate, 'yyyy-MM-dd');
-    const currentTask = dailyTasks.find(t => t.id === taskId);
-    if (currentTask && currentTask.task_date !== newDateStr) {
-      moveTaskToDate({ taskId, targetDate: newDateStr });
-    }
-    if (Object.keys(updates).length > 0) {
-      updateTask({ taskId, updates });
-    }
-  }, [dailyTasks, moveTaskToDate, updateTask]);
-
   // Handle Plan My Day command - opens wizard
   const handlePlanMyDay = useCallback(() => {
     setShowDayPlannerWizard(true);
@@ -620,33 +584,37 @@ const Journeys = () => {
           <p className="text-sm text-muted-foreground">Daily quests. Your path to progress.</p>
         </motion.div>
 
-        {/* Date Selector */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.05 }}
-          className="mb-4"
-        >
-          <DatePillsScroller
-            selectedDate={selectedDate}
-            onDateSelect={handleDatePillClick}
-            tasksPerDay={tasksPerDay}
-            onTaskDrop={handleMoveTaskToDate}
-          />
-        </motion.div>
+        <QuestsErrorBoundary>
+          {/* Date Selector */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.05 }}
+            className="mb-4"
+          >
+            <DatePillsScroller
+              selectedDate={selectedDate}
+              onDateSelect={handleDatePillClick}
+              tasksPerDay={tasksPerDay}
+              onTaskDrop={handleMoveTaskToDate}
+            />
+          </motion.div>
 
-        {/* Main Content Area */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-          {/* Today's Agenda */}
-          <TodaysAgenda
+          {/* Main Content Area */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            {/* Today's Agenda */}
+            <TodaysAgenda
             tasks={dailyTasks}
             selectedDate={selectedDate}
             onToggle={handleToggleTask}
-            onAddQuest={() => setShowAddSheet(true)}
+            onAddQuest={() => {
+              setPrefilledTime(null);
+              setShowAddSheet(true);
+            }}
             completedCount={completedCount}
             totalCount={totalCount}
             currentStreak={currentStreak}
@@ -684,9 +652,14 @@ const Journeys = () => {
             onUpdateScheduledTime={(taskId, newTime) => {
               updateTask({ taskId, updates: { scheduled_time: newTime } });
             }}
+            onTimeSlotLongPress={(date, time) => {
+              setSelectedDate(date);
+              setPrefilledTime(time);
+              setShowAddSheet(true);
+            }}
           />
-        </motion.div>
-
+          </motion.div>
+        </QuestsErrorBoundary>
 
         {/* Add Quest Sheet */}
         <AddQuestSheet
@@ -695,7 +668,7 @@ const Journeys = () => {
           selectedDate={selectedDate}
           onAdd={handleAddQuest}
           isAdding={isAdding}
-          prefilledTime={null}
+          prefilledTime={prefilledTime}
           onCreateCampaign={() => setShowPathfinder(true)}
         />
         
@@ -761,37 +734,6 @@ const Journeys = () => {
         />
         
         
-        {/* Quest Clear Celebration */}
-        <QuestClearCelebration
-          show={showQuestClear}
-          totalXP={dailyTasks.reduce((sum, t) => sum + (t.xp_reward || 0), 0)}
-          currentStreak={currentStreak}
-          onDismiss={() => setShowQuestClear(false)}
-        />
-        
-        
-        {/* Hourly/Month View Modal */}
-        <HourlyViewModal
-          open={showHourlyModal}
-          onOpenChange={setShowHourlyModal}
-          selectedDate={selectedDate}
-          onDateSelect={(date) => {
-            setSelectedDate(date);
-          }}
-          tasks={formattedTasksForModal}
-          milestones={[]}
-          onTaskDrop={handleModalTaskDrop}
-          onTimeSlotLongPress={(date, time) => {
-            setSelectedDate(date);
-            setShowAddSheet(true);
-          }}
-          onTaskLongPress={(taskId) => {
-            const task = dailyTasks.find(t => t.id === taskId);
-            if (task) handleEditQuest(task);
-          }}
-          onMilestoneClick={() => {}}
-        />
-
         {/* Smart Day Planner Wizard */}
         <SmartDayPlannerWizard
           open={showDayPlannerWizard}
@@ -840,7 +782,10 @@ const Journeys = () => {
           onComplete={handleAnimationComplete}
         />
         {/* Draggable FAB */}
-        <DraggableFAB onTap={() => setShowAddSheet(true)} />
+        <DraggableFAB onTap={() => {
+          setPrefilledTime(null);
+          setShowAddSheet(true);
+        }} />
       </div>
 
       <BottomNav />

@@ -1,4 +1,4 @@
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight, Clock, AlertCircle, Star } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const calendarEnd = endOfMonth(monthEnd);
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   // Generate year range (current year -2 to +5)
