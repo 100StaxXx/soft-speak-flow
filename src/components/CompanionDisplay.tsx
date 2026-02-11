@@ -366,6 +366,8 @@ export const CompanionDisplay = memo(() => {
 
   const stageName = getStageName(companion.current_stage);
   const colorName = getColorName(companion.favorite_color);
+  const safeNextEvolutionXP = nextEvolutionXP ?? companion.current_xp;
+  const isMaxStage = companion.current_stage >= 20;
 
   return (
     <>
@@ -504,7 +506,9 @@ export const CompanionDisplay = memo(() => {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-muted-foreground mb-2" id="xp-progress-label">
-                {companion.current_xp} / {nextEvolutionXP} XP to next evolution
+                {isMaxStage
+                  ? `Stage ${companion.current_stage} maxed`
+                  : `${companion.current_xp} / ${safeNextEvolutionXP} XP to next evolution`}
               </p>
               <Progress 
                 value={progressToNext} 
@@ -512,7 +516,7 @@ export const CompanionDisplay = memo(() => {
                 aria-labelledby="xp-progress-label"
                 aria-valuenow={companion.current_xp}
                 aria-valuemin={0}
-                aria-valuemax={nextEvolutionXP}
+                aria-valuemax={safeNextEvolutionXP}
               />
             </div>
             

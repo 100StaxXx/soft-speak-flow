@@ -192,22 +192,20 @@ const AppContent = memo(() => {
     setRecoveryChecked(true);
   }, [location.pathname, navigate]);
   
-  // Block route rendering until recovery check is complete - prevents paywall flash
-  if (!recoveryChecked && window.location.hash.includes('type=recovery')) {
-    return <LoadingFallback />;
-  }
-  
   // Ensure first app load starts on the Quests (Tasks) tab
   useEffect(() => {
     if (location.pathname !== "/") return;
     if (typeof window === "undefined") return;
+    if (!session?.user) return;
+    if (profileLoading) return;
+    if (profile?.onboarding_completed !== true) return;
     
     const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
     if (!hasRedirected) {
       safeSessionStorage.setItem("initialRouteRedirected", "true");
       navigate("/journeys", { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, profile?.onboarding_completed, profileLoading, session?.user]);
   
   // Respond to native push navigation events
   useEffect(() => {
@@ -259,6 +257,11 @@ const AppContent = memo(() => {
       return () => clearTimeout(timer);
     }
   }, [profileLoading, splashHidden]);
+
+  // Block route rendering until recovery check is complete - prevents paywall flash
+  if (!recoveryChecked && window.location.hash.includes('type=recovery')) {
+    return <LoadingFallback />;
+  }
   
   const resolvedMentorId = getResolvedMentorId(profile);
 

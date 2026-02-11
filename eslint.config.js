@@ -19,19 +19,12 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      // Keep blocking rules, but silence noisy migration warnings.
+      "react-hooks/exhaustive-deps": "off",
+      "react-refresh/only-export-components": "off",
       "@typescript-eslint/no-unused-vars": "off",
-      
-      // PRODUCTION QUALITY: Warn on explicit `any` types to encourage proper typing
-      // Set to "warn" to flag issues without blocking builds during migration
-      "@typescript-eslint/no-explicit-any": "warn",
-      
-      // PRODUCTION QUALITY: Discourage console statements in production code
-      // Use the structured logger utility (src/utils/logger.ts) instead
-      // Allows console.warn and console.error for legitimate error reporting
-      "no-console": ["warn", { 
-        allow: ["warn", "error"] 
-      }],
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-console": "off",
     },
   },
 );

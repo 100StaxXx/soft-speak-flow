@@ -22,9 +22,7 @@ import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
 import { getResolvedMentorId } from "@/utils/mentor";
-import { Sparkles } from "lucide-react";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type IndexProps = {
@@ -150,10 +148,15 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     // Mentor is ready if: no mentor needed, OR we have cached data, OR initial load complete
     const mentorDataReady = !hasMentor || !!mentorPageData || !mentorPageDataLoading;
     
-    // Ready = loading done AND (not completed onboarding OR has mentor) AND mentor data loaded
-    const ready = loadingComplete && (!hasCompletedOnboarding || hasMentor) && mentorDataReady;
+    // On Home we enforce mentor completion, but the Mentor tab itself should remain usable
+    // even if mentor selection is missing.
+    const requiresMentorForReadiness = enableOnboardingGuard;
+    const onboardingReady = !requiresMentorForReadiness || !hasCompletedOnboarding || hasMentor;
+
+    // Ready = loading done AND onboarding readiness AND mentor data loaded
+    const ready = loadingComplete && onboardingReady && mentorDataReady;
     setIsReady(ready);
-  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId, mentorPageDataLoading, mentorPageData]);
+  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId, mentorPageDataLoading, mentorPageData, enableOnboardingGuard]);
 
   // Memoized insight action handler - MUST be before early returns
   const onInsightAction = useCallback((insight: { actionType?: string }) => {

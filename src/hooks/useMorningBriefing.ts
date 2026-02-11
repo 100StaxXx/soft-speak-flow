@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 
 export interface MorningBriefing {
   id: string;
@@ -19,8 +21,21 @@ export interface MorningBriefing {
 
 export const useMorningBriefing = () => {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const queryClient = useQueryClient();
-  const today = new Date().toISOString().split('T')[0];
+  const today = useMemo(() => {
+    const timezone = profile?.timezone || "UTC";
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    } catch {
+      return new Date().toLocaleDateString("en-CA");
+    }
+  }, [profile?.timezone]);
 
   // Fetch today's briefing
   const { data: briefing, isLoading, error, refetch } = useQuery({

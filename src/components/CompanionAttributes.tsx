@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { ATTRIBUTE_DESCRIPTIONS, AttributeType } from "@/config/attributeDescriptions";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 interface CompanionAttributesProps {
   companion: Record<string, any>;
 }

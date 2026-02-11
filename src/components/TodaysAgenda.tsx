@@ -15,9 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   Rocket,
-  CheckCircle2,
   Target,
-  Sparkles,
   Zap,
   FileText,
   Timer,
@@ -25,7 +23,6 @@ import {
   Heart,
   Dumbbell,
   ArrowUpDown,
-  Inbox,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -38,7 +35,6 @@ import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 
@@ -51,9 +47,6 @@ import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
-
-import type { ParsedTask } from "@/features/tasks/hooks/useNaturalLanguageParser";
-import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekClarification";
 
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
@@ -103,12 +96,6 @@ interface Task {
   image_url?: string | null;
 }
 
-interface Journey {
-  id: string;
-  title: string;
-  progress_percentage: number;
-}
-
 interface TodaysAgendaProps {
   tasks: Task[];
   selectedDate: Date;
@@ -117,17 +104,12 @@ interface TodaysAgendaProps {
   completedCount: number;
   totalCount: number;
   currentStreak?: number;
-  activeJourneys?: Journey[];
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
   onReorderTasks?: (tasks: Task[]) => void;
-  hideIndicator?: boolean;
   calendarTasks?: CalendarTask[];
   calendarMilestones?: CalendarMilestone[];
   onDateSelect?: (date: Date) => void;
-  onQuickAdd?: (parsed: ParsedTask) => void;
-  onPlanMyDay?: () => void;
-  onPlanMyWeek?: (answers: PlanMyWeekAnswers) => void;
   activeEpics?: Array<{
     id: string;
     title: string;
@@ -149,7 +131,6 @@ interface TodaysAgendaProps {
       };
     }>;
   }>;
-  habitsAtRisk?: Array<{ id: string; title: string; current_streak: number }>;
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
@@ -173,19 +154,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   completedCount,
   totalCount,
   currentStreak = 0,
-  activeJourneys = [],
   onUndoToggle,
   onEditQuest,
   onReorderTasks,
-  hideIndicator = false,
   calendarTasks = [],
   calendarMilestones = [],
   onDateSelect,
-  onQuickAdd,
-  onPlanMyDay,
-  onPlanMyWeek,
   activeEpics = [],
-  habitsAtRisk = [],
   onDeleteQuest,
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
@@ -385,7 +360,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const isToday = safeFormat(selectedDate, "yyyy-MM-dd") === safeFormat(new Date(), "yyyy-MM-dd");
   const allComplete = totalCount > 0 && completedCount === totalCount;
 
   const triggerHaptic = async (style: ImpactStyle) => {

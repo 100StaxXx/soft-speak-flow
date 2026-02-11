@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { requireRequestAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,9 +27,25 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug, newStage, userId } = await req.json();
+    const auth = await requireRequestAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
 
-    console.log(`Generating evolution voice for ${mentorSlug}, stage ${newStage}`);
+    const { mentorSlug, newStage, userId } = await req.json();
+    const effectiveUserId = userId ?? auth.userId;
+
+    if (!auth.isServiceRole && userId && userId !== auth.userId) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: user mismatch" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    console.log(`Generating evolution voice for ${mentorSlug}, stage ${newStage}, user ${effectiveUserId}`);
 
     if (!mentorSlug || newStage === undefined) {
       console.warn('Missing mentorSlug or newStage - returning generic response');

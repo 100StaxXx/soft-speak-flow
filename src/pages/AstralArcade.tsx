@@ -519,7 +519,7 @@ export default function AstralArcade() {
       checkArcadeDiscovery();
     }
     playEncounterTrigger();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const renderGame = () => {

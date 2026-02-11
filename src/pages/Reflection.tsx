@@ -59,7 +59,7 @@ export default function Reflection() {
     if (user) {
       loadTodayReflection();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [user?.id]); // loadTodayReflection depends on user.id
 
   const handleSubmit = async () => {

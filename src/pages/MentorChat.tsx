@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
-import { motion } from "framer-motion";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { MentorTutorialModal } from "@/components/MentorTutorialModal";
@@ -118,7 +117,7 @@ export default function MentorChat() {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => navigate('/')} 
+              onClick={() => navigate('/mentor')} 
               className="bg-background/80 backdrop-blur-sm hover:bg-background/90 rounded-full shadow-soft"
             >
               <ArrowLeft className="w-5 h-5" />

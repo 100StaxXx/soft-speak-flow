@@ -20,6 +20,7 @@ interface Message {
 
 // Maximum dots to show in the visual indicator to prevent layout issues
 const MAX_VISUAL_INDICATOR_DOTS = 15;
+const DEFAULT_DAILY_LIMIT = 20;
 
 interface AskMentorChatProps {
   mentorName: string;
@@ -85,7 +86,7 @@ export const AskMentorChat = ({
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [dailyMessageCount, setDailyMessageCount] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [dailyLimit, setDailyLimit] = useState(10); // Server provides the actual limit
+  const [dailyLimit, setDailyLimit] = useState(DEFAULT_DAILY_LIMIT); // Server provides the actual limit
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const hasProcessedInitialMessage = useRef(false);
@@ -93,6 +94,36 @@ export const AskMentorChat = ({
   // Use ref for messages to avoid stale closure in sendMessage callback
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
+
+  const parseInvokeError = useCallback(async (error: unknown): Promise<{ status?: number; message?: string }> => {
+    if (error && typeof error === "object" && "context" in error) {
+      const maybeContext = (error as { context?: unknown }).context;
+      if (maybeContext instanceof Response) {
+        const status = maybeContext.status;
+        let message: string | undefined;
+        try {
+          const payload = await maybeContext.clone().json();
+          if (payload && typeof payload === "object") {
+            const payloadObj = payload as { message?: unknown; error?: unknown };
+            if (typeof payloadObj.message === "string") {
+              message = payloadObj.message;
+            } else if (typeof payloadObj.error === "string") {
+              message = payloadObj.error;
+            }
+          }
+        } catch {
+          // Ignore parse failures and fall back to generic handling.
+        }
+        return { status, message };
+      }
+    }
+
+    if (error instanceof Error) {
+      return { message: error.message };
+    }
+
+    return {};
+  }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
@@ -106,7 +137,7 @@ export const AskMentorChat = ({
     if (dailyMessageCount >= dailyLimit) {
       toast({ 
         title: "Daily limit reached", 
-        description: `You've reached your daily limit of ${dailyLimit} messages. Reset tomorrow!`,
+        description: `You've reached your daily limit of ${dailyLimit} messages. It resets at 00:00 UTC.`,
         variant: "destructive" 
       });
       return;
@@ -141,7 +172,7 @@ export const AskMentorChat = ({
       setMessages((prev) => [...prev, assistantMsg]);
 
       // Update limit from server if provided
-      if (data.dailyLimit) {
+      if (typeof data.dailyLimit === 'number' && Number.isFinite(data.dailyLimit)) {
         setDailyLimit(data.dailyLimit);
       }
       
@@ -162,6 +193,18 @@ export const AskMentorChat = ({
       }
     } catch (error) {
       console.error("Mentor chat error:", error);
+      const parsedError = await parseInvokeError(error);
+
+      // Server-side cap reached: show authoritative message and do not generate fallback.
+      if (parsedError.status === 429) {
+        toast({
+          title: "Daily limit reached",
+          description: parsedError.message || `You've reached your daily limit of ${dailyLimit} messages. It resets at 00:00 UTC.`,
+          variant: "destructive"
+        });
+        setMessages((prev) => prev.filter((_, index) => index !== prev.length - 1));
+        return;
+      }
 
       // Use fallback response instead of just showing error
       const fallback = isOnline
@@ -178,25 +221,13 @@ export const AskMentorChat = ({
       // Show subtle notification that fallback was used
       toast({
         title: "Connection issue",
-        description: "Using offline response. Your message was saved.",
+        description: "Live reply unavailable. Showing fallback guidance.",
         duration: 3000
       });
-
-      // Still increment count and save to history
-      setDailyMessageCount(prev => prev + 1);
-
-      // Save both messages even with fallback (non-blocking)
-      // Only save if mentorId is defined to maintain data integrity
-      if (mentorId) {
-        void supabase.from('mentor_chats').insert([
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'user', content: text },
-          { user_id: currentUser.id, mentor_id: mentorId, role: 'assistant', content: fallback.content }
-        ]).then(({ error }) => { if (error) console.error('Failed to save fallback chat:', error); });
-      }
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline, comprehensiveMode, briefingContext]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline, comprehensiveMode, briefingContext, parseInvokeError]);
 
   useEffect(() => {
     // Check today's message count on mount only
@@ -204,16 +235,15 @@ export const AskMentorChat = ({
     const checkDailyLimit = async () => {
       if (!user) return;
 
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      // Match server-side counting window (UTC day) for consistent limits.
+      const startOfDayUtc = new Date();
+      startOfDayUtc.setUTCHours(0, 0, 0, 0);
       const { count } = await supabase
         .from('mentor_chats')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('role', 'user')
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
+        .gte('created_at', startOfDayUtc.toISOString());
       
       setDailyMessageCount(count || 0);
     };
@@ -273,7 +303,7 @@ export const AskMentorChat = ({
       {!isOnline && (
         <div className="bg-destructive text-destructive-foreground px-4 py-2 text-sm flex items-center justify-center gap-2">
           <WifiOff className="h-4 w-4" />
-          <span>You're offline. Messages will be sent when you reconnect.</span>
+          <span>You're offline. Live mentor replies are unavailable; fallback guidance is shown.</span>
         </div>
       )}
       

@@ -101,7 +101,7 @@ const ResetPassword = () => {
       clearTimeout(verificationTimeout);
       clearTimeout(fallbackTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [navigate]); // toast is stable from useToast hook
 
   const handleResetPassword = async (e: React.FormEvent) => {

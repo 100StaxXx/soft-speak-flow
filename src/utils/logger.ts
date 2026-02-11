@@ -31,7 +31,7 @@ import * as Sentry from "@sentry/react";
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type LogContext = Record<string, any>;
 
 interface LogEntry {
@@ -116,11 +116,11 @@ function logMessage(
 
   switch (level) {
     case 'debug':
-      // eslint-disable-next-line no-console
+       
       console.log(...args);
       break;
     case 'info':
-      // eslint-disable-next-line no-console
+       
       console.log(...args);
       break;
     case 'warn':
@@ -216,7 +216,7 @@ export const logger = {
   // Legacy compatibility - maps to debug level
   log: (message: string, ...args: unknown[]) => {
     if (shouldLog('debug')) {
-      // eslint-disable-next-line no-console
+       
       console.log(message, ...args);
     }
   },
@@ -237,12 +237,12 @@ export const logger = {
   // Utility: Group related logs
   group: (label: string, fn: () => void) => {
     if (!shouldLog('debug')) return;
-    // eslint-disable-next-line no-console
+     
     console.group(label);
     try {
       fn();
     } finally {
-      // eslint-disable-next-line no-console
+       
       console.groupEnd();
     }
   },
@@ -250,7 +250,7 @@ export const logger = {
   // Utility: Table display for arrays/objects
   table: (data: unknown) => {
     if (!shouldLog('debug')) return;
-    // eslint-disable-next-line no-console
+     
     console.table(data);
   },
 };
