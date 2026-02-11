@@ -861,7 +861,6 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
     },
-    onSuccess: () => {},
   });
 
   return {

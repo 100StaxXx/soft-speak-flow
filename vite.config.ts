@@ -108,7 +108,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1300,
     sourcemap: false, // Disable source maps in production for smaller bundle
     reportCompressedSize: false, // Faster builds
   },

@@ -102,7 +102,10 @@ const Community = () => {
   }, [handleTaskReschedule]);
 
   const handleAddQuest = async (data: AddQuestData) => {
-    const taskDate = format(selectedDate, 'yyyy-MM-dd');
+    const taskDate = data.sendToInbox
+      ? null
+      : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
+
     await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
@@ -114,6 +117,11 @@ const Community = () => {
       recurrenceDays: data.recurrenceDays,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
+      notes: data.moreInformation,
+      location: data.location,
+      contactId: data.contactId,
+      autoLogInteraction: data.autoLogInteraction,
+      subtasks: data.subtasks,
     });
     setShowAddSheet(false);
     setPrefilledTime(null);
@@ -129,6 +137,7 @@ const Community = () => {
     recurrence_days: number[];
     reminder_enabled: boolean;
     reminder_minutes_before: number;
+    notes: string | null;
     category: string | null;
     image_url: string | null;
     location: string | null;

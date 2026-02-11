@@ -455,7 +455,7 @@ const Journeys = () => {
       action: {
         label: "Undo",
         onClick: () => {
-          restoreTask(taskData);
+          void restoreTask(taskData);
           toast.success("Quest restored");
         },
       },
