@@ -106,7 +106,6 @@ interface TodaysAgendaProps {
   currentStreak?: number;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
-  onReorderTasks?: (tasks: Task[]) => void;
   calendarTasks?: CalendarTask[];
   calendarMilestones?: CalendarMilestone[];
   onDateSelect?: (date: Date) => void;
@@ -156,7 +155,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   currentStreak = 0,
   onUndoToggle,
   onEditQuest,
-  onReorderTasks,
   calendarTasks = [],
   calendarMilestones = [],
   onDateSelect,
@@ -818,6 +816,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             <p className="text-xs text-muted-foreground/70">
               Tap <Plus className="w-3 h-3 inline" /> to add your first quest
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={onAddQuest}
+            >
+              <Plus className="w-3 h-3 mr-1.5" />
+              Add Quest
+            </Button>
           </div>
         ) : (
           <div>

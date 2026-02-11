@@ -13,6 +13,7 @@ import { useCalendarMilestones } from "@/hooks/useCalendarMilestones";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { CalendarTask } from "@/types/quest";
 import { PageTransition } from "@/components/PageTransition";
+import { toast } from "sonner";
 
 const Community = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -148,6 +149,7 @@ const Community = () => {
 
   const handleDeleteQuest = async (taskId: string) => {
     await deleteTask(taskId);
+    toast.success("Quest deleted");
     setEditingTask(null);
   };
 

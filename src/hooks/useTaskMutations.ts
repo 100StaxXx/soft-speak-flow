@@ -149,6 +149,12 @@ export const useTaskMutations = (taskDate: string) => {
             );
 
           if (subtasksError) {
+            // Best-effort rollback to keep create behavior predictable.
+            await supabase
+              .from('daily_tasks')
+              .delete()
+              .eq('id', data.id)
+              .eq('user_id', user.id);
             throw subtasksError;
           }
         }
@@ -190,6 +196,8 @@ export const useTaskMutations = (taskDate: string) => {
         reminder_minutes_before: params.reminderMinutesBefore ?? 15,
         reminder_sent: false,
         parent_template_id: null,
+        notes: params.notes || null,
+        location: params.location || null,
       };
 
       // Only update the specific day query to avoid cross-day cache pollution

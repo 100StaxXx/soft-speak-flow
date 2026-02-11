@@ -116,7 +116,6 @@ const Journeys = () => {
     updateTask,
     deleteTask,
     restoreTask,
-    reorderTasks,
     moveTaskToDate,
     completedCount,
     totalCount,
@@ -360,6 +359,7 @@ const Journeys = () => {
       trackDailyPlanOutcome(taskId, 'deleted');
     }
     await deleteTask(taskId);
+    toast.success("Quest deleted");
     setEditingTask(null);
   }, [deleteTask, trackDailyPlanOutcome]);
 
@@ -399,15 +399,6 @@ const Journeys = () => {
     }
     setEditingRitual(null);
   }, [user?.id, queryClient]);
-
-  // Handle task reordering from drag and drop
-  const handleReorderTasks = useCallback((reorderedTasks: typeof dailyTasks) => {
-    const updates = reorderedTasks.map((task, index) => ({
-      id: task.id,
-      sort_order: index,
-    }));
-    reorderTasks(updates);
-  }, [reorderTasks]);
 
   // Handle date pill click - just navigate to that day
   const handleDatePillClick = useCallback((date: Date) => {
@@ -454,9 +445,13 @@ const Journeys = () => {
       duration: 4000,
       action: {
         label: "Undo",
-        onClick: () => {
-          void restoreTask(taskData);
-          toast.success("Quest restored");
+        onClick: async () => {
+          try {
+            await restoreTask(taskData);
+            toast.success("Quest restored");
+          } catch {
+            toast.error("Failed to restore quest");
+          }
         },
       },
     });
@@ -569,7 +564,6 @@ const Journeys = () => {
             currentStreak={currentStreak}
             onUndoToggle={handleUndoToggle}
             onEditQuest={handleEditQuest}
-            onReorderTasks={handleReorderTasks}
             calendarTasks={allCalendarTasks}
             calendarMilestones={[]}
             onDateSelect={setSelectedDate}
