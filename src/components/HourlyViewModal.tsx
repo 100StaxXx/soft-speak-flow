@@ -20,6 +20,21 @@ interface HourlyViewModalProps {
   onMilestoneClick?: (milestone: CalendarMilestone) => void;
 }
 
+const parseValidDate = (dateString?: string | null) => {
+  if (!dateString) return null;
+  const parsed = new Date(`${dateString}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const safeFormat = (date: Date, fmt: string, fallback = "") => {
+  try {
+    if (Number.isNaN(date.getTime())) return fallback;
+    return format(date, fmt);
+  } catch {
+    return fallback;
+  }
+};
+
 export function HourlyViewModal({
   open,
   onOpenChange,
@@ -41,13 +56,15 @@ export function HourlyViewModal({
   };
 
   const handleTaskClick = (task: CalendarTask) => {
-    const taskDate = new Date(task.task_date + 'T00:00:00');
+    const taskDate = parseValidDate(task.task_date);
+    if (!taskDate) return;
     onDateSelect(taskDate);
     onOpenChange(false);
   };
 
   const handleMilestoneClick = (milestone: CalendarMilestone) => {
-    const milestoneDate = new Date(milestone.target_date + 'T00:00:00');
+    const milestoneDate = parseValidDate(milestone.target_date);
+    if (!milestoneDate) return;
     onDateSelect(milestoneDate);
     onOpenChange(false);
   };
@@ -70,7 +87,7 @@ export function HourlyViewModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <DialogTitle className="text-lg font-semibold">
-            {format(selectedDate, "MMMM yyyy")}
+            {safeFormat(selectedDate, "MMMM yyyy", "Calendar")}
           </DialogTitle>
           <Button
             variant="ghost"

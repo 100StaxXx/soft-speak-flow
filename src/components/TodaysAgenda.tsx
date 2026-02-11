@@ -58,7 +58,22 @@ import type { PlanMyWeekAnswers } from "@/features/tasks/components/PlanMyWeekCl
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
   if (!endDate) return null;
-  return Math.max(0, differenceInDays(new Date(endDate), new Date()));
+  try {
+    const parsed = new Date(endDate);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return Math.max(0, differenceInDays(parsed, new Date()));
+  } catch {
+    return null;
+  }
+};
+
+const safeFormat = (date: Date, fmt: string, fallback = "") => {
+  try {
+    if (Number.isNaN(date.getTime())) return fallback;
+    return format(date, fmt);
+  } catch {
+    return fallback;
+  }
 };
 
 interface Task {
@@ -367,7 +382,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+  const isToday = safeFormat(selectedDate, "yyyy-MM-dd") === safeFormat(new Date(), "yyyy-MM-dd");
   const allComplete = totalCount > 0 && completedCount === totalCount;
 
   const triggerHaptic = async (style: ImpactStyle) => {
@@ -778,7 +793,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
             >
               <span className="text-lg font-bold">
-                {format(selectedDate, "MMM d, yyyy")}
+                {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
               </span>
             </button>
             {currentStreak > 0 && (
