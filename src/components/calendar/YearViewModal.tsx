@@ -24,12 +24,8 @@ const MONTHS = [
 
 const parseValidDate = (dateString?: string | null) => {
   if (!dateString) return null;
-  try {
-    const parsed = new Date(`${dateString}T00:00:00`);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  } catch {
-    return null;
-  }
+  const parsed = new Date(dateString);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 export function YearView({ 
