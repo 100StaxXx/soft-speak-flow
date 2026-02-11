@@ -153,6 +153,7 @@ interface TodaysAgendaProps {
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
+  onTimeSlotLongPress?: (date: Date, time: string) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -188,6 +189,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onDeleteQuest,
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
+  onTimeSlotLongPress,
 }: TodaysAgendaProps) {
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -278,7 +280,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           case 'xp':
             return b.xp_reward - a.xp_reward;
           case 'custom':
-          default:
+          default: {
             const orderA = a.sort_order ?? 9999;
             const orderB = b.sort_order ?? 9999;
             if (orderA !== orderB) return orderA - orderB;
@@ -288,6 +290,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             if (a.scheduled_time) return -1;
             if (b.scheduled_time) return 1;
             return a.id.localeCompare(b.id);
+          }
         }
       });
       
@@ -779,7 +782,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, keepInPlace, optimisticCompleted, tasks]);
+  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, tasks]);
 
 
   return (
@@ -1119,6 +1122,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         tasks={calendarTasks}
         milestones={calendarMilestones}
         onTaskDrop={() => {}}
+        onTimeSlotLongPress={onTimeSlotLongPress}
       />
     </div>
   );

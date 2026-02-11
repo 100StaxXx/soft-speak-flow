@@ -75,10 +75,18 @@ serve(async (req) => {
     console.log("Image generated:", imageUrl ? "success" : "no URL");
 
     // Step 2: Calculate stats
-    const userAttributes = { mind, body, soul };
-    const stats = calculateStats(stage, userAttributes);
+    // Convert legacy mind/body/soul (0-100) to new 6-stat system (0-1000)
+    const userStats = {
+      wisdom: mind * 10,
+      creativity: mind * 10,
+      vitality: body * 10,
+      discipline: body * 10,
+      resolve: soul * 10,
+      alignment: soul * 10,
+    };
+    const stats = calculateStats(stage, userStats);
     const energyCost = calculateEnergyCost(stage);
-    const bondLevel = calculateBondLevel(stage, userAttributes);
+    const bondLevel = calculateBondLevel(stage, userStats);
 
     // Step 3: Determine rarity
     let rarity = "Common";

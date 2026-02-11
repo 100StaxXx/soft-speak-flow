@@ -37,9 +37,8 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const draggedTask = dragContext?.draggedTask;
   const hoveredDate = dragContext?.hoveredDate;
 
-  // Generate date range centered around today
-  const today = new Date();
-  const startDate = subDays(today, 3);
+  // Generate date range centered around selected date
+  const startDate = subDays(selectedDate, 3);
   const dates = Array.from({ length: daysToShow }, (_, i) => addDays(startDate, i));
 
   const getTaskCount = (date: Date) => {
