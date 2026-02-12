@@ -9,12 +9,14 @@ CREATE TABLE IF NOT EXISTS public.evolution_thresholds (
 ALTER TABLE public.evolution_thresholds ENABLE ROW LEVEL SECURITY;
 
 -- Allow anyone to read thresholds (they're public game data)
+DROP POLICY IF EXISTS "Anyone can view evolution thresholds" ON public.evolution_thresholds;
 CREATE POLICY "Anyone can view evolution thresholds"
   ON public.evolution_thresholds
   FOR SELECT
   USING (true);
 
 -- Only admins can modify thresholds
+DROP POLICY IF EXISTS "Admins can manage evolution thresholds" ON public.evolution_thresholds;
 CREATE POLICY "Admins can manage evolution thresholds"
   ON public.evolution_thresholds
   FOR ALL
@@ -47,7 +49,7 @@ ON CONFLICT (stage) DO NOTHING;
 
 -- Add helper functions
 CREATE OR REPLACE FUNCTION public.get_next_evolution_threshold(current_stage INTEGER)
-RETURNS INTEGER
+RETURNS BIGINT
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
@@ -56,7 +58,7 @@ AS $$
   SELECT xp_required FROM evolution_thresholds WHERE stage = current_stage + 1;
 $$;
 
-CREATE OR REPLACE FUNCTION public.should_evolve(current_stage INTEGER, current_xp INTEGER)
+CREATE OR REPLACE FUNCTION public.should_evolve(current_stage INTEGER, current_xp BIGINT)
 RETURNS BOOLEAN
 LANGUAGE SQL
 STABLE

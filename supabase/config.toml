@@ -1,4 +1,4 @@
-project_id = "your-new-project-ref"
+project_id = "opbfpbbqvuksuvmtmssd"
 
 [functions.validate-companion-image]
 verify_jwt = false

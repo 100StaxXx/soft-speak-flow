@@ -39,6 +39,7 @@ jobs:
             SUPABASE_ANON_KEY
             SUPABASE_SERVICE_ROLE_KEY
             OPENAI_API_KEY
+            ELEVENLABS_API_KEY
           )
 
           missing=0
@@ -53,8 +54,18 @@ jobs:
             exit 1
           fi
 
+      - name: Link Supabase project
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Repair stale migration versions
+        run: |
+          set -euo pipefail
+          for version in 20251123 20251125 20251126 20251127; do
+            supabase migration repair --linked --password "$SUPABASE_DB_PASSWORD" --status reverted "$version" --yes || true
+          done
+
       - name: Push database migrations
-        run: supabase db push --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes --include-all
 
       - name: Deploy allow-listed Edge Functions
         run: |
