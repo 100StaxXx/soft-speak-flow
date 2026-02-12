@@ -10,7 +10,10 @@ import {
   MapPin,
   Repeat,
   Brain,
-  ChevronLeft
+  ChevronLeft,
+  CheckCircle2,
+  Trophy,
+  Flame,
 } from "lucide-react";
 import { LucideIcon } from "lucide-react";
 
@@ -35,25 +38,36 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    id: "quests",
+    id: "first-quest",
     icon: Swords,
-    title: "Daily Quests",
-    subtitle: "Every hero starts somewhere...",
+    title: "Create Your First Quest",
+    subtitle: "Start with one small daily action.",
     features: [
-      { icon: Brain, text: "Use the Quick Add Bar to create quests naturally" },
-      { icon: Zap, text: "Complete quests to earn XP and grow your companion" },
-      { icon: Sparkles, text: "Set a Main Quest for 1.5x XP bonus" },
+      { icon: Zap, text: "Tap + in the lower-right corner" },
+      { icon: Brain, text: "Enter a simple quest title and save" },
+      { icon: CheckCircle2, text: "Your quest appears in the timeline instantly" },
     ],
   },
   {
-    id: "campaigns",
+    id: "first-campaign",
     icon: Target,
-    title: "Epic Campaigns",
-    subtitle: "Great journeys need direction...",
+    title: "Create Your First Campaign",
+    subtitle: "Turn a big goal into a guided plan.",
     features: [
-      { icon: MapPin, text: "Turn big goals into guided adventures" },
-      { icon: Brain, text: "AI Pathfinder creates custom plans for you" },
-      { icon: Repeat, text: "Link rituals to campaigns for auto-progress" },
+      { icon: Zap, text: "Tap + again and pick \"Or create a Campaign\"" },
+      { icon: MapPin, text: "Set your goal, timing, and direction" },
+      { icon: Repeat, text: "Add linked rituals for auto-progress" },
+    ],
+  },
+  {
+    id: "complete-track",
+    icon: Sparkles,
+    title: "Complete And Track Progress",
+    subtitle: "Close the loop every day.",
+    features: [
+      { icon: CheckCircle2, text: "Tap the circle on a quest to complete it" },
+      { icon: Trophy, text: "Watch XP and completion count update at the top" },
+      { icon: Flame, text: "Keep your streak alive for faster growth" },
     ],
   },
 ];

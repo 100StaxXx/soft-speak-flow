@@ -16,7 +16,8 @@ export const ONBOARDING_TASKS = [
     sort_order: 0,
     category: "soul",
     estimated_duration: 2,
-    notes: "Your companion grows stronger as you complete quests! Tap COMPANION in the bottom navigation bar to meet your companion and check your progress.",
+    notes:
+      "1. Tap COMPANION in the bottom navigation bar.\n2. Wait for the companion page to load.\n3. Check your bond/progress panel.\nDone when this step auto-completes.",
   },
   {
     task_text: "Morning Check-in 🌅",
@@ -25,7 +26,8 @@ export const ONBOARDING_TASKS = [
     sort_order: 1,
     category: "mind",
     estimated_duration: 3,
-    notes: "Start each day with intention. Tap MENTOR in the bottom navigation bar, then look for the morning check-in option to reflect on your day ahead.",
+    notes:
+      "1. Tap MENTOR in the bottom navigation bar.\n2. Open the Morning Check-in card.\n3. Submit your reflection.\nDone when this step auto-completes after submit.",
   },
   {
     task_text: "Create Your First Campaign 🚀",
@@ -34,7 +36,8 @@ export const ONBOARDING_TASKS = [
     sort_order: 2,
     category: "mind",
     estimated_duration: 5,
-    notes: "Campaigns are your big-picture goals! Tap QUESTS in the bottom navigation bar, then tap the + button and choose 'Or create a Campaign'.",
+    notes:
+      "1. Tap QUESTS in the bottom navigation bar.\n2. Tap + in the lower-right corner.\n3. Choose \"Or create a Campaign\".\n4. Complete the campaign setup.\nDone when this step auto-completes.",
   },
   {
     task_text: "Create Your First Quest 🎯",
@@ -43,7 +46,8 @@ export const ONBOARDING_TASKS = [
     sort_order: 3,
     category: "mind",
     estimated_duration: 2,
-    notes: "Quests are daily actions that move you forward! From the QUESTS tab (you're here now!), tap the + button in the bottom-right corner to create your first quest.",
+    notes:
+      "1. Stay on QUESTS.\n2. Tap + in the lower-right corner.\n3. Enter your quest title.\n4. Save the quest.\nDone when this step auto-completes after save.",
   },
 ];
 
@@ -119,8 +123,28 @@ export function useOnboardingSchedule(
           .in("task_text", ONBOARDING_TASKS.map((t) => t.task_text));
 
         if (existingTasks && existingTasks.length > 0) {
-          console.log("[Onboarding] Onboarding tasks already exist, marking as created");
+          // Keep onboarding copy/metadata up to date for returning users
+          await Promise.all(
+            ONBOARDING_TASKS.map((task) =>
+              supabase
+                .from("daily_tasks")
+                .update({
+                  notes: task.notes,
+                  xp_reward: task.xp_reward,
+                  difficulty: task.difficulty,
+                  sort_order: task.sort_order,
+                  category: task.category,
+                  estimated_duration: task.estimated_duration,
+                })
+                .eq("user_id", userId)
+                .eq("source", "onboarding")
+                .eq("task_text", task.task_text)
+            )
+          );
+
+          console.log("[Onboarding] Onboarding tasks already exist, synced latest guidance");
           safeLocalStorage.setItem(scheduleKey, "true");
+          queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
           setIsCreating(false);
           return;
         }

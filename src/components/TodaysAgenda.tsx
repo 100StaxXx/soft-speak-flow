@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useCallback, memo } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
@@ -508,7 +508,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )}
         >
           {/* Checkbox - only this toggles completion */}
-              <div className="relative ml-1">
+          <div className="relative ml-1">
             {/* Tutorial quest breathing glow effect */}
             {isOnboarding && !isComplete && (
               useLiteAnimations ? (
@@ -550,7 +550,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 }
                 touchStartRef.current = null;
               }}
-              className="relative flex items-center justify-center w-11 h-11 -ml-3 touch-manipulation active:scale-95 transition-transform select-none"
+              className="relative flex items-center justify-center w-11 h-11 touch-manipulation active:scale-95 transition-transform select-none"
               style={{
                 WebkitTapHighlightColor: 'transparent',
                 touchAction: 'manipulation',
@@ -599,22 +599,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </motion.div>
               )}
             </button>
-            {/* Tutorial quest helper label */}
-            {isOnboarding && !isComplete && (
-              useLiteAnimations ? (
-                <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium">
-                  Tap to complete
-                </span>
-              ) : (
-                <motion.span
-                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium"
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  Tap to complete
-                </motion.span>
-              )
-            )}
           </div>
           
           <div className="flex-1 min-w-0">
@@ -631,6 +615,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 )}
               />
             </div>
+            {isOnboarding && !isComplete && (
+              useLiteAnimations ? (
+                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/90">
+                  Tap the circle to complete
+                </p>
+              ) : (
+                <motion.p
+                  className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/90"
+                  animate={{ opacity: [0.55, 1, 0.55] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  Tap the circle to complete
+                </motion.p>
+              )
+            )}
             {task.scheduled_time && (
               <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 <Clock className="w-3 h-3" />
@@ -693,7 +692,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   )}
                 >
                   <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs">{stripMarkdown(task.notes)}</p>
+                  <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
                 </div>
               ) : (
                 <motion.div 
@@ -713,7 +712,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                 >
                   <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs">{stripMarkdown(task.notes)}</p>
+                  <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
                 </motion.div>
               )
             )}
@@ -928,12 +927,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     ? timelineDrag.getRowHandlers(task.id, task.scheduled_time)
                     : {};
 
-                  const rowStyle = {
-                    WebkitUserSelect: 'none' as const,
-                    userSelect: 'none' as const,
-                    WebkitTouchCallout: 'none' as const,
-                    touchAction: (isThisDragging ? 'none' : 'pan-y') as const,
-                    pointerEvents: (isAnyDragging && !isThisDragging ? 'none' : 'auto') as const,
+                  const rowStyle: CSSProperties = {
+                    WebkitUserSelect: 'none',
+                    userSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                    touchAction: isThisDragging ? 'none' : 'pan-y',
+                    pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
                     transform: isThisDragging
                       ? `translateY(${timelineDrag.dragOffsetY}px) scale(1.03)`
                       : undefined,
