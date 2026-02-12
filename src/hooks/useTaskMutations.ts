@@ -229,6 +229,7 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['inbox-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['inbox-count'] });
     },
     onSuccess: (data) => {
       toast({ title: "Quest added!" });

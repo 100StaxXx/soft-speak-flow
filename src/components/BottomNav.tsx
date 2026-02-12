@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
-import { useInboxTasks } from "@/hooks/useInboxTasks";
+import { useInboxCount } from "@/hooks/useInboxTasks";
 
 // Prefetch page modules on hover for instant navigation
 const prefetchMap: Record<string, () => Promise<unknown>> = {
@@ -24,7 +24,7 @@ const prefetchMap: Record<string, () => Promise<unknown>> = {
 export const BottomNav = memo(() => {
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
-  const { inboxCount } = useInboxTasks();
+  const { inboxCount } = useInboxCount();
 
   // Prefetch on hover/focus for even faster perceived navigation
   const handlePrefetch = useCallback((page: keyof typeof prefetchMap) => {

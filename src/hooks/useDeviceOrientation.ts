@@ -7,10 +7,14 @@ interface DeviceOrientation {
   available: boolean;
 }
 
+interface UseDeviceOrientationOptions {
+  enabled?: boolean;
+}
+
 // Smoothing factor (0 = no smoothing, 1 = instant response)
 const SMOOTHING_FACTOR = 0.15;
 
-export const useDeviceOrientation = () => {
+export const useDeviceOrientation = ({ enabled = true }: UseDeviceOrientationOptions = {}) => {
   const [orientation, setOrientation] = useState<DeviceOrientation>({
     gamma: 0,
     beta: 0,
@@ -25,6 +29,8 @@ export const useDeviceOrientation = () => {
   const rawBetaRef = useRef(0);
 
   const requestPermission = useCallback(async () => {
+    if (!enabled) return false;
+
     // iOS 13+ requires explicit permission
     if (typeof DeviceOrientationEvent !== 'undefined' && 
         typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
@@ -42,10 +48,10 @@ export const useDeviceOrientation = () => {
     // Non-iOS devices don't need permission
     setOrientation(prev => ({ ...prev, permitted: true }));
     return true;
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    if (!orientation.available) return;
+    if (!enabled || !orientation.available) return;
 
     const handleOrientation = (e: DeviceOrientationEvent) => {
       // Store raw values
@@ -70,7 +76,7 @@ export const useDeviceOrientation = () => {
     return () => {
       window.removeEventListener('deviceorientation', handleOrientation);
     };
-  }, [orientation.available]);
+  }, [enabled, orientation.available]);
 
   // Convert gamma (-90 to 90) to a normalized position (0 to 100)
   // with deadzone and smoothing - for PORTRAIT orientation
