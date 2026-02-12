@@ -8,7 +8,7 @@
 CREATE OR REPLACE FUNCTION complete_referral_stage3(
   p_referee_id UUID,
   p_referrer_id UUID
-) RETURNS JSONB AS $$
+) RETURNS JSONB AS $complete_referral$
 DECLARE
   v_new_count INTEGER;
   v_skin_id UUID;
@@ -125,14 +125,14 @@ EXCEPTION
       p_referee_id, p_referrer_id, SQLERRM;
     RAISE;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$complete_referral$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Fix Bug #15 & #18: Atomic function for applying referral code
 CREATE OR REPLACE FUNCTION apply_referral_code_atomic(
   p_user_id UUID,
   p_referrer_id UUID,
   p_referral_code TEXT
-) RETURNS JSONB AS $$
+) RETURNS JSONB AS $apply_referral$
 DECLARE
   v_current_referred_by UUID;
   v_already_completed BOOLEAN;
@@ -237,11 +237,11 @@ EXCEPTION WHEN OTHERS THEN
     p_user_id, p_referrer_id, SQLERRM;
   RAISE;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$apply_referral$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Add helper function to safely decrement count (for error recovery)
 CREATE OR REPLACE FUNCTION decrement_referral_count(referrer_id UUID)
-RETURNS INTEGER AS $$
+RETURNS INTEGER AS $decrement_referral$
 DECLARE
   v_new_count INTEGER;
 BEGIN
@@ -256,14 +256,14 @@ BEGIN
   
   RETURN v_new_count;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$decrement_referral$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Add index to improve concurrent lock performance
 CREATE INDEX IF NOT EXISTS idx_referral_completions_lookup
 ON referral_completions(referee_id, referrer_id);
 
 -- Add check constraint to prevent negative counts (if not already added)
-DO $$
+DO $fix_referral_count$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.constraint_column_usage
@@ -273,7 +273,7 @@ BEGIN
     ADD CONSTRAINT referral_count_non_negative
     CHECK (referral_count >= 0);
   END IF;
-END $$;
+END $fix_referral_count$;
 
 -- Comment explaining the transaction guarantees
 COMMENT ON FUNCTION complete_referral_stage3 IS 
