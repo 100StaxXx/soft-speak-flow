@@ -508,7 +508,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )}
         >
           {/* Checkbox - only this toggles completion */}
-          <div className="relative ml-1">
+          <div
+            className={cn(
+              "relative ml-1 flex flex-col items-center self-start pt-0.5",
+              isOnboarding && !isComplete ? "gap-1.5" : "gap-0"
+            )}
+          >
             {/* Tutorial quest breathing glow effect */}
             {isOnboarding && !isComplete && (
               useLiteAnimations ? (
@@ -599,6 +604,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </motion.div>
               )}
             </button>
+            {isOnboarding && !isComplete && (
+              useLiteAnimations ? (
+                <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-medium leading-tight text-primary/95 text-center">
+                  Tap circle to finish
+                </span>
+              ) : (
+                <motion.span
+                  className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-medium leading-tight text-primary/95 text-center"
+                  animate={{ opacity: [0.6, 1, 0.6] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  Tap circle to finish
+                </motion.span>
+              )
+            )}
           </div>
           
           <div className="flex-1 min-w-0">
@@ -615,21 +635,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 )}
               />
             </div>
-            {isOnboarding && !isComplete && (
-              useLiteAnimations ? (
-                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/90">
-                  Tap the circle to complete
-                </p>
-              ) : (
-                <motion.p
-                  className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-primary/90"
-                  animate={{ opacity: [0.55, 1, 0.55] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  Tap the circle to complete
-                </motion.p>
-              )
-            )}
             {task.scheduled_time && (
               <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 <Clock className="w-3 h-3" />
