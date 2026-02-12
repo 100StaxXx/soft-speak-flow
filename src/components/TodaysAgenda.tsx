@@ -14,7 +14,6 @@ import {
   Repeat,
   ChevronDown,
   ChevronUp,
-  Rocket,
   Target,
   Zap,
   FileText,
@@ -36,7 +35,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn, stripMarkdown } from "@/lib/utils";
-import { isOnboardingTask } from "@/hooks/useOnboardingSchedule";
 
 import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
@@ -204,31 +202,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
-
-  // Find onboarding tasks
-  const onboardingTasks = useMemo(() => 
-    tasks.filter(t => isOnboardingTask(t.task_text)),
-    [tasks]
-  );
-  
-  const hasOnboardingTasks = onboardingTasks.length > 0;
-  const onboardingComplete = onboardingTasks.filter(t => t.completed).length;
-  const onboardingTotal = onboardingTasks.length;
-
-  // Auto-expand only the first uncompleted onboarding task (accordion style)
-  useEffect(() => {
-    const firstUncompletedOnboarding = tasks.find(t => isOnboardingTask(t.task_text) && !t.completed);
-    
-    if (firstUncompletedOnboarding) {
-      setExpandedTasks(prev => {
-        // Only add if not already expanded
-        if (prev.has(firstUncompletedOnboarding.id)) return prev;
-        const next = new Set(prev);
-        next.add(firstUncompletedOnboarding.id);
-        return next;
-      });
-    }
-  }, [tasks]);
   
 
   // Priority weight for sorting
@@ -392,30 +365,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const toggleTaskExpanded = useCallback((taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    const isClickingOnboarding = tasks.some(t => t.id === taskId && isOnboardingTask(t.task_text));
-    
+
     setExpandedTasks(prev => {
       const next = new Set(prev);
-      
       if (next.has(taskId)) {
-        // Closing this task
         next.delete(taskId);
       } else {
-        // Opening this task - if it's onboarding, close other onboarding tasks first
-        if (isClickingOnboarding) {
-          tasks.forEach(t => {
-            if (isOnboardingTask(t.task_text) && t.id !== taskId) {
-              next.delete(t.id);
-            }
-          });
-        }
         next.add(taskId);
       }
-      
       return next;
     });
-  }, [tasks]);
+  }, []);
 
   const getCategoryIcon = (category: string | null | undefined) => {
     switch (category) {
@@ -428,8 +388,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
-    const isOnboarding = isOnboardingTask(task.task_text);
-    const isOnboardingAutoStep = isOnboarding;
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
     const isPressed = dragProps?.isPressed ?? false;
@@ -439,9 +397,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (isOnboardingAutoStep) {
-        return;
-      }
       // Don't allow clicks while dragging or during long press
       if (isDragging || isActivated || isPressed) {
         e.preventDefault();
@@ -471,27 +426,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             return next;
           });
         }, 600);
-        
-        // Auto-collapse tutorial quests when completed and expand next one
-        if (isOnboarding) {
-          setExpandedTasks(prev => {
-            const next = new Set(prev);
-            next.delete(task.id);
-            
-            // Find and expand the next uncompleted onboarding task
-            const nextOnboarding = tasks.find(t => 
-              isOnboardingTask(t.task_text) && 
-              !t.completed && 
-              t.id !== task.id
-            );
-            if (nextOnboarding) {
-              next.add(nextOnboarding.id);
-            }
-            
-            return next;
-          });
-        }
-        
+
         onToggle(task.id, !isComplete, task.xp_reward);
       }
     };
@@ -507,17 +442,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             isRitual ? "py-4" : "py-3",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
-                isActivated && !isDragging && "bg-muted/30 rounded-lg",
-                isOnboarding && !isComplete && "bg-primary/5 rounded-lg"
+            isActivated && !isDragging && "bg-muted/30 rounded-lg"
           )}
         >
           {/* Checkbox - only this toggles completion */}
-          <div
-            className={cn(
-              "relative ml-1 flex flex-col items-center self-start pt-0.5",
-              isOnboarding && !isComplete ? "gap-1.5" : "gap-0"
-            )}
-          >
+          <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
             <button
               data-interactive="true"
               onClick={handleCheckboxClick}
@@ -541,25 +470,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 touchStartRef.current = null;
               }}
               className={cn(
-                "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none disabled:opacity-100",
-                !isOnboardingAutoStep && "active:scale-95",
-                isOnboardingAutoStep && "cursor-default"
+                "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none",
+                "active:scale-95"
               )}
               style={{
                 WebkitTapHighlightColor: 'transparent',
                 touchAction: 'manipulation',
               }}
               aria-label={
-                isOnboardingAutoStep
-                  ? "Tutorial step auto-completes when finished"
-                  : isComplete
-                    ? "Mark task as incomplete"
-                    : "Mark task as complete"
+                isComplete
+                  ? "Mark task as incomplete"
+                  : "Mark task as complete"
               }
               role="checkbox"
               aria-checked={isComplete}
-              tabIndex={isOnboardingAutoStep ? -1 : 0}
-              disabled={isOnboardingAutoStep}
             >
               {useLiteAnimations ? (
                 <div
@@ -567,9 +491,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                     isComplete 
                       ? "bg-primary border-primary" 
-                      : isOnboarding
-                        ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
-                        : "border-muted-foreground/40 hover:border-primary"
+                      : "border-muted-foreground/40 hover:border-primary"
                   )}
                 >
                   {isComplete && (
@@ -582,9 +504,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                     isComplete 
                       ? "bg-primary border-primary" 
-                      : isOnboarding
-                        ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
-                        : "border-muted-foreground/40 hover:border-primary"
+                      : "border-muted-foreground/40 hover:border-primary"
                   )}
                   whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
                 >
@@ -600,21 +520,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </motion.div>
               )}
             </button>
-            {isOnboarding && !isComplete && (
-              useLiteAnimations ? (
-                <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-medium leading-tight text-primary/95 text-center">
-                  Auto-completes
-                </span>
-              ) : (
-                <motion.span
-                  className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-medium leading-tight text-primary/95 text-center"
-                  animate={{ opacity: [0.6, 1, 0.6] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  Auto-completes
-                </motion.span>
-              )
-            )}
           </div>
           
           <div className="flex-1 min-w-0">
@@ -641,7 +546,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           
           <div className="flex items-center gap-2">
             {/* Edit button - shows on hover for incomplete quests */}
-            {onEditQuest && !isComplete && !isDragging && !isActivated && !isOnboardingAutoStep && (
+            {onEditQuest && !isComplete && !isDragging && !isActivated && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -681,37 +586,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {/* Expandable details section */}
         <CollapsibleContent>
           <div className="pl-8 pr-2 pb-2 space-y-2">
-            {/* Notes - with tutorial highlight */}
+            {/* Notes */}
             {task.notes && (
               useLiteAnimations ? (
-                <div
-                  className={cn(
-                    "flex items-start gap-2 text-sm",
-                    isOnboarding && !isComplete
-                      ? "p-2 rounded-lg bg-primary/10 border border-primary/20 text-foreground"
-                      : "text-muted-foreground"
-                  )}
-                >
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
                   <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
                 </div>
               ) : (
-                <motion.div 
-                  className={cn(
-                    "flex items-start gap-2 text-sm",
-                    isOnboarding && !isComplete 
-                      ? "p-2 rounded-lg bg-primary/10 border border-primary/20 text-foreground" 
-                      : "text-muted-foreground"
-                  )}
-                  animate={isOnboarding && !isComplete ? {
-                    boxShadow: [
-                      "0 0 0 0 rgba(129, 140, 248, 0)",
-                      "0 0 12px 2px rgba(129, 140, 248, 0.3)",
-                      "0 0 0 0 rgba(129, 140, 248, 0)"
-                    ]
-                  } : {}}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                >
+                <motion.div className="flex items-start gap-2 text-sm text-muted-foreground">
                   <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <p className="text-xs leading-relaxed whitespace-pre-line">{stripMarkdown(task.notes)}</p>
                 </motion.div>
@@ -788,7 +671,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
 
     // Wrap with SwipeableTaskItem for swipe gestures (only for non-completed, non-dragging tasks)
-    if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated && !isOnboardingAutoStep) {
+    if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated) {
       // Don't allow "move to next day" for rituals - they're recurring and already exist every day
       const isRitual = !!task.habit_source_id;
       
@@ -804,7 +687,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, tasks, useLiteAnimations]);
+  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, useLiteAnimations]);
 
 
   return (
@@ -1133,55 +1016,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         )}
       </div>
-
-      {/* Onboarding Progress Banner */}
-      {hasOnboardingTasks && onboardingComplete < onboardingTotal && (
-        useLiteAnimations ? (
-          <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Rocket className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Getting Started</span>
-              <Badge variant="secondary" className="ml-auto text-xs">
-                {onboardingComplete}/{onboardingTotal}
-              </Badge>
-            </div>
-            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                style={{ width: `${(onboardingComplete / onboardingTotal) * 100}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Complete all tasks to evolve your companion! ✨
-            </p>
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Rocket className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Getting Started</span>
-              <Badge variant="secondary" className="ml-auto text-xs">
-                {onboardingComplete}/{onboardingTotal}
-              </Badge>
-            </div>
-            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${(onboardingComplete / onboardingTotal) * 100}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Complete all tasks to evolve your companion! ✨
-            </p>
-          </motion.div>
-        )
-      )}
 
       <HourlyViewModal
         open={showMonthView}

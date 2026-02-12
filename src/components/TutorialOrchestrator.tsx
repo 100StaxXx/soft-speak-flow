@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -8,12 +8,17 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { supabase } from "@/integrations/supabase/client";
 import { safeLocalStorage } from "@/utils/storage";
 import { cn } from "@/lib/utils";
+import type { GuidedTutorialProgress, GuidedTutorialStepId } from "@/types/profile";
 
-type GuidedStepId = "create_quest" | "meet_companion" | "morning_checkin";
+const GUIDED_TUTORIAL_VERSION = 2;
+const STEP_XP_REWARDS: Record<GuidedTutorialStepId, number> = {
+  create_quest: 4,
+  meet_companion: 3,
+  morning_checkin: 3,
+};
 
 interface GuidedStep {
-  id: GuidedStepId;
-  taskText: string;
+  id: GuidedTutorialStepId;
   title: string;
   description: string;
   checklist: string[];
@@ -33,18 +38,11 @@ interface GuidedStep {
       };
 }
 
-interface GuidedTutorialProgress {
-  completedSteps?: GuidedStepId[];
-  dismissed?: boolean;
-  completed?: boolean;
-  completedAt?: string;
-  lastUpdatedAt?: string;
-}
+type GuidedTutorialProgressSnapshot = Partial<GuidedTutorialProgress>;
 
 const GUIDED_STEPS: GuidedStep[] = [
   {
     id: "create_quest",
-    taskText: "Create Your First Quest 🎯",
     title: "Create your first quest",
     description: "Schedule one quest with a time so it appears in Quests.",
     checklist: [
@@ -61,7 +59,6 @@ const GUIDED_STEPS: GuidedStep[] = [
   },
   {
     id: "meet_companion",
-    taskText: "Meet Your Companion ✨",
     title: "Meet your companion",
     description: "Find your companion and confirm your bond/progress panel is visible.",
     checklist: [
@@ -78,7 +75,6 @@ const GUIDED_STEPS: GuidedStep[] = [
   },
   {
     id: "morning_checkin",
-    taskText: "Morning Check-in 🌅",
     title: "Complete morning check-in",
     description: "Open Mentor and submit one morning reflection.",
     checklist: [
@@ -95,23 +91,49 @@ const GUIDED_STEPS: GuidedStep[] = [
   },
 ];
 
-const GUIDED_STEP_ID_SET = new Set<GuidedStepId>(GUIDED_STEPS.map((step) => step.id));
-const isGuidedStepId = (value: unknown): value is GuidedStepId =>
-  typeof value === "string" && GUIDED_STEP_ID_SET.has(value as GuidedStepId);
+const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
 
-const STEP_BY_TASK_TEXT = new Map(GUIDED_STEPS.map((step) => [step.taskText, step.id]));
+const isGuidedStepId = (value: unknown): value is GuidedTutorialStepId =>
+  typeof value === "string" && GUIDED_STEP_ID_SET.has(value as GuidedTutorialStepId);
+
+const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+export const safeCompletedSteps = (value: unknown): GuidedTutorialStepId[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isGuidedStepId);
+};
+
+export const safeAwardedSteps = (value: unknown): GuidedTutorialStepId[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isGuidedStepId);
+};
 
 const getLocalProgressKey = (userId: string) => `guided_tutorial_progress_${userId}`;
 
-const readLocalProgress = (userId: string | undefined): GuidedTutorialProgress | null => {
+const readLocalProgress = (
+  userId: string | undefined
+): GuidedTutorialProgressSnapshot | null => {
   if (!userId) return null;
+
   const raw = safeLocalStorage.getItem(getLocalProgressKey(userId));
   if (!raw) return null;
+
   try {
-    return JSON.parse(raw) as GuidedTutorialProgress;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isProgressRecord(parsed)) return null;
+    return parsed as GuidedTutorialProgressSnapshot;
   } catch {
     return null;
   }
+};
+
+const readRemoteProgress = (
+  onboardingData: Record<string, unknown> | null
+): GuidedTutorialProgressSnapshot | null => {
+  const guided = onboardingData?.guided_tutorial;
+  if (!isProgressRecord(guided)) return null;
+  return guided as GuidedTutorialProgressSnapshot;
 };
 
 const pathIsHidden = (pathname: string) =>
@@ -127,76 +149,43 @@ export const TutorialOrchestrator = () => {
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+
   const spotlightRef = useRef<HTMLElement | null>(null);
   const completionPersistRef = useRef(false);
-  const [sessionCompleted, setSessionCompleted] = useState<GuidedStepId[]>([]);
+  const stepPersistThrottleRef = useRef<Set<GuidedTutorialStepId>>(new Set());
+
+  const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
+  const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
   const [dismissedOverride, setDismissedOverride] = useState<boolean | null>(null);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const walkthroughCompleted = onboardingData?.walkthrough_completed === true;
 
   const localProgress = useMemo(() => readLocalProgress(user?.id), [user?.id]);
-  const remoteProgress = useMemo(() => {
-    const guided = onboardingData?.guided_tutorial;
-    if (!guided || typeof guided !== "object") return null;
-    return guided as GuidedTutorialProgress;
-  }, [onboardingData]);
+  const remoteProgress = useMemo(() => readRemoteProgress(onboardingData), [onboardingData]);
+
+  const tutorialEligible =
+    remoteProgress?.version === GUIDED_TUTORIAL_VERSION && remoteProgress?.eligible === true;
 
   useEffect(() => {
     setSessionCompleted([]);
+    setSessionAwarded([]);
     setDismissedOverride(null);
     completionPersistRef.current = false;
+    stepPersistThrottleRef.current.clear();
   }, [user?.id]);
 
-  const { data: onboardingTasks = [], isLoading: onboardingTasksLoading } = useQuery({
-    queryKey: ["guided-tutorial-tasks", user?.id],
-    enabled: !!user?.id && walkthroughCompleted,
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const taskTexts = GUIDED_STEPS.map((step) => step.taskText);
-      const { data, error } = await supabase
-        .from("daily_tasks")
-        .select("id, task_text, completed, xp_reward")
-        .eq("user_id", user.id)
-        .eq("source", "onboarding")
-        .in("task_text", taskTexts);
-
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  const completedFromTasks = useMemo(() => {
-    const completed: GuidedStepId[] = [];
-    for (const task of onboardingTasks) {
-      if (!task.completed) continue;
-      const mapped = STEP_BY_TASK_TEXT.get(task.task_text);
-      if (mapped) completed.push(mapped);
-    }
-    return completed;
-  }, [onboardingTasks]);
-
-  const onboardingTaskByStep = useMemo(() => {
-    const map = new Map<GuidedStepId, { id: string; completed: boolean; xpReward: number }>();
-    for (const task of onboardingTasks) {
-      const mapped = STEP_BY_TASK_TEXT.get(task.task_text);
-      if (!mapped) continue;
-      map.set(mapped, {
-        id: task.id,
-        completed: Boolean(task.completed),
-        xpReward: task.xp_reward ?? 0,
-      });
-    }
-    return map;
-  }, [onboardingTasks]);
-
   const persistedCompleted = useMemo(() => {
-    const remote = (remoteProgress?.completedSteps ?? []).filter(isGuidedStepId);
-    const local = (localProgress?.completedSteps ?? []).filter(isGuidedStepId);
+    const remote = safeCompletedSteps(remoteProgress?.completedSteps);
+    const local = safeCompletedSteps(localProgress?.completedSteps);
     return Array.from(new Set([...remote, ...local]));
-  }, [remoteProgress?.completedSteps, localProgress?.completedSteps]);
+  }, [localProgress?.completedSteps, remoteProgress?.completedSteps]);
+
+  const persistedAwarded = useMemo(() => {
+    const remote = safeAwardedSteps(remoteProgress?.xpAwardedSteps);
+    const local = safeAwardedSteps(localProgress?.xpAwardedSteps);
+    return Array.from(new Set([...remote, ...local]));
+  }, [localProgress?.xpAwardedSteps, remoteProgress?.xpAwardedSteps]);
 
   const effectiveDismissed = useMemo(() => {
     if (dismissedOverride !== null) return dismissedOverride;
@@ -204,8 +193,13 @@ export const TutorialOrchestrator = () => {
   }, [dismissedOverride, localProgress?.dismissed, remoteProgress?.dismissed]);
 
   const completedSet = useMemo(
-    () => new Set<GuidedStepId>([...persistedCompleted, ...completedFromTasks, ...sessionCompleted]),
-    [completedFromTasks, persistedCompleted, sessionCompleted]
+    () => new Set<GuidedTutorialStepId>([...persistedCompleted, ...sessionCompleted]),
+    [persistedCompleted, sessionCompleted]
+  );
+
+  const awardedSet = useMemo(
+    () => new Set<GuidedTutorialStepId>([...persistedAwarded, ...sessionAwarded]),
+    [persistedAwarded, sessionAwarded]
   );
 
   const currentStep = useMemo(
@@ -217,30 +211,39 @@ export const TutorialOrchestrator = () => {
     Boolean(user?.id) &&
     !profileLoading &&
     walkthroughCompleted &&
-    !onboardingTasksLoading &&
-    onboardingTasks.length > 0;
+    tutorialEligible;
 
-  const tutorialComplete = tutorialReady && !currentStep;
+  const tutorialMarkedComplete = Boolean(
+    remoteProgress?.completed ?? localProgress?.completed ?? false
+  );
+
+  const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
 
   const persistProgress = useCallback(
-    async (progress: GuidedTutorialProgress) => {
+    async (progress: GuidedTutorialProgressSnapshot) => {
       if (!user?.id) return;
 
+      const nowIso = new Date().toISOString();
+
       const localCurrent = readLocalProgress(user.id) ?? {};
-      const localNext: GuidedTutorialProgress = {
+      const localNext: GuidedTutorialProgressSnapshot = {
         ...localCurrent,
         ...progress,
-        lastUpdatedAt: new Date().toISOString(),
+        version: GUIDED_TUTORIAL_VERSION,
+        eligible: true,
+        lastUpdatedAt: nowIso,
       };
       safeLocalStorage.setItem(getLocalProgressKey(user.id), JSON.stringify(localNext));
 
       const baseData = (profile?.onboarding_data as Record<string, unknown> | null) ?? {};
       const currentGuided =
-        (baseData.guided_tutorial as Record<string, unknown> | null) ?? {};
-      const remoteNext = {
+        (readRemoteProgress(baseData) as GuidedTutorialProgressSnapshot | null) ?? {};
+      const remoteNext: GuidedTutorialProgressSnapshot = {
         ...currentGuided,
         ...progress,
-        lastUpdatedAt: new Date().toISOString(),
+        version: GUIDED_TUTORIAL_VERSION,
+        eligible: true,
+        lastUpdatedAt: nowIso,
       };
 
       const { error } = await supabase
@@ -261,64 +264,58 @@ export const TutorialOrchestrator = () => {
   );
 
   const markStepComplete = useCallback(
-    (stepId: GuidedStepId) => {
+    (stepId: GuidedTutorialStepId) => {
       if (!tutorialReady || completedSet.has(stepId)) return;
+      if (stepPersistThrottleRef.current.has(stepId)) return;
 
-      setSessionCompleted((prev) => {
-        if (prev.includes(stepId)) return prev;
-        return [...prev, stepId];
-      });
+      stepPersistThrottleRef.current.add(stepId);
+      window.setTimeout(() => {
+        stepPersistThrottleRef.current.delete(stepId);
+      }, 1000);
 
-      const nextCompletedSet = new Set<GuidedStepId>([...completedSet, stepId]);
+      const nextCompletedSet = new Set<GuidedTutorialStepId>([...completedSet, stepId]);
       const nextCompleted = Array.from(nextCompletedSet);
       const complete = GUIDED_STEPS.every((step) => nextCompletedSet.has(step.id));
 
-      const onboardingTask = onboardingTaskByStep.get(stepId);
-      if (user?.id && onboardingTask && !onboardingTask.completed) {
-        void (async () => {
-          const { data, error } = await supabase
-            .from("daily_tasks")
-            .update({ completed: true, completed_at: new Date().toISOString() })
-            .eq("id", onboardingTask.id)
-            .eq("user_id", user.id)
-            .eq("source", "onboarding")
-            .eq("completed", false)
-            .select("id")
-            .maybeSingle();
+      setSessionCompleted((prev) => (prev.includes(stepId) ? prev : [...prev, stepId]));
 
-          if (error || !data) return;
+      const nextAwardedSet = new Set<GuidedTutorialStepId>(awardedSet);
+      if (!nextAwardedSet.has(stepId)) {
+        nextAwardedSet.add(stepId);
+        setSessionAwarded((prev) => (prev.includes(stepId) ? prev : [...prev, stepId]));
 
-          await awardCustomXP(onboardingTask.xpReward, "task_complete", undefined, {
-            task_id: onboardingTask.id,
-            source: "onboarding_auto",
-          });
-          queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
-          queryClient.invalidateQueries({ queryKey: ["guided-tutorial-tasks", user.id] });
-        })();
+        void awardCustomXP(STEP_XP_REWARDS[stepId], "guided_tutorial_step_complete", undefined, {
+          guided_step: stepId,
+          source: "guided_tutorial",
+        });
       }
 
       setDismissedOverride(false);
       void persistProgress({
         completedSteps: nextCompleted,
+        xpAwardedSteps: Array.from(nextAwardedSet),
         dismissed: false,
         completed: complete,
         completedAt: complete ? new Date().toISOString() : undefined,
       });
     },
-    [awardCustomXP, completedSet, onboardingTaskByStep, persistProgress, queryClient, tutorialReady, user?.id]
+    [awardCustomXP, awardedSet, completedSet, persistProgress, tutorialReady]
   );
 
   useEffect(() => {
     if (!tutorialComplete || completionPersistRef.current) return;
+
     completionPersistRef.current = true;
     setDismissedOverride(false);
+
     void persistProgress({
       completedSteps: GUIDED_STEPS.map((step) => step.id),
+      xpAwardedSteps: Array.from(awardedSet),
       dismissed: false,
       completed: true,
       completedAt: new Date().toISOString(),
     });
-  }, [persistProgress, tutorialComplete]);
+  }, [awardedSet, persistProgress, tutorialComplete]);
 
   useEffect(() => {
     if (!currentStep) return;
@@ -345,8 +342,9 @@ export const TutorialOrchestrator = () => {
       }
 
       if (currentStep.id === "create_quest") {
-        const detail = (event as CustomEvent<{ taskDate?: string | null; scheduledTime?: string | null }>).detail;
-        // Only count as "Create Quest" when a scheduled quest is created (not Inbox).
+        const detail = (
+          event as CustomEvent<{ taskDate?: string | null; scheduledTime?: string | null }>
+        ).detail;
         if (!detail?.taskDate || !detail?.scheduledTime) {
           return;
         }
@@ -432,13 +430,14 @@ export const TutorialOrchestrator = () => {
 
   const currentIndex = GUIDED_STEPS.findIndex((step) => step.id === currentStep.id);
   const progressText = `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
-  const needsFabAccess =
-    location.pathname === "/journeys" &&
-    currentStep.id === "create_quest";
+  const needsFabAccess = location.pathname === "/journeys" && currentStep.id === "create_quest";
 
   if (effectiveDismissed) {
     return (
-      <div className="fixed right-4 z-[70]" style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }}>
+      <div
+        className="fixed right-4 z-[70]"
+        style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         <Button
           size="sm"
           variant="secondary"
@@ -468,11 +467,17 @@ export const TutorialOrchestrator = () => {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-primary/90 font-semibold">{progressText}</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-primary/90 font-semibold">
+              {progressText}
+            </p>
             <h3 className="mt-1 text-sm font-semibold text-foreground">{currentStep.title}</h3>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{currentStep.description}</p>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              {currentStep.description}
+            </p>
             <div className="mt-2 rounded-lg border border-border/60 bg-background/35 px-2.5 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">Do this now</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+                Do this now
+              </p>
               <ol className="mt-1.5 space-y-1">
                 {currentStep.checklist.map((item, index) => (
                   <li key={item} className="text-[11px] text-foreground/90 leading-relaxed">
@@ -482,7 +487,9 @@ export const TutorialOrchestrator = () => {
                 ))}
               </ol>
             </div>
-            <p className="mt-2 text-[11px] text-primary/90 leading-relaxed">{currentStep.successHint}</p>
+            <p className="mt-2 text-[11px] text-primary/90 leading-relaxed">
+              {currentStep.successHint}
+            </p>
           </div>
           <button
             className={cn(

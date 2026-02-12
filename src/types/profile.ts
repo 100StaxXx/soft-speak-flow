@@ -2,6 +2,19 @@
  * Type definitions for profile onboarding data
  */
 
+export type GuidedTutorialStepId = "create_quest" | "meet_companion" | "morning_checkin";
+
+export interface GuidedTutorialProgress {
+  version: number;
+  eligible: boolean;
+  completedSteps: GuidedTutorialStepId[];
+  xpAwardedSteps: GuidedTutorialStepId[];
+  dismissed: boolean;
+  completed: boolean;
+  completedAt?: string;
+  lastUpdatedAt?: string;
+}
+
 export interface OnboardingData {
   userName?: string;
   mentorId?: string;
@@ -9,6 +22,7 @@ export interface OnboardingData {
   mentorEnergyPreference?: string;
   walkthrough_completed?: boolean;
   quests_tutorial_seen?: boolean;
+  guided_tutorial?: GuidedTutorialProgress;
   birthdate?: string;
   zodiacSign?: string;
   explanation?: {

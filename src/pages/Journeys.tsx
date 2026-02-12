@@ -12,7 +12,6 @@ import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { QuestHubTutorial } from "@/components/QuestHubTutorial";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -23,14 +22,13 @@ import { EditRitualSheet, RitualData } from "@/components/EditRitualSheet";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
-import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useRecurringTaskSpawner } from "@/hooks/useRecurringTaskSpawner";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 
-import { useOnboardingSchedule } from "@/hooks/useOnboardingSchedule";
+import { useOnboardingTaskCleanup } from "@/hooks/useOnboardingTaskCleanup";
 import { useEpics } from "@/hooks/useEpics";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
@@ -66,8 +64,6 @@ const Journeys = () => {
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
-  
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("journeys");
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -183,12 +179,12 @@ const Journeys = () => {
     }
   }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
-  // Onboarding schedule creation for new users who completed the main walkthrough
+  // Cleanup legacy onboarding pseudo-quests for users who completed walkthrough
   // Wait for profile to load before evaluating walkthrough status
   const hasCompletedWalkthrough = !profileLoading && 
     (profile?.onboarding_data as Record<string, unknown>)?.walkthrough_completed === true;
-  
-  useOnboardingSchedule(user?.id, hasCompletedWalkthrough, profileLoading);
+
+  useOnboardingTaskCleanup(user?.id, hasCompletedWalkthrough, profileLoading);
   
   const handleEditQuest = useCallback(async (task: {
     id: string;
@@ -628,11 +624,6 @@ const Journeys = () => {
           tip="Add quests by tapping the + button in the corner!"
         />
 
-        <QuestHubTutorial 
-          open={showTutorial} 
-          onClose={dismissTutorial}
-        />
-        
         {/* Streak Freeze Prompt */}
         <StreakFreezePromptModal
           open={needsStreakDecision}
