@@ -9,12 +9,14 @@ CREATE TABLE IF NOT EXISTS public.evolution_thresholds (
 ALTER TABLE public.evolution_thresholds ENABLE ROW LEVEL SECURITY;
 
 -- Allow anyone to read thresholds (they're public game data)
+DROP POLICY IF EXISTS "Anyone can view evolution thresholds" ON public.evolution_thresholds;
 CREATE POLICY "Anyone can view evolution thresholds"
   ON public.evolution_thresholds
   FOR SELECT
   USING (true);
 
 -- Only admins can modify thresholds
+DROP POLICY IF EXISTS "Admins can manage evolution thresholds" ON public.evolution_thresholds;
 CREATE POLICY "Admins can manage evolution thresholds"
   ON public.evolution_thresholds
   FOR ALL
