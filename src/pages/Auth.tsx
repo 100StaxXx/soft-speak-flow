@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from '@capacitor/core';
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -11,13 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { ChevronDown } from "lucide-react";
 import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
-import { useAuth } from "@/hooks/useAuth";
 import { signinBackground } from "@/assets/backgrounds";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 
 const authSchema = z.object({
   email: z.string()
@@ -55,17 +53,8 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { session: authSession } = useAuth();
   
   const backgroundImage = signinBackground;
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end start"]
-  });
-  
-  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
     const startTime = Date.now();
@@ -709,30 +698,13 @@ const Auth = () => {
     }
   };
 
-  const scrollToForm = () => {
-    document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
-    <div 
-      ref={containerRef}
-      className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide relative"
-    >
-      {/* Parallax Background */}
-      <motion.div 
-        className="fixed inset-0 -z-10"
-        style={{
-          backgroundImage: `url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          y: backgroundY,
-          scale: 1.1,
-        }}
-      />
+    <div className="min-h-screen relative">
+      <StaticBackgroundImage background={backgroundImage} />
       {/* Auth Form Section with iOS safe areas */}
       <section
         id="auth-form"
-        className="snap-start min-h-screen relative flex items-center justify-center pt-safe-top pb-safe-bottom"
+        className="min-h-screen relative flex items-center justify-center pt-safe-top pb-safe-bottom"
       >
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />

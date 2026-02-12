@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
 import { motion, useReducedMotion } from "framer-motion";
 import { PageLoader } from "@/components/PageLoader";
+import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 import { welcomeBackground } from "@/assets/backgrounds";
 
 const Welcome = () => {
@@ -34,15 +35,7 @@ const Welcome = () => {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Simple static background - no parallax, no transforms */}
-      <div
-        className="fixed inset-0 -z-10"
-        style={{
-          backgroundImage: `url(${welcomeBackground})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center center',
-        }}
-      />
+      <StaticBackgroundImage background={welcomeBackground} />
       
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background/50" />
