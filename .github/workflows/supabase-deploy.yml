@@ -59,7 +59,7 @@ jobs:
       - name: Repair stale migration versions
         run: |
           set -euo pipefail
-          for version in 20251125 20251126; do
+          for version in 20251123 20251125 20251126 20251127; do
             supabase migration repair --linked --password "$SUPABASE_DB_PASSWORD" --status reverted "$version" --yes || true
           done
 
