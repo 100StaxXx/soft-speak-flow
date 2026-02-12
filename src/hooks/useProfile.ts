@@ -50,7 +50,7 @@ interface Profile {
 export const useProfile = () => {
   const { user } = useAuth();
 
-  const { data: profile, isLoading: loading } = useQuery({
+  const { data: profile, isLoading: loading, error, refetch } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -97,5 +97,5 @@ export const useProfile = () => {
     refetchOnWindowFocus: false, // Prevent unnecessary refetches on tab switch
   });
 
-  return { profile: profile ?? null, loading };
+  return { profile: profile ?? null, loading, error, refetch };
 };
