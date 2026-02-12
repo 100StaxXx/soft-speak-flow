@@ -1,0 +1,68 @@
+name: Supabase Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - "scripts/check-function-manifest.sh"
+      - "scripts/generate-function-manifest.sh"
+      - "supabase/function-manifest.json"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify function manifest
+        run: ./scripts/check-function-manifest.sh
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate required Supabase secrets
+        run: |
+          set -euo pipefail
+          supabase secrets list --project-ref "$PROJECT_REF" > /tmp/supabase-secrets.txt
+          required=(
+            SUPABASE_URL
+            SUPABASE_ANON_KEY
+            SUPABASE_SERVICE_ROLE_KEY
+            OPENAI_API_KEY
+          )
+
+          missing=0
+          for key in "${required[@]}"; do
+            if ! grep -q "${key}" /tmp/supabase-secrets.txt; then
+              echo "Missing secret in Supabase project: ${key}" >&2
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Push database migrations
+        run: supabase db push --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Deploy allow-listed Edge Functions
+        run: |
+          set -euo pipefail
+          while IFS= read -r fn; do
+            if [ -z "$fn" ]; then
+              continue
+            fi
+            echo "Deploying function: $fn"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF"
+          done < <(jq -r '.allowList[]' supabase/function-manifest.json)

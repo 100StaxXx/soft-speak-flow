@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -47,8 +50,8 @@ serve(async (req) => {
       })
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
-    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openAIApiKey) throw new Error('OPENAI_API_KEY not configured')
 
     let nudgesGenerated = 0
     let concernNudgesGenerated = 0
@@ -128,10 +131,10 @@ ${contextPrompt}
 
 IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt tactics. Be genuine and caring.`;
 
-                const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Bearer ${lovableApiKey}`,
+                    'Authorization': `Bearer ${openAIApiKey}`,
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
@@ -196,10 +199,10 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
 
 The user hasn't completed their morning check-in yet (it's now mid-morning). Generate a brief, friendly nudge (1 sentence max) to encourage them to check in. Stay true to your personality.`
 
-              const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${lovableApiKey}`,
+                  'Authorization': `Bearer ${openAIApiKey}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
@@ -258,10 +261,10 @@ The user hasn't completed their morning check-in yet (it's now mid-morning). Gen
 
 The user has active habits but hasn't completed any today (it's evening now). Generate a brief nudge (1 sentence max) to encourage them before the day ends. Stay true to your personality.`
 
-                const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Bearer ${lovableApiKey}`,
+                    'Authorization': `Bearer ${openAIApiKey}`,
                     'Content-Type': 'application/json',
                   },
                 body: JSON.stringify({
@@ -317,10 +320,10 @@ The user has active habits but hasn't completed any today (it's evening now). Ge
 
 The user has been quiet today. Generate a brief, unexpected check-in message (1 sentence max) to let them know you're thinking of them. Make it feel like a genuine surprise, not a scheduled reminder. Stay true to your personality.`
 
-              const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${lovableApiKey}`,
+                  'Authorization': `Bearer ${openAIApiKey}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({

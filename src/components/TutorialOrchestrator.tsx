@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { safeLocalStorage } from "@/utils/storage";
 import { cn } from "@/lib/utils";
 
-type GuidedStepId = "create_quest" | "complete_quest" | "meet_companion" | "morning_checkin";
+type GuidedStepId = "create_quest" | "meet_companion" | "morning_checkin";
 
 interface GuidedStep {
   id: GuidedStepId;
@@ -58,23 +58,6 @@ const GUIDED_STEPS: GuidedStep[] = [
     navSelector: '[data-tour="quests-tab"]',
     inRouteSelector: '[data-tour="add-quest-fab"]',
     completion: { type: "event", eventName: "task-added", requireRoute: true },
-  },
-  {
-    id: "complete_quest",
-    taskText: "Complete Your First Quest ✅",
-    title: "Complete your first quest",
-    description: "Finish one quest to begin your XP loop.",
-    checklist: [
-      "Find the quest you just created.",
-      "Tap the quest circle once.",
-      "Wait for completion and XP feedback.",
-    ],
-    successHint: "This step auto-completes after a real quest completion.",
-    actionLabel: "Go to Quests",
-    route: "/journeys",
-    navSelector: '[data-tour="quests-tab"]',
-    inRouteSelector: '[data-tour="quests-list"]',
-    completion: { type: "event", eventName: "quest-completed", requireRoute: true },
   },
   {
     id: "meet_companion",
@@ -451,7 +434,7 @@ export const TutorialOrchestrator = () => {
   const progressText = `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
   const needsFabAccess =
     location.pathname === "/journeys" &&
-    (currentStep.id === "create_quest" || currentStep.id === "complete_quest");
+    currentStep.id === "create_quest";
 
   if (effectiveDismissed) {
     return (

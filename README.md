@@ -1,76 +1,81 @@
-# Welcome to your Lovable project
+# Cosmiq App
 
-## Project info
+## Stack
 
-**URL**: https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c
+- Vite + React + TypeScript
+- Tailwind + shadcn/ui
+- Supabase (Auth, Postgres, Edge Functions, Storage)
+- Capacitor (iOS native shell)
 
-## How can I edit this code?
+## Local development
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+1. Install dependencies:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+2. Configure environment values:
 
-# Step 3: Install the necessary dependencies.
-npm i
+```sh
+cp .env.example .env
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+3. Set at minimum:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
+- `VITE_NATIVE_REDIRECT_BASE`
+
+4. Run the web app:
+
+```sh
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Backend ownership model
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This repository is configured for self-managed hosted Supabase outside the previous managed platform.
 
-**Use GitHub Codespaces**
+- Supabase project linkage: `supabase/config.toml`
+- Function allow-list: `supabase/function-manifest.json`
+- Manifest generation/check:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+./scripts/generate-function-manifest.sh
+./scripts/check-function-manifest.sh
+```
 
-## What technologies are used for this project?
+## Deployment automation
 
-This project is built with:
+GitHub Actions workflows:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- `.github/workflows/supabase-deploy.yml`
+  - checks function manifest
+  - validates required Supabase secrets
+  - pushes DB migrations
+  - deploys allow-listed Edge Functions
+- `.github/workflows/scheduled-functions.yml`
+  - replaces DB cron jobs with GitHub-owned schedules
+- `.github/workflows/backend-smoke.yml`
+  - post-deploy backend smoke checks
+- `docs/backend-cutover-checklist.md`
+  - staging/production cutover and decommission sequence
 
-## How can I deploy this project?
+Required GitHub secrets:
 
-Simply open [Lovable](https://lovable.dev/projects/1b75b247-809a-454c-82ea-ceca9d5f620c) and click on Share -> Publish.
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_DB_PASSWORD`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-## Can I connect a custom domain to my Lovable project?
+Required Supabase project secrets (minimum):
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
 
 ## iOS build troubleshooting
 
@@ -101,4 +106,4 @@ If you still hit `[CP] Copy XCFrameworks` failures:
    ```
 3. In Xcode, delete Derived Data for the app target, then rebuild.
 
-After a fresh `pod install`, the hook will repopulate missing `ios-arm64` slices automatically, so the build completes even when upstream vendors omit that directory.
+After a fresh `pod install`, the hook repopulates missing `ios-arm64` slices automatically, so the build completes even when upstream vendors omit that directory.

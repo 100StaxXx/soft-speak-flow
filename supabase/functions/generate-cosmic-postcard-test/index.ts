@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -91,10 +94,10 @@ serve(async (req) => {
 
     console.log(`[Cosmic Postcard Test] Starting for milestone ${milestonePercent}%`);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("Missing LOVABLE_API_KEY environment variable");
+    if (!OPENAI_API_KEY) {
+      throw new Error("Missing OPENAI_API_KEY environment variable");
     }
 
     const spiritAnimal = companionData?.spirit_animal || 'wolf';
@@ -140,10 +143,10 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
 
     console.log('[Cosmic Postcard Test] Calling Gemini image edit API...');
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

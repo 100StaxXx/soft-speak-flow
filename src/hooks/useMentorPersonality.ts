@@ -57,11 +57,12 @@ export const useMentorPersonality = (): MentorPersonality | null => {
     queryKey: ['mentor-personality', resolvedMentorId],
     queryFn: async () => {
       if (!resolvedMentorId) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('mentors')
         .select('name, slug, tone_description, style, avatar_url, primary_color')
         .eq('id', resolvedMentorId)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!resolvedMentorId,

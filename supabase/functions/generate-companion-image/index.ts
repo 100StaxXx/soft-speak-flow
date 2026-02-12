@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
@@ -464,9 +467,9 @@ serve(async (req) => {
       overallDescription: string;
     } | null = null;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY not configured");
       return new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }), 
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
     }
@@ -522,9 +525,9 @@ serve(async (req) => {
             }
           };
 
-          const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const analysisResponse = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
-            headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               model: "google/gemini-2.5-flash",
               messages: [{
@@ -750,9 +753,9 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
 
       let aiResponse;
       try {
-        aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "google/gemini-2.5-flash-image-preview",
             messages: [{ role: "user", content: messageContent }],
@@ -829,9 +832,9 @@ ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` 
 
 Score each aspect from 0-100 and list any issues.`;
 
-        const qualityResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const qualityResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { "Authorization": `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             model: "google/gemini-2.5-flash",
             messages: [{

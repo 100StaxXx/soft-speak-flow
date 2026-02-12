@@ -71,11 +71,30 @@ const MentorSelection = () => {
 
     try {
       setSelecting(true);
+
+      const { data: existingProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("onboarding_data")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      const onboardingData =
+        existingProfile?.onboarding_data &&
+        typeof existingProfile.onboarding_data === "object" &&
+        !Array.isArray(existingProfile.onboarding_data)
+          ? (existingProfile.onboarding_data as Record<string, unknown>)
+          : {};
       
       const { error } = await supabase
         .from("profiles")
         .update({ 
           selected_mentor_id: mentorId,
+          onboarding_data: {
+            ...onboardingData,
+            mentorId,
+          },
           updated_at: new Date().toISOString()
         })
         .eq("id", user.id);

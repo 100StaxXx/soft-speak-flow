@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -208,9 +211,9 @@ Deno.serve(async (req) => {
     
     if (includeImage) {
       console.log('Generating AI image for quote...');
-      const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+      const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
       
-      if (lovableApiKey) {
+      if (openAIApiKey) {
       try {
         const bgTheme = type === 'category' ? value : 'motivation';
         const emotion = type === 'trigger' ? value : '';
@@ -240,10 +243,10 @@ ${emotion ? `- Emotional tone: ${emotion}` : ''}
 
 REMEMBER: Spell the quote text EXACTLY as provided above. Every word must match PERFECTLY.`;
         
-        const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const imageResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${lovableApiKey}`,
+            'Authorization': `Bearer ${openAIApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
