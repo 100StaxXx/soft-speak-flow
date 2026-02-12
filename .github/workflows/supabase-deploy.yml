@@ -53,6 +53,9 @@ jobs:
             exit 1
           fi
 
+      - name: Link Supabase project
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
       - name: Push database migrations
         run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
 
