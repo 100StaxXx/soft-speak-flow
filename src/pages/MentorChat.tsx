@@ -20,11 +20,12 @@ import { getResolvedMentorId } from "@/utils/mentor";
 
 export default function MentorChat() {
   const { user } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
+  const { profile, loading: profileLoading, error: profileError, refetch: refetchProfile } = useProfile();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const [showPageInfo, setShowPageInfo] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const haptics = useHapticFeedback();
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('mentor');
   const resolvedMentorId = getResolvedMentorId(profile);
@@ -50,9 +51,18 @@ export default function MentorChat() {
   });
 
   const handleRetry = async () => {
-    await queryClient.refetchQueries({ queryKey: ['profile'] });
-    if (resolvedMentorId) {
-      await refetchMentor();
+    setIsRetrying(true);
+    try {
+      await refetchProfile();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['mentor'] }),
+        queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
+      ]);
+      if (resolvedMentorId) {
+        await refetchMentor();
+      }
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -63,6 +73,22 @@ export default function MentorChat() {
         <div className="text-center space-y-3">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-muted-foreground text-sm">Loading your motivator...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (profileError && !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <p className="text-lg font-semibold">We couldn't load your profile</p>
+          <p className="text-muted-foreground">
+            Connection may have dropped while the app was in the background. Try again.
+          </p>
+          <Button onClick={() => void handleRetry()} disabled={isRetrying || mentorFetching}>
+            {isRetrying || mentorFetching ? 'Retrying...' : 'Retry'}
+          </Button>
         </div>
       </div>
     );
@@ -93,8 +119,8 @@ export default function MentorChat() {
             Connection may have dropped while the app was in the background. Try again.
           </p>
           <div className="flex items-center justify-center gap-2">
-            <Button onClick={() => void handleRetry()} disabled={mentorFetching}>
-              {mentorFetching ? 'Retrying...' : 'Retry'}
+            <Button onClick={() => void handleRetry()} disabled={isRetrying || mentorFetching}>
+              {isRetrying || mentorFetching ? 'Retrying...' : 'Retry'}
             </Button>
             <Button variant="outline" onClick={() => navigate('/mentor-selection')}>
               Choose Mentor
@@ -114,8 +140,8 @@ export default function MentorChat() {
             We couldn't find your selected mentor right now.
           </p>
           <div className="flex items-center justify-center gap-2">
-            <Button onClick={() => void handleRetry()} disabled={mentorFetching}>
-              {mentorFetching ? 'Retrying...' : 'Retry'}
+            <Button onClick={() => void handleRetry()} disabled={isRetrying || mentorFetching}>
+              {isRetrying || mentorFetching ? 'Retrying...' : 'Retry'}
             </Button>
             <Button variant="outline" onClick={() => navigate('/mentor-selection')}>
               Choose Mentor
