@@ -15,45 +15,40 @@ GRANT ALL ON subscriptions TO service_role;
 GRANT ALL ON payment_history TO service_role;
 
 -- Add explicit policies for service role operations
-CREATE POLICY IF NOT EXISTS "Service role can insert subscriptions"
+DROP POLICY IF EXISTS "Service role can insert subscriptions" ON subscriptions;
+CREATE POLICY "Service role can insert subscriptions"
   ON subscriptions FOR INSERT
   TO service_role
-  USING (true);
+  WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "Service role can update subscriptions"
+DROP POLICY IF EXISTS "Service role can update subscriptions" ON subscriptions;
+CREATE POLICY "Service role can update subscriptions"
   ON subscriptions FOR UPDATE
   TO service_role
-  USING (true);
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "Service role can delete subscriptions"
+DROP POLICY IF EXISTS "Service role can delete subscriptions" ON subscriptions;
+CREATE POLICY "Service role can delete subscriptions"
   ON subscriptions FOR DELETE
   TO service_role
   USING (true);
 
-CREATE POLICY IF NOT EXISTS "Service role can insert payment history"
+DROP POLICY IF EXISTS "Service role can insert payment history" ON payment_history;
+CREATE POLICY "Service role can insert payment history"
   ON payment_history FOR INSERT
   TO service_role
-  USING (true);
+  WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "Service role can update payment history"
+DROP POLICY IF EXISTS "Service role can update payment history" ON payment_history;
+CREATE POLICY "Service role can update payment history"
   ON payment_history FOR UPDATE
   TO service_role
-  USING (true);
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY IF NOT EXISTS "Service role can delete payment history"
+DROP POLICY IF EXISTS "Service role can delete payment history" ON payment_history;
+CREATE POLICY "Service role can delete payment history"
   ON payment_history FOR DELETE
   TO service_role
   USING (true);
-
--- Add comments for documentation
-COMMENT ON POLICY "Users can view their own subscriptions" ON subscriptions IS 
-  'Authenticated users can only SELECT their own subscription data';
-
-COMMENT ON POLICY "Service role can manage all subscriptions" ON subscriptions IS 
-  'Service role (edge functions) has full CRUD access to all subscriptions';
-
-COMMENT ON POLICY "Users can view their own payment history" ON payment_history IS 
-  'Authenticated users can only SELECT their own payment history';
-
-COMMENT ON POLICY "Service role can manage all payment history" ON payment_history IS 
-  'Service role (edge functions) has full CRUD access to all payment history';
