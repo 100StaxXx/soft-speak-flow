@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo } from "react";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays } from "date-fns";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { 
   Flame, 
@@ -164,6 +164,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onUpdateScheduledTime,
   onTimeSlotLongPress,
 }: TodaysAgendaProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const isNativeIOS = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const capacitor = (window as Window & {
+      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
+    }).Capacitor;
+    return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
+  }, []);
+  const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion);
   const { profile } = useProfile();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
 
@@ -502,18 +511,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <div className="relative ml-1">
             {/* Tutorial quest breathing glow effect */}
             {isOnboarding && !isComplete && (
-              <motion.div
-                className="absolute inset-0 rounded-full bg-primary/30"
-                animate={{ 
-                  scale: [1, 1.5, 1],
-                  opacity: [0.6, 0, 0.6]
-                }}
-                transition={{ 
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              />
+              useLiteAnimations ? (
+                <div className="absolute inset-0 rounded-full bg-primary/20" />
+              ) : (
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-primary/30"
+                  animate={{ 
+                    scale: [1, 1.5, 1],
+                    opacity: [0.6, 0, 0.6]
+                  }}
+                  transition={{ 
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                />
+              )
             )}
             <button
               data-interactive="true"
@@ -547,37 +560,60 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               aria-checked={isComplete}
               tabIndex={0}
             >
-              <motion.div 
-                className={cn(
-                  "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                  isComplete 
-                    ? "bg-primary border-primary" 
-                    : isOnboarding
-                      ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
-                      : "border-muted-foreground/40 hover:border-primary"
-                )}
-                whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
-              >
-                {isComplete && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                  >
+              {useLiteAnimations ? (
+                <div
+                  className={cn(
+                    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                    isComplete 
+                      ? "bg-primary border-primary" 
+                      : isOnboarding
+                        ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
+                        : "border-muted-foreground/40 hover:border-primary"
+                  )}
+                >
+                  {isComplete && (
                     <Check className="w-4 h-4 text-primary-foreground" />
-                  </motion.div>
-                )}
-              </motion.div>
+                  )}
+                </div>
+              ) : (
+                <motion.div 
+                  className={cn(
+                    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                    isComplete 
+                      ? "bg-primary border-primary" 
+                      : isOnboarding
+                        ? "border-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
+                        : "border-muted-foreground/40 hover:border-primary"
+                  )}
+                  whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
+                >
+                  {isComplete && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                    >
+                      <Check className="w-4 h-4 text-primary-foreground" />
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
             </button>
             {/* Tutorial quest helper label */}
             {isOnboarding && !isComplete && (
-              <motion.span
-                className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium"
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                Tap to complete
-              </motion.span>
+              useLiteAnimations ? (
+                <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium">
+                  Tap to complete
+                </span>
+              ) : (
+                <motion.span
+                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-primary whitespace-nowrap font-medium"
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  Tap to complete
+                </motion.span>
+              )
             )}
           </div>
           
@@ -647,25 +683,39 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           <div className="pl-8 pr-2 pb-2 space-y-2">
             {/* Notes - with tutorial highlight */}
             {task.notes && (
-              <motion.div 
-                className={cn(
-                  "flex items-start gap-2 text-sm",
-                  isOnboarding && !isComplete 
-                    ? "p-2 rounded-lg bg-primary/10 border border-primary/20 text-foreground" 
-                    : "text-muted-foreground"
-                )}
-                animate={isOnboarding && !isComplete ? {
-                  boxShadow: [
-                    "0 0 0 0 rgba(129, 140, 248, 0)",
-                    "0 0 12px 2px rgba(129, 140, 248, 0.3)",
-                    "0 0 0 0 rgba(129, 140, 248, 0)"
-                  ]
-                } : {}}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <p className="text-xs">{stripMarkdown(task.notes)}</p>
-              </motion.div>
+              useLiteAnimations ? (
+                <div
+                  className={cn(
+                    "flex items-start gap-2 text-sm",
+                    isOnboarding && !isComplete
+                      ? "p-2 rounded-lg bg-primary/10 border border-primary/20 text-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs">{stripMarkdown(task.notes)}</p>
+                </div>
+              ) : (
+                <motion.div 
+                  className={cn(
+                    "flex items-start gap-2 text-sm",
+                    isOnboarding && !isComplete 
+                      ? "p-2 rounded-lg bg-primary/10 border border-primary/20 text-foreground" 
+                      : "text-muted-foreground"
+                  )}
+                  animate={isOnboarding && !isComplete ? {
+                    boxShadow: [
+                      "0 0 0 0 rgba(129, 140, 248, 0)",
+                      "0 0 12px 2px rgba(129, 140, 248, 0.3)",
+                      "0 0 0 0 rgba(129, 140, 248, 0)"
+                    ]
+                  } : {}}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <FileText className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs">{stripMarkdown(task.notes)}</p>
+                </motion.div>
+              )
             )}
             
             {/* Badges row */}
@@ -754,7 +804,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, tasks]);
+  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, tasks, useLiteAnimations]);
 
 
   return (
@@ -878,46 +928,65 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     ? timelineDrag.getRowHandlers(task.id, task.scheduled_time)
                     : {};
 
+                  const rowStyle = {
+                    WebkitUserSelect: 'none' as const,
+                    userSelect: 'none' as const,
+                    WebkitTouchCallout: 'none' as const,
+                    touchAction: (isThisDragging ? 'none' : 'pan-y') as const,
+                    pointerEvents: (isAnyDragging && !isThisDragging ? 'none' : 'auto') as const,
+                    transform: isThisDragging
+                      ? `translateY(${timelineDrag.dragOffsetY}px) scale(1.03)`
+                      : undefined,
+                    opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                    boxShadow: isThisDragging
+                      ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                      : "none",
+                    backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
+                    borderRadius: isThisDragging ? 12 : 0,
+                    transition: 'none',
+                  };
+
+                  const rowContent = (
+                    <TimelineTaskRow
+                      time={task.scheduled_time}
+                      overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
+                      showLine={index > 0}
+                      isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
+                      isDragTarget={isThisDragging}
+                    >
+                      {renderTaskItem(task)}
+                    </TimelineTaskRow>
+                  );
+
+                  if (useLiteAnimations || !isJustDropped) {
+                    return (
+                      <div
+                        key={task.id}
+                        className={cn("relative", isThisDragging && "z-50")}
+                        style={rowStyle}
+                        {...rowHandlers}
+                      >
+                        {rowContent}
+                      </div>
+                    );
+                  }
+
                   return (
                     <motion.div
                       key={task.id}
                       className={cn("relative", isThisDragging && "z-50")}
-                      animate={isJustDropped ? {
+                      animate={{
                         scale: [1, 1.02, 0.98, 1],
                         y: [0, -2, 1, 0],
-                      } : { scale: 1, y: 0 }}
-                      transition={isJustDropped ? {
+                      }}
+                      transition={{
                         duration: 0.25,
                         ease: [0.25, 0.1, 0.25, 1],
-                      } : { duration: 0 }}
-                      style={{
-                        WebkitUserSelect: 'none',
-                        userSelect: 'none',
-                        WebkitTouchCallout: 'none',
-                        touchAction: isThisDragging ? 'none' : 'pan-y',
-                        pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
-                        transform: isThisDragging
-                          ? `translateY(${timelineDrag.dragOffsetY}px) scale(1.03)`
-                          : undefined,
-                        opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
-                        boxShadow: isThisDragging
-                          ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                          : "none",
-                        backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
-                        borderRadius: isThisDragging ? 12 : 0,
-                        transition: 'none',
                       }}
+                      style={rowStyle}
                       {...rowHandlers}
                     >
-                      <TimelineTaskRow
-                        time={task.scheduled_time}
-                        overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
-                        showLine={index > 0}
-                        isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
-                        isDragTarget={isThisDragging}
-                      >
-                        {renderTaskItem(task)}
-                      </TimelineTaskRow>
+                      {rowContent}
                     </motion.div>
                   );
                 })}
@@ -1067,30 +1136,51 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       {/* Onboarding Progress Banner */}
       {hasOnboardingTasks && onboardingComplete < onboardingTotal && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-4 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Rocket className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">Getting Started</span>
-            <Badge variant="secondary" className="ml-auto text-xs">
-              {onboardingComplete}/{onboardingTotal}
-            </Badge>
+        useLiteAnimations ? (
+          <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Rocket className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Getting Started</span>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {onboardingComplete}/{onboardingTotal}
+              </Badge>
+            </div>
+            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                style={{ width: `${(onboardingComplete / onboardingTotal) * 100}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Complete all tasks to evolve your companion! ✨
+            </p>
           </div>
-          <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${(onboardingComplete / onboardingTotal) * 100}%` }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Complete all tasks to evolve your companion! ✨
-          </p>
-        </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-3 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Rocket className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Getting Started</span>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {onboardingComplete}/{onboardingTotal}
+              </Badge>
+            </div>
+            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${(onboardingComplete / onboardingTotal) * 100}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Complete all tasks to evolve your companion! ✨
+            </p>
+          </motion.div>
+        )
       )}
 
       <HourlyViewModal

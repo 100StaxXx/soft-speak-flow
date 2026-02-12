@@ -1,15 +1,12 @@
 import { useState, useCallback, memo } from "react";
 import { format } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
-import { Inbox as InboxIcon, Plus, Check, CalendarDays, Trash2, Circle, Pencil } from "lucide-react";
+import { motion } from "framer-motion";
+import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { DraggableFAB } from "@/components/DraggableFAB";
@@ -19,24 +16,22 @@ import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 
 const InboxPage = memo(function InboxPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask, scheduleTask } = useInboxTasks();
+  const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask } = useInboxTasks();
 
-  const [selectedDate] = useState(() => new Date());
   const [showAddQuest, setShowAddQuest] = useState(false);
-  const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<typeof inboxTasks[number] | null>(null);
 
-  const { addTask, updateTask, deleteTask, isUpdating, isDeleting } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
+  const { addTask, updateTask, isUpdating } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     await updateTask({ taskId, updates });
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
     setEditingTask(null);
   }, [updateTask, queryClient]);
 
@@ -44,7 +39,7 @@ const InboxPage = memo(function InboxPage() {
     if (!user?.id) return;
     const taskDate = data.sendToInbox
       ? null
-      : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
+      : (data.taskDate ?? format(new Date(), 'yyyy-MM-dd'));
 
     await addTask({
       taskText: data.text,
@@ -67,16 +62,9 @@ const InboxPage = memo(function InboxPage() {
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     }
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
     setShowAddQuest(false);
-  }, [user?.id, selectedDate, addTask, queryClient]);
-
-  const handleSchedule = useCallback((taskId: string, date: Date) => {
-    const targetDate = format(date, "yyyy-MM-dd");
-    scheduleTask({ taskId, targetDate });
-    setSchedulingTaskId(null);
-    toast.success(`Scheduled for ${format(date, "MMM d")}`);
-    haptics.light();
-  }, [scheduleTask]);
+  }, [user?.id, addTask, queryClient]);
 
   return (
     <PageTransition>
@@ -121,63 +109,56 @@ const InboxPage = memo(function InboxPage() {
             />
           ) : (
             <div className="space-y-2">
-              <AnimatePresence mode="popLayout">
-                {inboxTasks.map((task) => (
-                  <motion.div
-                    key={task.id}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    className="flex items-center gap-3 py-3 px-3 rounded-xl bg-card/60 backdrop-blur-sm border border-border/20"
+              {inboxTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-3 py-3 px-3 rounded-xl bg-card/60 backdrop-blur-sm border border-border/20"
+                >
+                  {/* Checkbox */}
+                  <button
+                    onClick={() => {
+                      toggleInboxTask({ taskId: task.id, completed: !task.completed });
+                      haptics.light();
+                    }}
+                    className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-muted-foreground/40 hover:border-primary flex items-center justify-center transition-colors"
                   >
-                    {/* Checkbox */}
+                    {task.completed && <Check className="w-4 h-4 text-primary" />}
+                  </button>
+
+                  {/* Task text */}
+                  <span className={cn(
+                    "text-sm flex-1 min-w-0",
+                    task.completed && "line-through text-muted-foreground"
+                  )}>
+                    {task.task_text}
+                  </span>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => {
-                        toggleInboxTask({ taskId: task.id, completed: !task.completed });
+                        setEditingTask(task);
                         haptics.light();
                       }}
-                      className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-muted-foreground/40 hover:border-primary flex items-center justify-center transition-colors"
+                      className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+                      aria-label="Edit quest"
                     >
-                      {task.completed && <Check className="w-4 h-4 text-primary" />}
+                      <Pencil className="w-4 h-4" />
                     </button>
 
-                    {/* Task text */}
-                    <span className={cn(
-                      "text-sm flex-1 min-w-0",
-                      task.completed && "line-through text-muted-foreground"
-                    )}>
-                      {task.task_text}
-                    </span>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-
-                      <button
-                        onClick={() => {
-                          setEditingTask(task);
-                          haptics.light();
-                        }}
-                        className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
-                        aria-label="Edit quest"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          deleteInboxTask(task.id);
-                          haptics.light();
-                        }}
-                        className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
-                        aria-label="Delete quest"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                    <button
+                      onClick={() => {
+                        deleteInboxTask(task.id);
+                        haptics.light();
+                      }}
+                      className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
+                      aria-label="Delete quest"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
