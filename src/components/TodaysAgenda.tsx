@@ -429,6 +429,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isOnboarding = isOnboardingTask(task.task_text);
+    const isOnboardingAutoStep = isOnboarding;
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
     const isPressed = dragProps?.isPressed ?? false;
@@ -438,6 +439,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (isOnboardingAutoStep) {
+        return;
+      }
       // Don't allow clicks while dragging or during long press
       if (isDragging || isActivated || isPressed) {
         e.preventDefault();
@@ -536,15 +540,26 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 }
                 touchStartRef.current = null;
               }}
-              className="relative flex items-center justify-center w-11 h-11 touch-manipulation active:scale-95 transition-transform select-none"
+              className={cn(
+                "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none disabled:opacity-100",
+                !isOnboardingAutoStep && "active:scale-95",
+                isOnboardingAutoStep && "cursor-default"
+              )}
               style={{
                 WebkitTapHighlightColor: 'transparent',
                 touchAction: 'manipulation',
               }}
-              aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+              aria-label={
+                isOnboardingAutoStep
+                  ? "Tutorial step auto-completes when finished"
+                  : isComplete
+                    ? "Mark task as incomplete"
+                    : "Mark task as complete"
+              }
               role="checkbox"
               aria-checked={isComplete}
-              tabIndex={0}
+              tabIndex={isOnboardingAutoStep ? -1 : 0}
+              disabled={isOnboardingAutoStep}
             >
               {useLiteAnimations ? (
                 <div
@@ -588,7 +603,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {isOnboarding && !isComplete && (
               useLiteAnimations ? (
                 <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-medium leading-tight text-primary/95 text-center">
-                  Tap circle to finish
+                  Auto-completes
                 </span>
               ) : (
                 <motion.span
@@ -596,7 +611,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   animate={{ opacity: [0.6, 1, 0.6] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 >
-                  Tap circle to finish
+                  Auto-completes
                 </motion.span>
               )
             )}
@@ -626,7 +641,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           
           <div className="flex items-center gap-2">
             {/* Edit button - shows on hover for incomplete quests */}
-            {onEditQuest && !isComplete && !isDragging && !isActivated && (
+            {onEditQuest && !isComplete && !isDragging && !isActivated && !isOnboardingAutoStep && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -773,7 +788,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
 
     // Wrap with SwipeableTaskItem for swipe gestures (only for non-completed, non-dragging tasks)
-    if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated) {
+    if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated && !isOnboardingAutoStep) {
       // Don't allow "move to next day" for rituals - they're recurring and already exist every day
       const isRitual = !!task.habit_source_id;
       
@@ -794,7 +809,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   return (
     <div className="relative">
-      <div className="relative px-2 py-2 overflow-visible">
+      <div className="relative px-2 py-2 overflow-visible" data-tour="quests-list">
         {/* Compact Header: Date + Progress Ring + XP */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
