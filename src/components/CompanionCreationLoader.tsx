@@ -13,7 +13,7 @@ const CREATION_MESSAGES = [
 ];
 
 const CREATION_TIPS = [
-  "Each companion is uniquely generated just for you",
+  "Each companion is uniquely crafted for you",
   "Your choices shape their appearance and personality",
   "They'll grow and evolve as you complete quests",
 ];
@@ -26,6 +26,7 @@ export const CompanionCreationLoader = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [progress, setProgress] = useState(5);
+  const takingLongerThanExpected = progress >= 90;
 
   // Cycle messages every 4 seconds
   useEffect(() => {
@@ -43,7 +44,7 @@ export const CompanionCreationLoader = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Simulate progress over ~40 seconds (visual comfort only)
+  // Simulate progress over time (visual comfort only)
   useEffect(() => {
     const interval = setInterval(() => {
       setProgress((prev) => {
@@ -146,8 +147,13 @@ export const CompanionCreationLoader = () => {
             Your companion is being brought to life.
           </p>
           <p className="text-sm text-muted-foreground">
-            This takes 20-40 seconds.
+            Usually ready within 30-90 seconds.
           </p>
+          {takingLongerThanExpected && (
+            <p className="text-sm text-muted-foreground">
+              Taking longer than expected. We&apos;re still working on it.
+            </p>
+          )}
         </div>
 
         <motion.div

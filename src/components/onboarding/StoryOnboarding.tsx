@@ -21,6 +21,13 @@ import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
 import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";
+import { TimeoutError, pollWithDeadline, withTimeout } from "@/utils/asyncTimeout";
+import { logger } from "@/utils/logger";
+import {
+  filterMentorsByEnergyPreference,
+  getDesiredIntensityFromGuidanceTone,
+  getEnergyPreferenceFromAnswers,
+} from "@/utils/onboardingMentorMatching";
 
 // Removed duplicate outer function - using inner component method instead
 
@@ -50,15 +57,8 @@ interface Mentor {
   target_user: string;
   themes?: string[];
   intensity_level?: string;
+  gender_energy?: string | null;
 }
-
-// Map Q2 (guidance_tone) answers to intensity levels
-const GUIDANCE_TONE_TO_INTENSITY: Record<string, "high" | "medium" | "gentle"> = {
-  "🌱 Gentle & compassionate": "gentle",
-  "🤝 Encouraging & supportive": "medium",
-  "🧘 Calm & grounded": "gentle",
-  "⚔️ Direct & demanding": "high",
-};
 
 const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
   const normalized = value?.toLowerCase();
@@ -67,6 +67,17 @@ const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "ge
   if (["high", "strong", "intense"].includes(normalized)) return "high";
   return "medium";
 };
+
+export const mapGuidanceToneToIntensity = (answer: string): "high" | "medium" | "gentle" => {
+  return getDesiredIntensityFromGuidanceTone(answer.trim());
+};
+
+const COMPANION_CREATION_TIMEOUT_MS = 90_000;
+const COMPANION_RECOVERY_DEADLINE_MS = 30_000;
+const COMPANION_RECOVERY_INTERVAL_MS = 3_000;
+const DISPLAY_NAME_INITIAL_DELAY_MS = 2_000;
+const DISPLAY_NAME_DEADLINE_MS = 20_000;
+const DISPLAY_NAME_INTERVAL_MS = 1_000;
 
 
 export const StoryOnboarding = () => {
@@ -92,40 +103,34 @@ export const StoryOnboarding = () => {
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
 
-  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
   const waitForCompanionDisplayName = async (companionId: string) => {
-    const maxAttempts = 45;  // Extended from 30 for AI retry scenarios
-    const delayMs = 1000;
-    const initialDelay = 2000;  // Give card generation a head start
-    
-    // Initial delay to let card generation begin
-    await wait(initialDelay);
+    await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const { data, error } = await supabase
-        .from("companion_evolution_cards")
-        .select("creature_name")
-        .eq("companion_id", companionId)
-        .order("evolution_stage", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+    return pollWithDeadline<string>({
+      deadlineMs: DISPLAY_NAME_DEADLINE_MS,
+      intervalMs: DISPLAY_NAME_INTERVAL_MS,
+      task: async () => {
+        const { data, error } = await supabase
+          .from("companion_evolution_cards")
+          .select("creature_name")
+          .eq("companion_id", companionId)
+          .order("evolution_stage", { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Error fetching companion name:", error);
-        // Don't return null on error, keep trying
-      }
+        if (error) {
+          throw error;
+        }
 
-      if (data?.creature_name) {
-        return data.creature_name as string;
-      }
-
-      if (attempt < maxAttempts) {
-        await wait(delayMs);
-      }
-    }
-
-    return null;
+        return data?.creature_name ?? null;
+      },
+      onPollError: (error) => {
+        logger.warn("Companion display name poll failed", {
+          companionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      },
+    });
   };
 
   // Load mentors on mount
@@ -152,6 +157,7 @@ export const StoryOnboarding = () => {
           target_user: m.target_user || "",
           themes: m.themes ?? undefined,
           intensity_level: m.intensity_level ?? undefined,
+          gender_energy: m.gender_energy ?? null,
         }));
         setMentors(mappedMentors);
       }
@@ -164,20 +170,32 @@ export const StoryOnboarding = () => {
     
     // Save name to profile
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
         .maybeSingle();
 
+      if (profileError) {
+        console.error("Failed to load profile before saving onboarding name:", profileError);
+        toast.error("We couldn't save your name right now. Please try again.");
+        return;
+      }
+
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
 
-      await supabase.from("profiles").update({
+      const { error: updateError } = await supabase.from("profiles").update({
         onboarding_data: {
           ...existingData,
           userName: name,
         },
       }).eq("id", user.id);
+
+      if (updateError) {
+        console.error("Failed to save onboarding name:", updateError);
+        toast.error("We couldn't save your name right now. Please try again.");
+        return;
+      }
     }
     
     setStage("destiny");
@@ -223,9 +241,18 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
     // Extract desired intensity from Q2 (guidance_tone)
     const toneAnswer = questionAnswers.find(a => a.questionId === "guidance_tone");
-    const desiredIntensity: "high" | "medium" | "gentle" = toneAnswer
-      ? GUIDANCE_TONE_TO_INTENSITY[toneAnswer.answer] ?? "medium"
-      : "medium";
+    const desiredIntensity = mapGuidanceToneToIntensity(toneAnswer?.answer ?? "");
+
+    // Apply hard energy preference filtering with fallback to avoid blocking onboarding
+    const energyPreference = getEnergyPreferenceFromAnswers(questionAnswers);
+    const { candidates: mentorsForScoring, usedFallback: usedEnergyFallback } =
+      filterMentorsByEnergyPreference(mentors, energyPreference);
+
+    if (usedEnergyFallback && energyPreference !== "no_preference") {
+      console.warn(
+        `[Onboarding] No mentors matched energy preference "${energyPreference}". Falling back to all mentors.`,
+      );
+    }
 
     // Calculate scores for each mentor
     interface MentorScore {
@@ -234,7 +261,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       exactMatches: number;
       intensityMatch: boolean;
     }
-    const mentorScores: MentorScore[] = mentors.map(mentor => {
+    const mentorScores: MentorScore[] = mentorsForScoring.map(mentor => {
       const mentorCanonicalTags = (() => {
         const normalized = canonicalizeTags([...(mentor.tags || []), ...(mentor.themes || [])]);
         if (normalized.length > 0) {
@@ -258,20 +285,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       const intensityMatch = mentorIntensity === desiredIntensity;
       if (intensityMatch) {
         score += 0.8;
-      }
-
-      // Apply gender preference boost
-      const genderAnswer = questionAnswers.find(a => a.questionId === "mentor_energy");
-      const prefersFeminine = genderAnswer?.tags.includes("feminine_preference");
-      const prefersMasculine = genderAnswer?.tags.includes("masculine_preference");
-      
-      const isFeminine = mentorCanonicalTags.includes("supportive") || (mentor.tags || []).includes("feminine");
-      const isMasculine = (mentor.tags || []).includes("masculine");
-      
-      if (prefersFeminine && isFeminine) {
-        score += 1.5;
-      } else if (prefersMasculine && isMasculine) {
-        score += 1.5;
       }
 
       return {
@@ -333,9 +346,9 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     // Fallback: if no match or score is 0, default to a reasonable mentor
     if (!bestMatch || topScore === 0) {
       // Try to find Atlas or Eli as fallbacks, or just pick the first mentor
-      bestMatch = mentors.find(m => m.slug === "atlas")
-        || mentors.find(m => m.slug === "eli")
-        || mentors[0];
+      bestMatch = mentorsForScoring.find(m => m.slug === "atlas")
+        || mentorsForScoring.find(m => m.slug === "eli")
+        || mentorsForScoring[0];
     }
 
     if (bestMatch) {
@@ -385,25 +398,29 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleMentorConfirm = async (mentor: Mentor, explanationOverride?: MentorExplanation | null) => {
     if (user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
         .maybeSingle();
+
+      if (profileError) {
+        console.error("Failed to load profile before mentor confirmation:", profileError);
+        toast.error("We couldn't save your mentor selection right now. Please try again.");
+        return;
+      }
       
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
       const explanationToSave = explanationOverride ?? mentorExplanation;
+      const energyPreference = getEnergyPreferenceFromAnswers(answers);
       
-      // Get gender preference from answers
-      const genderPref = answers.find(a => a.questionId === "mentor_energy")?.answer;
-      
-      await supabase.from("profiles").update({
+      const { error: updateError } = await supabase.from("profiles").update({
         selected_mentor_id: mentor.id,
         onboarding_data: {
           ...existingData,
           mentorId: mentor.id,
           mentorName: mentor.name,
-          mentorEnergyPreference: genderPref || "no_preference",
+          mentorEnergyPreference: energyPreference,
           explanation: explanationToSave ? {
             title: explanationToSave.title,
             subtitle: explanationToSave.subtitle,
@@ -412,6 +429,12 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
           } : null,
         },
       }).eq("id", user.id);
+
+      if (updateError) {
+        console.error("Failed to save mentor selection:", updateError);
+        toast.error("We couldn't save your mentor selection right now. Please try again.");
+        return;
+      }
       
       // Force immediate refetch to ensure fresh data
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
@@ -449,72 +472,225 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   }) => {
     if (!user || isCreatingCompanion) return;
 
+    const startedAt = Date.now();
+    let onboardingFinalized = false;
     setIsCreatingCompanion(true);
 
-    try {
-      const companionData = await createCompanion.mutateAsync({
-        favoriteColor: preferences.favoriteColor,
-        spiritAnimal: preferences.spiritAnimal,
-        coreElement: preferences.coreElement,
-        storyTone: preferences.storyTone,
-      });
-
-      if (!companionData?.id) {
-        throw new Error("Companion record missing ID after creation.");
-      }
+    const finalizeCompanionOnboarding = async (
+      companionId: string,
+      fallbackName: string,
+      recoveredAfterTimeout: boolean,
+    ) => {
+      if (onboardingFinalized) return;
+      onboardingFinalized = true;
 
       // Mark onboarding complete and save story tone
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("onboarding_data")
         .eq("id", user.id)
         .maybeSingle();
-      
+
+      if (profileError) {
+        throw profileError;
+      }
+
       const existingData = (profile?.onboarding_data as Record<string, unknown>) || {};
-      
-      await supabase.from("profiles").update({
-        onboarding_completed: true,
-        onboarding_data: {
-          ...existingData,
-          walkthrough_completed: true,
-          story_tone: preferences.storyTone,
-        },
-      }).eq("id", user.id);
+      const nowIso = new Date().toISOString();
+      const { error: completionError } = await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          onboarding_data: {
+            ...existingData,
+            walkthrough_completed: true,
+            story_tone: preferences.storyTone,
+            guided_tutorial: {
+              version: 2,
+              eligible: true,
+              completedSteps: [],
+              xpAwardedSteps: [],
+              dismissed: false,
+              completed: false,
+              lastUpdatedAt: nowIso,
+            },
+          },
+        })
+        .eq("id", user.id);
+
+      if (completionError) {
+        throw completionError;
+      }
 
       // Force immediate refetch to ensure fresh data (invalidateQueries only marks stale)
       await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
       await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
 
       // Create first meeting memory (non-blocking)
-      const today = new Date().toISOString().split('T')[0];
-      supabase.from('companion_memories').insert({
-        user_id: user.id,
-        companion_id: companionData.id,
-        memory_type: 'first_meeting',
-        memory_date: today,
-        memory_context: {
-          title: 'Our First Meeting',
-          description: `The day we met - a ${preferences.spiritAnimal} appeared and our journey began.`,
-          emotion: 'wonder',
-          details: { 
-            spiritAnimal: preferences.spiritAnimal,
-            coreElement: preferences.coreElement,
+      const today = new Date().toISOString().split("T")[0];
+      supabase
+        .from("companion_memories")
+        .insert({
+          user_id: user.id,
+          companion_id: companionId,
+          memory_type: "first_meeting",
+          memory_date: today,
+          memory_context: {
+            title: "Our First Meeting",
+            description: `The day we met - a ${preferences.spiritAnimal} appeared and our journey began.`,
+            emotion: "wonder",
+            details: {
+              spiritAnimal: preferences.spiritAnimal,
+              coreElement: preferences.coreElement,
+            },
           },
-        },
-        referenced_count: 0,
-      }).then(({ error }) => {
-        if (error) console.error('Failed to create first meeting memory:', error);
+          referenced_count: 0,
+        })
+        .then(({ error }) => {
+          if (error) {
+            logger.warn("Failed to create first meeting memory", {
+              companionId,
+              error: error.message,
+            });
+          }
+        });
+
+      setCompanionAnimal(fallbackName);
+      setStage("journey-begins");
+
+      logger.info("Companion onboarding finalized", {
+        userId: user.id,
+        companionId,
+        recoveredAfterTimeout,
+        durationMs: Date.now() - startedAt,
       });
 
-      const companionDisplayName = await waitForCompanionDisplayName(companionData.id);
-      if (!companionDisplayName) {
-        console.warn("Companion name was not ready in time; falling back to spirit animal.");
+      // Non-blocking display name hydration.
+      void waitForCompanionDisplayName(companionId)
+        .then((displayName) => {
+          if (!displayName) {
+            logger.warn("Companion display name not ready before deadline", {
+              userId: user.id,
+              companionId,
+            });
+            return;
+          }
+          setCompanionAnimal(displayName);
+          logger.info("Companion display name hydrated", {
+            userId: user.id,
+            companionId,
+          });
+        })
+        .catch((displayNameError) => {
+          logger.warn("Companion display name hydration failed", {
+            userId: user.id,
+            companionId,
+            error:
+              displayNameError instanceof Error
+                ? displayNameError.message
+                : String(displayNameError),
+          });
+        });
+    };
+
+    try {
+      logger.info("Companion creation started from onboarding", {
+        userId: user.id,
+        spiritAnimal: preferences.spiritAnimal,
+      });
+
+      const companionData = await withTimeout(
+        () =>
+          createCompanion.mutateAsync({
+            favoriteColor: preferences.favoriteColor,
+            spiritAnimal: preferences.spiritAnimal,
+            coreElement: preferences.coreElement,
+            storyTone: preferences.storyTone,
+          }),
+        {
+          timeoutMs: COMPANION_CREATION_TIMEOUT_MS,
+          operation: "Companion onboarding creation",
+          timeoutCode: "GENERATION_TIMEOUT",
+        },
+      );
+
+      if (!companionData?.id) {
+        throw new Error("Companion record missing ID after creation.");
       }
 
-      setCompanionAnimal(companionDisplayName || preferences.spiritAnimal);
-      setStage("journey-begins");
+      await finalizeCompanionOnboarding(companionData.id, preferences.spiritAnimal, false);
     } catch (error) {
-      console.error("Error creating companion:", error);
+      const isTimeout =
+        error instanceof TimeoutError ||
+        (error instanceof Error && error.message.includes("GENERATION_TIMEOUT"));
+
+      if (isTimeout) {
+        logger.warn("Companion creation timed out; starting recovery poll", {
+          userId: user.id,
+          timeoutMs: COMPANION_CREATION_TIMEOUT_MS,
+          elapsedMs: Date.now() - startedAt,
+        });
+
+        const recoveredCompanion = await pollWithDeadline<{ id: string; spirit_animal: string | null }>({
+          deadlineMs: COMPANION_RECOVERY_DEADLINE_MS,
+          intervalMs: COMPANION_RECOVERY_INTERVAL_MS,
+          task: async () => {
+            const { data, error: fetchError } = await supabase
+              .from("user_companion")
+              .select("id, spirit_animal")
+              .eq("user_id", user.id)
+              .maybeSingle();
+
+            if (fetchError) {
+              throw fetchError;
+            }
+
+            if (!data?.id) {
+              return null;
+            }
+
+            return {
+              id: data.id,
+              spirit_animal: data.spirit_animal ?? null,
+            };
+          },
+          onPollError: (pollError) => {
+            logger.warn("Companion recovery poll attempt failed", {
+              userId: user.id,
+              error: pollError instanceof Error ? pollError.message : String(pollError),
+            });
+          },
+        });
+
+        if (recoveredCompanion?.id) {
+          logger.warn("Companion recovery succeeded after timeout", {
+            userId: user.id,
+            companionId: recoveredCompanion.id,
+            elapsedMs: Date.now() - startedAt,
+          });
+          toast.success("Your companion finished taking shape. Continuing your journey...");
+          await finalizeCompanionOnboarding(
+            recoveredCompanion.id,
+            recoveredCompanion.spirit_animal || preferences.spiritAnimal,
+            true,
+          );
+          return;
+        }
+
+        logger.error("Companion recovery failed after timeout", {
+          userId: user.id,
+          recoveryWindowMs: COMPANION_RECOVERY_DEADLINE_MS,
+          elapsedMs: Date.now() - startedAt,
+        });
+        toast.error("This is taking longer than expected. Tap Begin Your Journey to try again.");
+        return;
+      }
+
+      logger.error("Error creating companion during onboarding", {
+        userId: user.id,
+        elapsedMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
       toast.error("Something went wrong. Please try again.");
     } finally {
       setIsCreatingCompanion(false);

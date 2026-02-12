@@ -340,6 +340,18 @@ function getElementOverlay(element: string): string {
   return `\n━━━ ELEMENTAL OVERLAY: ${element.toUpperCase()} ━━━\nEffect: ${effect}\nNOTE: Element adds ambient effects AROUND creature, does NOT change body/fur color!`;
 }
 
+const DEFAULT_INTERNAL_RETRIES = 2;
+const STAGE_ZERO_INTERNAL_RETRIES = 1;
+const MAX_ALLOWED_RETRIES = 3;
+const GENERATION_FETCH_TIMEOUT_MS = 75_000;
+const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
+
+type TimeoutCode = "AI_TIMEOUT" | "GENERATION_TIMEOUT";
+
+interface TimedRequestError extends Error {
+  code: TimeoutCode;
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -356,6 +368,47 @@ function ensureValidHex(color: string | undefined | null, fallback: string): str
   // Try adding # if missing
   if (/^[0-9A-Fa-f]{6}$/.test(cleanColor)) return `#${cleanColor}`;
   return fallback;
+}
+
+function createTimedRequestError(code: TimeoutCode, timeoutMs: number): TimedRequestError {
+  const err = new Error(`Request timed out after ${timeoutMs}ms`) as TimedRequestError;
+  err.name = "TimedRequestError";
+  err.code = code;
+  return err;
+}
+
+function isTimedRequestError(error: unknown): error is TimedRequestError {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as { code?: string }).code !== undefined &&
+    ((error as { code?: string }).code === "AI_TIMEOUT" ||
+      (error as { code?: string }).code === "GENERATION_TIMEOUT")
+  );
+}
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutCode: TimeoutCode,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw createTimedRequestError(timeoutCode, timeoutMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function generateCharacterDNA(spiritAnimal: string, element: string, favoriteColor: string, eyeColor: string | undefined, furColor: string | undefined, stage: number): string {
@@ -432,7 +485,19 @@ serve(async (req) => {
 
     console.log(`User authenticated: ${user.id}`);
 
-    const { spiritAnimal, element, stage, favoriteColor, eyeColor, furColor, retryAttempt = 0, storyTone, previousStageImageUrl, companionId } = await req.json();
+    const {
+      spiritAnimal,
+      element,
+      stage,
+      favoriteColor,
+      eyeColor,
+      furColor,
+      retryAttempt = 0,
+      maxInternalRetries,
+      storyTone,
+      previousStageImageUrl,
+      companionId,
+    } = await req.json();
 
     console.log(`Request - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}`);
 
@@ -525,22 +590,27 @@ serve(async (req) => {
             }
           };
 
-          const analysisResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [{
-                role: "user",
-                content: [
-                  { type: "text", text: `Analyze this ${spiritAnimal} creature image and extract its visual characteristics for consistent evolution. Be precise with hex colors and descriptive with features.` },
-                  { type: "image_url", image_url: { url: previousImageUrl } }
-                ]
-              }],
-              tools: [extractionTool],
-              tool_choice: { type: "function", function: { name: "extract_visual_metadata" } }
-            })
-          });
+          const analysisResponse = await fetchWithTimeout(
+            "https://api.openai.com/v1/chat/completions",
+            {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: [{
+                  role: "user",
+                  content: [
+                    { type: "text", text: `Analyze this ${spiritAnimal} creature image and extract its visual characteristics for consistent evolution. Be precise with hex colors and descriptive with features.` },
+                    { type: "image_url", image_url: { url: previousImageUrl } }
+                  ]
+                }],
+                tools: [extractionTool],
+                tool_choice: { type: "function", function: { name: "extract_visual_metadata" } }
+              }),
+            },
+            AUXILIARY_FETCH_TIMEOUT_MS,
+            "AI_TIMEOUT",
+          );
 
           if (analysisResponse.ok) {
             const analysisData = await analysisResponse.json();
@@ -602,7 +672,11 @@ serve(async (req) => {
             console.warn("Metadata extraction API call failed, proceeding without reference");
           }
         } catch (metadataError) {
-          console.warn("Error extracting metadata:", metadataError);
+          if (isTimedRequestError(metadataError)) {
+            console.warn("Metadata extraction timed out, proceeding without reference");
+          } else {
+            console.warn("Error extracting metadata:", metadataError);
+          }
         }
       }
     }
@@ -732,7 +806,13 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
     // CALL AI FOR IMAGE GENERATION WITH AUTO-RETRY ON LOW QUALITY
     // ========================================================================
 
-    const MAX_INTERNAL_RETRIES = 2;
+    const stageNumber = Number(stage);
+    const adaptiveRetryDefault = stageNumber === 0 ? STAGE_ZERO_INTERNAL_RETRIES : DEFAULT_INTERNAL_RETRIES;
+    const requestedRetries =
+      typeof maxInternalRetries === "number" && Number.isFinite(maxInternalRetries)
+        ? Math.max(0, Math.min(MAX_ALLOWED_RETRIES, Math.floor(maxInternalRetries)))
+        : adaptiveRetryDefault;
+    const MAX_INTERNAL_RETRIES = requestedRetries;
     let currentAttempt = 0;
     let imageUrl: string | null = null;
     let qualityScore: { 
@@ -753,16 +833,26 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
 
       let aiResponse;
       try {
-        aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image-preview",
-            messages: [{ role: "user", content: messageContent }],
-            modalities: ["image", "text"]
-          })
-        });
+        aiResponse = await fetchWithTimeout(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash-image-preview",
+              messages: [{ role: "user", content: messageContent }],
+              modalities: ["image", "text"]
+            })
+          },
+          GENERATION_FETCH_TIMEOUT_MS,
+          "GENERATION_TIMEOUT",
+        );
       } catch (fetchError) {
+        if (isTimedRequestError(fetchError)) {
+          console.error("AI generation timed out:", fetchError);
+          return new Response(JSON.stringify({ error: "AI generation timed out. Try again.", code: fetchError.code }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 });
+        }
         console.error("Network error:", fetchError);
         return new Response(JSON.stringify({ error: "Network error. Try again.", code: "NETWORK_ERROR" }), 
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 });
@@ -832,22 +922,27 @@ ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` 
 
 Score each aspect from 0-100 and list any issues.`;
 
-        const qualityResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [{
-              role: "user",
-              content: [
-                { type: "text", text: qualityPrompt },
-                { type: "image_url", image_url: { url: imageUrl } }
-              ]
-            }],
-            tools: [qualityTool],
-            tool_choice: { type: "function", function: { name: "score_image_quality" } }
-          })
-        });
+        const qualityResponse = await fetchWithTimeout(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [{
+                role: "user",
+                content: [
+                  { type: "text", text: qualityPrompt },
+                  { type: "image_url", image_url: { url: imageUrl } }
+                ]
+              }],
+              tools: [qualityTool],
+              tool_choice: { type: "function", function: { name: "score_image_quality" } }
+            })
+          },
+          AUXILIARY_FETCH_TIMEOUT_MS,
+          "AI_TIMEOUT",
+        );
 
         if (qualityResponse.ok) {
           const qualityData = await qualityResponse.json();
@@ -867,7 +962,11 @@ Score each aspect from 0-100 and list any issues.`;
           }
         }
       } catch (qualityError) {
-        console.warn("Quality analysis failed (non-blocking):", qualityError);
+        if (isTimedRequestError(qualityError)) {
+          console.warn("Quality analysis timed out (non-blocking)");
+        } else {
+          console.warn("Quality analysis failed (non-blocking):", qualityError);
+        }
       }
 
       // Check if we should retry
@@ -917,7 +1016,11 @@ Score each aspect from 0-100 and list any issues.`;
     };
     
     if (qualityScore) {
-      responseData.qualityScore = qualityScore;
+      responseData.qualityScore = {
+        ...qualityScore,
+        overallScore: qualityScore.overall,
+        retryCount: currentAttempt,
+      };
     }
     
     if (extractedMetadata) {
@@ -928,6 +1031,12 @@ Score each aspect from 0-100 and list any issues.`;
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
 
   } catch (error) {
+    if (isTimedRequestError(error)) {
+      return new Response(
+        JSON.stringify({ error: "AI request timed out. Please try again.", code: error.code }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 },
+      );
+    }
     console.error("Error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }), 
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });

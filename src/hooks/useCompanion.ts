@@ -89,6 +89,7 @@ export const useCompanion = () => {
       coreElement: string;
       storyTone: string;
     }) => {
+      const creationStartedAt = Date.now();
       if (!user) throw new Error("Not authenticated");
 
       // Prevent duplicate companion creation during rapid clicks
@@ -99,6 +100,12 @@ export const useCompanion = () => {
 
       try {
         logger.log("Starting companion creation process...");
+        logger.info("Companion creation started", {
+          userId: user.id,
+          spiritAnimal: data.spiritAnimal,
+          coreElement: data.coreElement,
+          stage: 0,
+        });
 
         // Determine consistent colors for the companion's lifetime
         const eyeColor = `glowing ${data.favoriteColor}`;
@@ -117,7 +124,8 @@ export const useCompanion = () => {
             storyTone: data.storyTone,
           },
           {
-            maxRetries: 2,
+            // Adaptive retry policy: onboarding (stage 0) prioritizes reliability/latency.
+            maxRetries: 1,
             onRetry: (attempt) => {
               logger.log(`Validation failed, retrying image generation (attempt ${attempt})...`);
             },
@@ -280,10 +288,19 @@ export const useCompanion = () => {
         });
       }
 
+      logger.info("Companion creation completed", {
+        userId: user.id,
+        durationMs: Date.now() - creationStartedAt,
+      });
       return companionData;
       } catch (error) {
         // Reset flag on error
         companionCreationInProgress.current = false;
+        logger.error("Companion creation mutation failed", {
+          userId: user.id,
+          durationMs: Date.now() - creationStartedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
         throw error;
       }
     },
