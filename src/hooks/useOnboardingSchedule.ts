@@ -10,10 +10,30 @@ import { safeLocalStorage } from "@/utils/storage";
  */
 export const ONBOARDING_TASKS = [
   {
-    task_text: "Meet Your Companion ✨",
+    task_text: "Create Your First Quest 🎯",
     xp_reward: 2,
     difficulty: "easy",
     sort_order: 0,
+    category: "mind",
+    estimated_duration: 3,
+    notes:
+      "1. Stay on QUESTS.\n2. Tap + in the lower-right corner.\n3. Set a time (required for creating a Quest here).\n4. Enter your quest title.\n5. Tap Create Quest.\nIf time is missing, it becomes an Inbox item.",
+  },
+  {
+    task_text: "Complete Your First Quest ✅",
+    xp_reward: 3,
+    difficulty: "easy",
+    sort_order: 1,
+    category: "mind",
+    estimated_duration: 2,
+    notes:
+      "1. Find the quest you just created.\n2. Tap the quest circle once.\n3. Watch your completion and XP update.\nDone when this step auto-completes.",
+  },
+  {
+    task_text: "Meet Your Companion ✨",
+    xp_reward: 2,
+    difficulty: "easy",
+    sort_order: 2,
     category: "soul",
     estimated_duration: 2,
     notes:
@@ -23,31 +43,11 @@ export const ONBOARDING_TASKS = [
     task_text: "Morning Check-in 🌅",
     xp_reward: 3,
     difficulty: "easy",
-    sort_order: 1,
+    sort_order: 3,
     category: "mind",
     estimated_duration: 3,
     notes:
       "1. Tap MENTOR in the bottom navigation bar.\n2. Open the Morning Check-in card.\n3. Submit your reflection.\nDone when this step auto-completes after submit.",
-  },
-  {
-    task_text: "Create Your First Campaign 🚀",
-    xp_reward: 3,
-    difficulty: "easy",
-    sort_order: 2,
-    category: "mind",
-    estimated_duration: 5,
-    notes:
-      "1. Tap QUESTS in the bottom navigation bar.\n2. Tap + in the lower-right corner.\n3. Choose \"Or create a Campaign\".\n4. Complete the campaign setup.\nDone when this step auto-completes.",
-  },
-  {
-    task_text: "Create Your First Quest 🎯",
-    xp_reward: 2,
-    difficulty: "easy",
-    sort_order: 3,
-    category: "mind",
-    estimated_duration: 2,
-    notes:
-      "1. Stay on QUESTS.\n2. Tap + in the lower-right corner.\n3. Enter your quest title.\n4. Save the quest.\nDone when this step auto-completes after save.",
   },
 ];
 
@@ -88,13 +88,14 @@ export function useOnboardingSchedule(
       return;
     }
 
-    const scheduleKey = `onboarding_schedule_created_${userId}`;
+    const ONBOARDING_SCHEDULE_VERSION = 2;
+    const scheduleKey = `onboarding_schedule_version_${userId}`;
 
     const createOnboardingSchedule = async () => {
-      const alreadyCreated = safeLocalStorage.getItem(scheduleKey) === "true";
+      const storedVersion = Number(safeLocalStorage.getItem(scheduleKey) ?? "0");
 
       // Recovery: verify tasks actually exist if flag is set
-      if (alreadyCreated) {
+      if (storedVersion >= ONBOARDING_SCHEDULE_VERSION) {
         const { data: verification } = await supabase
           .from("daily_tasks")
           .select("id")
@@ -115,35 +116,72 @@ export function useOnboardingSchedule(
       console.log("[Onboarding] Creating onboarding schedule for new user");
 
       try {
-        // Check if any onboarding tasks already exist
-        const { data: existingTasks } = await supabase
+        const today = format(new Date(), "yyyy-MM-dd");
+        const desiredTaskTexts = ONBOARDING_TASKS.map((t) => t.task_text);
+
+        // Check if onboarding tasks already exist and sync them to current shape
+        const { data: existingOnboardingTasks } = await supabase
           .from("daily_tasks")
           .select("id, task_text")
           .eq("user_id", userId)
-          .in("task_text", ONBOARDING_TASKS.map((t) => t.task_text));
+          .eq("source", "onboarding");
 
-        if (existingTasks && existingTasks.length > 0) {
-          // Keep onboarding copy/metadata up to date for returning users
+        if (existingOnboardingTasks && existingOnboardingTasks.length > 0) {
+          const existingByText = new Map(
+            existingOnboardingTasks.map((task) => [task.task_text, task])
+          );
+          const obsoleteIds = existingOnboardingTasks
+            .filter((task) => !desiredTaskTexts.includes(task.task_text))
+            .map((task) => task.id);
+
           await Promise.all(
-            ONBOARDING_TASKS.map((task) =>
-              supabase
+            ONBOARDING_TASKS.map((task) => {
+              const existing = existingByText.get(task.task_text);
+              if (existing) {
+                return supabase
+                  .from("daily_tasks")
+                  .update({
+                    notes: task.notes,
+                    xp_reward: task.xp_reward,
+                    difficulty: task.difficulty,
+                    sort_order: task.sort_order,
+                    category: task.category,
+                    estimated_duration: task.estimated_duration,
+                    is_main_quest: false,
+                  })
+                  .eq("id", existing.id)
+                  .eq("user_id", userId);
+              }
+
+              return supabase
                 .from("daily_tasks")
-                .update({
-                  notes: task.notes,
+                .insert({
+                  user_id: userId,
+                  task_text: task.task_text,
                   xp_reward: task.xp_reward,
                   difficulty: task.difficulty,
+                  task_date: today,
+                  is_main_quest: false,
                   sort_order: task.sort_order,
+                  source: "onboarding",
+                  notes: task.notes,
                   category: task.category,
                   estimated_duration: task.estimated_duration,
-                })
-                .eq("user_id", userId)
-                .eq("source", "onboarding")
-                .eq("task_text", task.task_text)
-            )
+                });
+            })
           );
 
-          console.log("[Onboarding] Onboarding tasks already exist, synced latest guidance");
-          safeLocalStorage.setItem(scheduleKey, "true");
+          if (obsoleteIds.length > 0) {
+            await supabase
+              .from("daily_tasks")
+              .delete()
+              .eq("user_id", userId)
+              .eq("source", "onboarding")
+              .in("id", obsoleteIds);
+          }
+
+          console.log("[Onboarding] Onboarding tasks synced to latest flow");
+          safeLocalStorage.setItem(scheduleKey, String(ONBOARDING_SCHEDULE_VERSION));
           queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
           setIsCreating(false);
           return;
@@ -159,12 +197,10 @@ export function useOnboardingSchedule(
 
         if (legacyTask) {
           console.log("[Onboarding] Legacy user detected, skipping onboarding tasks");
-          safeLocalStorage.setItem(scheduleKey, "true");
+          safeLocalStorage.setItem(scheduleKey, String(ONBOARDING_SCHEDULE_VERSION));
           setIsCreating(false);
           return;
         }
-
-        const today = format(new Date(), "yyyy-MM-dd");
 
         // Create all onboarding tasks
         const tasksToInsert = ONBOARDING_TASKS.map((task) => ({
@@ -194,7 +230,7 @@ export function useOnboardingSchedule(
         }
 
         console.log("[Onboarding] Successfully created", data.length, "onboarding tasks");
-        safeLocalStorage.setItem(scheduleKey, "true");
+        safeLocalStorage.setItem(scheduleKey, String(ONBOARDING_SCHEDULE_VERSION));
         queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       } catch (error) {
         console.error("[Onboarding] Error creating onboarding schedule:", error);

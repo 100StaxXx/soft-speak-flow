@@ -44,8 +44,8 @@ const STEPS: Step[] = [
     subtitle: "Start with one small daily action.",
     features: [
       { icon: Zap, text: "Tap + in the lower-right corner" },
-      { icon: Brain, text: "Enter a simple quest title and save" },
-      { icon: CheckCircle2, text: "Your quest appears in the timeline instantly" },
+      { icon: Brain, text: "Set a time, then enter your title and tap Create Quest" },
+      { icon: CheckCircle2, text: "No time = Inbox item, with time = Quest timeline" },
     ],
   },
   {

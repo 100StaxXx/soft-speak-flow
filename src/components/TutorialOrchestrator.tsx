@@ -4,11 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useXPRewards } from "@/hooks/useXPRewards";
 import { supabase } from "@/integrations/supabase/client";
 import { safeLocalStorage } from "@/utils/storage";
 import { cn } from "@/lib/utils";
 
-type GuidedStepId = "meet_companion" | "morning_checkin" | "create_campaign" | "create_quest";
+type GuidedStepId = "create_quest" | "complete_quest" | "meet_companion" | "morning_checkin";
 
 interface GuidedStep {
   id: GuidedStepId;
@@ -41,6 +42,40 @@ interface GuidedTutorialProgress {
 }
 
 const GUIDED_STEPS: GuidedStep[] = [
+  {
+    id: "create_quest",
+    taskText: "Create Your First Quest 🎯",
+    title: "Create your first quest",
+    description: "Schedule one quest with a time so it appears in Quests.",
+    checklist: [
+      "Stay on the QUESTS tab.",
+      "Tap + in the lower-right corner.",
+      "Set a time, enter a title, then tap Create Quest.",
+    ],
+    successHint: "If time is missing, it becomes an Inbox item.",
+    actionLabel: "Go to Quests",
+    route: "/journeys",
+    navSelector: '[data-tour="quests-tab"]',
+    inRouteSelector: '[data-tour="add-quest-fab"]',
+    completion: { type: "event", eventName: "task-added", requireRoute: true },
+  },
+  {
+    id: "complete_quest",
+    taskText: "Complete Your First Quest ✅",
+    title: "Complete your first quest",
+    description: "Finish one quest to begin your XP loop.",
+    checklist: [
+      "Find the quest you just created.",
+      "Tap the quest circle once.",
+      "Wait for completion and XP feedback.",
+    ],
+    successHint: "This step auto-completes after a real quest completion.",
+    actionLabel: "Go to Quests",
+    route: "/journeys",
+    navSelector: '[data-tour="quests-tab"]',
+    inRouteSelector: '[data-tour="quests-list"]',
+    completion: { type: "event", eventName: "quest-completed", requireRoute: true },
+  },
   {
     id: "meet_companion",
     taskText: "Meet Your Companion ✨",
@@ -75,41 +110,11 @@ const GUIDED_STEPS: GuidedStep[] = [
     inRouteSelector: '[data-tour="morning-checkin"]',
     completion: { type: "event", eventName: "morning-checkin-completed", requireRoute: true },
   },
-  {
-    id: "create_campaign",
-    taskText: "Create Your First Campaign 🚀",
-    title: "Create your first campaign",
-    description: "Set up one big-goal campaign from the Quests tab.",
-    checklist: [
-      "Tap QUESTS in the bottom navigation bar.",
-      "Tap the + button in the lower-right corner.",
-      "Choose \"Or create a Campaign\" and finish setup.",
-    ],
-    successHint: "This step auto-completes right after the campaign is created.",
-    actionLabel: "Go to Quests",
-    route: "/journeys",
-    navSelector: '[data-tour="quests-tab"]',
-    inRouteSelector: '[data-tour="add-quest-fab"]',
-    completion: { type: "event", eventName: "campaign-created", requireRoute: true },
-  },
-  {
-    id: "create_quest",
-    taskText: "Create Your First Quest 🎯",
-    title: "Create your first quest",
-    description: "Add one daily quest so your routine starts rolling.",
-    checklist: [
-      "Stay on the QUESTS tab.",
-      "Tap + in the lower-right corner.",
-      "Enter a quest title and save.",
-    ],
-    successHint: "This step auto-completes as soon as the quest is added.",
-    actionLabel: "Go to Quests",
-    route: "/journeys",
-    navSelector: '[data-tour="quests-tab"]',
-    inRouteSelector: '[data-tour="add-quest-fab"]',
-    completion: { type: "event", eventName: "task-added", requireRoute: true },
-  },
 ];
+
+const GUIDED_STEP_ID_SET = new Set<GuidedStepId>(GUIDED_STEPS.map((step) => step.id));
+const isGuidedStepId = (value: unknown): value is GuidedStepId =>
+  typeof value === "string" && GUIDED_STEP_ID_SET.has(value as GuidedStepId);
 
 const STEP_BY_TASK_TEXT = new Map(GUIDED_STEPS.map((step) => [step.taskText, step.id]));
 
@@ -135,6 +140,7 @@ const pathIsHidden = (pathname: string) =>
 export const TutorialOrchestrator = () => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  const { awardCustomXP } = useXPRewards();
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -167,7 +173,7 @@ export const TutorialOrchestrator = () => {
       const taskTexts = GUIDED_STEPS.map((step) => step.taskText);
       const { data, error } = await supabase
         .from("daily_tasks")
-        .select("task_text, completed")
+        .select("id, task_text, completed, xp_reward")
         .eq("user_id", user.id)
         .eq("source", "onboarding")
         .in("task_text", taskTexts);
@@ -189,10 +195,24 @@ export const TutorialOrchestrator = () => {
     return completed;
   }, [onboardingTasks]);
 
+  const onboardingTaskByStep = useMemo(() => {
+    const map = new Map<GuidedStepId, { id: string; completed: boolean; xpReward: number }>();
+    for (const task of onboardingTasks) {
+      const mapped = STEP_BY_TASK_TEXT.get(task.task_text);
+      if (!mapped) continue;
+      map.set(mapped, {
+        id: task.id,
+        completed: Boolean(task.completed),
+        xpReward: task.xp_reward ?? 0,
+      });
+    }
+    return map;
+  }, [onboardingTasks]);
+
   const persistedCompleted = useMemo(() => {
-    const remote = remoteProgress?.completedSteps ?? [];
-    const local = localProgress?.completedSteps ?? [];
-    return Array.from(new Set([...remote, ...local])) as GuidedStepId[];
+    const remote = (remoteProgress?.completedSteps ?? []).filter(isGuidedStepId);
+    const local = (localProgress?.completedSteps ?? []).filter(isGuidedStepId);
+    return Array.from(new Set([...remote, ...local]));
   }, [remoteProgress?.completedSteps, localProgress?.completedSteps]);
 
   const effectiveDismissed = useMemo(() => {
@@ -266,8 +286,34 @@ export const TutorialOrchestrator = () => {
         return [...prev, stepId];
       });
 
-      const nextCompleted = Array.from(new Set([...completedSet, stepId])) as GuidedStepId[];
-      const complete = nextCompleted.length === GUIDED_STEPS.length;
+      const nextCompletedSet = new Set<GuidedStepId>([...completedSet, stepId]);
+      const nextCompleted = Array.from(nextCompletedSet);
+      const complete = GUIDED_STEPS.every((step) => nextCompletedSet.has(step.id));
+
+      const onboardingTask = onboardingTaskByStep.get(stepId);
+      if (user?.id && onboardingTask && !onboardingTask.completed) {
+        void (async () => {
+          const { data, error } = await supabase
+            .from("daily_tasks")
+            .update({ completed: true, completed_at: new Date().toISOString() })
+            .eq("id", onboardingTask.id)
+            .eq("user_id", user.id)
+            .eq("source", "onboarding")
+            .eq("completed", false)
+            .select("id")
+            .maybeSingle();
+
+          if (error || !data) return;
+
+          await awardCustomXP(onboardingTask.xpReward, "task_complete", undefined, {
+            task_id: onboardingTask.id,
+            source: "onboarding_auto",
+          });
+          queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+          queryClient.invalidateQueries({ queryKey: ["guided-tutorial-tasks", user.id] });
+        })();
+      }
+
       setDismissedOverride(false);
       void persistProgress({
         completedSteps: nextCompleted,
@@ -276,7 +322,7 @@ export const TutorialOrchestrator = () => {
         completedAt: complete ? new Date().toISOString() : undefined,
       });
     },
-    [completedSet, persistProgress, tutorialReady]
+    [awardCustomXP, completedSet, onboardingTaskByStep, persistProgress, queryClient, tutorialReady, user?.id]
   );
 
   useEffect(() => {
@@ -310,10 +356,19 @@ export const TutorialOrchestrator = () => {
     const completion = currentStep.completion;
     if (completion.type !== "event") return;
 
-    const listener = () => {
+    const listener = (event: Event) => {
       if (completion.requireRoute && location.pathname !== currentStep.route) {
         return;
       }
+
+      if (currentStep.id === "create_quest") {
+        const detail = (event as CustomEvent<{ taskDate?: string | null; scheduledTime?: string | null }>).detail;
+        // Only count as "Create Quest" when a scheduled quest is created (not Inbox).
+        if (!detail?.taskDate || !detail?.scheduledTime) {
+          return;
+        }
+      }
+
       markStepComplete(currentStep.id);
     };
 
@@ -332,6 +387,7 @@ export const TutorialOrchestrator = () => {
   useEffect(() => {
     if (spotlightRef.current) {
       spotlightRef.current.classList.remove("tutorial-guide-spotlight");
+      spotlightRef.current.classList.remove("tutorial-guide-fab-spotlight");
       spotlightRef.current = null;
     }
 
@@ -344,6 +400,9 @@ export const TutorialOrchestrator = () => {
     if (!target) return;
 
     target.classList.add("tutorial-guide-spotlight");
+    if (activeSelector === '[data-tour="add-quest-fab"]') {
+      target.classList.add("tutorial-guide-fab-spotlight");
+    }
     spotlightRef.current = target;
 
     if (location.pathname === currentStep.route) {
@@ -354,6 +413,7 @@ export const TutorialOrchestrator = () => {
 
     return () => {
       target.classList.remove("tutorial-guide-spotlight");
+      target.classList.remove("tutorial-guide-fab-spotlight");
       if (spotlightRef.current === target) {
         spotlightRef.current = null;
       }
@@ -391,7 +451,7 @@ export const TutorialOrchestrator = () => {
   const progressText = `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
   const needsFabAccess =
     location.pathname === "/journeys" &&
-    (currentStep.id === "create_campaign" || currentStep.id === "create_quest");
+    (currentStep.id === "create_quest" || currentStep.id === "complete_quest");
 
   if (effectiveDismissed) {
     return (

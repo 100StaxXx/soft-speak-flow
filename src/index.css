@@ -1600,6 +1600,36 @@ All colors MUST be HSL.
     animation: tutorial-guide-pulse 1.35s ease-in-out infinite;
   }
 
+  @keyframes tutorial-guide-fab-ping {
+    0% {
+      transform: scale(1);
+      opacity: 0.85;
+    }
+    100% {
+      transform: scale(1.45);
+      opacity: 0;
+    }
+  }
+
+  .tutorial-guide-fab-spotlight {
+    position: relative;
+    z-index: 80 !important;
+    box-shadow:
+      0 0 0 2px hsl(var(--primary) / 0.75),
+      0 0 20px hsl(var(--primary) / 0.45),
+      0 10px 26px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  .tutorial-guide-fab-spotlight::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--primary) / 0.75);
+    animation: tutorial-guide-fab-ping 1.4s ease-out infinite;
+    pointer-events: none;
+  }
+
   /* Safe Area Support for Mobile Devices (iOS notches, home indicators) */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);

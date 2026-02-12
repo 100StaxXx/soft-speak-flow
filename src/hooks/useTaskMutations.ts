@@ -233,7 +233,14 @@ export const useTaskMutations = (taskDate: string) => {
     },
     onSuccess: (data) => {
       toast({ title: "Quest added!" });
-      window.dispatchEvent(new CustomEvent('task-added'));
+      window.dispatchEvent(
+        new CustomEvent('task-added', {
+          detail: {
+            taskDate: data?.task_date ?? null,
+            scheduledTime: data?.scheduled_time ?? null,
+          },
+        })
+      );
       
       // Track task creation for learning
       if (data) {
