@@ -15,6 +15,8 @@ interface GuidedStep {
   taskText: string;
   title: string;
   description: string;
+  checklist: string[];
+  successHint: string;
   actionLabel: string;
   route: string;
   navSelector: string;
@@ -43,7 +45,13 @@ const GUIDED_STEPS: GuidedStep[] = [
     id: "meet_companion",
     taskText: "Meet Your Companion ✨",
     title: "Meet your companion",
-    description: "Tap Companion in the bottom navigation and open the companion page.",
+    description: "Find your companion and confirm your bond/progress panel is visible.",
+    checklist: [
+      "Tap COMPANION in the bottom navigation bar.",
+      "Wait for the companion page to fully load.",
+      "Look at the progress area to confirm you're in the right place.",
+    ],
+    successHint: "This step auto-completes once the Companion page opens.",
     actionLabel: "Go to Companion",
     route: "/companion",
     navSelector: '[data-tour="companion-tab"]',
@@ -54,7 +62,13 @@ const GUIDED_STEPS: GuidedStep[] = [
     id: "morning_checkin",
     taskText: "Morning Check-in 🌅",
     title: "Complete morning check-in",
-    description: "Open Mentor, then submit your morning check-in.",
+    description: "Open Mentor and submit one morning reflection.",
+    checklist: [
+      "Tap MENTOR in the bottom navigation bar.",
+      "Open the Morning Check-in card.",
+      "Answer and submit your check-in.",
+    ],
+    successHint: "This step auto-completes after your check-in is submitted.",
     actionLabel: "Go to Mentor",
     route: "/mentor",
     navSelector: '[data-tour="mentor-tab"]',
@@ -65,7 +79,13 @@ const GUIDED_STEPS: GuidedStep[] = [
     id: "create_campaign",
     taskText: "Create Your First Campaign 🚀",
     title: "Create your first campaign",
-    description: "On Quests, tap +, then choose “Or create a Campaign”.",
+    description: "Set up one big-goal campaign from the Quests tab.",
+    checklist: [
+      "Tap QUESTS in the bottom navigation bar.",
+      "Tap the + button in the lower-right corner.",
+      "Choose \"Or create a Campaign\" and finish setup.",
+    ],
+    successHint: "This step auto-completes right after the campaign is created.",
     actionLabel: "Go to Quests",
     route: "/journeys",
     navSelector: '[data-tour="quests-tab"]',
@@ -76,7 +96,13 @@ const GUIDED_STEPS: GuidedStep[] = [
     id: "create_quest",
     taskText: "Create Your First Quest 🎯",
     title: "Create your first quest",
-    description: "On Quests, tap + and create a quest.",
+    description: "Add one daily quest so your routine starts rolling.",
+    checklist: [
+      "Stay on the QUESTS tab.",
+      "Tap + in the lower-right corner.",
+      "Enter a quest title and save.",
+    ],
+    successHint: "This step auto-completes as soon as the quest is added.",
     actionLabel: "Go to Quests",
     route: "/journeys",
     navSelector: '[data-tour="quests-tab"]',
@@ -281,18 +307,19 @@ export const TutorialOrchestrator = () => {
 
   useEffect(() => {
     if (!currentStep) return;
-    if (currentStep.completion.type !== "event") return;
+    const completion = currentStep.completion;
+    if (completion.type !== "event") return;
 
     const listener = () => {
-      if (currentStep.completion.requireRoute && location.pathname !== currentStep.route) {
+      if (completion.requireRoute && location.pathname !== currentStep.route) {
         return;
       }
       markStepComplete(currentStep.id);
     };
 
-    window.addEventListener(currentStep.completion.eventName, listener as EventListener);
+    window.addEventListener(completion.eventName, listener as EventListener);
     return () => {
-      window.removeEventListener(currentStep.completion.eventName, listener as EventListener);
+      window.removeEventListener(completion.eventName, listener as EventListener);
     };
   }, [currentStep, location.pathname, markStepComplete]);
 
@@ -386,6 +413,18 @@ export const TutorialOrchestrator = () => {
             <p className="text-[10px] uppercase tracking-[0.18em] text-primary/90 font-semibold">{progressText}</p>
             <h3 className="mt-1 text-sm font-semibold text-foreground">{currentStep.title}</h3>
             <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{currentStep.description}</p>
+            <div className="mt-2 rounded-lg border border-border/60 bg-background/35 px-2.5 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">Do this now</p>
+              <ol className="mt-1.5 space-y-1">
+                {currentStep.checklist.map((item, index) => (
+                  <li key={item} className="text-[11px] text-foreground/90 leading-relaxed">
+                    <span className="mr-1 text-primary/90 font-semibold">{index + 1}.</span>
+                    {item}
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <p className="mt-2 text-[11px] text-primary/90 leading-relaxed">{currentStep.successHint}</p>
           </div>
           <button
             className={cn(
