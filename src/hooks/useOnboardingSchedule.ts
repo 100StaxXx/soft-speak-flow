@@ -34,7 +34,7 @@ export const ONBOARDING_TASKS = [
     sort_order: 2,
     category: "mind",
     estimated_duration: 5,
-    notes: "Campaigns are your big-picture goals! Tap CAMPAIGNS in the bottom navigation bar, then tap the + button to create your first campaign.",
+    notes: "Campaigns are your big-picture goals! Tap QUESTS in the bottom navigation bar, then tap the + button and choose 'Or create a Campaign'.",
   },
   {
     task_text: "Create Your First Quest 🎯",

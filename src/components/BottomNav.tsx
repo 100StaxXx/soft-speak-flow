@@ -65,6 +65,7 @@ export const BottomNav = memo(() => {
             to="/mentor"
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
             activeClassName="bg-gradient-to-br from-orange-500/20 to-orange-500/5 shadow-soft"
+            data-tour="mentor-tab"
             onClick={() => haptics.light()}
             onMouseEnter={() => handlePrefetch('mentor')}
             onFocus={() => handlePrefetch('mentor')}

@@ -446,6 +446,7 @@ export const useEpics = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
+      window.dispatchEvent(new CustomEvent("campaign-created"));
       toast.success("Epic quest created! 🎯", {
         description: "Your companion is excited for this legendary journey!",
       });

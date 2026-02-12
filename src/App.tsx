@@ -40,6 +40,7 @@ import { useAuthSync } from "@/hooks/useAuthSync";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { safeSessionStorage } from "@/utils/storage";
  import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
+import { TutorialOrchestrator } from "@/components/TutorialOrchestrator";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -327,6 +328,7 @@ const AppContent = memo(() => {
                   <Route path="*" element={<NotFound />} />
                   </Routes>
                 </AnimatePresence>
+                <TutorialOrchestrator />
                 </Suspense>
                 </AstralEncounterProvider>
                 </RealtimeSyncProvider>
