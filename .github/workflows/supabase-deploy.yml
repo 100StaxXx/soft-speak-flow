@@ -39,6 +39,7 @@ jobs:
             SUPABASE_ANON_KEY
             SUPABASE_SERVICE_ROLE_KEY
             OPENAI_API_KEY
+            ELEVENLABS_API_KEY
           )
 
           missing=0
