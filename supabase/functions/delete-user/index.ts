@@ -34,26 +34,6 @@ function sanitizeError(error: unknown): { message: string; status: number } {
   return { message: "An error occurred during account deletion. Please try again.", status: 500 };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function cleanupReferralArtifacts(supabase: any, userId: string) {
-  const { error: referralPayoutsError } = await supabase
-    .from("referral_payouts")
-    .delete()
-    .or(`referrer_id.eq.${userId},referee_id.eq.${userId}`);
-  if (referralPayoutsError) {
-    throw referralPayoutsError;
-  }
-
-  const { error: referralCodesError } = await supabase
-    .from("referral_codes")
-    .delete()
-    .eq("owner_type", "user")
-    .eq("owner_user_id", userId);
-  if (referralCodesError) {
-    throw referralCodesError;
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -119,8 +99,6 @@ serve(async (req) => {
     if (deleteDataError) {
       throw deleteDataError;
     }
-
-    await cleanupReferralArtifacts(supabase, userId);
 
     const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
     if (authDeleteError) {
