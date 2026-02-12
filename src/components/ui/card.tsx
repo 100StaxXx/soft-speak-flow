@@ -7,15 +7,12 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     ref={ref} 
     className={cn(
       "rounded-2xl border text-card-foreground",
-      "bg-card/60 backdrop-blur-xl",
-      "border-white/[0.08]",
-      "shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
-      "transition-all duration-300",
-      "active:scale-[0.99] sm:hover:scale-[1.01] touch-manipulation",
-      "select-none",
+      "bg-card/78 backdrop-blur-lg",
+      "border-border/60",
+      "shadow-[0_12px_28px_rgba(0,0,0,0.22)]",
+      "transition-colors duration-200",
       className
     )}
-    onContextMenu={(e) => e.preventDefault()}
     {...props} 
   />
 ));

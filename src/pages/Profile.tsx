@@ -63,13 +63,13 @@ const QuickActionCard = memo(({
   <button
     onClick={onClick}
     className={`
-      group flex items-center gap-3 p-4 rounded-xl border transition-all text-left w-full
-      active:scale-[0.98] select-none
+      group flex items-center gap-3 p-4 rounded-2xl border transition-all duration-200 text-left w-full
+      active:scale-[0.99]
       ${variant === "accent" 
-        ? "bg-gradient-to-br from-stardust-gold/10 to-amber-600/5 border-stardust-gold/20 sm:hover:border-stardust-gold/40" 
+        ? "bg-gradient-to-br from-stardust-gold/10 to-amber-600/5 border-stardust-gold/25 sm:hover:border-stardust-gold/45" 
         : variant === "info"
-        ? "bg-gradient-to-br from-celestial-blue/10 to-blue-600/5 border-celestial-blue/20 sm:hover:border-celestial-blue/40"
-        : "bg-card/50 border-border/50 sm:hover:border-primary/40 sm:hover:bg-card/80"
+        ? "bg-gradient-to-br from-celestial-blue/10 to-blue-600/5 border-celestial-blue/25 sm:hover:border-celestial-blue/45"
+        : "bg-card/75 border-border/55 sm:hover:border-primary/35 sm:hover:bg-card/90"
       }
     `}
     style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
@@ -109,7 +109,7 @@ const DevTriggerHeader = memo(({ onNavigate }: { onNavigate: () => void }) => {
       className={`cursor-pointer select-none transition-opacity ${isActivated ? 'opacity-50' : ''}`}
       style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
-      <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+      <h1 className="text-2xl font-semibold tracking-tight">
         Command Center
       </h1>
       <p className="text-sm text-muted-foreground">Your account & settings</p>
@@ -320,7 +320,7 @@ const Profile = () => {
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 relative z-10">
           {/* Quick Actions Grid */}
           <section className="space-y-3">
-            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">Quick Access</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground px-1">Quick Access</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <QuickActionCard 
                 icon={BookHeart} 
@@ -353,11 +353,11 @@ const Profile = () => {
 
           {/* Settings Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4 h-auto p-1 cosmiq-glass-subtle border border-cosmiq-glow/20">
-              <TabsTrigger value="account" className="text-xs sm:text-sm py-2">Account</TabsTrigger>
-              <TabsTrigger value="rewards" className="text-xs sm:text-sm py-2">Rewards</TabsTrigger>
-              <TabsTrigger value="notifications" className="text-xs sm:text-sm py-2">Alerts</TabsTrigger>
-              <TabsTrigger value="preferences" className="text-xs sm:text-sm py-2">Prefs</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1 bg-card/80 border border-border/60">
+              <TabsTrigger value="account" className="text-xs sm:text-sm py-2 font-medium">Account</TabsTrigger>
+              <TabsTrigger value="rewards" className="text-xs sm:text-sm py-2 font-medium">Rewards</TabsTrigger>
+              <TabsTrigger value="notifications" className="text-xs sm:text-sm py-2 font-medium">Alerts</TabsTrigger>
+              <TabsTrigger value="preferences" className="text-xs sm:text-sm py-2 font-medium">Prefs</TabsTrigger>
             </TabsList>
 
             {/* Account Tab */}

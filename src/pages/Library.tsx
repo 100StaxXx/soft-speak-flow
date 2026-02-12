@@ -141,26 +141,26 @@ export default function Library() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <h1 className="font-heading text-5xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
             My Library
           </h1>
-          <p className="text-muted-foreground text-lg mt-2">
+          <p className="text-muted-foreground mt-2">
             Your saved content and history
           </p>
         </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LibraryTab)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8 bg-card/50 backdrop-blur-xl border border-border/50">
-            <TabsTrigger value="favorites" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground">
+          <TabsList className="grid w-full grid-cols-3 mb-8 bg-card/80 border border-border/60">
+            <TabsTrigger value="favorites">
               <Heart className="h-4 w-4 mr-2" />
               Favorites
             </TabsTrigger>
-            <TabsTrigger value="downloads" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="downloads">
               <Download className="h-4 w-4 mr-2" />
               Downloads
             </TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground">
+            <TabsTrigger value="history">
               <Clock className="h-4 w-4 mr-2" />
               History
             </TabsTrigger>

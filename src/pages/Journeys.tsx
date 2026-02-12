@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { format, addDays } from "date-fns";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { PageTransition } from "@/components/PageTransition";
@@ -54,6 +54,7 @@ interface CreatedCampaignData {
 }
 
 const Journeys = () => {
+  const prefersReducedMotion = useReducedMotion();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -514,8 +515,9 @@ const Journeys = () => {
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         {/* Hero Header */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
           className="mb-6 text-center relative"
         >
           <div className="absolute right-0 top-0">
@@ -523,18 +525,18 @@ const Journeys = () => {
               onClick={() => setShowPageInfo(true)} 
             />
           </div>
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-semibold tracking-tight mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Quests
           </h1>
-          <p className="text-sm text-muted-foreground">Daily quests. Your path to progress.</p>
+          <p className="text-sm text-muted-foreground/90">Daily quests. Your path to progress.</p>
         </motion.div>
 
         <QuestsErrorBoundary>
           {/* Date Selector */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.05 }}
+            transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
             className="mb-4"
           >
             <DatePillsScroller
@@ -546,9 +548,9 @@ const Journeys = () => {
 
           {/* Main Content Area */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
+            transition={{ delay: prefersReducedMotion ? 0 : 0.1, duration: prefersReducedMotion ? 0 : 0.2 }}
           >
             {/* Today's Agenda */}
             <TodaysAgenda
@@ -657,12 +659,14 @@ const Journeys = () => {
         {/* Quick Adjust Floating Button + Drawer */}
         {dailyTasks.some(t => t.ai_generated) && (
           <motion.button
-            initial={{ scale: 0 }}
+            initial={prefersReducedMotion ? false : { scale: 0.9, opacity: 0 }}
             animate={{ scale: 1 }}
-            className="fixed bottom-24 right-4 z-40 p-3 rounded-full bg-primary shadow-lg active:scale-95 transition-transform"
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+            className="fixed bottom-24 right-4 z-40 p-3 rounded-full bg-card/92 backdrop-blur-xl border border-border/60 shadow-[0_10px_24px_rgba(0,0,0,0.28)] active:scale-95 transition-transform"
             onClick={() => setShowQuickAdjust(true)}
+            aria-label="Open quick adjust"
           >
-            <Wand2 className="h-5 w-5 text-primary-foreground" />
+            <Wand2 className="h-5 w-5 text-primary" />
           </motion.button>
         )}
 

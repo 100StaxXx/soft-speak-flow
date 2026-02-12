@@ -145,17 +145,6 @@ export default {
           "50%": {
             opacity: "0.5",
           },
-          to: {
-            height: "0",
-          },
-        },
-        "skeleton-pulse": {
-          "0%, 100%": {
-            opacity: "1",
-          },
-          "50%": {
-            opacity: "0.5",
-          },
         },
         "shimmer": {
           "0%": {

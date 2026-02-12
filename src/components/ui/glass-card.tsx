@@ -8,34 +8,34 @@ const glassCardVariants = cva(
     variants: {
       variant: {
         default: [
-          "bg-white/[0.03] backdrop-blur-xl",
-          "border-white/[0.08]",
-          "shadow-[0_8px_32px_rgba(0,0,0,0.12)]",
+          "bg-card/78 backdrop-blur-lg",
+          "border-border/60",
+          "shadow-[0_10px_24px_rgba(0,0,0,0.22)]",
         ],
         elevated: [
-          "bg-white/[0.06] backdrop-blur-2xl",
-          "border-white/[0.12]",
-          "shadow-[0_12px_40px_rgba(0,0,0,0.2),0_2px_8px_rgba(0,0,0,0.08)]",
+          "bg-card/86 backdrop-blur-2xl",
+          "border-border/70",
+          "shadow-[0_14px_34px_rgba(0,0,0,0.28),0_2px_8px_rgba(0,0,0,0.12)]",
         ],
         inset: [
-          "bg-black/[0.1] backdrop-blur-lg",
-          "border-white/[0.05]",
+          "bg-background/60 backdrop-blur-lg",
+          "border-border/45",
           "shadow-inner",
         ],
         hero: [
-          "bg-gradient-to-br from-primary/[0.08] to-accent/[0.05] backdrop-blur-2xl",
-          "border-white/[0.1]",
-          "shadow-[0_16px_48px_rgba(0,0,0,0.15)]",
+          "bg-gradient-to-br from-primary/[0.12] to-accent/[0.07] backdrop-blur-2xl",
+          "border-border/60",
+          "shadow-[0_16px_38px_rgba(0,0,0,0.24)]",
         ],
         subtle: [
-          "bg-white/[0.02] backdrop-blur-md",
-          "border-white/[0.04]",
-          "shadow-[0_4px_16px_rgba(0,0,0,0.08)]",
+          "bg-card/62 backdrop-blur-md",
+          "border-border/45",
+          "shadow-[0_6px_16px_rgba(0,0,0,0.16)]",
         ],
         ultra: [
-          "bg-white/[0.02] backdrop-blur-2xl",
-          "border-white/[0.06]",
-          "shadow-[0_8px_32px_rgba(0,0,0,0.15)]",
+          "bg-card/70 backdrop-blur-2xl",
+          "border-border/55",
+          "shadow-[0_10px_28px_rgba(0,0,0,0.24)]",
         ],
       },
       glow: {

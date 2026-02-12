@@ -593,20 +593,30 @@ All colors MUST be HSL.
 @layer base {
   * {
     @apply border-border;
-    /* Prevent text selection app-wide for mobile experience */
-    -webkit-user-select: none !important;
-    user-select: none !important;
-    -webkit-touch-callout: none !important;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
     
-  /* Allow text selection ONLY in input fields */
+  /* Keep text selectable by default for native-feeling interactions */
+  p, span, div, h1, h2, h3, h4, h5, h6, label {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Inputs/selectable fields */
   input, textarea, [contenteditable="true"] {
     -webkit-user-select: text !important;
     user-select: text !important;
@@ -622,8 +632,9 @@ All colors MUST be HSL.
     }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Bebas Neue', 'Oswald', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    letter-spacing: 0.02em;
+    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    letter-spacing: 0.01em;
+    font-weight: 600;
   }
 
   /* Prevent text selection on interactive elements (iOS) */
@@ -635,13 +646,17 @@ All colors MUST be HSL.
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* iOS Safari specific - aggressive text selection prevention */
-  @supports (-webkit-touch-callout: none) {
-    p, span, div, h1, h2, h3, h4, h5, h6, label {
-      -webkit-user-select: none !important;
-      user-select: none !important;
-      -webkit-touch-callout: none !important;
-    }
+  button,
+  a,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.28);
+    color: hsl(var(--foreground));
   }
   
   /* 3D flip utilities */
@@ -1747,16 +1762,15 @@ All colors MUST be HSL.
   .cosmiq-glass-nav {
     background: linear-gradient(
       180deg,
-      hsl(var(--background) / 0.5),
-      hsl(var(--background) / 0.3)
+      hsl(var(--background) / 0.82),
+      hsl(var(--background) / 0.68)
     );
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border-top: 1px solid hsl(var(--cosmiq-glow) / 0.2);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-top: 1px solid hsl(var(--border) / 0.6);
     box-shadow: 
-      0 -8px 32px rgba(0, 0, 0, 0.25),
-      0 -2px 8px rgba(0, 0, 0, 0.1);
-    transform: translateZ(30px);
+      0 -8px 24px rgba(0, 0, 0, 0.2),
+      0 -1px 0 hsl(var(--foreground) / 0.04) inset;
   }
   
   /* Header glass - for sticky headers */
@@ -1764,29 +1778,28 @@ All colors MUST be HSL.
   .cosmiq-glass-header {
     background: linear-gradient(
       180deg,
-      hsl(var(--background) / 0.4),
-      hsl(var(--background) / 0.2)
+      hsl(var(--background) / 0.85),
+      hsl(var(--background) / 0.72)
     );
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border-bottom: 1px solid hsl(var(--cosmiq-glow) / 0.2);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    transform: translateZ(30px);
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+    border-bottom: 1px solid hsl(var(--border) / 0.55);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
   }
   
   /* Base cosmiq glass effect (updated for more transparency) */
   .cosmiq-glass {
     background: linear-gradient(
       135deg,
-      hsl(var(--card) / 0.5),
-      hsl(var(--card) / 0.35)
+      hsl(var(--card) / 0.78),
+      hsl(var(--card) / 0.62)
     );
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--cosmiq-glow) / 0.2);
+    backdrop-filter: blur(20px) saturate(125%);
+    -webkit-backdrop-filter: blur(20px) saturate(125%);
+    border: 1px solid hsl(var(--border) / 0.55);
     box-shadow: 
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 hsl(var(--pure-white) / 0.1);
+      0 10px 28px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 hsl(var(--pure-white) / 0.07);
   }
 
   /* Enhanced cosmiq card with glow */
@@ -1797,12 +1810,12 @@ All colors MUST be HSL.
   }
 
   .cosmiq-card:hover {
-    border-color: hsl(var(--cosmiq-glow) / 0.4);
+    border-color: hsl(var(--primary) / 0.35);
     box-shadow: 
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      0 0 40px hsl(var(--cosmiq-glow) / 0.2),
-      inset 0 1px 0 hsl(var(--pure-white) / 0.1);
-    transform: translateY(-2px);
+      0 12px 26px rgba(0, 0, 0, 0.28),
+      0 0 24px hsl(var(--primary) / 0.12),
+      inset 0 1px 0 hsl(var(--pure-white) / 0.08);
+    transform: translateY(-1px);
   }
 
   /* Cosmiq button with glow effect */
@@ -2648,4 +2661,21 @@ All colors MUST be HSL.
     hsl(200, 60%, 40%) 70%,
     hsl(260, 80%, 30%) 100%
   );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .cosmiq-card:hover,
+  .parallax-glass-card,
+  .cosmiq-button::before {
+    transform: none !important;
+  }
 }

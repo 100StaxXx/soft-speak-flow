@@ -1,6 +1,6 @@
 import { useState, useCallback, memo } from "react";
 import { format } from "date-fns";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { haptics } from "@/utils/haptics";
 
 const InboxPage = memo(function InboxPage() {
+  const prefersReducedMotion = useReducedMotion();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask } = useInboxTasks();
@@ -74,12 +75,12 @@ const InboxPage = memo(function InboxPage() {
         {/* Hero Title */}
         <div className="max-w-lg mx-auto px-4 pt-6" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 0px))' }}>
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.24 }}
             className="text-center mb-6"
           >
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-celestial-blue to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-semibold tracking-tight bg-gradient-to-r from-celestial-blue to-blue-400 bg-clip-text text-transparent">
               Inbox
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Capture now. Conquer later.</p>
@@ -112,7 +113,7 @@ const InboxPage = memo(function InboxPage() {
               {inboxTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-center gap-3 py-3 px-3 rounded-xl bg-card/60 backdrop-blur-sm border border-border/20"
+                  className="flex items-center gap-3 py-3 px-3 rounded-2xl bg-card/82 backdrop-blur-lg border border-border/55 shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
                 >
                   {/* Checkbox */}
                   <button
@@ -140,7 +141,7 @@ const InboxPage = memo(function InboxPage() {
                         setEditingTask(task);
                         haptics.light();
                       }}
-                      className="p-2 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+                      className="p-2 rounded-xl hover:bg-muted/55 text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
                       aria-label="Edit quest"
                     >
                       <Pencil className="w-4 h-4" />
@@ -151,7 +152,7 @@ const InboxPage = memo(function InboxPage() {
                         deleteInboxTask(task.id);
                         haptics.light();
                       }}
-                      className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
+                      className="p-2 rounded-xl hover:bg-destructive/12 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
                       aria-label="Delete quest"
                     >
                       <Trash2 className="w-4 h-4" />

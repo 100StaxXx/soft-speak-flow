@@ -125,27 +125,27 @@ export default function Challenges() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <h1 className="font-heading text-5xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
             Challenges
           </h1>
-          <p className="text-muted-foreground text-lg mt-2">
+          <p className="text-muted-foreground mt-2">
             Transform your life with structured challenges
           </p>
         </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ChallengeTab)} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-card/50 backdrop-blur-xl border border-border/50">
+          <TabsList className="grid w-full grid-cols-2 mb-8 bg-card/80 border border-border/60">
             <TabsTrigger
               value="active"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground"
+              className="font-medium"
             >
               <Target className="h-4 w-4 mr-2" />
               Active
             </TabsTrigger>
             <TabsTrigger
               value="available"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground"
+              className="font-medium"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
               Available
@@ -248,7 +248,7 @@ export default function Challenges() {
                       ) : (
                         <Button
                           onClick={() => handleStartChallenge(challenge.id, challenge.total_days)}
-                          className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-glow"
+                          className="w-full bg-gradient-to-r from-primary to-accent"
                         >
                           Start Challenge
                         </Button>

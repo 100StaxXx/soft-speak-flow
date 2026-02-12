@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, LogIn, Play, Star, Zap, Heart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { PageLoader } from "@/components/PageLoader";
 import { welcomeBackground } from "@/assets/backgrounds";
 
 const Welcome = () => {
+  const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
@@ -50,9 +51,9 @@ const Welcome = () => {
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 pt-safe-top pb-safe-bottom text-center">
         {/* Animated Logo/Brand */}
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.24 }}
           className="mb-8"
         >
           <div className="relative">
@@ -65,19 +66,19 @@ const Welcome = () => {
 
         {/* Title */}
         <motion.h1
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-4xl font-bold mb-4 bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent"
+          transition={{ delay: prefersReducedMotion ? 0 : 0.06, duration: prefersReducedMotion ? 0 : 0.24 }}
+          className="text-4xl font-semibold tracking-tight mb-4 bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent"
         >
           Cosmiq Quest
         </motion.h1>
 
         {/* Subtitle */}
         <motion.p
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.24 }}
           className="text-lg text-muted-foreground mb-8 px-2 md:max-w-md"
         >
           Transform your daily habits into an epic adventure with mentors and a companion that grows with you
@@ -85,17 +86,17 @@ const Welcome = () => {
 
         {/* Feature Pills */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 8, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
+          transition={{ delay: prefersReducedMotion ? 0 : 0.1, duration: prefersReducedMotion ? 0 : 0.24 }}
           className="flex flex-wrap justify-center gap-3 mb-12"
         >
           {features.map((feature) => (
             <motion.div
               key={feature.text}
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={prefersReducedMotion ? false : { scale: 0.97, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: feature.delay + 0.4, duration: 0.3 }}
+              transition={{ delay: prefersReducedMotion ? 0 : feature.delay + 0.1, duration: prefersReducedMotion ? 0 : 0.2 }}
               className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border/50 shadow-sm"
             >
               <feature.icon className="h-4 w-4 text-primary" />
@@ -106,9 +107,9 @@ const Welcome = () => {
 
         {/* CTA Buttons */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 8, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
+          transition={{ delay: prefersReducedMotion ? 0 : 0.12, duration: prefersReducedMotion ? 0 : 0.24 }}
           className="flex flex-col gap-4 w-full px-4 md:max-w-sm"
         >
           <Button
@@ -134,9 +135,9 @@ const Welcome = () => {
 
       {/* Footer with iOS safe area */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
+        transition={{ delay: prefersReducedMotion ? 0 : 0.16, duration: prefersReducedMotion ? 0 : 0.2 }}
         className="relative z-10 pb-safe-bottom text-center"
       >
         <p className="text-xs text-muted-foreground">
