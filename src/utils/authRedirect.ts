@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
-import { getResolvedMentorId } from "./mentor";
+import {
+  getOnboardingMentorId,
+  getResolvedMentorId,
+  isInvalidMentorReferenceError,
+  stripOnboardingMentorId,
+} from "./mentor";
 import { logger } from "./logger";
 
 /**
@@ -57,23 +62,48 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
     }
 
     const resolvedMentorId = getResolvedMentorId(profile);
+    const onboardingMentorId = getOnboardingMentorId(profile);
     logger.debug('[getAuthRedirectPath] Profile fetched', { 
       hasProfile: !!profile, 
       onboardingCompleted: profile?.onboarding_completed,
       hasMentor: !!profile?.selected_mentor_id,
+      onboardingMentorId: onboardingMentorId?.substring(0, 8),
       resolvedMentorId: resolvedMentorId?.substring(0, 8)
     });
 
-    if (profile?.onboarding_completed && !profile.selected_mentor_id && resolvedMentorId) {
-      // Fire and forget - don't wait for this update
-      Promise.resolve(
-        supabase
+    if (profile?.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId) {
+      // Fire and forget - don't block navigation on profile cleanup
+      Promise.resolve((async () => {
+        const { error: backfillError } = await supabase
           .from("profiles")
-          .update({ selected_mentor_id: resolvedMentorId })
-          .eq("id", userId)
-      )
-        .then(() => logger.debug('[getAuthRedirectPath] Mentor ID updated'))
-        .catch((err: Error) => logger.warn('[getAuthRedirectPath] Failed to update mentor ID', { error: err }));
+          .update({ selected_mentor_id: onboardingMentorId })
+          .eq("id", userId);
+
+        if (!backfillError) {
+          logger.debug('[getAuthRedirectPath] Mentor ID updated');
+          return;
+        }
+
+        if (!isInvalidMentorReferenceError(backfillError)) {
+          logger.warn('[getAuthRedirectPath] Failed to update mentor ID', { error: backfillError });
+          return;
+        }
+
+        const sanitizedOnboardingData = stripOnboardingMentorId(profile.onboarding_data);
+        const { error: cleanupError } = await supabase
+          .from("profiles")
+          .update({ onboarding_data: sanitizedOnboardingData })
+          .eq("id", userId);
+
+        if (cleanupError) {
+          logger.warn('[getAuthRedirectPath] Failed to clear stale onboarding mentor ID', { error: cleanupError });
+          return;
+        }
+
+        logger.debug('[getAuthRedirectPath] Cleared stale onboarding mentor ID');
+      })()).catch((err: Error) =>
+        logger.warn('[getAuthRedirectPath] Mentor backfill cleanup failed', { error: err })
+      );
     }
 
     // If onboarding is completed, always go to tasks

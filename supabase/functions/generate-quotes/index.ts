@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
@@ -59,10 +62,10 @@ Deno.serve(async (req) => {
       ? `Generate ${count} short, authentic quotes and affirmations for someone feeling "${value}". Each must include an author (famous person or "Anonymous"). IMPORTANT: Do NOT include em dashes (—) or attribution dashes in the quote text itself. Return JSON array of {"text","author"} where text is ONLY the quote without any dashes or author attribution.`
       : `Generate ${count} short, inspiring quotes and affirmations related to "${value}". Each must include an author (famous person or "Anonymous"). IMPORTANT: Do NOT include em dashes (—) or attribution dashes in the quote text itself. Return JSON array of {"text","author"} where text is ONLY the quote without any dashes or author attribution.`;
 
-    const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
+        Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

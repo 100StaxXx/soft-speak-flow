@@ -1,132 +1,33 @@
 # Database State Report
 
-**Last Updated:** 2025-01-27
-**Status:** ✅ Migration Completed
+**Last Updated:** 2026-02-12
+**Status:** Backend ownership migrated to self-managed hosted Supabase workflow
 
-## Current Runtime Configuration
+## Current Source of Truth
 
-### ✅ ACTIVE: Self-Managed Supabase (`opbfpbbqvuksuvmtmssd`)
+- Supabase linkage file: `supabase/config.toml`
+- Runtime frontend env template: `.env.example`
+- Function deployment allow-list: `supabase/function-manifest.json`
+- CI deployment workflow: `.github/workflows/supabase-deploy.yml`
 
-**Status:** ✅ Currently in use by the application
+## Required Cutover Inputs
 
-**Evidence:**
-- `.env` file contains:
-  ```
-  VITE_SUPABASE_URL="https://opbfpbbqvuksuvmtmssd.supabase.co"
-  VITE_SUPABASE_PROJECT_ID="opbfpbbqvuksuvmtmssd"
-  VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." (Self-managed project key)
-  ```
+Before deployment, set real values for:
 
-**Location:** Frontend connects via `src/integrations/supabase/client.ts`
-- Uses `import.meta.env.VITE_SUPABASE_URL` 
-- Uses `import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY`
-- Both point to the self-managed project
+- `supabase/config.toml` -> `project_id`
+- `.env` -> `VITE_SUPABASE_URL`, `VITE_SUPABASE_PROJECT_ID`, `VITE_SUPABASE_PUBLISHABLE_KEY`
+- GitHub secrets -> `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `SUPABASE_SERVICE_ROLE_KEY`
 
-**Configuration Files:**
-- ✅ Runtime: `.env` → `opbfpbbqvuksuvmtmssd`
-- ✅ Supabase CLI: `supabase/config.toml` → `opbfpbbqvuksuvmtmssd`
+## Scheduling Ownership
 
-**Project URL:** `https://opbfpbbqvuksuvmtmssd.supabase.co`
+Legacy DB cron scheduling has been removed from runtime ownership.
 
----
+- Historical migration: `supabase/migrations/20251127174517_49eb8abb-f580-4245-958c-ded03fd9168c.sql`
+- Cleanup migration: `supabase/migrations/20260212090000_remove_legacy_hardcoded_cron_jobs.sql`
+- Active scheduler: `.github/workflows/scheduled-functions.yml`
 
-### ❌ DEPRECATED: Lovable-Managed Supabase (`tffrgsaawvletgiztfry`)
+Scheduled functions:
 
-**Status:** No longer in use - Migration completed
-
-**Previous Status:** Was previously active until migration to self-managed project
-
-**Project URL:** `https://tffrgsaawvletgiztfry.supabase.co`
-
----
-
-### ❌ CLEANED UP: Firebase (`cosmiq-prod`)
-
-**Status:** ✅ Removed - Migration artifacts cleaned up
-
-**What Was Removed:**
-- ✅ `functions/` directory (compiled Firebase Cloud Functions)
-- ✅ `.secrets/cosmiq-prod-service-account.json` (Firebase service account)
-
-**Note:** No Firebase code was found in active use. All references were from the abandoned migration attempt.
-
-**Firebase Project:** `cosmiq-prod` (no longer referenced in codebase)
-
----
-
-## Summary Table
-
-| Database | Project ID | Status | Runtime Usage | Configuration |
-|----------|-----------|--------|---------------|---------------|
-| **Self-Managed Supabase** | `opbfpbbqvuksuvmtmssd` | ✅ **ACTIVE** | ✅ Frontend connected | ✅ `.env` configured, CLI linked |
-| **Lovable Supabase** | `tffrgsaawvletgiztfry` | ❌ **DEPRECATED** | ❌ Not in use | ❌ No longer referenced |
-| **Firebase** | `cosmiq-prod` | ❌ **REMOVED** | ❌ Not in use | ❌ Artifacts cleaned up |
-
----
-
-## Migration Summary
-
-### ✅ Completed Actions
-
-1. ✅ Updated `.env` file to point to `opbfpbbqvuksuvmtmssd`:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY`
-   - `VITE_SUPABASE_PROJECT_ID`
-
-2. ✅ Verified configuration alignment:
-   - Supabase CLI (`supabase/config.toml`) is linked to `opbfpbbqvuksuvmtmssd`
-   - Runtime environment (`.env`) points to `opbfpbbqvuksuvmtmssd`
-   - ✅ Configuration is now consistent
-
-3. ✅ Cleaned up Firebase artifacts:
-   - Removed `functions/` directory
-   - Removed `.secrets/cosmiq-prod-service-account.json`
-   - Verified no active Firebase code references remain
-
-### ⚠️ Next Steps (Recommended)
-
-1. Verify all Edge Functions are deployed to `opbfpbbqvuksuvmtmssd`:
-   ```bash
-   supabase functions list --project-ref opbfpbbqvuksuvmtmssd
-   ```
-
-2. Verify database migrations are applied:
-   ```bash
-   supabase db push --project-ref opbfpbbqvuksuvmtmssd
-   ```
-
-3. Verify all secrets are set:
-   ```bash
-   supabase secrets list --project-ref opbfpbbqvuksuvmtmssd
-   ```
-
-4. Test the application thoroughly:
-   - User authentication
-   - Database operations
-   - Edge function calls
-   - Storage operations
-
-5. Regenerate TypeScript types (if needed):
-   ```bash
-   ./REGENERATE_TYPES.sh
-   ```
-
----
-
-## Configuration Status
-
-✅ **Configuration is now aligned:**
-- Frontend app connects to: `opbfpbbqvuksuvmtmssd`
-- Supabase CLI is linked to: `opbfpbbqvuksuvmtmssd`
-- Edge Functions deploy to: `opbfpbbqvuksuvmtmssd`
-- All components are now using the same project!
-
----
-
-## Files Reference
-
-- ✅ `.env` - Runtime config (Self-managed project: `opbfpbbqvuksuvmtmssd`)
-- ✅ `supabase/config.toml` - CLI config (Self-managed project: `opbfpbbqvuksuvmtmssd`)
-- 📄 `docs/MIGRATION_GUIDE.md` - Setup instructions for self-managed project
-- 📄 `docs/auth-diagnostic-report.md` - References self-managed project
-- ✅ Firebase artifacts removed - No longer present in codebase
+- `generate-daily-mentor-pep-talks`
+- `schedule-daily-mentor-pushes`
+- `dispatch-daily-pushes`

@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -22,7 +25,7 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
@@ -43,13 +46,13 @@ serve(async (req) => {
     
     console.log('Generating new welcome image for user:', userId);
     
-    // Generate the image using Lovable AI with next-gen model for higher quality
+    // Generate the image using OpenAI with next-gen model for higher quality
     const prompt = `9:16 portrait aspect ratio full-screen mobile wallpaper. Mystical cosmic adventure scene - a glowing ethereal portal gateway at center-bottom third, surrounded by swirling nebula clouds in deep purples, cosmic blues, and subtle pink hues. Starfield with sparkling stars, floating magical particles, mystical path leading to the portal. Fantasy adventure theme, atmospheric depth, cinematic lighting. No text, no characters, no UI elements. Ultra high resolution, 4K quality, sharp details, professional digital art. Dreamy ethereal fantasy art style.`;
     
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

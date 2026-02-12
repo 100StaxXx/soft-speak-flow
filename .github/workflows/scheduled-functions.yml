@@ -1,0 +1,67 @@
+name: Scheduled Edge Functions
+
+on:
+  schedule:
+    - cron: "1 0 * * *"
+    - cron: "5 0 * * *"
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: "Function to invoke manually"
+        required: true
+        type: string
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Select function for this run
+        id: select
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            fn="${{ inputs.function_name }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "1 0 * * *")
+                fn="generate-daily-mentor-pep-talks"
+                ;;
+              "5 0 * * *")
+                fn="schedule-daily-mentor-pushes"
+                ;;
+              "*/5 * * * *")
+                fn="dispatch-daily-pushes"
+                ;;
+              *)
+                echo "Unsupported schedule: ${{ github.event.schedule }}" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+          echo "function_name=$fn" >> "$GITHUB_OUTPUT"
+
+      - name: Invoke scheduled function
+        run: |
+          set -euo pipefail
+          fn="${{ steps.select.outputs.function_name }}"
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/${fn}"
+
+          status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
+            -X POST "$url" \
+            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "HTTP $status"
+          cat /tmp/function-response.json || true
+
+          if [ "$status" -ge 300 ]; then
+            exit 1
+          fi

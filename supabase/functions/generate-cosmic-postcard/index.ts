@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { mentorNarrativeProfiles, getMentorNarrativeProfile, type MentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
@@ -158,11 +161,11 @@ serve(async (req) => {
 
     console.log(`[Cosmic Postcard] Starting for user ${userId}, companion ${companionId}, milestone ${milestonePercent}%, chapter ${chapterNumber || 'N/A'}`);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Missing required environment variables");
     }
 
@@ -294,10 +297,10 @@ OUTPUT: A beautiful cosmic postcard showing THIS EXACT companion visiting ${loca
     console.log('[Cosmic Postcard] Calling Gemini image edit API...');
 
     // Use Gemini's image editing (multimodal) to place companion in scene
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -454,10 +457,10 @@ Return ONLY the story content - no JSON, no formatting markers, just the narrati
 
       console.log('[Cosmic Postcard] Generating chapter content with mentor voice...');
       
-      const storyResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const storyResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

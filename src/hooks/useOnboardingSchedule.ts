@@ -11,7 +11,7 @@ import { safeLocalStorage } from "@/utils/storage";
 export const ONBOARDING_TASKS = [
   {
     task_text: "Create Your First Quest 🎯",
-    xp_reward: 2,
+    xp_reward: 4,
     difficulty: "easy",
     sort_order: 0,
     category: "mind",
@@ -20,20 +20,10 @@ export const ONBOARDING_TASKS = [
       "1. Stay on QUESTS.\n2. Tap + in the lower-right corner.\n3. Set a time (required for creating a Quest here).\n4. Enter your quest title.\n5. Tap Create Quest.\nIf time is missing, it becomes an Inbox item.",
   },
   {
-    task_text: "Complete Your First Quest ✅",
+    task_text: "Meet Your Companion ✨",
     xp_reward: 3,
     difficulty: "easy",
     sort_order: 1,
-    category: "mind",
-    estimated_duration: 2,
-    notes:
-      "1. Find the quest you just created.\n2. Tap the quest circle once.\n3. Watch your completion and XP update.\nDone when this step auto-completes.",
-  },
-  {
-    task_text: "Meet Your Companion ✨",
-    xp_reward: 2,
-    difficulty: "easy",
-    sort_order: 2,
     category: "soul",
     estimated_duration: 2,
     notes:
@@ -43,7 +33,7 @@ export const ONBOARDING_TASKS = [
     task_text: "Morning Check-in 🌅",
     xp_reward: 3,
     difficulty: "easy",
-    sort_order: 3,
+    sort_order: 2,
     category: "mind",
     estimated_duration: 3,
     notes:
@@ -88,7 +78,7 @@ export function useOnboardingSchedule(
       return;
     }
 
-    const ONBOARDING_SCHEDULE_VERSION = 2;
+    const ONBOARDING_SCHEDULE_VERSION = 3;
     const scheduleKey = `onboarding_schedule_version_${userId}`;
 
     const createOnboardingSchedule = async () => {

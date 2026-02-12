@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -21,9 +24,9 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const systemPrompt = `You are a task breakdown expert. Given a goal or large task, break it into 3-7 actionable, specific subtasks.
@@ -41,12 +44,12 @@ You MUST use the decompose_task function to return your response.`;
       ? `Break down this goal into actionable subtasks:\n\nGoal: "${taskTitle}"\nContext: "${taskDescription}"`
       : `Break down this goal into actionable subtasks:\n\nGoal: "${taskTitle}"`;
 
-    console.log('Calling Lovable AI to decompose task:', taskTitle);
+    console.log('Calling OpenAI to decompose task:', taskTitle);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

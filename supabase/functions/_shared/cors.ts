@@ -34,9 +34,6 @@ const getAllowedOrigins = (): string[] => {
   // Default allowed origins
   // Add your production domains here
   return [
-    // Lovable preview URLs
-    "https://lovable.dev",
-    "https://lovableproject.com",
     // Production domains
     "https://cosmiq.app",
     "https://www.cosmiq.app",
@@ -64,11 +61,6 @@ export function isOriginAllowed(origin: string | null): boolean {
   
   // Check exact match
   if (allowedOrigins.includes(origin)) {
-    return true;
-  }
-  
-  // Check for Lovable preview subdomains
-  if (origin.endsWith('.lovableproject.com') || origin.endsWith('.lovable.dev')) {
     return true;
   }
   

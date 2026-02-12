@@ -197,10 +197,19 @@ const Profile = () => {
     if (!user || isChangingMentor) return;
     setIsChangingMentor(true);
     try {
+      const onboardingData =
+        profile?.onboarding_data && typeof profile.onboarding_data === "object" && !Array.isArray(profile.onboarding_data)
+          ? (profile.onboarding_data as Record<string, unknown>)
+          : {};
+
       const { error } = await supabase
         .from("profiles")
         .update({ 
           selected_mentor_id: mentorId,
+          onboarding_data: {
+            ...onboardingData,
+            mentorId,
+          },
           timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
         })
         .eq("id", user.id);
@@ -212,7 +221,7 @@ const Profile = () => {
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
       setIsChangingMentor(false);
     }
-  }, [user, isChangingMentor, profile?.timezone, toast]);
+  }, [user, isChangingMentor, profile?.onboarding_data, profile?.timezone, toast]);
 
   const handleSignOut = useCallback(async () => {
     if (isSigningOut) return;

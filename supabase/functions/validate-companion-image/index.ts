@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -27,9 +30,9 @@ serve(async (req) => {
       );
     }
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) {
-      console.error("LOVABLE_API_KEY not configured");
+    const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openAIApiKey) {
+      console.error("OPENAI_API_KEY not configured");
       return new Response(
         JSON.stringify({ error: "AI service not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -88,10 +91,10 @@ Set "valid" to false if confidence of ANY issue is above 70%.
 Only include issueTypes that are actually detected.
 Be strict - if something looks off, flag it.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
+        "Authorization": `Bearer ${openAIApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

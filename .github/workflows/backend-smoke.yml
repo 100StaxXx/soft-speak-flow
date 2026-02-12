@@ -1,0 +1,71 @@
+name: Backend Smoke
+
+on:
+  workflow_run:
+    workflows:
+      - Supabase Deploy
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Basic auth health check
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o /tmp/auth-health.txt -w "%{http_code}" "https://${PROJECT_REF}.supabase.co/auth/v1/health")
+          echo "auth/v1/health => HTTP $status"
+          cat /tmp/auth-health.txt || true
+          if [ "$status" -ge 300 ]; then
+            exit 1
+          fi
+
+      - name: Verify protected functions reject anonymous requests
+        run: |
+          set -euo pipefail
+
+          check_unauthorized() {
+            local fn="$1"
+            local body="$2"
+            local status
+
+            status=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+              -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/${fn}" \
+              -H "Content-Type: application/json" \
+              -d "$body")
+
+            echo "${fn} (anonymous) => HTTP ${status}"
+            cat /tmp/resp.json || true
+
+            if [ "$status" != "401" ] && [ "$status" != "403" ]; then
+              echo "Expected ${fn} to reject anonymous access" >&2
+              exit 1
+            fi
+          }
+
+          check_unauthorized "mentor-chat" '{"message":"hi","mentorName":"Eli","mentorTone":"supportive"}'
+          check_unauthorized "generate-daily-plan" '{"energyLevel":"medium","dayType":"workday","focusArea":"progress"}'
+          check_unauthorized "verify-admin-access" '{}'
+
+      - name: Verify service-auth scheduled endpoint executes
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o /tmp/scheduled.json -w "%{http_code}" \
+            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/dispatch-daily-pushes" \
+            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "dispatch-daily-pushes (service role) => HTTP $status"
+          cat /tmp/scheduled.json || true
+
+          if [ "$status" -ge 300 ]; then
+            exit 1
+          fi

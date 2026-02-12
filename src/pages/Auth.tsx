@@ -659,7 +659,7 @@ const Auth = () => {
         return;
       }
 
-      // Web OAuth flow for Google and web Apple Sign-In
+      // Web OAuth flow for Google and Apple Sign-In
       if (providerSupportsNative) {
         const providerReady = provider === 'google' ? googleNativeReady : appleNativeReady;
         if (!providerReady) {
@@ -669,18 +669,8 @@ const Auth = () => {
 
       console.log(`[${provider} OAuth] Using web OAuth flow`);
       console.log(`[${provider} OAuth] Redirect URL:`, getRedirectUrl());
-      
-      // For Apple on web, use Lovable Cloud managed OAuth
-      if (provider === 'apple') {
-        const { lovable } = await import("@/integrations/lovable");
-        const { error } = await lovable.auth.signInWithOAuth("apple", {
-          redirect_uri: getRedirectUrl(),
-        });
-        if (error) throw new Error(error.message);
-        return; // Redirect happens automatically
-      }
 
-      // For other providers, use standard Supabase OAuth
+      // Use standard Supabase OAuth for all web providers
       const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {

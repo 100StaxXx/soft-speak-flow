@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
@@ -133,8 +136,8 @@ serve(async (req) => {
       ? `Today's pep talk theme: "${pepTalk.title}" (${pepTalk.topic_category}). Reference this theme if relevant to their intention.`
       : '';
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
-    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY not configured')
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openAIApiKey) throw new Error('OPENAI_API_KEY not configured')
 
     // Build personalized prompt using template system
     const promptBuilder = new PromptBuilder(supabaseUrl, supabaseKey);
@@ -154,10 +157,10 @@ serve(async (req) => {
       }
     });
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

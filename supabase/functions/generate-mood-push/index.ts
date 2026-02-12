@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -24,7 +27,7 @@ serve(async (req) => {
   try {
     const { mood } = await req.json();
     
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
     const mapping = moodMapping[mood] || moodMapping['Unmotivated'];
     
@@ -38,10 +41,10 @@ Tone: Strong, direct, supportive. Not overly soft. Think David Goggins meets a g
 
     const userPrompt = `The user is feeling: ${mood}. Help them evolve through this moment.`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

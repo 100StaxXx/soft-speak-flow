@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   // ⚠️ PRODUCTION BUILD: server config commented out
   // Only use during LOCAL development - DO NOT uncomment for iOS/Android builds!
   // server: {
-  //   url: 'https://1b75b247-809a-454c-82ea-ceca9d5f620c.lovableproject.com?forceHideBadge=true',
+  //   url: 'https://app.cosmiq.quest?forceHideBadge=true',
   //   cleartext: true
   // },
   plugins: {

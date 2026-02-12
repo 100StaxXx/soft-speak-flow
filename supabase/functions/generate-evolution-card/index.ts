@@ -1,3 +1,6 @@
+import { installOpenAICompatibilityShim } from "../_shared/aiClient.ts";
+installOpenAICompatibilityShim();
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { calculateBondLevel, calculateEnergyCost, calculateStats } from "../_shared/cardMath.ts";
@@ -69,10 +72,10 @@ serve(async (req) => {
     // Generate frame type based on element
     const frameType = `${element.toLowerCase()}-frame`;
 
-    // Use Lovable AI to generate creature name, traits, story, and lore seed
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    // Use OpenAI to generate creature name, traits, story, and lore seed
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
     const personality = userAttributes?.body > 60 ? 'powerful and energetic' :
@@ -175,10 +178,10 @@ Make it LEGENDARY. This is the birth of a companion.`;
       };
       console.log('Using pre-generated Stage 20 card data');
     } else {
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

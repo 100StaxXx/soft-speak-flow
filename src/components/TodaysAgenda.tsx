@@ -809,7 +809,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   return (
     <div className="relative">
-      <div className="relative px-2 py-2 overflow-visible" data-tour="quests-list">
+      <div className="relative px-2 py-2 overflow-visible">
         {/* Compact Header: Date + Progress Ring + XP */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
