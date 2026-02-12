@@ -49,7 +49,7 @@ ON CONFLICT (stage) DO NOTHING;
 
 -- Add helper functions
 CREATE OR REPLACE FUNCTION public.get_next_evolution_threshold(current_stage INTEGER)
-RETURNS INTEGER
+RETURNS BIGINT
 LANGUAGE SQL
 STABLE
 SECURITY DEFINER
@@ -58,7 +58,7 @@ AS $$
   SELECT xp_required FROM evolution_thresholds WHERE stage = current_stage + 1;
 $$;
 
-CREATE OR REPLACE FUNCTION public.should_evolve(current_stage INTEGER, current_xp INTEGER)
+CREATE OR REPLACE FUNCTION public.should_evolve(current_stage INTEGER, current_xp BIGINT)
 RETURNS BOOLEAN
 LANGUAGE SQL
 STABLE
