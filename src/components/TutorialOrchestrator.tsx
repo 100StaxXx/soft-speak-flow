@@ -389,6 +389,9 @@ export const TutorialOrchestrator = () => {
 
   const currentIndex = GUIDED_STEPS.findIndex((step) => step.id === currentStep.id);
   const progressText = `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
+  const needsFabAccess =
+    location.pathname === "/journeys" &&
+    (currentStep.id === "create_campaign" || currentStep.id === "create_quest");
 
   if (effectiveDismissed) {
     return (
@@ -406,8 +409,20 @@ export const TutorialOrchestrator = () => {
   }
 
   return (
-    <div className="fixed left-0 right-0 z-[70] px-3" style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }}>
-      <div className="mx-auto max-w-lg rounded-2xl border border-primary/30 bg-card/92 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] p-3">
+    <div
+      className="fixed left-0 right-0 z-[70] px-3"
+      style={
+        needsFabAccess
+          ? { top: "calc(1rem + env(safe-area-inset-top, 0px))" }
+          : { bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }
+      }
+    >
+      <div
+        className={cn(
+          "mx-auto rounded-2xl border border-primary/30 bg-card/92 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] p-3",
+          needsFabAccess ? "max-w-md" : "max-w-lg"
+        )}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.18em] text-primary/90 font-semibold">{progressText}</p>

@@ -514,25 +514,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               isOnboarding && !isComplete ? "gap-1.5" : "gap-0"
             )}
           >
-            {/* Tutorial quest breathing glow effect */}
-            {isOnboarding && !isComplete && (
-              useLiteAnimations ? (
-                <div className="absolute inset-0 rounded-full bg-primary/20" />
-              ) : (
-                <motion.div
-                  className="absolute inset-0 rounded-full bg-primary/30"
-                  animate={{ 
-                    scale: [1, 1.5, 1],
-                    opacity: [0.6, 0, 0.6]
-                  }}
-                  transition={{ 
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                />
-              )
-            )}
             <button
               data-interactive="true"
               onClick={handleCheckboxClick}
