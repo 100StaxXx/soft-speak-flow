@@ -23,6 +23,7 @@ interface EnergyBeamGameProps {
 // ENDLESS mode config - no timer, no wave cap
 const DIFFICULTY_CONFIG = {
   beginner: {
+    startLives: 5,
     baseEnemiesPerWave: 6,
     enemyFireRate: 0,
     enemySpeed: 0.2,
@@ -33,6 +34,7 @@ const DIFFICULTY_CONFIG = {
     diveIncreasePerWave: 0.003,
   },
   easy: {
+    startLives: 4,
     baseEnemiesPerWave: 8,
     enemyFireRate: 0,
     enemySpeed: 0.3,
@@ -43,6 +45,7 @@ const DIFFICULTY_CONFIG = {
     diveIncreasePerWave: 0.005,
   },
   medium: {
+    startLives: 3,
     baseEnemiesPerWave: 10,
     enemyFireRate: 0.003,
     enemySpeed: 0.4,
@@ -53,6 +56,7 @@ const DIFFICULTY_CONFIG = {
     diveIncreasePerWave: 0.006,
   },
   hard: {
+    startLives: 2,
     baseEnemiesPerWave: 12,
     enemyFireRate: 0.006,
     enemySpeed: 0.5,
@@ -63,6 +67,7 @@ const DIFFICULTY_CONFIG = {
     diveIncreasePerWave: 0.008,
   },
   master: {
+    startLives: 2,
     baseEnemiesPerWave: 15,
     enemyFireRate: 0.01,
     enemySpeed: 0.65,
@@ -436,9 +441,9 @@ const WaveTransition = memo(({ wave }: { wave: number }) => (
 WaveTransition.displayName = 'WaveTransition';
 
 // Lives display - compact
-const LivesDisplay = memo(({ lives }: { lives: number }) => (
+const LivesDisplay = memo(({ lives, maxLives }: { lives: number; maxLives: number }) => (
   <div className="flex items-center gap-0.5">
-    {Array.from({ length: 3 }).map((_, i) => (
+    {Array.from({ length: maxLives }).map((_, i) => (
       <Heart
         key={i}
         className={`w-4 h-4 ${i < lives ? 'text-red-500 fill-red-500' : 'text-slate-600'}`}
@@ -610,7 +615,7 @@ export function EnergyBeamGame({
   const [countdown, setCountdown] = useState(3);
   const [score, setScore] = useState(0);
   const [wave, setWave] = useState(1);
-  const [lives, setLives] = useState(3);
+  const [lives, setLives] = useState(config.startLives);
   
   // Player state
   const [playerX, setPlayerX] = useState(50);
@@ -1026,8 +1031,8 @@ export function EnergyBeamGame({
                 setTimeout(() => setRapidFire(false), 5000);
                 break;
               case 'repair':
-                // Restore 1 life (max 3)
-                setLives(l => Math.min(l + 1, 3));
+                // Restore 1 life up to the difficulty cap.
+                setLives(l => Math.min(l + 1, config.startLives));
                 setScorePopups(p => [...p, {
                   id: `sp-repair-${Date.now()}`,
                   x: pu.x,
@@ -1087,6 +1092,8 @@ export function EnergyBeamGame({
                 setScreenFlash('rgba(59,130,246,0.4)');
                 setTimeout(() => setScreenFlash(null), 150);
               } else {
+                onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'enemy_collision' });
+
                 // Hit effect
                 setHitEffects(prevEffects => [...prevEffects, {
                   id: `hit-enemy-${Date.now()}`,
@@ -1130,7 +1137,7 @@ export function EnergyBeamGame({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, playerX, currentConfig, fireProjectile, hasShield, isInvulnerable]);
+  }, [gameState, playerX, currentConfig, fireProjectile, hasShield, isInvulnerable, onDamage, tierAttackDamage]);
   
   // Check wave completion - ENDLESS, always spawn next wave
   useEffect(() => {
@@ -1232,7 +1239,7 @@ export function EnergyBeamGame({
             {!compact && <div className="text-xs text-muted-foreground">Endless Mode</div>}
           </div>
           
-          <LivesDisplay lives={lives} />
+          <LivesDisplay lives={lives} maxLives={config.startLives} />
         </div>
         
         {/* Power-up indicators - hidden in compact mode */}

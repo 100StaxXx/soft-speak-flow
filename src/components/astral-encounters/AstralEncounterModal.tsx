@@ -40,7 +40,7 @@ interface AstralEncounterModalProps {
   encounter: AstralEncounter | null;
   adversary: Adversary | null;
   questInterval?: number;
-  onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => void;
+  onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => Promise<boolean>;
   onPass?: () => void;
   // Boss battle props
   isBossBattle?: boolean;
@@ -130,7 +130,7 @@ export const AstralEncounterModal = ({
   });
 
   // Handle battle end (victory or defeat)
-  const handleBattleEnd = useCallback((outcome: 'victory' | 'fail') => {
+  const handleBattleEnd = useCallback(async (outcome: 'victory' | 'fail') => {
     if (!adversary || !encounter) return;
     
     const result = outcome === 'fail' ? 'fail' : getResult();
@@ -141,6 +141,17 @@ export const AstralEncounterModal = ({
       usedTiltControls
     );
 
+    const didPersist = await onComplete({
+      encounterId: encounter.id,
+      accuracy,
+      phasesCompleted: outcome === 'fail' ? currentPhaseIndex : adversary.phases,
+    });
+
+    if (!didPersist) {
+      onOpenChange(false);
+      return;
+    }
+
     setFinalResult({
       result,
       accuracy,
@@ -148,14 +159,8 @@ export const AstralEncounterModal = ({
       tiltBonus: usedTiltControls,
     });
 
-    onComplete({
-      encounterId: encounter.id,
-      accuracy,
-      phasesCompleted: outcome === 'fail' ? currentPhaseIndex : adversary.phases,
-    });
-
     setPhase('result');
-  }, [adversary, encounter, getResult, battleState.playerHPPercent, onComplete, currentPhaseIndex, usedTiltControls]);
+  }, [adversary, encounter, getResult, battleState.playerHPPercent, onComplete, currentPhaseIndex, usedTiltControls, onOpenChange]);
 
   // Reset phase when modal opens - set to boss_intro for boss battles
   useEffect(() => {

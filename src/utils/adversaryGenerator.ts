@@ -146,41 +146,6 @@ export const getTierFromTrigger = (
   return 'common';
 };
 
-// Active games for resist mode (randomized selection)
-const ACTIVE_RESIST_GAMES: MiniGameType[] = [
-  'energy_beam',
-  'tap_sequence',
-  'orb_match',
-  'galactic_match'
-];
-
-// Generate adversary specifically for resist mode (always single phase, quick)
-export const generateResistAdversary = (habitTheme: AdversaryTheme): Adversary => {
-  const tier: AdversaryTier = Math.random() > 0.7 ? 'uncommon' : 'common';
-  const config = TIER_CONFIG[tier];
-  
-  const prefix = randomFrom(NAME_PREFIXES[habitTheme]);
-  const suffix = randomFrom(NAME_SUFFIXES[tier]);
-  const name = `${prefix} ${suffix}`;
-  
-  const lore = randomFrom(LORE_TEMPLATES[habitTheme]);
-  const essenceName = randomFrom(ESSENCE_NAMES[habitTheme]);
-  const essenceDescription = ESSENCE_DESCRIPTIONS[habitTheme];
-  
-  return {
-    name,
-    theme: habitTheme,
-    tier,
-    lore,
-    miniGameType: randomFrom(ACTIVE_RESIST_GAMES), // Random game selection
-    phases: 1, // Always single phase for quick resist sessions
-    essenceName,
-    essenceDescription,
-    statType: THEME_STAT_MAP[habitTheme],
-    statBoost: config.statBoost,
-  };
-};
-
 // Get theme based on epic category or random
 export const getThemeForTrigger = (
   triggerType: TriggerType,

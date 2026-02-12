@@ -25,6 +25,8 @@ export const AstralEncounterTriggerOverlay = ({
 }: AstralEncounterTriggerOverlayProps) => {
   const colors = TIER_COLORS[tier];
   const hasSoundPlayed = useRef(false);
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionScheduledRef = useRef(false);
 
   // Play trigger sound when encounter starts
   useEffect(() => {
@@ -35,8 +37,22 @@ export const AstralEncounterTriggerOverlay = ({
     
     if (!isVisible) {
       hasSoundPlayed.current = false;
+      completionScheduledRef.current = false;
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
     }
   }, [isVisible]);
+
+  useEffect(() => {
+    return () => {
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   if (!isVisible) return null;
 
@@ -46,8 +62,13 @@ export const AstralEncounterTriggerOverlay = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onAnimationComplete={() => {
-        // Auto-complete after animation sequence
-        setTimeout(onComplete, 2500);
+        // Auto-complete after animation sequence.
+        if (completionScheduledRef.current) return;
+        completionScheduledRef.current = true;
+        completionTimeoutRef.current = setTimeout(() => {
+          completionTimeoutRef.current = null;
+          onComplete();
+        }, 2500);
       }}
       className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
       style={{ 

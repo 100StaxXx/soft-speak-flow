@@ -589,6 +589,7 @@ export const OrbMatchGame = ({
       moveTime: Math.max(3, cfg.moveTime - questIntervalScale * 0.5 + soulBonus * 1.5),
     };
   }, [level, difficultyMod, questIntervalScale, soulBonus]);
+  const effectiveTimeLimit = maxTimer ?? levelConfig.timeLimit;
 
   const availableColors = useMemo((): OrbColor[] => {
     const allColors: OrbColor[] = ['fire', 'water', 'earth', 'light', 'dark', 'cosmic'];
@@ -667,9 +668,9 @@ export const OrbMatchGame = ({
 
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
-    setTimeLeft(levelConfig.timeLimit);
+    setTimeLeft(effectiveTimeLimit);
     startRound();
-  }, [levelConfig.timeLimit, startRound]);
+  }, [effectiveTimeLimit, startRound]);
 
   const resetHintTimer = useCallback(() => {
     setHint(null);
@@ -1168,6 +1169,11 @@ export const OrbMatchGame = ({
       setLastTimeBonus(timeBonus);
       setTotalScore(prev => prev + levelScoreWithBonus);
       setLevelsCompleted(prev => prev + 1);
+
+      if (isPractice) {
+        setGameState('complete');
+        return;
+      }
       
       // Deal milestone damage
       onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.orb_match.scoreTarget, source: 'level_complete' });
@@ -1175,7 +1181,7 @@ export const OrbMatchGame = ({
       triggerHaptic('heavy');
       setGameState('levelComplete');
     }
-  }, [score, levelConfig.targetScore, gameState, timeLeft, onDamage]);
+  }, [score, levelConfig.targetScore, gameState, timeLeft, onDamage, isPractice]);
 
   // Handle advancing to next level
   const advanceToNextLevel = useCallback(() => {
@@ -1191,11 +1197,11 @@ export const OrbMatchGame = ({
     const allColors: OrbColor[] = ['fire', 'water', 'earth', 'light', 'dark', 'cosmic'];
     const nextLevelColors = allColors.slice(0, nextLevelCfg.colors);
     
-    setTimeLeft(nextLevelCfg.timeLimit);
+    setTimeLeft(maxTimer ?? nextLevelCfg.timeLimit);
     initializeGrid(nextLevelColors);
     setMoveTimeLeft(nextLevelCfg.moveTime);
     setGameState('playing');
-  }, [level, difficultyMod, initializeGrid]);
+  }, [level, difficultyMod, initializeGrid, maxTimer]);
 
   // Game over logic
   useEffect(() => {
@@ -1252,7 +1258,7 @@ export const OrbMatchGame = ({
 
       <GameHUD
         title={`Starburst - Level ${level}`} subtitle={`Target: ${levelConfig.targetScore} pts`}
-        timeLeft={timeLeft} totalTime={levelConfig.timeLimit} combo={combo} showCombo={true}
+        timeLeft={timeLeft} totalTime={effectiveTimeLimit} combo={combo} showCombo={true}
         primaryStat={{ value: score, label: `${score}/${levelConfig.targetScore}`, color: score >= levelConfig.targetScore ? '#22c55e' : '#a855f7' }}
         secondaryStat={{ value: levelsCompleted, label: `${levelsCompleted} cleared`, color: '#22d3ee' }}
         isPaused={gameState === 'paused'} onPauseToggle={() => setGameState(gameState === 'paused' ? 'playing' : 'paused')}

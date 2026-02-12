@@ -45,6 +45,7 @@ export const HabitResistCard = memo(({ habit, onResist, onRemove, isLoading }: H
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-destructive"
               onClick={onRemove}
+              disabled={isLoading}
             >
               <Trash2 className="h-4 w-4" />
             </Button>

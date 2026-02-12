@@ -4,19 +4,10 @@ import { useEncounterPasses } from '@/hooks/useEncounterPasses';
 import { AstralEncounterModal } from './AstralEncounterModal';
 import { AstralEncounterTriggerOverlay } from './AstralEncounterTriggerOverlay';
 import { DisableEncountersDialog } from './DisableEncountersDialog';
-import { AdversaryTier, TriggerType } from '@/types/astralEncounters';
-import { useEvolution } from '@/contexts/EvolutionContext';
+import { AdversaryTier } from '@/types/astralEncounters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-
-interface QueuedEncounter {
-  triggerType: TriggerType;
-  sourceId?: string;
-  epicProgress?: number;
-  epicCategory?: string;
-  activityInterval?: number;
-}
 
 interface AstralEncounterProviderProps {
   children: React.ReactNode;
@@ -26,65 +17,42 @@ interface AstralEncounterProviderProps {
 const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps) => {
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
-  const [queuedEncounter, setQueuedEncounter] = useState<QueuedEncounter | null>(null);
   const [showDisableDialog, setShowDisableDialog] = useState(false);
-  const isEvolutionActiveRef = useRef(false);
+
+  // Prevent replaying overlay for the same encounter id.
+  const lastOverlayEncounterIdRef = useRef<string | null>(null);
 
   const { user } = useAuth();
-  const { isEvolvingLoading } = useEvolution();
   const { passCount, recordPass } = useEncounterPasses();
 
   const {
     activeEncounter,
     showEncounterModal,
     setShowEncounterModal,
-    checkEncounterTrigger,
-    completeEncounter,
+    completeEncounterAsync,
     closeEncounter,
     passEncounter,
   } = useAstralEncounterContext();
 
-  // Track evolution state in ref for immediate access
+  // Watch for activeEncounter changes to show overlay before modal.
   useEffect(() => {
-    isEvolutionActiveRef.current = isEvolvingLoading;
-    console.log('[AstralEncounterProvider] Evolution active:', isEvolvingLoading);
-  }, [isEvolvingLoading]);
+    const encounterId = activeEncounter?.encounter.id ?? null;
 
-  // Use ref to access queued encounter in event handler without stale closure
-  const queuedEncounterRef = useRef<QueuedEncounter | null>(null);
-  useEffect(() => {
-    queuedEncounterRef.current = queuedEncounter;
-  }, [queuedEncounter]);
-
-  // Process queued encounter when evolution modal closes
-  useEffect(() => {
-    const handleEvolutionClosed = () => {
-      console.log('[AstralEncounterProvider] Evolution modal closed, checking queue');
-      // Add small delay to ensure evolution cleanup is complete
-      setTimeout(() => {
-        const pending = queuedEncounterRef.current;
-        if (pending) {
-          console.log('[AstralEncounterProvider] Processing queued encounter:', pending.triggerType);
-          const { triggerType, sourceId, epicProgress, epicCategory, activityInterval } = pending;
-          setQueuedEncounter(null);
-          checkEncounterTrigger(triggerType, sourceId, epicProgress, epicCategory, activityInterval);
-        }
-      }, 500);
-    };
-
-    window.addEventListener('evolution-modal-closed', handleEvolutionClosed);
-    return () => window.removeEventListener('evolution-modal-closed', handleEvolutionClosed);
-  }, [checkEncounterTrigger]);
-
-  // Watch for activeEncounter changes to show overlay
-  useEffect(() => {
-    if (activeEncounter?.adversary && !showEncounterModal) {
-      // Set the tier for the overlay
-      setPendingTier(activeEncounter.adversary.tier as AdversaryTier);
-      // Show the trigger overlay
-      setShowTriggerOverlay(true);
+    if (!encounterId) {
+      lastOverlayEncounterIdRef.current = null;
+      setShowTriggerOverlay(false);
+      return;
     }
-  }, [activeEncounter, showEncounterModal]);
+
+    if (lastOverlayEncounterIdRef.current === encounterId) {
+      return;
+    }
+
+    lastOverlayEncounterIdRef.current = encounterId;
+    setPendingTier((activeEncounter?.adversary.tier as AdversaryTier) || 'common');
+    setShowEncounterModal(false);
+    setShowTriggerOverlay(true);
+  }, [activeEncounter?.encounter.id, activeEncounter?.adversary.tier, setShowEncounterModal]);
 
   const handleTriggerOverlayComplete = useCallback(() => {
     setShowTriggerOverlay(false);
@@ -101,19 +69,26 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
     setShowEncounterModal(true);
   }, [closeEncounter, setShowEncounterModal]);
 
-  const handleComplete = useCallback((params: {
+  const handleComplete = useCallback(async (params: {
     encounterId: string;
     accuracy: number;
     phasesCompleted: number;
   }) => {
-    completeEncounter(params);
-  }, [completeEncounter]);
+    try {
+      await completeEncounterAsync(params);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [completeEncounterAsync]);
 
   // Handle passing on an encounter
   const handlePass = useCallback(async () => {
+    const didPass = await passEncounter();
+    if (!didPass) return;
+
     const newCount = recordPass();
-    await passEncounter();
-    
+
     // After the 3rd pass, show the disable prompt
     if (newCount >= 3) {
       setShowDisableDialog(true);
@@ -123,13 +98,15 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
   // Handle disabling encounters via profile setting
   const handleDisableEncounters = useCallback(async () => {
     if (!user?.id) return;
-    
+
     try {
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ astral_encounters_enabled: false })
         .eq('id', user.id);
-      
+
+      if (error) throw error;
+
       setShowDisableDialog(false);
       toast.success('Astral Encounters disabled. Re-enable in Profile settings.');
     } catch (error) {
@@ -145,7 +122,7 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
   return (
     <>
       {children}
-      
+
       {/* Epic trigger animation overlay */}
       <AstralEncounterTriggerOverlay
         isVisible={showTriggerOverlay}

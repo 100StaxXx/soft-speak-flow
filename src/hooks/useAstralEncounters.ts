@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,7 +23,21 @@ import {
   getResultFromAccuracy 
 } from '@/utils/adversaryGenerator';
 import { toast } from 'sonner';
- import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
+import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
+
+export type EncounterTriggerReason =
+  | 'not_authenticated'
+  | 'companion_not_ready'
+  | 'trigger_in_progress'
+  | 'pending_lookup_failed'
+  | 'start_failed';
+
+export interface EncounterTriggerResult {
+  ok: boolean;
+  started: boolean;
+  resumed: boolean;
+  reason?: EncounterTriggerReason;
+}
 
 export const useAstralEncounters = () => {
   const { user } = useAuth();
@@ -31,9 +45,25 @@ export const useAstralEncounters = () => {
   const { awardCustomXP } = useXPRewards();
   const { checkAdversaryDefeatAchievements } = useAchievements();
   const queryClient = useQueryClient();
-   
-   // Living companion reaction system - safe hook returns no-op when outside provider
-   const { triggerResistVictory } = useLivingCompanionSafe();
+
+  // Living companion reaction system - safe hook returns no-op when outside provider
+  const { triggerResistVictory } = useLivingCompanionSafe();
+
+  const throwIfSupabaseError = useCallback((error: { message: string } | null, context: string) => {
+    if (error) {
+      throw new Error(`${context}: ${error.message}`);
+    }
+  }, []);
+
+  const isDuplicateActiveEncounterError = useCallback((error: unknown) => {
+    if (!error || typeof error !== 'object') return false;
+
+    const maybeError = error as { code?: string; message?: string };
+    const code = maybeError.code ?? '';
+    const message = maybeError.message ?? '';
+
+    return code === '23505' || message.includes('idx_astral_encounters_one_active_per_user');
+  }, []);
   
   const [activeEncounter, setActiveEncounter] = useState<{
     encounter: AstralEncounter;
@@ -41,6 +71,8 @@ export const useAstralEncounters = () => {
     questInterval?: number;
   } | null>(null);
   const [showEncounterModal, setShowEncounterModal] = useState(false);
+  const [isTriggeringEncounter, setIsTriggeringEncounter] = useState(false);
+  const triggerInProgressRef = useRef(false);
 
   // Fetch user's encounter history
   const { data: encounters, isLoading: encountersLoading } = useQuery({
@@ -145,16 +177,16 @@ export const useAstralEncounters = () => {
     },
     onSuccess: ({ encounter, adversary, questInterval }) => {
       setActiveEncounter({ encounter, adversary, questInterval });
-      setShowEncounterModal(true);
+      setShowEncounterModal(false);
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
     },
     onError: (error) => {
       console.error('Failed to start encounter:', error);
-      toast.error('Failed to start encounter');
+      if (!isDuplicateActiveEncounterError(error)) {
+        toast.error('Failed to start encounter');
+      }
     },
   });
-
-  const startEncounterMutate = startEncounterMutation.mutate;
 
   // Complete an encounter
   const completeEncounter = useMutation({
@@ -196,7 +228,7 @@ export const useAstralEncounters = () => {
       // If successful, create essence and update codex
       if (result !== 'fail') {
         // Create essence
-        await supabase.from('adversary_essences').insert({
+        const { error: essenceInsertError } = await supabase.from('adversary_essences').insert({
           user_id: user.id,
           companion_id: companion.id,
           encounter_id: params.encounterId,
@@ -208,32 +240,36 @@ export const useAstralEncounters = () => {
           adversary_theme: activeEncounter.adversary.theme,
           rarity: activeEncounter.adversary.tier,
         });
+        throwIfSupabaseError(essenceInsertError, 'Failed to insert adversary essence');
 
         // Update or insert codex entry and check for achievements
-        const { data: existingEntry } = await supabase
+        const { data: existingEntry, error: existingEntryError } = await supabase
           .from('cosmic_codex_entries')
           .select('id, times_defeated')
           .eq('user_id', user.id)
           .eq('adversary_theme', activeEncounter.adversary.theme)
           .maybeSingle();
+        throwIfSupabaseError(existingEntryError, 'Failed to query cosmic codex entry');
 
         let newTimesDefeated = 1;
         if (existingEntry) {
           newTimesDefeated = existingEntry.times_defeated + 1;
-          await supabase
+          const { error: codexUpdateError } = await supabase
             .from('cosmic_codex_entries')
             .update({
               times_defeated: newTimesDefeated,
               last_defeated_at: new Date().toISOString(),
             })
             .eq('id', existingEntry.id);
+          throwIfSupabaseError(codexUpdateError, 'Failed to update cosmic codex entry');
         } else {
-          await supabase.from('cosmic_codex_entries').insert({
+          const { error: codexInsertError } = await supabase.from('cosmic_codex_entries').insert({
             user_id: user.id,
             adversary_theme: activeEncounter.adversary.theme,
             adversary_name: activeEncounter.adversary.name,
             adversary_lore: activeEncounter.adversary.lore,
           });
+          throwIfSupabaseError(codexInsertError, 'Failed to insert cosmic codex entry');
         }
 
         // Check for theme mastery achievements and potential loot rolls
@@ -249,11 +285,12 @@ export const useAstralEncounters = () => {
               ? ['rare', 'epic'] 
               : ['rare'];
           
-          const { data: themeLoot } = await supabase
+          const { data: themeLoot, error: themeLootError } = await supabase
             .from('epic_rewards')
             .select('*')
             .eq('adversary_theme', theme)
             .in('rarity', allowedRarities);
+          throwIfSupabaseError(themeLootError, 'Failed to fetch theme loot');
 
           if (themeLoot && themeLoot.length > 0) {
             // Pick a random reward based on weight
@@ -270,19 +307,21 @@ export const useAstralEncounters = () => {
             }
 
             // Check if user already has this reward
-            const { data: existing } = await supabase
+            const { data: existing, error: existingRewardError } = await supabase
               .from('user_epic_rewards')
               .select('id')
               .eq('user_id', user.id)
               .eq('reward_id', selectedReward.id)
               .maybeSingle();
+            throwIfSupabaseError(existingRewardError, 'Failed to check existing epic reward');
 
             if (!existing) {
               // Award the loot
-              await supabase.from('user_epic_rewards').insert({
+              const { error: rewardInsertError } = await supabase.from('user_epic_rewards').insert({
                 user_id: user.id,
                 reward_id: selectedReward.id,
               });
+              throwIfSupabaseError(rewardInsertError, 'Failed to award epic reward');
               
               toast.success(`🎁 New Loot: ${selectedReward.name}!`, {
                 description: selectedReward.description,
@@ -293,7 +332,7 @@ export const useAstralEncounters = () => {
 
         // Update companion stats - validate statType is a valid field
         // Map old stat types to new 6-stat system
-        const statTypeMapping: Record<string, keyof typeof companionStatsNew> = {
+        const statTypeMapping: Record<'mind' | 'body' | 'soul', 'wisdom' | 'vitality' | 'resolve'> = {
           'mind': 'wisdom',
           'body': 'vitality', 
           'soul': 'resolve',
@@ -316,10 +355,11 @@ export const useAstralEncounters = () => {
         const currentStat = companionStatsNew[newStatField];
         const newStat = Math.min(1000, currentStat + activeEncounter.adversary.statBoost * 3);
 
-        await supabase
+        const { error: companionUpdateError } = await supabase
           .from('user_companion')
           .update({ [newStatField]: newStat })
           .eq('id', companion.id);
+        throwIfSupabaseError(companionUpdateError, 'Failed to update companion stats');
 
         // Award XP
         if (xpEarned > 0) {
@@ -332,18 +372,19 @@ export const useAstralEncounters = () => {
         const habitId = activeEncounter.encounter.trigger_source_id;
         if (habitId) {
           // Fetch the habit
-          const { data: habit } = await supabase
+          const { data: habit, error: habitQueryError } = await supabase
             .from('user_bad_habits')
             .select('*')
             .eq('id', habitId)
             .maybeSingle();
+          throwIfSupabaseError(habitQueryError, 'Failed to fetch bad habit');
 
           if (habit) {
             const isSuccess = result !== 'fail';
             const careBoost = isSuccess ? 0.05 : 0;
 
             // Log the resist attempt
-            await supabase.from('resist_log').insert({
+            const { error: resistLogInsertError } = await supabase.from('resist_log').insert({
               user_id: user.id,
               habit_id: habitId,
               encounter_id: params.encounterId,
@@ -351,6 +392,7 @@ export const useAstralEncounters = () => {
               xp_earned: xpEarned,
               care_boost: careBoost,
             });
+            throwIfSupabaseError(resistLogInsertError, 'Failed to write resist log');
 
             // Calculate streak logic
             const now = new Date();
@@ -366,7 +408,7 @@ export const useAstralEncounters = () => {
             }
 
             // Update habit stats
-            await supabase
+            const { error: habitUpdateError } = await supabase
               .from('user_bad_habits')
               .update({
                 times_resisted: habit.times_resisted + (isSuccess ? 1 : 0),
@@ -375,16 +417,18 @@ export const useAstralEncounters = () => {
                 last_resisted_at: now.toISOString(),
               })
               .eq('id', habitId);
+            throwIfSupabaseError(habitUpdateError, 'Failed to update bad habit stats');
 
             // Boost companion care_recovery if successful
             if (isSuccess && companion) {
               const currentRecovery = (companion as any).care_recovery ?? 0;
-              await supabase
+              const { error: recoveryUpdateError } = await supabase
                 .from('user_companion')
                 .update({
                   care_recovery: Math.min(1, currentRecovery + careBoost),
                 })
                 .eq('id', companion.id);
+              throwIfSupabaseError(recoveryUpdateError, 'Failed to update companion care recovery');
             }
 
             if (isSuccess) {
@@ -422,6 +466,24 @@ export const useAstralEncounters = () => {
     },
   });
 
+  const buildAdversaryFromEncounter = useCallback((storedEncounter: AstralEncounter): Adversary => {
+    const theme = storedEncounter.adversary_theme as AdversaryTheme;
+    const tier = storedEncounter.adversary_tier as AdversaryTier;
+
+    return {
+      name: storedEncounter.adversary_name,
+      theme,
+      tier,
+      lore: storedEncounter.adversary_lore || '',
+      miniGameType: storedEncounter.mini_game_type as MiniGameType,
+      phases: storedEncounter.total_phases || 1,
+      essenceName: `Essence of ${storedEncounter.adversary_name}`,
+      essenceDescription: `Power absorbed from defeating ${storedEncounter.adversary_name}`,
+      statType: THEME_STAT_MAP[theme] || 'mind',
+      statBoost: TIER_CONFIG[tier]?.statBoost || 1,
+    };
+  }, []);
+
   // Check if encounter should trigger
   const checkEncounterTrigger = useCallback(async (
     triggerType: TriggerType,
@@ -429,54 +491,108 @@ export const useAstralEncounters = () => {
     epicProgress?: number,
     epicCategory?: string,
     questInterval?: number
-  ) => {
-    if (!user?.id) return false;
+  ): Promise<EncounterTriggerResult> => {
+    if (!user?.id) {
+      return { ok: false, started: false, resumed: false, reason: 'not_authenticated' };
+    }
+
     if (!companion?.id) {
       console.warn('Encounter trigger skipped: companion not ready');
-      return false;
+      return { ok: false, started: false, resumed: false, reason: 'companion_not_ready' };
     }
 
-    // Check for recent incomplete encounter
-    const { data: pendingEncounter } = await supabase
-      .from('astral_encounters')
-      .select('*')
-      .eq('user_id', user.id)
-      .is('completed_at', null)
-      .maybeSingle();
-
-    if (pendingEncounter) {
-      // Resume pending encounter - reconstruct adversary from stored data
-      const storedEncounter = pendingEncounter as AstralEncounter;
-      const theme = storedEncounter.adversary_theme as AdversaryTheme;
-      const tier = storedEncounter.adversary_tier as AdversaryTier;
-      const adversary: Adversary = {
-        name: storedEncounter.adversary_name,
-        theme,
-        tier,
-        lore: storedEncounter.adversary_lore || '',
-        miniGameType: storedEncounter.mini_game_type as MiniGameType,
-        phases: storedEncounter.total_phases || 1,
-        // Use theme-stat mapping for essence details
-        essenceName: `Essence of ${storedEncounter.adversary_name}`,
-        essenceDescription: `Power absorbed from defeating ${storedEncounter.adversary_name}`,
-        statType: THEME_STAT_MAP[theme] || 'mind',
-        statBoost: TIER_CONFIG[tier]?.statBoost || 1,
-      };
-      setActiveEncounter({ encounter: storedEncounter, adversary, questInterval: 3 }); // Default for resumed
-      setShowEncounterModal(true);
-      return true;
+    if (triggerInProgressRef.current) {
+      return { ok: false, started: false, resumed: false, reason: 'trigger_in_progress' };
     }
 
-    // Start new encounter
-    startEncounterMutate({ 
-      triggerType, 
-      triggerSourceId, 
-      epicProgress, 
-      epicCategory,
-      questInterval
-    });
-    return true;
-  }, [user?.id, companion?.id, startEncounterMutate]);
+    triggerInProgressRef.current = true;
+    setIsTriggeringEncounter(true);
+
+    try {
+      // Find unfinished encounters (keep newest, close stale duplicates)
+      const { data: pendingEncounters, error: pendingLookupError } = await supabase
+        .from('astral_encounters')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('completed_at', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (pendingLookupError) {
+        console.error('Failed to lookup pending encounters:', pendingLookupError);
+        return { ok: false, started: false, resumed: false, reason: 'pending_lookup_failed' };
+      }
+
+      const pendingList = (pendingEncounters as AstralEncounter[] | null) ?? [];
+      const newestPending = pendingList[0] ?? null;
+      const stalePendingIds = pendingList.slice(1).map((encounter) => encounter.id);
+
+      if (stalePendingIds.length > 0) {
+        const { error: staleCloseError } = await supabase
+          .from('astral_encounters')
+          .update({ completed_at: new Date().toISOString() })
+          .in('id', stalePendingIds)
+          .is('completed_at', null);
+
+        if (staleCloseError) {
+          console.error('Failed to close stale pending encounters:', staleCloseError);
+        }
+      }
+
+      if (newestPending) {
+        const adversary = buildAdversaryFromEncounter(newestPending);
+        setActiveEncounter({ encounter: newestPending, adversary, questInterval: questInterval ?? 3 });
+        setShowEncounterModal(false);
+        return { ok: true, started: false, resumed: true };
+      }
+
+      // Start a new encounter and wait for state write before unlocking UI.
+      await startEncounterMutation.mutateAsync({
+        triggerType,
+        triggerSourceId,
+        epicProgress,
+        epicCategory,
+        questInterval,
+      });
+
+      return { ok: true, started: true, resumed: false };
+    } catch (error) {
+      if (isDuplicateActiveEncounterError(error)) {
+        const { data: conflictPending, error: conflictLookupError } = await supabase
+          .from('astral_encounters')
+          .select('*')
+          .eq('user_id', user.id)
+          .is('completed_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (conflictLookupError) {
+          console.error('Failed to recover pending encounter after duplicate create:', conflictLookupError);
+          return { ok: false, started: false, resumed: false, reason: 'pending_lookup_failed' };
+        }
+
+        const recoveredEncounter = (conflictPending as AstralEncounter[] | null)?.[0];
+        if (recoveredEncounter) {
+          const adversary = buildAdversaryFromEncounter(recoveredEncounter);
+          setActiveEncounter({ encounter: recoveredEncounter, adversary, questInterval: questInterval ?? 3 });
+          setShowEncounterModal(false);
+          return { ok: true, started: false, resumed: true };
+        }
+      }
+
+      console.error('Failed to trigger encounter:', error);
+      return { ok: false, started: false, resumed: false, reason: 'start_failed' };
+    } finally {
+      triggerInProgressRef.current = false;
+      setIsTriggeringEncounter(false);
+    }
+  }, [
+    user?.id,
+    companion?.id,
+    buildAdversaryFromEncounter,
+    isDuplicateActiveEncounterError,
+    startEncounterMutation,
+  ]);
 
   const closeEncounter = useCallback(() => {
     setShowEncounterModal(false);
@@ -485,24 +601,28 @@ export const useAstralEncounters = () => {
 
   // Pass on an encounter (delete without completing)
   const passEncounter = useCallback(async () => {
-    if (!activeEncounter) return;
+    if (!activeEncounter) return false;
 
     try {
       // Delete the incomplete encounter from DB
-      await supabase
+      const { error: deleteError } = await supabase
         .from('astral_encounters')
         .delete()
         .eq('id', activeEncounter.encounter.id);
+      throwIfSupabaseError(deleteError, 'Failed to delete encounter');
 
       // Close modal and clear state
       setActiveEncounter(null);
       setShowEncounterModal(false);
       
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
+      return true;
     } catch (error) {
       console.error('Failed to pass encounter:', error);
+      toast.error('Failed to pass encounter');
+      return false;
     }
-  }, [activeEncounter, queryClient]);
+  }, [activeEncounter, queryClient, throwIfSupabaseError]);
 
   return {
     // State
@@ -518,11 +638,14 @@ export const useAstralEncounters = () => {
     // Loading states
     isLoading: encountersLoading || essencesLoading || codexLoading,
     isStarting: startEncounterMutation.isPending,
+    isTriggeringEncounter,
     isCompleting: completeEncounter.isPending,
     
     // Actions
-    startEncounter: startEncounterMutate,
+    startEncounter: startEncounterMutation.mutate,
+    startEncounterAsync: startEncounterMutation.mutateAsync,
     completeEncounter: completeEncounter.mutate,
+    completeEncounterAsync: completeEncounter.mutateAsync,
     checkEncounterTrigger,
     closeEncounter,
     passEncounter,

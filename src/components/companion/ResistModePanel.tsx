@@ -10,23 +10,30 @@ import { AdversaryTheme } from '@/types/astralEncounters';
 
 export const ResistModePanel = memo(() => {
   const { habits, stats, isLoading, addHabit, removeHabit, isAddingHabit } = useResistMode();
-  const { checkEncounterTrigger } = useAstralEncounterContext();
+  const { checkEncounterTrigger, isTriggeringEncounter } = useAstralEncounterContext();
   const [resistingHabitId, setResistingHabitId] = useState<string | null>(null);
+  const [isStartingEncounter, setIsStartingEncounter] = useState(false);
 
   const handleResist = useCallback(async (habit: BadHabit) => {
+    if (isStartingEncounter || isTriggeringEncounter) return;
+
     setResistingHabitId(habit.id);
-    
-    // Trigger astral encounter with urge_resist type
-    // The theme is based on the habit's theme
-    await checkEncounterTrigger(
-      'urge_resist',
-      habit.id,
-      undefined,
-      habit.habit_theme
-    );
-    
-    setResistingHabitId(null);
-  }, [checkEncounterTrigger]);
+    setIsStartingEncounter(true);
+
+    try {
+      // Trigger astral encounter with urge_resist type
+      // The theme is based on the habit's theme
+      await checkEncounterTrigger(
+        'urge_resist',
+        habit.id,
+        undefined,
+        habit.habit_theme
+      );
+    } finally {
+      setResistingHabitId(null);
+      setIsStartingEncounter(false);
+    }
+  }, [checkEncounterTrigger, isStartingEncounter, isTriggeringEncounter]);
 
   const handleAddHabit = useCallback((params: { name: string; icon: string; theme: AdversaryTheme }) => {
     addHabit(params);
@@ -86,7 +93,7 @@ export const ResistModePanel = memo(() => {
               habit={habit}
               onResist={() => handleResist(habit)}
               onRemove={() => handleRemoveHabit(habit.id)}
-              isLoading={resistingHabitId === habit.id}
+              isLoading={isStartingEncounter || isTriggeringEncounter || resistingHabitId === habit.id}
             />
           ))}
         </AnimatePresence>

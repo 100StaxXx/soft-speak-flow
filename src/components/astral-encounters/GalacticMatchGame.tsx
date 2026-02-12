@@ -305,7 +305,8 @@ export const GalacticMatchGame = ({
       
       // Add level completion bonus
       const levelBonus = 15 * level;
-      setScore(prev => prev + levelBonus);
+      const scoreWithBonus = score + levelBonus;
+      setScore(scoreWithBonus);
       
       // Move to next level/round after delay
       setTimeout(() => {
@@ -318,7 +319,7 @@ export const GalacticMatchGame = ({
             highScoreValue: level,
             gameStats: {
               level,
-              score,
+              score: scoreWithBonus,
               maxCombo: combo,
             },
           });
@@ -370,7 +371,7 @@ export const GalacticMatchGame = ({
         setRevealCountdown(Math.ceil(nextConfig.revealTime));
       }, 1500);
     }
-  }, [matchedPairs, config.pairs, phase, level, round, isPractice, onComplete, mistakesThisLevel, onDamage, diffConfig]);
+  }, [matchedPairs, config.pairs, phase, level, round, isPractice, onComplete, mistakesThisLevel, onDamage, diffConfig, score, combo]);
 
   // Handle game over
   useEffect(() => {
