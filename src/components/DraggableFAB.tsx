@@ -29,6 +29,7 @@ export const DraggableFAB = ({ onTap }: DraggableFABProps) => {
 
   return (
     <motion.button
+      data-tour="add-quest-fab"
       initial={{ scale: 0, opacity: 0 }}
       animate={{ 
         scale: isDragging ? 1.15 : 1, 

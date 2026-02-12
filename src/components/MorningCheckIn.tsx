@@ -142,6 +142,7 @@ const MorningCheckInContent = () => {
 
       // Trigger astral encounter check
       window.dispatchEvent(new CustomEvent('quest-completed'));
+      window.dispatchEvent(new CustomEvent('morning-checkin-completed'));
 
       // Start polling timer (using ref to avoid stale closure)
       pollStartTimeRef.current = Date.now();

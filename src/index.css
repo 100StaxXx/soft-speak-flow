@@ -1578,6 +1578,28 @@ All colors MUST be HSL.
     background-color: hsl(0 0% 0% / 0.75) !important;
   }
 
+  @keyframes tutorial-guide-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 0 2px hsl(var(--primary) / 0.55),
+        0 0 0 8px hsl(var(--primary) / 0.15),
+        0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    50% {
+      box-shadow:
+        0 0 0 3px hsl(var(--primary) / 0.85),
+        0 0 0 10px hsl(var(--primary) / 0.22),
+        0 12px 36px rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  .tutorial-guide-spotlight {
+    position: relative;
+    z-index: 75 !important;
+    border-radius: 14px;
+    animation: tutorial-guide-pulse 1.35s ease-in-out infinite;
+  }
+
   /* Safe Area Support for Mobile Devices (iOS notches, home indicators) */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
@@ -2597,4 +2619,3 @@ All colors MUST be HSL.
     hsl(260, 80%, 30%) 100%
   );
 }
-

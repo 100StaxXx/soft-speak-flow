@@ -555,7 +555,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 187;
 				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = "../CosmiqWidget/Info.plist";
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -584,7 +584,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 187;
 				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = "../CosmiqWidget/Info.plist";
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";

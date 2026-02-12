@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
@@ -20,9 +20,35 @@ export const useAppResumeRefresh = () => {
   const queryClient = useQueryClient();
   const lastResumeRef = useRef<number>(0);
 
+  const refreshCriticalData = useCallback(async (source: string) => {
+    logger.debug(`${source} - refreshing critical data`);
+
+    // Refetch profile first (mentor ID depends on it)
+    await queryClient.refetchQueries({ queryKey: ['profile'] });
+
+    // Invalidate mentor queries used across mentor tab/chat/profile/nav
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] }),
+      queryClient.invalidateQueries({ queryKey: ['mentor-personality'] }),
+      queryClient.invalidateQueries({ queryKey: ['mentor'] }),
+      queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
+    ]);
+
+    // Invalidate habit and epic data for cross-device sync
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['habits'] }),
+      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] }),
+      queryClient.invalidateQueries({ queryKey: ['epics'] }),
+      queryClient.invalidateQueries({ queryKey: ['epic-progress'] }),
+    ]);
+  }, [queryClient]);
+
   // Native iOS/Android: Listen for app state changes
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+
+    let isDisposed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
 
     const handleAppStateChange = async ({ isActive }: { isActive: boolean }) => {
       if (!isActive) return; // Only care about resume
@@ -37,28 +63,31 @@ export const useAppResumeRefresh = () => {
       }
 
       lastResumeRef.current = now;
-      logger.debug('App resumed - refreshing critical data');
-
-      // Refetch profile first (mentor ID depends on it)
-      await queryClient.refetchQueries({ queryKey: ['profile'] });
-      
-      // Then invalidate mentor-related queries
-      queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
-      queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
-      
-      // Invalidate habit and epic data for cross-device sync
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
-      queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
+      try {
+        await refreshCriticalData('App resumed');
+      } catch (error) {
+        logger.warn('App resume refresh failed', { error: error instanceof Error ? error.message : String(error) });
+      }
     };
 
-    App.addListener('appStateChange', handleAppStateChange);
+    const setupListener = async () => {
+      const handle = await App.addListener('appStateChange', handleAppStateChange);
+      if (isDisposed) {
+        await handle.remove();
+        return;
+      }
+      listenerHandle = handle;
+    };
+
+    void setupListener();
 
     return () => {
-      App.removeAllListeners();
+      isDisposed = true;
+      if (listenerHandle) {
+        void listenerHandle.remove();
+      }
     };
-  }, [queryClient]);
+  }, [refreshCriticalData]);
 
   // Web/PWA: Listen for visibility changes
   useEffect(() => {
@@ -73,21 +102,14 @@ export const useAppResumeRefresh = () => {
       if (elapsed < RESUME_COOLDOWN_MS) return;
 
       lastResumeRef.current = now;
-      logger.debug('Tab became visible - refreshing critical data');
-
-      // Await profile first (mentor depends on resolvedMentorId from it)
-      await queryClient.refetchQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['mentor-page-data'] });
-      queryClient.invalidateQueries({ queryKey: ['mentor-personality'] });
-      
-      // Invalidate habit and epic data for cross-device sync
-      queryClient.invalidateQueries({ queryKey: ['habits'] });
-      queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
-      queryClient.invalidateQueries({ queryKey: ['epics'] });
-      queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
+      try {
+        await refreshCriticalData('Tab became visible');
+      } catch (error) {
+        logger.warn('Visibility refresh failed', { error: error instanceof Error ? error.message : String(error) });
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [queryClient]);
+  }, [refreshCriticalData]);
 };

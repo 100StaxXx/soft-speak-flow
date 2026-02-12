@@ -16,10 +16,19 @@ export const useAuthSync = () => {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           // Use setTimeout to avoid deadlock - defer Supabase calls
           setTimeout(async () => {
-            // Await profile so mentor queries have resolvedMentorId ready
-            await queryClient.refetchQueries({ queryKey: ["profile"] });
-            queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] });
-            queryClient.invalidateQueries({ queryKey: ["mentor-personality"] });
+            try {
+              // Await profile so mentor queries have resolvedMentorId ready
+              await queryClient.refetchQueries({ queryKey: ["profile"] });
+
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["mentor-page-data"] }),
+                queryClient.invalidateQueries({ queryKey: ["mentor-personality"] }),
+                queryClient.invalidateQueries({ queryKey: ["mentor"] }),
+                queryClient.invalidateQueries({ queryKey: ["selected-mentor"] }),
+              ]);
+            } catch (error) {
+              console.error("Auth sync refresh failed:", error);
+            }
           }, 0);
         }
         
