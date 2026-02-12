@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, memo } from "react";
+import { useEffect, useMemo, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,7 +36,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isReady, setIsReady] = useState(false);
   const { showModal, dismissModal } = useFirstTimeModal("mentor");
 
   // Scroll to top on mount
@@ -131,32 +130,35 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const mentorImage = mentorPageData?.mentorImage || "";
   const todaysQuote = mentorPageData?.todaysQuote || null;
 
-  // Wait for all critical data to load before marking ready
-  useEffect(() => {
-    if (!user) {
-      setIsReady(false);
-      return;
-    }
-    
+  const isReady = useMemo(() => {
+    if (!user) return false;
+
     // Wait for both profile and companion to finish loading
     const loadingComplete = !profileLoading && !companionLoading;
-    
+
     // If user completed onboarding, require mentor to be resolved before ready
     const hasCompletedOnboarding = profile?.onboarding_completed === true;
     const hasMentor = !!resolvedMentorId;
-    
+
     // Mentor is ready if: no mentor needed, OR we have cached data, OR initial load complete
     const mentorDataReady = !hasMentor || !!mentorPageData || !mentorPageDataLoading;
-    
+
     // On Home we enforce mentor completion, but the Mentor tab itself should remain usable
     // even if mentor selection is missing.
     const requiresMentorForReadiness = enableOnboardingGuard;
     const onboardingReady = !requiresMentorForReadiness || !hasCompletedOnboarding || hasMentor;
 
-    // Ready = loading done AND onboarding readiness AND mentor data loaded
-    const ready = loadingComplete && onboardingReady && mentorDataReady;
-    setIsReady(ready);
-  }, [user, profileLoading, companionLoading, profile?.onboarding_completed, resolvedMentorId, mentorPageDataLoading, mentorPageData, enableOnboardingGuard]);
+    return loadingComplete && onboardingReady && mentorDataReady;
+  }, [
+    user,
+    profileLoading,
+    companionLoading,
+    profile?.onboarding_completed,
+    resolvedMentorId,
+    mentorPageData,
+    mentorPageDataLoading,
+    enableOnboardingGuard,
+  ]);
 
   // Memoized insight action handler - MUST be before early returns
   const onInsightAction = useCallback((insight: { actionType?: string }) => {
@@ -218,7 +220,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   }
 
   return (
-    <PageTransition>
+    <PageTransition mode={enableOnboardingGuard ? "animated" : "instant"}>
       {/* Cosmiq Starfield Background */}
       <StarfieldBackground />
       

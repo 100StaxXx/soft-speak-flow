@@ -41,6 +41,7 @@ import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { safeSessionStorage } from "@/utils/storage";
  import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { TutorialOrchestrator } from "@/components/TutorialOrchestrator";
+import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -55,7 +56,6 @@ const Premium = lazy(() => import("./pages/Premium"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
-const Mentor = lazy(() => import("./pages/Mentor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 // Tasks removed - consolidated into Journeys
 const Reflection = lazy(() => import("./pages/Reflection"));
@@ -63,14 +63,11 @@ const MentorChat = lazy(() => import("./pages/MentorChat"));
 const Library = lazy(() => import("./pages/Library"));
 const Challenges = lazy(() => import("./pages/Challenges"));
 const Search = lazy(() => import("./pages/Search"));
-const Companion = lazy(() => import("./pages/Companion"));
 const PepTalks = lazy(() => import("./pages/PepTalks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const PremiumSuccess = lazy(() => import("./pages/PremiumSuccess"));
 const Epics = lazy(() => import("./pages/Epics"));
-const Journeys = lazy(() => import("./pages/Journeys"));
-const Inbox = lazy(() => import("./pages/Inbox"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
@@ -113,11 +110,8 @@ const queryClient = new QueryClient({
 // Prefetch critical routes during idle time for instant navigation
 const prefetchCriticalRoutes = () => {
   const routes = [
-    () => import('./pages/Journeys'),
     () => import('./pages/Profile'),
     () => import('./pages/MentorChat'),
-    () => import('./pages/Companion'),
-    () => import('./pages/Mentor'),
   ];
   routes.forEach(route => route());
 };
@@ -148,6 +142,9 @@ const ScrollToTop = memo(() => {
   const { pathname } = useLocation();
 
   useEffect(() => {
+    if (isMainTabPath(pathname)) {
+      return;
+    }
     window.scrollTo(0, 0);
   }, [pathname]);
 
@@ -265,6 +262,7 @@ const AppContent = memo(() => {
   }
   
   const resolvedMentorId = getResolvedMentorId(profile);
+  const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
 
   return (
     <ThemeProvider mentorId={resolvedMentorId}>
@@ -277,7 +275,12 @@ const AppContent = memo(() => {
                 <AstralEncounterProvider>
                 <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
-                <AnimatePresence mode="wait" initial={false}>
+                {activeMainTabPath ? (
+                  <ProtectedRoute>
+                    <MainTabsKeepAlive activePath={activeMainTabPath} />
+                  </ProtectedRoute>
+                ) : (
+                <AnimatePresence mode="sync" initial={false}>
                   <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />
@@ -287,7 +290,6 @@ const AppContent = memo(() => {
                   <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                  <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
@@ -297,8 +299,6 @@ const AppContent = memo(() => {
                   <Route path="/admin" element={<ProtectedRoute requireMentor={false}><Admin /></ProtectedRoute>} />
                   <Route path="/tasks" element={<Navigate to="/journeys" replace />} />
                   <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
-                  <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
-                  <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
                   <Route path="/join/:code" element={<JoinEpic />} />
                   <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
                   {/* HIDDEN: Arcade route disabled */}
@@ -312,7 +312,6 @@ const AppContent = memo(() => {
                   <Route path="/pep-talks" element={<ProtectedRoute><PepTalks /></ProtectedRoute>} />
                   <Route path="/inspire" element={<Navigate to="/pep-talks" replace />} />
                   <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-                  <Route path="/companion" element={<ProtectedRoute><Companion /></ProtectedRoute>} />
                   <Route path="/partners" element={<Partners />} />
                   <Route path="/account-deletion" element={<AccountDeletionHelp />} />
                   <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
@@ -328,6 +327,7 @@ const AppContent = memo(() => {
                   <Route path="*" element={<NotFound />} />
                   </Routes>
                 </AnimatePresence>
+                )}
                 <TutorialOrchestrator />
                 </Suspense>
                 </AstralEncounterProvider>

@@ -96,6 +96,8 @@ export const useTasksQuery = (selectedDate?: Date) => {
     },
     enabled: !!user?.id,
     staleTime: 2 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
 

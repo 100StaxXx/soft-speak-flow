@@ -30,6 +30,8 @@ export const useInboxTasks = () => {
     },
     enabled: !!user?.id,
     staleTime: 30 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
 
@@ -103,6 +105,8 @@ export const useInboxCount = () => {
     },
     enabled: !!user?.id,
     staleTime: 30 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
 

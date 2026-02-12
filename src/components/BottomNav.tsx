@@ -13,12 +13,12 @@ import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
 import { useInboxCount } from "@/hooks/useInboxTasks";
 
-// Prefetch page modules on hover for instant navigation
+// Core tabs are eagerly loaded in App.tsx for instant navigation.
 const prefetchMap: Record<string, () => Promise<unknown>> = {
-  mentor: () => import('@/pages/Mentor'),
-  inbox: () => import('@/pages/Inbox'),
-  journeys: () => import('@/pages/Journeys'),
-  companion: () => import('@/pages/Companion'),
+  mentor: () => Promise.resolve(),
+  inbox: () => Promise.resolve(),
+  journeys: () => Promise.resolve(),
+  companion: () => Promise.resolve(),
 };
 
 export const BottomNav = memo(() => {
