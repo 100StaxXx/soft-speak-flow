@@ -20,7 +20,9 @@ jobs:
       - name: Basic auth health check
         run: |
           set -euo pipefail
-          status=$(curl -sS -o /tmp/auth-health.txt -w "%{http_code}" "https://${PROJECT_REF}.supabase.co/auth/v1/health")
+          status=$(curl -sS -o /tmp/auth-health.txt -w "%{http_code}" \
+            "https://${PROJECT_REF}.supabase.co/auth/v1/health" \
+            -H "apikey: ${SERVICE_ROLE_KEY}")
           echo "auth/v1/health => HTTP $status"
           cat /tmp/auth-health.txt || true
           if [ "$status" -ge 300 ]; then
@@ -60,6 +62,7 @@ jobs:
           status=$(curl -sS -o /tmp/scheduled.json -w "%{http_code}" \
             -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/dispatch-daily-pushes" \
             -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+            -H "apikey: ${SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
             -d '{}')
 
