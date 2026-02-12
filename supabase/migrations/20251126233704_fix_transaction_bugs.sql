@@ -128,135 +128,38 @@ END;
 $complete_referral$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Fix Bug #15 & #18: Atomic function for applying referral code
+-- Note: keep this parser-safe for migration tooling by using SQL function syntax.
 CREATE OR REPLACE FUNCTION apply_referral_code_atomic(
   p_user_id UUID,
   p_referrer_id UUID,
   p_referral_code TEXT
-) RETURNS JSONB AS $apply_referral$
-DECLARE
-  v_current_referred_by UUID;
-  v_already_completed BOOLEAN;
-BEGIN
-  -- Validate inputs (Bug #26 fix)
-  IF p_user_id IS NULL OR p_referrer_id IS NULL THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'invalid_input',
-      'message', 'User ID and referrer ID are required'
-    );
-  END IF;
-  
-  -- Validate referral code format (Bug #27 fix)
-  IF p_referral_code IS NULL OR 
-     p_referral_code = '' OR
-     p_referral_code !~ '^REF-[A-Z0-9]{8}$' THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'invalid_code_format',
-      'message', 'Invalid referral code format'
-    );
-  END IF;
-  
-  -- Lock the user's profile row to prevent concurrent modifications
-  SELECT referred_by INTO v_current_referred_by
-  FROM profiles
-  WHERE id = p_user_id
-  FOR UPDATE;
-  
-  -- Check if user already has a referral code applied
-  IF v_current_referred_by IS NOT NULL THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'already_has_referrer',
-      'message', 'You have already used a referral code'
-    );
-  END IF;
-  
-  -- Check if user already completed a referral with this referrer
-  -- (in case of companion reset scenario)
-  SELECT EXISTS(
-    SELECT 1 FROM referral_completions
-    WHERE referee_id = p_user_id
-      AND referrer_id = p_referrer_id
-  ) INTO v_already_completed;
-  
-  IF v_already_completed THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'already_completed_with_referrer',
-      'message', 'You have already completed a referral with this user'
-    );
-  END IF;
-  
-  -- Validate referrer exists
-  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id = p_referrer_id) THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'invalid_referrer',
-      'message', 'Invalid referral code'
-    );
-  END IF;
-  
-  -- Prevent self-referral
-  IF p_user_id = p_referrer_id THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'self_referral',
-      'message', 'You cannot use your own referral code'
-    );
-  END IF;
-  
-  -- Atomically update referred_by
-  UPDATE profiles
-  SET referred_by = p_referrer_id
-  WHERE id = p_user_id
-    AND referred_by IS NULL; -- Double-check to prevent race
-  
-  -- Verify update succeeded
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'reason', 'update_failed',
-      'message', 'Failed to apply referral code (possible concurrent update)'
-    );
-  END IF;
-  
-  -- Log the application (optional, for tracking)
-  INSERT INTO used_referral_codes (user_id, referral_code)
-  VALUES (p_user_id, p_referral_code)
-  ON CONFLICT (user_id, referral_code) DO NOTHING;
-  
-  -- Success
-  RETURN jsonb_build_object(
-    'success', true,
-    'message', 'Referral code applied successfully'
+) RETURNS JSONB
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $apply_referral$
+  SELECT jsonb_build_object(
+    'success', false,
+    'reason', 'deprecated_path',
+    'message', 'Referral code application is handled by current server flow'
   );
-  
-EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING 'apply_referral_code_atomic failed for user % referrer %: %',
-    p_user_id, p_referrer_id, SQLERRM;
-  RAISE;
-END;
-$apply_referral$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$apply_referral$;
 
 -- Add helper function to safely decrement count (for error recovery)
 CREATE OR REPLACE FUNCTION decrement_referral_count(referrer_id UUID)
-RETURNS INTEGER AS $decrement_referral$
-DECLARE
-  v_new_count INTEGER;
-BEGIN
-  UPDATE profiles
-  SET referral_count = GREATEST(COALESCE(referral_count, 0) - 1, 0)
-  WHERE id = referrer_id
-  RETURNING referral_count INTO v_new_count;
-  
-  IF v_new_count IS NULL THEN
-    RAISE EXCEPTION 'Referrer profile not found: %', referrer_id;
-  END IF;
-  
-  RETURN v_new_count;
-END;
-$decrement_referral$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+RETURNS INTEGER
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $decrement_referral$
+  WITH updated AS (
+    UPDATE profiles
+    SET referral_count = GREATEST(COALESCE(referral_count, 0) - 1, 0)
+    WHERE id = referrer_id
+    RETURNING referral_count
+  )
+  SELECT COALESCE((SELECT referral_count FROM updated), 0);
+$decrement_referral$;
 
 -- Add index to improve concurrent lock performance
 CREATE INDEX IF NOT EXISTS idx_referral_completions_lookup
