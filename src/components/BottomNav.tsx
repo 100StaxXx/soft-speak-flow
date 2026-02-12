@@ -55,16 +55,16 @@ export const BottomNav = memo(() => {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 cosmiq-glass-nav z-50 transition-transform duration-200"
+        className="fixed bottom-0 left-0 right-0 cosmiq-glass-nav z-50 border-t border-border/40 transition-transform duration-200"
         role="navigation"
         aria-label="Main navigation"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-3 sm:py-2.5">
+        <div className="max-w-lg mx-auto flex items-center justify-around px-2 sm:px-4 py-2.5">
           <NavLink
             to="/mentor"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-            activeClassName="bg-gradient-to-br from-orange-500/20 to-orange-500/5 shadow-soft"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
+            activeClassName="bg-orange-500/12"
             data-tour="mentor-tab"
             onClick={() => haptics.light()}
             onMouseEnter={() => handlePrefetch('mentor')}
@@ -84,9 +84,9 @@ export const BottomNav = memo(() => {
                     showBorder={false}
                   />
                 ) : (
-                  <User className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-orange-400 drop-shadow-[0_0_8px_hsl(25,95%,55%)]' : 'text-muted-foreground'}`} />
+                  <User className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-orange-300' : 'text-muted-foreground'}`} />
                 )}
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-orange-400' : 'text-muted-foreground/80'}`}>
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-orange-200' : 'text-muted-foreground/85'}`}>
                   Mentor
                 </span>
               </>
@@ -95,8 +95,8 @@ export const BottomNav = memo(() => {
 
           <NavLink
             to="/inbox"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px] relative"
-            activeClassName="bg-gradient-to-br from-celestial-blue/20 to-celestial-blue/5 shadow-soft"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
+            activeClassName="bg-celestial-blue/12"
             onClick={() => haptics.light()}
             onMouseEnter={() => handlePrefetch('inbox')}
             onFocus={() => handlePrefetch('inbox')}
@@ -104,14 +104,14 @@ export const BottomNav = memo(() => {
             {({ isActive }) => (
               <>
                 <div className="relative">
-                  <Inbox className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-celestial-blue drop-shadow-[0_0_8px_hsl(200,80%,55%)]' : 'text-muted-foreground'}`} />
+                  <Inbox className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground'}`} />
                   {inboxCount > 0 && (
-                    <Badge className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 p-0 flex items-center justify-center text-[8px] bg-celestial-blue text-white border-0">
+                    <Badge className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 p-0 flex items-center justify-center text-[9px] bg-celestial-blue text-white border-0">
                       {inboxCount > 9 ? '9+' : inboxCount}
                     </Badge>
                   )}
                 </div>
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/80'}`}>
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/85'}`}>
                   Inbox
                 </span>
               </>
@@ -120,8 +120,8 @@ export const BottomNav = memo(() => {
 
           <NavLink
             to="/journeys"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px]"
-            activeClassName="bg-gradient-to-br from-cosmiq-glow/20 to-cosmiq-glow/5 shadow-soft"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
+            activeClassName="bg-cosmiq-glow/12"
             data-tour="quests-tab"
             onClick={() => haptics.light()}
             onMouseEnter={() => handlePrefetch('journeys')}
@@ -129,8 +129,8 @@ export const BottomNav = memo(() => {
           >
             {({ isActive }) => (
               <>
-                <Compass className={`h-6 w-6 transition-all duration-300 ${isActive ? 'text-cosmiq-glow drop-shadow-[0_0_8px_hsl(270,70%,55%)]' : 'text-muted-foreground'}`} />
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/80'}`}>
+                <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
                   Quests
                 </span>
               </>
@@ -139,8 +139,8 @@ export const BottomNav = memo(() => {
 
           <NavLink
             to="/companion"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[56px] min-h-[56px] relative"
-            activeClassName="bg-gradient-to-br from-stardust-gold/20 to-stardust-gold/5 shadow-soft"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
+            activeClassName="bg-stardust-gold/12"
             data-tour="companion-tab"
             onClick={() => haptics.light()}
             onMouseEnter={() => handlePrefetch('companion')}
@@ -150,14 +150,14 @@ export const BottomNav = memo(() => {
               <>
                 <div className="relative">
                   <CompanionNavPresence isActive={isActive} />
-                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-all duration-300 ${isActive ? 'text-stardust-gold drop-shadow-[0_0_8px_hsl(45,100%,65%)]' : 'text-muted-foreground'}`} />
+                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
                   {companion && progressToNext > 90 && (
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[8px] bg-stardust-gold text-black animate-pulse">
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
                       !
                     </Badge>
                   )}
                 </div>
-                <span className={`text-[9px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/80'}`}>
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
                   Companion
                 </span>
               </>

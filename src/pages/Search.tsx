@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, MessageSquare } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 
 const Search = () => {
+  const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const trimmedQuery = searchQuery.trim();
@@ -53,7 +54,7 @@ const Search = () => {
       <StarfieldBackground />
 
       <div className="relative min-h-screen pb-nav-safe pt-safe">
-        <div className="relative z-10 max-w-6xl mx-auto px-4 py-10 space-y-12">
+        <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 space-y-10">
           <SearchHero
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -63,20 +64,20 @@ const Search = () => {
             {isSearchActive ? (
               <motion.div
                 key="search-results"
-                initial={{ opacity: 0, y: 20 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.35, ease: "easeInOut" }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.24, ease: "easeOut" }}
               >
                 <GlobalSearch searchQuery={trimmedQuery} hideSearchBar />
               </motion.div>
             ) : (
               <motion.div
                 key="search-discover"
-                initial={{ opacity: 0, y: 10 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.4 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.24 }}
                 className="space-y-12"
               >
                 <SuggestedSearches onSearch={setSearchQuery} />
@@ -84,8 +85,9 @@ const Search = () => {
                 <section className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <motion.h2
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={prefersReducedMotion ? false : { opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
                       className="text-xl font-semibold flex items-center gap-2"
                     >
                       <BookOpen className="h-5 w-5 text-royal-purple" />
@@ -117,8 +119,9 @@ const Search = () => {
                 <section className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <motion.h2
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={prefersReducedMotion ? false : { opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
                       className="text-xl font-semibold flex items-center gap-2"
                     >
                       <MessageSquare className="h-5 w-5 text-nebula-pink" />

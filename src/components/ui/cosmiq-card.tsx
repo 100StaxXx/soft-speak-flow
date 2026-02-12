@@ -7,12 +7,12 @@ const cosmiqCardVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-card/80 border-border/50 hover:border-border",
-        warning: "bg-card/80 border-l-4 border-l-amber-500 border-t-border/30 border-r-border/30 border-b-border/30",
-        success: "bg-card/80 border-l-4 border-l-green-500 border-t-border/30 border-r-border/30 border-b-border/30",
-        info: "bg-card/80 border-l-4 border-l-blue-500 border-t-border/30 border-r-border/30 border-b-border/30",
-        highlight: "bg-gradient-to-br from-primary/10 via-card/90 to-accent/10 border-primary/30 shadow-glow",
-        glass: "bg-white/5 border-white/10 backdrop-blur-2xl",
+        default: "bg-card/86 border-border/60 hover:border-border/80",
+        warning: "bg-card/86 border-l-4 border-l-amber-500 border-t-border/40 border-r-border/40 border-b-border/40",
+        success: "bg-card/86 border-l-4 border-l-green-500 border-t-border/40 border-r-border/40 border-b-border/40",
+        info: "bg-card/86 border-l-4 border-l-blue-500 border-t-border/40 border-r-border/40 border-b-border/40",
+        highlight: "bg-gradient-to-br from-primary/14 via-card/92 to-accent/12 border-primary/35 shadow-[0_12px_28px_hsl(var(--primary)/0.2)]",
+        glass: "bg-card/74 border-border/55 backdrop-blur-2xl",
       },
       size: {
         default: "p-4",
@@ -40,7 +40,7 @@ const CosmiqCard = React.forwardRef<HTMLDivElement, CosmiqCardProps>(
         ref={ref}
         className={cn(
           cosmiqCardVariants({ variant, size }),
-          glow && "shadow-glow hover:shadow-glow-lg",
+          glow && "shadow-[0_10px_28px_hsl(var(--primary)/0.22)] hover:shadow-[0_14px_34px_hsl(var(--primary)/0.28)]",
           className
         )}
         {...props}

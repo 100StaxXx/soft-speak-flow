@@ -277,7 +277,7 @@ const AppContent = memo(() => {
                 <AstralEncounterProvider>
                 <Suspense fallback={<LoadingFallback />}>
                 <EvolutionAwareContent />
-                <AnimatePresence mode="sync">
+                <AnimatePresence mode="wait" initial={false}>
                   <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />

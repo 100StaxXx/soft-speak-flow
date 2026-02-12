@@ -238,17 +238,17 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
       {/* Scrollable Content */}
       <div className="relative z-10 min-h-screen pb-nav-safe pt-safe">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-48 sm:pt-32 md:pt-24 space-y-4 sm:space-y-6 md:space-y-8">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-28 sm:pt-24 md:pt-20 space-y-4 sm:space-y-6 md:space-y-8">
 
           {/* Quote of the Day */}
           {todaysQuote && (
             <div className="text-right px-4 sm:px-6">
               <blockquote className="max-w-2xl ml-auto">
-                <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-orange-400 leading-relaxed">
+                <p className="font-serif italic text-lg sm:text-xl md:text-2xl text-foreground/90 leading-relaxed">
                   "{todaysQuote.text}"
                 </p>
                 {todaysQuote.author && (
-                  <footer className="mt-2 font-serif italic text-sm sm:text-base text-orange-300/70">
+                  <footer className="mt-2 font-serif italic text-sm sm:text-base text-muted-foreground">
                     — {todaysQuote.author}
                   </footer>
                 )}
@@ -256,32 +256,32 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             </div>
           )}
           
-          <ParallaxCard offset={28}>
+          <ParallaxCard offset={14}>
             <ErrorBoundary>
               <MorningCheckIn />
             </ErrorBoundary>
           </ParallaxCard>
 
-          <ParallaxCard offset={24}>
+          <ParallaxCard offset={12}>
             <ErrorBoundary>
-              <MorningBriefing className="animate-scale-in" />
+              <MorningBriefing />
             </ErrorBoundary>
           </ParallaxCard>
 
-          <ParallaxCard offset={20}>
+          <ParallaxCard offset={10}>
             <ErrorBoundary>
               <EveningReflectionBanner />
             </ErrorBoundary>
           </ParallaxCard>
 
-          <ParallaxCard offset={18}>
+          <ParallaxCard offset={10}>
             <ErrorBoundary>
               <WeeklyRecapCard />
             </ErrorBoundary>
           </ParallaxCard>
 
           {/* Daily Coach Panel - AI-powered insights */}
-          <ParallaxCard offset={16}>
+          <ParallaxCard offset={9}>
             <ErrorBoundary>
               <DailyCoachPanel 
                 maxInsights={3} 
@@ -290,14 +290,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
             </ErrorBoundary>
           </ParallaxCard>
         
-          <ParallaxCard offset={14}>
+          <ParallaxCard offset={8}>
             <ErrorBoundary>
               <TodaysPepTalk />
             </ErrorBoundary>
           </ParallaxCard>
 
           {/* Ask Mentor Section */}
-          <ParallaxCard offset={12}>
+          <ParallaxCard offset={8}>
             <CompanionErrorBoundary>
               <ErrorBoundary>
                 <div className="cosmiq-glass-ultra rounded-2xl">

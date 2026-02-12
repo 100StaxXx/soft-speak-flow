@@ -6,14 +6,12 @@ import { useActivityFeed } from "@/hooks/useActivityFeed";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Moon, Heart } from "lucide-react";
+import { ArrowLeft, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoodSelector } from "@/components/MoodSelector";
 import { BottomNav } from "@/components/BottomNav";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-
-type Mood = 'good' | 'neutral' | 'tough';
 
 
 export default function Reflection() {
@@ -22,12 +20,11 @@ export default function Reflection() {
   const { toast } = useToast();
   const { logActivity } = useActivityFeed();
   
-  const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [todayReflection, setTodayReflection] = useState<{ mood: string; note: string | null; ai_reply: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentMoodSelection, setCurrentMoodSelection] = useState<string | null>(null);
 
   const loadTodayReflection = async () => {
     if (!user?.id) return;
@@ -45,7 +42,7 @@ export default function Reflection() {
       
       if (data) {
         setTodayReflection(data);
-        setSelectedMood(data.mood as Mood);
+        setSelectedMood(data.mood);
         setNote(data.note || "");
       }
     } catch (error) {
@@ -113,7 +110,7 @@ export default function Reflection() {
       console.error('Error saving reflection:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Unable to save reflection.",
         variant: "destructive"
       });
     } finally {
@@ -141,7 +138,7 @@ export default function Reflection() {
               <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <h1 className="text-2xl font-heading font-black flex-1 text-center">Gratitude Journal</h1>
+              <h1 className="text-2xl font-semibold tracking-tight flex-1 text-center">Gratitude Journal</h1>
               <Button variant="outline" size="sm" onClick={() => navigate('/mood-history')}>
                 View History
               </Button>
@@ -151,7 +148,7 @@ export default function Reflection() {
               <div className="flex items-center gap-3">
                 <Heart className="w-8 h-8 text-primary" />
                 <div>
-                  <h2 className="text-xl font-heading font-black">Gratitude Complete</h2>
+                  <h2 className="text-xl font-semibold tracking-tight">Gratitude Complete</h2>
                   <p className="text-sm text-muted-foreground">You logged gratitude today</p>
                 </div>
               </div>
@@ -185,8 +182,8 @@ export default function Reflection() {
             {/* Mood Selector Section */}
             <Card className="p-6">
               <MoodSelector 
-                selected={currentMoodSelection}
-                onSelect={setCurrentMoodSelection}
+                selected={selectedMood}
+                onSelect={setSelectedMood}
               />
             </Card>
           </div>
@@ -206,7 +203,7 @@ export default function Reflection() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-2xl font-heading font-black flex-1 text-center">Gratitude Journal</h1>
+            <h1 className="text-2xl font-semibold tracking-tight flex-1 text-center">Gratitude Journal</h1>
             <Button variant="outline" size="sm" onClick={() => navigate('/mood-history')}>
               View History
             </Button>
@@ -216,15 +213,15 @@ export default function Reflection() {
             <div className="flex items-center gap-3">
               <Heart className="w-8 h-8 text-primary" />
               <div>
-                <h2 className="text-xl font-heading font-black">Daily Gratitude</h2>
+                <h2 className="text-xl font-semibold tracking-tight">Daily Gratitude</h2>
                 <p className="text-sm text-muted-foreground">What are you grateful for?</p>
               </div>
             </div>
 
             <div className="space-y-6">
               <MoodSelector 
-                selected={currentMoodSelection}
-                onSelect={setCurrentMoodSelection}
+                selected={selectedMood}
+                onSelect={setSelectedMood}
               />
 
               <div>

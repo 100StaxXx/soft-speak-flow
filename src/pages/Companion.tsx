@@ -21,7 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
 
 // Memoized tab content to prevent unnecessary re-renders
@@ -85,6 +85,7 @@ const OverviewSkeleton = () => (
 );
 
 const Companion = () => {
+  const prefersReducedMotion = useReducedMotion();
   const { companion, nextEvolutionXP, progressToNext, isLoading, error, refetch } = useCompanion();
   const [activeTab, setActiveTab] = useState("overview");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
@@ -102,14 +103,15 @@ const Companion = () => {
             <p className="text-muted-foreground max-w-md">
               {error instanceof Error ? error.message : 'Unable to load your companion data. Please try refreshing the page.'}
             </p>
-            <button
+            <Button
+              variant="default"
               onClick={() => {
                 void refetch();
               }}
-              className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
+              className="mt-4 h-11 px-6"
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -125,12 +127,13 @@ const Companion = () => {
             <p className="text-muted-foreground max-w-md">
               It looks like you haven't created your companion yet. Please complete the onboarding process to get started.
             </p>
-            <button
+            <Button
+              variant="default"
               onClick={() => navigate('/onboarding')}
-              className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
+              className="mt-4 h-11 px-6"
             >
               Start Onboarding
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -139,7 +142,7 @@ const Companion = () => {
     // Loading or loaded content with tabs
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="container pb-6">
-        <TabsList className="grid w-full grid-cols-5 cosmiq-glass-subtle border border-cosmiq-glow/20">
+        <TabsList className="grid w-full grid-cols-5 bg-card/80 backdrop-blur-md border border-border/60">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -168,16 +171,16 @@ const Companion = () => {
               key="skeleton"
               initial={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.15 }}
             >
               <OverviewSkeleton />
             </motion.div>
           ) : (
             <motion.div
               key="content"
-              initial={{ opacity: 0 }}
+              initial={prefersReducedMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
             >
               <TabsContent value="overview">
                 {activeTab === "overview" && (
@@ -228,7 +231,7 @@ const Companion = () => {
           {/* Fixed header - won't move on iOS overscroll */}
           <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
             <div className="container flex items-center justify-between py-4">
-              <h1 className="font-heading font-black text-2xl">Companion</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Companion</h1>
               <Button
                 variant="ghost"
                 size="icon"

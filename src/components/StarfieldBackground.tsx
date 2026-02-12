@@ -203,10 +203,10 @@ export const StarfieldBackground = memo(() => {
   }, [starDistribution]);
 
   // Memoize all generated elements
-  const dustParticles = useMemo(() => generateDust(useLiteMode ? 10 : 20), [useLiteMode]);
-  const backgroundStars = useMemo(() => generateStars(useLiteMode ? 12 : 20, 0.8, 1.5, 0.3, 0.5), [useLiteMode]);
-  const midLayerStars = useMemo(() => generateStars(useLiteMode ? 6 : 10, 1.5, 2.5, 0.4, 0.7), [useLiteMode]);
-  const brightStars = useMemo(() => generateStars(useLiteMode ? 3 : 5, 2.5, 4, 0.7, 1), [useLiteMode]);
+  const dustParticles = useMemo(() => generateDust(useLiteMode ? 8 : 14), [useLiteMode]);
+  const backgroundStars = useMemo(() => generateStars(useLiteMode ? 10 : 14, 0.8, 1.5, 0.3, 0.5), [useLiteMode]);
+  const midLayerStars = useMemo(() => generateStars(useLiteMode ? 5 : 8, 1.5, 2.5, 0.4, 0.7), [useLiteMode]);
+  const brightStars = useMemo(() => generateStars(useLiteMode ? 2 : 4, 2.5, 4, 0.7, 1), [useLiteMode]);
   const shootingStars = useMemo(() => (useLiteMode ? [] : generateShootingStars()), [useLiteMode]);
 
   // Dynamic gradient based on time period

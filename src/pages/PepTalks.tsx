@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PepTalks() {
+  const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTrigger, setSelectedTrigger] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export default function PepTalks() {
                   <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-stardust-gold flex items-center justify-center">
                     <Headphones className="h-4 w-4 text-primary-foreground" />
                   </div>
-                  <h1 className="text-lg font-heading font-bold">Pep Talks</h1>
+                  <h1 className="text-lg font-semibold tracking-tight">Pep Talks</h1>
                 </div>
               </div>
               <PageInfoButton onClick={() => setShowPageInfo(true)} />
@@ -89,9 +90,9 @@ export default function PepTalks() {
         <div className="max-w-4xl mx-auto px-4 py-6">
           {/* Hero Section */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.24 }}
             className="mb-6"
           >
             <GlassCard variant="hero" glow="accent" className="p-6 relative overflow-hidden">
@@ -105,7 +106,7 @@ export default function PepTalks() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Brain className="h-4 w-4 text-stardust-gold" />
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      <p className="text-xs font-medium text-muted-foreground">
                         How are you feeling?
                       </p>
                     </div>
@@ -126,8 +127,8 @@ export default function PepTalks() {
                       variant={!selectedTrigger ? "default" : "outline"}
                       className={`cursor-pointer transition-all duration-200 ${
                         !selectedTrigger 
-                          ? "bg-gradient-to-r from-primary to-primary/80 shadow-glow" 
-                          : "hover:border-primary/50 hover:bg-primary/10"
+                          ? "bg-primary text-primary-foreground shadow-[0_8px_18px_hsl(var(--primary)/0.3)]" 
+                          : "hover:border-primary/50 hover:bg-primary/8"
                       }`}
                       onClick={() => setSelectedTrigger(null)}
                     >
@@ -140,8 +141,8 @@ export default function PepTalks() {
                         variant={selectedTrigger === trigger ? "default" : "outline"}
                         className={`cursor-pointer transition-all duration-200 ${
                           selectedTrigger === trigger
-                            ? "bg-gradient-to-r from-primary to-primary/80 shadow-glow"
-                            : "hover:border-primary/50 hover:bg-primary/10"
+                            ? "bg-primary text-primary-foreground shadow-[0_8px_18px_hsl(var(--primary)/0.3)]"
+                            : "hover:border-primary/50 hover:bg-primary/8"
                         }`}
                         onClick={() => setSelectedTrigger(trigger)}
                       >
@@ -155,18 +156,18 @@ export default function PepTalks() {
 
                 {/* Topic Categories */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Target className="h-4 w-4 text-primary" />
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      What do you need?
-                    </p>
-                  </div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="h-4 w-4 text-primary" />
+                      <p className="text-xs font-medium text-muted-foreground">
+                        What do you need?
+                      </p>
+                    </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge
                       variant={!selectedCategory ? "default" : "outline"}
                       className={`cursor-pointer transition-all duration-200 ${
                         !selectedCategory
-                          ? "bg-gradient-to-r from-stardust-gold to-stardust-gold/80 text-background shadow-glow"
+                          ? "bg-stardust-gold text-background shadow-[0_8px_18px_hsl(var(--stardust-gold)/0.35)]"
                           : "hover:border-stardust-gold/50 hover:bg-stardust-gold/10"
                       }`}
                       onClick={() => setSelectedCategory(null)}
@@ -179,7 +180,7 @@ export default function PepTalks() {
                         variant={selectedCategory === cat.value ? "default" : "outline"}
                         className={`cursor-pointer transition-all duration-200 ${
                           selectedCategory === cat.value
-                            ? "bg-gradient-to-r from-stardust-gold to-stardust-gold/80 text-background shadow-glow"
+                            ? "bg-stardust-gold text-background shadow-[0_8px_18px_hsl(var(--stardust-gold)/0.35)]"
                             : "hover:border-stardust-gold/50 hover:bg-stardust-gold/10"
                         }`}
                         onClick={() => setSelectedCategory(cat.value)}
@@ -223,9 +224,9 @@ export default function PepTalks() {
                 {pepTalks.map((pepTalk, index) => (
                   <motion.div
                     key={pepTalk.id}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    transition={{ duration: prefersReducedMotion ? 0 : 0.2, delay: prefersReducedMotion ? 0 : index * 0.04 }}
                   >
                     <PepTalkCard
                       id={pepTalk.id}
@@ -243,15 +244,15 @@ export default function PepTalks() {
               </>
             ) : (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
               >
                 <GlassCard variant="elevated" glow="soft" className="p-12 text-center">
                   <div className="h-16 w-16 mx-auto rounded-full bg-gradient-to-br from-primary/20 to-stardust-gold/20 flex items-center justify-center mb-4">
                     <Headphones className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">No pep talks found</h3>
+                  <h3 className="text-xl font-semibold mb-2">No pep talks found</h3>
                   <p className="text-muted-foreground mb-6">
                     Try adjusting your filters to discover more content
                   </p>

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { motion, useScroll, useTransform, useSpring, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,14 @@ export const ParallaxCard = ({
 }: ParallaxCardProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const isNativeIOS = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const capacitor = (window as Window & {
+      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
+    }).Capacitor;
+    return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
+  }, []);
+  const disableParallax = prefersReducedMotion || isNativeIOS;
   
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -26,17 +34,17 @@ export const ParallaxCard = ({
   });
   
   // Transform scroll progress to Y translation
-  const yRange = useTransform(scrollYProgress, [0, 1], [offset, -offset]);
+  const yRange = useTransform(scrollYProgress, [0, 1], [offset * 0.65, -offset * 0.65]);
   const y = useSpring(yRange, { stiffness, damping });
   
   // Subtle scale effect
-  const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.98, 1, 0.98]);
-  const scaleSpring = useSpring(scale, { stiffness: 200, damping: 40 });
+  const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.992, 1, 0.992]);
+  const scaleSpring = useSpring(scale, { stiffness: 170, damping: 36 });
   
   // Subtle opacity for depth
   const opacity = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], [0.9, 1, 1, 0.9]);
   
-  if (prefersReducedMotion) {
+  if (disableParallax) {
     return <div className={cn(className)}>{children}</div>;
   }
   

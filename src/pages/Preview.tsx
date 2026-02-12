@@ -16,10 +16,13 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectPath } from "@/utils/authRedirect";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
+import { PageTransition } from "@/components/PageTransition";
+import { StarfieldBackground } from "@/components/StarfieldBackground";
 
 const Preview = () => {
+  const prefersReducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
@@ -54,9 +57,11 @@ const Preview = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <PageTransition>
+      <StarfieldBackground />
+      <div className="min-h-screen bg-background pb-24 pt-safe relative z-10">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
+      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/55 px-4 py-3 safe-area-top">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -73,16 +78,16 @@ const Preview = () => {
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
         {/* Demo Companion Card */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.24 }}
         >
           <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-card via-card to-primary/5">
             <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/30 via-primary/20 to-transparent flex items-center justify-center border border-primary/20">
-                    <Heart className="h-10 w-10 text-primary animate-pulse" />
+                    <Heart className={`h-10 w-10 text-primary ${prefersReducedMotion ? "" : "animate-pulse"}`} />
                   </div>
                   <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
                     Lv. 1
@@ -111,9 +116,9 @@ const Preview = () => {
 
         {/* Demo Quests */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
+          transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.24 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -126,9 +131,9 @@ const Preview = () => {
             {demoQuests.map((quest, index) => (
               <motion.div
                 key={quest.text}
-                initial={{ x: -20, opacity: 0 }}
+                initial={prefersReducedMotion ? false : { x: -10, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.15 + index * 0.05, duration: 0.3 }}
+                transition={{ delay: prefersReducedMotion ? 0 : 0.08 + index * 0.03, duration: prefersReducedMotion ? 0 : 0.2 }}
               >
                 <Card className={quest.completed ? "bg-primary/5 border-primary/20" : "bg-card"}>
                   <CardContent className="p-4 flex items-center gap-3">
@@ -152,9 +157,9 @@ const Preview = () => {
 
         {/* Demo Mentors */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.4 }}
+          transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.24 }}
         >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -166,9 +171,9 @@ const Preview = () => {
             {demoMentors.map((mentor, index) => (
               <motion.div
                 key={mentor.name}
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={prefersReducedMotion ? false : { scale: 0.97, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.35 + index * 0.05, duration: 0.3 }}
+                transition={{ delay: prefersReducedMotion ? 0 : 0.1 + index * 0.03, duration: prefersReducedMotion ? 0 : 0.2 }}
               >
                 <Card className="text-center p-4 hover:border-primary/50 transition-colors cursor-pointer">
                   <div 
@@ -187,9 +192,9 @@ const Preview = () => {
 
         {/* Features Preview */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
+          initial={prefersReducedMotion ? false : { y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
+          transition={{ delay: prefersReducedMotion ? 0 : 0.12, duration: prefersReducedMotion ? 0 : 0.24 }}
         >
           <Card className="bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
             <CardContent className="p-5">
@@ -218,7 +223,7 @@ const Preview = () => {
       </div>
 
       {/* Fixed CTA at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t border-border">
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe-bottom bg-background/90 backdrop-blur-xl border-t border-border/55">
         <div className="max-w-lg mx-auto">
           <Button
             size="lg"
@@ -230,7 +235,8 @@ const Preview = () => {
           </Button>
         </div>
       </div>
-    </div>
+      </div>
+    </PageTransition>
   );
 };
 
