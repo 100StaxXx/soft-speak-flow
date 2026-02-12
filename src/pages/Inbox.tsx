@@ -68,7 +68,7 @@ const InboxPage = memo(function InboxPage() {
   }, [user?.id, addTask, queryClient]);
 
   return (
-    <PageTransition>
+    <PageTransition mode="instant">
       <div className="min-h-screen bg-transparent pb-24 pt-safe">
         <StarfieldBackground />
 

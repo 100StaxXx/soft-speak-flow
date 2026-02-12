@@ -510,7 +510,7 @@ const Journeys = () => {
   }, []);
 
   return (
-    <PageTransition>
+    <PageTransition mode="instant">
       <StarfieldBackground />
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         {/* Hero Header */}

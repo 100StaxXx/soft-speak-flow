@@ -3,24 +3,25 @@ import { ReactNode, memo } from "react";
 
 interface PageTransitionProps {
   children: ReactNode;
+  mode?: "animated" | "instant";
 }
 
 // iOS-like easing curve
 const iosEasing = [0.25, 0.1, 0.25, 1] as const;
 
-export const PageTransition = memo(({ children }: PageTransitionProps) => {
+export const PageTransition = memo(({ children, mode = "animated" }: PageTransitionProps) => {
   const prefersReducedMotion = useReducedMotion();
 
-  if (prefersReducedMotion) {
+  if (prefersReducedMotion || mode === "instant") {
     return <div style={{ width: "100%", height: "100%" }}>{children}</div>;
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.24, ease: iosEasing }}
+      transition={{ duration: 0.18, ease: iosEasing }}
       style={{ width: '100%', height: '100%' }}
     >
       {children}

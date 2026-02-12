@@ -224,7 +224,7 @@ const Companion = () => {
   };
 
   return (
-    <PageTransition>
+    <PageTransition mode="instant">
       <CompanionErrorBoundary>
         <StarfieldBackground />
         <div className="min-h-screen pb-nav-safe relative z-10" data-tour="companion-page">
