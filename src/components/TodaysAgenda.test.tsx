@@ -312,7 +312,7 @@ describe("TodaysAgenda combo feedback", () => {
 });
 
 describe("TodaysAgenda scheduled timeline behavior", () => {
-  it("does not render scheduled header copy or drag-handle button", () => {
+  it("shows scheduled header and keeps drag-handle button", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -340,9 +340,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.queryByText("Scheduled")).not.toBeInTheDocument();
+    expect(screen.getByText("Scheduled")).toBeInTheDocument();
     expect(screen.queryByText(/Drag handle to reschedule/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /drag to reschedule/i })).toBeInTheDocument();
   });
 
   it("shows overlap warning text for conflicting tasks", () => {

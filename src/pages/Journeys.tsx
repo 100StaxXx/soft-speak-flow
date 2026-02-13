@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { format, addDays, isSameDay, startOfWeek } from "date-fns";
+import { format, addDays } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, Compass } from "lucide-react";
+import { Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -10,6 +10,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 
+import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -362,11 +363,6 @@ const Journeys = () => {
     return map;
   }, [allCalendarTasks]);
 
-  const selectedWeekDays = useMemo(() => {
-    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
-    return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  }, [selectedDate]);
-
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
     let taskDateOverride: string | undefined;
     let scheduledTimeOverride: string | undefined;
@@ -713,110 +709,86 @@ const Journeys = () => {
   return (
     <PageTransition mode="instant">
       <StarfieldBackground palette="cool-night" quality="auto" intensity="medium" parallax="pointer" />
-      <div className="min-h-screen pb-nav-safe pt-safe relative z-10">
-        <div className="px-5">
+      <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
+        {/* Hero Header */}
+        <motion.div
+          initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium }}
+          className="mb-6 text-center relative"
+        >
+          <div className="absolute right-0 top-0">
+            <PageInfoButton 
+              onClick={() => setShowPageInfo(true)} 
+            />
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            Quests
+          </h1>
+          <p className="text-sm text-muted-foreground/90">Daily quests. Your path to progress.</p>
+        </motion.div>
+
+        <QuestsErrorBoundary>
+          {/* Date Selector */}
           <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium }}
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              delay: prefersReducedMotion ? 0 : 0.04,
+              duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium,
+            }}
             className="mb-4"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-1.5 text-left">
-                <h1 className="text-[46px] leading-tight font-semibold tracking-tight text-foreground">
-                  {format(selectedDate, "MMMM d,")}
-                  <span className="text-[#ef8a8a]"> {format(selectedDate, "yyyy")}</span>
-                </h1>
-                <ChevronRight className="h-7 w-7 text-[#ef8a8a]" />
-              </div>
-              <PageInfoButton onClick={() => setShowPageInfo(true)} />
-            </div>
-
-            <div className="mt-2 grid grid-cols-7 gap-2">
-              {selectedWeekDays.map((date) => {
-                const dateKey = format(date, "yyyy-MM-dd");
-                const isSelected = isSameDay(date, selectedDate);
-                const taskCount = tasksPerDay[dateKey] || 0;
-                return (
-                  <button
-                    key={dateKey}
-                    onClick={() => handleDatePillClick(date)}
-                    className="flex flex-col items-center gap-1 rounded-xl py-1.5"
-                  >
-                    <span className="text-[12px] text-muted-foreground uppercase">
-                      {format(date, "EEE")}
-                    </span>
-                    <span
-                      className={
-                        isSelected
-                          ? "h-10 w-10 rounded-full bg-[#ef8a8a] text-black text-2xl font-semibold flex items-center justify-center"
-                          : "h-10 w-10 rounded-full text-2xl font-semibold flex items-center justify-center text-foreground"
-                      }
-                    >
-                      {format(date, "d")}
-                    </span>
-                    <div className="h-2 flex items-center gap-1">
-                      {taskCount > 0 && (
-                        <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#ef8a8a]" />
-                          {taskCount > 1 && <span className="h-1.5 w-1.5 rounded-full bg-[#8ec5ff]" />}
-                          {taskCount > 2 && <span className="h-1.5 w-1.5 rounded-full bg-[#ef8a8a]/70" />}
-                        </>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <DatePillsScroller
+              selectedDate={selectedDate}
+              onDateSelect={handleDatePillClick}
+              tasksPerDay={tasksPerDay}
+            />
           </motion.div>
 
-          <QuestsErrorBoundary>
-            <motion.div
-              initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: prefersReducedMotion ? 0 : 0.08,
-                duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium,
-              }}
-              className="rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(22,22,26,0.92),rgba(19,19,24,0.9))] shadow-[0_20px_50px_rgba(0,0,0,0.42)] overflow-hidden"
-            >
-              <div className="flex justify-center pt-2">
-                <span className="h-1.5 w-20 rounded-full bg-white/15" />
-              </div>
-              <TodaysAgenda
-                tasks={dailyTasks}
-                selectedDate={selectedDate}
-                onToggle={handleToggleTask}
-                onAddQuest={() => {
-                  setPrefilledTime(null);
-                  setShowAddSheet(true);
-                }}
-                completedCount={completedCount}
-                totalCount={totalCount}
-                currentStreak={currentStreak}
-                onUndoToggle={handleUndoToggle}
-                onEditQuest={handleEditQuest}
-                calendarTasks={allCalendarTasks}
-                calendarMilestones={[]}
-                onDateSelect={setSelectedDate}
-                activeEpics={activeEpics}
-                onDeleteQuest={handleSwipeDeleteQuest}
-                onSendToCalendar={handleSendTaskToCalendar}
-                hasCalendarLink={hasLinkedEvent}
-                onMoveQuestToNextDay={handleSwipeMoveToNextDay}
-                onUpdateScheduledTime={(taskId, newTime) => {
-                  updateTask({ taskId, updates: { scheduled_time: newTime } });
-                  syncTaskUpdate.mutate({ taskId });
-                }}
-                onTimeSlotLongPress={(date, time) => {
-                  setSelectedDate(date);
-                  setPrefilledTime(time);
-                  setShowAddSheet(true);
-                }}
-              />
-            </motion.div>
-          </QuestsErrorBoundary>
-        </div>
+          {/* Main Content Area */}
+          <motion.div
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: prefersReducedMotion ? 0 : 0.1,
+              duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium,
+            }}
+          >
+            {/* Today's Agenda */}
+            <TodaysAgenda
+            tasks={dailyTasks}
+            selectedDate={selectedDate}
+            onToggle={handleToggleTask}
+            onAddQuest={() => {
+              setPrefilledTime(null);
+              setShowAddSheet(true);
+            }}
+            completedCount={completedCount}
+            totalCount={totalCount}
+            currentStreak={currentStreak}
+            onUndoToggle={handleUndoToggle}
+            onEditQuest={handleEditQuest}
+            calendarTasks={allCalendarTasks}
+            calendarMilestones={[]}
+            onDateSelect={setSelectedDate}
+            activeEpics={activeEpics}
+            onDeleteQuest={handleSwipeDeleteQuest}
+            onSendToCalendar={handleSendTaskToCalendar}
+            hasCalendarLink={hasLinkedEvent}
+            onMoveQuestToNextDay={handleSwipeMoveToNextDay}
+            onUpdateScheduledTime={(taskId, newTime) => {
+              updateTask({ taskId, updates: { scheduled_time: newTime } });
+              syncTaskUpdate.mutate({ taskId });
+            }}
+            onTimeSlotLongPress={(date, time) => {
+              setSelectedDate(date);
+              setPrefilledTime(time);
+              setShowAddSheet(true);
+            }}
+          />
+          </motion.div>
+        </QuestsErrorBoundary>
 
         {/* Add Quest Sheet */}
         <AddQuestSheet
