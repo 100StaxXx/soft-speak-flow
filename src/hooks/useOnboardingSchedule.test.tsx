@@ -4,25 +4,28 @@ import { renderHook, waitFor } from "@testing-library/react";
 import React from "react";
 
 type Scenario = {
-  deleteError: Error | null;
+  deleteErrors: Array<Error | null>;
 };
 
-const ONBOARDING_TASK_CLEANUP_VERSION = 1;
+const ONBOARDING_TASK_CLEANUP_VERSION = 2;
 const cleanupKey = (userId: string) =>
   `onboarding_task_cleanup_version_${ONBOARDING_TASK_CLEANUP_VERSION}_${userId}`;
+const legacyCleanupKey = (userId: string) => `onboarding_task_cleanup_version_1_${userId}`;
 
 const mocks = vi.hoisted(() => {
   const scenario: Scenario = {
-    deleteError: null,
+    deleteErrors: [],
   };
 
   const deleteCallMock = vi.fn();
+  let deleteCallCount = 0;
 
-  const createDeleteBuilder = () => {
+  const createDeleteBuilder = (table: string) => {
     const filters: Record<string, unknown> = {};
 
     const builder: {
       eq: (field: string, value: unknown) => typeof builder;
+      in: (field: string, values: unknown[]) => typeof builder;
       then: (
         resolve: (value: { data: null; error: Error | null }) => unknown,
         reject?: (reason: unknown) => unknown,
@@ -32,23 +35,40 @@ const mocks = vi.hoisted(() => {
         filters[field] = value;
         return builder;
       },
+      in: (field: string, values: unknown[]) => {
+        filters[field] = values;
+        return builder;
+      },
       then: (resolve, reject) => {
-        deleteCallMock(filters);
-        return Promise.resolve({ data: null, error: scenario.deleteError }).then(resolve, reject);
+        const callIndex = deleteCallCount;
+        const error = scenario.deleteErrors[callIndex] ?? null;
+        deleteCallMock({
+          callIndex,
+          table,
+          filters: { ...filters },
+        });
+        deleteCallCount += 1;
+        return Promise.resolve({ data: null, error }).then(resolve, reject);
       },
     };
 
     return builder;
   };
 
-  const fromMock = vi.fn((_table: string) => ({
-    delete: () => createDeleteBuilder(),
+  const fromMock = vi.fn((table: string) => ({
+    delete: () => createDeleteBuilder(table),
   }));
+
+  const reset = () => {
+    scenario.deleteErrors = [];
+    deleteCallCount = 0;
+  };
 
   return {
     scenario,
     deleteCallMock,
     fromMock,
+    reset,
   };
 });
 
@@ -99,12 +119,12 @@ describe("useOnboardingSchedule (cleanup compatibility wrapper)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     storageMocks.reset();
-    mocks.scenario.deleteError = null;
+    mocks.reset();
   });
 
-  it("does not persist cleanup key when delete fails", async () => {
-    const userId = "user-sync-fail";
-    mocks.scenario.deleteError = new Error("cleanup delete failed");
+  it("does not persist cleanup key when first delete pass fails", async () => {
+    const userId = "user-first-pass-fail";
+    mocks.scenario.deleteErrors = [new Error("source cleanup failed")];
 
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -117,12 +137,47 @@ describe("useOnboardingSchedule (cleanup compatibility wrapper)", () => {
 
     await waitFor(() => expect(mocks.deleteCallMock).toHaveBeenCalledTimes(1));
 
+    expect(mocks.deleteCallMock.mock.calls[0]?.[0]).toMatchObject({
+      table: "daily_tasks",
+      filters: {
+        user_id: userId,
+        source: "onboarding",
+      },
+    });
     expect(storageMocks.safeLocalStorage.getItem(cleanupKey(userId))).toBeNull();
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
   });
 
-  it("persists cleanup key and invalidates task queries after successful cleanup", async () => {
+  it("does not persist cleanup key when second delete pass fails", async () => {
+    const userId = "user-second-pass-fail";
+    mocks.scenario.deleteErrors = [null, new Error("title cleanup failed")];
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    renderHook(() => useOnboardingSchedule(userId, true, false), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(mocks.deleteCallMock).toHaveBeenCalledTimes(2));
+
+    expect(mocks.deleteCallMock.mock.calls[1]?.[0]).toMatchObject({
+      table: "daily_tasks",
+      filters: {
+        user_id: userId,
+        difficulty: "easy",
+        is_main_quest: false,
+      },
+    });
+    expect(storageMocks.safeLocalStorage.getItem(cleanupKey(userId))).toBeNull();
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
+  });
+
+  it("runs both cleanup passes and persists version 2 cleanup key", async () => {
     const userId = "user-cleanup-success";
 
     const queryClient = new QueryClient({
@@ -134,13 +189,53 @@ describe("useOnboardingSchedule (cleanup compatibility wrapper)", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await waitFor(() => expect(mocks.deleteCallMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.deleteCallMock).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(storageMocks.safeLocalStorage.getItem(cleanupKey(userId))).toBe("true"),
     );
 
+    const secondPassFilters = mocks.deleteCallMock.mock.calls[1]?.[0]?.filters as
+      | Record<string, unknown>
+      | undefined;
+    expect(Array.isArray(secondPassFilters?.task_text)).toBe(true);
+    expect((secondPassFilters?.task_text as unknown[]).length).toBe(12);
+    expect(secondPassFilters?.xp_reward).toEqual([2, 3, 4]);
+
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
+  });
+
+  it("does not run cleanup when cleanup eligibility is false", async () => {
+    const userId = "user-ineligible";
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderHook(() => useOnboardingSchedule(userId, false, false), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.deleteCallMock).not.toHaveBeenCalled();
+    expect(storageMocks.safeLocalStorage.getItem(cleanupKey(userId))).toBeNull();
+  });
+
+  it("reruns cleanup with version 2 key even when legacy version 1 key exists", async () => {
+    const userId = "user-version-migration";
+    storageMocks.safeLocalStorage.setItem(legacyCleanupKey(userId), "true");
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderHook(() => useOnboardingSchedule(userId, true, false), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(mocks.deleteCallMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(storageMocks.safeLocalStorage.getItem(cleanupKey(userId))).toBe("true"),
+    );
   });
 
   it("keeps legacy compatibility exports empty", () => {

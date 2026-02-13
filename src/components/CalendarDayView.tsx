@@ -11,6 +11,35 @@ import { Card } from "./ui/card";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
 import { getScheduledTimeParts, parseScheduledTime } from "@/utils/scheduledTime";
+import { bucketTaskToHalfHourSlot, computeDynamicWindow, snapPointerToFiveMinuteOffset } from "./calendar/timeWindow";
+
+const SLOT_ROW_HEIGHT_PX = 60;
+const HALF_HOUR_MINUTES = 30;
+const MAX_SLOT_START_MINUTE = 24 * 60 - HALF_HOUR_MINUTES;
+
+const formatTime24FromMinutes = (totalMinutes: number) => {
+  const clamped = Math.max(0, Math.min((24 * 60) - 1, totalMinutes));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+};
+
+const formatTimeSlotFromMinutes = (totalMinutes: number) => {
+  const clamped = Math.max(0, Math.min(MAX_SLOT_START_MINUTE, totalMinutes));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return format(new Date(2000, 0, 1, hour, minute), "h:mm a");
+};
+
+const generateHalfHourSlots = (startMinute: number, endMinute: number) => {
+  const slots: number[] = [];
+  const safeStart = Math.max(0, Math.min(MAX_SLOT_START_MINUTE, startMinute));
+  const safeEnd = Math.max(safeStart, Math.min(MAX_SLOT_START_MINUTE, endMinute));
+  for (let minute = safeStart; minute <= safeEnd; minute += HALF_HOUR_MINUTES) {
+    slots.push(minute);
+  }
+  return slots;
+};
 
 interface CalendarDayViewProps {
   selectedDate: Date;
@@ -40,6 +69,11 @@ export const CalendarDayView = ({
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const longPressSlot = useRef<{
+    slotStartMinute: number;
+    fineGrained: boolean;
+    offsetY: number;
+  } | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
 
@@ -47,66 +81,23 @@ export const CalendarDayView = ({
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const dayTasks = tasks.filter(t => t.task_date === dateStr);
 
-  // Auto-expand time range based on scheduled tasks (or full day if fullDayMode)
-  const calculateTimeRange = () => {
-    if (fullDayMode) {
-      return { start: 0, end: 23 }; // Full 24-hour view: 12:00 AM - 11:30 PM
-    }
-    
-    const scheduledTasks = dayTasks.filter(t => t.scheduled_time);
+  const dynamicWindow = useMemo(() => computeDynamicWindow(dayTasks), [dayTasks]);
 
-    if (scheduledTasks.length === 0) {
-      return { start: 6, end: 23 }; // Default 6am-11pm
-    }
+  const standardTimeSlots = useMemo(
+    () => generateHalfHourSlots(dynamicWindow.startMinute, dynamicWindow.endMinute),
+    [dynamicWindow],
+  );
 
-    let earliestHour = 6;
-    let latestHour = 23;
+  const fullDayTimeSlots = useMemo(
+    () => generateHalfHourSlots(0, (23 * 60) + 30),
+    [],
+  );
 
-    scheduledTasks.forEach(task => {
-      const parts = getScheduledTimeParts(task.scheduled_time);
-      if (!parts) return;
-      const hour = parts.hour;
-      const duration = task.estimated_duration || 30;
-      const endHour = Math.ceil((hour * 60 + parts.minute + duration) / 60);
+  const timeSlots = fullDayMode ? fullDayTimeSlots : standardTimeSlots;
 
-      earliestHour = Math.min(earliestHour, hour);
-      latestHour = Math.max(latestHour, endHour);
-    });
-
-    // Add buffer before and after
-    earliestHour = Math.max(0, earliestHour - 1);
-    latestHour = Math.min(23, latestHour + 1);
-
-    return { start: earliestHour, end: latestHour };
-  };
-
-  // Memoize time range calculation
-  const { start: startHour, end: endHour } = useMemo(() => calculateTimeRange(), [dayTasks, fullDayMode]);
-  
-  // Memoize time slots
-  const timeSlots = useMemo(() => {
-    const slots = [];
-    for (let hour = startHour; hour <= endHour; hour++) {
-      slots.push({ hour, minute: 0 });
-      slots.push({ hour, minute: 30 });
-    }
-    return slots;
-  }, [startHour, endHour]);
-
-  const formatTimeSlot = (hour: number, minute: number) => {
-    return format(new Date().setHours(hour, minute, 0), 'h:mm a');
-  };
-
-  const formatTime24 = (hour: number, minute: number) => {
-    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-  };
-
-  const getTasksForTimeSlot = (hour: number, minute: number) => {
-    return dayTasks.filter(task => {
-      const parts = getScheduledTimeParts(task.scheduled_time);
-      return !!parts && parts.hour === hour && parts.minute === minute;
-    });
-  };
+  const getTasksForTimeSlot = useCallback((slotStartMinute: number) => {
+    return dayTasks.filter(task => bucketTaskToHalfHourSlot(task.scheduled_time) === slotStartMinute);
+  }, [dayTasks]);
 
   const getUnscheduledTasks = () => {
     return dayTasks.filter(task => !task.scheduled_time && !task.completed);
@@ -126,16 +117,44 @@ export const CalendarDayView = ({
     return Math.max(60, (duration / 30) * 60);
   };
 
+  const clearLongPress = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressSlot.current = null;
+  }, []);
+
   // Optimized touch handlers with proper cleanup
-  const handleTouchStart = useCallback((hour: number, minute: number, e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((
+    slotStartMinute: number,
+    fineGrained: boolean,
+    e: React.TouchEvent<HTMLDivElement>,
+  ) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+
     touchStartPos.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY
+      x: touch.clientX,
+      y: touch.clientY
+    };
+
+    const rowBounds = e.currentTarget.getBoundingClientRect();
+    longPressSlot.current = {
+      slotStartMinute,
+      fineGrained,
+      offsetY: touch.clientY - rowBounds.top,
     };
     
     longPressTimer.current = setTimeout(() => {
+      const pending = longPressSlot.current;
+      if (!pending) return;
+
+      const minuteOffset = pending.fineGrained
+        ? snapPointerToFiveMinuteOffset(pending.offsetY, SLOT_ROW_HEIGHT_PX)
+        : 0;
       playSound('pop');
-      const time24 = formatTime24(hour, minute);
+      const time24 = formatTime24FromMinutes(pending.slotStartMinute + minuteOffset);
       onTimeSlotLongPress?.(selectedDate, time24);
     }, 600); // Reduced for snappier response
   }, [selectedDate, onTimeSlotLongPress]);
@@ -146,20 +165,29 @@ export const CalendarDayView = ({
       const dx = Math.abs(e.touches[0].clientX - touchStartPos.current.x);
       const dy = Math.abs(e.touches[0].clientY - touchStartPos.current.y);
       if (dx > 10 || dy > 10) {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-        }
+        clearLongPress();
       }
     }
-  }, []);
+  }, [clearLongPress]);
 
   const handleTouchEnd = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    clearLongPress();
     touchStartPos.current = null;
+  }, [clearLongPress]);
+
+  const getDropTimeForSlot = useCallback((
+    slotStartMinute: number,
+    fineGrained: boolean,
+    e: React.DragEvent<HTMLDivElement>,
+  ) => {
+    if (!fineGrained) {
+      return formatTime24FromMinutes(slotStartMinute);
+    }
+
+    const rowBounds = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rowBounds.top;
+    const minuteOffset = snapPointerToFiveMinuteOffset(offsetY, SLOT_ROW_HEIGHT_PX);
+    return formatTime24FromMinutes(slotStartMinute + minuteOffset);
   }, []);
 
   const unscheduledTasks = getUnscheduledTasks();
@@ -430,21 +458,21 @@ export const CalendarDayView = ({
         // No ScrollArea in fullDayMode - let parent modal handle scrolling
         <div className="rounded-lg border border-border">
           <div className="relative">
-            {timeSlots.map(({ hour, minute }, index) => {
-              const slotTasks = getTasksForTimeSlot(hour, minute);
-              const isHourMark = minute === 0;
-              const time24 = formatTime24(hour, minute);
+            {timeSlots.map((slotStartMinute) => {
+              const slotTasks = getTasksForTimeSlot(slotStartMinute);
+              const isHourMark = slotStartMinute % 60 === 0;
+              const time24 = formatTime24FromMinutes(slotStartMinute);
 
               return (
                 <div
-                  key={`${hour}-${minute}`}
-                  data-hour={isHourMark ? hour : undefined}
+                  key={slotStartMinute}
+                  data-hour={isHourMark ? slotStartMinute / 60 : undefined}
                   className={cn(
                     "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation select-none",
                     isHourMark && "border-t border-border"
                   )}
                   style={{ 
-                    minHeight: '60px',
+                    minHeight: `${SLOT_ROW_HEIGHT_PX}px`,
                     WebkitTapHighlightColor: 'transparent',
                     WebkitTouchCallout: 'none',
                     WebkitUserSelect: 'none',
@@ -458,7 +486,7 @@ export const CalendarDayView = ({
                     onTaskDrop(taskId, selectedDate, time24);
                     setDraggedTask(null);
                   }}
-                  onTouchStart={(e) => handleTouchStart(hour, minute, e)}
+                  onTouchStart={(e) => handleTouchStart(slotStartMinute, false, e)}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
                   onTouchCancel={handleTouchEnd}
@@ -468,7 +496,7 @@ export const CalendarDayView = ({
                     "flex-shrink-0 w-20 p-2 text-xs font-medium",
                     isHourMark ? "text-foreground" : "text-muted-foreground/60"
                   )}>
-                    {isHourMark && formatTimeSlot(hour, minute)}
+                    {isHourMark && formatTimeSlotFromMinutes(slotStartMinute)}
                   </div>
 
                   {/* Task Area */}
@@ -485,7 +513,7 @@ export const CalendarDayView = ({
                             key={task.id}
                             style={{
                               height: `${calculateTaskHeight(task.estimated_duration)}px`,
-                              minHeight: '60px'
+                              minHeight: `${SLOT_ROW_HEIGHT_PX}px`
                             }}
                           >
                             <QuestDragCard
@@ -513,20 +541,19 @@ export const CalendarDayView = ({
         // Normal view with ScrollArea
         <ScrollArea className="rounded-lg border border-border max-h-[520px] min-h-[320px]">
           <div className="relative">
-            {timeSlots.map(({ hour, minute }, index) => {
-              const slotTasks = getTasksForTimeSlot(hour, minute);
-              const isHourMark = minute === 0;
-              const time24 = formatTime24(hour, minute);
+            {timeSlots.map((slotStartMinute) => {
+              const slotTasks = getTasksForTimeSlot(slotStartMinute);
+              const isHourMark = slotStartMinute % 60 === 0;
 
               return (
                 <div
-                  key={`${hour}-${minute}`}
+                  key={slotStartMinute}
                   className={cn(
                     "flex border-b border-border/50 hover:bg-accent/30 transition-colors group touch-manipulation select-none",
                     isHourMark && "border-t border-border"
                   )}
                   style={{ 
-                    minHeight: '60px',
+                    minHeight: `${SLOT_ROW_HEIGHT_PX}px`,
                     WebkitTapHighlightColor: 'transparent',
                     WebkitTouchCallout: 'none',
                     WebkitUserSelect: 'none',
@@ -536,11 +563,12 @@ export const CalendarDayView = ({
                   onDrop={(e) => {
                     e.preventDefault();
                     const taskId = e.dataTransfer.getData('taskId');
+                    const dropTime = getDropTimeForSlot(slotStartMinute, true, e);
                     playSound('complete');
-                    onTaskDrop(taskId, selectedDate, time24);
+                    onTaskDrop(taskId, selectedDate, dropTime);
                     setDraggedTask(null);
                   }}
-                  onTouchStart={(e) => handleTouchStart(hour, minute, e)}
+                  onTouchStart={(e) => handleTouchStart(slotStartMinute, true, e)}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
                   onTouchCancel={handleTouchEnd}
@@ -550,7 +578,7 @@ export const CalendarDayView = ({
                     "flex-shrink-0 w-20 p-2 text-xs font-medium",
                     isHourMark ? "text-foreground" : "text-muted-foreground/60"
                   )}>
-                    {isHourMark && formatTimeSlot(hour, minute)}
+                    {formatTimeSlotFromMinutes(slotStartMinute)}
                   </div>
 
                   {/* Task Area */}
@@ -567,7 +595,7 @@ export const CalendarDayView = ({
                             key={task.id}
                             style={{
                               height: `${calculateTaskHeight(task.estimated_duration)}px`,
-                              minHeight: '60px'
+                              minHeight: `${SLOT_ROW_HEIGHT_PX}px`
                             }}
                           >
                             <QuestDragCard

@@ -51,6 +51,7 @@ import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { getTodayIfDateStale, JOURNEYS_ROUTE, shouldResetJourneysDate } from "@/pages/journeysDateSync";
+import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -263,12 +264,15 @@ const Journeys = () => {
     }
   }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
-  // Cleanup legacy onboarding pseudo-quests for users who completed walkthrough
-  // Wait for profile to load before evaluating walkthrough status
-  const hasCompletedWalkthrough = !profileLoading && 
-    (profile?.onboarding_data as Record<string, unknown>)?.walkthrough_completed === true;
-
-  useOnboardingTaskCleanup(user?.id, hasCompletedWalkthrough, profileLoading);
+  // Cleanup legacy onboarding pseudo-quests for users who completed onboarding
+  // and/or walkthrough, once profile state has resolved.
+  const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
+  const cleanupEligible = isOnboardingCleanupEligible(
+    profileLoading,
+    profile?.onboarding_completed,
+    onboardingData
+  );
+  useOnboardingTaskCleanup(user?.id, cleanupEligible, profileLoading);
   
   const handleEditQuest = useCallback(async (task: {
     id: string;
