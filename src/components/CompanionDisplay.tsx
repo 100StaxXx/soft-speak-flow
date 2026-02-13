@@ -550,7 +550,7 @@ export const CompanionDisplay = memo(() => {
           </div>
 
           {/* Companion Dialogue - emotional responses based on care signals */}
-          <CompanionDialogue showBondInfo className="mt-2" />
+          <CompanionDialogue className="mt-2" />
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>

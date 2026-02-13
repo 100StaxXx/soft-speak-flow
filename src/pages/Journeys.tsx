@@ -3,6 +3,9 @@ import { format, addDays } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
+import { useLocation } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
@@ -47,6 +50,7 @@ import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
+import { getTodayIfDateStale, JOURNEYS_ROUTE, shouldResetJourneysDate } from "@/pages/journeysDateSync";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,6 +62,7 @@ interface CreatedCampaignData {
 
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
+  const location = useLocation();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -69,6 +74,8 @@ const Journeys = () => {
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
+  const previousPathRef = useRef<string | null>(location.pathname);
+  const activePathRef = useRef(location.pathname);
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -84,6 +91,67 @@ const Journeys = () => {
     resetStreak, 
     isResolving 
   } = useStreakAtRisk();
+
+  useEffect(() => {
+    activePathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const previousPath = previousPathRef.current;
+    if (shouldResetJourneysDate(previousPath, location.pathname)) {
+      setSelectedDate((currentDate) => getTodayIfDateStale(currentDate));
+    }
+    previousPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  const syncSelectedDateToTodayIfJourneysActive = useCallback(() => {
+    if (activePathRef.current !== JOURNEYS_ROUTE) return;
+    setSelectedDate((currentDate) => getTodayIfDateStale(currentDate));
+  }, []);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      syncSelectedDateToTodayIfJourneysActive();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [syncSelectedDateToTodayIfJourneysActive]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let isDisposed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+
+    const setupListener = async () => {
+      const handle = await CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+        if (!isActive) return;
+        syncSelectedDateToTodayIfJourneysActive();
+      });
+
+      if (isDisposed) {
+        await handle.remove();
+        return;
+      }
+
+      listenerHandle = handle;
+    };
+
+    void setupListener();
+
+    return () => {
+      isDisposed = true;
+      if (listenerHandle) {
+        void listenerHandle.remove();
+      }
+    };
+  }, [syncSelectedDateToTodayIfJourneysActive]);
   
   // Combo tracking
   

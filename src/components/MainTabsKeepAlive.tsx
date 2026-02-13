@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import Mentor from "@/pages/Mentor";
@@ -6,18 +6,22 @@ import Companion from "@/pages/Companion";
 import Inbox from "@/pages/Inbox";
 import Journeys from "@/pages/Journeys";
 import { useAuth } from "@/hooks/useAuth";
+import { PullToRefreshContainer } from "@/components/PullToRefreshContainer";
 import {
   DAILY_TASKS_GC_TIME,
   DAILY_TASKS_STALE_TIME,
   fetchDailyTasks,
   getDailyTasksQueryKey,
 } from "@/hooks/useTasksQuery";
-
-export type MainTabPath = "/mentor" | "/inbox" | "/journeys" | "/companion";
+import {
+  buildRefreshPredicate,
+  dispatchMainTabRefreshEvent,
+  type MainTabPath,
+} from "@/utils/mainTabRefresh";
 
 const TAB_ORDER: MainTabPath[] = ["/mentor", "/inbox", "/journeys", "/companion"];
 
-const TAB_COMPONENTS: Record<MainTabPath, React.ComponentType> = {
+const TAB_COMPONENTS: Record<MainTabPath, ComponentType> = {
   "/mentor": Mentor,
   "/inbox": Inbox,
   "/journeys": Journeys,
@@ -83,6 +87,22 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
     return () => window.cancelAnimationFrame(frame);
   }, [activePath]);
 
+  const handlePullRefresh = useCallback(
+    async (path: MainTabPath) => {
+      await queryClient.invalidateQueries({
+        predicate: buildRefreshPredicate(path),
+        refetchType: "active",
+      });
+
+      dispatchMainTabRefreshEvent({
+        path,
+        source: "pull-to-refresh",
+        triggeredAt: Date.now(),
+      });
+    },
+    [queryClient],
+  );
+
   return (
     <div className="relative">
       {TAB_ORDER.map((path) => {
@@ -92,13 +112,13 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
         const isActive = path === activePath;
 
         return (
-          <section
-            key={path}
-            style={{ display: isActive ? "block" : "none" }}
-            aria-hidden={!isActive}
-          >
-            <TabPage />
-          </section>
+          <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive}>
+            <PullToRefreshContainer enabled={isActive} onRefresh={() => handlePullRefresh(path)}>
+              <section>
+                <TabPage />
+              </section>
+            </PullToRefreshContainer>
+          </div>
         );
       })}
     </div>

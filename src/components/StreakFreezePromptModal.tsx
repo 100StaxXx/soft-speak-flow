@@ -10,6 +10,7 @@ interface StreakFreezePromptModalProps {
   freezesAvailable: number;
   onUseFreeze: () => Promise<void>;
   onResetStreak: () => Promise<void>;
+  onOpenChange?: (open: boolean) => void;
   isResolving: boolean;
 }
 
@@ -19,6 +20,7 @@ export const StreakFreezePromptModal = memo(function StreakFreezePromptModal({
   freezesAvailable,
   onUseFreeze,
   onResetStreak,
+  onOpenChange,
   isResolving,
 }: StreakFreezePromptModalProps) {
   const [selectedAction, setSelectedAction] = useState<"freeze" | "reset" | null>(null);
@@ -34,7 +36,7 @@ export const StreakFreezePromptModal = memo(function StreakFreezePromptModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-amber-500/30" hideCloseButton>
         <DialogHeader className="text-center">
           <motion.div

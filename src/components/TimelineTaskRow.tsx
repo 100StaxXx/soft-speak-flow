@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 interface TimelineTaskRowProps {
   time?: string | null;
   overrideTime?: string | null;
+  label?: string | null;
   showLine?: boolean;
   isLast?: boolean;
   isDragTarget?: boolean;
@@ -18,7 +19,15 @@ const formatTime12h = (time: string) => {
   return `${displayHour}:${minutes}${ampm}`;
 };
 
-export function TimelineTaskRow({ time, overrideTime, showLine = true, isLast = false, isDragTarget = false, children }: TimelineTaskRowProps) {
+export function TimelineTaskRow({
+  time,
+  overrideTime,
+  label,
+  showLine = true,
+  isLast = false,
+  isDragTarget = false,
+  children,
+}: TimelineTaskRowProps) {
   const displayTime = overrideTime ?? time;
   const isOverridden = overrideTime != null;
 
@@ -26,7 +35,7 @@ export function TimelineTaskRow({ time, overrideTime, showLine = true, isLast = 
     <div className={cn("relative flex gap-2", isDragTarget && "rounded-lg")}>
       {/* Time label column - fixed width */}
       <div className="w-9 flex-shrink-0 pt-[22px] text-left">
-        {displayTime && (
+        {displayTime ? (
           <span className={cn(
             "text-[10px] font-medium leading-none transition-colors",
             isOverridden
@@ -35,7 +44,11 @@ export function TimelineTaskRow({ time, overrideTime, showLine = true, isLast = 
           )}>
             {formatTime12h(displayTime)}
           </span>
-        )}
+        ) : label ? (
+          <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+            {label}
+          </span>
+        ) : null}
       </div>
 
       {/* Timeline dot + line */}

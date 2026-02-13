@@ -21,13 +21,11 @@ const moodConfig: Record<DialogueMood, MoodConfig> = {
 
 interface CompanionDialogueProps {
   className?: string;
-  showBondInfo?: boolean;
 }
 
-export const CompanionDialogue = memo(({ className, showBondInfo = false }: CompanionDialogueProps) => {
+export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) => {
   const { 
     greeting, 
-    bondDialogue, 
     dialogueMood, 
     isLoading 
   } = useCompanionDialogue();
@@ -58,9 +56,6 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
   }
 
   const config = moodConfig[dialogueMood];
-  
-  // Decide what secondary text to show
-  const secondaryText = showBondInfo ? bondDialogue : null;
 
   return (
     <motion.div 
@@ -111,18 +106,6 @@ export const CompanionDialogue = memo(({ className, showBondInfo = false }: Comp
                 "{displayText}"
               </motion.p>
             </AnimatePresence>
-            
-            {/* Secondary text (bond dialogue) */}
-            {secondaryText && (
-              <motion.p
-                className="text-xs text-muted-foreground mt-2 italic"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                "{secondaryText}"
-              </motion.p>
-            )}
           </div>
         </div>
       </div>

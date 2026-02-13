@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getResolvedMentorId } from "@/utils/mentor";
+import { MAIN_TAB_REFRESH_EVENT, type MainTabRefreshEventDetail } from "@/utils/mainTabRefresh";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -86,107 +87,120 @@ export const TodaysPepTalk = memo(() => {
 
   const resolvedMentorId = getResolvedMentorId(profile);
 
-  useEffect(() => {
-    const fetchDailyPepTalk = async () => {
-      if (!resolvedMentorId) {
+  const fetchDailyPepTalk = useCallback(async () => {
+    if (!resolvedMentorId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError(false);
+      setIsFallback(false);
+      const today = new Date().toLocaleDateString("en-CA");
+
+      const { data: mentor, error: mentorError } = await supabase
+        .from("mentors")
+        .select("slug, name")
+        .eq("id", resolvedMentorId)
+        .maybeSingle();
+
+      if (mentorError) {
+        console.error("Error fetching mentor:", mentorError);
+        setError(true);
         setLoading(false);
         return;
       }
 
-      try {
-        setError(false);
-        setIsFallback(false);
-        const today = new Date().toLocaleDateString("en-CA");
+      if (!mentor) {
+        setLoading(false);
+        return;
+      }
 
-        const { data: mentor, error: mentorError } = await supabase
-          .from("mentors")
-          .select("slug, name")
-          .eq("id", resolvedMentorId)
-          .maybeSingle();
+      // Save mentor slug for potential generation
+      setMentorSlug(mentor.slug);
 
-        if (mentorError) {
-          console.error("Error fetching mentor:", mentorError);
-          setError(true);
-          setLoading(false);
-          return;
-        }
+      // First try today's pep talk
+      const { data: todayPepTalk, error: pepTalkError } = await supabase
+        .from("daily_pep_talks")
+        .select("*")
+        .eq("for_date", today)
+        .eq("mentor_slug", mentor.slug)
+        .maybeSingle();
 
-        if (!mentor) {
-          setLoading(false);
-          return;
-        }
+      let data = todayPepTalk;
 
-        // Save mentor slug for potential generation
-        setMentorSlug(mentor.slug);
+      if (pepTalkError) {
+        console.error("Error fetching pep talk:", pepTalkError);
+        setError(true);
+        setLoading(false);
+        return;
+      }
 
-        // First try today's pep talk
-        const { data: todayPepTalk, error: pepTalkError } = await supabase
+      // If no pep talk for today, fall back to most recent
+      if (!data) {
+        console.log("No pep talk for today, fetching most recent...");
+        const { data: fallbackData, error: fallbackError } = await supabase
           .from("daily_pep_talks")
           .select("*")
-          .eq("for_date", today)
           .eq("mentor_slug", mentor.slug)
+          .order("for_date", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
-        let data = todayPepTalk;
-
-        if (pepTalkError) {
-          console.error("Error fetching pep talk:", pepTalkError);
-          setError(true);
-          setLoading(false);
-          return;
+        if (fallbackError) {
+          console.error("Error fetching fallback pep talk:", fallbackError);
+        } else if (fallbackData) {
+          data = fallbackData;
+          setIsFallback(true);
+          console.log("Using fallback pep talk from:", fallbackData.for_date);
         }
-
-        // If no pep talk for today, fall back to most recent
-        if (!data) {
-          console.log("No pep talk for today, fetching most recent...");
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from("daily_pep_talks")
-            .select("*")
-            .eq("mentor_slug", mentor.slug)
-            .order("for_date", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (fallbackError) {
-            console.error("Error fetching fallback pep talk:", fallbackError);
-          } else if (fallbackData) {
-            data = fallbackData;
-            setIsFallback(true);
-            console.log("Using fallback pep talk from:", fallbackData.for_date);
-          }
-        }
-
-        if (data) {
-          // Validate and sanitize transcript data
-          let transcript: CaptionWord[] = [];
-          if (Array.isArray(data.transcript)) {
-            // Validate each word object has required fields
-            transcript = (data.transcript as unknown as CaptionWord[]).filter(
-              (word): word is CaptionWord => 
-                word && 
-                typeof word === 'object' &&
-                typeof word.word === 'string' &&
-                typeof word.start === 'number' &&
-                typeof word.end === 'number'
-            );
-          }
-          
-          setPepTalk({ 
-            ...data, 
-            mentor_name: mentor.name,
-            transcript,
-          } as DailyPepTalk);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching pep talk:", err);
-        setError(true);
-      } finally {
-        setLoading(false);
       }
+
+      if (data) {
+        // Validate and sanitize transcript data
+        let transcript: CaptionWord[] = [];
+        if (Array.isArray(data.transcript)) {
+          // Validate each word object has required fields
+          transcript = (data.transcript as unknown as CaptionWord[]).filter(
+            (word): word is CaptionWord =>
+              word &&
+              typeof word === "object" &&
+              typeof word.word === "string" &&
+              typeof word.start === "number" &&
+              typeof word.end === "number",
+          );
+        }
+
+        setPepTalk({
+          ...data,
+          mentor_name: mentor.name,
+          transcript,
+        } as DailyPepTalk);
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching pep talk:", err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [resolvedMentorId]);
+
+  useEffect(() => {
+    void fetchDailyPepTalk();
+  }, [fetchDailyPepTalk]);
+
+  useEffect(() => {
+    const handleMainTabRefresh = (event: CustomEvent<MainTabRefreshEventDetail>) => {
+      if (event.detail.path !== "/mentor") return;
+      if (event.detail.source !== "pull-to-refresh") return;
+      void fetchDailyPepTalk();
     };
 
-    fetchDailyPepTalk();
-  }, [resolvedMentorId]);
+    window.addEventListener(MAIN_TAB_REFRESH_EVENT, handleMainTabRefresh as EventListener);
+    return () => {
+      window.removeEventListener(MAIN_TAB_REFRESH_EVENT, handleMainTabRefresh as EventListener);
+    };
+  }, [fetchDailyPepTalk]);
 
   // Handle user-triggered pep talk generation
   const handleGeneratePepTalk = async () => {

@@ -33,7 +33,12 @@ export const DeathNotification = memo(({
   }, [isOpen]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent 
         className="max-w-md bg-background/95 backdrop-blur-xl border-muted/30 p-0 overflow-hidden"
         hideCloseButton

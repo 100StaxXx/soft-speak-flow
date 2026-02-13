@@ -348,12 +348,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [tasks, sortBy, keepInPlace]);
 
   // Only quests go into the unified timeline (rituals grouped by campaign below)
-  const { scheduledItems, anytimeItems } = useMemo(() => {
+  const { scheduledItems, timelineItems } = useMemo(() => {
     const scheduled = questTasks.filter(t => !!t.scheduled_time).sort((a, b) => 
       (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
     );
     const anytime = questTasks.filter(t => !t.scheduled_time);
-    return { scheduledItems: scheduled, anytimeItems: anytime };
+    return { scheduledItems: scheduled, timelineItems: [...scheduled, ...anytime] };
   }, [questTasks]);
 
   // Group rituals by campaign
@@ -991,21 +991,26 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
 
             {/* Scheduled Tasks Timeline */}
-            {scheduledItems.length > 0 && (
+            {timelineItems.length > 0 && (
               <div ref={timelineDragContainerRef}>
-                <div className="flex items-center gap-2 pb-2">
-                  <div className="w-9 flex-shrink-0" />
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Scheduled
-                  </span>
-                  <span className="text-[11px] text-muted-foreground/80">
-                    Drag handle to reschedule • 5m steps
-                  </span>
-                </div>
-                {scheduledItems.map((task, index) => {
+                {scheduledItems.length > 0 && (
+                  <div className="flex items-center gap-2 pb-2">
+                    <div className="w-9 flex-shrink-0" />
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Scheduled
+                    </span>
+                    <span className="text-[11px] text-muted-foreground/80">
+                      Drag handle to reschedule • 5m steps
+                    </span>
+                  </div>
+                )}
+                {timelineItems.map((task, index) => {
                   const isThisDragging = timelineDrag.draggingTaskId === task.id;
                   const isAnyDragging = timelineDrag.isDragging;
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
+                  const isAnytimeTask = !task.scheduled_time;
+                  const showAnytimeLabel = isAnytimeTask
+                    && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
                   const dragHandleProps = task.scheduled_time
                     ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
                     : undefined;
@@ -1029,9 +1034,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const rowContent = (
                     <TimelineTaskRow
                       time={task.scheduled_time}
+                      label={showAnytimeLabel ? "Anytime" : undefined}
                       overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
                       showLine={index > 0}
-                      isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
+                      isLast={index === timelineItems.length - 1}
                       isDragTarget={isThisDragging}
                     >
                       {renderTaskItem(task, undefined, dragHandleProps)}
@@ -1062,31 +1068,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     </motion.div>
                   );
                 })}
-              </div>
-            )}
-
-            {/* Anytime Divider + Unscheduled Tasks */}
-            {anytimeItems.length > 0 && (
-              <div>
-                {/* Divider */}
-                <div className="flex items-center gap-2 py-2 mt-1">
-                  <div className="w-9 flex-shrink-0" />
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    <Clock className="h-3 w-3" />
-                    Anytime
-                  </div>
-                  <div className="flex-1 border-t border-dashed border-border/40" />
-                </div>
-
-                {anytimeItems.map((task, index) => (
-                  <TimelineTaskRow
-                    key={task.id}
-                    showLine={true}
-                    isLast={index === anytimeItems.length - 1}
-                  >
-                    {renderTaskItem(task)}
-                  </TimelineTaskRow>
-                ))}
               </div>
             )}
           </div>
