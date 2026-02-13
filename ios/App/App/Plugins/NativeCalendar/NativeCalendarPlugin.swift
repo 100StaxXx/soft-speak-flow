@@ -4,6 +4,7 @@ import EventKit
 
 @objc(NativeCalendarPlugin)
 public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
+    // CAPBridgedPlugin conformance
     public let identifier = "NativeCalendarPlugin"
     public let jsName = "NativeCalendar"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -16,11 +17,22 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let eventStore = EKEventStore()
 
-    @objc func isAvailable(_ call: CAPPluginCall) {
+    // MARK: - Helpers
+    private func hasCalendarAccess() -> Bool {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if #available(iOS 17.0, *) {
+            return status == .authorized || status == .fullAccess
+        } else {
+            return status == .authorized
+        }
+    }
+
+    // MARK: - Plugin Methods
+    @objc public func isAvailable(_ call: CAPPluginCall) {
         call.resolve(["available": true])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         eventStore.requestAccess(to: .event) { granted, error in
             if let error = error {
                 call.reject("Calendar permission request failed", nil, error)
@@ -30,9 +42,8 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func listCalendars(_ call: CAPPluginCall) {
-        let status = EKEventStore.authorizationStatus(for: .event)
-        guard status == .authorized || status == .fullAccess else {
+    @objc public func listCalendars(_ call: CAPPluginCall) {
+        guard hasCalendarAccess() else {
             call.resolve(["calendars": []])
             return
         }
@@ -41,16 +52,15 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
             return [
                 "id": calendar.calendarIdentifier,
                 "title": calendar.title,
-                "isPrimary": calendar.source.sourceType == .calDAV && calendar.allowsContentModifications
+                "isPrimary": (calendar.source.sourceType == .calDAV) && calendar.allowsContentModifications
             ] as [String : Any]
         }
 
         call.resolve(["calendars": calendars])
     }
 
-    @objc func createOrUpdateEvent(_ call: CAPPluginCall) {
-        let status = EKEventStore.authorizationStatus(for: .event)
-        guard status == .authorized || status == .fullAccess else {
+    @objc public func createOrUpdateEvent(_ call: CAPPluginCall) {
+        guard hasCalendarAccess() else {
             call.reject("Calendar access not granted")
             return
         }
@@ -99,7 +109,7 @@ public class NativeCalendarPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func deleteEvent(_ call: CAPPluginCall) {
+    @objc public func deleteEvent(_ call: CAPPluginCall) {
         guard let eventId = call.getString("eventId") else {
             call.reject("eventId is required")
             return
