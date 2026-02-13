@@ -3,6 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildJourneyPathPrompt } from "./promptContext.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,13 +128,14 @@ serve(async (req) => {
     
     const visualTheme = storyThemes[epic.story_type_slug || ''] || 'cosmic fantasy landscapes';
 
-    const prompt = `A beautiful panoramic walk path through ${worldContext.worldName} in ${worldContext.worldEra}. 
-The path leads from ${worldContext.currentLocation} towards ${worldContext.nextLocation}. 
-Visual theme: ${visualTheme}.
-The path should be suitable for a ${companionType} companion with ${coreElement} energy walking alongside.
-Color palette: ${themeColor} tones with cosmic accents.
-Style: ethereal fantasy illustration, dreamy atmosphere, horizontal landscape format, magical lighting, no text or characters visible.
-Ultra high resolution.`;
+    const { prompt, visualTokens } = buildJourneyPathPrompt({
+      worldContext,
+      visualTheme,
+      companionType,
+      coreElement,
+      themeColor,
+      milestoneIndex,
+    });
 
     console.log(`[generate-journey-path] Generated prompt: ${prompt.substring(0, 200)}...`);
 
@@ -209,6 +211,7 @@ Ultra high resolution.`;
         image_url: imageUrl,
         prompt_context: {
           worldContext,
+          visualTokens,
           companionType,
           coreElement,
           themeColor,

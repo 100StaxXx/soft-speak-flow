@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProper
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays } from "date-fns";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { 
   Flame, 
@@ -51,6 +51,7 @@ import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
@@ -178,6 +179,8 @@ const formatTime = (time: string) => {
   return `${displayHour}:${minutes} ${ampm}`;
 };
 
+const COMBO_WINDOW_MS = 8000;
+
 export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
@@ -200,6 +203,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   hasCalendarLink,
 }: TodaysAgendaProps) {
   const prefersReducedMotion = useReducedMotion();
+  const { capabilities } = useMotionProfile();
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
     const capacitor = (window as Window & {
@@ -207,7 +211,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }).Capacitor;
     return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
   }, []);
-  const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion);
+  const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -272,6 +276,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [comboCount, setComboCount] = useState(0);
+  const [showComboFx, setShowComboFx] = useState(false);
+  const lastComboAtRef = useRef<number | null>(null);
+  const comboResetTimerRef = useRef<number | null>(null);
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -285,6 +293,57 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
+
+  const scheduleComboReset = useCallback(() => {
+    if (comboResetTimerRef.current !== null) {
+      window.clearTimeout(comboResetTimerRef.current);
+    }
+    comboResetTimerRef.current = window.setTimeout(() => {
+      setComboCount(0);
+      setShowComboFx(false);
+      lastComboAtRef.current = null;
+      comboResetTimerRef.current = null;
+    }, COMBO_WINDOW_MS);
+  }, []);
+
+  const registerCompletionCombo = useCallback(() => {
+    const now = Date.now();
+    const canChain = lastComboAtRef.current !== null && now - lastComboAtRef.current <= COMBO_WINDOW_MS;
+    const nextCombo = canChain ? comboCount + 1 : 1;
+
+    setComboCount(nextCombo);
+    lastComboAtRef.current = now;
+    scheduleComboReset();
+
+    if (nextCombo > 1) {
+      setShowComboFx(true);
+      window.setTimeout(() => {
+        setShowComboFx(false);
+      }, useLiteAnimations ? 600 : 1000);
+    }
+  }, [comboCount, scheduleComboReset, useLiteAnimations]);
+
+  const resetCombo = useCallback(() => {
+    if (comboResetTimerRef.current !== null) {
+      window.clearTimeout(comboResetTimerRef.current);
+      comboResetTimerRef.current = null;
+    }
+    setComboCount(0);
+    setShowComboFx(false);
+    lastComboAtRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (comboResetTimerRef.current !== null) {
+        window.clearTimeout(comboResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    resetCombo();
+  }, [selectedDate, resetCombo]);
   
 
   // Priority weight for sorting
@@ -513,11 +572,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           next.delete(task.id);
           return next;
         });
+        resetCombo();
         triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, task.xp_reward);
       } else {
         // Complete: add to optimistic set immediately for instant strikethrough
         setOptimisticCompleted(prev => new Set(prev).add(task.id));
+        registerCompletionCombo();
         triggerHaptic(ImpactStyle.Medium);
         playStrikethrough();
         // Track for strikethrough animation
@@ -877,7 +938,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo]);
 
 
   return (
@@ -928,6 +989,44 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           </div>
         </div>
+
+        <AnimatePresence>
+          {comboCount > 1 && (
+            <motion.div
+              key="combo-banner"
+              initial={useLiteAnimations ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={useLiteAnimations ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: useLiteAnimations ? 0.1 : 0.24 }}
+              className={cn(
+                "mb-3 relative overflow-hidden rounded-xl border px-3 py-2",
+                "bg-gradient-to-r from-stardust-gold/12 via-primary/10 to-stardust-gold/12 border-stardust-gold/30",
+                showComboFx && !useLiteAnimations && "animate-combo-pop",
+              )}
+              data-testid="combo-banner"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-stardust-gold" />
+                  <span className="text-sm font-semibold text-stardust-gold">
+                    Combo x{comboCount}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Keep completing quests
+                </span>
+              </div>
+
+              {!useLiteAnimations && showComboFx && (
+                <div className="pointer-events-none absolute inset-0">
+                  <span className="absolute left-4 top-2 h-1.5 w-1.5 rounded-full bg-stardust-gold animate-combo-particle" />
+                  <span className="absolute left-1/2 top-1 h-1 w-1 rounded-full bg-primary animate-combo-particle [animation-delay:120ms]" />
+                  <span className="absolute right-5 bottom-2 h-1.5 w-1.5 rounded-full bg-celestial-blue animate-combo-particle [animation-delay:200ms]" />
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Timeline Content */}
         {tasks.length === 0 ? (

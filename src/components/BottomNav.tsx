@@ -1,5 +1,6 @@
 import { memo, useCallback } from "react";
 import { PawPrint, User, Compass, Inbox } from "lucide-react";
+import { motion } from "framer-motion";
 
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
@@ -14,6 +15,8 @@ import { CompanionNavPresence } from "@/components/companion/CompanionNavPresenc
 import { useInboxCount } from "@/hooks/useInboxTasks";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
+import { MOTION_DURATION, MOTION_EASE } from "@/lib/motionTokens";
 import {
   DAILY_TASKS_GC_TIME,
   DAILY_TASKS_STALE_TIME,
@@ -27,6 +30,7 @@ export const BottomNav = memo(() => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { capabilities } = useMotionProfile();
   const { companion, progressToNext } = useCompanion();
   const { inboxCount } = useInboxCount();
 
@@ -90,23 +94,42 @@ export const BottomNav = memo(() => {
           >
             {({ isActive }) => (
               <>
-                {mentorLoading ? (
-                  <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
-                ) : selectedMentor ? (
-                  <MentorAvatar
-                    mentorSlug={selectedMentor.slug || ''}
-                    mentorName={selectedMentor.name}
-                    primaryColor={selectedMentor.primary_color || '#000'}
-                    size="sm"
-                    className="w-7 h-7"
-                    showBorder={false}
-                  />
-                ) : (
-                  <User className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-orange-300' : 'text-muted-foreground'}`} />
-                )}
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-orange-200' : 'text-muted-foreground/85'}`}>
-                  Mentor
-                </span>
+                <motion.span
+                  className="absolute left-2 right-2 top-0 h-0.5 rounded-full bg-orange-300/80"
+                  initial={false}
+                  animate={{ opacity: isActive ? 1 : 0, scaleX: isActive ? 1 : 0.5 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                />
+                <motion.div
+                  className="flex flex-col items-center gap-1"
+                  initial={false}
+                  animate={capabilities.enableTabTransitions ? { y: isActive ? -1 : 0, scale: isActive ? 1.04 : 1 } : { y: 0, scale: 1 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                >
+                  {mentorLoading ? (
+                    <div className="h-7 w-7 rounded-full bg-muted animate-pulse" aria-hidden />
+                  ) : selectedMentor ? (
+                    <MentorAvatar
+                      mentorSlug={selectedMentor.slug || ''}
+                      mentorName={selectedMentor.name}
+                      primaryColor={selectedMentor.primary_color || '#000'}
+                      size="sm"
+                      className="w-7 h-7"
+                      showBorder={false}
+                    />
+                  ) : (
+                    <User className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-orange-300' : 'text-muted-foreground'}`} />
+                  )}
+                  <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-orange-200' : 'text-muted-foreground/85'}`}>
+                    Mentor
+                  </span>
+                </motion.div>
               </>
             )}
           </NavLink>
@@ -121,17 +144,36 @@ export const BottomNav = memo(() => {
           >
             {({ isActive }) => (
               <>
-                <div className="relative">
-                  <Inbox className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground'}`} />
-                  {inboxCount > 0 && (
-                    <Badge className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 p-0 flex items-center justify-center text-[9px] bg-celestial-blue text-white border-0">
-                      {inboxCount > 9 ? '9+' : inboxCount}
-                    </Badge>
-                  )}
-                </div>
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/85'}`}>
-                  Inbox
-                </span>
+                <motion.span
+                  className="absolute left-2 right-2 top-0 h-0.5 rounded-full bg-celestial-blue/90"
+                  initial={false}
+                  animate={{ opacity: isActive ? 1 : 0, scaleX: isActive ? 1 : 0.5 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                />
+                <motion.div
+                  className="flex flex-col items-center gap-1"
+                  initial={false}
+                  animate={capabilities.enableTabTransitions ? { y: isActive ? -1 : 0, scale: isActive ? 1.04 : 1 } : { y: 0, scale: 1 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                >
+                  <div className="relative">
+                    <Inbox className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground'}`} />
+                    {inboxCount > 0 && (
+                      <Badge className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 p-0 flex items-center justify-center text-[9px] bg-celestial-blue text-white border-0">
+                        {inboxCount > 9 ? '9+' : inboxCount}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/85'}`}>
+                    Inbox
+                  </span>
+                </motion.div>
               </>
             )}
           </NavLink>
@@ -148,10 +190,29 @@ export const BottomNav = memo(() => {
           >
             {({ isActive }) => (
               <>
-                <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
-                  Quests
-                </span>
+                <motion.span
+                  className="absolute left-2 right-2 top-0 h-0.5 rounded-full bg-cosmiq-glow/90"
+                  initial={false}
+                  animate={{ opacity: isActive ? 1 : 0, scaleX: isActive ? 1 : 0.5 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                />
+                <motion.div
+                  className="flex flex-col items-center gap-1"
+                  initial={false}
+                  animate={capabilities.enableTabTransitions ? { y: isActive ? -1 : 0, scale: isActive ? 1.04 : 1 } : { y: 0, scale: 1 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                >
+                  <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
+                  <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
+                    Quests
+                  </span>
+                </motion.div>
               </>
             )}
           </NavLink>
@@ -167,18 +228,37 @@ export const BottomNav = memo(() => {
           >
           {({ isActive }) => (
               <>
-                <div className="relative">
-                  <CompanionNavPresence isActive={isActive} />
-                  <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
-                  {companion && progressToNext > 90 && (
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
-                      !
-                    </Badge>
-                  )}
-                </div>
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
-                  Companion
-                </span>
+                <motion.span
+                  className="absolute left-2 right-2 top-0 h-0.5 rounded-full bg-stardust-gold/90"
+                  initial={false}
+                  animate={{ opacity: isActive ? 1 : 0, scaleX: isActive ? 1 : 0.5 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                />
+                <motion.div
+                  className="flex flex-col items-center gap-1"
+                  initial={false}
+                  animate={capabilities.enableTabTransitions ? { y: isActive ? -1 : 0, scale: isActive ? 1.04 : 1 } : { y: 0, scale: 1 }}
+                  transition={{
+                    duration: MOTION_DURATION.quick,
+                    ease: MOTION_EASE.standard,
+                  }}
+                >
+                  <div className="relative">
+                    <CompanionNavPresence isActive={isActive} />
+                    <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
+                    {companion && progressToNext > 90 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
+                        !
+                      </Badge>
+                    )}
+                  </div>
+                  <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground/85'}`}>
+                    Companion
+                  </span>
+                </motion.div>
               </>
             )}
           </NavLink>

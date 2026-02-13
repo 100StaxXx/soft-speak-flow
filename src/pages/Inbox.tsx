@@ -5,7 +5,6 @@ import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { BottomNav } from "@/components/BottomNav";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -166,7 +165,7 @@ const InboxPage = memo(function InboxPage() {
   return (
     <PageTransition mode="instant">
       <div className="min-h-screen bg-transparent pb-24 pt-safe">
-        <StarfieldBackground />
+        <StarfieldBackground palette="cool-night" />
 
         {/* Hero Title */}
         <div className="max-w-lg mx-auto px-4 pt-6" style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top, 0px))' }}>
@@ -286,7 +285,6 @@ const InboxPage = memo(function InboxPage() {
           isDeleting={false}
         />
 
-        <BottomNav />
       </div>
     </PageTransition>
   );

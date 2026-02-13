@@ -3,7 +3,7 @@ import { Zap, Flame, Mountain } from "lucide-react";
 // --- Difficulty color helpers ---
 export const DIFFICULTY_COLORS = {
   easy: { bg: "bg-emerald-600", text: "text-emerald-400", pill: "bg-emerald-500", border: "border-emerald-500/40" },
-  medium: { bg: "bg-amber-400/80", text: "text-amber-300", pill: "bg-amber-500/80", border: "border-amber-400/35" },
+  medium: { bg: "bg-celestial-blue", text: "text-celestial-blue", pill: "bg-celestial-blue", border: "border-celestial-blue/40" },
   hard: { bg: "bg-violet-500", text: "text-violet-400", pill: "bg-violet-500", border: "border-violet-500/40" },
 } as const;
 

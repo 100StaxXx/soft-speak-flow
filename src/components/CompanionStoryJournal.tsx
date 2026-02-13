@@ -11,8 +11,13 @@ import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
 
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
+import type { CompanionCampaignRecapCard } from "@/types/companionLife";
 
-export const CompanionStoryJournal = () => {
+interface CompanionStoryJournalProps {
+  campaignRecaps?: CompanionCampaignRecapCard[];
+}
+
+export const CompanionStoryJournal = ({ campaignRecaps = [] }: CompanionStoryJournalProps) => {
   const { companion, isLoading: companionLoading } = useCompanion();
   const [viewingStage, setViewingStage] = useState(0);
   const [debouncedStage, setDebouncedStage] = useState(0);
@@ -93,6 +98,9 @@ export const CompanionStoryJournal = () => {
   }, [companion]);
 
   const isStageUnlocked = canAccessStage(debouncedStage);
+  const recapsSorted = [...campaignRecaps].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  const currentStageRecap = recapsSorted.find((recap) => recap.chapter === debouncedStage) ?? null;
+  const latestRecaps = recapsSorted.slice(0, 3);
 
   // Calculate which stages to show in gallery (unlocked + 1 preview)
   const maxVisibleStage = companion ? Math.min(companion.current_stage + 1, 20) : 0;
@@ -186,6 +194,35 @@ export const CompanionStoryJournal = () => {
           Your companion's epic journey - unlock new chapters as they evolve
         </p>
       </div>
+
+      {campaignRecaps.length > 0 && (
+        <Card className="p-4 border-primary/20 bg-primary/5">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Campaign Sync</p>
+            <p className="text-xs text-muted-foreground">{campaignRecaps.length} recap milestones</p>
+          </div>
+          {currentStageRecap ? (
+            <div className="rounded-md border border-primary/30 bg-background/50 p-3">
+              <p className="text-sm font-semibold">
+                Chapter {currentStageRecap.chapter}: {currentStageRecap.title}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{currentStageRecap.summary}</p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No direct campaign recap for this chapter yet. Latest milestone shown below.
+            </p>
+          )}
+          <div className="grid gap-2 mt-3 sm:grid-cols-3">
+            {latestRecaps.map((recap) => (
+              <div key={recap.id} className="rounded-md border border-border/40 bg-background/40 p-2">
+                <p className="text-xs font-medium">Chapter {recap.chapter}</p>
+                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{recap.title}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Progress indicator & Gallery button */}
       <div className="flex justify-center items-center gap-4">

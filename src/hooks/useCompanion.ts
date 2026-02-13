@@ -24,6 +24,7 @@ export interface Companion {
   current_image_url: string | null;
   initial_image_url?: string | null;
   dormant_image_url?: string | null;
+  dormant_since?: string | null;
   eye_color?: string;
   fur_color?: string;
   cached_creature_name?: string | null;
@@ -41,6 +42,12 @@ export interface Companion {
   inactive_days?: number;
   neglected_image_url?: string | null;
   image_regenerations_used?: number;
+  care_score?: number | null;
+  care_consistency?: number | null;
+  current_emotional_arc?: string | null;
+  routine_stability_score?: number | null;
+  request_fatigue?: number | null;
+  habitat_theme?: string | null;
   created_at: string;
   updated_at: string;
 }

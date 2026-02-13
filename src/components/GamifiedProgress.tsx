@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 interface GamifiedProgressProps {
   value: number; // 0-100
@@ -13,6 +14,7 @@ export function GamifiedProgress({ value, completedCount, totalCount, className 
   const [animatedValue, setAnimatedValue] = useState(0);
   const [showMilestoneSparkle, setShowMilestoneSparkle] = useState<number | null>(null);
   const prevValueRef = useRef(value);
+  const { capabilities, profile } = useMotionProfile();
   
   const milestones = [25, 50, 75, 100];
   
@@ -30,11 +32,11 @@ export function GamifiedProgress({ value, completedCount, totalCount, className 
     milestones.forEach(milestone => {
       if (prevValue < milestone && value >= milestone) {
         setShowMilestoneSparkle(milestone);
-        setTimeout(() => setShowMilestoneSparkle(null), 1500);
+        setTimeout(() => setShowMilestoneSparkle(null), profile === "reduced" ? 300 : 1200);
       }
     });
     prevValueRef.current = value;
-  }, [value]);
+  }, [profile, value]);
   
   // Determine color based on progress - purple → blue → gold journey
   const getProgressColor = () => {
@@ -83,27 +85,30 @@ export function GamifiedProgress({ value, completedCount, totalCount, className 
           className={cn(
             "h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden",
             "bg-gradient-to-r",
-            getProgressColor()
+            getProgressColor(),
+            value >= 75 && value < 100 && capabilities.allowBackgroundAnimation && "shadow-[0_0_18px_hsl(var(--primary)/0.35)]"
           )}
           style={{ width: `${animatedValue}%` }}
         >
           {/* Shimmer overlay */}
-          <div 
-            className="absolute inset-0 animate-shimmer-slide"
-            style={{
-              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-              backgroundSize: '200% 100%',
-            }}
-          />
+          {capabilities.allowBackgroundAnimation && (
+            <div 
+              className="absolute inset-0 animate-shimmer-slide"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                backgroundSize: '200% 100%',
+              }}
+            />
+          )}
           
           {/* Glow effect at 100% */}
-          {value >= 100 && (
+          {value >= 100 && capabilities.allowBackgroundAnimation && (
             <div className="absolute inset-0 animate-pulse-glow bg-stardust-gold/30" />
           )}
         </div>
         
         {/* Particle effects at completion */}
-        {value >= 100 && (
+        {value >= 100 && capabilities.allowBackgroundAnimation && (
           <>
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-stardust-gold rounded-full animate-ping" />
             <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-1 bg-white rounded-full animate-ping" style={{ animationDelay: '150ms' }} />

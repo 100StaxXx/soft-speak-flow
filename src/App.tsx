@@ -42,6 +42,8 @@ import { safeSessionStorage } from "@/utils/storage";
  import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { TutorialOrchestrator } from "@/components/TutorialOrchestrator";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
+import { BottomNav } from "@/components/BottomNav";
+import { MotionProfileProvider } from "@/contexts/MotionProfileContext";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -277,7 +279,16 @@ const AppContent = memo(() => {
                 <EvolutionAwareContent />
                 {activeMainTabPath ? (
                   <ProtectedRoute>
-                    <MainTabsKeepAlive activePath={activeMainTabPath} />
+                    <>
+                      <MainTabsKeepAlive
+                        activePath={activeMainTabPath}
+                        transitionPreset="fade-slide"
+                        transitionDurationMs={180}
+                      />
+                      <ErrorBoundary>
+                        <BottomNav />
+                      </ErrorBoundary>
+                    </>
                   </ProtectedRoute>
                 ) : (
                 <AnimatePresence mode="sync" initial={false}>
@@ -359,12 +370,14 @@ const App = () => {
                 <Toaster />
                 <Sonner />
                 <InstallPWA />
-                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                  <DeepLinkProvider>
-                    <ScrollToTop />
-                    <AppContent />
-                  </DeepLinkProvider>
-                </BrowserRouter>
+                <MotionProfileProvider>
+                  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                    <DeepLinkProvider>
+                      <ScrollToTop />
+                      <AppContent />
+                    </DeepLinkProvider>
+                  </BrowserRouter>
+                </MotionProfileProvider>
               </TooltipProvider>
             </CelebrationProvider>
           </EvolutionProvider>

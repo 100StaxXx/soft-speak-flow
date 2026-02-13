@@ -6,6 +6,7 @@ import {
   format,
   isSameDay,
   isToday,
+  startOfWeek,
   startOfDay,
   subDays,
 } from "date-fns";
@@ -17,6 +18,7 @@ interface DatePillsScrollerProps {
   onDateSelect: (date: Date) => void;
   tasksPerDay?: Record<string, number>;
   daysToShow?: number;
+  weekStartsOn?: 0 | 1;
 }
 
 const EDGE_THRESHOLD_PX = 80;
@@ -39,15 +41,20 @@ const getInitialRange = (selectedDate: Date, daysToShow: number) => {
   return { start, end };
 };
 
+const getWeekStart = (date: Date, weekStartsOn: 0 | 1) => startOfWeek(startOfDay(date), { weekStartsOn });
+
 export const DatePillsScroller = memo(function DatePillsScroller({
   selectedDate,
   onDateSelect,
   tasksPerDay = {},
   daysToShow = 14,
+  weekStartsOn = 0,
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const shouldCenterOnSelectedRef = useRef(true);
+  const suppressNextCenterRef = useRef(false);
+  const pendingWeekSnapRef = useRef<Date | null>(null);
   const pendingLeftCompensationRef = useRef<{
     previousScrollWidth: number;
     previousScrollLeft: number;
@@ -56,6 +63,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
+  const [visibleWeekStart, setVisibleWeekStart] = useState<Date>(() => getWeekStart(selectedDate, weekStartsOn));
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
 
@@ -64,6 +72,10 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     setRangeStart(nextRange.start);
     setRangeEnd(nextRange.end);
   }, [daysToShow]);
+
+  useEffect(() => {
+    setVisibleWeekStart(getWeekStart(selectedDate, weekStartsOn));
+  }, [weekStartsOn]);
 
   useEffect(() => {
     const selectedTime = selectedDate.getTime();
@@ -79,7 +91,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const dates = useMemo(() => {
     const totalDays = differenceInCalendarDays(rangeEnd, rangeStart) + 1;
     return Array.from({ length: Math.max(1, totalDays) }, (_, index) => addDays(rangeStart, index));
-  }, [rangeEnd, rangeStart]);
+  }, [rangeEnd, rangeStart, selectedDate]);
 
   const getTaskCount = useCallback(
     (date: Date) => {
@@ -88,6 +100,20 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     },
     [tasksPerDay],
   );
+
+  const snapToWeekStart = useCallback((weekStart: Date) => {
+    const container = scrollRef.current;
+    if (!container) return false;
+
+    const dateKey = format(weekStart, "yyyy-MM-dd");
+    const targetButton = container.querySelector<HTMLButtonElement>(`button[data-date='${dateKey}']`);
+    if (!targetButton) return false;
+
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    const leftTarget = Math.max(0, Math.min(targetButton.offsetLeft - 8, maxScrollLeft));
+    container.scrollTo({ left: leftTarget, behavior: "smooth" });
+    return true;
+  }, []);
 
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
@@ -125,6 +151,13 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       pendingLeftCompensationRef.current = null;
     }
 
+    const pendingWeekSnap = pendingWeekSnapRef.current;
+    if (pendingWeekSnap) {
+      if (snapToWeekStart(pendingWeekSnap)) {
+        pendingWeekSnapRef.current = null;
+      }
+    }
+
     const frame =
       typeof window !== "undefined"
         ? window.requestAnimationFrame(() => {
@@ -137,11 +170,40 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frame);
       }
     };
-  }, [rangeEnd, rangeStart]);
+  }, [rangeEnd, rangeStart, snapToWeekStart]);
 
   useEffect(() => {
-    shouldCenterOnSelectedRef.current = true;
-  }, [selectedDate]);
+    const selectedWeekStart = getWeekStart(selectedDate, weekStartsOn);
+    const weekDelta = differenceInCalendarDays(selectedWeekStart, visibleWeekStart);
+
+    if (weekDelta === 0) {
+      if (suppressNextCenterRef.current) {
+        suppressNextCenterRef.current = false;
+        return;
+      }
+      shouldCenterOnSelectedRef.current = true;
+      return;
+    }
+
+    shouldCenterOnSelectedRef.current = false;
+    suppressNextCenterRef.current = true;
+    setVisibleWeekStart(selectedWeekStart);
+    pendingWeekSnapRef.current = selectedWeekStart;
+
+    const isTargetInRange =
+      selectedWeekStart.getTime() >= rangeStart.getTime() && selectedWeekStart.getTime() <= rangeEnd.getTime();
+
+    if (!isTargetInRange) {
+      const nextRange = getInitialRange(selectedWeekStart, daysToShow);
+      setRangeStart(nextRange.start);
+      setRangeEnd(nextRange.end);
+      return;
+    }
+
+    if (snapToWeekStart(selectedWeekStart)) {
+      pendingWeekSnapRef.current = null;
+    }
+  }, [daysToShow, rangeEnd, rangeStart, selectedDate, snapToWeekStart, visibleWeekStart, weekStartsOn]);
 
   // Scroll selected date to center only after explicit selected-date changes.
   useEffect(() => {
@@ -177,6 +239,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         return (
           <motion.button
             key={dateKey}
+            data-date={dateKey}
             ref={isSelected ? selectedRef : undefined}
             onClick={async () => {
               await triggerHaptic(ImpactStyle.Light);

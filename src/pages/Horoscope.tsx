@@ -354,7 +354,7 @@ const Horoscope = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-24">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 relative overflow-hidden pb-nav-safe">
       {/* Animated constellation background */}
       <div className="absolute inset-0">
         {/* Stars */}

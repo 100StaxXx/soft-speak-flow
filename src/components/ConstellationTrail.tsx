@@ -1,11 +1,19 @@
 import { memo, useMemo, useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HelpCircle, MapPin, Sparkles, Lock, Star, Zap } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
+import { useVisibleAnimation } from "@/hooks/useVisibleAnimation";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  resolveJourneyMotionProfile,
+  type TrailMotionPreset,
+  type TrailPerformanceMode,
+  type TrailSurface,
+} from "@/components/journey/motionProfile";
 
 // Milestone from epic_milestones table
 interface TrailMilestone {
@@ -31,6 +39,9 @@ interface ConstellationTrailProps {
   milestones?: TrailMilestone[]; // Actual milestones from database
   epicId?: string; // For fetching journey path background
   transparentBackground?: boolean; // Skip background when parent handles path image
+  surface?: TrailSurface;
+  motionPreset?: TrailMotionPreset;
+  performanceMode?: TrailPerformanceMode;
 }
 
 // Fixed constellation pattern - wave with more vertical variation for taller container
@@ -153,11 +164,15 @@ const generatePartialPathString = (starPositions: { x: number; y: number }[], pr
 const MysteryMilestonePopover = ({ 
   milestone, 
   currentProgress,
-  isPostcard 
+  isPostcard,
+  animateEnabled,
+  ambientSparkles,
 }: { 
   milestone: TrailMilestone; 
   currentProgress: number;
   isPostcard: boolean;
+  animateEnabled: boolean;
+  ambientSparkles: number;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -213,14 +228,19 @@ const MysteryMilestonePopover = ({
               isPostcard ? "text-amber-400/70" : "text-purple-400/70",
               "group-hover:scale-125 transition-transform"
             )}
-            animate={{ 
+            animate={animateEnabled ? {
               opacity: [0.5, 1, 0.5],
-              scale: [1, 1.1, 1]
+              scale: [1, 1.1, 1],
+            } : {
+              opacity: 0.8,
+              scale: 1,
             }}
-            transition={{ 
-              duration: 2, 
+            transition={animateEnabled ? {
+              duration: 2,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
+            } : {
+              duration: 0.2,
             }}
           >
             <HelpCircle className="w-3.5 h-3.5" />
@@ -252,63 +272,85 @@ const MysteryMilestonePopover = ({
           <AnimatePresence>
             {isOpen && (
               <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <motion.div
-                  className={cn(
-                    "absolute top-3 right-4",
-                    isPostcard ? "text-amber-400/40" : "text-purple-400/40"
-                  )}
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ 
-                    opacity: 1, 
-                    scale: 1,
-                    rotate: 360 
-                  }}
-                  exit={{ opacity: 0, scale: 0 }}
-                  transition={{ 
-                    opacity: { duration: 0.3 },
-                    rotate: { duration: 4, repeat: Infinity, ease: "linear" }
-                  }}
-                >
-                  <Sparkles className="w-4 h-4" />
-                </motion.div>
-                <motion.div
-                  className={cn(
-                    "absolute bottom-6 left-3",
-                    isPostcard ? "text-amber-400/25" : "text-purple-400/25"
-                  )}
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ 
-                    opacity: 1, 
-                    scale: [1, 1.3, 1],
-                    rotate: -360 
-                  }}
-                  exit={{ opacity: 0, scale: 0 }}
-                  transition={{ 
-                    opacity: { duration: 0.3, delay: 0.1 },
-                    scale: { duration: 3, repeat: Infinity },
-                    rotate: { duration: 5, repeat: Infinity, ease: "linear" }
-                  }}
-                >
-                  <Star className="w-3 h-3" />
-                </motion.div>
-                {/* Extra floating particle */}
-                <motion.div
-                  className={cn(
-                    "absolute top-1/2 right-6 w-1.5 h-1.5 rounded-full",
-                    isPostcard ? "bg-amber-400/30" : "bg-purple-400/30"
-                  )}
-                  initial={{ opacity: 0 }}
-                  animate={{ 
-                    opacity: [0, 1, 0],
-                    y: [0, -10, 0],
-                  }}
-                  exit={{ opacity: 0 }}
-                  transition={{ 
-                    duration: 2,
-                    repeat: Infinity,
-                    delay: 0.5
-                  }}
-                />
+                {ambientSparkles >= 1 && (
+                  <motion.div
+                    className={cn(
+                      "absolute top-3 right-4",
+                      isPostcard ? "text-amber-400/40" : "text-purple-400/40",
+                    )}
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={animateEnabled ? {
+                      opacity: 1,
+                      scale: 1,
+                      rotate: 360,
+                    } : {
+                      opacity: 1,
+                      scale: 1,
+                      rotate: 0,
+                    }}
+                    exit={{ opacity: 0, scale: 0 }}
+                    transition={animateEnabled ? {
+                      opacity: { duration: 0.3 },
+                      rotate: { duration: 4, repeat: Infinity, ease: "linear" },
+                    } : {
+                      duration: 0.2,
+                    }}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </motion.div>
+                )}
+                {ambientSparkles >= 2 && (
+                  <motion.div
+                    className={cn(
+                      "absolute bottom-6 left-3",
+                      isPostcard ? "text-amber-400/25" : "text-purple-400/25",
+                    )}
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={animateEnabled ? {
+                      opacity: 1,
+                      scale: [1, 1.3, 1],
+                      rotate: -360,
+                    } : {
+                      opacity: 1,
+                      scale: 1,
+                      rotate: 0,
+                    }}
+                    exit={{ opacity: 0, scale: 0 }}
+                    transition={animateEnabled ? {
+                      opacity: { duration: 0.3, delay: 0.1 },
+                      scale: { duration: 3, repeat: Infinity },
+                      rotate: { duration: 5, repeat: Infinity, ease: "linear" },
+                    } : {
+                      duration: 0.2,
+                    }}
+                  >
+                    <Star className="w-3 h-3" />
+                  </motion.div>
+                )}
+                {ambientSparkles >= 3 && (
+                  <motion.div
+                    className={cn(
+                      "absolute top-1/2 right-6 w-1.5 h-1.5 rounded-full",
+                      isPostcard ? "bg-amber-400/30" : "bg-purple-400/30",
+                    )}
+                    initial={{ opacity: 0 }}
+                    animate={animateEnabled ? {
+                      opacity: [0, 1, 0],
+                      y: [0, -10, 0],
+                    } : {
+                      opacity: 0.4,
+                      y: 0,
+                    }}
+                    exit={{ opacity: 0 }}
+                    transition={animateEnabled ? {
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: 0.5,
+                    } : {
+                      duration: 0.2,
+                    }}
+                  />
+                )}
               </div>
             )}
           </AnimatePresence>
@@ -328,7 +370,7 @@ const MysteryMilestonePopover = ({
                     ? ["0 0 12px rgba(251,191,36,0.3)", "0 0 20px rgba(251,191,36,0.5)", "0 0 12px rgba(251,191,36,0.3)"]
                     : ["0 0 12px rgba(168,85,247,0.3)", "0 0 20px rgba(168,85,247,0.5)", "0 0 12px rgba(168,85,247,0.3)"]
                 }}
-                transition={{ duration: 2, repeat: Infinity }}
+                transition={animateEnabled ? { duration: 2, repeat: Infinity } : { duration: 0.2 }}
               >
                 <Lock className="w-4 h-4" />
               </motion.div>
@@ -434,11 +476,13 @@ const MysteryMilestonePopover = ({
 const MilestoneRevealAnimation = ({ 
   isRevealing,
   isPostcard,
-  onComplete
+  onComplete,
+  revealParticleCount,
 }: { 
   isRevealing: boolean;
   isPostcard: boolean;
   onComplete: () => void;
+  revealParticleCount: number;
 }) => {
   useEffect(() => {
     if (isRevealing) {
@@ -518,8 +562,8 @@ const MilestoneRevealAnimation = ({
           />
           
           {/* Particle explosions */}
-          {Array.from({ length: 8 }).map((_, i) => {
-            const angle = (i / 8) * Math.PI * 2;
+          {Array.from({ length: revealParticleCount }).map((_, i) => {
+            const angle = (i / revealParticleCount) * Math.PI * 2;
             const distance = 30 + Math.random() * 20;
             return (
               <motion.div
@@ -632,12 +676,20 @@ const MilestoneStar = ({
   index,
   progress,
   sortedMilestones,
+  animateEnabled,
+  currentPulseDuration,
+  revealParticleCount,
+  ambientSparkles,
 }: {
   milestone: TrailMilestone;
   pos: { x: number; y: number; size: number };
   index: number;
   progress: number;
   sortedMilestones: TrailMilestone[];
+  animateEnabled: boolean;
+  currentPulseDuration: number;
+  revealParticleCount: number;
+  ambientSparkles: number;
 }) => {
   const milestonePercent = milestone.milestone_percent;
   const isCompleted = progress >= milestonePercent || !!milestone.completed_at;
@@ -681,6 +733,7 @@ const MilestoneStar = ({
         isRevealing={isRevealing}
         isPostcard={!!isPostcard}
         onComplete={handleRevealComplete}
+        revealParticleCount={revealParticleCount}
       />
       
       {/* Completed glow effect */}
@@ -701,7 +754,7 @@ const MilestoneStar = ({
               filter: "blur(8px)",
             }}
             initial={isRevealing ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 0.5 }}
-            animate={isCurrent ? {
+            animate={isCurrent && animateEnabled ? {
               scale: [1, 1.3, 1],
               opacity: [0.5, 0.8, 0.5],
             } : { scale: 1, opacity: 0.5 }}
@@ -710,8 +763,8 @@ const MilestoneStar = ({
               scale: { duration: 0.5, ease: "easeOut" },
               opacity: { duration: 0.5, ease: "easeOut" },
             } : {
-              duration: 2,
-              repeat: isCurrent ? Infinity : 0,
+              duration: currentPulseDuration,
+              repeat: isCurrent && animateEnabled ? Infinity : 0,
               ease: "easeInOut",
             }}
           />
@@ -735,11 +788,11 @@ const MilestoneStar = ({
         animate={isRevealing ? {
           scale: [0.5, 1.4, 1],
           rotate: [0, 180, 360],
-        } : isCurrent ? {
+        } : isCurrent && animateEnabled ? {
           boxShadow: isPostcard ? [
-            "0 0 10px rgba(250,204,21,0.5)",
-            "0 0 20px rgba(250,204,21,0.8)",
-            "0 0 10px rgba(250,204,21,0.5)",
+            "0 0 14px rgba(250,204,21,0.65)",
+            "0 0 28px rgba(250,204,21,0.95)",
+            "0 0 14px rgba(250,204,21,0.65)",
           ] : [
             "0 0 10px rgba(167,108,255,0.5)",
             "0 0 20px rgba(167,108,255,0.8)",
@@ -750,8 +803,8 @@ const MilestoneStar = ({
           duration: 0.6,
           ease: "easeOut",
         } : {
-          duration: 1.5,
-          repeat: Infinity,
+          duration: currentPulseDuration,
+          repeat: isCurrent && animateEnabled ? Infinity : 0,
           ease: "easeInOut",
         }}
       />
@@ -783,6 +836,8 @@ const MilestoneStar = ({
                 milestone={milestone}
                 currentProgress={progress}
                 isPostcard={!!isPostcard}
+                animateEnabled={animateEnabled}
+                ambientSparkles={ambientSparkles}
               />
             </motion.div>
           ) : isPostcard ? (
@@ -844,18 +899,56 @@ export const ConstellationTrail = memo(function ConstellationTrail({
   showCompanion = true,
   milestones: propMilestones,
   epicId,
-  transparentBackground = false
+  transparentBackground = false,
+  surface = "card",
+  motionPreset = "cinematic",
+  performanceMode = "balanced",
 }: ConstellationTrailProps) {
+  const reducedMotion = useReducedMotion();
+  const isMobile = useIsMobile();
+  const { ref: animationRef, isVisible } = useVisibleAnimation({ threshold: 0.15, rootMargin: "0px" });
+  const [isDocumentVisible, setIsDocumentVisible] = useState(
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
+  const [isPathImageLoaded, setIsPathImageLoaded] = useState(false);
+
   // Fetch journey path image for this epic
   const { 
     pathImageUrl, 
-    isLoading: isPathLoading, 
-    isGenerating, 
-    generateInitialPath 
+    isLoading: isPathLoading,
+    isGenerating,
   } = useJourneyPathImage(epicId);
   
   // Path generation is handled by useEpics when epic is created
   // This component only displays the generated path
+
+  useEffect(() => {
+    if (!pathImageUrl) {
+      setIsPathImageLoaded(false);
+    }
+  }, [pathImageUrl]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      setIsDocumentVisible(document.visibilityState === "visible");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  const motionProfile = useMemo(
+    () => resolveJourneyMotionProfile({ surface, motionPreset, performanceMode }),
+    [surface, motionPreset, performanceMode],
+  );
+
+  const loopAnimationsActive = !reducedMotion && isVisible && isDocumentVisible;
+  const totalBgStars = isMobile ? motionProfile.bgStarsTotalMobile : motionProfile.bgStarsTotalDesktop;
+  const animatedBgStars = isMobile ? motionProfile.bgStarsAnimatedMobile : motionProfile.bgStarsAnimatedDesktop;
   
   // Sort milestones by percentage and include start (0%)
   const sortedMilestones = useMemo(() => {
@@ -882,14 +975,14 @@ export const ConstellationTrail = memo(function ConstellationTrail({
       return x - Math.floor(x);
     };
     
-    return Array.from({ length: 20 }, (_, i) => ({
+    return Array.from({ length: totalBgStars }, (_, i) => ({
       x: seededRandom(i * 1) * 100,
       y: seededRandom(i * 2 + 0.5) * 100,
       size: 1 + seededRandom(i * 3 + 0.7) * 2,
       delay: seededRandom(i * 4 + 0.3) * 3,
       duration: 2 + seededRandom(i * 5 + 0.9) * 2,
     }));
-  }, []);
+  }, [totalBgStars]);
 
   // Calculate progress-based colors (red -> orange -> yellow -> green)
   const getProgressColors = (p: number) => {
@@ -908,9 +1001,14 @@ export const ConstellationTrail = memo(function ConstellationTrail({
 
   return (
     <div 
+      ref={animationRef}
+      data-testid="constellation-trail"
+      data-motion-active={loopAnimationsActive ? "true" : "false"}
       className={cn(
         "relative w-full h-56 rounded-xl overflow-hidden",
-        !transparentBackground && !pathImageUrl && "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
+        !transparentBackground &&
+          (!pathImageUrl || !isPathImageLoaded) &&
+          "bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950",
         className
       )}
       style={!transparentBackground ? {
@@ -924,44 +1022,73 @@ export const ConstellationTrail = memo(function ConstellationTrail({
     >
       {/* AI-generated journey path background */}
       {pathImageUrl && (
-        <div className="absolute inset-0">
-          <img 
-            src={pathImageUrl} 
+        <motion.div
+          className="absolute inset-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isPathImageLoaded ? 1 : 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <motion.img
+            src={pathImageUrl}
             alt="Journey path"
             className="w-full h-full object-cover"
+            initial={{ scale: 1.03 }}
+            animate={{ scale: isPathImageLoaded ? 1 : 1.03 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            onLoad={() => setIsPathImageLoaded(true)}
           />
           {/* Overlay gradient for star/companion visibility */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70" />
-        </div>
+          <div
+            className={cn(
+              "absolute inset-0",
+              surface === "drawer"
+                ? "bg-gradient-to-t from-slate-950/75 via-slate-950/35 to-slate-950/50"
+                : "bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-950/70",
+            )}
+          />
+        </motion.div>
       )}
       
       {/* Loading state for path generation */}
-      {isGenerating && !pathImageUrl && (
+      {(isGenerating || (isPathLoading && !pathImageUrl)) && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-purple-950/50 to-slate-950">
-          <motion.div 
+          <motion.div
             className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
-            animate={{ x: ["-100%", "100%"] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            animate={loopAnimationsActive ? { x: ["-100%", "100%"] } : { x: 0, opacity: 0.4 }}
+            transition={loopAnimationsActive ? {
+              duration: 2,
+              repeat: Infinity,
+              ease: "linear",
+            } : { duration: 0.2 }}
           />
           <div className="absolute bottom-2 left-2 text-xs text-primary/60 flex items-center gap-1">
             <Sparkles className="w-3 h-3 animate-pulse" />
-            <span>Mapping your path...</span>
+            <span>{isGenerating ? "Mapping your path..." : "Loading journey path..."}</span>
           </div>
         </div>
       )}
 
       {/* Nebula glow effect - show when no path image and not transparent mode */}
-      {!pathImageUrl && !transparentBackground && (
-        <div className="absolute inset-0 opacity-40">
+      {!transparentBackground && (
+        <motion.div
+          className="absolute inset-0"
+          initial={false}
+          animate={{ opacity: !pathImageUrl || !isPathImageLoaded ? 0.4 : 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        >
           <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/30 rounded-full blur-xl" />
           <div className="absolute top-1/3 right-1/4 w-16 h-16 bg-purple-500/20 rounded-full blur-lg" />
-        </div>
+        </motion.div>
       )}
 
       {/* Background twinkling stars */}
-      {bgStars.map((star, i) => (
+      {bgStars.map((star, i) => {
+        const shouldAnimateStar = loopAnimationsActive && i < animatedBgStars;
+        return (
         <motion.div
           key={`bg-${i}`}
+          data-testid="bg-star"
+          data-star-animated={shouldAnimateStar ? "true" : "false"}
           className="absolute rounded-full bg-white/60"
           style={{
             left: `${star.x}%`,
@@ -969,32 +1096,26 @@ export const ConstellationTrail = memo(function ConstellationTrail({
             width: star.size,
             height: star.size,
           }}
-          animate={{
+          animate={shouldAnimateStar ? {
             opacity: [0.2, 0.8, 0.2],
             scale: [1, 1.2, 1],
+          } : {
+            opacity: 0.45,
+            scale: 1,
           }}
-          transition={{
+          transition={shouldAnimateStar ? {
             duration: star.duration,
             delay: star.delay,
             repeat: Infinity,
             ease: "easeInOut",
-          }}
+          } : { duration: 0.2 }}
         />
-      ))}
+        );
+      })}
 
       {/* Trail paths SVG */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
-          <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--primary) / 0.15)" />
-            <stop offset="40%" stopColor="hsl(var(--primary) / 0.15)" />
-            <stop offset="50%" stopColor="hsl(var(--primary) / 0.8)" />
-            <stop offset="60%" stopColor="hsl(var(--primary) / 0.15)" />
-            <stop offset="100%" stopColor="hsl(var(--primary) / 0.15)" />
-            <animate attributeName="x1" values="-100%;100%" dur="2.5s" repeatCount="indefinite" />
-            <animate attributeName="x2" values="0%;200%" dur="2.5s" repeatCount="indefinite" />
-          </linearGradient>
-          
           <filter id="trailGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="1" result="blur" />
             <feMerge>
@@ -1016,11 +1137,35 @@ export const ConstellationTrail = memo(function ConstellationTrail({
         <path
           d={generateFullPathString(starPositions)}
           fill="none"
-          stroke="url(#pulseGradient)"
-          strokeWidth="2"
+          stroke="hsl(var(--primary) / 0.15)"
+          strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
           opacity="0.7"
+        />
+
+        <motion.path
+          data-testid="trail-path-sweep"
+          d={generateFullPathString(starPositions)}
+          fill="none"
+          stroke="hsl(var(--primary) / 0.85)"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="18 140"
+          animate={loopAnimationsActive ? {
+            strokeDashoffset: [220, 0],
+            opacity: [0.35, 0.9, 0.35],
+          } : {
+            strokeDashoffset: 0,
+            opacity: 0.28,
+          }}
+          transition={loopAnimationsActive ? {
+            duration: motionProfile.pathSweepDurationSec,
+            repeat: Infinity,
+            repeatDelay: motionProfile.pathSweepRepeatDelaySec,
+            ease: "linear",
+          } : { duration: 0.2 }}
         />
 
         {progress > 0 && (
@@ -1048,6 +1193,10 @@ export const ConstellationTrail = memo(function ConstellationTrail({
           index={i}
           progress={progress}
           sortedMilestones={sortedMilestones}
+          animateEnabled={loopAnimationsActive}
+          currentPulseDuration={motionProfile.currentMilestonePulseDurationSec}
+          revealParticleCount={motionProfile.revealParticleCount}
+          ambientSparkles={motionProfile.mysteryPopoverAmbientSparkles}
         />
       ))}
 
@@ -1063,12 +1212,18 @@ export const ConstellationTrail = memo(function ConstellationTrail({
           animate={{ 
             scale: 1, 
             opacity: 1,
-            y: [0, -4, 0],
+            y: loopAnimationsActive ? [0, -motionProfile.companionBobAmplitudePx, 0] : 0,
           }}
           transition={{
             scale: { duration: 0.5 },
             opacity: { duration: 0.5 },
-            y: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+            y: loopAnimationsActive
+              ? {
+                  duration: motionProfile.companionBobDurationSec,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0.2 },
           }}
         >
           <motion.div
@@ -1081,14 +1236,16 @@ export const ConstellationTrail = memo(function ConstellationTrail({
               filter: "blur(6px)",
             }}
             animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.4, 0.7, 0.4],
+              scale: loopAnimationsActive ? [1, 1.2, 1] : 1,
+              opacity: loopAnimationsActive ? [0.4, 0.7, 0.4] : 0.45,
             }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
+            transition={loopAnimationsActive
+              ? {
+                  duration: motionProfile.companionBobDurationSec,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0.2 }}
           />
           
           <div 

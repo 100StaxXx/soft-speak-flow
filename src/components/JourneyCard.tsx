@@ -220,6 +220,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
           showCompanion={true}
           milestones={trailMilestones}
           epicId={journey.id}
+          surface="card"
         />
 
 

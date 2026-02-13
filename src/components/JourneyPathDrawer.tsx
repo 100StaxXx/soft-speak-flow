@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
 import { ConstellationTrail } from "@/components/ConstellationTrail";
 import { JourneyDetailDrawer } from "@/components/JourneyDetailDrawer";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
@@ -51,7 +50,7 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
 }: JourneyPathDrawerProps) {
   const [open, setOpen] = useState(false);
   
-  const { pathImageUrl, isLoading: isLoadingPath } = useJourneyPathImage(epic.id);
+  const { isLoading: isLoadingPath } = useJourneyPathImage(epic.id);
   const { milestones, totalCount } = useMilestones(epic.id);
   const { companion } = useCompanion();
 
@@ -115,18 +114,6 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
             <div className="rounded-xl overflow-hidden border border-border/30 bg-card/30 backdrop-blur-sm">
               {/* Combined Journey Visualization */}
               <div className="relative h-56 w-full overflow-hidden">
-                {/* AI-Generated Path Image Background */}
-                {pathImageUrl && (
-                  <>
-                    <img
-                      src={pathImageUrl}
-                      alt="Your journey path"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/30 to-transparent" />
-                  </>
-                )}
-                
                 {/* Constellation Trail Overlay */}
                 <ConstellationTrail
                   progress={epic.progress_percentage}
@@ -135,16 +122,19 @@ export const JourneyPathDrawer = memo(function JourneyPathDrawer({
                   companionMood={companion?.current_mood}
                   showCompanion={true}
                   milestones={trailMilestones}
-                  transparentBackground={!!pathImageUrl}
+                  epicId={epic.id}
+                  surface="drawer"
+                  motionPreset="cinematic"
+                  performanceMode="balanced"
                   className="absolute inset-0"
                 />
               </div>
 
               {/* Loading state for path */}
-              {isLoadingPath && !pathImageUrl && (
-                <div className="h-56 flex items-center justify-center">
+              {isLoadingPath && (
+                <div className="py-3 flex items-center justify-center border-t border-border/20">
                   <div className="text-center space-y-2">
-                    <Sparkles className="w-8 h-8 text-primary/50 mx-auto animate-pulse" />
+                    <Sparkles className="w-4 h-4 text-primary/50 mx-auto animate-pulse" />
                     <p className="text-xs text-muted-foreground">Loading journey path...</p>
                   </div>
                 </div>

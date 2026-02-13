@@ -219,6 +219,24 @@ verify_jwt = true
 [functions.deal-boss-damage]
 verify_jwt = false
 
+[functions.process-companion-day-tick]
+verify_jwt = true
+
+[functions.generate-companion-requests]
+verify_jwt = true
+
+[functions.resolve-companion-request]
+verify_jwt = true
+
+[functions.complete-companion-ritual]
+verify_jwt = true
+
+[functions.advance-companion-campaign]
+verify_jwt = true
+
+[functions.publish-companion-snapshot]
+verify_jwt = true
+
 [functions.paypal-webhook]
 verify_jwt = false
 

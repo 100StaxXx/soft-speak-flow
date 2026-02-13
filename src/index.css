@@ -48,6 +48,93 @@
 .animate-companion-dormant { animation: companion-dormant 6s ease-in-out infinite; }
 .animate-companion-slow-breathe { animation: companion-slow-breathe 5s ease-in-out infinite; }
 
+@keyframes companion-particle-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -40px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, -80px) scale(0.9);
+  }
+  75% {
+    transform: translate(40px, -40px) scale(1.05);
+  }
+}
+
+@keyframes companion-particle-twinkle {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.companion-particle-base {
+  will-change: transform, opacity;
+}
+
+.companion-particle-sparkle {
+  animation-name: companion-particle-drift, companion-particle-twinkle;
+  animation-timing-function: ease-in-out, ease-in-out;
+  animation-iteration-count: infinite, infinite;
+}
+
+.companion-particle-gentle {
+  animation-name: companion-particle-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.companion-particle-minimal {
+  animation-name: companion-particle-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes companion-nav-breathe {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes companion-attention-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+.companion-nav-breathe {
+  animation-name: companion-nav-breathe;
+  animation-duration: 3s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.companion-attention-pulse {
+  animation: companion-attention-pulse 2s ease-in-out infinite;
+}
+
+.stat-pill {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 /* ===== iOS-STYLE ULTRA GLASS UTILITIES ===== */
 
 /* Maximum transparency glass - for hero cards */
@@ -996,15 +1083,6 @@ All colors MUST be HSL.
   
   .animate-subtle-pulse {
     animation: subtle-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes gradient-text {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-  
-  .animate-gradient-text {
-    animation: gradient-text 3s ease-in-out infinite;
   }
 
   /* GPU layer promotion utility */

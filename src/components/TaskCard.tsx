@@ -5,6 +5,7 @@ import { cn, stripMarkdown } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { haptics } from "@/utils/haptics";
 import { playHabitComplete } from "@/utils/soundEffects";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 interface TaskCardProps {
   task: {
@@ -46,6 +47,7 @@ export const TaskCard = ({
   const [justCompleted, setJustCompleted] = useState(false);
   const [showCheckAnimation, setShowCheckAnimation] = useState(false);
   const isInitialMount = useRef(true);
+  const { capabilities, profile } = useMotionProfile();
 
   // Enhanced difficulty config with icons and glow colors
   const difficultyConfig = {
@@ -118,7 +120,7 @@ export const TaskCard = ({
         setShowXP(false);
         setJustCompleted(false);
         setShowCheckAnimation(false);
-      }, 2000);
+      }, profile === "reduced" ? 900 : 1600);
       return () => clearTimeout(timer);
     } else if (!task.completed && justCompleted) {
       setJustCompleted(false);
@@ -162,11 +164,15 @@ export const TaskCard = ({
               <span className="text-xs ml-1 opacity-80">({streakMultiplier}x)</span>
             )}
             {/* Enhanced sparkle particles */}
-            <span className="absolute -left-4 -top-2 w-2 h-2 bg-stardust-gold rounded-full animate-sparkle-burst" style={{ animationDelay: '0ms' }} />
-            <span className="absolute -right-4 top-0 w-2 h-2 bg-primary rounded-full animate-sparkle-burst" style={{ animationDelay: '100ms' }} />
-            <span className="absolute left-1/2 -top-4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-burst" style={{ animationDelay: '200ms' }} />
-            <span className="absolute -left-2 bottom-0 w-1.5 h-1.5 bg-stardust-gold rounded-full animate-sparkle-burst" style={{ animationDelay: '150ms' }} />
-            <span className="absolute right-0 -bottom-2 w-1 h-1 bg-primary rounded-full animate-sparkle-burst" style={{ animationDelay: '250ms' }} />
+            {capabilities.allowBackgroundAnimation && (
+              <>
+                <span className="absolute -left-4 -top-2 w-2 h-2 bg-stardust-gold rounded-full animate-sparkle-burst" style={{ animationDelay: '0ms' }} />
+                <span className="absolute -right-4 top-0 w-2 h-2 bg-primary rounded-full animate-sparkle-burst" style={{ animationDelay: '100ms' }} />
+                <span className="absolute left-1/2 -top-4 w-1.5 h-1.5 bg-accent rounded-full animate-sparkle-burst" style={{ animationDelay: '200ms' }} />
+                <span className="absolute -left-2 bottom-0 w-1.5 h-1.5 bg-stardust-gold rounded-full animate-sparkle-burst" style={{ animationDelay: '150ms' }} />
+                <span className="absolute right-0 -bottom-2 w-1 h-1 bg-primary rounded-full animate-sparkle-burst" style={{ animationDelay: '250ms' }} />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -244,7 +250,11 @@ export const TaskCard = ({
           <button
             onClick={() => {
               if (isToggling) return;
-              haptics.success();
+              if (!task.completed) {
+                haptics.success();
+              } else {
+                haptics.light();
+              }
               onToggle();
             }}
             disabled={isToggling}
