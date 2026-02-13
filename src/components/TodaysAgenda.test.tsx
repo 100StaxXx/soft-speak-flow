@@ -283,3 +283,38 @@ describe("TodaysAgenda combo feedback", () => {
     vi.useRealTimers();
   });
 });
+
+describe("TodaysAgenda scheduled header copy", () => {
+  it("shows Scheduled label, hides helper copy, and keeps drag handle", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByText("Scheduled")).toBeInTheDocument();
+    expect(screen.queryByText(/Drag handle to reschedule/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /drag to reschedule/i })).toBeInTheDocument();
+  });
+});

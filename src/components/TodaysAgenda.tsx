@@ -1098,9 +1098,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Scheduled
                     </span>
-                    <span className="text-[11px] text-muted-foreground/80">
-                      Drag handle to reschedule • 5m steps
-                    </span>
                   </div>
                 )}
                 {timelineItems.map((task, index) => {
