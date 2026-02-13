@@ -3,6 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
+export interface DailySubtask {
+  id: string;
+  title: string;
+  completed: boolean | null;
+  sort_order: number | null;
+}
+
 export interface DailyTask {
   id: string;
   user_id: string;
@@ -53,7 +60,44 @@ export interface DailyTask {
   // Additional metadata
   notes: string | null;
   location: string | null;
+  subtasks?: DailySubtask[];
 }
+
+export const DAILY_TASKS_STALE_TIME = 2 * 60 * 1000;
+export const DAILY_TASKS_GC_TIME = 30 * 60 * 1000;
+
+export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: string) =>
+  ['daily-tasks', userId, taskDate] as const;
+
+export const fetchDailyTasks = async (userId: string, taskDate: string): Promise<DailyTask[]> => {
+  const { data, error } = await supabase
+    .from('daily_tasks')
+    .select(`
+      *,
+      epics(title),
+      contact:contacts!contact_id(id, name, avatar_url),
+      subtasks(id, title, completed, sort_order)
+    `)
+    .eq('user_id', userId)
+    .eq('task_date', taskDate)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Failed to fetch daily tasks:', error);
+    throw error;
+  }
+
+  // Flatten epic title/contact and normalize subtasks.
+  return (data || []).map(task => ({
+    ...task,
+    epic_title: (task.epics as { title: string } | null)?.title || null,
+    contact: task.contact as { id: string; name: string; avatar_url: string | null } | null,
+    subtasks: ((task.subtasks as DailySubtask[] | null) ?? [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER)),
+  })) as DailyTask[];
+};
 
 export const useTasksQuery = (selectedDate?: Date) => {
   const { user } = useAuth();
@@ -64,39 +108,17 @@ export const useTasksQuery = (selectedDate?: Date) => {
     : format(new Date(), 'yyyy-MM-dd');
 
   const { data: tasks = [], isLoading, error } = useQuery({
-    queryKey: ['daily-tasks', user?.id, taskDate],
+    queryKey: getDailyTasksQueryKey(user?.id, taskDate),
     queryFn: async () => {
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
-      
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .select(`
-          *,
-          epics(title),
-          contact:contacts!contact_id(id, name, avatar_url)
-        `)
-        .eq('user_id', user.id)
-        .eq('task_date', taskDate)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Failed to fetch daily tasks:', error);
-        throw error;
-      }
-      
-      // Flatten epic title and contact from joined data
-      return (data || []).map(task => ({
-        ...task,
-        epic_title: (task.epics as { title: string } | null)?.title || null,
-        contact: task.contact as { id: string; name: string; avatar_url: string | null } | null,
-      })) as DailyTask[];
+      return fetchDailyTasks(user.id, taskDate);
     },
     enabled: !!user?.id,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: DAILY_TASKS_STALE_TIME,
+    gcTime: DAILY_TASKS_GC_TIME,
     placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });

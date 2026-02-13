@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
 import { useCalendarIntegrations, type CalendarProvider, type ConnectedCalendar } from '@/hooks/useCalendarIntegrations';
+import { parseScheduledTime } from '@/utils/scheduledTime';
 
 export interface QuestCalendarLink {
   id: string;
@@ -44,9 +45,10 @@ function toIsoRange(task: TaskLite) {
     throw new Error('SCHEDULED_TIME_REQUIRED');
   }
 
-  const [h, m] = task.scheduled_time.split(':').map(Number);
-  const start = new Date(`${task.task_date}T00:00:00`);
-  start.setHours(h || 0, m || 0, 0, 0);
+  const start = parseScheduledTime(task.scheduled_time, new Date(`${task.task_date}T00:00:00`));
+  if (!start) {
+    throw new Error('SCHEDULED_TIME_INVALID');
+  }
 
   const minutes = task.estimated_duration && task.estimated_duration > 0
     ? task.estimated_duration

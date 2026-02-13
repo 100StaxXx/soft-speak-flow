@@ -115,6 +115,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
         <div className="flex gap-2">
           <Input
             type="time"
+            step={300}
             value={props.scheduledTime || ''}
             onChange={(e) => props.onScheduledTimeChange(e.target.value || null)}
             className="flex-1"

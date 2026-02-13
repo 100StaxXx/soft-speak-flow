@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { format, isSameDay, parse } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Clock, Plus, ChevronRight } from "lucide-react";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
@@ -8,6 +8,7 @@ import { TimelineTaskCard } from "./TimelineTaskCard";
 import { AllDayTaskBanner } from "./AllDayTaskBanner";
 import { MilestoneCalendarCard } from "../MilestoneCalendarCard";
 import { Button } from "../ui/button";
+import { normalizeScheduledTime, parseScheduledTime } from "@/utils/scheduledTime";
 
 interface TimelineViewProps {
   selectedDate: Date;
@@ -26,13 +27,16 @@ interface TimelineViewProps {
 // Calculate new time based on drag offset
 function calculateNewTime(originalTime: string, deltaY: number): string {
   const minutesPerPixel = 0.75;
-  const deltaMinutes = Math.round((deltaY * minutesPerPixel) / 15) * 15;
-  
-  const original = parse(originalTime, "HH:mm", new Date());
+  const deltaMinutes = Math.round((deltaY * minutesPerPixel) / 5) * 5;
+  const original = parseScheduledTime(originalTime, new Date("2000-01-01T00:00:00"));
+  if (!original) {
+    return normalizeScheduledTime(originalTime) ?? originalTime;
+  }
+
   const newTime = new Date(original.getTime() + deltaMinutes * 60000);
   
   const hours = Math.max(6, Math.min(23, newTime.getHours()));
-  const minutes = Math.min(45, Math.max(0, Math.floor(newTime.getMinutes() / 15) * 15));
+  const minutes = Math.min(55, Math.max(0, Math.floor(newTime.getMinutes() / 5) * 5));
   
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }

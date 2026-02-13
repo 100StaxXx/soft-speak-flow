@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { parseScheduledTime } from "@/utils/scheduledTime";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -92,9 +93,10 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
     
     for (let i = 0; i < scheduledTasks.length; i++) {
       for (let j = i + 1; j < scheduledTasks.length; j++) {
-        const task1Start = new Date(`2000-01-01T${scheduledTasks[i].scheduled_time}:00`);
+        const task1Start = parseScheduledTime(scheduledTasks[i].scheduled_time, new Date("2000-01-01T00:00:00"));
+        const task2Start = parseScheduledTime(scheduledTasks[j].scheduled_time, new Date("2000-01-01T00:00:00"));
+        if (!task1Start || !task2Start) continue;
         const task1End = new Date(task1Start.getTime() + (scheduledTasks[i].estimated_duration! * 60000));
-        const task2Start = new Date(`2000-01-01T${scheduledTasks[j].scheduled_time}:00`);
         const task2End = new Date(task2Start.getTime() + (scheduledTasks[j].estimated_duration! * 60000));
         
         if (task1Start < task2End && task2Start < task1End) {

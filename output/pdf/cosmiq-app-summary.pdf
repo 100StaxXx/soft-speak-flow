@@ -1,0 +1,70 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 3927 >>
+stream
+1 1 1 rg 0 0 612 792 re f
+0 0 0 rg
+BT /F2 18.00 Tf 1 0 0 1 46.00 760.00 Tm (Cosmiq App - One-Page Repo Summary) Tj ET
+BT /F1 8.70 Tf 1 0 0 1 46.00 738.00 Tm (Evidence sources: README.md, index.html, src/App.tsx, src/hooks/*, src/pages/*, src/integrations/supabase/client.ts, supabase/function-manifest.json.) Tj ET
+BT /F2 11.80 Tf 1 0 0 1 46.00 722.00 Tm (What it is) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 708.00 Tm (Cosmiq is a Vite + React + TypeScript app described in repo metadata as a gamified self-improvement product for habits and) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 697.00 Tm (quests with a celestial theme.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 686.00 Tm (Repository code shows a web/PWA client plus a Capacitor iOS shell, backed by Supabase for auth, Postgres data, Edge) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 675.00 Tm (Functions, and storage.) Tj ET
+BT /F2 11.80 Tf 1 0 0 1 46.00 657.00 Tm (Who it is for) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 643.00 Tm (Primary persona: people who want a gamified personal planning and growth app with coach-like guidance \(inferred from quest,) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 632.00 Tm (mentor, companion, and pep-talk flows\).) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 621.00 Tm (Explicit primary persona statement in repository docs: Not found in repo.) Tj ET
+BT /F2 11.80 Tf 1 0 0 1 46.00 603.00 Tm (What it does) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 589.00 Tm (- Manages daily quests with inbox capture, scheduling, recurring tasks, subtasks, and streak handling.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 577.00 Tm (- Provides mentor experiences: mentor selection, chat, daily pep talks, and reflection/recap screens.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 565.00 Tm (- Runs a companion system with XP progression, evolution, story generation, postcards, and collections.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 553.00 Tm (- Supports epics/campaigns/journeys planning with AI-assisted planning endpoints and orchestration.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 541.00 Tm (- Integrates calendars across Google, Outlook, and Apple with send-only or full-sync options.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 529.00 Tm (- Includes contacts and interaction logging, plus multi-tab navigation across mentor/inbox/journeys/companion.) Tj ET
+BT /F2 11.80 Tf 1 0 0 1 46.00 510.00 Tm (How it works \(architecture\)) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 496.00 Tm (- Client: React app with React Router, React Query caching, and layered context providers in src/App.tsx.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 484.00 Tm (- Data layer: supabase-js client handles auth/session and table access \(for example daily_tasks, mentors, user_companion,) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 473.00 Tm (  contacts\).) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 461.00 Tm (- Service layer: supabase.functions.invoke calls AI/service endpoints such as mentor-chat and ai-orchestrator.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 449.00 Tm (- Backend surface: function-manifest allow-list contains 64 Edge Functions, including 3 scheduled functions.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 437.00 Tm (- Realtime and runtime: RealtimeSyncProvider enables habits/epics/tasks sync; web uses service worker, iOS uses Capacitor) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 426.00 Tm (  plugins.) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 414.00 Tm (- Detailed production topology diagram and capacity/SLA metrics: Not found in repo.) Tj ET
+BT /F2 11.80 Tf 1 0 0 1 46.00 395.00 Tm (How to run \(minimal\)) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 381.00 Tm (- Install dependencies: npm install) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 369.00 Tm (- Create env file: cp .env.example .env) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 357.00 Tm (- Set required vars: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY, VITE_SUPABASE_PROJECT_ID,) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 346.00 Tm (  VITE_NATIVE_REDIRECT_BASE) Tj ET
+BT /F1 9.40 Tf 1 0 0 1 46.00 334.00 Tm (- Start local app: npm run dev) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000321 00000 n 
+0000000396 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+4375
+%%EOF

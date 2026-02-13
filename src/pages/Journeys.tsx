@@ -318,7 +318,7 @@ const Journeys = () => {
           taskDateOverride = pickedDate;
         }
 
-        if (message.includes("SCHEDULED_TIME_REQUIRED") && !scheduledTimeOverride) {
+        if ((message.includes("SCHEDULED_TIME_REQUIRED") || message.includes("SCHEDULED_TIME_INVALID")) && !scheduledTimeOverride) {
           const pickedTime = window.prompt("Choose a time to send this quest (HH:mm)", "09:00");
           if (!pickedTime || !TIME_24H_REGEX.test(pickedTime)) {
             toast.error("Calendar send cancelled. Please choose a valid HH:mm time.");
@@ -336,6 +336,7 @@ const Journeys = () => {
           if (
             !message.includes("TASK_DATE_REQUIRED")
             && !message.includes("SCHEDULED_TIME_REQUIRED")
+            && !message.includes("SCHEDULED_TIME_INVALID")
           ) {
             toast.error(message);
             return;
@@ -348,7 +349,7 @@ const Journeys = () => {
         return;
       }
 
-      if (message.includes("SCHEDULED_TIME_REQUIRED")) {
+      if (message.includes("SCHEDULED_TIME_REQUIRED") || message.includes("SCHEDULED_TIME_INVALID")) {
         toast.error("Please assign a time before sending this quest to calendar.");
         return;
       }

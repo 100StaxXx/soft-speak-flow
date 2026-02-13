@@ -1,8 +1,17 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import Mentor from "@/pages/Mentor";
 import Companion from "@/pages/Companion";
 import Inbox from "@/pages/Inbox";
 import Journeys from "@/pages/Journeys";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DAILY_TASKS_GC_TIME,
+  DAILY_TASKS_STALE_TIME,
+  fetchDailyTasks,
+  getDailyTasksQueryKey,
+} from "@/hooks/useTasksQuery";
 
 export type MainTabPath = "/mentor" | "/inbox" | "/journeys" | "/companion";
 
@@ -26,10 +35,28 @@ const initialScrollPositions: Record<MainTabPath, number> = {
 };
 
 export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath }) => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [mountedTabs, setMountedTabs] = useState<MainTabPath[]>([activePath]);
   const activePathRef = useRef<MainTabPath>(activePath);
   const visitedTabsRef = useRef<Set<MainTabPath>>(new Set([activePath]));
   const scrollPositionsRef = useRef<Record<MainTabPath, number>>(initialScrollPositions);
+
+  const prefetchJourneysTasks = useCallback(() => {
+    if (!user?.id) return;
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    void queryClient.prefetchQuery({
+      queryKey: getDailyTasksQueryKey(user.id, today),
+      queryFn: () => fetchDailyTasks(user.id, today),
+      staleTime: DAILY_TASKS_STALE_TIME,
+      gcTime: DAILY_TASKS_GC_TIME,
+    }).catch(() => undefined);
+  }, [queryClient, user?.id]);
+
+  useEffect(() => {
+    prefetchJourneysTasks();
+  }, [prefetchJourneysTasks]);
 
   useEffect(() => {
     setMountedTabs((previous) =>

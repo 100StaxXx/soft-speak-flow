@@ -708,10 +708,18 @@ export const useTaskMutations = (taskDate: string) => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast({ title: "Quest updated!" });
+
+      const definedFields = Object.entries(variables.updates)
+        .filter(([, value]) => value !== undefined)
+        .map(([key]) => key);
+      const isScheduledTimeOnlyUpdate = definedFields.length === 1 && definedFields[0] === 'scheduled_time';
+
+      if (!isScheduledTimeOnlyUpdate) {
+        toast({ title: "Quest updated!" });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update quest", description: error.message, variant: "destructive" });

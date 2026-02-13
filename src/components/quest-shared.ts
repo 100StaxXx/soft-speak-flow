@@ -3,7 +3,7 @@ import { Zap, Flame, Mountain } from "lucide-react";
 // --- Difficulty color helpers ---
 export const DIFFICULTY_COLORS = {
   easy: { bg: "bg-emerald-600", text: "text-emerald-400", pill: "bg-emerald-500", border: "border-emerald-500/40" },
-  medium: { bg: "bg-amber-500", text: "text-amber-400", pill: "bg-amber-500", border: "border-amber-500/40" },
+  medium: { bg: "bg-amber-400/80", text: "text-amber-300", pill: "bg-amber-500/80", border: "border-amber-400/35" },
   hard: { bg: "bg-violet-500", text: "text-violet-400", pill: "bg-violet-500", border: "border-violet-500/40" },
 } as const;
 
@@ -23,7 +23,7 @@ export function formatTime12(time24: string): string {
 export function generateTimeSlots(): string[] {
   const slots: string[] = [];
   for (let h = 6; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
+    for (let m = 0; m < 60; m += 5) {
       slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     }
   }

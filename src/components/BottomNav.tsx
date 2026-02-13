@@ -3,7 +3,7 @@ import { PawPrint, User, Compass, Inbox } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -12,24 +12,42 @@ import { getResolvedMentorId } from "@/utils/mentor";
 import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
 import { useInboxCount } from "@/hooks/useInboxTasks";
+import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
+import {
+  DAILY_TASKS_GC_TIME,
+  DAILY_TASKS_STALE_TIME,
+  fetchDailyTasks,
+  getDailyTasksQueryKey,
+} from "@/hooks/useTasksQuery";
 
-// Core tabs are eagerly loaded in App.tsx for instant navigation.
-const prefetchMap: Record<string, () => Promise<unknown>> = {
-  mentor: () => Promise.resolve(),
-  inbox: () => Promise.resolve(),
-  journeys: () => Promise.resolve(),
-  companion: () => Promise.resolve(),
-};
+type PrefetchTarget = "mentor" | "inbox" | "journeys" | "companion";
 
 export const BottomNav = memo(() => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { profile } = useProfile();
   const { companion, progressToNext } = useCompanion();
   const { inboxCount } = useInboxCount();
 
+  const prefetchJourneysTasks = useCallback(() => {
+    if (!user?.id) return;
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    void queryClient.prefetchQuery({
+      queryKey: getDailyTasksQueryKey(user.id, today),
+      queryFn: () => fetchDailyTasks(user.id, today),
+      staleTime: DAILY_TASKS_STALE_TIME,
+      gcTime: DAILY_TASKS_GC_TIME,
+    }).catch(() => undefined);
+  }, [queryClient, user?.id]);
+
   // Prefetch on hover/focus for even faster perceived navigation
-  const handlePrefetch = useCallback((page: keyof typeof prefetchMap) => {
-    prefetchMap[page]?.();
-  }, []);
+  const handlePrefetch = useCallback((page: PrefetchTarget) => {
+    if (page === "journeys") {
+      prefetchJourneysTasks();
+    }
+  }, [prefetchJourneysTasks]);
 
   const resolvedMentorId = getResolvedMentorId(profile);
 
@@ -124,6 +142,7 @@ export const BottomNav = memo(() => {
             activeClassName="bg-cosmiq-glow/12"
             data-tour="quests-tab"
             onClick={() => haptics.light()}
+            onPointerDown={prefetchJourneysTasks}
             onMouseEnter={() => handlePrefetch('journeys')}
             onFocus={() => handlePrefetch('journeys')}
           >

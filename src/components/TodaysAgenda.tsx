@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
@@ -21,6 +22,7 @@ import {
   Brain,
   Heart,
   Dumbbell,
+  GripVertical,
   ArrowUpDown,
   MoreHorizontal,
   CalendarPlus,
@@ -35,8 +37,10 @@ import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn, stripMarkdown } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
@@ -94,7 +98,34 @@ interface Task {
   reminder_minutes_before?: number | null;
   category?: string | null;
   image_url?: string | null;
+  subtasks?: TaskSubtask[];
 }
+
+interface TaskSubtask {
+  id: string;
+  title: string;
+  completed: boolean | null;
+  sort_order: number | null;
+}
+
+const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: TaskSubtask[] }>(
+  tasks: T[] | undefined,
+  taskId: string,
+  subtaskId: string,
+  completed: boolean
+): T[] | undefined => {
+  if (!tasks) return tasks;
+
+  return tasks.map((task) => {
+    if (task.id !== taskId || !task.subtasks) return task;
+    return {
+      ...task,
+      subtasks: task.subtasks.map((subtask) =>
+        subtask.id === subtaskId ? { ...subtask, completed } : subtask
+      ),
+    };
+  });
+};
 
 interface TodaysAgendaProps {
   tasks: Task[];
@@ -178,7 +209,53 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion);
   const { profile } = useProfile();
+  const queryClient = useQueryClient();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
+
+  const toggleSubtask = useMutation({
+    mutationFn: async ({
+      taskId,
+      subtaskId,
+      completed,
+    }: {
+      taskId: string;
+      subtaskId: string;
+      completed: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("subtasks")
+        .update({
+          completed,
+          completed_at: completed ? new Date().toISOString() : null,
+        })
+        .eq("id", subtaskId)
+        .eq("task_id", taskId);
+
+      if (error) throw error;
+    },
+    onMutate: async ({ taskId, subtaskId, completed }) => {
+      await queryClient.cancelQueries({ queryKey: ["daily-tasks"] });
+      const previousDailyTasks = queryClient.getQueriesData<Task[]>({
+        queryKey: ["daily-tasks"],
+      });
+
+      queryClient.setQueriesData<Task[]>(
+        { queryKey: ["daily-tasks"] },
+        (currentTasks) => patchSubtaskCompletionInTaskList(currentTasks, taskId, subtaskId, completed)
+      );
+
+      return { previousDailyTasks };
+    },
+    onError: (_error, _variables, context) => {
+      if (!context?.previousDailyTasks) return;
+      context.previousDailyTasks.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+    },
+  });
 
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
@@ -359,6 +436,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   // Check if a task has expandable details
   const hasExpandableDetails = useCallback((task: Task) => {
     return !!(
+      (task.subtasks && task.subtasks.length > 0) ||
       task.notes || 
       task.priority || 
       task.energy_level || 
@@ -392,7 +470,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   };
 
-  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps) => {
+  type TimelineDragHandleProps = {
+    onPointerDown?: React.PointerEventHandler<HTMLElement>;
+    onTouchStart?: React.TouchEventHandler<HTMLElement>;
+    onTouchMove?: React.TouchEventHandler<HTMLElement>;
+    onTouchEnd?: React.TouchEventHandler<HTMLElement>;
+    onTouchCancel?: React.TouchEventHandler<HTMLElement>;
+  };
+
+  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, timelineDragHandleProps?: TimelineDragHandleProps) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
@@ -400,6 +486,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const isActivated = dragProps?.isActivated ?? false;
     const isExpanded = expandedTasks.has(task.id);
     const hasDetails = hasExpandableDetails(task);
+    const CategoryIcon = getCategoryIcon(task.category);
+    const subtasks = task.subtasks ?? [];
+    const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
+    const hasDetailBadges = !!(
+      (CategoryIcon && task.category) ||
+      task.difficulty ||
+      task.priority ||
+      task.energy_level ||
+      task.estimated_duration ||
+      (task.is_recurring && task.recurrence_pattern)
+    );
     
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -436,8 +533,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         onToggle(task.id, !isComplete, task.xp_reward);
       }
     };
-
-    const CategoryIcon = getCategoryIcon(task.category);
 
     const taskContent = (
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
@@ -551,6 +646,25 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
           
           <div className="flex items-center gap-2">
+            {!!task.scheduled_time && !isRitual && !isComplete && !!timelineDragHandleProps && (
+              <button
+                type="button"
+                data-interactive="true"
+                aria-label="Drag to reschedule"
+                title="Drag handle to reschedule in 5-minute steps"
+                className={cn(
+                  "h-8 w-8 rounded-md flex items-center justify-center touch-none",
+                  "opacity-55 group-hover:opacity-100 transition-opacity",
+                  isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
+                )}
+                style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
+                onPointerDownCapture={(e) => e.stopPropagation()}
+                onTouchStartCapture={(e) => e.stopPropagation()}
+                {...timelineDragHandleProps}
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+            )}
             {/* Quest action menu */}
             {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar) && (
               <DropdownMenu>
@@ -617,6 +731,49 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         {/* Expandable details section */}
         <CollapsibleContent>
           <div className="pl-8 pr-2 pb-2 space-y-2">
+            {/* Subtasks */}
+            {subtasks.length > 0 && (
+              <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Subtasks
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {completedSubtaskCount}/{subtasks.length}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  {subtasks.map((subtask) => (
+                    <label
+                      key={subtask.id}
+                      className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs"
+                    >
+                      <Checkbox
+                        checked={!!subtask.completed}
+                        onCheckedChange={(checked) => {
+                          toggleSubtask.mutate({
+                            taskId: task.id,
+                            subtaskId: subtask.id,
+                            completed: !!checked,
+                          });
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span
+                        className={cn(
+                          "text-xs",
+                          subtask.completed && "text-muted-foreground line-through"
+                        )}
+                      >
+                        {subtask.title}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Notes */}
             {task.notes && (
               useLiteAnimations ? (
@@ -633,7 +790,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             )}
             
             {/* Badges row */}
-            <div className="flex flex-wrap gap-1.5">
+            {hasDetailBadges && (
+              <div className="flex flex-wrap gap-1.5">
               {/* Category */}
               {CategoryIcon && task.category && (
                 <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
@@ -695,7 +853,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   {task.recurrence_pattern}
                 </Badge>
               )}
-            </div>
+              </div>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -718,7 +877,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, useLiteAnimations]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations]);
 
 
   return (
@@ -834,13 +993,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {/* Scheduled Tasks Timeline */}
             {scheduledItems.length > 0 && (
               <div ref={timelineDragContainerRef}>
+                <div className="flex items-center gap-2 pb-2">
+                  <div className="w-9 flex-shrink-0" />
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Scheduled
+                  </span>
+                  <span className="text-[11px] text-muted-foreground/80">
+                    Drag handle to reschedule • 5m steps
+                  </span>
+                </div>
                 {scheduledItems.map((task, index) => {
                   const isThisDragging = timelineDrag.draggingTaskId === task.id;
                   const isAnyDragging = timelineDrag.isDragging;
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
-                  const rowHandlers = task.scheduled_time
-                    ? timelineDrag.getRowHandlers(task.id, task.scheduled_time)
-                    : {};
+                  const dragHandleProps = task.scheduled_time
+                    ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                    : undefined;
 
                   const rowStyle: CSSProperties = {
                     WebkitUserSelect: 'none',
@@ -848,9 +1016,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     WebkitTouchCallout: 'none',
                     touchAction: isThisDragging ? 'none' : 'pan-y',
                     pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
-                    transform: isThisDragging
-                      ? `translateY(${timelineDrag.dragOffsetY}px) scale(1.03)`
-                      : undefined,
                     opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
                     boxShadow: isThisDragging
                       ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
@@ -858,6 +1023,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
                     borderRadius: isThisDragging ? 12 : 0,
                     transition: 'none',
+                    willChange: isThisDragging ? "transform" : undefined,
                   };
 
                   const rowContent = (
@@ -868,37 +1034,29 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       isLast={index === scheduledItems.length - 1 && anytimeItems.length === 0}
                       isDragTarget={isThisDragging}
                     >
-                      {renderTaskItem(task)}
+                      {renderTaskItem(task, undefined, dragHandleProps)}
                     </TimelineTaskRow>
                   );
 
-                  if (useLiteAnimations || !isJustDropped) {
-                    return (
-                      <div
-                        key={task.id}
-                        className={cn("relative", isThisDragging && "z-50")}
-                        style={rowStyle}
-                        {...rowHandlers}
-                      >
-                        {rowContent}
-                      </div>
-                    );
-                  }
-
+                  const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
+                    ? {
+                        scale: [1, 1.02, 0.98, 1],
+                        y: [0, -2, 1, 0],
+                      }
+                    : undefined;
                   return (
                     <motion.div
                       key={task.id}
                       className={cn("relative", isThisDragging && "z-50")}
-                      animate={{
-                        scale: [1, 1.02, 0.98, 1],
-                        y: [0, -2, 1, 0],
-                      }}
-                      transition={{
+                      animate={bounceAnimation}
+                      transition={bounceAnimation ? {
                         duration: 0.25,
                         ease: [0.25, 0.1, 0.25, 1],
+                      } : undefined}
+                      style={{
+                        ...rowStyle,
+                        y: isThisDragging ? timelineDrag.dragOffsetY : 0,
                       }}
-                      style={rowStyle}
-                      {...rowHandlers}
                     >
                       {rowContent}
                     </motion.div>

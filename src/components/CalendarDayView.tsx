@@ -10,6 +10,7 @@ import { playSound } from "@/utils/soundEffects";
 import { Card } from "./ui/card";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
+import { getScheduledTimeParts, parseScheduledTime } from "@/utils/scheduledTime";
 
 interface CalendarDayViewProps {
   selectedDate: Date;
@@ -62,10 +63,11 @@ export const CalendarDayView = ({
     let latestHour = 23;
 
     scheduledTasks.forEach(task => {
-      const [hourStr, minuteStr] = task.scheduled_time!.split(':');
-      const hour = parseInt(hourStr);
+      const parts = getScheduledTimeParts(task.scheduled_time);
+      if (!parts) return;
+      const hour = parts.hour;
       const duration = task.estimated_duration || 30;
-      const endHour = Math.ceil((hour * 60 + parseInt(minuteStr) + duration) / 60);
+      const endHour = Math.ceil((hour * 60 + parts.minute + duration) / 60);
 
       earliestHour = Math.min(earliestHour, hour);
       latestHour = Math.max(latestHour, endHour);
@@ -101,9 +103,8 @@ export const CalendarDayView = ({
 
   const getTasksForTimeSlot = (hour: number, minute: number) => {
     return dayTasks.filter(task => {
-      if (!task.scheduled_time) return false;
-      const [taskHour, taskMinute] = task.scheduled_time.split(':').map(Number);
-      return taskHour === hour && taskMinute === minute;
+      const parts = getScheduledTimeParts(task.scheduled_time);
+      return !!parts && parts.hour === hour && parts.minute === minute;
     });
   };
 
@@ -183,9 +184,10 @@ export const CalendarDayView = ({
     let conflicts = 0;
     for (let i = 0; i < scheduledTasks.length; i++) {
       for (let j = i + 1; j < scheduledTasks.length; j++) {
-        const task1Start = new Date(`2000-01-01T${scheduledTasks[i].scheduled_time}:00`);
+        const task1Start = parseScheduledTime(scheduledTasks[i].scheduled_time, new Date("2000-01-01T00:00:00"));
+        const task2Start = parseScheduledTime(scheduledTasks[j].scheduled_time, new Date("2000-01-01T00:00:00"));
+        if (!task1Start || !task2Start) continue;
         const task1End = new Date(task1Start.getTime() + (scheduledTasks[i].estimated_duration! * 60000));
-        const task2Start = new Date(`2000-01-01T${scheduledTasks[j].scheduled_time}:00`);
         const task2End = new Date(task2Start.getTime() + (scheduledTasks[j].estimated_duration! * 60000));
         if (task1Start < task2End && task2Start < task1End) conflicts++;
       }
@@ -205,8 +207,8 @@ export const CalendarDayView = ({
 
     // Morning Warrior (before 9am)
     const morningTasks = scheduledTasks.filter(t => {
-      const hour = parseInt(t.scheduled_time!.split(':')[0]);
-      return hour < 9;
+      const parts = getScheduledTimeParts(t.scheduled_time);
+      return !!parts && parts.hour < 9;
     });
     powerUpXP += morningTasks.length * CALENDAR_BONUS_XP.MORNING_WARRIOR;
 

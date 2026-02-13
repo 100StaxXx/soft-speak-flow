@@ -1,25 +1,27 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { useAutoscroll } from '@/hooks/useAutoscroll';
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useMotionValue, type MotionValue } from "framer-motion";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { useAutoscroll } from "@/hooks/useAutoscroll";
 
-const PIXELS_PER_10MIN = 40;
-const LONG_PRESS_DURATION = 500;
-const SCROLL_CANCEL_THRESHOLD = 10;
+const PIXELS_PER_5_MIN = 20;
+const TOUCH_HOLD_MS = 180;
+const TOUCH_CANCEL_THRESHOLD = 8;
+const DROP_BOUNCE_MS = 300;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
     await Haptics.impact({ style });
-  } catch (e) {
+  } catch {
     // Haptics not available on web
   }
 };
 
-/** Clamp total minutes to 0..1430 (00:00 – 23:50) */
-const clampMinutes = (m: number) => Math.max(0, Math.min(1430, m));
+/** Clamp total minutes to 0..1435 (00:00 – 23:55) */
+const clampMinutes = (m: number) => Math.max(0, Math.min(1435, m));
 
 /** Convert "HH:mm" → total minutes */
 const timeToMinutes = (t: string): number => {
-  const [h, m] = t.split(':').map(Number);
+  const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 };
 
@@ -28,7 +30,7 @@ const minutesToTime = (totalMin: number): string => {
   const clamped = clampMinutes(totalMin);
   const h = Math.floor(clamped / 60);
   const m = clamped % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
 interface UseTimelineDragOptions {
@@ -36,24 +38,40 @@ interface UseTimelineDragOptions {
   onDrop: (taskId: string, newTime: string) => void;
 }
 
+interface DragHandleProps {
+  onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
+  onTouchStart: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchMove: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchEnd: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchCancel: (e: React.TouchEvent<HTMLElement>) => void;
+}
+
+interface WindowListeners {
+  pointermove?: (e: PointerEvent) => void;
+  pointerup?: () => void;
+  pointercancel?: () => void;
+  touchmove?: (e: TouchEvent) => void;
+  touchend?: () => void;
+  touchcancel?: () => void;
+}
+
 export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions) {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [previewTime, setPreviewTime] = useState<string | null>(null);
-  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
+  const dragOffsetY = useMotionValue(0);
 
-  // Refs (no re-renders)
-  const draggingRef = useRef<string | null>(null);
-  const originalTimeRef = useRef<string>('09:00');
+  // Refs (no drag-frame re-renders)
+  const draggingTaskIdRef = useRef<string | null>(null);
+  const originalTimeRef = useRef<string>("09:00");
   const originalMinutesRef = useRef(540);
   const dragStartYRef = useRef(0);
-  const currentYRef = useRef(0);
   const lastSnappedMinutesRef = useRef(540);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const isLongPressActiveRef = useRef(false);
-  const rafRef = useRef<number | null>(null);
-  const justDroppedIdRef = useRef<string | null>(null);
-  const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
+  const pendingTouchDragRef = useRef<{ taskId: string; scheduledTime: string; startY: number } | null>(null);
+  const windowListenersRef = useRef<WindowListeners>({});
 
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -63,206 +81,227 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     scrollSpeed: 8,
   });
 
-  // --- Move handlers (window-level for smooth tracking) ---
-  const handleMove = useCallback((clientY: number) => {
-    if (!draggingRef.current) return;
-
-    currentYRef.current = clientY;
-    const deltaY = clientY - dragStartYRef.current;
-
-    // Throttled offset update
-    if (!rafRef.current) {
-      rafRef.current = requestAnimationFrame(() => {
-        setDragOffsetY(currentYRef.current - dragStartYRef.current);
-        rafRef.current = null;
-      });
+  const clearTouchHoldTimer = useCallback(() => {
+    if (touchHoldTimerRef.current) {
+      clearTimeout(touchHoldTimerRef.current);
+      touchHoldTimerRef.current = null;
     }
-
-    updateAutoscroll(clientY);
-
-    // Snap to 10-min increments
-    const deltaMinutes = Math.round(deltaY / PIXELS_PER_10MIN) * 10;
-    const newMinutes = clampMinutes(originalMinutesRef.current + deltaMinutes);
-
-    if (newMinutes !== lastSnappedMinutesRef.current) {
-      lastSnappedMinutesRef.current = newMinutes;
-      const newTime = minutesToTime(newMinutes);
-      setPreviewTime(newTime);
-      triggerHaptic(ImpactStyle.Light);
-    }
-  }, [updateAutoscroll]);
-
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    handleMove(e.clientY);
-  }, [handleMove]);
-
-  const handleTouchMoveWindow = useCallback((e: TouchEvent) => {
-    if (!draggingRef.current) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    if (touch) handleMove(touch.clientY);
-  }, [handleMove]);
-
-  // --- End handlers ---
-  const cleanup = useCallback(() => {
-    window.removeEventListener('pointermove', handlePointerMove);
-    window.removeEventListener('pointerup', handleEnd);
-    window.removeEventListener('pointercancel', handleEnd);
-    window.removeEventListener('touchmove', handleTouchMoveWindow);
-    window.removeEventListener('touchend', handleTouchEnd);
-    window.removeEventListener('touchcancel', handleTouchEnd);
   }, []);
+
+  const clearDropResetTimer = useCallback(() => {
+    if (dropResetTimerRef.current) {
+      clearTimeout(dropResetTimerRef.current);
+      dropResetTimerRef.current = null;
+    }
+  }, []);
+
+  const removeWindowListeners = useCallback(() => {
+    const listeners = windowListenersRef.current;
+    if (listeners.pointermove) window.removeEventListener("pointermove", listeners.pointermove);
+    if (listeners.pointerup) window.removeEventListener("pointerup", listeners.pointerup);
+    if (listeners.pointercancel) window.removeEventListener("pointercancel", listeners.pointercancel);
+    if (listeners.touchmove) window.removeEventListener("touchmove", listeners.touchmove);
+    if (listeners.touchend) window.removeEventListener("touchend", listeners.touchend);
+    if (listeners.touchcancel) window.removeEventListener("touchcancel", listeners.touchcancel);
+    windowListenersRef.current = {};
+  }, []);
+
+  const handleMove = useCallback(
+    (clientY: number) => {
+      if (!draggingTaskIdRef.current) return;
+
+      const deltaY = clientY - dragStartYRef.current;
+      dragOffsetY.set(deltaY);
+      updateAutoscroll(clientY);
+
+      const deltaMinutes = Math.round(deltaY / PIXELS_PER_5_MIN) * 5;
+      const newMinutes = clampMinutes(originalMinutesRef.current + deltaMinutes);
+
+      if (newMinutes !== lastSnappedMinutesRef.current) {
+        lastSnappedMinutesRef.current = newMinutes;
+        setPreviewTime(minutesToTime(newMinutes));
+        void triggerHaptic(ImpactStyle.Light);
+      }
+    },
+    [dragOffsetY, updateAutoscroll],
+  );
 
   const finishDrag = useCallback(() => {
-    const taskId = draggingRef.current;
-    const finalTime = lastSnappedMinutesRef.current;
+    removeWindowListeners();
+    clearTouchHoldTimer();
+    pendingTouchDragRef.current = null;
+    touchStartPosRef.current = null;
 
-    if (taskId) {
-      const newTimeStr = minutesToTime(finalTime);
-      triggerHaptic(ImpactStyle.Medium);
-      onDrop(taskId, newTimeStr);
+    const taskId = draggingTaskIdRef.current;
+    const finalTime = minutesToTime(lastSnappedMinutesRef.current);
+    const didChange = taskId && finalTime !== originalTimeRef.current;
 
-      // Bounce animation trigger
-      justDroppedIdRef.current = taskId;
+    if (taskId && didChange) {
+      void triggerHaptic(ImpactStyle.Medium);
+      onDrop(taskId, finalTime);
       setJustDroppedId(taskId);
-      setTimeout(() => {
-        justDroppedIdRef.current = null;
+      clearDropResetTimer();
+      dropResetTimerRef.current = setTimeout(() => {
         setJustDroppedId(null);
-      }, 300);
+      }, DROP_BOUNCE_MS);
     }
 
-    draggingRef.current = null;
+    draggingTaskIdRef.current = null;
     setDraggingTaskId(null);
     setPreviewTime(null);
-    setDragOffsetY(0);
-    isLongPressActiveRef.current = false;
+    dragOffsetY.set(0);
     stopScroll();
-    cleanup();
-  }, [onDrop, stopScroll, cleanup]);
+  }, [clearDropResetTimer, clearTouchHoldTimer, dragOffsetY, onDrop, removeWindowListeners, stopScroll]);
 
-  // We need stable references for window listeners
-  const handleEnd = useCallback(() => { finishDrag(); }, [finishDrag]);
-  const handleTouchEnd = useCallback(() => { finishDrag(); }, [finishDrag]);
+  const startDrag = useCallback(
+    (taskId: string, scheduledTime: string, startY: number) => {
+      if (draggingTaskIdRef.current) return;
 
-  // --- Start drag ---
-  const startDrag = useCallback((taskId: string, scheduledTime: string, startY: number) => {
-    draggingRef.current = taskId;
-    originalTimeRef.current = scheduledTime;
-    originalMinutesRef.current = timeToMinutes(scheduledTime);
-    lastSnappedMinutesRef.current = timeToMinutes(scheduledTime);
-    dragStartYRef.current = startY;
-    currentYRef.current = startY;
+      removeWindowListeners();
+      clearTouchHoldTimer();
 
-    setDraggingTaskId(taskId);
-    setPreviewTime(scheduledTime);
-    setDragOffsetY(0);
+      draggingTaskIdRef.current = taskId;
+      originalTimeRef.current = scheduledTime;
+      originalMinutesRef.current = timeToMinutes(scheduledTime);
+      lastSnappedMinutesRef.current = originalMinutesRef.current;
+      dragStartYRef.current = startY;
 
-    triggerHaptic(ImpactStyle.Medium);
+      setDraggingTaskId(taskId);
+      setPreviewTime(scheduledTime);
+      dragOffsetY.set(0);
 
-    // Add window-level listeners for smooth tracking
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handleEnd);
-    window.addEventListener('pointercancel', handleEnd);
-    window.addEventListener('touchmove', handleTouchMoveWindow, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
-    window.addEventListener('touchcancel', handleTouchEnd);
-  }, [handlePointerMove, handleEnd, handleTouchMoveWindow, handleTouchEnd]);
+      void triggerHaptic(ImpactStyle.Medium);
 
-  // --- Long press detection (touch) ---
-  const clearLongPress = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    touchStartPosRef.current = null;
-  }, []);
+      const pointerMove = (e: PointerEvent) => {
+        handleMove(e.clientY);
+      };
+      const pointerEnd = () => {
+        finishDrag();
+      };
+      const touchMove = (e: TouchEvent) => {
+        if (!draggingTaskIdRef.current) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        if (touch) {
+          handleMove(touch.clientY);
+        }
+      };
+      const touchEnd = () => {
+        finishDrag();
+      };
 
-  const handleTouchStart = useCallback((e: React.TouchEvent, taskId: string, scheduledTime: string) => {
-    if (draggingRef.current) return;
+      windowListenersRef.current = {
+        pointermove: pointerMove,
+        pointerup: pointerEnd,
+        pointercancel: pointerEnd,
+        touchmove: touchMove,
+        touchend: touchEnd,
+        touchcancel: touchEnd,
+      };
 
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="checkbox"]') || target.closest('[data-interactive]')) {
-      return;
-    }
+      window.addEventListener("pointermove", pointerMove);
+      window.addEventListener("pointerup", pointerEnd);
+      window.addEventListener("pointercancel", pointerEnd);
+      window.addEventListener("touchmove", touchMove, { passive: false });
+      window.addEventListener("touchend", touchEnd);
+      window.addEventListener("touchcancel", touchEnd);
+    },
+    [clearTouchHoldTimer, dragOffsetY, finishDrag, handleMove, removeWindowListeners],
+  );
 
-    const touch = e.touches[0];
-    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+  const beginTouchHold = useCallback(
+    (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
+      if (draggingTaskIdRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
 
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressActiveRef.current = true;
-      startDrag(taskId, scheduledTime, touch.clientY);
-    }, LONG_PRESS_DURATION);
-  }, [startDrag]);
+      e.stopPropagation();
 
-  const handleTouchMoveLocal = useCallback((e: React.TouchEvent) => {
-    // If dragging, window handler takes care of it
-    if (isLongPressActiveRef.current || draggingRef.current) return;
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      pendingTouchDragRef.current = { taskId, scheduledTime, startY: touch.clientY };
 
-    if (!touchStartPosRef.current) return;
-    const touch = e.touches[0];
-    const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
-    if (deltaY > SCROLL_CANCEL_THRESHOLD) {
-      clearLongPress();
-    }
-  }, [clearLongPress]);
+      clearTouchHoldTimer();
+      touchHoldTimerRef.current = setTimeout(() => {
+        const pending = pendingTouchDragRef.current;
+        if (!pending) return;
+        startDrag(pending.taskId, pending.scheduledTime, pending.startY);
+      }, TOUCH_HOLD_MS);
+    },
+    [clearTouchHoldTimer, startDrag],
+  );
 
-  const handleTouchEndLocal = useCallback(() => {
-    clearLongPress();
-    isLongPressActiveRef.current = false;
-  }, [clearLongPress]);
+  const moveTouchHold = useCallback(
+    (e: React.TouchEvent<HTMLElement>) => {
+      if (draggingTaskIdRef.current) return;
+      if (!touchStartPosRef.current) return;
 
-  // --- Pointer (mouse) long press ---
-  const handlePointerDown = useCallback((e: React.PointerEvent, taskId: string, scheduledTime: string) => {
-    if (draggingRef.current || e.pointerType === 'touch') return;
+      e.stopPropagation();
 
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="checkbox"]') || target.closest('[data-interactive]')) {
-      return;
-    }
+      const touch = e.touches[0];
+      if (!touch) return;
 
-    touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+      if (dx > TOUCH_CANCEL_THRESHOLD || dy > TOUCH_CANCEL_THRESHOLD) {
+        clearTouchHoldTimer();
+        pendingTouchDragRef.current = null;
+        touchStartPosRef.current = null;
+      }
+    },
+    [clearTouchHoldTimer],
+  );
 
-    longPressTimerRef.current = setTimeout(() => {
-      isLongPressActiveRef.current = true;
+  const endTouchHold = useCallback(
+    (e: React.TouchEvent<HTMLElement>) => {
+      e.stopPropagation();
+      if (!draggingTaskIdRef.current) {
+        clearTouchHoldTimer();
+        pendingTouchDragRef.current = null;
+        touchStartPosRef.current = null;
+      }
+    },
+    [clearTouchHoldTimer],
+  );
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
+      if (draggingTaskIdRef.current) return;
+      if (e.pointerType === "touch") return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
       startDrag(taskId, scheduledTime, e.clientY);
-    }, LONG_PRESS_DURATION);
-  }, [startDrag]);
+    },
+    [startDrag],
+  );
 
-  const handlePointerUp = useCallback(() => {
-    if (!isLongPressActiveRef.current) {
-      clearLongPress();
-    }
-  }, [clearLongPress]);
+  const getDragHandleProps = useCallback(
+    (taskId: string, scheduledTime: string): DragHandleProps => ({
+      onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
+      onTouchStart: (e) => beginTouchHold(e, taskId, scheduledTime),
+      onTouchMove: moveTouchHold,
+      onTouchEnd: endTouchHold,
+      onTouchCancel: endTouchHold,
+    }),
+    [beginTouchHold, endTouchHold, handlePointerDown, moveTouchHold],
+  );
 
-  const handlePointerCancel = useCallback(() => {
-    clearLongPress();
-  }, [clearLongPress]);
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      cleanup();
-      clearLongPress();
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      removeWindowListeners();
+      clearTouchHoldTimer();
+      clearDropResetTimer();
+      stopScroll();
     };
-  }, [cleanup, clearLongPress]);
+  }, [clearDropResetTimer, clearTouchHoldTimer, removeWindowListeners, stopScroll]);
 
   return {
     draggingTaskId,
     previewTime,
-    dragOffsetY,
+    dragOffsetY: dragOffsetY as MotionValue<number>,
     justDroppedId,
     isDragging: draggingTaskId !== null,
-
-    // Touch handlers (pass to each row)
-    getRowHandlers: (taskId: string, scheduledTime: string) => ({
-      onTouchStart: (e: React.TouchEvent) => handleTouchStart(e, taskId, scheduledTime),
-      onTouchMove: handleTouchMoveLocal,
-      onTouchEnd: handleTouchEndLocal,
-      onTouchCancel: handleTouchEndLocal,
-      onPointerDown: (e: React.PointerEvent) => handlePointerDown(e, taskId, scheduledTime),
-      onPointerUp: handlePointerUp,
-      onPointerCancel: handlePointerCancel,
-    }),
+    getDragHandleProps,
   };
 }

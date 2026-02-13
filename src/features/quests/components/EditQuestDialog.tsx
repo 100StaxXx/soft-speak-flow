@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { format, isToday, addMinutes, parse } from "date-fns";
+import { format, isToday, addMinutes } from "date-fns";
 import { X, ArrowLeft, Clock, ChevronRight, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain, CalendarPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +27,13 @@ import { useQuestImagePicker } from "@/hooks/useQuestImagePicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import { DIFFICULTY_COLORS, DifficultyIconMap, formatTime12, TIME_SLOTS, DURATION_OPTIONS } from "@/components/quest-shared";
 import type { QuestDifficulty } from "../types";
+import {
+  normalizeQuestDifficulty,
+  normalizeScheduledTime,
+  normalizeTaskDate,
+  parseTaskDate,
+} from "../utils/editQuestDialogNormalization";
+import { parseScheduledTime } from "@/utils/scheduledTime";
 
 interface Task {
   id: string;
@@ -114,14 +121,18 @@ export function EditQuestDialog({
   useEffect(() => {
     if (task && open) {
       setTaskText(task.task_text);
-      setTaskDate(task.task_date || null);
-      setDifficulty((task.difficulty as QuestDifficulty) || "medium");
-      setScheduledTime(task.scheduled_time || null);
+      setTaskDate(normalizeTaskDate(task.task_date));
+      setDifficulty(normalizeQuestDifficulty(task.difficulty));
+      setScheduledTime(normalizeScheduledTime(task.scheduled_time));
       setEstimatedDuration(task.estimated_duration ?? 30);
       setRecurrencePattern(task.recurrence_pattern || null);
-      setRecurrenceDays(task.recurrence_days || []);
-      setReminderEnabled(task.reminder_enabled || false);
-      setReminderMinutesBefore(task.reminder_minutes_before || 15);
+      setRecurrenceDays(Array.isArray(task.recurrence_days) ? task.recurrence_days : []);
+      setReminderEnabled(Boolean(task.reminder_enabled));
+      setReminderMinutesBefore(
+        typeof task.reminder_minutes_before === "number" && task.reminder_minutes_before > 0
+          ? task.reminder_minutes_before
+          : 15,
+      );
       setMoreInformation(task.notes || null);
       setImageUrl(task.image_url || null);
       setLocation(task.location || null);
@@ -146,7 +157,8 @@ export function EditQuestDialog({
 
   const endTime = useMemo(() => {
     if (!scheduledTime || !estimatedDuration) return null;
-    const base = parse(scheduledTime, "HH:mm", new Date());
+    const base = parseScheduledTime(scheduledTime);
+    if (!base) return null;
     return format(addMinutes(base, estimatedDuration), "HH:mm");
   }, [scheduledTime, estimatedDuration]);
 
@@ -159,31 +171,33 @@ export function EditQuestDialog({
     return `${estimatedDuration} min`;
   }, [estimatedDuration]);
 
+  const parsedTaskDate = useMemo(() => parseTaskDate(taskDate), [taskDate]);
+
   const summaryLine = useMemo(() => {
     const dur = durationLabel;
-    if (taskDate) {
-      const d = new Date(taskDate + "T00:00:00");
+    if (parsedTaskDate) {
+      const d = parsedTaskDate;
       if (isToday(d)) return `${dur} · Today`;
       return `${dur} · ${format(d, "EEE, MMM d")}`;
     }
     return `${dur} · Inbox`;
-  }, [durationLabel, taskDate]);
+  }, [durationLabel, parsedTaskDate]);
 
   const colors = DIFFICULTY_COLORS[difficulty];
-  const dateObj = taskDate ? new Date(taskDate + "T00:00:00") : new Date();
+  const dateObj = parsedTaskDate ?? new Date();
 
   const handleSave = useCallback(async () => {
     if (!task || !taskText.trim()) return;
     await onSave(task.id, {
       task_text: taskText.trim(),
-      task_date: taskDate,
+      task_date: normalizeTaskDate(taskDate),
       difficulty,
-      scheduled_time: scheduledTime || null,
+      scheduled_time: normalizeScheduledTime(scheduledTime),
       estimated_duration: estimatedDuration,
       recurrence_pattern: recurrencePattern,
-      recurrence_days: recurrenceDays,
+      recurrence_days: Array.isArray(recurrenceDays) ? recurrenceDays : [],
       reminder_enabled: reminderEnabled,
-      reminder_minutes_before: reminderMinutesBefore,
+      reminder_minutes_before: Number.isFinite(reminderMinutesBefore) && reminderMinutesBefore > 0 ? reminderMinutesBefore : 15,
       notes: moreInformation,
       category: task.category || null,
       image_url: imageUrl,
@@ -218,6 +232,10 @@ export function EditQuestDialog({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden">
+        <SheetTitle className="sr-only">Edit Quest</SheetTitle>
+        <SheetDescription className="sr-only">
+          Update this quest details, schedule, and reminders.
+        </SheetDescription>
 
         {/* Header Banner - difficulty colored, editable title */}
         <div className={cn("relative px-5 pt-3 pb-3 flex-shrink-0", colors.bg)}>
@@ -374,7 +392,7 @@ export function EditQuestDialog({
                 onClick={() => {
                   if (!scheduledTime) {
                     const now = new Date();
-                    const rm = Math.ceil(now.getMinutes() / 15) * 15;
+                    const rm = Math.ceil(now.getMinutes() / 5) * 5;
                     const rounded = new Date(now);
                     rounded.setMinutes(rm, 0, 0);
                     if (rm >= 60) rounded.setHours(rounded.getHours() + 1, 0, 0, 0);

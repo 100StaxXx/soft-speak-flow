@@ -1,8 +1,9 @@
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, Sun } from "lucide-react";
 import { CalendarTask } from "@/types/quest";
+import { normalizeScheduledTime, parseScheduledTime } from "@/utils/scheduledTime";
 
 interface TimelineTaskCardProps {
   task: CalendarTask;
@@ -23,7 +24,8 @@ const CATEGORY_CONFIG: Record<string, { icon: typeof Brain; bg: string; iconColo
 };
 
 function formatTimeDisplay(time: string): string {
-  const parsed = parse(time, "HH:mm", new Date());
+  const parsed = parseScheduledTime(time);
+  if (!parsed) return normalizeScheduledTime(time) ?? time;
   const hour = parsed.getHours();
   const formattedTime = format(parsed, "h:mm a");
   
@@ -115,7 +117,8 @@ export function TimelineTaskCard({
 
   // Display time (show preview if dragging)
   const displayTime = previewTime || task.scheduled_time;
-  const isMorning = displayTime ? parse(displayTime, "HH:mm", new Date()).getHours() < 12 : false;
+  const parsedDisplayTime = displayTime ? parseScheduledTime(displayTime) : null;
+  const isMorning = !!(parsedDisplayTime && parsedDisplayTime.getHours() < 12);
 
   return (
     <div

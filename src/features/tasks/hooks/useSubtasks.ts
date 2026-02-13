@@ -60,6 +60,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
     },
     onError: () => {
       toast.error('Failed to add subtask');
@@ -80,6 +81,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
     },
   });
 
@@ -94,6 +96,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
     },
   });
 
@@ -108,6 +111,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
     },
     onError: () => {
       toast.error('Failed to update subtask');
@@ -134,6 +138,7 @@ export const useSubtasks = (parentTaskId: string | null) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subtasks', parentTaskId] });
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       toast.success('Subtasks added!');
     },
     onError: () => {

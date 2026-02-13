@@ -32,6 +32,18 @@ export const useDailyTasksRealtime = () => {
           queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subtasks',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+        }
+      )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           logger.warn('Daily tasks realtime subscription error', { status, error: err?.message });
