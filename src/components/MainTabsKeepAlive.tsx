@@ -31,13 +31,6 @@ const TAB_COMPONENTS: Record<MainTabPath, ComponentType> = {
 export const isMainTabPath = (pathname: string): pathname is MainTabPath =>
   TAB_ORDER.includes(pathname as MainTabPath);
 
-const initialScrollPositions: Record<MainTabPath, number> = {
-  "/mentor": 0,
-  "/inbox": 0,
-  "/journeys": 0,
-  "/companion": 0,
-};
-
 interface MainTabsKeepAliveProps {
   activePath: MainTabPath;
   transitionPreset?: "none" | "fade-slide";
@@ -55,10 +48,7 @@ export const MainTabsKeepAlive = memo(({
   const [mountedTabs, setMountedTabs] = useState<MainTabPath[]>([activePath]);
   const [exitingPath, setExitingPath] = useState<MainTabPath | null>(null);
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
-  const scrollPathRef = useRef<MainTabPath>(activePath);
   const transitionPathRef = useRef<MainTabPath>(activePath);
-  const visitedTabsRef = useRef<Set<MainTabPath>>(new Set([activePath]));
-  const scrollPositionsRef = useRef<Record<MainTabPath, number>>(initialScrollPositions);
   const exitTimerRef = useRef<number | null>(null);
   const enableTransitions = transitionPreset === "fade-slide" && capabilities.enableTabTransitions;
 
@@ -126,20 +116,9 @@ export const MainTabsKeepAlive = memo(({
   }, [activePath]);
 
   useLayoutEffect(() => {
-    const previousPath = scrollPathRef.current;
-    if (previousPath !== activePath) {
-      scrollPositionsRef.current[previousPath] = window.scrollY;
-    }
-
-    const wasVisited = visitedTabsRef.current.has(activePath);
-    const targetY = wasVisited ? scrollPositionsRef.current[activePath] ?? 0 : 0;
-
     const frame = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     });
-
-    visitedTabsRef.current.add(activePath);
-    scrollPathRef.current = activePath;
 
     return () => window.cancelAnimationFrame(frame);
   }, [activePath]);

@@ -14,9 +14,9 @@ interface TimelineTaskRowProps {
 const formatTime12h = (time: string) => {
   const [hours, minutes] = time.split(':');
   const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'p' : 'a';
+  const ampm = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 || 12;
-  return `${displayHour}:${minutes}${ampm}`;
+  return `${displayHour}:${minutes} ${ampm}`;
 };
 
 export function TimelineTaskRow({
@@ -32,51 +32,51 @@ export function TimelineTaskRow({
   const isOverridden = overrideTime != null;
 
   return (
-    <div className={cn("relative flex gap-2", isDragTarget && "rounded-lg")}>
+    <div className={cn("relative flex gap-3", isDragTarget && "rounded-2xl bg-black/30")}>
       {/* Time label column - fixed width */}
-      <div className="w-9 flex-shrink-0 pt-[22px] text-left">
+      <div className="w-[84px] flex-shrink-0 pt-[18px] text-left">
         {displayTime ? (
           <span className={cn(
-            "text-[10px] font-medium leading-none transition-colors",
+            "text-[16px] italic leading-none transition-colors",
             isOverridden
-              ? "text-primary font-bold"
-              : "text-muted-foreground"
+              ? "text-white font-semibold"
+              : "text-white/70"
           )}>
             {formatTime12h(displayTime)}
           </span>
         ) : label ? (
-          <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-white/45">
             {label}
           </span>
         ) : null}
       </div>
 
       {/* Timeline dot + line */}
-      <div className="relative flex flex-col items-center flex-shrink-0 w-3">
+      <div className="relative flex flex-col items-center flex-shrink-0 w-6">
         {/* Top segment of line */}
         {showLine && (
-          <div className="w-px flex-1 border-l border-dashed border-border/50 min-h-[8px]" />
+          <div className="w-px flex-1 border-l border-dashed border-[#ef8a8a]/60 min-h-[8px]" />
         )}
         {!showLine && <div className="flex-1 min-h-[8px]" />}
         
         {/* Dot */}
         <div className={cn(
-          "w-2 h-2 rounded-full flex-shrink-0 z-10",
+          "w-3.5 h-3.5 rounded-full flex-shrink-0 z-10 border",
           time 
-            ? "bg-primary/70 ring-2 ring-primary/20" 
-            : "bg-muted-foreground/40 ring-2 ring-muted/30"
+            ? "bg-[#ef8a8a] border-[#ef8a8a] ring-4 ring-[#ef8a8a]/30" 
+            : "bg-transparent border-white/35"
         )} />
         
         {/* Bottom segment of line */}
         {!isLast ? (
-          <div className="w-px flex-1 border-l border-dashed border-border/50 min-h-[8px]" />
+          <div className="w-px flex-1 border-l border-dashed border-[#ef8a8a]/60 min-h-[8px]" />
         ) : (
           <div className="flex-1 min-h-[8px]" />
         )}
       </div>
 
       {/* Task card */}
-      <div className="flex-1 min-w-0 py-1">
+      <div className="flex-1 min-w-0 py-1.5">
         {children}
       </div>
     </div>

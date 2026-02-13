@@ -3,6 +3,8 @@ import { format, addDays, startOfDay } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { normalizeTaskSchedulingState } from '@/utils/taskSchedulingRules';
 
 interface WeeklyTask {
   id: string;
@@ -12,6 +14,8 @@ interface WeeklyTask {
   estimated_duration: number | null;
   scheduled_time: string | null;
   is_main_quest: boolean;
+  habit_source_id?: string | null;
+  source?: string | null;
 }
 
 interface RescheduleAction {
@@ -116,7 +120,14 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
     if (incompleteTasks.length === 0) return;
 
     const tasksPerDay = Math.ceil(incompleteTasks.length / 7);
-    const updates: { id: string; task_date: string }[] = [];
+    const updates: Array<{
+      id: string;
+      task_date: string | null;
+      scheduled_time: string | null;
+      source: string | null;
+      previousSource: string | null;
+      normalizedToInbox: boolean;
+    }> = [];
 
     let taskIndex = 0;
     for (let dayIndex = 0; dayIndex < 7 && taskIndex < incompleteTasks.length; dayIndex++) {
@@ -125,7 +136,20 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
       for (let i = 0; i < tasksPerDay && taskIndex < incompleteTasks.length; i++) {
         const task = incompleteTasks[taskIndex];
         if (task.task_date !== targetDate) {
-          updates.push({ id: task.id, task_date: targetDate });
+          const normalized = normalizeTaskSchedulingState({
+            task_date: targetDate,
+            scheduled_time: task.scheduled_time ?? null,
+            habit_source_id: task.habit_source_id ?? null,
+            source: task.source ?? null,
+          });
+          updates.push({
+            id: task.id,
+            task_date: normalized.task_date,
+            scheduled_time: normalized.scheduled_time,
+            source: normalized.source ?? null,
+            previousSource: task.source ?? null,
+            normalizedToInbox: normalized.normalizedToInbox,
+          });
         }
         taskIndex++;
       }
@@ -146,22 +170,29 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
     setIsRescheduling(true);
     try {
-      // Batch by date for efficiency
-      const byDate = updates.reduce((acc, u) => {
-        (acc[u.task_date] ||= []).push(u.id);
-        return acc;
-      }, {} as Record<string, string[]>);
+      for (const update of updates) {
+        const updateData: Record<string, unknown> = {
+          task_date: update.task_date,
+          scheduled_time: update.scheduled_time,
+        };
+        if (update.source !== update.previousSource) {
+          updateData.source = update.source;
+        }
 
-      for (const [date, ids] of Object.entries(byDate)) {
         await supabase
           .from('daily_tasks')
-          .update({ task_date: date })
-          .in('id', ids)
+          .update(updateData)
+          .eq('id', update.id)
           .eq('user_id', user.id);
       }
 
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      const normalizedCount = updates.filter(update => update.normalizedToInbox).length;
+      if (normalizedCount > 0) {
+        toast(`${normalizedCount} quest${normalizedCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
+      }
     } catch {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -183,10 +214,23 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
     if (weekendTasks.length === 0) return;
 
     const weekdayDates = [0, 1, 2, 3, 4].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
-    const updates = weekendTasks.map((task, i) => ({
-      id: task.id,
-      task_date: weekdayDates[i % 5]
-    }));
+    const updates = weekendTasks.map((task, i) => {
+      const normalized = normalizeTaskSchedulingState({
+        task_date: weekdayDates[i % 5],
+        scheduled_time: task.scheduled_time ?? null,
+        habit_source_id: task.habit_source_id ?? null,
+        source: task.source ?? null,
+      });
+
+      return {
+        id: task.id,
+        task_date: normalized.task_date,
+        scheduled_time: normalized.scheduled_time,
+        source: normalized.source ?? null,
+        previousSource: task.source ?? null,
+        normalizedToInbox: normalized.normalizedToInbox,
+      };
+    });
 
     // Optimistic update
     const updateMap = new Map(updates.map(u => [u.id, u.task_date]));
@@ -201,21 +245,29 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
     setIsRescheduling(true);
     try {
-      const byDate = updates.reduce((acc, u) => {
-        (acc[u.task_date] ||= []).push(u.id);
-        return acc;
-      }, {} as Record<string, string[]>);
+      for (const update of updates) {
+        const updateData: Record<string, unknown> = {
+          task_date: update.task_date,
+          scheduled_time: update.scheduled_time,
+        };
+        if (update.source !== update.previousSource) {
+          updateData.source = update.source;
+        }
 
-      for (const [date, ids] of Object.entries(byDate)) {
         await supabase
           .from('daily_tasks')
-          .update({ task_date: date })
-          .in('id', ids)
+          .update(updateData)
+          .eq('id', update.id)
           .eq('user_id', user.id);
       }
 
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      const normalizedCount = updates.filter(update => update.normalizedToInbox).length;
+      if (normalizedCount > 0) {
+        toast(`${normalizedCount} quest${normalizedCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
+      }
     } catch {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -228,7 +280,14 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
     if (!user?.id) return;
 
     const today = startOfDay(startDate);
-    const updates: { id: string; task_date: string }[] = [];
+    const updates: Array<{
+      id: string;
+      task_date: string | null;
+      scheduled_time: string | null;
+      source: string | null;
+      previousSource: string | null;
+      normalizedToInbox: boolean;
+    }> = [];
     const laterDates = [3, 4, 5, 6].map(offset => format(addDays(today, offset), 'yyyy-MM-dd'));
     let laterIndex = 0;
 
@@ -239,7 +298,20 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
       if (dayTasks.length > 4) {
         const excess = dayTasks.slice(4).filter(t => !t.is_main_quest);
         for (const task of excess) {
-          updates.push({ id: task.id, task_date: laterDates[laterIndex % 4] });
+          const normalized = normalizeTaskSchedulingState({
+            task_date: laterDates[laterIndex % 4],
+            scheduled_time: task.scheduled_time ?? null,
+            habit_source_id: task.habit_source_id ?? null,
+            source: task.source ?? null,
+          });
+          updates.push({
+            id: task.id,
+            task_date: normalized.task_date,
+            scheduled_time: normalized.scheduled_time,
+            source: normalized.source ?? null,
+            previousSource: task.source ?? null,
+            normalizedToInbox: normalized.normalizedToInbox,
+          });
           laterIndex++;
         }
       }
@@ -260,21 +332,29 @@ export function useWeeklyReschedule(weeklyTasks: WeeklyTask[], startDate: Date =
 
     setIsRescheduling(true);
     try {
-      const byDate = updates.reduce((acc, u) => {
-        (acc[u.task_date] ||= []).push(u.id);
-        return acc;
-      }, {} as Record<string, string[]>);
+      for (const update of updates) {
+        const updateData: Record<string, unknown> = {
+          task_date: update.task_date,
+          scheduled_time: update.scheduled_time,
+        };
+        if (update.source !== update.previousSource) {
+          updateData.source = update.source;
+        }
 
-      for (const [date, ids] of Object.entries(byDate)) {
         await supabase
           .from('daily_tasks')
-          .update({ task_date: date })
-          .in('id', ids)
+          .update(updateData)
+          .eq('id', update.id)
           .eq('user_id', user.id);
       }
 
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      const normalizedCount = updates.filter(update => update.normalizedToInbox).length;
+      if (normalizedCount > 0) {
+        toast(`${normalizedCount} quest${normalizedCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
+      }
     } catch {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });

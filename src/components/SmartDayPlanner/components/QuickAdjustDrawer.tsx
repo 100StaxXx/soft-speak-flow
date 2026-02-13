@@ -24,6 +24,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  normalizeTaskSchedulingState,
+  normalizeTaskSchedulingUpdate,
+} from '@/utils/taskSchedulingRules';
 
 interface Task {
   id: string;
@@ -126,11 +130,37 @@ export function QuickAdjustDrawer({
 
       // Apply the adjustments returned by the edge function
       if (data?.adjustments && Array.isArray(data.adjustments)) {
+        let normalizedToInboxCount = 0;
         for (const adj of data.adjustments) {
           if (adj.action === 'update' && adj.taskId && adj.updates) {
+            const updatePayload = { ...adj.updates } as Record<string, unknown>;
+
+            if (Object.prototype.hasOwnProperty.call(updatePayload, 'task_date')
+              || Object.prototype.hasOwnProperty.call(updatePayload, 'scheduled_time')) {
+              const { data: existing, error: existingError } = await supabase
+                .from('daily_tasks')
+                .select('task_date, scheduled_time, habit_source_id, source')
+                .eq('id', adj.taskId)
+                .maybeSingle();
+
+              if (existingError) throw existingError;
+              if (existing) {
+                const normalized = normalizeTaskSchedulingUpdate(existing, {
+                  task_date: (updatePayload.task_date as string | null | undefined),
+                  scheduled_time: (updatePayload.scheduled_time as string | null | undefined),
+                });
+                updatePayload.task_date = normalized.task_date;
+                updatePayload.scheduled_time = normalized.scheduled_time;
+                if (normalized.source !== existing.source) {
+                  updatePayload.source = normalized.source;
+                }
+                if (normalized.normalizedToInbox) normalizedToInboxCount += 1;
+              }
+            }
+
             await supabase
               .from('daily_tasks')
-              .update(adj.updates)
+              .update(updatePayload)
               .eq('id', adj.taskId);
           } else if (adj.action === 'delete' && adj.taskId) {
             await supabase
@@ -140,11 +170,39 @@ export function QuickAdjustDrawer({
           } else if (adj.action === 'move_to_tomorrow' && adj.taskId) {
             const tomorrow = new Date(selectedDate);
             tomorrow.setDate(tomorrow.getDate() + 1);
+            const { data: existing, error: existingError } = await supabase
+              .from('daily_tasks')
+              .select('task_date, scheduled_time, habit_source_id, source')
+              .eq('id', adj.taskId)
+              .maybeSingle();
+            if (existingError) throw existingError;
+            if (!existing) continue;
+
+            const normalized = normalizeTaskSchedulingState({
+              task_date: format(tomorrow, 'yyyy-MM-dd'),
+              scheduled_time: existing.scheduled_time,
+              habit_source_id: existing.habit_source_id,
+              source: existing.source,
+            });
+            if (normalized.normalizedToInbox) normalizedToInboxCount += 1;
+
+            const updatePayload: Record<string, unknown> = {
+              task_date: normalized.task_date,
+              scheduled_time: normalized.scheduled_time,
+            };
+            if (normalized.source !== existing.source) {
+              updatePayload.source = normalized.source;
+            }
+
             await supabase
               .from('daily_tasks')
-              .update({ task_date: format(tomorrow, 'yyyy-MM-dd') })
+              .update(updatePayload)
               .eq('id', adj.taskId);
           }
+        }
+
+        if (normalizedToInboxCount > 0) {
+          toast(`${normalizedToInboxCount} quest${normalizedToInboxCount === 1 ? '' : 's'} stayed in Inbox (time required).`);
         }
       }
 

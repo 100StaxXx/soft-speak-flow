@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
-import { format, differenceInDays } from "date-fns";
+import { differenceInDays } from "date-fns";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { toast } from "sonner";
 import { 
   Flame, 
-  Trophy, 
   Plus,
   Check,
   Circle,
@@ -22,8 +22,7 @@ import {
   Brain,
   Heart,
   Dumbbell,
-  GripVertical,
-  ArrowUpDown,
+  User,
   MoreHorizontal,
   CalendarPlus,
 } from "lucide-react";
@@ -50,8 +49,8 @@ import { SwipeableTaskItem } from "./SwipeableTaskItem";
 import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
-import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
+import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
 
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
@@ -62,15 +61,6 @@ const getDaysLeft = (endDate?: string | null) => {
     return Math.max(0, differenceInDays(parsed, new Date()));
   } catch {
     return null;
-  }
-};
-
-const safeFormat = (date: Date, fmt: string, fallback = "") => {
-  try {
-    if (Number.isNaN(date.getTime())) return fallback;
-    return format(date, fmt);
-  } catch {
-    return fallback;
   }
 };
 
@@ -186,9 +176,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   selectedDate,
   onToggle,
   onAddQuest,
-  completedCount,
-  totalCount,
-  currentStreak = 0,
+  completedCount: _completedCount,
+  totalCount: _totalCount,
+  currentStreak: _currentStreak = 0,
   onUndoToggle,
   onEditQuest,
   calendarTasks = [],
@@ -263,16 +253,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
-  const timelineDrag = useTimelineDrag({
-    containerRef: timelineDragContainerRef,
-    onDrop: (taskId, newTime) => {
-      onUpdateScheduledTime?.(taskId, newTime);
-    },
-  });
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showMonthView, setShowMonthView] = useState(false);
-  const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
+  const [sortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
@@ -407,13 +391,77 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [tasks, sortBy, keepInPlace]);
 
   // Only quests go into the unified timeline (rituals grouped by campaign below)
-  const { scheduledItems, timelineItems } = useMemo(() => {
+  const timelineItems = useMemo(() => {
     const scheduled = questTasks.filter(t => !!t.scheduled_time).sort((a, b) => 
       (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
     );
     const anytime = questTasks.filter(t => !t.scheduled_time);
-    return { scheduledItems: scheduled, timelineItems: [...scheduled, ...anytime] };
+    return [...scheduled, ...anytime];
   }, [questTasks]);
+
+  const draggableTimelineItems = useMemo(
+    () => [...timelineItems, ...ritualTasks],
+    [timelineItems, ritualTasks],
+  );
+
+  const timelineDrag = useTimelineDrag({
+    containerRef: timelineDragContainerRef,
+    onDrop: (taskId, newTime) => {
+      const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
+      onUpdateScheduledTime?.(taskId, newTime);
+      if (overlapCount > 0) {
+        toast(`Overlaps with ${overlapCount} other quest${overlapCount === 1 ? "" : "s"}`);
+      }
+    },
+  });
+
+  const baseTimelineConflictMap = useMemo(
+    () => buildTaskConflictMap(draggableTimelineItems),
+    [draggableTimelineItems],
+  );
+
+  const timelineConflictMap = useMemo(() => {
+    const activeTaskId = timelineDrag.draggingTaskId;
+    const previewTime = timelineDrag.previewTime;
+    if (!activeTaskId || !previewTime) return baseTimelineConflictMap;
+
+    const activeConflictIds = getTaskConflictSetForTask(activeTaskId, draggableTimelineItems, {
+      [activeTaskId]: previewTime,
+    });
+    const previousActiveConflictIds = baseTimelineConflictMap.get(activeTaskId) ?? new Set<string>();
+    const touchedTaskIds = new Set<string>([
+      ...previousActiveConflictIds,
+      ...activeConflictIds,
+    ]);
+    const nextMap = new Map(baseTimelineConflictMap);
+
+    for (const touchedTaskId of touchedTaskIds) {
+      const updatedConflicts = new Set(nextMap.get(touchedTaskId) ?? []);
+      updatedConflicts.delete(activeTaskId);
+      if (activeConflictIds.has(touchedTaskId)) {
+        updatedConflicts.add(activeTaskId);
+      }
+
+      if (updatedConflicts.size > 0) {
+        nextMap.set(touchedTaskId, updatedConflicts);
+      } else {
+        nextMap.delete(touchedTaskId);
+      }
+    }
+
+    if (activeConflictIds.size > 0) {
+      nextMap.set(activeTaskId, new Set(activeConflictIds));
+    } else {
+      nextMap.delete(activeTaskId);
+    }
+
+    return nextMap;
+  }, [
+    baseTimelineConflictMap,
+    draggableTimelineItems,
+    timelineDrag.draggingTaskId,
+    timelineDrag.previewTime,
+  ]);
 
   // Group rituals by campaign
   const campaignRitualGroups = useMemo(() => {
@@ -480,10 +528,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   
 
-  const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
-  const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const allComplete = totalCount > 0 && completedCount === totalCount;
-
   const triggerHaptic = async (style: ImpactStyle) => {
     try {
       await Haptics.impact({ style });
@@ -529,15 +573,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   };
 
-  type TimelineDragHandleProps = {
-    onPointerDown?: React.PointerEventHandler<HTMLElement>;
-    onTouchStart?: React.TouchEventHandler<HTMLElement>;
-    onTouchMove?: React.TouchEventHandler<HTMLElement>;
-    onTouchEnd?: React.TouchEventHandler<HTMLElement>;
-    onTouchCancel?: React.TouchEventHandler<HTMLElement>;
-  };
-
-  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, timelineDragHandleProps?: TimelineDragHandleProps) => {
+  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, overlapCount = 0) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
@@ -546,16 +582,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const isExpanded = expandedTasks.has(task.id);
     const hasDetails = hasExpandableDetails(task);
     const CategoryIcon = getCategoryIcon(task.category);
+    const TaskIcon = isRitual ? Repeat : (CategoryIcon ?? User);
     const subtasks = task.subtasks ?? [];
     const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
-    const hasDetailBadges = !!(
-      (CategoryIcon && task.category) ||
-      task.difficulty ||
-      task.priority ||
-      task.energy_level ||
-      task.estimated_duration ||
-      (task.is_recurring && task.recurrence_pattern)
-    );
     
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -599,141 +628,61 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       <Collapsible open={isExpanded} onOpenChange={() => {}}>
         <div
           className={cn(
-            "flex items-center gap-3 transition-all relative group",
-            "select-none min-h-[52px]",
-            isRitual ? "py-4" : "py-3",
+            "flex items-start gap-3 transition-all relative group rounded-[22px] border border-white/10 bg-[#171a20]/90 px-3 py-3.5 shadow-[0_6px_20px_rgba(0,0,0,0.3)]",
+            "select-none min-h-[72px]",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
-            isActivated && !isDragging && "bg-muted/30 rounded-lg"
+            isActivated && !isDragging && "bg-white/10",
           )}
         >
-          {/* Checkbox - only this toggles completion */}
-          <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
-            <button
-              data-interactive="true"
-              onClick={handleCheckboxClick}
-              onTouchStart={(e) => {
-                touchStartRef.current = { 
-                  x: e.touches[0].clientX, 
-                  y: e.touches[0].clientY 
-                };
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                // Only trigger if finger moved less than 5px (not scrolling)
-                if (touchStartRef.current) {
-                  const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-                  const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-                  if (dx < 5 && dy < 5) {
-                    handleCheckboxClick(e as unknown as React.MouseEvent);
-                  }
-                }
-                touchStartRef.current = null;
-              }}
-              className={cn(
-                "relative flex items-center justify-center w-11 h-11 touch-manipulation transition-transform select-none",
-                "active:scale-95"
-              )}
-              style={{
-                WebkitTapHighlightColor: 'transparent',
-                touchAction: 'manipulation',
-              }}
-              aria-label={
-                isComplete
-                  ? "Mark task as incomplete"
-                  : "Mark task as complete"
-              }
-              role="checkbox"
-              aria-checked={isComplete}
-            >
-              {useLiteAnimations ? (
-                <div
-                  className={cn(
-                    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                    isComplete 
-                      ? "bg-primary border-primary" 
-                      : "border-muted-foreground/40 hover:border-primary"
-                  )}
-                >
-                  {isComplete && (
-                    <Check className="w-4 h-4 text-primary-foreground" />
-                  )}
-                </div>
-              ) : (
-                <motion.div 
-                  className={cn(
-                    "flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                    isComplete 
-                      ? "bg-primary border-primary" 
-                      : "border-muted-foreground/40 hover:border-primary"
-                  )}
-                  whileTap={!isDragging && !isPressed ? { scale: 0.85 } : {}}
-                >
-                  {isComplete && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                    >
-                      <Check className="w-4 h-4 text-primary-foreground" />
-                    </motion.div>
-                  )}
-                </motion.div>
-              )}
-            </button>
+          <div
+            className={cn(
+              "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border",
+              isRitual
+                ? "border-[#ef8a8a]/55 bg-[#ef8a8a]/85 text-black"
+                : "border-[#8ec5ff]/45 bg-[#8ec5ff]/80 text-black",
+            )}
+          >
+            <TaskIcon className="h-5 w-5" />
           </div>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              {isRitual && (
-                <Repeat className="w-4 h-4 text-accent flex-shrink-0" />
-              )}
+            {task.scheduled_time && (
+              <span className="text-[13px] text-white/70 flex items-center gap-1 mb-0.5">
+                <Clock className="w-3 h-3" />
+                {formatTime(task.scheduled_time)}
+                {task.estimated_duration
+                  ? ` (${task.estimated_duration} min)`
+                  : null}
+              </span>
+            )}
+            <div className="flex items-start gap-2">
               <MarqueeText
                 text={task.task_text}
                 className={cn(
-                  "text-sm flex-1",
+                  "text-[20px] leading-tight flex-1 font-semibold text-white",
                   isComplete && "text-muted-foreground",
                   isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
                 )}
               />
             </div>
-            {task.scheduled_time && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Clock className="w-3 h-3" />
-                {formatTime(task.scheduled_time)}
-              </span>
+            {overlapCount > 0 && (
+              <p className="text-sm font-semibold text-[#ef8a8a] mt-1">
+                Tasks are overlapping
+              </p>
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            {!!task.scheduled_time && !isRitual && !isComplete && !!timelineDragHandleProps && (
-              <button
-                type="button"
-                data-interactive="true"
-                aria-label="Drag to reschedule"
-                title="Drag handle to reschedule in 5-minute steps"
-                className={cn(
-                  "h-8 w-8 rounded-md flex items-center justify-center touch-none",
-                  "opacity-55 group-hover:opacity-100 transition-opacity",
-                  isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
-                )}
-                style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
-                onPointerDownCapture={(e) => e.stopPropagation()}
-                onTouchStartCapture={(e) => e.stopPropagation()}
-                {...timelineDragHandleProps}
-              >
-                <GripVertical className="w-4 h-4" />
-              </button>
-            )}
+          <div className="flex items-start gap-1.5">
             {/* Quest action menu */}
             {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    data-interactive="true"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
+                    className="h-8 w-8 -m-1 text-white/65 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreHorizontal className="w-4 h-4" />
@@ -765,19 +714,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {task.is_main_quest && (
-              <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
-                Main
-              </Badge>
-            )}
-            <span className="text-sm font-bold text-stardust-gold/80">+{task.xp_reward}</span>
             
             {/* Chevron for expandable details - only shown if task has details */}
             {hasDetails && (
               <Button
+                data-interactive="true"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 -m-1 flex-shrink-0"
+                className="h-7 w-7 -m-1 flex-shrink-0 text-white/55 hover:text-white/80"
                 onClick={(e) => toggleTaskExpanded(task.id, e)}
               >
                 <ChevronDown className={cn(
@@ -786,6 +730,57 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 )} />
               </Button>
             )}
+
+            {/* Right status ring */}
+            <button
+              data-interactive="true"
+              onClick={handleCheckboxClick}
+              onTouchStart={(e) => {
+                touchStartRef.current = {
+                  x: e.touches[0].clientX,
+                  y: e.touches[0].clientY,
+                };
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (touchStartRef.current) {
+                  const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                  const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                  if (dx < 5 && dy < 5) {
+                    handleCheckboxClick(e as unknown as React.MouseEvent);
+                  }
+                }
+                touchStartRef.current = null;
+              }}
+              className={cn(
+                "relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all active:scale-95",
+                isComplete
+                  ? "border-[#ef8a8a] bg-[#ef8a8a] text-black"
+                  : "border-[#ef8a8a] bg-transparent text-[#ef8a8a]",
+              )}
+              style={{
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation',
+              }}
+              aria-label={isComplete ? "Mark task as incomplete" : "Mark task as complete"}
+              role="checkbox"
+              aria-checked={isComplete}
+            >
+              {isComplete && (
+                useLiteAnimations
+                  ? <Check className="h-4 w-4" />
+                  : (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                      >
+                        <Check className="h-4 w-4" />
+                      </motion.div>
+                    )
+              )}
+            </button>
           </div>
         </div>
 
@@ -851,7 +846,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             )}
             
             {/* Badges row */}
-            {hasDetailBadges && (
+            {(
+              task.category ||
+              task.difficulty ||
+              task.priority ||
+              task.energy_level ||
+              task.estimated_duration ||
+              (task.is_recurring && task.recurrence_pattern)
+            ) && (
               <div className="flex flex-wrap gap-1.5">
               {/* Category */}
               {CategoryIcon && task.category && (
@@ -930,7 +932,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <SwipeableTaskItem
           onSwipeDelete={() => onDeleteQuest?.(task.id)}
           onSwipeMoveToNextDay={!isRitual && onMoveQuestToNextDay ? () => onMoveQuestToNextDay(task.id) : undefined}
-          disabled={isDragging || isActivated}
+          disabled={isDragging || isActivated || timelineDrag.draggingTaskId === task.id}
         >
           {taskContent}
         </SwipeableTaskItem>
@@ -938,58 +940,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, timelineDrag.draggingTaskId]);
 
 
   return (
     <div className="relative">
-      <div className="relative px-2 py-2 overflow-visible">
-        {/* Compact Header: Date + Progress Ring + XP */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setShowMonthView(true)}
-              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-            >
-              <span className="text-lg font-bold">
-                {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
-              </span>
-            </button>
-            {currentStreak > 0 && (
-              <div className={cn(
-                "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                currentStreak >= 30 
-                  ? "bg-stardust-gold/20 text-stardust-gold" 
-                  : currentStreak >= 14 
-                    ? "bg-celestial-blue/20 text-celestial-blue" 
-                    : "bg-orange-500/10 text-orange-400"
-              )}>
-                <Flame className="h-3.5 w-3.5" />
-                {currentStreak}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Compact progress ring */}
-            {totalCount > 0 && (
-              <div className="flex items-center gap-1.5">
-                <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {completedCount}/{totalCount}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-1 text-sm">
-              <Trophy className={cn(
-                "h-4 w-4",
-                allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
-              )} />
-              <span className="font-semibold text-stardust-gold">{totalXP}</span>
-            </div>
-          </div>
-        </div>
-
+      <div ref={timelineDragContainerRef} className="relative px-2 py-2 overflow-visible">
         <AnimatePresence>
           {comboCount > 1 && (
             <motion.div
@@ -1050,56 +1006,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         ) : (
           <div>
-            {/* Sort dropdown */}
-            <div className="flex items-center gap-2 mb-1">
-              {tasks.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-28">
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('custom')}
-                      className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
-                    >
-                      Custom
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('time')}
-                      className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
-                    >
-                      Time
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('priority')}
-                      className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
-                    >
-                      Priority
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('xp')}
-                      className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
-                    >
-                      XP
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-
             {/* Scheduled Tasks Timeline */}
             {timelineItems.length > 0 && (
-              <div ref={timelineDragContainerRef}>
-                {scheduledItems.length > 0 && (
-                  <div className="flex items-center gap-2 pb-2">
-                    <div className="w-9 flex-shrink-0" />
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Scheduled
-                    </span>
-                  </div>
-                )}
+              <div>
                 {timelineItems.map((task, index) => {
                   const isThisDragging = timelineDrag.draggingTaskId === task.id;
                   const isAnyDragging = timelineDrag.isDragging;
@@ -1107,9 +1016,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const isAnytimeTask = !task.scheduled_time;
                   const showAnytimeLabel = isAnytimeTask
                     && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
-                  const dragHandleProps = task.scheduled_time
-                    ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                  const rowDragProps = task.scheduled_time
+                    ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                     : undefined;
+                  const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
 
                   const rowStyle: CSSProperties = {
                     WebkitUserSelect: 'none',
@@ -1136,7 +1046,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       isLast={index === timelineItems.length - 1}
                       isDragTarget={isThisDragging}
                     >
-                      {renderTaskItem(task, undefined, dragHandleProps)}
+                      {renderTaskItem(task, undefined, overlapCount)}
                     </TimelineTaskRow>
                   );
 
@@ -1159,6 +1069,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         ...rowStyle,
                         y: isThisDragging ? timelineDrag.dragOffsetY : 0,
                       }}
+                      {...rowDragProps}
                     >
                       {rowContent}
                     </motion.div>
@@ -1173,7 +1084,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         {/* Campaign Dropdown Folders with Rituals */}
         {campaignRitualGroups.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-border/30">
+          <div className="mt-6 pt-4 border-t border-white/10">
             {/* Campaigns divider */}
             <div className="flex items-center gap-2 mb-3">
               <div className="w-9 flex-shrink-0" />
@@ -1184,13 +1095,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <div className="flex-1 border-t border-dashed border-border/40" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {campaignRitualGroups.map(group => {
                 const isCampaignExpanded = expandedCampaigns.has(group.epicId);
                 return (
-                  <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
+                  <div key={group.epicId} className="rounded-[22px] border border-white/10 bg-[#161a20]/80 overflow-hidden">
                     {/* Campaign Header */}
-                    <div className="flex items-center gap-2 px-3 py-2.5">
+                    <div className="flex items-center gap-2 px-3 py-3">
                       <JourneyPathDrawer epic={{
                         id: group.epic.id,
                         title: group.epic.title,
@@ -1202,16 +1113,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         epic_habits: group.epic.epic_habits,
                       }}>
                         <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
-                          <Target className="w-4 h-4 text-primary shrink-0" />
-                          <span className="text-sm font-medium truncate">{group.title}</span>
+                          <Target className="w-4 h-4 text-[#8ec5ff] shrink-0" />
+                          <span className="text-sm font-medium truncate text-white/90">{group.title}</span>
                         </button>
                       </JourneyPathDrawer>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                        <span className="text-[#8ec5ff] font-bold text-xs">{group.progress}%</span>
                         {group.daysLeft !== null && (
-                          <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
+                          <span className="text-white/55 text-xs">{group.daysLeft}d</span>
                         )}
-                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                        <Badge variant="secondary" className="text-xs h-5 px-1.5 bg-white/10 border border-white/10 text-white/75">
                           {group.completedCount}/{group.rituals.length}
                         </Badge>
                         <button
@@ -1232,12 +1143,30 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
                     {/* Collapsible Rituals */}
                     {isCampaignExpanded && (
-                      <div className="border-t border-border/20 px-2 pb-1">
-                        {group.rituals.map(task => (
-                          <div key={task.id}>
-                            {renderTaskItem(task)}
-                          </div>
-                        ))}
+                      <div className="border-t border-white/10 px-2 pb-2">
+                        {group.rituals.map(task => {
+                          const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                          const isAnyDragging = timelineDrag.isDragging;
+                          const rowDragProps = task.scheduled_time
+                            ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
+                            : undefined;
+                          const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+
+                          return (
+                            <motion.div
+                              key={task.id}
+                              className={cn("relative", isThisDragging && "z-50")}
+                              style={{
+                                y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                                pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
+                                opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                              }}
+                              {...rowDragProps}
+                            >
+                              {renderTaskItem(task, undefined, overlapCount)}
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

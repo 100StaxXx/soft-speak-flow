@@ -6,10 +6,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const subtaskEqMock = vi.fn();
   const subtaskUpdateMock = vi.fn();
+  const swipeableDisabledStates: Array<boolean | undefined> = [];
+  const timelineDragState = {
+    draggingTaskId: null as string | null,
+    isDragging: false,
+    justDroppedId: null as string | null,
+    dragOffsetY: 0,
+    previewTime: undefined as string | undefined,
+  };
 
   return {
     subtaskEqMock,
     subtaskUpdateMock,
+    swipeableDisabledStates,
+    timelineDragState,
   };
 });
 
@@ -34,12 +44,9 @@ vi.mock("@/hooks/useMotionProfile", () => ({
 
 vi.mock("@/hooks/useTimelineDrag", () => ({
   useTimelineDrag: () => ({
-    draggingTaskId: null,
-    isDragging: false,
-    justDroppedId: null,
-    dragOffsetY: 0,
-    previewTime: undefined,
+    ...mocks.timelineDragState,
     getDragHandleProps: () => ({}),
+    getRowDragProps: () => ({}),
   }),
 }));
 
@@ -80,11 +87,25 @@ vi.mock("@/components/JourneyPathDrawer", () => ({
 }));
 
 vi.mock("@/components/TimelineTaskRow", () => ({
-  TimelineTaskRow: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TimelineTaskRow: ({ children, overrideTime }: { children: ReactNode; overrideTime?: string | null }) => (
+    <div>
+      {overrideTime ? <span>{overrideTime}</span> : null}
+      {children}
+    </div>
+  ),
 }));
 
-vi.mock("@/components/SwipeableTaskItem", () => ({
-  SwipeableTaskItem: ({ children }: { children: ReactNode }) => <>{children}</>,
+vi.mock("./SwipeableTaskItem", () => ({
+  SwipeableTaskItem: ({
+    children,
+    disabled,
+  }: {
+    children: ReactNode;
+    disabled?: boolean;
+  }) => {
+    mocks.swipeableDisabledStates.push(disabled);
+    return <>{children}</>;
+  },
 }));
 
 vi.mock("@/components/ui/marquee-text", () => ({
@@ -104,6 +125,12 @@ const createWrapper = (client: QueryClient) => {
 describe("TodaysAgenda subtasks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.swipeableDisabledStates.length = 0;
+    mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.isDragging = false;
+    mocks.timelineDragState.justDroppedId = null;
+    mocks.timelineDragState.dragOffsetY = 0;
+    mocks.timelineDragState.previewTime = undefined;
     mocks.subtaskEqMock.mockResolvedValue({ error: null });
     mocks.subtaskUpdateMock.mockReturnValue({
       eq: mocks.subtaskEqMock,
@@ -284,8 +311,8 @@ describe("TodaysAgenda combo feedback", () => {
   });
 });
 
-describe("TodaysAgenda scheduled header copy", () => {
-  it("shows Scheduled label, hides helper copy, and keeps drag handle", () => {
+describe("TodaysAgenda scheduled timeline behavior", () => {
+  it("does not render scheduled header copy or drag-handle button", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -313,8 +340,145 @@ describe("TodaysAgenda scheduled header copy", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByText("Scheduled")).toBeInTheDocument();
+    expect(screen.queryByText("Scheduled")).not.toBeInTheDocument();
     expect(screen.queryByText(/Drag handle to reschedule/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /drag to reschedule/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
+  });
+
+  it("shows overlap warning text for conflicting tasks", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 60,
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Standup",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "09:30",
+            estimated_duration: 30,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getAllByText("Tasks are overlapping").length).toBeGreaterThan(0);
+  });
+
+  it("uses drag preview time in timeline row during active drag", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.timelineDragState.previewTime = "09:45";
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByText("09:45")).toBeInTheDocument();
+  });
+
+  it("keeps swipe enabled when not dragging and disables it for the active dragged row", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.isDragging = false;
+    mocks.timelineDragState.previewTime = undefined;
+    mocks.swipeableDisabledStates.length = 0;
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        onDeleteQuest={vi.fn()}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(mocks.swipeableDisabledStates.at(-1)).toBe(false);
+
+    mocks.swipeableDisabledStates.length = 0;
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        onDeleteQuest={vi.fn()}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(mocks.swipeableDisabledStates.at(-1)).toBe(true);
   });
 });

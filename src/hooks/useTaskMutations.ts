@@ -12,6 +12,10 @@ import React, { useRef, createElement } from "react";
 import { getEffectiveQuestXP } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";
+import {
+  normalizeTaskSchedulingState,
+  normalizeTaskSchedulingUpdate,
+} from "@/utils/taskSchedulingRules";
 
 type TaskCategory = 'mind' | 'body' | 'soul';
 const validCategories: TaskCategory[] = ['mind', 'body', 'soul'];
@@ -69,6 +73,22 @@ export const useTaskMutations = (taskDate: string) => {
 
   const addInProgress = useRef(false);
 
+  const fetchTaskSchedulingState = async (taskId: string) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    const { data: task, error } = await supabase
+      .from('daily_tasks')
+      .select('task_date, scheduled_time, habit_source_id, source')
+      .eq('id', taskId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!task) throw new Error('Task not found');
+
+    return task;
+  };
+
   const addTask = useMutation({
     mutationFn: async (params: AddTaskParams) => {
       if (addInProgress.current) throw new Error('Please wait...');
@@ -76,8 +96,14 @@ export const useTaskMutations = (taskDate: string) => {
 
       try {
         if (!user?.id) throw new Error('User not authenticated');
-        
-        const effectiveDate = params.taskDate !== undefined ? params.taskDate : taskDate;
+
+        const normalizedScheduling = normalizeTaskSchedulingState({
+          task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
+          scheduled_time: params.scheduledTime || null,
+          habit_source_id: null,
+          source: params.taskDate === null ? 'inbox' : 'manual',
+        });
+        const effectiveDate = normalizedScheduling.task_date;
         let countQuery = supabase
           .from('daily_tasks')
           .select('id')
@@ -104,9 +130,9 @@ export const useTaskMutations = (taskDate: string) => {
             task_text: params.taskText,
             difficulty: params.difficulty,
             xp_reward: xpReward,
-            task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
+            task_date: normalizedScheduling.task_date,
             is_main_quest: params.isMainQuest ?? false,
-            scheduled_time: params.scheduledTime || null,
+            scheduled_time: normalizedScheduling.scheduled_time,
             estimated_duration: params.estimatedDuration || null,
             recurrence_pattern: params.recurrencePattern || null,
             recurrence_days: params.recurrenceDays || null,
@@ -121,6 +147,7 @@ export const useTaskMutations = (taskDate: string) => {
             auto_log_interaction: params.autoLogInteraction ?? true,
             image_url: params.imageUrl || null,
             location: params.location || null,
+            source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
           })
           .select()
           .single();
@@ -173,17 +200,24 @@ export const useTaskMutations = (taskDate: string) => {
       const previousDailyTasks = queryClient.getQueriesData({ queryKey: ['daily-tasks'] });
       const previousCalendarTasks = queryClient.getQueriesData({ queryKey: ['calendar-tasks'] });
 
+      const normalizedScheduling = normalizeTaskSchedulingState({
+        task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
+        scheduled_time: params.scheduledTime || null,
+        habit_source_id: null,
+        source: params.taskDate === null ? 'inbox' : 'manual',
+      });
+
       // Create optimistic task with all required fields
       const optimisticTask = {
         id: `temp-${Date.now()}`,
         user_id: user?.id,
         task_text: params.taskText,
         difficulty: params.difficulty,
-        task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
+        task_date: normalizedScheduling.task_date,
         completed: false,
         completed_at: null,
         is_main_quest: params.isMainQuest ?? false,
-        scheduled_time: params.scheduledTime || null,
+        scheduled_time: normalizedScheduling.scheduled_time,
         estimated_duration: params.estimatedDuration || null,
         xp_reward: getEffectiveQuestXP(params.difficulty, 1),
         created_at: new Date().toISOString(),
@@ -198,6 +232,7 @@ export const useTaskMutations = (taskDate: string) => {
         parent_template_id: null,
         notes: params.notes || null,
         location: params.location || null,
+        source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
       };
 
       // Only update the specific day query to avoid cross-day cache pollution
@@ -540,18 +575,26 @@ export const useTaskMutations = (taskDate: string) => {
       recurrence_days?: number[] | null;
       reminder_enabled?: boolean;
       reminder_minutes_before?: number | null;
+      source?: string | null;
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
+
+      const normalizedScheduling = normalizeTaskSchedulingState({
+        task_date: taskData.task_date ?? null,
+        scheduled_time: taskData.scheduled_time ?? null,
+        habit_source_id: taskData.habit_source_id ?? null,
+        source: taskData.source ?? null,
+      });
       
       const { data, error } = await supabase
         .from('daily_tasks')
         .insert({
           user_id: user.id,
           task_text: taskData.task_text,
-          task_date: taskData.task_date,
+          task_date: normalizedScheduling.task_date,
           xp_reward: taskData.xp_reward ?? 10,
           difficulty: taskData.difficulty ?? 'medium',
-          scheduled_time: taskData.scheduled_time,
+          scheduled_time: normalizedScheduling.scheduled_time,
           estimated_duration: taskData.estimated_duration,
           is_main_quest: taskData.is_main_quest ?? false,
           epic_id: taskData.epic_id,
@@ -566,6 +609,7 @@ export const useTaskMutations = (taskDate: string) => {
           recurrence_days: taskData.recurrence_days,
           reminder_enabled: taskData.reminder_enabled ?? false,
           reminder_minutes_before: taskData.reminder_minutes_before,
+          source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
         })
         .select()
         .single();
@@ -641,6 +685,8 @@ export const useTaskMutations = (taskDate: string) => {
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
+      let normalizedToInbox = false;
+      let strippedScheduledTime = false;
 
       // Build update object with only provided fields
       const updateData: Record<string, unknown> = {};
@@ -696,8 +742,26 @@ export const useTaskMutations = (taskDate: string) => {
         updateData.location = updates.location;
       }
 
+      if (updates.task_date !== undefined || updates.scheduled_time !== undefined) {
+        const existingScheduling = await fetchTaskSchedulingState(taskId);
+        const normalizedScheduling = normalizeTaskSchedulingUpdate(existingScheduling, {
+          task_date: updates.task_date,
+          scheduled_time: updates.scheduled_time,
+        });
+
+        updateData.task_date = normalizedScheduling.task_date;
+        updateData.scheduled_time = normalizedScheduling.scheduled_time;
+
+        if (normalizedScheduling.source !== existingScheduling.source) {
+          updateData.source = normalizedScheduling.source;
+        }
+
+        normalizedToInbox = normalizedScheduling.normalizedToInbox;
+        strippedScheduledTime = normalizedScheduling.strippedScheduledTime;
+      }
+
       if (Object.keys(updateData).length === 0) {
-        return; // Nothing to update
+        return { normalizedToInbox, strippedScheduledTime };
       }
 
       const { error } = await supabase
@@ -707,8 +771,9 @@ export const useTaskMutations = (taskDate: string) => {
         .eq('user_id', user.id);
 
       if (error) throw error;
+      return { normalizedToInbox, strippedScheduledTime };
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
 
@@ -716,6 +781,22 @@ export const useTaskMutations = (taskDate: string) => {
         .filter(([, value]) => value !== undefined)
         .map(([key]) => key);
       const isScheduledTimeOnlyUpdate = definedFields.length === 1 && definedFields[0] === 'scheduled_time';
+
+      if (data?.normalizedToInbox) {
+        toast({
+          title: "Moved to Inbox",
+          description: "Regular quests without a time are kept in Inbox.",
+        });
+        return;
+      }
+
+      if (data?.strippedScheduledTime && !isScheduledTimeOnlyUpdate) {
+        toast({
+          title: "Time removed",
+          description: "Inbox quests do not keep a scheduled time.",
+        });
+        return;
+      }
 
       if (!isScheduledTimeOnlyUpdate) {
         toast({ title: "Quest updated!" });
@@ -819,21 +900,39 @@ export const useTaskMutations = (taskDate: string) => {
       };
 
       const newTime = sectionTimeMap[targetSection];
+      const existingScheduling = await fetchTaskSchedulingState(taskId);
+      const normalizedScheduling = normalizeTaskSchedulingUpdate(existingScheduling, {
+        scheduled_time: newTime,
+      });
+
+      const updateData: Record<string, unknown> = {
+        task_date: normalizedScheduling.task_date,
+        scheduled_time: normalizedScheduling.scheduled_time,
+        sort_order: 0, // Place at top of new section
+      };
+
+      if (normalizedScheduling.source !== existingScheduling.source) {
+        updateData.source = normalizedScheduling.source;
+      }
 
       const { error } = await supabase
         .from('daily_tasks')
-        .update({ 
-          scheduled_time: newTime,
-          sort_order: 0, // Place at top of new section
-        })
+        .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id);
 
       if (error) throw error;
+      return normalizedScheduling;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      if (data?.normalizedToInbox) {
+        toast({
+          title: "Moved to Inbox",
+          description: "Regular quests without a time are kept in Inbox.",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
@@ -847,18 +946,33 @@ export const useTaskMutations = (taskDate: string) => {
       targetDate: string;
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
+      const existingScheduling = await fetchTaskSchedulingState(taskId);
+      const normalizedScheduling = normalizeTaskSchedulingUpdate(existingScheduling, {
+        task_date: targetDate,
+      });
+
+      const updateData: Record<string, unknown> = {
+        task_date: normalizedScheduling.task_date,
+        scheduled_time: normalizedScheduling.scheduled_time,
+        sort_order: 0,
+      };
+
+      if (normalizedScheduling.source !== existingScheduling.source) {
+        updateData.source = normalizedScheduling.source;
+      }
 
       const { error } = await supabase
         .from('daily_tasks')
-        .update({ 
-          task_date: targetDate,
-          sort_order: 0,
-        })
+        .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id);
 
       if (error) throw error;
-      return { taskId, targetDate };
+      return {
+        taskId,
+        targetDate: normalizedScheduling.task_date,
+        normalizedToInbox: normalizedScheduling.normalizedToInbox,
+      };
     },
     onMutate: async () => {
       // Cancel outgoing refetches
@@ -880,6 +994,14 @@ export const useTaskMutations = (taskDate: string) => {
         context.previousCalendar.forEach(([key, data]) => queryClient.setQueryData(key, data));
       }
       toast({ title: "Failed to move quest", description: error.message, variant: "destructive" });
+    },
+    onSuccess: (data) => {
+      if (data?.normalizedToInbox) {
+        toast({
+          title: "Moved to Inbox",
+          description: "Regular quests without a time are kept in Inbox.",
+        });
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });

@@ -25,21 +25,24 @@ vi.mock("@capacitor/haptics", () => ({
   },
 }));
 
-const createPointerDownEvent = (clientY: number) =>
+const createPointerDownEvent = (clientY: number, target?: Element) =>
   ({
     pointerType: "mouse",
     button: 0,
     clientY,
+    target: target ?? document.createElement("div"),
     preventDefault: vi.fn(),
     stopPropagation: vi.fn(),
   }) as unknown as React.PointerEvent<HTMLElement>;
 
 const createTouchEvent = (
   y: number,
+  target?: Element,
 ): React.TouchEvent<HTMLElement> =>
   ({
     touches: [{ clientX: 0, clientY: y }],
     changedTouches: [{ clientX: 0, clientY: y }],
+    target: target ?? document.createElement("div"),
     stopPropagation: vi.fn(),
   }) as unknown as React.TouchEvent<HTMLElement>;
 
@@ -98,6 +101,45 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-1", "09:05");
     expect(result.current.draggingTaskId).toBeNull();
     expect(result.current.dragOffsetY.get()).toBe(0);
+  });
+
+  it("starts drag from row-level drag props", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const rowProps = result.current.getRowDragProps("task-row", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(120));
+      dispatchPointerMove(140);
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-row", "09:05");
+  });
+
+  it("ignores pointer/touch starts from interactive descendants", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const interactiveEl = document.createElement("button");
+    interactiveEl.setAttribute("data-interactive", "true");
+    const child = document.createElement("span");
+    interactiveEl.appendChild(child);
+
+    const handleProps = result.current.getRowDragProps("task-1", "09:00");
+
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100, child));
+    });
+    expect(result.current.draggingTaskId).toBeNull();
+
+    vi.useFakeTimers();
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100, child));
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current.draggingTaskId).toBeNull();
+    vi.useRealTimers();
   });
 
   it("skips onDrop when the dragged time is unchanged", () => {

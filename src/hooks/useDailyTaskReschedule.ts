@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { format, addDays } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { normalizeTaskSchedulingState } from '@/utils/taskSchedulingRules';
 
 export interface RescheduleAction {
   type: 'prioritize' | 'extend_tomorrow' | 'replan';
@@ -131,19 +132,41 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
 
     setIsRescheduling(true);
     try {
-      // Batch update using .in()
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update({ task_date: tomorrow })
-        .in('id', toMove.map(t => t.id));
+      let normalizedToInboxCount = 0;
+      for (const task of toMove) {
+        const normalized = normalizeTaskSchedulingState({
+          task_date: tomorrow,
+          scheduled_time: task.scheduled_time ?? null,
+          habit_source_id: task.habit_source_id ?? null,
+          source: task.source ?? null,
+        });
+        if (normalized.normalizedToInbox) normalizedToInboxCount += 1;
 
-      if (error) throw error;
+        const updateData: Record<string, unknown> = {
+          task_date: normalized.task_date,
+          scheduled_time: normalized.scheduled_time,
+        };
+        if (normalized.source !== (task.source ?? null)) {
+          updateData.source = normalized.source;
+        }
+
+        const { error } = await supabase
+          .from('daily_tasks')
+          .update(updateData)
+          .eq('id', task.id)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
       
       const kept = incompleteTasks.length - toMove.length;
-      toast.success(`Focused on ${kept} essentials, moved ${toMove.length} quests to tomorrow`);
+      toast.success(
+        normalizedToInboxCount > 0
+          ? `Focused on ${kept} essentials, moved ${toMove.length} quests (${normalizedToInboxCount} stayed in Inbox)`
+          : `Focused on ${kept} essentials, moved ${toMove.length} quests to tomorrow`
+      );
     } catch (error) {
       console.error('Error prioritizing tasks:', error);
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -170,17 +193,39 @@ export function useDailyTaskReschedule(tasks: any[], selectedDate: Date) {
 
     setIsRescheduling(true);
     try {
-      // Single batch update
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update({ task_date: tomorrow })
-        .in('id', incompleteTasks.map(t => t.id));
+      let normalizedToInboxCount = 0;
+      for (const task of incompleteTasks) {
+        const normalized = normalizeTaskSchedulingState({
+          task_date: tomorrow,
+          scheduled_time: task.scheduled_time ?? null,
+          habit_source_id: task.habit_source_id ?? null,
+          source: task.source ?? null,
+        });
+        if (normalized.normalizedToInbox) normalizedToInboxCount += 1;
 
-      if (error) throw error;
+        const updateData: Record<string, unknown> = {
+          task_date: normalized.task_date,
+          scheduled_time: normalized.scheduled_time,
+        };
+        if (normalized.source !== (task.source ?? null)) {
+          updateData.source = normalized.source;
+        }
+
+        const { error } = await supabase
+          .from('daily_tasks')
+          .update(updateData)
+          .eq('id', task.id)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
-      toast.success(`Moved ${incompleteTasks.length} quests to tomorrow`);
+      toast.success(
+        normalizedToInboxCount > 0
+          ? `Moved ${incompleteTasks.length} quests (${normalizedToInboxCount} stayed in Inbox)`
+          : `Moved ${incompleteTasks.length} quests to tomorrow`
+      );
     } catch (error) {
       console.error('Error moving tasks:', error);
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });

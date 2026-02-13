@@ -1,6 +1,7 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, type MouseEvent } from "react";
 import { PawPrint, User, Compass, Inbox } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocation } from "react-router-dom";
 
 import { NavLink } from "@/components/NavLink";
 import { useProfile } from "@/hooks/useProfile";
@@ -23,11 +24,13 @@ import {
   fetchDailyTasks,
   getDailyTasksQueryKey,
 } from "@/hooks/useTasksQuery";
+import type { MainTabPath } from "@/utils/mainTabRefresh";
 
 type PrefetchTarget = "mentor" | "inbox" | "journeys" | "companion";
 
 export const BottomNav = memo(() => {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { user } = useAuth();
   const { profile } = useProfile();
   const { capabilities } = useMotionProfile();
@@ -52,6 +55,17 @@ export const BottomNav = memo(() => {
       prefetchJourneysTasks();
     }
   }, [prefetchJourneysTasks]);
+
+  const handleTabClick = useCallback(
+    (path: MainTabPath) => (event: MouseEvent<HTMLAnchorElement>) => {
+      haptics.light();
+      if (location.pathname === path) {
+        event.preventDefault();
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      }
+    },
+    [location.pathname],
+  );
 
   const resolvedMentorId = getResolvedMentorId(profile);
 
@@ -88,7 +102,7 @@ export const BottomNav = memo(() => {
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
             activeClassName="bg-orange-500/12"
             data-tour="mentor-tab"
-            onClick={() => haptics.light()}
+            onClick={handleTabClick("/mentor")}
             onMouseEnter={() => handlePrefetch('mentor')}
             onFocus={() => handlePrefetch('mentor')}
           >
@@ -138,7 +152,7 @@ export const BottomNav = memo(() => {
             to="/inbox"
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
             activeClassName="bg-celestial-blue/12"
-            onClick={() => haptics.light()}
+            onClick={handleTabClick("/inbox")}
             onMouseEnter={() => handlePrefetch('inbox')}
             onFocus={() => handlePrefetch('inbox')}
           >
@@ -183,7 +197,7 @@ export const BottomNav = memo(() => {
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
             activeClassName="bg-cosmiq-glow/12"
             data-tour="quests-tab"
-            onClick={() => haptics.light()}
+            onClick={handleTabClick("/journeys")}
             onPointerDown={prefetchJourneysTasks}
             onMouseEnter={() => handlePrefetch('journeys')}
             onFocus={() => handlePrefetch('journeys')}
@@ -222,7 +236,7 @@ export const BottomNav = memo(() => {
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
             activeClassName="bg-stardust-gold/12"
             data-tour="companion-tab"
-            onClick={() => haptics.light()}
+            onClick={handleTabClick("/companion")}
             onMouseEnter={() => handlePrefetch('companion')}
             onFocus={() => handlePrefetch('companion')}
           >

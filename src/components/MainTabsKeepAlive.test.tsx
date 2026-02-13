@@ -108,18 +108,22 @@ describe("MainTabsKeepAlive", () => {
     expect(inboxPanel).toHaveAttribute("data-main-tab-active", "true");
   });
 
-  it("restores saved scroll position when returning to a tab", () => {
+  it("resets scroll to top on each tab switch", () => {
     const scrollToSpy = vi.spyOn(window, "scrollTo");
     const { rerender } = render(<MainTabsKeepAlive activePath="/mentor" transitionPreset="none" />);
 
+    scrollToSpy.mockClear();
     (window as Window & { scrollY: number }).scrollY = 140;
     rerender(<MainTabsKeepAlive activePath="/inbox" transitionPreset="none" />);
+
+    let lastCallArg = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions | undefined;
+    expect(lastCallArg).toMatchObject({ top: 0, left: 0, behavior: "auto" });
 
     (window as Window & { scrollY: number }).scrollY = 320;
     rerender(<MainTabsKeepAlive activePath="/mentor" transitionPreset="none" />);
 
-    const lastCallArg = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions | undefined;
-    expect(lastCallArg).toMatchObject({ top: 140, left: 0, behavior: "auto" });
+    lastCallArg = scrollToSpy.mock.calls.at(-1)?.[0] as ScrollToOptions | undefined;
+    expect(lastCallArg).toMatchObject({ top: 0, left: 0, behavior: "auto" });
   });
 
   it("uses exiting state only when fade-slide transitions are enabled", async () => {

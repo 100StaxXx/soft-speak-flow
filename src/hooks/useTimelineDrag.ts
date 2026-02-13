@@ -7,6 +7,8 @@ const PIXELS_PER_5_MIN = 20;
 const TOUCH_HOLD_MS = 180;
 const TOUCH_CANCEL_THRESHOLD = 8;
 const DROP_BOUNCE_MS = 300;
+const LIGHT_HAPTIC_MIN_INTERVAL_MS = 45;
+const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -72,6 +74,7 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const pendingTouchDragRef = useRef<{ taskId: string; scheduledTime: string; startY: number } | null>(null);
   const windowListenersRef = useRef<WindowListeners>({});
+  const lastLightHapticAtRef = useRef(0);
 
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -80,6 +83,10 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     edgeThreshold: 80,
     scrollSpeed: 8,
   });
+
+  const isInteractiveEventTarget = useCallback((target: EventTarget | null) => {
+    return target instanceof Element && !!target.closest(INTERACTIVE_SELECTOR);
+  }, []);
 
   const clearTouchHoldTimer = useCallback(() => {
     if (touchHoldTimerRef.current) {
@@ -120,7 +127,11 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
       if (newMinutes !== lastSnappedMinutesRef.current) {
         lastSnappedMinutesRef.current = newMinutes;
         setPreviewTime(minutesToTime(newMinutes));
-        void triggerHaptic(ImpactStyle.Light);
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        if (now - lastLightHapticAtRef.current >= LIGHT_HAPTIC_MIN_INTERVAL_MS) {
+          lastLightHapticAtRef.current = now;
+          void triggerHaptic(ImpactStyle.Light);
+        }
       }
     },
     [dragOffsetY, updateAutoscroll],
@@ -169,6 +180,7 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
       setDraggingTaskId(taskId);
       setPreviewTime(scheduledTime);
       dragOffsetY.set(0);
+      lastLightHapticAtRef.current = 0;
 
       void triggerHaptic(ImpactStyle.Medium);
 
@@ -212,6 +224,7 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
   const beginTouchHold = useCallback(
     (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (draggingTaskIdRef.current) return;
+      if (isInteractiveEventTarget(e.target)) return;
       const touch = e.touches[0];
       if (!touch) return;
 
@@ -227,7 +240,7 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
         startDrag(pending.taskId, pending.scheduledTime, pending.startY);
       }, TOUCH_HOLD_MS);
     },
-    [clearTouchHoldTimer, startDrag],
+    [clearTouchHoldTimer, isInteractiveEventTarget, startDrag],
   );
 
   const moveTouchHold = useCallback(
@@ -266,6 +279,7 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (draggingTaskIdRef.current) return;
+      if (isInteractiveEventTarget(e.target)) return;
       if (e.pointerType === "touch") return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
@@ -273,10 +287,21 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
       e.stopPropagation();
       startDrag(taskId, scheduledTime, e.clientY);
     },
-    [startDrag],
+    [isInteractiveEventTarget, startDrag],
   );
 
   const getDragHandleProps = useCallback(
+    (taskId: string, scheduledTime: string): DragHandleProps => ({
+      onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
+      onTouchStart: (e) => beginTouchHold(e, taskId, scheduledTime),
+      onTouchMove: moveTouchHold,
+      onTouchEnd: endTouchHold,
+      onTouchCancel: endTouchHold,
+    }),
+    [beginTouchHold, endTouchHold, handlePointerDown, moveTouchHold],
+  );
+
+  const getRowDragProps = useCallback(
     (taskId: string, scheduledTime: string): DragHandleProps => ({
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
       onTouchStart: (e) => beginTouchHold(e, taskId, scheduledTime),
@@ -303,5 +328,6 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     justDroppedId,
     isDragging: draggingTaskId !== null,
     getDragHandleProps,
+    getRowDragProps,
   };
 }
