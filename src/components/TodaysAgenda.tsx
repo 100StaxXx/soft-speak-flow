@@ -786,8 +786,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
                 )}
                 style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
-                onPointerDownCapture={(e) => e.stopPropagation()}
-                onTouchStartCapture={(e) => e.stopPropagation()}
+                // Keep drag start handlers in bubble phase; capture stopPropagation here blocks handle drag start.
                 {...timelineDragHandleProps}
               >
                 <GripVertical className="w-4 h-4" />

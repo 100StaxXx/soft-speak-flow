@@ -43,6 +43,7 @@ const createTouchEvent = (
     touches: [{ clientX: 0, clientY: y }],
     changedTouches: [{ clientX: 0, clientY: y }],
     target: target ?? document.createElement("div"),
+    preventDefault: vi.fn(),
     stopPropagation: vi.fn(),
   }) as unknown as React.TouchEvent<HTMLElement>;
 
@@ -253,13 +254,10 @@ describe("useTimelineDrag", () => {
     });
     expect(result.current.draggingTaskId).toBeNull();
 
-    vi.useFakeTimers();
     act(() => {
       handleProps.onTouchStart(createTouchEvent(100, child));
-      vi.advanceTimersByTime(200);
     });
     expect(result.current.draggingTaskId).toBeNull();
-    vi.useRealTimers();
   });
 
   it("skips onDrop when the dragged time is unchanged", () => {
@@ -275,9 +273,7 @@ describe("useTimelineDrag", () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 
-  it("starts drag on touch after short hold, and cancels hold on movement", () => {
-    vi.useFakeTimers();
-
+  it("starts drag immediately on touch and supports quick touch drag/drop", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
 
@@ -285,12 +281,6 @@ describe("useTimelineDrag", () => {
 
     act(() => {
       handleProps.onTouchStart(createTouchEvent(100));
-      vi.advanceTimersByTime(179);
-    });
-    expect(result.current.draggingTaskId).toBeNull();
-
-    act(() => {
-      vi.advanceTimersByTime(1);
     });
     expect(result.current.draggingTaskId).toBe("task-1");
 
@@ -299,13 +289,6 @@ describe("useTimelineDrag", () => {
       dispatchTouchEnd();
     });
     expect(onDrop).toHaveBeenCalledWith("task-1", "09:15");
-
-    act(() => {
-      handleProps.onTouchStart(createTouchEvent(100));
-      handleProps.onTouchMove(createTouchEvent(111));
-      vi.advanceTimersByTime(200);
-    });
-    expect(result.current.draggingTaskId).toBeNull();
   });
 
   it("clamps time range to 00:00 through 23:55", () => {

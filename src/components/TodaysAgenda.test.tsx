@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const subtaskEqMock = vi.fn();
   const subtaskUpdateMock = vi.fn();
-  const getDragHandlePropsMock = vi.fn(() => ({}));
+  const handlePointerDownSpy = vi.fn();
+  const handleTouchStartSpy = vi.fn();
+  const getDragHandlePropsMock = vi.fn(() => ({
+    onPointerDown: handlePointerDownSpy,
+    onTouchStart: handleTouchStartSpy,
+  }));
   const getRowDragPropsMock = vi.fn(() => ({}));
   const swipeableDisabledStates: Array<boolean | undefined> = [];
   const timelineDragState = {
@@ -29,6 +34,8 @@ const mocks = vi.hoisted(() => {
   return {
     subtaskEqMock,
     subtaskUpdateMock,
+    handlePointerDownSpy,
+    handleTouchStartSpy,
     getDragHandlePropsMock,
     getRowDragPropsMock,
     swipeableDisabledStates,
@@ -151,6 +158,8 @@ describe("TodaysAgenda subtasks", () => {
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
+    mocks.handlePointerDownSpy.mockClear();
+    mocks.handleTouchStartSpy.mockClear();
     mocks.getDragHandlePropsMock.mockClear();
     mocks.getRowDragPropsMock.mockClear();
     mocks.subtaskEqMock.mockResolvedValue({ error: null });
@@ -342,6 +351,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
+    mocks.handlePointerDownSpy.mockClear();
+    mocks.handleTouchStartSpy.mockClear();
     mocks.getDragHandlePropsMock.mockClear();
     mocks.getRowDragPropsMock.mockClear();
     mocks.swipeableDisabledStates.length = 0;
@@ -410,6 +421,74 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     expect(mocks.getDragHandlePropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
     expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards pointer down from grip handle to drag handler", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const grip = screen.getByRole("button", { name: /drag to reschedule/i });
+    fireEvent.pointerDown(grip, { pointerType: "mouse", button: 0, clientY: 100 });
+
+    expect(mocks.handlePointerDownSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards touch start from grip handle to drag handler", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const grip = screen.getByRole("button", { name: /drag to reschedule/i });
+    fireEvent.touchStart(grip, { touches: [{ clientX: 0, clientY: 100 }] });
+
+    expect(mocks.handleTouchStartSpy).toHaveBeenCalledTimes(1);
   });
 
   it("shows overlap warning text for conflicting tasks", () => {

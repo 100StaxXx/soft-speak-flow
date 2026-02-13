@@ -15,8 +15,6 @@ import {
   time24ToMinute,
 } from "@/components/calendar/dragSnap";
 
-const TOUCH_HOLD_MS = 180;
-const TOUCH_CANCEL_THRESHOLD = 8;
 const DROP_BOUNCE_MS = 300;
 const LIGHT_HAPTIC_MIN_INTERVAL_MS = 45;
 const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
@@ -84,10 +82,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   const runtimeScaleRef = useRef<AdaptiveSnapRuntimeScale>(
     buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight()),
   );
-  const touchHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const pendingTouchDragRef = useRef<{ taskId: string; scheduledTime: string; startY: number } | null>(null);
   const windowListenersRef = useRef<WindowListeners>({});
   const lastLightHapticAtRef = useRef(0);
   const snapModeRef = useRef<DragSnapMode>("coarse");
@@ -102,13 +97,6 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
   const isInteractiveEventTarget = useCallback((target: EventTarget | null) => {
     return target instanceof Element && !!target.closest(INTERACTIVE_SELECTOR);
-  }, []);
-
-  const clearTouchHoldTimer = useCallback(() => {
-    if (touchHoldTimerRef.current) {
-      clearTimeout(touchHoldTimerRef.current);
-      touchHoldTimerRef.current = null;
-    }
   }, []);
 
   const clearDropResetTimer = useCallback(() => {
@@ -254,9 +242,6 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
   const finishDrag = useCallback(() => {
     removeWindowListeners();
-    clearTouchHoldTimer();
-    pendingTouchDragRef.current = null;
-    touchStartPosRef.current = null;
 
     const taskId = draggingTaskIdRef.current;
     const finalTime = minuteToTime24(lastSnappedMinutesRef.current, resolvedSnapConfig);
@@ -280,7 +265,6 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     resetSnapState();
   }, [
     clearDropResetTimer,
-    clearTouchHoldTimer,
     dragOffsetY,
     onDrop,
     removeWindowListeners,
@@ -294,7 +278,6 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       if (draggingTaskIdRef.current) return;
 
       removeWindowListeners();
-      clearTouchHoldTimer();
 
       const safeStartY = Number.isFinite(startY) ? startY : 0;
       const startMinute = time24ToMinute(scheduledTime, resolvedSnapConfig);
@@ -361,7 +344,6 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       window.addEventListener("touchcancel", touchEnd);
     },
     [
-      clearTouchHoldTimer,
       dragOffsetY,
       finishDrag,
       handleMove,
@@ -370,59 +352,32 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     ],
   );
 
-  const beginTouchHold = useCallback(
+  const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (draggingTaskIdRef.current) return;
       if (isInteractiveEventTarget(e.target)) return;
       const touch = e.touches[0];
       if (!touch) return;
 
+      e.preventDefault();
       e.stopPropagation();
-
-      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-      pendingTouchDragRef.current = { taskId, scheduledTime, startY: touch.clientY };
-
-      clearTouchHoldTimer();
-      touchHoldTimerRef.current = setTimeout(() => {
-        const pending = pendingTouchDragRef.current;
-        if (!pending) return;
-        startDrag(pending.taskId, pending.scheduledTime, pending.startY);
-      }, TOUCH_HOLD_MS);
+      startDrag(taskId, scheduledTime, touch.clientY);
     },
-    [clearTouchHoldTimer, isInteractiveEventTarget, startDrag],
+    [isInteractiveEventTarget, startDrag],
   );
 
-  const moveTouchHold = useCallback(
+  const noopTouchMove = useCallback(
     (e: React.TouchEvent<HTMLElement>) => {
-      if (draggingTaskIdRef.current) return;
-      if (!touchStartPosRef.current) return;
-
       e.stopPropagation();
-
-      const touch = e.touches[0];
-      if (!touch) return;
-
-      const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
-      const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-      if (dx > TOUCH_CANCEL_THRESHOLD || dy > TOUCH_CANCEL_THRESHOLD) {
-        clearTouchHoldTimer();
-        pendingTouchDragRef.current = null;
-        touchStartPosRef.current = null;
-      }
     },
-    [clearTouchHoldTimer],
+    [],
   );
 
-  const endTouchHold = useCallback(
+  const noopTouchEnd = useCallback(
     (e: React.TouchEvent<HTMLElement>) => {
       e.stopPropagation();
-      if (!draggingTaskIdRef.current) {
-        clearTouchHoldTimer();
-        pendingTouchDragRef.current = null;
-        touchStartPosRef.current = null;
-      }
     },
-    [clearTouchHoldTimer],
+    [],
   );
 
   const handlePointerDown = useCallback(
@@ -442,33 +397,32 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   const getDragHandleProps = useCallback(
     (taskId: string, scheduledTime: string): DragHandleProps => ({
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
-      onTouchStart: (e) => beginTouchHold(e, taskId, scheduledTime),
-      onTouchMove: moveTouchHold,
-      onTouchEnd: endTouchHold,
-      onTouchCancel: endTouchHold,
+      onTouchStart: (e) => handleTouchStart(e, taskId, scheduledTime),
+      onTouchMove: noopTouchMove,
+      onTouchEnd: noopTouchEnd,
+      onTouchCancel: noopTouchEnd,
     }),
-    [beginTouchHold, endTouchHold, handlePointerDown, moveTouchHold],
+    [handlePointerDown, handleTouchStart, noopTouchEnd, noopTouchMove],
   );
 
   const getRowDragProps = useCallback(
     (taskId: string, scheduledTime: string): DragHandleProps => ({
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
-      onTouchStart: (e) => beginTouchHold(e, taskId, scheduledTime),
-      onTouchMove: moveTouchHold,
-      onTouchEnd: endTouchHold,
-      onTouchCancel: endTouchHold,
+      onTouchStart: (e) => handleTouchStart(e, taskId, scheduledTime),
+      onTouchMove: noopTouchMove,
+      onTouchEnd: noopTouchEnd,
+      onTouchCancel: noopTouchEnd,
     }),
-    [beginTouchHold, endTouchHold, handlePointerDown, moveTouchHold],
+    [handlePointerDown, handleTouchStart, noopTouchEnd, noopTouchMove],
   );
 
   useEffect(() => {
     return () => {
       removeWindowListeners();
-      clearTouchHoldTimer();
       clearDropResetTimer();
       stopScroll();
     };
-  }, [clearDropResetTimer, clearTouchHoldTimer, removeWindowListeners, stopScroll]);
+  }, [clearDropResetTimer, removeWindowListeners, stopScroll]);
 
   return {
     draggingTaskId,
