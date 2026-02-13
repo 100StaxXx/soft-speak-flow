@@ -1,9 +1,18 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useMotionValue, type MotionValue } from "framer-motion";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { useAutoscroll } from "@/hooks/useAutoscroll";
+import {
+  AdaptiveSnapConfig,
+  DragSnapMode,
+  DragZoomRailState,
+  buildDragZoomRailState,
+  computeAdaptiveMinute,
+  minuteToTime24,
+  resolveAdaptiveSnapConfig,
+  time24ToMinute,
+} from "@/components/calendar/dragSnap";
 
-const PIXELS_PER_5_MIN = 20;
 const TOUCH_HOLD_MS = 180;
 const TOUCH_CANCEL_THRESHOLD = 8;
 const DROP_BOUNCE_MS = 300;
@@ -18,26 +27,10 @@ const triggerHaptic = async (style: ImpactStyle) => {
   }
 };
 
-/** Clamp total minutes to 0..1435 (00:00 – 23:55) */
-const clampMinutes = (m: number) => Math.max(0, Math.min(1435, m));
-
-/** Convert "HH:mm" → total minutes */
-const timeToMinutes = (t: string): number => {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-};
-
-/** Convert total minutes → "HH:mm" */
-const minutesToTime = (totalMin: number): string => {
-  const clamped = clampMinutes(totalMin);
-  const h = Math.floor(clamped / 60);
-  const m = clamped % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-};
-
 interface UseTimelineDragOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   onDrop: (taskId: string, newTime: string) => void;
+  snapConfig?: Partial<AdaptiveSnapConfig>;
 }
 
 interface DragHandleProps {
@@ -57,10 +50,16 @@ interface WindowListeners {
   touchcancel?: () => void;
 }
 
-export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions) {
+const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+
+export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelineDragOptions) {
+  const resolvedSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(snapConfig), [snapConfig]);
+
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [previewTime, setPreviewTime] = useState<string | null>(null);
   const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
+  const [snapMode, setSnapMode] = useState<DragSnapMode>("coarse");
+  const [zoomRail, setZoomRail] = useState<DragZoomRailState | null>(null);
   const dragOffsetY = useMotionValue(0);
 
   // Refs (no drag-frame re-renders)
@@ -69,12 +68,17 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
   const originalMinutesRef = useRef(540);
   const dragStartYRef = useRef(0);
   const lastSnappedMinutesRef = useRef(540);
+  const fineAnchorMinuteRef = useRef<number | null>(null);
+  const fineAnchorClientYRef = useRef<number | null>(null);
+  const coarseDwellOriginYRef = useRef(0);
+  const coarseDwellStartedAtRef = useRef(0);
   const touchHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const pendingTouchDragRef = useRef<{ taskId: string; scheduledTime: string; startY: number } | null>(null);
   const windowListenersRef = useRef<WindowListeners>({});
   const lastLightHapticAtRef = useRef(0);
+  const snapModeRef = useRef<DragSnapMode>("coarse");
 
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -113,28 +117,81 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     windowListenersRef.current = {};
   }, []);
 
+  const resetSnapState = useCallback(() => {
+    snapModeRef.current = "coarse";
+    setSnapMode("coarse");
+    setZoomRail(null);
+    fineAnchorMinuteRef.current = null;
+    fineAnchorClientYRef.current = null;
+    coarseDwellOriginYRef.current = 0;
+    coarseDwellStartedAtRef.current = 0;
+  }, []);
+
+  const maybeActivateFineMode = useCallback((clientY: number) => {
+    if (snapModeRef.current !== "coarse") return;
+
+    const dwellDistance = Math.abs(clientY - coarseDwellOriginYRef.current);
+    if (dwellDistance > resolvedSnapConfig.fineActivationMovementPx) {
+      coarseDwellOriginYRef.current = clientY;
+      coarseDwellStartedAtRef.current = nowMs();
+      return;
+    }
+
+    const dwellDuration = nowMs() - coarseDwellStartedAtRef.current;
+    if (dwellDuration < resolvedSnapConfig.fineActivationHoldMs) {
+      return;
+    }
+
+    snapModeRef.current = "fine";
+    setSnapMode("fine");
+    fineAnchorMinuteRef.current = lastSnappedMinutesRef.current;
+    fineAnchorClientYRef.current = clientY;
+  }, [resolvedSnapConfig.fineActivationHoldMs, resolvedSnapConfig.fineActivationMovementPx]);
+
   const handleMove = useCallback(
     (clientY: number) => {
       if (!draggingTaskIdRef.current) return;
 
-      const deltaY = clientY - dragStartYRef.current;
+      const safeClientY = Number.isFinite(clientY) ? clientY : dragStartYRef.current;
+      const deltaY = safeClientY - dragStartYRef.current;
       dragOffsetY.set(deltaY);
-      updateAutoscroll(clientY);
+      updateAutoscroll(safeClientY);
 
-      const deltaMinutes = Math.round(deltaY / PIXELS_PER_5_MIN) * 5;
-      const newMinutes = clampMinutes(originalMinutesRef.current + deltaMinutes);
+      maybeActivateFineMode(safeClientY);
 
+      const computed = computeAdaptiveMinute({
+        startMinute: originalMinutesRef.current,
+        startClientY: dragStartYRef.current,
+        currentClientY: safeClientY,
+        mode: snapModeRef.current,
+        lastSnappedMinute: lastSnappedMinutesRef.current,
+        fineAnchorMinute: fineAnchorMinuteRef.current,
+        fineAnchorClientY: fineAnchorClientYRef.current,
+        config: resolvedSnapConfig,
+      });
+
+      fineAnchorMinuteRef.current = computed.fineAnchorMinute;
+      fineAnchorClientYRef.current = computed.fineAnchorClientY;
+
+      const newMinutes = computed.snappedMinute;
       if (newMinutes !== lastSnappedMinutesRef.current) {
         lastSnappedMinutesRef.current = newMinutes;
-        setPreviewTime(minutesToTime(newMinutes));
-        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        setPreviewTime(minuteToTime24(newMinutes, resolvedSnapConfig));
+        const now = nowMs();
         if (now - lastLightHapticAtRef.current >= LIGHT_HAPTIC_MIN_INTERVAL_MS) {
           lastLightHapticAtRef.current = now;
           void triggerHaptic(ImpactStyle.Light);
         }
       }
+
+      setZoomRail(buildDragZoomRailState(
+        snapModeRef.current,
+        safeClientY,
+        newMinutes,
+        resolvedSnapConfig,
+      ));
     },
-    [dragOffsetY, updateAutoscroll],
+    [dragOffsetY, maybeActivateFineMode, resolvedSnapConfig, updateAutoscroll],
   );
 
   const finishDrag = useCallback(() => {
@@ -144,7 +201,7 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     touchStartPosRef.current = null;
 
     const taskId = draggingTaskIdRef.current;
-    const finalTime = minutesToTime(lastSnappedMinutesRef.current);
+    const finalTime = minuteToTime24(lastSnappedMinutesRef.current, resolvedSnapConfig);
     const didChange = taskId && finalTime !== originalTimeRef.current;
 
     if (taskId && didChange) {
@@ -162,7 +219,17 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     setPreviewTime(null);
     dragOffsetY.set(0);
     stopScroll();
-  }, [clearDropResetTimer, clearTouchHoldTimer, dragOffsetY, onDrop, removeWindowListeners, stopScroll]);
+    resetSnapState();
+  }, [
+    clearDropResetTimer,
+    clearTouchHoldTimer,
+    dragOffsetY,
+    onDrop,
+    removeWindowListeners,
+    resetSnapState,
+    resolvedSnapConfig,
+    stopScroll,
+  ]);
 
   const startDrag = useCallback(
     (taskId: string, scheduledTime: string, startY: number) => {
@@ -171,16 +238,25 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
       removeWindowListeners();
       clearTouchHoldTimer();
 
+      const safeStartY = Number.isFinite(startY) ? startY : 0;
+      const startMinute = time24ToMinute(scheduledTime, resolvedSnapConfig);
+      const normalizedStartTime = minuteToTime24(startMinute, resolvedSnapConfig);
+
       draggingTaskIdRef.current = taskId;
-      originalTimeRef.current = scheduledTime;
-      originalMinutesRef.current = timeToMinutes(scheduledTime);
-      lastSnappedMinutesRef.current = originalMinutesRef.current;
-      dragStartYRef.current = startY;
+      originalTimeRef.current = normalizedStartTime;
+      originalMinutesRef.current = startMinute;
+      lastSnappedMinutesRef.current = startMinute;
+      dragStartYRef.current = safeStartY;
+      coarseDwellOriginYRef.current = safeStartY;
+      coarseDwellStartedAtRef.current = nowMs();
 
       setDraggingTaskId(taskId);
-      setPreviewTime(scheduledTime);
+      setPreviewTime(normalizedStartTime);
       dragOffsetY.set(0);
       lastLightHapticAtRef.current = 0;
+
+      resetSnapState();
+      setZoomRail(buildDragZoomRailState("coarse", safeStartY, startMinute, resolvedSnapConfig));
 
       void triggerHaptic(ImpactStyle.Medium);
 
@@ -218,7 +294,15 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
       window.addEventListener("touchend", touchEnd);
       window.addEventListener("touchcancel", touchEnd);
     },
-    [clearTouchHoldTimer, dragOffsetY, finishDrag, handleMove, removeWindowListeners],
+    [
+      clearTouchHoldTimer,
+      dragOffsetY,
+      finishDrag,
+      handleMove,
+      removeWindowListeners,
+      resetSnapState,
+      resolvedSnapConfig,
+    ],
   );
 
   const beginTouchHold = useCallback(
@@ -327,6 +411,8 @@ export function useTimelineDrag({ containerRef, onDrop }: UseTimelineDragOptions
     dragOffsetY: dragOffsetY as MotionValue<number>,
     justDroppedId,
     isDragging: draggingTaskId !== null,
+    snapMode,
+    zoomRail,
     getDragHandleProps,
     getRowDragProps,
   };

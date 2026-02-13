@@ -39,6 +39,29 @@ const setButtonLayoutMetrics = (scroller: HTMLDivElement) => {
   });
 };
 
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const waitForProgrammaticLockToClear = () => wait(150);
+
+const attachScrollToSpy = (scroller: HTMLDivElement) => {
+  const scrollToSpy = vi.fn((options?: ScrollToOptions | number) => {
+    if (typeof options === "object" && options !== null && typeof options.left === "number") {
+      Object.defineProperty(scroller, "scrollLeft", {
+        configurable: true,
+        writable: true,
+        value: options.left,
+      });
+    }
+  });
+
+  Object.defineProperty(scroller, "scrollTo", {
+    configurable: true,
+    value: scrollToSpy,
+  });
+
+  return scrollToSpy;
+};
+
 describe("DatePillsScroller", () => {
   it("extends the range when scrolled near the right edge", async () => {
     const onDateSelect = vi.fn();
@@ -55,6 +78,7 @@ describe("DatePillsScroller", () => {
 
     const initialCount = scroller.querySelectorAll("button").length;
 
+    await waitForProgrammaticLockToClear();
     setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
     fireEvent.scroll(scroller);
 
@@ -76,6 +100,7 @@ describe("DatePillsScroller", () => {
     const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
     const initialCount = scroller.querySelectorAll("button").length;
 
+    await waitForProgrammaticLockToClear();
     setScrollMetrics(scroller, { scrollLeft: 20, clientWidth: 320, scrollWidth: 1000 });
     fireEvent.scroll(scroller);
 
@@ -95,6 +120,7 @@ describe("DatePillsScroller", () => {
     );
 
     const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+    await waitForProgrammaticLockToClear();
     setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
     fireEvent.scroll(scroller);
 
@@ -121,17 +147,10 @@ describe("DatePillsScroller", () => {
     );
 
     const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
-    setScrollMetrics(scroller, { scrollLeft: 0, clientWidth: 320, scrollWidth: 3000 });
+    setScrollMetrics(scroller, { scrollLeft: 200, clientWidth: 320, scrollWidth: 3000 });
     setButtonLayoutMetrics(scroller);
 
-    const scrollToSpy = vi.fn();
-    Object.defineProperty(scroller, "scrollTo", {
-      configurable: true,
-      value: scrollToSpy,
-    });
-    await waitFor(() => {
-      expect(scrollToSpy.mock.calls.length).toBeGreaterThanOrEqual(0);
-    });
+    const scrollToSpy = attachScrollToSpy(scroller);
     scrollToSpy.mockClear();
 
     rerender(
@@ -158,17 +177,10 @@ describe("DatePillsScroller", () => {
     );
 
     const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
-    setScrollMetrics(scroller, { scrollLeft: 0, clientWidth: 320, scrollWidth: 3000 });
+    setScrollMetrics(scroller, { scrollLeft: 200, clientWidth: 320, scrollWidth: 3000 });
     setButtonLayoutMetrics(scroller);
 
-    const scrollToSpy = vi.fn();
-    Object.defineProperty(scroller, "scrollTo", {
-      configurable: true,
-      value: scrollToSpy,
-    });
-    await waitFor(() => {
-      expect(scrollToSpy.mock.calls.length).toBeGreaterThanOrEqual(0);
-    });
+    const scrollToSpy = attachScrollToSpy(scroller);
     scrollToSpy.mockClear();
 
     rerender(
@@ -184,7 +196,7 @@ describe("DatePillsScroller", () => {
     });
   });
 
-  it("does not snap when selected date remains in the same week", async () => {
+  it("recenters selected date when selected date remains in the same week", async () => {
     const onDateSelect = vi.fn();
 
     const { container, rerender } = render(
@@ -195,17 +207,10 @@ describe("DatePillsScroller", () => {
     );
 
     const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
-    setScrollMetrics(scroller, { scrollLeft: 0, clientWidth: 320, scrollWidth: 3000 });
+    setScrollMetrics(scroller, { scrollLeft: 200, clientWidth: 320, scrollWidth: 3000 });
     setButtonLayoutMetrics(scroller);
 
-    const scrollToSpy = vi.fn();
-    Object.defineProperty(scroller, "scrollTo", {
-      configurable: true,
-      value: scrollToSpy,
-    });
-    await waitFor(() => {
-      expect(scrollToSpy.mock.calls.length).toBeGreaterThanOrEqual(0);
-    });
+    const scrollToSpy = attachScrollToSpy(scroller);
     scrollToSpy.mockClear();
 
     rerender(
@@ -235,14 +240,7 @@ describe("DatePillsScroller", () => {
     setScrollMetrics(scroller, { scrollLeft: 0, clientWidth: 320, scrollWidth: 3000 });
     setButtonLayoutMetrics(scroller);
 
-    const scrollToSpy = vi.fn();
-    Object.defineProperty(scroller, "scrollTo", {
-      configurable: true,
-      value: scrollToSpy,
-    });
-    await waitFor(() => {
-      expect(scrollToSpy.mock.calls.length).toBeGreaterThanOrEqual(0);
-    });
+    const scrollToSpy = attachScrollToSpy(scroller);
     scrollToSpy.mockClear();
 
     rerender(
@@ -256,5 +254,98 @@ describe("DatePillsScroller", () => {
     await waitFor(() => {
       expect(scrollToSpy).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("snaps to nearest week start after manual scroll idle", async () => {
+    const onDateSelect = vi.fn();
+
+    const { container } = render(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-13T12:00:00.000Z")}
+        onDateSelect={onDateSelect}
+      />,
+    );
+
+    const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+    setScrollMetrics(scroller, { scrollLeft: 500, clientWidth: 320, scrollWidth: 3000 });
+    setButtonLayoutMetrics(scroller);
+
+    const scrollToSpy = attachScrollToSpy(scroller);
+    await waitForProgrammaticLockToClear();
+    scrollToSpy.mockClear();
+
+    fireEvent.scroll(scroller);
+
+    await waitFor(() => {
+      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+    });
+
+    const [options] = scrollToSpy.mock.calls[0] as [ScrollToOptions];
+    expect(options.left).toBe(532);
+    expect(options.behavior).toBe("smooth");
+  });
+
+  it("does not issue a manual snap when already aligned within epsilon", async () => {
+    const onDateSelect = vi.fn();
+
+    const { container } = render(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-13T12:00:00.000Z")}
+        onDateSelect={onDateSelect}
+      />,
+    );
+
+    const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+    setScrollMetrics(scroller, { scrollLeft: 532, clientWidth: 320, scrollWidth: 3000 });
+    setButtonLayoutMetrics(scroller);
+
+    const scrollToSpy = attachScrollToSpy(scroller);
+    await waitForProgrammaticLockToClear();
+    scrollToSpy.mockClear();
+
+    fireEvent.scroll(scroller);
+    await wait(180);
+
+    expect(scrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("ignores edge expansion while programmatic week snap lock is active", async () => {
+    const onDateSelect = vi.fn();
+
+    const { container, rerender } = render(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-13T12:00:00.000Z")}
+        onDateSelect={onDateSelect}
+      />,
+    );
+
+    const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+    setScrollMetrics(scroller, { scrollLeft: 0, clientWidth: 320, scrollWidth: 3000 });
+    setButtonLayoutMetrics(scroller);
+
+    const scrollToSpy = attachScrollToSpy(scroller);
+    await waitForProgrammaticLockToClear();
+    scrollToSpy.mockClear();
+
+    const initialCount = scroller.querySelectorAll("button").length;
+
+    rerender(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-16T12:00:00.000Z")}
+        onDateSelect={onDateSelect}
+      />,
+    );
+    setButtonLayoutMetrics(scroller);
+
+    await waitFor(() => {
+      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+    });
+
+    setScrollMetrics(scroller, { scrollLeft: 700, clientWidth: 320, scrollWidth: 1000 });
+    fireEvent.scroll(scroller);
+    await wait(40);
+
+    expect(scroller.querySelectorAll("button").length).toBe(initialCount);
+    expect(scrollToSpy).toHaveBeenCalledTimes(1);
   });
 });

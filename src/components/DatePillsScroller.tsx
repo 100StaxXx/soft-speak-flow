@@ -23,6 +23,9 @@ interface DatePillsScrollerProps {
 
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
+const MANUAL_SNAP_IDLE_MS = 120;
+const SNAP_EPSILON_PX = 2;
+const WEEK_START_LEFT_OFFSET_PX = 8;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -60,12 +63,63 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false);
+  const manualSnapTimerRef = useRef<number | null>(null);
+  const programmaticUnlockTimerRef = useRef<number | null>(null);
+  const weekSnapRetryFrameRef = useRef<number | null>(null);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
   const [visibleWeekStart, setVisibleWeekStart] = useState<Date>(() => getWeekStart(selectedDate, weekStartsOn));
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
+
+  const clearManualSnapTimer = useCallback(() => {
+    if (manualSnapTimerRef.current === null || typeof window === "undefined") return;
+    window.clearTimeout(manualSnapTimerRef.current);
+    manualSnapTimerRef.current = null;
+  }, []);
+
+  const clearProgrammaticUnlockTimer = useCallback(() => {
+    if (programmaticUnlockTimerRef.current === null || typeof window === "undefined") return;
+    window.clearTimeout(programmaticUnlockTimerRef.current);
+    programmaticUnlockTimerRef.current = null;
+  }, []);
+
+  const clearWeekSnapRetryFrame = useCallback(() => {
+    if (weekSnapRetryFrameRef.current === null || typeof window === "undefined") return;
+    window.cancelAnimationFrame(weekSnapRetryFrameRef.current);
+    weekSnapRetryFrameRef.current = null;
+  }, []);
+
+  const scheduleProgrammaticUnlock = useCallback(() => {
+    if (typeof window === "undefined") return;
+    clearProgrammaticUnlockTimer();
+    programmaticUnlockTimerRef.current = window.setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+      programmaticUnlockTimerRef.current = null;
+    }, MANUAL_SNAP_IDLE_MS);
+  }, [clearProgrammaticUnlockTimer]);
+
+  const scrollToPosition = useCallback(
+    (targetLeft: number, behavior: ScrollBehavior = "smooth") => {
+      const container = scrollRef.current;
+      if (!container) return false;
+
+      const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+      const clampedLeft = Math.max(0, Math.min(targetLeft, maxScrollLeft));
+
+      if (Math.abs(container.scrollLeft - clampedLeft) <= SNAP_EPSILON_PX) {
+        return false;
+      }
+
+      isProgrammaticScrollRef.current = true;
+      scheduleProgrammaticUnlock();
+      container.scrollTo({ left: clampedLeft, behavior });
+      return true;
+    },
+    [scheduleProgrammaticUnlock],
+  );
 
   useEffect(() => {
     const nextRange = getInitialRange(selectedDate, daysToShow);
@@ -109,15 +163,53 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const targetButton = container.querySelector<HTMLButtonElement>(`button[data-date='${dateKey}']`);
     if (!targetButton) return false;
 
-    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-    const leftTarget = Math.max(0, Math.min(targetButton.offsetLeft - 8, maxScrollLeft));
-    container.scrollTo({ left: leftTarget, behavior: "smooth" });
-    return true;
-  }, []);
+    return scrollToPosition(targetButton.offsetLeft - WEEK_START_LEFT_OFFSET_PX, "smooth");
+  }, [scrollToPosition]);
+
+  const scheduleManualWeekSnap = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    clearManualSnapTimer();
+    manualSnapTimerRef.current = window.setTimeout(() => {
+      manualSnapTimerRef.current = null;
+      const container = scrollRef.current;
+
+      if (!container || isExpandingRef.current || isProgrammaticScrollRef.current) return;
+
+      const weekStartButtons = Array.from(
+        container.querySelectorAll<HTMLButtonElement>("button[data-week-start='true']"),
+      );
+
+      if (weekStartButtons.length === 0) return;
+
+      const currentLeft = container.scrollLeft;
+      let nearestLeft = weekStartButtons[0].offsetLeft - WEEK_START_LEFT_OFFSET_PX;
+      let nearestDistance = Math.abs(nearestLeft - currentLeft);
+
+      for (let index = 1; index < weekStartButtons.length; index += 1) {
+        const candidateLeft = weekStartButtons[index].offsetLeft - WEEK_START_LEFT_OFFSET_PX;
+        const candidateDistance = Math.abs(candidateLeft - currentLeft);
+        if (candidateDistance < nearestDistance) {
+          nearestDistance = candidateDistance;
+          nearestLeft = candidateLeft;
+        }
+      }
+
+      scrollToPosition(nearestLeft, "smooth");
+    }, MANUAL_SNAP_IDLE_MS);
+  }, [clearManualSnapTimer, scrollToPosition]);
 
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
-    if (!container || isExpandingRef.current) return;
+    if (!container) return;
+
+    if (isProgrammaticScrollRef.current) {
+      scheduleProgrammaticUnlock();
+      return;
+    }
+
+    scheduleManualWeekSnap();
+    if (isExpandingRef.current) return;
 
     const { scrollLeft, clientWidth, scrollWidth } = container;
 
@@ -135,7 +227,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       isExpandingRef.current = true;
       setRangeEnd((currentEnd) => addDays(currentEnd, extensionChunk));
     }
-  }, [extensionChunk]);
+  }, [extensionChunk, scheduleManualWeekSnap, scheduleProgrammaticUnlock]);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -155,6 +247,16 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     if (pendingWeekSnap) {
       if (snapToWeekStart(pendingWeekSnap)) {
         pendingWeekSnapRef.current = null;
+        clearWeekSnapRetryFrame();
+      } else if (typeof window !== "undefined" && weekSnapRetryFrameRef.current === null) {
+        weekSnapRetryFrameRef.current = window.requestAnimationFrame(() => {
+          weekSnapRetryFrameRef.current = null;
+          const retryWeekSnap = pendingWeekSnapRef.current;
+          if (!retryWeekSnap) return;
+          if (snapToWeekStart(retryWeekSnap)) {
+            pendingWeekSnapRef.current = null;
+          }
+        });
       }
     }
 
@@ -169,8 +271,9 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       if (frame !== null) {
         window.cancelAnimationFrame(frame);
       }
+      clearWeekSnapRetryFrame();
     };
-  }, [rangeEnd, rangeStart, snapToWeekStart]);
+  }, [clearWeekSnapRetryFrame, rangeEnd, rangeStart, snapToWeekStart]);
 
   useEffect(() => {
     const selectedWeekStart = getWeekStart(selectedDate, weekStartsOn);
@@ -216,12 +319,17 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const selectedLeft = selected.offsetLeft;
     const selectedWidth = selected.offsetWidth;
 
-    container.scrollTo({
-      left: selectedLeft - containerWidth / 2 + selectedWidth / 2,
-      behavior: "smooth",
-    });
+    scrollToPosition(selectedLeft - containerWidth / 2 + selectedWidth / 2, "smooth");
     shouldCenterOnSelectedRef.current = false;
-  }, [dates, selectedDate]);
+  }, [dates, scrollToPosition, selectedDate]);
+
+  useEffect(() => {
+    return () => {
+      clearManualSnapTimer();
+      clearProgrammaticUnlockTimer();
+      clearWeekSnapRetryFrame();
+    };
+  }, [clearManualSnapTimer, clearProgrammaticUnlockTimer, clearWeekSnapRetryFrame]);
 
   return (
     <div
@@ -233,6 +341,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       {dates.map((date) => {
         const isSelected = isSameDay(date, selectedDate);
         const isDayToday = isToday(date);
+        const isWeekStart = date.getDay() === weekStartsOn;
         const taskCount = getTaskCount(date);
         const dateKey = format(date, "yyyy-MM-dd");
 
@@ -240,6 +349,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
           <motion.button
             key={dateKey}
             data-date={dateKey}
+            data-week-start={isWeekStart ? "true" : undefined}
             ref={isSelected ? selectedRef : undefined}
             onClick={async () => {
               await triggerHaptic(ImpactStyle.Light);

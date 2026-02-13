@@ -13,6 +13,15 @@ const mocks = vi.hoisted(() => {
     justDroppedId: null as string | null,
     dragOffsetY: 0,
     previewTime: undefined as string | undefined,
+    snapMode: "coarse" as const,
+    zoomRail: null as
+      | {
+          mode: "coarse" | "fine";
+          clientY: number;
+          snappedMinute: number;
+          ticks: Array<{ minute: number; label: string; isCenter: boolean; isMajor: boolean }>;
+        }
+      | null,
   };
 
   return {
@@ -82,6 +91,11 @@ vi.mock("@/components/HourlyViewModal", () => ({
   HourlyViewModal: () => null,
 }));
 
+vi.mock("@/components/calendar/DragTimeZoomRail", () => ({
+  DragTimeZoomRail: ({ rail }: { rail: unknown }) =>
+    rail ? <div data-testid="drag-time-zoom-rail" /> : null,
+}));
+
 vi.mock("@/components/JourneyPathDrawer", () => ({
   JourneyPathDrawer: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -131,6 +145,8 @@ describe("TodaysAgenda subtasks", () => {
     mocks.timelineDragState.justDroppedId = null;
     mocks.timelineDragState.dragOffsetY = 0;
     mocks.timelineDragState.previewTime = undefined;
+    mocks.timelineDragState.snapMode = "coarse";
+    mocks.timelineDragState.zoomRail = null;
     mocks.subtaskEqMock.mockResolvedValue({ error: null });
     mocks.subtaskUpdateMock.mockReturnValue({
       eq: mocks.subtaskEqMock,
@@ -417,6 +433,45 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByText("09:45")).toBeInTheDocument();
+  });
+
+  it("renders zoom rail while drag preview is active", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.timelineDragState.zoomRail = {
+      mode: "fine",
+      clientY: 320,
+      snappedMinute: 585,
+      ticks: [],
+    };
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("drag-time-zoom-rail")).toBeInTheDocument();
   });
 
   it("keeps swipe enabled when not dragging and disables it for the active dragged row", () => {

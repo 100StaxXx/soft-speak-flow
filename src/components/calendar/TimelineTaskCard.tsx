@@ -1,7 +1,7 @@
 import { format } from "date-fns";
-import { useRef, useCallback } from "react";
+import type { PointerEventHandler, TouchEventHandler } from "react";
 import { cn } from "@/lib/utils";
-import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, Sun } from "lucide-react";
+import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, Sun, GripVertical } from "lucide-react";
 import { CalendarTask } from "@/types/quest";
 import { normalizeScheduledTime, parseScheduledTime } from "@/utils/scheduledTime";
 
@@ -11,9 +11,13 @@ interface TimelineTaskCardProps {
   onTaskLongPress?: (taskId: string) => void;
   isDragging?: boolean;
   previewTime?: string | null;
-  onDragStart?: () => void;
-  onDragMove?: (deltaY: number) => void;
-  onDragEnd?: () => void;
+  dragHandleProps?: {
+    onPointerDown?: PointerEventHandler<HTMLElement>;
+    onTouchStart?: TouchEventHandler<HTMLElement>;
+    onTouchMove?: TouchEventHandler<HTMLElement>;
+    onTouchEnd?: TouchEventHandler<HTMLElement>;
+    onTouchCancel?: TouchEventHandler<HTMLElement>;
+  };
 }
 
 const CATEGORY_CONFIG: Record<string, { icon: typeof Brain; bg: string; iconColor: string }> = {
@@ -51,69 +55,18 @@ export function TimelineTaskCard({
   onTaskLongPress,
   isDragging,
   previewTime,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
+  dragHandleProps,
 }: TimelineTaskCardProps) {
   const categoryConfig = CATEGORY_CONFIG[task.category || "default"] || CATEGORY_CONFIG.default;
   const IconComponent = categoryConfig.icon;
-  
-  // Drag tracking refs
-  const startYRef = useRef<number>(0);
-  const isDraggingRef = useRef(false);
 
   const handleClick = () => {
-    if (!isDraggingRef.current) {
-      onTaskClick?.(task);
-    }
+    onTaskClick?.(task);
   };
 
   const handleLongPress = () => {
     onTaskLongPress?.(task.id);
   };
-
-  // Touch/pointer event handlers for drag
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (task.completed || !onDragStart) return;
-    
-    e.preventDefault();
-    startYRef.current = e.clientY;
-    isDraggingRef.current = false;
-    
-    const element = e.currentTarget as HTMLElement;
-    element.setPointerCapture(e.pointerId);
-  }, [task.completed, onDragStart]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!startYRef.current || !onDragMove) return;
-    
-    const deltaY = e.clientY - startYRef.current;
-    
-    // Start drag after 5px threshold
-    if (!isDraggingRef.current && Math.abs(deltaY) > 5) {
-      isDraggingRef.current = true;
-      onDragStart?.();
-    }
-    
-    if (isDraggingRef.current) {
-      onDragMove(deltaY);
-    }
-  }, [onDragStart, onDragMove]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    const element = e.currentTarget as HTMLElement;
-    element.releasePointerCapture(e.pointerId);
-    
-    if (isDraggingRef.current) {
-      onDragEnd?.();
-    }
-    
-    startYRef.current = 0;
-    // Reset dragging state after a tick to prevent click firing
-    setTimeout(() => {
-      isDraggingRef.current = false;
-    }, 10);
-  }, [onDragEnd]);
 
   // Display time (show preview if dragging)
   const displayTime = previewTime || task.scheduled_time;
@@ -127,10 +80,6 @@ export function TimelineTaskCard({
         e.preventDefault();
         handleLongPress();
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
       className={cn(
         "flex items-center gap-4 py-3 cursor-pointer transition-all select-none touch-none",
         task.completed && "opacity-50",
@@ -179,20 +128,39 @@ export function TimelineTaskCard({
       </div>
 
       {/* Checkbox */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          // Toggle will be handled by parent
-        }}
-        className={cn(
-          "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
-          task.completed
-            ? "bg-coral-500 border-coral-500"
-            : "border-coral-500/50 hover:border-coral-500"
+      <div className="flex items-center gap-2">
+        {!task.completed && dragHandleProps && (
+          <button
+            type="button"
+            aria-label="Drag to reschedule"
+            title="Drag handle to reschedule (15-minute snap, hold for 5-minute precision)"
+            className={cn(
+              "h-8 w-8 rounded-md flex items-center justify-center touch-none",
+              isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
+            )}
+            style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
+            onClick={(e) => e.stopPropagation()}
+            {...dragHandleProps}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
         )}
-      >
-        {task.completed && <Check className="h-5 w-5 text-white" />}
-      </button>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            // Toggle will be handled by parent
+          }}
+          className={cn(
+            "flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
+            task.completed
+              ? "bg-coral-500 border-coral-500"
+              : "border-coral-500/50 hover:border-coral-500"
+          )}
+        >
+          {task.completed && <Check className="h-5 w-5 text-white" />}
+        </button>
+      </div>
     </div>
   );
 }

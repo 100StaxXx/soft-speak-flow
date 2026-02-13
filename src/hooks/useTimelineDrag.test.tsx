@@ -77,7 +77,7 @@ describe("useTimelineDrag", () => {
     vi.useRealTimers();
   });
 
-  it("starts immediately from drag handle for mouse and snaps to 5-minute increments", () => {
+  it("starts immediately from drag handle and coarse-snaps to 15-minute increments", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
 
@@ -92,15 +92,18 @@ describe("useTimelineDrag", () => {
     act(() => {
       dispatchPointerMove(120);
     });
-    expect(result.current.previewTime).toBe("09:05");
+    expect(result.current.previewTime).toBe("09:15");
+    expect(result.current.snapMode).toBe("coarse");
+    expect(result.current.zoomRail?.mode).toBe("coarse");
 
     act(() => {
       dispatchPointerUp();
     });
 
-    expect(onDrop).toHaveBeenCalledWith("task-1", "09:05");
+    expect(onDrop).toHaveBeenCalledWith("task-1", "09:15");
     expect(result.current.draggingTaskId).toBeNull();
     expect(result.current.dragOffsetY.get()).toBe(0);
+    expect(result.current.zoomRail).toBeNull();
   });
 
   it("starts drag from row-level drag props", () => {
@@ -114,7 +117,35 @@ describe("useTimelineDrag", () => {
       dispatchPointerUp();
     });
 
-    expect(onDrop).toHaveBeenCalledWith("task-row", "09:05");
+    expect(onDrop).toHaveBeenCalledWith("task-row", "09:15");
+  });
+
+  it("switches into fine mode and snaps in 5-minute steps after dwell", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: { fineActivationHoldMs: 0 },
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-1", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(120); // coarse -> 09:15
+      dispatchPointerMove(122); // enters fine mode
+    });
+
+    expect(result.current.snapMode).toBe("fine");
+    expect(result.current.zoomRail?.mode).toBe("fine");
+
+    act(() => {
+      dispatchPointerMove(152); // +30px in fine mode => +5 minutes
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-1", "09:20");
   });
 
   it("ignores pointer/touch starts from interactive descendants", () => {
@@ -178,7 +209,7 @@ describe("useTimelineDrag", () => {
       dispatchTouchMove(120);
       dispatchTouchEnd();
     });
-    expect(onDrop).toHaveBeenCalledWith("task-1", "09:05");
+    expect(onDrop).toHaveBeenCalledWith("task-1", "09:15");
 
     act(() => {
       handleProps.onTouchStart(createTouchEvent(100));

@@ -1,14 +1,16 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useRef } from "react";
 import { format, isSameDay } from "date-fns";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Clock, Plus, ChevronRight } from "lucide-react";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
+import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { WeekStrip } from "./WeekStrip";
 import { TimelineTaskCard } from "./TimelineTaskCard";
 import { AllDayTaskBanner } from "./AllDayTaskBanner";
 import { MilestoneCalendarCard } from "../MilestoneCalendarCard";
+import { DragTimeZoomRail } from "./DragTimeZoomRail";
 import { Button } from "../ui/button";
-import { normalizeScheduledTime, parseScheduledTime } from "@/utils/scheduledTime";
 
 interface TimelineViewProps {
   selectedDate: Date;
@@ -22,23 +24,6 @@ interface TimelineViewProps {
   onAddClick?: () => void;
   onTaskReschedule?: (taskId: string, newTime: string) => void;
   onDateHeaderClick?: () => void;
-}
-
-// Calculate new time based on drag offset
-function calculateNewTime(originalTime: string, deltaY: number): string {
-  const minutesPerPixel = 0.75;
-  const deltaMinutes = Math.round((deltaY * minutesPerPixel) / 5) * 5;
-  const original = parseScheduledTime(originalTime, new Date("2000-01-01T00:00:00"));
-  if (!original) {
-    return normalizeScheduledTime(originalTime) ?? originalTime;
-  }
-
-  const newTime = new Date(original.getTime() + deltaMinutes * 60000);
-  
-  const hours = Math.max(6, Math.min(23, newTime.getHours()));
-  const minutes = Math.min(55, Math.max(0, Math.floor(newTime.getMinutes() / 5) * 5));
-  
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
 }
 
 export function TimelineView({
@@ -56,10 +41,6 @@ export function TimelineView({
 }: TimelineViewProps) {
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const isToday = isSameDay(selectedDate, new Date());
-
-  // Drag state
-  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
 
   // Filter and sort tasks for the selected day
   const dayTasks = useMemo(() => {
@@ -79,37 +60,13 @@ export function TimelineView({
   const scheduledTasks = dayTasks.filter((t) => t.scheduled_time && t.estimated_duration !== 1440);
   const unscheduledTasks = dayTasks.filter((t) => !t.scheduled_time && t.estimated_duration !== 1440);
   const dayMilestones = milestones.filter((m) => m.target_date === dateStr);
-
-  // Drag handlers
-  const handleDragStart = useCallback((taskId: string) => {
-    setDraggingTaskId(taskId);
-    setDragOffset(0);
-  }, []);
-
-  const handleDragMove = useCallback((deltaY: number) => {
-    setDragOffset(deltaY);
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    if (draggingTaskId && dragOffset !== 0 && onTaskReschedule) {
-      const task = scheduledTasks.find(t => t.id === draggingTaskId);
-      if (task?.scheduled_time) {
-        const newTime = calculateNewTime(task.scheduled_time, dragOffset);
-        if (newTime !== task.scheduled_time) {
-          onTaskReschedule(draggingTaskId, newTime);
-        }
-      }
-    }
-    setDraggingTaskId(null);
-    setDragOffset(0);
-  }, [draggingTaskId, dragOffset, scheduledTasks, onTaskReschedule]);
-
-  const getDragPreviewTime = (task: CalendarTask) => {
-    if (task.id === draggingTaskId && task.scheduled_time && dragOffset !== 0) {
-      return calculateNewTime(task.scheduled_time, dragOffset);
-    }
-    return null;
-  };
+  const timelineDragContainerRef = useRef<HTMLDivElement>(null);
+  const timelineDrag = useTimelineDrag({
+    containerRef: timelineDragContainerRef,
+    onDrop: (taskId, newTime) => {
+      onTaskReschedule?.(taskId, newTime);
+    },
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -177,30 +134,36 @@ export function TimelineView({
 
           {/* Scheduled Tasks Timeline */}
           {scheduledTasks.length > 0 && (
-            <div className="py-4">
-              {scheduledTasks.map((task) => (
-                <div 
+            <div className="py-4" ref={timelineDragContainerRef}>
+              {scheduledTasks.map((task) => {
+                const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                const isAnyDragging = timelineDrag.isDragging;
+
+                return (
+                <motion.div 
                   key={task.id} 
                   className={cn(
                     "relative transition-transform duration-75",
-                    task.id === draggingTaskId && "z-10"
+                    isThisDragging && "z-10"
                   )}
                   style={{
-                    transform: task.id === draggingTaskId ? `translateY(${dragOffset}px)` : undefined,
+                    y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                    opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                    pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
                   }}
                 >
                   <TimelineTaskCard
                     task={task}
                     onTaskClick={onTaskClick}
                     onTaskLongPress={onTaskLongPress}
-                    isDragging={task.id === draggingTaskId}
-                    previewTime={getDragPreviewTime(task)}
-                    onDragStart={() => handleDragStart(task.id)}
-                    onDragMove={handleDragMove}
-                    onDragEnd={handleDragEnd}
+                    isDragging={isThisDragging}
+                    previewTime={isThisDragging ? timelineDrag.previewTime : null}
+                    dragHandleProps={task.scheduled_time
+                      ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                      : undefined}
                   />
-                </div>
-              ))}
+                </motion.div>
+              )})}
             </div>
           )}
 
@@ -273,6 +236,8 @@ export function TimelineView({
           <div className="h-8" />
         </div>
       </div>
+
+      <DragTimeZoomRail rail={timelineDrag.zoomRail} />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
+import { DragTimeZoomRail } from "@/components/calendar/DragTimeZoomRail";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -776,7 +777,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <button
                 type="button"
                 aria-label="Drag to reschedule"
-                title="Drag handle to reschedule in 5-minute steps"
+                title="Drag handle to reschedule (15-minute snap, hold for 5-minute precision)"
                 className={cn(
                   "h-8 w-8 rounded-md flex items-center justify-center touch-none",
                   "opacity-55 group-hover:opacity-100 transition-opacity",
@@ -1384,6 +1385,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         onTaskDrop={() => {}}
         onTimeSlotLongPress={onTimeSlotLongPress}
       />
+
+      <DragTimeZoomRail rail={timelineDrag.zoomRail} />
     </div>
   );
 });

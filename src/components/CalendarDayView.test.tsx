@@ -82,6 +82,12 @@ const createDropEvent = (clientY: number, dataTransfer: { getData: ReturnType<ty
   return event;
 };
 
+const createDragOverEvent = (clientY: number) => {
+  const event = new Event("dragover", { bubbles: true, cancelable: true }) as DragEvent;
+  Object.defineProperty(event, "clientY", { configurable: true, value: clientY });
+  return event;
+};
+
 describe("CalendarDayView interactions", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -92,7 +98,7 @@ describe("CalendarDayView interactions", () => {
     vi.useRealTimers();
   });
 
-  it("snaps standard-view drop time to 5-minute increments from row pointer position", () => {
+  it("snaps standard-view drop time to 15-minute increments before fine mode", () => {
     const { onTaskDrop } = setup([baseTask()]);
 
     const label = screen.getByText("8:30 AM");
@@ -104,10 +110,33 @@ describe("CalendarDayView interactions", () => {
       getData: vi.fn().mockReturnValue("drop-task"),
     };
 
-    fireEvent(row!, createDropEvent(122, dataTransfer)); // 22px into row => +10 minutes
+    fireEvent(row!, createDropEvent(122, dataTransfer)); // 22px into row => coarse snap to nearest 15 min
 
     expect(dataTransfer.getData).toHaveBeenCalledWith("taskId");
-    expect(onTaskDrop).toHaveBeenCalledWith("drop-task", selectedDate, "08:40");
+    expect(onTaskDrop).toHaveBeenCalledWith("drop-task", selectedDate, "08:45");
+  });
+
+  it("enters fine mode after dwell and allows 5-minute drop precision", () => {
+    const { onTaskDrop } = setup([baseTask()]);
+
+    const label = screen.getByText("8:30 AM");
+    const row = label.closest("div.flex");
+    expect(row).toBeTruthy();
+    mockRowBounds(row!, 100);
+
+    const dataTransfer = {
+      getData: vi.fn().mockReturnValue("drop-task"),
+    };
+
+    fireEvent(row!, createDragOverEvent(122));
+    act(() => {
+      vi.advanceTimersByTime(230);
+    });
+    fireEvent(row!, createDragOverEvent(122)); // switches into fine mode after dwell
+    fireEvent(row!, createDragOverEvent(152)); // +30px in fine mode => +5 minutes
+    fireEvent(row!, createDropEvent(152, dataTransfer));
+
+    expect(onTaskDrop).toHaveBeenCalledWith("drop-task", selectedDate, "08:50");
   });
 
   it("snaps long-press add time to 5-minute increments in standard view", () => {
@@ -120,7 +149,7 @@ describe("CalendarDayView interactions", () => {
 
     act(() => {
       fireEvent.touchStart(row!, {
-        touches: [{ clientX: 0, clientY: 145 }], // 45px into row => +20 minutes
+        touches: [{ clientX: 0, clientY: 140 }], // 40px into row => +20 minutes
       });
       vi.advanceTimersByTime(600);
     });

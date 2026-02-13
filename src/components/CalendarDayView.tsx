@@ -11,18 +11,22 @@ import { Card } from "./ui/card";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { CALENDAR_BONUS_XP } from "@/config/xpRewards";
 import { getScheduledTimeParts, parseScheduledTime } from "@/utils/scheduledTime";
-import { bucketTaskToHalfHourSlot, computeDynamicWindow, snapPointerToFiveMinuteOffset } from "./calendar/timeWindow";
+import { bucketTaskToHalfHourSlot, computeDynamicWindow } from "./calendar/timeWindow";
+import {
+  DragSnapMode,
+  DragZoomRailState,
+  buildDragZoomRailState,
+  computeAdaptiveMinute,
+  minuteFromRowOffset,
+  minuteToTime24,
+  resolveAdaptiveSnapConfig,
+  snapMinuteByMode,
+} from "./calendar/dragSnap";
+import { DragTimeZoomRail } from "./calendar/DragTimeZoomRail";
 
 const SLOT_ROW_HEIGHT_PX = 60;
 const HALF_HOUR_MINUTES = 30;
 const MAX_SLOT_START_MINUTE = 24 * 60 - HALF_HOUR_MINUTES;
-
-const formatTime24FromMinutes = (totalMinutes: number) => {
-  const clamped = Math.max(0, Math.min((24 * 60) - 1, totalMinutes));
-  const hour = Math.floor(clamped / 60);
-  const minute = clamped % 60;
-  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-};
 
 const formatTimeSlotFromMinutes = (totalMinutes: number) => {
   const clamped = Math.max(0, Math.min(MAX_SLOT_START_MINUTE, totalMinutes));
@@ -40,6 +44,8 @@ const generateHalfHourSlots = (startMinute: number, endMinute: number) => {
   }
   return slots;
 };
+
+const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 interface CalendarDayViewProps {
   selectedDate: Date;
@@ -71,11 +77,22 @@ export const CalendarDayView = ({
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const longPressSlot = useRef<{
     slotStartMinute: number;
-    fineGrained: boolean;
     offsetY: number;
   } | null>(null);
+  const gridDragSession = useRef<{
+    startMinute: number;
+    startClientY: number;
+    mode: DragSnapMode;
+    fineAnchorMinute: number | null;
+    fineAnchorClientY: number | null;
+    coarseDwellOriginY: number;
+    coarseDwellStartedAt: number;
+    lastSnappedMinute: number;
+  } | null>(null);
+  const [gridZoomRail, setGridZoomRail] = useState<DragZoomRailState | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [showAllUnscheduled, setShowAllUnscheduled] = useState(false);
+  const adaptiveSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(), []);
 
   // Calculate date string and day tasks first
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -125,10 +142,91 @@ export const CalendarDayView = ({
     longPressSlot.current = null;
   }, []);
 
+  const clearGridDragSession = useCallback(() => {
+    gridDragSession.current = null;
+    setGridZoomRail(null);
+  }, []);
+
+  const updateAdaptiveMinuteFromPointer = useCallback((
+    slotStartMinute: number,
+    clientY: number,
+    rowBounds: DOMRect,
+  ) => {
+    const safeClientY = Number.isFinite(clientY) ? clientY : rowBounds.top;
+    const offsetY = safeClientY - rowBounds.top;
+    let pointerMinute = minuteFromRowOffset(
+      slotStartMinute,
+      offsetY,
+      rowBounds.height || SLOT_ROW_HEIGHT_PX,
+      adaptiveSnapConfig,
+    );
+    if (!Number.isFinite(pointerMinute)) {
+      pointerMinute = snapMinuteByMode(slotStartMinute, "coarse", adaptiveSnapConfig);
+    }
+    const now = nowMs();
+
+    if (!gridDragSession.current) {
+      const snappedMinute = snapMinuteByMode(pointerMinute, "coarse", adaptiveSnapConfig);
+      gridDragSession.current = {
+        startMinute: pointerMinute,
+        startClientY: safeClientY,
+        mode: "coarse",
+        fineAnchorMinute: null,
+        fineAnchorClientY: null,
+        coarseDwellOriginY: safeClientY,
+        coarseDwellStartedAt: now,
+        lastSnappedMinute: snappedMinute,
+      };
+    }
+
+    const session = gridDragSession.current;
+    if (!session) {
+      return snapMinuteByMode(pointerMinute, "coarse", adaptiveSnapConfig);
+    }
+
+    if (session.mode === "coarse") {
+      const dwellDistance = Math.abs(safeClientY - session.coarseDwellOriginY);
+      if (dwellDistance > adaptiveSnapConfig.fineActivationMovementPx) {
+        session.coarseDwellOriginY = safeClientY;
+        session.coarseDwellStartedAt = now;
+      } else {
+        const dwellDuration = now - session.coarseDwellStartedAt;
+        if (dwellDuration >= adaptiveSnapConfig.fineActivationHoldMs) {
+          session.mode = "fine";
+          session.fineAnchorMinute = session.lastSnappedMinute;
+          session.fineAnchorClientY = safeClientY;
+        }
+      }
+    }
+
+    const computed = computeAdaptiveMinute({
+      startMinute: session.startMinute,
+      startClientY: session.startClientY,
+      currentClientY: safeClientY,
+      mode: session.mode,
+      lastSnappedMinute: session.lastSnappedMinute,
+      fineAnchorMinute: session.fineAnchorMinute,
+      fineAnchorClientY: session.fineAnchorClientY,
+      config: adaptiveSnapConfig,
+    });
+
+    session.fineAnchorMinute = computed.fineAnchorMinute;
+    session.fineAnchorClientY = computed.fineAnchorClientY;
+    session.lastSnappedMinute = computed.snappedMinute;
+
+    setGridZoomRail(buildDragZoomRailState(
+      session.mode,
+      safeClientY,
+      computed.snappedMinute,
+      adaptiveSnapConfig,
+    ));
+
+    return computed.snappedMinute;
+  }, [adaptiveSnapConfig]);
+
   // Optimized touch handlers with proper cleanup
   const handleTouchStart = useCallback((
     slotStartMinute: number,
-    fineGrained: boolean,
     e: React.TouchEvent<HTMLDivElement>,
   ) => {
     const touch = e.touches[0];
@@ -142,7 +240,6 @@ export const CalendarDayView = ({
     const rowBounds = e.currentTarget.getBoundingClientRect();
     longPressSlot.current = {
       slotStartMinute,
-      fineGrained,
       offsetY: touch.clientY - rowBounds.top,
     };
     
@@ -150,14 +247,18 @@ export const CalendarDayView = ({
       const pending = longPressSlot.current;
       if (!pending) return;
 
-      const minuteOffset = pending.fineGrained
-        ? snapPointerToFiveMinuteOffset(pending.offsetY, SLOT_ROW_HEIGHT_PX)
-        : 0;
+      const pointerMinute = minuteFromRowOffset(
+        pending.slotStartMinute,
+        pending.offsetY,
+        SLOT_ROW_HEIGHT_PX,
+        adaptiveSnapConfig,
+      );
+      const snappedMinute = snapMinuteByMode(pointerMinute, "fine", adaptiveSnapConfig);
       playSound('pop');
-      const time24 = formatTime24FromMinutes(pending.slotStartMinute + minuteOffset);
+      const time24 = minuteToTime24(snappedMinute, adaptiveSnapConfig);
       onTimeSlotLongPress?.(selectedDate, time24);
     }, 600); // Reduced for snappier response
-  }, [selectedDate, onTimeSlotLongPress]);
+  }, [adaptiveSnapConfig, selectedDate, onTimeSlotLongPress]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     // Cancel if moved more than 10px
@@ -177,18 +278,12 @@ export const CalendarDayView = ({
 
   const getDropTimeForSlot = useCallback((
     slotStartMinute: number,
-    fineGrained: boolean,
     e: React.DragEvent<HTMLDivElement>,
   ) => {
-    if (!fineGrained) {
-      return formatTime24FromMinutes(slotStartMinute);
-    }
-
     const rowBounds = e.currentTarget.getBoundingClientRect();
-    const offsetY = e.clientY - rowBounds.top;
-    const minuteOffset = snapPointerToFiveMinuteOffset(offsetY, SLOT_ROW_HEIGHT_PX);
-    return formatTime24FromMinutes(slotStartMinute + minuteOffset);
-  }, []);
+    const snappedMinute = updateAdaptiveMinuteFromPointer(slotStartMinute, e.clientY, rowBounds);
+    return minuteToTime24(snappedMinute, adaptiveSnapConfig);
+  }, [adaptiveSnapConfig, updateAdaptiveMinuteFromPointer]);
 
   const unscheduledTasks = getUnscheduledTasks();
   const dayMilestones = getDayMilestones();
@@ -405,7 +500,12 @@ export const CalendarDayView = ({
                 onDragStart={(e) => {
                   e.dataTransfer.setData("taskId", task.id);
                   setDraggedTask(task.id);
+                  clearGridDragSession();
                   playSound("pop");
+                }}
+                onDragEnd={() => {
+                  setDraggedTask(null);
+                  clearGridDragSession();
                 }}
                 className="cursor-move"
               >
@@ -461,7 +561,6 @@ export const CalendarDayView = ({
             {timeSlots.map((slotStartMinute) => {
               const slotTasks = getTasksForTimeSlot(slotStartMinute);
               const isHourMark = slotStartMinute % 60 === 0;
-              const time24 = formatTime24FromMinutes(slotStartMinute);
 
               return (
                 <div
@@ -478,15 +577,21 @@ export const CalendarDayView = ({
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
                   }}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    const rowBounds = e.currentTarget.getBoundingClientRect();
+                    updateAdaptiveMinuteFromPointer(slotStartMinute, e.clientY, rowBounds);
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
                     const taskId = e.dataTransfer.getData('taskId');
+                    const dropTime = getDropTimeForSlot(slotStartMinute, e);
                     playSound('complete');
-                    onTaskDrop(taskId, selectedDate, time24);
+                    onTaskDrop(taskId, selectedDate, dropTime);
                     setDraggedTask(null);
+                    clearGridDragSession();
                   }}
-                  onTouchStart={(e) => handleTouchStart(slotStartMinute, false, e)}
+                  onTouchStart={(e) => handleTouchStart(slotStartMinute, e)}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
                   onTouchCancel={handleTouchEnd}
@@ -515,6 +620,10 @@ export const CalendarDayView = ({
                               height: `${calculateTaskHeight(task.estimated_duration)}px`,
                               minHeight: `${SLOT_ROW_HEIGHT_PX}px`
                             }}
+                            onDragEnd={() => {
+                              setDraggedTask(null);
+                              clearGridDragSession();
+                            }}
                           >
                             <QuestDragCard
                               task={task}
@@ -522,6 +631,7 @@ export const CalendarDayView = ({
                               onDragStart={(e) => {
                                 e.dataTransfer.setData('taskId', task.id);
                                 setDraggedTask(task.id);
+                                clearGridDragSession();
                                 playSound('pop');
                               }}
                               onLongPress={() => onTaskLongPress?.(task.id)}
@@ -559,16 +669,21 @@ export const CalendarDayView = ({
                     WebkitUserSelect: 'none',
                     userSelect: 'none',
                   }}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    const rowBounds = e.currentTarget.getBoundingClientRect();
+                    updateAdaptiveMinuteFromPointer(slotStartMinute, e.clientY, rowBounds);
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
                     const taskId = e.dataTransfer.getData('taskId');
-                    const dropTime = getDropTimeForSlot(slotStartMinute, true, e);
+                    const dropTime = getDropTimeForSlot(slotStartMinute, e);
                     playSound('complete');
                     onTaskDrop(taskId, selectedDate, dropTime);
                     setDraggedTask(null);
+                    clearGridDragSession();
                   }}
-                  onTouchStart={(e) => handleTouchStart(slotStartMinute, true, e)}
+                  onTouchStart={(e) => handleTouchStart(slotStartMinute, e)}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
                   onTouchCancel={handleTouchEnd}
@@ -597,6 +712,10 @@ export const CalendarDayView = ({
                               height: `${calculateTaskHeight(task.estimated_duration)}px`,
                               minHeight: `${SLOT_ROW_HEIGHT_PX}px`
                             }}
+                            onDragEnd={() => {
+                              setDraggedTask(null);
+                              clearGridDragSession();
+                            }}
                           >
                             <QuestDragCard
                               task={task}
@@ -604,6 +723,7 @@ export const CalendarDayView = ({
                               onDragStart={(e) => {
                                 e.dataTransfer.setData('taskId', task.id);
                                 setDraggedTask(task.id);
+                                clearGridDragSession();
                                 playSound('pop');
                               }}
                               showTime
@@ -619,6 +739,8 @@ export const CalendarDayView = ({
           </div>
         </ScrollArea>
       )}
+
+      <DragTimeZoomRail rail={gridZoomRail} />
 
       {/* Completed Today Section */}
       {getCompletedTasks().length > 0 && (

@@ -83,7 +83,6 @@ const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
 // const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive")); // Shelved
 const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 const Recaps = lazy(() => import("./pages/Recaps"));
-const Community = lazy(() => import("./pages/Community"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const TestDayPlanner = lazy(() => import("./pages/TestDayPlanner"));
 const TestScroll = lazy(() => import("./pages/TestScroll"));

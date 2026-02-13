@@ -5,12 +5,18 @@ import { useAchievements } from "./useAchievements";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
 import { useRef, useMemo, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
 import { generateWithValidation } from "@/utils/validateCompanionImage";
+import {
+  isRetriableFunctionInvokeError,
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 
 export interface Companion {
   id: string;
@@ -542,19 +548,45 @@ export const useCompanion = () => {
         setIsEvolvingLoading(true);
 
         try {
-        // Call the new evolution edge function with strict continuity
-        const { data: evolutionData, error: evolutionError } = await supabase.functions.invoke(
-          "generate-companion-evolution",
-          {
-            body: {
-              userId: user.id,
-            },
-          }
-        );
+        // Call the new evolution edge function with strict continuity.
+        // Retry transient transport/backend failures before surfacing a user-facing error.
+        const functionName = "generate-companion-evolution";
+        let evolutionData: Record<string, any> | null = null;
+        try {
+          evolutionData = await retryWithBackoff(
+            async () => {
+              const { data, error: evolutionError } = await supabase.functions.invoke(functionName, {
+                body: {
+                  userId: user.id,
+                },
+              });
 
-        if (evolutionError) {
-          evolutionInProgress.current = false;
-          throw evolutionError;
+              if (evolutionError) throw evolutionError;
+              return data as Record<string, any> | null;
+            },
+            {
+              maxAttempts: 3,
+              initialDelay: 750,
+              maxDelay: 2500,
+              shouldRetry: isRetriableFunctionInvokeError,
+            },
+          );
+        } catch (invokeError) {
+          const parsedInvokeError = await parseFunctionInvokeError(invokeError);
+          logger.error("Companion evolution invoke failed", {
+            functionName,
+            platform: Capacitor.getPlatform(),
+            isNative: Capacitor.isNativePlatform(),
+            isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
+            status: parsedInvokeError.status,
+            errorName: parsedInvokeError.name,
+            category: parsedInvokeError.category,
+            backendMessage: parsedInvokeError.backendMessage,
+            backendCode: parsedInvokeError.responsePayload?.code ?? parsedInvokeError.code,
+          });
+          throw new Error(
+            toUserFacingFunctionError(parsedInvokeError, { action: "evolve your companion" }),
+          );
         }
         
         if (!evolutionData?.evolved) {
@@ -727,7 +759,12 @@ export const useCompanion = () => {
       evolutionInProgress.current = false;
       setIsEvolvingLoading(false);
       console.error("Evolution failed:", error);
-      toast.error(error instanceof Error ? error.message : "Unable to evolve your companion. Please try again.");
+      const fallbackMessage = "Unable to evolve your companion right now. Please try again.";
+      const message = error instanceof Error && error.message ? error.message : fallbackMessage;
+      const hasSdkInternals = /failed to send a request to the edge function|functionsfetcherror|edge function returned a non-2xx status code/i.test(
+        message,
+      );
+      toast.error(hasSdkInternals ? fallbackMessage : message);
     },
   });
 
@@ -759,7 +796,6 @@ export const useCompanion = () => {
     setIsEvolvingLoading(true);
     window.dispatchEvent(new CustomEvent('evolution-loading-start'));
     
-    toast.success("🎉 Let's evolve!");
     evolveCompanion.mutate({ 
       newStage: nextStage, 
       currentXP: companion.current_xp 

@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { getFallbackResponse, getConnectionErrorFallback } from "@/utils/mentorFallbacks";
+import { parseFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
 import { MentorChatFeedback } from "./MentorChatFeedback";
 
 interface Message {
@@ -95,36 +96,6 @@ export const AskMentorChat = ({
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
 
-  const parseInvokeError = useCallback(async (error: unknown): Promise<{ status?: number; message?: string }> => {
-    if (error && typeof error === "object" && "context" in error) {
-      const maybeContext = (error as { context?: unknown }).context;
-      if (maybeContext instanceof Response) {
-        const status = maybeContext.status;
-        let message: string | undefined;
-        try {
-          const payload = await maybeContext.clone().json();
-          if (payload && typeof payload === "object") {
-            const payloadObj = payload as { message?: unknown; error?: unknown };
-            if (typeof payloadObj.message === "string") {
-              message = payloadObj.message;
-            } else if (typeof payloadObj.error === "string") {
-              message = payloadObj.error;
-            }
-          }
-        } catch {
-          // Ignore parse failures and fall back to generic handling.
-        }
-        return { status, message };
-      }
-    }
-
-    if (error instanceof Error) {
-      return { message: error.message };
-    }
-
-    return {};
-  }, []);
-
   const sendMessage = useCallback(async (text: string) => {
     // Verify user is still authenticated
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
@@ -193,13 +164,17 @@ export const AskMentorChat = ({
       }
     } catch (error) {
       console.error("Mentor chat error:", error);
-      const parsedError = await parseInvokeError(error);
+      const parsedError = await parseFunctionInvokeError(error);
+      const parsedMessage =
+        parsedError.responsePayload?.message ??
+        parsedError.responsePayload?.error ??
+        parsedError.message;
 
       // Server-side cap reached: show authoritative message and do not generate fallback.
       if (parsedError.status === 429) {
         toast({
           title: "Daily limit reached",
-          description: parsedError.message || `You've reached your daily limit of ${dailyLimit} messages. It resets at 00:00 UTC.`,
+          description: parsedMessage || `You've reached your daily limit of ${dailyLimit} messages. It resets at 00:00 UTC.`,
           variant: "destructive"
         });
         setMessages((prev) => prev.filter((_, index) => index !== prev.length - 1));
@@ -227,7 +202,7 @@ export const AskMentorChat = ({
     } finally {
       setIsLoading(false);
     }
-  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline, comprehensiveMode, briefingContext, parseInvokeError]);
+  }, [dailyMessageCount, dailyLimit, toast, mentorName, mentorTone, mentorId, isOnline, comprehensiveMode, briefingContext]);
 
   useEffect(() => {
     // Check today's message count on mount only
