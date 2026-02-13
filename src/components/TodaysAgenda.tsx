@@ -55,6 +55,7 @@ import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
+import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
 
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
@@ -419,6 +420,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
+    snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     onDrop: (taskId, newTime) => {
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
@@ -777,7 +779,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <button
                 type="button"
                 aria-label="Drag to reschedule"
-                title="Drag handle to reschedule (15-minute snap, hold for 5-minute precision)"
+                title="Drag to reschedule (15-minute snap; hold near start before moving for 5-minute precision)"
                 className={cn(
                   "h-8 w-8 rounded-md flex items-center justify-center touch-none",
                   "opacity-55 group-hover:opacity-100 transition-opacity",
@@ -1174,9 +1176,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const isAnytimeTask = !task.scheduled_time;
                   const showAnytimeLabel = isAnytimeTask
                     && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
-                  const rowDragProps = task.scheduled_time
-                    ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
-                    : undefined;
                   const dragHandleProps = task.scheduled_time
                     ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
                     : undefined;
@@ -1230,7 +1229,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         ...rowStyle,
                         y: isThisDragging ? timelineDrag.dragOffsetY : 0,
                       }}
-                      {...rowDragProps}
                     >
                       {rowContent}
                     </motion.div>
@@ -1308,9 +1306,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         {group.rituals.map(task => {
                           const isThisDragging = timelineDrag.draggingTaskId === task.id;
                           const isAnyDragging = timelineDrag.isDragging;
-                          const rowDragProps = task.scheduled_time
-                            ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
-                            : undefined;
                           const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
 
                           return (
@@ -1322,7 +1317,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                                 pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
                                 opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
                               }}
-                              {...rowDragProps}
                             >
                               {renderTaskItem(task, undefined, undefined, overlapCount)}
                             </motion.div>

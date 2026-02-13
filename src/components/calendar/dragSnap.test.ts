@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAdaptiveSnapRuntimeScale,
   buildDragZoomRailState,
   clampMinuteToRange,
   computeAdaptiveMinute,
@@ -54,6 +55,29 @@ describe("dragSnap", () => {
     });
 
     expect(fineMove.snappedMinute).toBe((9 * 60) + 20);
+  });
+
+  it("derives runtime pixels-per-minute from viewport range", () => {
+    const runtime = buildAdaptiveSnapRuntimeScale(undefined, 720);
+    expect(runtime.coarsePixelsPerMinute).toBeCloseTo(2, 5); // 6 hours per viewport
+    expect(runtime.finePixelsPerMinute).toBeCloseTo(6, 5); // 2 hours per viewport
+  });
+
+  it("maps full viewport drag to multi-hour coarse movement", () => {
+    const runtime = buildAdaptiveSnapRuntimeScale(undefined, 720);
+
+    const result = computeAdaptiveMinute({
+      startMinute: 9 * 60,
+      startClientY: 0,
+      currentClientY: 720,
+      mode: "coarse",
+      lastSnappedMinute: 9 * 60,
+      fineAnchorMinute: null,
+      fineAnchorClientY: null,
+      runtimeScale: runtime,
+    });
+
+    expect(result.snappedMinute).toBe(15 * 60);
   });
 
   it("clamps minute and time output to day bounds", () => {

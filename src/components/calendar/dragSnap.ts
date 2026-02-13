@@ -1,15 +1,25 @@
 export type DragSnapMode = "coarse" | "fine";
+export type PrecisionActivationMode = "manual-hold" | "auto-dwell" | "none";
 
 export interface AdaptiveSnapConfig {
   coarseStepMinutes: number;
   fineStepMinutes: number;
   minMinute: number;
   maxMinute: number;
-  basePixelsPerMinute: number;
-  finePixelsPerMinute: number;
-  fineActivationHoldMs: number;
-  fineActivationMovementPx: number;
+  coarseHoursPerViewport: number;
+  fineHoursPerViewport: number;
+  precisionActivationMode: PrecisionActivationMode;
+  precisionHoldMs: number;
+  precisionHoldMovementPx: number;
+  precisionActivationWindowPx: number;
+  precisionExitMovementPx: number;
   zoomTickCount: number;
+}
+
+export interface AdaptiveSnapRuntimeScale {
+  viewportHeight: number;
+  coarsePixelsPerMinute: number;
+  finePixelsPerMinute: number;
 }
 
 export interface DragZoomRailTick {
@@ -34,6 +44,7 @@ export interface ComputeAdaptiveMinuteParams {
   lastSnappedMinute: number;
   fineAnchorMinute: number | null;
   fineAnchorClientY: number | null;
+  runtimeScale?: AdaptiveSnapRuntimeScale;
   config?: Partial<AdaptiveSnapConfig>;
 }
 
@@ -49,18 +60,32 @@ const DEFAULT_ADAPTIVE_SNAP_CONFIG: AdaptiveSnapConfig = {
   fineStepMinutes: 5,
   minMinute: 0,
   maxMinute: (24 * 60) - 5,
-  basePixelsPerMinute: 2,
-  finePixelsPerMinute: 6,
-  fineActivationHoldMs: 220,
-  fineActivationMovementPx: 14,
+  coarseHoursPerViewport: 6,
+  fineHoursPerViewport: 2,
+  precisionActivationMode: "manual-hold",
+  precisionHoldMs: 220,
+  precisionHoldMovementPx: 14,
+  precisionActivationWindowPx: 72,
+  precisionExitMovementPx: 96,
   zoomTickCount: 7,
 };
+
+const DEFAULT_RUNTIME_VIEWPORT_HEIGHT = 720;
+const MIN_RUNTIME_VIEWPORT_HEIGHT = 320;
 
 export const resolveAdaptiveSnapConfig = (
   overrides?: Partial<AdaptiveSnapConfig>,
 ): AdaptiveSnapConfig => ({
   ...DEFAULT_ADAPTIVE_SNAP_CONFIG,
   ...overrides,
+});
+
+export const SHARED_TIMELINE_DRAG_PROFILE: Readonly<Partial<AdaptiveSnapConfig>> = Object.freeze({
+  coarseStepMinutes: 15,
+  fineStepMinutes: 5,
+  coarseHoursPerViewport: 6,
+  fineHoursPerViewport: 2,
+  precisionActivationMode: "manual-hold",
 });
 
 export const clampMinuteToRange = (
@@ -115,6 +140,26 @@ export const time24ToMinute = (
   return clampMinuteToRange((hour * 60) + minute, config);
 };
 
+export const buildAdaptiveSnapRuntimeScale = (
+  config?: Partial<AdaptiveSnapConfig>,
+  viewportHeight: number = DEFAULT_RUNTIME_VIEWPORT_HEIGHT,
+): AdaptiveSnapRuntimeScale => {
+  const resolved = resolveAdaptiveSnapConfig(config);
+  const safeViewportHeight = Math.max(
+    MIN_RUNTIME_VIEWPORT_HEIGHT,
+    Math.round(Number.isFinite(viewportHeight) ? viewportHeight : DEFAULT_RUNTIME_VIEWPORT_HEIGHT),
+  );
+
+  const coarsePixelsPerMinute = safeViewportHeight / Math.max(60, resolved.coarseHoursPerViewport * 60);
+  const finePixelsPerMinute = safeViewportHeight / Math.max(60, resolved.fineHoursPerViewport * 60);
+
+  return {
+    viewportHeight: safeViewportHeight,
+    coarsePixelsPerMinute: Math.max(0.1, coarsePixelsPerMinute),
+    finePixelsPerMinute: Math.max(0.1, finePixelsPerMinute),
+  };
+};
+
 const formatMinuteLabel = (minute: number): string => {
   const clamped = clampMinuteToRange(minute);
   const hour24 = Math.floor(clamped / 60);
@@ -143,10 +188,11 @@ export const computeAdaptiveMinute = (
   params: ComputeAdaptiveMinuteParams,
 ): ComputeAdaptiveMinuteResult => {
   const resolved = resolveAdaptiveSnapConfig(params.config);
+  const runtimeScale = params.runtimeScale ?? buildAdaptiveSnapRuntimeScale(resolved);
 
   if (params.mode === "coarse") {
     const deltaY = params.currentClientY - params.startClientY;
-    const rawMinute = params.startMinute + (deltaY / resolved.basePixelsPerMinute);
+    const rawMinute = params.startMinute + (deltaY / runtimeScale.coarsePixelsPerMinute);
     const snappedMinute = snapMinuteByMode(rawMinute, "coarse", resolved);
     return {
       rawMinute,
@@ -159,7 +205,7 @@ export const computeAdaptiveMinute = (
   const fineAnchorMinute = params.fineAnchorMinute ?? params.lastSnappedMinute;
   const fineAnchorClientY = params.fineAnchorClientY ?? params.currentClientY;
   const fineDeltaY = params.currentClientY - fineAnchorClientY;
-  const rawMinute = fineAnchorMinute + (fineDeltaY / resolved.finePixelsPerMinute);
+  const rawMinute = fineAnchorMinute + (fineDeltaY / runtimeScale.finePixelsPerMinute);
   const snappedMinute = snapMinuteByMode(rawMinute, "fine", resolved);
 
   return {

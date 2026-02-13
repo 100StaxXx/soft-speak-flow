@@ -26,7 +26,7 @@ export function DragTimeZoomRail({ rail, className }: DragTimeZoomRailProps) {
     >
       <div className="rounded-xl border border-border/70 bg-background/95 px-2 py-1.5 shadow-xl backdrop-blur">
         <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
-          {rail.mode === "fine" ? "Fine" : "Coarse"}
+          {rail.mode === "fine" ? "Precision" : "Coarse"}
         </div>
         <div className="mb-1 text-center text-xs font-semibold text-primary">
           {formatCenterTime(rail.snappedMinute)}

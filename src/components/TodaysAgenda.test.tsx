@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const subtaskEqMock = vi.fn();
   const subtaskUpdateMock = vi.fn();
+  const getDragHandlePropsMock = vi.fn(() => ({}));
+  const getRowDragPropsMock = vi.fn(() => ({}));
   const swipeableDisabledStates: Array<boolean | undefined> = [];
   const timelineDragState = {
     draggingTaskId: null as string | null,
@@ -27,6 +29,8 @@ const mocks = vi.hoisted(() => {
   return {
     subtaskEqMock,
     subtaskUpdateMock,
+    getDragHandlePropsMock,
+    getRowDragPropsMock,
     swipeableDisabledStates,
     timelineDragState,
   };
@@ -54,8 +58,8 @@ vi.mock("@/hooks/useMotionProfile", () => ({
 vi.mock("@/hooks/useTimelineDrag", () => ({
   useTimelineDrag: () => ({
     ...mocks.timelineDragState,
-    getDragHandleProps: () => ({}),
-    getRowDragProps: () => ({}),
+    getDragHandleProps: mocks.getDragHandlePropsMock,
+    getRowDragProps: mocks.getRowDragPropsMock,
   }),
 }));
 
@@ -147,6 +151,8 @@ describe("TodaysAgenda subtasks", () => {
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
+    mocks.getDragHandlePropsMock.mockClear();
+    mocks.getRowDragPropsMock.mockClear();
     mocks.subtaskEqMock.mockResolvedValue({ error: null });
     mocks.subtaskUpdateMock.mockReturnValue({
       eq: mocks.subtaskEqMock,
@@ -328,6 +334,19 @@ describe("TodaysAgenda combo feedback", () => {
 });
 
 describe("TodaysAgenda scheduled timeline behavior", () => {
+  beforeEach(() => {
+    mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.isDragging = false;
+    mocks.timelineDragState.justDroppedId = null;
+    mocks.timelineDragState.dragOffsetY = 0;
+    mocks.timelineDragState.previewTime = undefined;
+    mocks.timelineDragState.snapMode = "coarse";
+    mocks.timelineDragState.zoomRail = null;
+    mocks.getDragHandlePropsMock.mockClear();
+    mocks.getRowDragPropsMock.mockClear();
+    mocks.swipeableDisabledStates.length = 0;
+  });
+
   it("shows scheduled header and keeps drag-handle button", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -359,6 +378,38 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
     expect(screen.queryByText(/Drag handle to reschedule/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /drag to reschedule/i })).toBeInTheDocument();
+  });
+
+  it("uses handle-only drag wiring (row drag props are not requested)", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(mocks.getDragHandlePropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
+    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
   });
 
   it("shows overlap warning text for conflicting tasks", () => {

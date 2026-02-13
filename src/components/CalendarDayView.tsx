@@ -186,12 +186,12 @@ export const CalendarDayView = ({
 
     if (session.mode === "coarse") {
       const dwellDistance = Math.abs(safeClientY - session.coarseDwellOriginY);
-      if (dwellDistance > adaptiveSnapConfig.fineActivationMovementPx) {
+      if (dwellDistance > adaptiveSnapConfig.precisionHoldMovementPx) {
         session.coarseDwellOriginY = safeClientY;
         session.coarseDwellStartedAt = now;
       } else {
         const dwellDuration = now - session.coarseDwellStartedAt;
-        if (dwellDuration >= adaptiveSnapConfig.fineActivationHoldMs) {
+        if (dwellDuration >= adaptiveSnapConfig.precisionHoldMs) {
           session.mode = "fine";
           session.fineAnchorMinute = session.lastSnappedMinute;
           session.fineAnchorClientY = safeClientY;

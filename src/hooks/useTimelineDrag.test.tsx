@@ -71,6 +71,15 @@ describe("useTimelineDrag", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      writable: true,
+      value: 720,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: { height: 720 },
+    });
   });
 
   afterEach(() => {
@@ -106,6 +115,20 @@ describe("useTimelineDrag", () => {
     expect(result.current.zoomRail).toBeNull();
   });
 
+  it("maps a full-screen drag to multi-hour movement", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const handleProps = result.current.getDragHandleProps("task-long", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(820);
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-long", "15:00");
+  });
+
   it("starts drag from row-level drag props", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
@@ -120,32 +143,98 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-row", "09:15");
   });
 
-  it("switches into fine mode and snaps in 5-minute steps after dwell", () => {
+  it("enters precision mode only when intentionally held near start", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
       useTimelineDrag({
         containerRef,
         onDrop,
-        snapConfig: { fineActivationHoldMs: 0 },
+        snapConfig: {
+          precisionHoldMs: 0,
+          precisionActivationWindowPx: 120,
+        },
       }),
     );
 
     const handleProps = result.current.getDragHandleProps("task-1", "09:00");
     act(() => {
       handleProps.onPointerDown(createPointerDownEvent(100));
-      dispatchPointerMove(120); // coarse -> 09:15
-      dispatchPointerMove(122); // enters fine mode
+      dispatchPointerMove(100); // hold near start enters precision mode
     });
 
     expect(result.current.snapMode).toBe("fine");
     expect(result.current.zoomRail?.mode).toBe("fine");
 
     act(() => {
-      dispatchPointerMove(152); // +30px in fine mode => +5 minutes
+      dispatchPointerMove(130); // +30px in precision mode => +5 minutes
       dispatchPointerUp();
     });
 
-    expect(onDrop).toHaveBeenCalledWith("task-1", "09:20");
+    expect(onDrop).toHaveBeenCalledWith("task-1", "09:05");
+  });
+
+  it("keeps coarse mode during continuous movement (no accidental precision)", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: {
+          precisionHoldMs: 120,
+          precisionActivationWindowPx: 72,
+          precisionHoldMovementPx: 12,
+        },
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-1", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(130);
+      dispatchPointerMove(160);
+      dispatchPointerMove(190);
+    });
+
+    expect(result.current.snapMode).toBe("coarse");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-1", "09:45");
+  });
+
+  it("returns to coarse mode after leaving precision lane", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: {
+          precisionHoldMs: 0,
+          precisionActivationWindowPx: 120,
+          precisionExitMovementPx: 96,
+        },
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-1", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(100); // enter precision
+      dispatchPointerMove(130); // fine move
+    });
+    expect(result.current.snapMode).toBe("fine");
+
+    act(() => {
+      dispatchPointerMove(250); // exits precision due to large movement
+    });
+    expect(result.current.snapMode).toBe("coarse");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+    expect(onDrop).toHaveBeenCalledWith("task-1", "10:15");
   });
 
   it("ignores pointer/touch starts from interactive descendants", () => {

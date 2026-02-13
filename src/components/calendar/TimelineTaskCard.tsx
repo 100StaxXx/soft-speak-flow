@@ -133,7 +133,7 @@ export function TimelineTaskCard({
           <button
             type="button"
             aria-label="Drag to reschedule"
-            title="Drag handle to reschedule (15-minute snap, hold for 5-minute precision)"
+            title="Drag to reschedule (15-minute snap; hold near start before moving for 5-minute precision)"
             className={cn(
               "h-8 w-8 rounded-md flex items-center justify-center touch-none",
               isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
