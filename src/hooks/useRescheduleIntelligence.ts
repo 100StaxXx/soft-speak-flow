@@ -208,7 +208,7 @@ export function useRescheduleIntelligence(
       
       smartQuickActions.push({
         label: 'Get Back on Track',
-        description: 'AI will redistribute milestones to match your pace',
+        description: 'We will redistribute milestones to match your pace',
         adjustmentText: 'I\'m behind schedule. Redistribute milestones realistically based on my current pace, prioritizing the most important ones.',
         icon: 'target',
         priority: 'primary',
@@ -324,7 +324,7 @@ export function useRescheduleIntelligence(
       smartQuickActions.push(
         {
           label: 'Optimize Timeline',
-          description: 'Let AI analyze and improve your schedule',
+          description: 'Get guidance to improve your schedule',
           adjustmentText: 'Analyze my current progress and optimize the remaining timeline for best results.',
           icon: 'sparkles',
           priority: 'primary',

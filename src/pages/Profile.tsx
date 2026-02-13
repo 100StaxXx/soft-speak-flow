@@ -32,6 +32,7 @@ import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
 import { AstrologySettings } from "@/components/AstrologySettings";
 import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
+import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsSettings";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -406,7 +407,7 @@ const Profile = () => {
               <Card className="border-border/50">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Your Mentor</CardTitle>
-                  <CardDescription className="text-xs">Change your AI mentor anytime</CardDescription>
+                  <CardDescription className="text-xs">Change your mentor anytime</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {selectedMentor && (
@@ -558,6 +559,7 @@ const Profile = () => {
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-y-4">
               <QuestBehaviorSettings />
+              <CalendarIntegrationsSettings />
               <SoundSettings />
               <AstrologySettings />
               

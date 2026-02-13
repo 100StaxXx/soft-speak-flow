@@ -1,0 +1,44 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/DataRequest.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataRequest.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataRequest.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataRequest.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataRequest.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataRequest.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/DataStreamRequest.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DataStreamRequest.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/DownloadRequest.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DownloadRequest.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DownloadRequest.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DownloadRequest.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DownloadRequest.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DownloadRequest.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/DispatchQueue+Alamofire.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/DispatchQueue+Alamofire.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/Concurrency.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/Concurrency.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/Concurrency.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/Concurrency.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/Concurrency.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/Concurrency.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/EventMonitor.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/EventMonitor.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/EventMonitor.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/EventMonitor.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/EventMonitor.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/x86_64/EventMonitor.swiftdeps"
+  }
+}

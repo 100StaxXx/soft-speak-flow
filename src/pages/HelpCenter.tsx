@@ -72,7 +72,7 @@ const HelpCenter = () => {
       items: [
         {
           title: "Evolution Stages",
-          content: "Your companion evolves through 21 distinct stages, from a tiny spark to a majestic cosmic being. Each stage has unique artwork that's generated based on your companion's species and personality. When your companion reaches the required XP threshold, an 'Evolve Now' button appears on the Companion page—tap it when you're ready to witness the transformation!"
+          content: "Your companion evolves through 21 distinct stages, from a tiny spark to a majestic cosmic being. Each stage has unique artwork shaped by your companion's species and personality. When your companion reaches the required XP threshold, an 'Evolve Now' button appears on the Companion page—tap it when you're ready to witness the transformation!"
         },
         {
           title: "Earning XP",
@@ -84,7 +84,7 @@ const HelpCenter = () => {
         },
         {
           title: "Postcards & Stories",
-          content: "As your companion evolves, it generates postcards—illustrated snapshots of your journey together. These chronicle your growth milestones and create a visual diary of your transformation. View your postcard collection on the Companion page."
+          content: "As your companion evolves, it unlocks postcards—illustrated snapshots of your journey together. These chronicle your growth milestones and create a visual diary of your transformation. View your postcard collection on the Companion page."
         },
         {
           title: "Resetting Your Companion",
@@ -136,7 +136,7 @@ const HelpCenter = () => {
         },
         {
           title: "Epic Stories",
-          content: "Each Epic generates a unique narrative as you progress. Reach milestones to unlock story chapters featuring your companion. Complete an Epic to receive a final 'book' summarizing your journey—a keepsake of your achievement."
+          content: "Each Epic unfolds a unique narrative as you progress. Reach milestones to unlock story chapters featuring your companion. Complete an Epic to receive a final 'book' summarizing your journey—a keepsake of your achievement."
         },
         {
           title: "Shared Epics",
@@ -216,7 +216,7 @@ const HelpCenter = () => {
         },
         {
           title: "Guild Stories",
-          content: "Active guilds generate collective story chapters as members reach milestones together. These narratives feature all guild members' companions and celebrate shared achievements."
+          content: "Active guilds unlock collective story chapters as members reach milestones together. These narratives feature all guild members' companions and celebrate shared achievements."
         }
       ]
     },
@@ -264,7 +264,7 @@ const HelpCenter = () => {
         },
         {
           title: "Updating Birth Info",
-          content: "If you entered incorrect birth details, update them in Command Center → Preferences → Astrology Settings. Your cosmic profile regenerates with accurate placements. Birth time is optional but provides more detailed Rising and house placements."
+          content: "If you entered incorrect birth details, update them in Command Center → Preferences → Astrology Settings. Your cosmic profile refreshes with accurate placements. Birth time is optional but provides more detailed Rising and house placements."
         }
       ]
     },
@@ -284,7 +284,7 @@ const HelpCenter = () => {
         },
         {
           title: "Weekly Recaps",
-          content: "Every week, Cosmiq generates a recap of your activity—quests completed, habits maintained, XP earned, and companion progress. Recaps include mentor reflections on your week and encouragement for the week ahead."
+          content: "Every week, Cosmiq prepares a recap of your activity—quests completed, habits maintained, XP earned, and companion progress. Recaps include mentor reflections on your week and encouragement for the week ahead."
         },
         {
           title: "Past Recaps",

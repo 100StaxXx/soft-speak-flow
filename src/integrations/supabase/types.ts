@@ -2975,6 +2975,33 @@ export type Database = {
           },
         ]
       }
+      calendar_user_settings: {
+        Row: {
+          created_at: string
+          default_provider: string | null
+          integration_visible: boolean
+          nudge_dismissed_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_provider?: string | null
+          integration_visible?: boolean
+          nudge_dismissed_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_provider?: string | null
+          integration_visible?: boolean
+          nudge_dismissed_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           content_id: string
@@ -6443,9 +6470,13 @@ export type Database = {
           created_at: string | null
           id: string
           last_synced_at: string | null
+          platform: string
+          primary_calendar_id: string | null
+          primary_calendar_name: string | null
           provider: string
           refresh_token: string | null
           sync_enabled: boolean | null
+          sync_mode: string
           sync_token: string | null
           token_expires_at: string | null
           updated_at: string | null
@@ -6458,9 +6489,13 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_synced_at?: string | null
+          platform?: string
+          primary_calendar_id?: string | null
+          primary_calendar_name?: string | null
           provider: string
           refresh_token?: string | null
           sync_enabled?: boolean | null
+          sync_mode?: string
           sync_token?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
@@ -6473,15 +6508,82 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_synced_at?: string | null
+          platform?: string
+          primary_calendar_id?: string | null
+          primary_calendar_name?: string | null
           provider?: string
           refresh_token?: string | null
           sync_enabled?: boolean | null
+          sync_mode?: string
           sync_token?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: []
+      }
+      quest_calendar_links: {
+        Row: {
+          connection_id: string
+          created_at: string
+          external_calendar_id: string | null
+          external_event_id: string
+          id: string
+          last_app_sync_at: string | null
+          last_conflict_at: string | null
+          last_provider_sync_at: string | null
+          provider: string
+          sync_mode: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          external_calendar_id?: string | null
+          external_event_id: string
+          id?: string
+          last_app_sync_at?: string | null
+          last_conflict_at?: string | null
+          last_provider_sync_at?: string | null
+          provider: string
+          sync_mode?: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          external_calendar_id?: string | null
+          external_event_id?: string
+          id?: string
+          last_app_sync_at?: string | null
+          last_conflict_at?: string | null
+          last_provider_sync_at?: string | null
+          provider?: string
+          sync_mode?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quest_calendar_links_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "user_calendar_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quest_calendar_links_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "daily_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_challenges: {
         Row: {

@@ -63,7 +63,7 @@ export default function PrivacyPolicy() {
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3 space-y-2">
                   <p className="font-medium text-foreground text-sm sm:text-base">Communication Data:</p>
-                  <p className="text-xs sm:text-sm">Interactions with AI mentors, chat history, selected preferences</p>
+                  <p className="text-xs sm:text-sm">Interactions with mentors, chat history, selected preferences</p>
                 </div>
                 <div className="bg-muted/30 rounded-lg p-3 space-y-2">
                   <p className="font-medium text-foreground text-sm sm:text-base">Device Information:</p>
@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="text-primary shrink-0">•</span>
-                  <span>Generate personalized content and mentor responses</span>
+                  <span>Provide personalized content and mentor responses</span>
                 </p>
                 <p className="flex items-start gap-2">
                   <span className="text-primary shrink-0">•</span>
@@ -117,7 +117,7 @@ export default function PrivacyPolicy() {
                 4. Personalization and Data Processing
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                We use advanced personalization to provide tailored mentorship, generate companion evolutions, and create motivational content. Your interaction data may be processed to improve personalization. We implement measures to protect your privacy during this processing, including data anonymization where appropriate.
+                We use advanced personalization to provide tailored mentorship, guide companion evolutions, and create motivational content. Your interaction data may be processed to improve personalization. We implement measures to protect your privacy during this processing, including data anonymization where appropriate.
               </p>
             </section>
 
@@ -142,7 +142,7 @@ export default function PrivacyPolicy() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary shrink-0">→</span>
-                      <span>Content generation services</span>
+                      <span>Content personalization services</span>
                     </li>
                   </ul>
                 </div>

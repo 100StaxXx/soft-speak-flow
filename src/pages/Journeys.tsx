@@ -45,6 +45,11 @@ import { Wand2 } from "lucide-react";
 
 import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/useTaskCompletionWithInteraction";
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
+import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
+import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
+
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 interface CreatedCampaignData {
   title: string;
@@ -94,6 +99,8 @@ const Journeys = () => {
   );
   
   const { currentStreak } = useStreakMultiplier();
+  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, syncProviderPull, hasLinkedEvent } = useQuestCalendarSync();
+  const { connections: calendarConnections } = useCalendarIntegrations();
   
   // Contact interaction logging
   const {
@@ -275,12 +282,87 @@ const Journeys = () => {
     return map;
   }, [allCalendarTasks]);
 
+  const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+    let taskDateOverride: string | undefined;
+    let scheduledTimeOverride: string | undefined;
+
+    const attempt = async () => {
+      await sendTaskToCalendar.mutateAsync({
+        taskId,
+        options: taskDateOverride || scheduledTimeOverride
+          ? {
+              taskDate: taskDateOverride,
+              scheduledTime: scheduledTimeOverride,
+            }
+          : undefined,
+      });
+    };
+
+    try {
+      await attempt();
+      toast.success("Quest synced to calendar");
+      return;
+    } catch (error) {
+      let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+
+      for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+        if (message.includes("TASK_DATE_REQUIRED") && !taskDateOverride) {
+          const pickedDate = window.prompt(
+            "Choose a date to send this quest (YYYY-MM-DD)",
+            format(selectedDate, "yyyy-MM-dd"),
+          );
+          if (!pickedDate || !DATE_INPUT_REGEX.test(pickedDate)) {
+            toast.error("Calendar send cancelled. Please choose a valid YYYY-MM-DD date.");
+            return;
+          }
+          taskDateOverride = pickedDate;
+        }
+
+        if (message.includes("SCHEDULED_TIME_REQUIRED") && !scheduledTimeOverride) {
+          const pickedTime = window.prompt("Choose a time to send this quest (HH:mm)", "09:00");
+          if (!pickedTime || !TIME_24H_REGEX.test(pickedTime)) {
+            toast.error("Calendar send cancelled. Please choose a valid HH:mm time.");
+            return;
+          }
+          scheduledTimeOverride = pickedTime;
+        }
+
+        try {
+          await attempt();
+          toast.success("Quest synced to calendar");
+          return;
+        } catch (retryError) {
+          message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (
+            !message.includes("TASK_DATE_REQUIRED")
+            && !message.includes("SCHEDULED_TIME_REQUIRED")
+          ) {
+            toast.error(message);
+            return;
+          }
+        }
+      }
+
+      if (message.includes("TASK_DATE_REQUIRED")) {
+        toast.error("Please assign a date before sending this quest to calendar.");
+        return;
+      }
+
+      if (message.includes("SCHEDULED_TIME_REQUIRED")) {
+        toast.error("Please assign a time before sending this quest to calendar.");
+        return;
+      }
+
+      toast.error(message);
+    }
+  }, [selectedDate, sendTaskToCalendar]);
+
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     const taskDate = data.sendToInbox
       ? null
       : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
 
-    await addTask({
+    const createdTask = await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
       taskDate: taskDate,
@@ -297,8 +379,12 @@ const Journeys = () => {
       autoLogInteraction: data.autoLogInteraction,
       subtasks: data.subtasks,
     });
+
+    if (data.sendToCalendar && createdTask?.id) {
+      await handleSendTaskToCalendar(createdTask.id);
+    }
     setShowAddSheet(false);
-  }, [selectedDate, addTask]);
+  }, [selectedDate, addTask, handleSendTaskToCalendar]);
 
   const handleToggleTask = useCallback((taskId: string, completed: boolean, xpReward: number, taskData?: { scheduled_time?: string | null; difficulty?: string | null; category?: string | null; ai_generated?: boolean | null; task_text?: string | null }) => {
     if (completed) {
@@ -347,18 +433,24 @@ const Journeys = () => {
     location: string | null;
   }) => {
     await updateTask({ taskId, updates });
+    await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {
+      toast.error("Saved quest, but failed to sync linked calendar event");
+    });
     setEditingTask(null);
-  }, [updateTask]);
+  }, [updateTask, syncTaskUpdate]);
 
   const handleDeleteQuest = useCallback(async (taskId: string, isAIGenerated?: boolean) => {
     // Track deletion for AI learning
     if (isAIGenerated) {
       trackDailyPlanOutcome(taskId, 'deleted');
     }
+    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
+      toast.error("Failed to remove linked calendar event");
+    });
     await deleteTask(taskId);
     toast.success("Quest deleted");
     setEditingTask(null);
-  }, [deleteTask, trackDailyPlanOutcome]);
+  }, [deleteTask, trackDailyPlanOutcome, syncTaskDelete]);
 
   const handleDeleteRitual = useCallback(async (habitId: string) => {
     if (!user?.id) return;
@@ -436,6 +528,9 @@ const Journeys = () => {
       // Haptics not available on web
     }
     
+    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
+      toast.error("Failed to remove linked calendar event");
+    });
     await deleteTask(taskId);
     
     toast("Quest deleted", {
@@ -452,7 +547,7 @@ const Journeys = () => {
         },
       },
     });
-  }, [dailyTasks, deleteTask, restoreTask]);
+  }, [dailyTasks, deleteTask, restoreTask, syncTaskDelete]);
 
   // Handle swipe-to-move-to-next-day with undo
   const handleSwipeMoveToNextDay = useCallback(async (taskId: string) => {
@@ -484,6 +579,30 @@ const Journeys = () => {
       },
     });
   }, [dailyTasks, selectedDate, moveTaskToDate]);
+
+  // Pull external updates for full-sync providers on an interval.
+  useEffect(() => {
+    const fullSyncProviders = calendarConnections
+      .filter((connection) => connection.sync_mode === 'full_sync' && (connection.provider === 'google' || connection.provider === 'outlook'))
+      .map((connection) => connection.provider as 'google' | 'outlook');
+
+    if (fullSyncProviders.length === 0) return;
+
+    const doPull = () => {
+      for (const provider of fullSyncProviders) {
+        syncProviderPull.mutate({ provider });
+      }
+    };
+
+    doPull();
+    const id = window.setInterval(() => {
+      doPull();
+    }, 2 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [calendarConnections, syncProviderPull]);
 
   // Handle campaign creation
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
@@ -567,9 +686,12 @@ const Journeys = () => {
             onDateSelect={setSelectedDate}
             activeEpics={activeEpics}
             onDeleteQuest={handleSwipeDeleteQuest}
+            onSendToCalendar={handleSendTaskToCalendar}
+            hasCalendarLink={hasLinkedEvent}
             onMoveQuestToNextDay={handleSwipeMoveToNextDay}
             onUpdateScheduledTime={(taskId, newTime) => {
               updateTask({ taskId, updates: { scheduled_time: newTime } });
+              syncTaskUpdate.mutate({ taskId });
             }}
             onTimeSlotLongPress={(date, time) => {
               setSelectedDate(date);
@@ -598,6 +720,9 @@ const Journeys = () => {
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
+          onSendToCalendar={handleSendTaskToCalendar}
+          hasCalendarLink={editingTask ? hasLinkedEvent(editingTask.id) : false}
+          isSendingToCalendar={sendTaskToCalendar.isPending}
           onDelete={handleDeleteQuest}
           isDeleting={isDeleting}
         />

@@ -318,7 +318,7 @@ const BattleInfoCard = ({ difficulty }: { difficulty: Difficulty }) => (
       <span className="text-sm font-bold text-red-300 uppercase tracking-wider">Battle Mode</span>
     </div>
     <p className="text-sm text-muted-foreground leading-relaxed">
-      Face randomly generated adversaries! Deal damage with good performance, take hits from mistakes. 
+      Face unpredictable adversaries! Deal damage with good performance, take hits from mistakes. 
       <span className="text-red-400 font-medium"> Survive to claim victory!</span>
     </p>
   </motion.div>

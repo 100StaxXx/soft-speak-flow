@@ -68,8 +68,8 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
     setIsGenerating(true);
 
     try {
-      // Step 1: Generate complete pep talk content
-      toast.info("Generating pep talk content...");
+      // Step 1: Prepare complete pep talk content
+      toast.info("Preparing pep talk...");
       const { data: contentData, error: contentError } = await supabase.functions.invoke(
         "generate-complete-pep-talk",
         {
@@ -84,8 +84,8 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
 
       if (contentError) throw contentError;
 
-      // Step 2: Generate audio from the script
-      toast.info("Generating audio...");
+      // Step 2: Prepare audio from the script
+      toast.info("Preparing audio...");
       const { data: audioData, error: audioError } = await supabase.functions.invoke(
         "generate-mentor-audio",
         {
@@ -114,14 +114,14 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
 
         if (transcriptError) {
           console.error("Transcription error:", transcriptError);
-          toast.warning("Audio generated but transcription failed");
+          toast.warning("Audio is ready, but transcription failed");
         } else if (transcriptData?.transcript) {
           transcript = transcriptData.transcript;
-          toast.success("Complete pep talk with transcript generated!");
+          toast.success("Pep talk and transcript are ready!");
         }
       } catch (transcriptError) {
         console.error("Transcription error:", transcriptError);
-        toast.warning("Audio generated but transcription failed");
+        toast.warning("Audio is ready, but transcription failed");
       }
 
       // Pass all data to parent component including transcript
@@ -139,7 +139,7 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
       }
     } catch (error) {
       console.error("Error generating complete pep talk:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to generate pep talk");
+      toast.error(error instanceof Error ? error.message : "Failed to prepare pep talk");
     } finally {
       setIsGenerating(false);
     }
@@ -156,10 +156,10 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Music className="h-5 w-5" />
-          Generate Pep Talk
+          Prepare Pep Talk
         </CardTitle>
         <CardDescription>
-          Select options below, then generate a complete pep talk with title, description, script, and audio
+          Select options below, then prepare a complete pep talk with title, description, script, and audio
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -254,12 +254,12 @@ export const AudioGenerator = ({ onFullPepTalkGenerated, mentors }: AudioGenerat
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generating Complete Pep Talk...
+              Preparing Pep Talk...
             </>
           ) : (
             <>
               <Music className="mr-2 h-4 w-4" />
-              Generate Pep Talk
+              Prepare Pep Talk
             </>
           )}
         </Button>

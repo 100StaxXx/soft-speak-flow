@@ -60,7 +60,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
     } catch (error) {
       console.error('Failed to generate briefing:', error);
       toast({
-        title: "Couldn't generate briefing",
+        title: "Couldn't prepare briefing",
         description: error instanceof Error ? error.message : "Please try again later",
         variant: "destructive",
       });
@@ -203,7 +203,7 @@ export const MorningBriefing = memo(({ onAskMore, className }: MorningBriefingPr
                 ) : (
                   <>
                     <Sparkles className="h-5 w-5" />
-                    Generate My Briefing
+                    Prepare My Briefing
                   </>
                 )}
               </Button>

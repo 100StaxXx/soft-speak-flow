@@ -1,0 +1,37 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/Request.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/Request.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/Request.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/Request.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/Request.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/Request.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/RequestTaskMap.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestTaskMap.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestTaskMap.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestTaskMap.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestTaskMap.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestTaskMap.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RedirectHandler.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RedirectHandler.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RedirectHandler.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RedirectHandler.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RedirectHandler.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RedirectHandler.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RequestCompression.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestCompression.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestCompression.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestCompression.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestCompression.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestCompression.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RequestInterceptor.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestInterceptor.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestInterceptor.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestInterceptor.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestInterceptor.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Alamofire.build/Objects-normal/arm64/RequestInterceptor.swiftdeps"
+  }
+}

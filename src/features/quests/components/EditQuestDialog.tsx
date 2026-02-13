@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { format, isToday, addMinutes, parse } from "date-fns";
-import { X, ArrowLeft, Clock, ChevronRight, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain } from "lucide-react";
+import { X, ArrowLeft, Clock, ChevronRight, Trash2, Sliders, CalendarIcon, Zap, Flame, Mountain, CalendarPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,9 @@ interface EditQuestDialogProps {
   isSaving: boolean;
   onDelete?: (taskId: string) => Promise<void>;
   isDeleting?: boolean;
+  onSendToCalendar?: (taskId: string) => Promise<void> | void;
+  hasCalendarLink?: boolean;
+  isSendingToCalendar?: boolean;
 }
 
 export function EditQuestDialog({
@@ -78,6 +81,9 @@ export function EditQuestDialog({
   isSaving,
   onDelete,
   isDeleting,
+  onSendToCalendar,
+  hasCalendarLink = false,
+  isSendingToCalendar = false,
 }: EditQuestDialogProps) {
   const [taskText, setTaskText] = useState("");
   const [taskDate, setTaskDate] = useState<string | null>(null);
@@ -542,16 +548,31 @@ export function EditQuestDialog({
 
         {/* Footer */}
         <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
-          <Button
-            onClick={handleSave}
-            disabled={isSaving || !taskText.trim()}
-            className={cn(
-              "w-full text-white",
-              taskText.trim() ? cn(colors.pill, "hover:opacity-90") : ""
-            )}
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !taskText.trim()}
+              className={cn(
+                "w-full text-white",
+                taskText.trim() ? cn(colors.pill, "hover:opacity-90") : ""
+              )}
+            >
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          {onSendToCalendar && (
+            <Button
+              variant="outline"
+              onClick={() => onSendToCalendar(task?.id || "")}
+              disabled={isSendingToCalendar || !task?.id}
+              className="w-full"
+            >
+              <CalendarPlus className="w-4 h-4 mr-2" />
+              {isSendingToCalendar
+                ? "Syncing..."
+                : hasCalendarLink
+                  ? "Re-send to Calendar"
+                  : "Send to Calendar"}
+            </Button>
+          )}
           {onDelete && (
             <Button
               variant="ghost"

@@ -20,6 +20,7 @@ import {
   Sheet,
   SheetContent,
 } from "@/components/ui/sheet";
+import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 
 export interface AddQuestData {
   text: string;
@@ -36,6 +37,7 @@ export interface AddQuestData {
   contactId: string | null;
   autoLogInteraction: boolean;
   sendToInbox: boolean;
+  sendToCalendar: boolean;
   subtasks: string[];
 }
 
@@ -84,6 +86,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [customDurationInput, setCustomDurationInput] = useState("");
+  const [sendToCalendar, setSendToCalendar] = useState(false);
+
+  const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
+  const effectiveProvider = defaultProvider || connections[0]?.provider || null;
+  const canShowCalendarSendOption = Boolean(integrationVisible && effectiveProvider);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const timeWheelRef = useRef<HTMLDivElement>(null);
@@ -114,6 +121,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setShowDurationChips(false);
       setShowTimePicker(false);
       setSubtasks([]);
+      setSendToCalendar(false);
     } else {
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
@@ -219,10 +227,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       contactId,
       autoLogInteraction,
       sendToInbox: false,
+      sendToCalendar: sendToCalendar && canShowCalendarSendOption,
       subtasks: subtasks.filter(s => s.trim()),
     });
     onOpenChange(false);
-  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, onAdd, onOpenChange]);
+  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, sendToCalendar, canShowCalendarSendOption, subtasks, onAdd, onOpenChange]);
 
   const handleAddToInbox = useCallback(async () => {
     if (!taskText.trim()) return;
@@ -241,6 +250,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       contactId,
       autoLogInteraction,
       sendToInbox: true,
+      sendToCalendar: false,
       subtasks: subtasks.filter(s => s.trim()),
     });
     onOpenChange(false);
@@ -622,6 +632,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
             {/* Step 2 Footer */}
             <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
+              {canShowCalendarSendOption && (
+                <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">
+                    Send to {effectiveProvider === 'apple' ? 'Apple' : effectiveProvider === 'google' ? 'Google' : 'Outlook'} Calendar after create
+                  </div>
+                  <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
+                </div>
+              )}
               <Button
                 onClick={handleSubmit}
                 disabled={isAdding || !canCreateTask}

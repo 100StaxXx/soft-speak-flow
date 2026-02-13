@@ -1,0 +1,11 @@
+framework module CapacitorCommunityContacts {
+  umbrella header "CapacitorCommunityContacts-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module CapacitorCommunityContacts.Swift {
+  header "CapacitorCommunityContacts-Swift.h"
+  requires objc
+}

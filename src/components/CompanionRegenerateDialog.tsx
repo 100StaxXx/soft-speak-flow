@@ -38,7 +38,7 @@ export const CompanionRegenerateDialog = ({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            {isRegenerating ? "Creating New Look..." : "Regenerate Companion?"}
+            {isRegenerating ? "Creating New Look..." : "Refresh Companion Look?"}
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             {isRegenerating ? (
@@ -61,11 +61,11 @@ export const CompanionRegenerateDialog = ({
                   all stats, XP, and progress intact.
                 </p>
                 <p className="text-sm text-muted-foreground/80">
-                  You have <span className="font-semibold text-primary">{regenerationsRemaining}</span> regeneration
-                  {regenerationsRemaining === 1 ? '' : 's'} remaining (lifetime limit).
+                  You have <span className="font-semibold text-primary">{regenerationsRemaining}</span> look refresh
+                  {regenerationsRemaining === 1 ? '' : 'es'} remaining (lifetime limit).
                 </p>
                 <p className="text-xs text-muted-foreground/60">
-                  Generation usually takes 10-20 seconds. We'll ensure quality by validating the result.
+                  This usually takes 10-20 seconds. We'll ensure quality by validating the result.
                 </p>
               </>
             )}
@@ -84,7 +84,7 @@ export const CompanionRegenerateDialog = ({
                 className="bg-primary hover:bg-primary/90"
               >
                 <Sparkles className="h-4 w-4 mr-2" />
-                Regenerate
+                Refresh Look
               </AlertDialogAction>
             </>
           )}

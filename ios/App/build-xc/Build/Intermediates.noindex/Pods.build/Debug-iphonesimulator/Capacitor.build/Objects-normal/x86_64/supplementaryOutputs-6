@@ -1,0 +1,37 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Codable/JSValueDecoder.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueDecoder.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueDecoder.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueDecoder.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueDecoder.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueDecoder.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Codable/JSValueEncoder.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueEncoder.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueEncoder.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueEncoder.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueEncoder.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/JSValueEncoder.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/KeyPath.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyPath.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyPath.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyPath.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyPath.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyPath.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/KeyValueStore.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyValueStore.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyValueStore.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyValueStore.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyValueStore.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/KeyValueStore.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/NotificationHandlerProtocol.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/NotificationHandlerProtocol.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/NotificationHandlerProtocol.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/NotificationHandlerProtocol.dia",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/NotificationHandlerProtocol.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/x86_64/NotificationHandlerProtocol.swiftdeps"
+  }
+}

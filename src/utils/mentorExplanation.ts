@@ -80,6 +80,8 @@ const TAG_TO_TEXT: Record<string, string> = {
   grounded: "grounded energy",
   spiritual: "spiritual guidance",
   intuition: "intuitive guidance",
+  feminine_preference: "feminine mentor energy",
+  masculine_preference: "masculine mentor energy",
 };
 
 export function generateMentorExplanation(
@@ -89,10 +91,10 @@ export function generateMentorExplanation(
   const title = `Your Mentor is: ${mentor.name}`;
   const subtitle = mentor.short_title;
 
-  // Get tags from the new StoryQuestionnaire format
-  const growthTag = selectedAnswers["growth_focus"] || "";
-  const guidanceTag = selectedAnswers["guidance_style"] || "";
-  const energyTag = selectedAnswers["energy_preference"] || "";
+  // Support current onboarding question IDs with backward compatibility for legacy keys.
+  const growthTag = selectedAnswers["focus_area"] || selectedAnswers["growth_focus"] || "";
+  const guidanceTag = selectedAnswers["guidance_tone"] || selectedAnswers["guidance_style"] || "";
+  const energyTag = selectedAnswers["mentor_energy"] || selectedAnswers["energy_preference"] || "";
 
   // Build paragraph
   let paragraph = "";
@@ -115,6 +117,11 @@ export function generateMentorExplanation(
     if (mentor.themes && mentor.themes.length > 0) {
       const topThemes = mentor.themes.slice(0, 2).join(" and ");
       paragraph += ` They'll support your growth in ${topThemes} in a way that fits how you like to be guided.`;
+    }
+
+    const energyText = TAG_TO_TEXT[energyTag];
+    if (energyText) {
+      paragraph += ` You also asked for ${energyText}.`;
     }
   } else {
     // Fallback if answers missing

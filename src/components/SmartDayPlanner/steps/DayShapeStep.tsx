@@ -45,7 +45,7 @@ const SHAPE_OPTIONS: ShapeOption[] = [
   {
     value: 'auto',
     label: 'Smart Auto',
-    description: 'AI chooses based on your data',
+    description: 'Chooses based on your data',
     icon: Sparkles,
     curve: [40, 70, 50, 60, 75, 35],
   },
@@ -185,7 +185,7 @@ export function DayShapeStep({ context, updateContext, onNext, isGenerating }: D
           <div>
             <p className="text-xs font-medium text-foreground">What happens next</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">
-              Next, you can add blocked time slots and special requests before we generate your plan.
+              Next, you can add blocked time slots and special requests before we build your plan.
             </p>
           </div>
         </div>

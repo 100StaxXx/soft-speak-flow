@@ -425,7 +425,7 @@ export const CompanionDisplay = memo(() => {
               className="relative select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
               role="button"
               tabIndex={0}
-              aria-label={`Press and hold to regenerate your companion. ${regenerationsRemaining} regeneration${regenerationsRemaining === 1 ? '' : 's'} remaining.`}
+              aria-label={`Press and hold to refresh your companion's look. ${regenerationsRemaining} look refresh${regenerationsRemaining === 1 ? '' : 'es'} remaining.`}
               onMouseDown={handlePressStart}
               onMouseUp={handlePressEnd}
               onMouseLeave={handlePressEnd}

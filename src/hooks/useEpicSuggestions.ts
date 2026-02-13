@@ -107,7 +107,7 @@ export function useEpicSuggestions(): UseEpicSuggestionsReturn {
 
       setSuggestions(suggestionsWithSelection);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to generate suggestions';
+      const message = err instanceof Error ? err.message : 'Failed to build suggestions';
       setError(message);
       toast.error(message);
     } finally {

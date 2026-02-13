@@ -10,7 +10,10 @@ export interface CalendarConnection {
   provider: string;
   calendar_id: string | null;
   calendar_email: string | null;
+  primary_calendar_id?: string | null;
+  primary_calendar_name?: string | null;
   sync_enabled: boolean;
+  sync_mode?: 'send_only' | 'full_sync';
   last_synced_at: string | null;
   created_at: string | null;
 }
@@ -50,7 +53,7 @@ export function useGoogleCalendarConnection() {
       setIsConnecting(true);
       
       const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
-        body: { action: 'get_auth_url', redirectUri },
+        body: { action: 'getAuthUrl', redirectUri },
       });
 
       if (error) {
@@ -59,7 +62,7 @@ export function useGoogleCalendarConnection() {
         return null;
       }
 
-      return data?.url || null;
+      return data?.url || data?.auth_url || null;
     } catch (err) {
       console.error('Error in getAuthUrl:', err);
       toast.error('Failed to connect to Google Calendar');
@@ -73,7 +76,7 @@ export function useGoogleCalendarConnection() {
   const exchangeCode = useMutation({
     mutationFn: async ({ code, redirectUri }: { code: string; redirectUri: string }) => {
       const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
-        body: { action: 'exchange_code', code, redirectUri },
+        body: { action: 'exchangeCode', code, redirectUri },
       });
 
       if (error) {
@@ -129,7 +132,7 @@ export function useGoogleCalendarConnection() {
         return null;
       }
 
-      return data;
+      return data ? { connected: !!data.connected, email: data.calendarEmail || data.email } : null;
     } catch (err) {
       console.error('Error in checkStatus:', err);
       return null;

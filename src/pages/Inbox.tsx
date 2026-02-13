@@ -2,6 +2,7 @@ import { useState, useCallback, memo } from "react";
 import { format } from "date-fns";
 import { motion, useReducedMotion } from "framer-motion";
 import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { BottomNav } from "@/components/BottomNav";
@@ -17,6 +18,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { haptics } from "@/utils/haptics";
+import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
+
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const InboxPage = memo(function InboxPage() {
   const prefersReducedMotion = useReducedMotion();
@@ -28,13 +33,99 @@ const InboxPage = memo(function InboxPage() {
   const [editingTask, setEditingTask] = useState<typeof inboxTasks[number] | null>(null);
 
   const { addTask, updateTask, isUpdating } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
+  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync();
+
+  const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+    let taskDateOverride: string | undefined;
+    let scheduledTimeOverride: string | undefined;
+
+    const attempt = async () => {
+      await sendTaskToCalendar.mutateAsync({
+        taskId,
+        options: taskDateOverride || scheduledTimeOverride
+          ? {
+              taskDate: taskDateOverride,
+              scheduledTime: scheduledTimeOverride,
+            }
+          : undefined,
+      });
+    };
+
+    try {
+      await attempt();
+      toast.success("Quest synced to calendar");
+      return;
+    } catch (error) {
+      let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+
+      for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+        if (message.includes("TASK_DATE_REQUIRED") && !taskDateOverride) {
+          const pickedDate = window.prompt(
+            "Choose a date to send this quest (YYYY-MM-DD)",
+            format(new Date(), "yyyy-MM-dd"),
+          );
+          if (!pickedDate || !DATE_INPUT_REGEX.test(pickedDate)) {
+            toast.error("Calendar send cancelled. Please choose a valid YYYY-MM-DD date.");
+            return;
+          }
+          taskDateOverride = pickedDate;
+        }
+
+        if (message.includes("SCHEDULED_TIME_REQUIRED") && !scheduledTimeOverride) {
+          const pickedTime = window.prompt("Choose a time to send this quest (HH:mm)", "09:00");
+          if (!pickedTime || !TIME_24H_REGEX.test(pickedTime)) {
+            toast.error("Calendar send cancelled. Please choose a valid HH:mm time.");
+            return;
+          }
+          scheduledTimeOverride = pickedTime;
+        }
+
+        try {
+          await attempt();
+          toast.success("Quest synced to calendar");
+          return;
+        } catch (retryError) {
+          message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (
+            !message.includes("TASK_DATE_REQUIRED")
+            && !message.includes("SCHEDULED_TIME_REQUIRED")
+          ) {
+            toast.error(message);
+            return;
+          }
+        }
+      }
+
+      if (message.includes("TASK_DATE_REQUIRED")) {
+        toast.error("Please assign a date before sending this quest to calendar.");
+        return;
+      }
+
+      if (message.includes("SCHEDULED_TIME_REQUIRED")) {
+        toast.error("Please assign a time before sending this quest to calendar.");
+        return;
+      }
+
+      toast.error(message);
+    }
+  }, [sendTaskToCalendar]);
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     await updateTask({ taskId, updates });
+    await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {
+      toast.error("Saved quest, but failed to sync linked calendar event");
+    });
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
     setEditingTask(null);
-  }, [updateTask, queryClient]);
+  }, [updateTask, syncTaskUpdate, queryClient]);
+
+  const handleDeleteQuest = useCallback(async (taskId: string) => {
+    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
+      toast.error("Failed to remove linked calendar event");
+    });
+    deleteInboxTask(taskId);
+  }, [deleteInboxTask, syncTaskDelete]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     if (!user?.id) return;
@@ -42,7 +133,7 @@ const InboxPage = memo(function InboxPage() {
       ? null
       : (data.taskDate ?? format(new Date(), 'yyyy-MM-dd'));
 
-    await addTask({
+    const createdTask = await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
       taskDate: taskDate,
@@ -59,13 +150,17 @@ const InboxPage = memo(function InboxPage() {
       autoLogInteraction: data.autoLogInteraction,
       subtasks: data.subtasks,
     });
+
+    if (data.sendToCalendar && createdTask?.id) {
+      await handleSendTaskToCalendar(createdTask.id);
+    }
     if (!data.sendToInbox) {
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     }
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
     setShowAddQuest(false);
-  }, [user?.id, addTask, queryClient]);
+  }, [user?.id, addTask, handleSendTaskToCalendar, queryClient]);
 
   return (
     <PageTransition mode="instant">
@@ -149,7 +244,7 @@ const InboxPage = memo(function InboxPage() {
 
                     <button
                       onClick={() => {
-                        deleteInboxTask(task.id);
+                        void handleDeleteQuest(task.id);
                         haptics.light();
                       }}
                       className="p-2 rounded-xl hover:bg-destructive/12 text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
@@ -180,8 +275,11 @@ const InboxPage = memo(function InboxPage() {
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
+          onSendToCalendar={handleSendTaskToCalendar}
+          hasCalendarLink={editingTask ? hasLinkedEvent(editingTask.id) : false}
+          isSendingToCalendar={sendTaskToCalendar.isPending}
           onDelete={async (taskId) => {
-            deleteInboxTask(taskId);
+            await handleDeleteQuest(taskId);
             setEditingTask(null);
           }}
           isDeleting={false}

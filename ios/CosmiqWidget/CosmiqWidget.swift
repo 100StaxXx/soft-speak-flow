@@ -9,7 +9,7 @@ extension Color {
     static let cosmicPurple = Color(red: 0.55, green: 0.36, blue: 0.95)
     static let cosmicGold = Color(red: 0.95, green: 0.75, blue: 0.30)
     static let cosmicText = Color.white
-    static let cosmicSecondary = Color.white.opacity(0.6)
+    static let cosmicSecondary = Color.white.opacity(0.72)
     static let cosmicGreen = Color(red: 0.4, green: 0.9, blue: 0.5)
 }
 
@@ -51,7 +51,7 @@ struct Provider: TimelineProvider {
         let entry = TaskEntry(date: Date(), data: data)
         
         // Refresh every 15 minutes to stay current
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(15 * 60)
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }

@@ -90,7 +90,7 @@ export function useJourneySchedule() {
       setSchedule(generatedSchedule);
       return generatedSchedule;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to generate schedule';
+      const message = err instanceof Error ? err.message : 'Failed to build schedule';
       setError(message);
       console.error('Failed to generate schedule:', err);
       return null;

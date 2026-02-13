@@ -112,6 +112,12 @@ export const getAuthRedirectPath = async (userId: string): Promise<string> => {
       return "/tasks";
     }
 
+    // Explicitly incomplete onboarding must always return to onboarding.
+    if (profile?.onboarding_completed === false) {
+      logger.debug('[getAuthRedirectPath] Onboarding marked incomplete, redirecting to /onboarding');
+      return "/onboarding";
+    }
+
     // No profile or no mentor selected -> onboarding
     if (!profile || !resolvedMentorId) {
       logger.debug('[getAuthRedirectPath] No profile or mentor, redirecting to /onboarding');

@@ -72,7 +72,7 @@ export default function PremiumSuccess() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>✓ Unlimited access to all content</p>
             <p>✓ All mentors unlocked</p>
-            <p>✓ Unlimited AI mentor chat</p>
+            <p>✓ Unlimited mentor chat</p>
             <p>✓ Offline downloads</p>
             <p>✓ Priority support</p>
           </div>

@@ -57,7 +57,7 @@ export const EmptyMissions = ({ onRetry, isRetrying, errorMessage }: EmptyMissio
             ) : (
               <>
                 <RefreshCcw className="h-3 w-3" />
-                Retry Generation
+                Try Refresh Again
               </>
             )}
           </Button>

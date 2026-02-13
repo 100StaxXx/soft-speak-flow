@@ -15,7 +15,7 @@ const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
 
 const features = [
   { icon: Sparkles, text: "All 21 evolution stages" },
-  { icon: MessageCircle, text: "Unlimited AI Mentor Chat" },
+  { icon: MessageCircle, text: "Unlimited mentor chat" },
   { icon: Crown, text: "Pet Mode, Guild Stories & all features" },
   { icon: Lock, text: "Unlimited Quests, Epics & Challenges" },
 ];

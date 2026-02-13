@@ -468,7 +468,7 @@ const CosmiqDeepDive = () => {
             <Skeleton className="h-20 w-full bg-gray-800/50" />
             <Skeleton className="h-20 w-full bg-gray-800/50" />
             <p className="text-center text-gray-400 text-sm animate-pulse">
-              ✨ Generating your Cosmiq insight...
+              ✨ Preparing your Cosmiq insight...
             </p>
           </div>
         ) : content ? (

@@ -10,10 +10,14 @@ export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
     ritualCompleted: number;
     date: string;
   }): Promise<void> {
-    console.log('[WidgetData] Web fallback - no widget support');
+    if (import.meta.env.DEV) {
+      console.debug('[WidgetData] Web fallback - no widget support');
+    }
   }
   
   async reloadWidget(): Promise<void> {
-    console.log('[WidgetData] Web fallback - no widget support');
+    if (import.meta.env.DEV) {
+      console.debug('[WidgetData] Web fallback - no widget support');
+    }
   }
 }

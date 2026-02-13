@@ -390,7 +390,7 @@ export const StellarFlowGame = ({
   if (!puzzle) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-muted-foreground">Generating puzzle...</div>
+        <div className="animate-pulse text-muted-foreground">Preparing puzzle...</div>
       </div>
     );
   }

@@ -119,7 +119,7 @@ export function useAdjustEpicPlan(): UseAdjustEpicPlanReturn {
       setEncouragement(result.encouragement);
       setEpicStatus(result.epicStatus);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to generate adjustment suggestions';
+      const message = err instanceof Error ? err.message : 'Failed to build adjustment suggestions';
       setError(message);
       toast.error(message);
     } finally {

@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/share/ios/Sources/SharePlugin/SharePlugin.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin~partial.swiftmodule"
+  }
+}

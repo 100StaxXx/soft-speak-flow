@@ -1,0 +1,79 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFilesystemLib-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFilesystemLib-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFilesystemLib-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFilesystemLib-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFilesystemLib-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/IONFILEChunkPublisher.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEChunkPublisher~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/IONFILEItemAttributeModel.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEItemAttributeModel~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/IONFILEManager+Enums.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Enums~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/IONFILEManager+Errors.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Errors~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/IONFILEManager+Protocols.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager+Protocols~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/IONFILEManager.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/IONFILEManager~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/IONFilesystemLib/Sources/IONFilesystemLib/URL+Extension.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/IONFilesystemLib.build/Objects-normal/arm64/URL+Extension~partial.swiftmodule"
+  }
+}

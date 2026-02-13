@@ -1,0 +1,59 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/CapgoCapacitorSocialLogin-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/CapgoCapacitorSocialLogin-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/CapgoCapacitorSocialLogin-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/CapgoCapacitorSocialLogin-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/CapgoCapacitorSocialLogin-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/AppleProvider.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/AppleProvider~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/FacebookProvider.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/FacebookProvider~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/GoogleProvider.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/GoogleProvider~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/SocialLoginPlugin.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/SocialLoginPlugin~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capgo/capacitor-social-login/ios/Sources/SocialLoginPlugin/TwitterProvider.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-xc/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapgoCapacitorSocialLogin.build/Objects-normal/arm64/TwitterProvider~partial.swiftmodule"
+  }
+}

@@ -90,14 +90,14 @@ const PepTalkDetail = () => {
       if (error) throw error;
 
       if (data?.transcript && Array.isArray(data.transcript)) {
-        toast.success("Transcript generated successfully!");
+        toast.success("Transcript is ready!");
         await fetchPepTalk(id);
       } else {
         throw new Error('No transcript data returned');
       }
     } catch (error) {
       console.error('Transcription error:', error);
-      toast.error("Failed to generate transcript");
+      toast.error("Failed to prepare transcript");
     } finally {
       setIsTranscribing(false);
     }
@@ -244,7 +244,7 @@ const PepTalkDetail = () => {
                     <div>
                       <h3 className="font-semibold mb-2">No Transcript Available</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Generate a word-by-word transcript with timestamps
+                        Prepare a word-by-word transcript with timestamps
                       </p>
                       <Button 
                         onClick={handleTranscribe}
@@ -259,7 +259,7 @@ const PepTalkDetail = () => {
                         ) : (
                           <>
                             <FileText className="mr-2 h-4 w-4" />
-                            Generate Transcript
+                            Prepare Transcript
                           </>
                         )}
                       </Button>

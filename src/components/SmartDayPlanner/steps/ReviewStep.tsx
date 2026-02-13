@@ -95,7 +95,7 @@ export function ReviewStep({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <AlertCircle className="h-10 w-10 text-destructive mb-3" />
-        <h3 className="font-medium text-foreground mb-1">Couldn't generate plan</h3>
+        <h3 className="font-medium text-foreground mb-1">Couldn't build plan</h3>
         <p className="text-sm text-muted-foreground mb-4">{error}</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
           Start Over
@@ -108,7 +108,7 @@ export function ReviewStep({
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-        <p className="text-sm text-muted-foreground">Generating your plan...</p>
+        <p className="text-sm text-muted-foreground">Building your plan...</p>
       </div>
     );
   }

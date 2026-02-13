@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <meta name="screen-orientation" content="portrait">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <title>Cosmiq - Align Your Time With The Cosmos</title>
+    <meta name="description" content="Transform your daily routine with Cosmiq. A gamified self-improvement app that blends celestial wisdom with powerful habit tracking and quest management." />
+    <meta name="author" content="Cosmiq" />
+
+    <meta property="og:title" content="Cosmiq - Align Your Time With The Cosmos" />
+    <meta property="og:description" content="Your cosmic companion for personal growth. Gamified habits, quests, and celestial guidance to transform your journey." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/splash.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@CosmiqApp" />
+    <meta name="twitter:image" content="/splash.png" />
+    
+    <!-- Performance: DNS Prefetch & Preconnect for External Resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Google Fonts - Optimized for faction styles -->
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;500;600;700&family=Barlow:wght@400;500;600;700;800&family=Cinzel:wght@400;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-B9iotTKE.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/date-vendor-CuPqBTxb.js">
+    <link rel="modulepreload" crossorigin href="/assets/three-vendor-qI8GXUTd.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-CkzXtEGd.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CY2aWTNY.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+
+  <body>
+    <!-- Debug indicator - shows if WebView loads but JS fails -->
+    <div id="debug-indicator" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:24px;z-index:9999;background:#000;padding:20px;border-radius:10px;">
+      Loading Cosmiq...
+    </div>
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        document.getElementById('debug-indicator').innerHTML = 
+          '<div style="background:red;padding:20px;border-radius:10px;">' +
+          '<strong>JS Error:</strong><br>' + msg + '<br>Line: ' + line +
+          '</div>';
+        return false;
+      };
+    </script>
+    <div id="root"></div>
+  </body>
+</html>

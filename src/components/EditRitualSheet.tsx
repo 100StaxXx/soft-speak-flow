@@ -291,7 +291,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
               />
               {!description && (
                 <p className="text-xs text-muted-foreground">
-                  Add details about what this ritual involves - this was generated when you created your campaign
+                  Add details about what this ritual involves - this was drafted when you created your campaign
                 </p>
               )}
             </div>

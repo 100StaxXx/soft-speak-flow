@@ -207,6 +207,12 @@ verify_jwt = true
 [functions.google-calendar-events]
 verify_jwt = true
 
+[functions.outlook-calendar-auth]
+verify_jwt = true
+
+[functions.outlook-calendar-events]
+verify_jwt = true
+
 [functions.spawn-guild-boss]
 verify_jwt = true
 

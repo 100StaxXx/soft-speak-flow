@@ -94,7 +94,7 @@ export default function TermsOfService() {
                 7. Personalized Content
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Our service creates personalized content, mentor responses, and companion interactions tailored to your journey. This content is provided for informational and motivational purposes only. While we strive for accuracy and helpfulness, generated content may not always be perfect or applicable to your specific situation.
+                Our service creates personalized content, mentor responses, and companion interactions tailored to your journey. This content is provided for informational and motivational purposes only. While we strive for accuracy and helpfulness, personalized content may not always be perfect or applicable to your specific situation.
               </p>
             </section>
 

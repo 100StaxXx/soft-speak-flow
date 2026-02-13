@@ -67,6 +67,8 @@
 	<string>We save photos to your library only if you choose to download images from the app.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>We use your contacts to help you quickly add people to your network without typing their information manually.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>We use calendar access to let you optionally send quests to your Apple Calendar and keep linked events in sync.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

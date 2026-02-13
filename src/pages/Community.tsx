@@ -11,9 +11,13 @@ import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
 import { useCalendarTasks } from "@/hooks/useCalendarTasks";
 import { useCalendarMilestones } from "@/hooks/useCalendarMilestones";
 import { useDailyTasks } from "@/hooks/useDailyTasks";
+import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { CalendarTask } from "@/types/quest";
 import { PageTransition } from "@/components/PageTransition";
 import { toast } from "sonner";
+
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const Community = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -44,6 +48,7 @@ const Community = () => {
   
   // Daily tasks for updates
   const { addTask, updateTask, deleteTask, isAdding, isUpdating, isDeleting } = useDailyTasks(selectedDate);
+  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync();
 
   // Format tasks for calendar components
   const formattedTasks = useMemo(() => 
@@ -89,11 +94,14 @@ const Community = () => {
   }, [formattedTasks, handleTaskClick]);
 
   const handleTaskReschedule = useCallback(async (taskId: string, newTime: string) => {
-    await updateTask({ 
-      taskId, 
-      updates: { scheduled_time: newTime } 
+    await updateTask({
+      taskId,
+      updates: { scheduled_time: newTime }
     });
-  }, [updateTask]);
+    await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {
+      toast.error("Saved quest, but failed to sync linked calendar event");
+    });
+  }, [updateTask, syncTaskUpdate]);
 
   // Adapter for CalendarDayView's onTaskDrop signature
   const handleTaskDrop = useCallback((taskId: string, _date: Date, newTime?: string) => {
@@ -102,12 +110,87 @@ const Community = () => {
     }
   }, [handleTaskReschedule]);
 
+  const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+    let taskDateOverride: string | undefined;
+    let scheduledTimeOverride: string | undefined;
+
+    const attempt = async () => {
+      await sendTaskToCalendar.mutateAsync({
+        taskId,
+        options: taskDateOverride || scheduledTimeOverride
+          ? {
+              taskDate: taskDateOverride,
+              scheduledTime: scheduledTimeOverride,
+            }
+          : undefined,
+      });
+    };
+
+    try {
+      await attempt();
+      toast.success("Quest synced to calendar");
+      return;
+    } catch (error) {
+      let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+
+      for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+        if (message.includes("TASK_DATE_REQUIRED") && !taskDateOverride) {
+          const pickedDate = window.prompt(
+            "Choose a date to send this quest (YYYY-MM-DD)",
+            format(selectedDate, "yyyy-MM-dd"),
+          );
+          if (!pickedDate || !DATE_INPUT_REGEX.test(pickedDate)) {
+            toast.error("Calendar send cancelled. Please choose a valid YYYY-MM-DD date.");
+            return;
+          }
+          taskDateOverride = pickedDate;
+        }
+
+        if (message.includes("SCHEDULED_TIME_REQUIRED") && !scheduledTimeOverride) {
+          const pickedTime = window.prompt("Choose a time to send this quest (HH:mm)", "09:00");
+          if (!pickedTime || !TIME_24H_REGEX.test(pickedTime)) {
+            toast.error("Calendar send cancelled. Please choose a valid HH:mm time.");
+            return;
+          }
+          scheduledTimeOverride = pickedTime;
+        }
+
+        try {
+          await attempt();
+          toast.success("Quest synced to calendar");
+          return;
+        } catch (retryError) {
+          message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (
+            !message.includes("TASK_DATE_REQUIRED")
+            && !message.includes("SCHEDULED_TIME_REQUIRED")
+          ) {
+            toast.error(message);
+            return;
+          }
+        }
+      }
+
+      if (message.includes("TASK_DATE_REQUIRED")) {
+        toast.error("Please assign a date before sending this quest to calendar.");
+        return;
+      }
+
+      if (message.includes("SCHEDULED_TIME_REQUIRED")) {
+        toast.error("Please assign a time before sending this quest to calendar.");
+        return;
+      }
+
+      toast.error(message);
+    }
+  }, [selectedDate, sendTaskToCalendar]);
+
   const handleAddQuest = async (data: AddQuestData) => {
     const taskDate = data.sendToInbox
       ? null
       : (data.taskDate ?? format(selectedDate, 'yyyy-MM-dd'));
 
-    await addTask({
+    const createdTask = await addTask({
       taskText: data.text,
       difficulty: data.difficulty,
       taskDate,
@@ -124,6 +207,10 @@ const Community = () => {
       autoLogInteraction: data.autoLogInteraction,
       subtasks: data.subtasks,
     });
+
+    if (data.sendToCalendar && createdTask?.id) {
+      await handleSendTaskToCalendar(createdTask.id);
+    }
     setShowAddSheet(false);
     setPrefilledTime(null);
   };
@@ -144,10 +231,16 @@ const Community = () => {
     location: string | null;
   }) => {
     await updateTask({ taskId, updates });
+    await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {
+      toast.error("Saved quest, but failed to sync linked calendar event");
+    });
     setEditingTask(null);
   };
 
   const handleDeleteQuest = async (taskId: string) => {
+    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
+      toast.error("Failed to remove linked calendar event");
+    });
     await deleteTask(taskId);
     toast.success("Quest deleted");
     setEditingTask(null);
@@ -226,6 +319,9 @@ const Community = () => {
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
+          onSendToCalendar={handleSendTaskToCalendar}
+          hasCalendarLink={editingTask ? hasLinkedEvent(editingTask.id) : false}
+          isSendingToCalendar={sendTaskToCalendar.isPending}
           onDelete={handleDeleteQuest}
           isDeleting={isDeleting}
         />

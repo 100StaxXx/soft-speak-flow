@@ -379,7 +379,7 @@ const TrackLoadingScreen = memo(({ isGenerating }: { isGenerating?: boolean }) =
       <Sparkles className="absolute -top-1 -right-1 w-5 h-5 text-yellow-400 animate-pulse" />
     </div>
     <p className="text-base font-medium text-foreground">
-      {isGenerating ? 'Generating music...' : 'Loading music...'}
+      {isGenerating ? 'Preparing music...' : 'Loading music...'}
     </p>
   </div>
 ));

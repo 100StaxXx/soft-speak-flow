@@ -90,7 +90,7 @@ export function DecomposeTaskDialog({
       setSuggestions(result);
       setHasGenerated(true);
     } catch (err) {
-      toast.error('Failed to generate suggestions');
+      toast.error('Failed to build suggestions');
     }
   };
 
@@ -235,7 +235,7 @@ export function DecomposeTaskDialog({
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 <div className="absolute inset-0 w-8 h-8 rounded-full bg-primary/20 animate-ping" />
               </div>
-              <p className="text-sm text-muted-foreground">Generating subtasks...</p>
+              <p className="text-sm text-muted-foreground">Building subtasks...</p>
               <div className="flex gap-1 mt-2">
                 {[0, 1, 2].map((i) => (
                   <div
@@ -276,7 +276,7 @@ export function DecomposeTaskDialog({
                   className="transition-all hover:scale-105"
                 >
                   <RefreshCw className={cn("w-4 h-4 mr-1 transition-transform", isDecomposing && "animate-spin")} />
-                  Regenerate
+                  Try new suggestions
                 </Button>
               </div>
 

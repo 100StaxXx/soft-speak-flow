@@ -22,6 +22,8 @@ import {
   Heart,
   Dumbbell,
   ArrowUpDown,
+  MoreHorizontal,
+  CalendarPlus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -132,6 +134,8 @@ interface TodaysAgendaProps {
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
   onTimeSlotLongPress?: (date: Date, time: string) => void;
+  onSendToCalendar?: (taskId: string) => void;
+  hasCalendarLink?: (taskId: string) => boolean;
 }
 
 // Helper to format time in 12-hour format
@@ -161,6 +165,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
   onTimeSlotLongPress,
+  onSendToCalendar,
+  hasCalendarLink,
 }: TodaysAgendaProps) {
   const prefersReducedMotion = useReducedMotion();
   const isNativeIOS = useMemo(() => {
@@ -545,19 +551,44 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Edit button - shows on hover for incomplete quests */}
-            {onEditQuest && !isComplete && !isDragging && !isActivated && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEditQuest(task);
-                }}
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
+            {/* Quest action menu */}
+            {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {onEditQuest && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditQuest(task);
+                      }}
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit quest
+                    </DropdownMenuItem>
+                  )}
+                  {onSendToCalendar && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSendToCalendar(task.id);
+                      }}
+                    >
+                      <CalendarPlus className="w-4 h-4 mr-2" />
+                      {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {task.is_main_quest && (
               <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 bg-primary/10 border-primary/30">
@@ -687,7 +718,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, useLiteAnimations]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, useLiteAnimations]);
 
 
   return (

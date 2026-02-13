@@ -309,7 +309,7 @@ export function Pathfinder({
     
     // Only proceed if generation was successful
     if (!result) {
-      toast.error('Failed to generate timeline', {
+      toast.error('Failed to build timeline', {
         description: 'Please try again or adjust your goal'
       });
       return;
@@ -684,12 +684,12 @@ export function Pathfinder({
                     ) : isScheduleLoading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating your plan...
+                        Building your plan...
                       </>
                     ) : (
                       <>
                         <Wand2 className="w-5 h-5 mr-2" />
-                        Generate My Plan
+                        Build My Plan
                       </>
                     )}
                   </Button>

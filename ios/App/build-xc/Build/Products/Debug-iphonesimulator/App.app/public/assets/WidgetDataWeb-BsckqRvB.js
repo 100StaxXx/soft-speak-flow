@@ -1,0 +1,1 @@
+import{eb as t}from"./vendor-CkzXtEGd.js";import"./date-vendor-CuPqBTxb.js";import"./three-vendor-qI8GXUTd.js";class s extends t{async updateWidgetData(a){console.log("[WidgetData] Web fallback - no widget support")}async reloadWidget(){console.log("[WidgetData] Web fallback - no widget support")}}export{s as WidgetDataWeb};

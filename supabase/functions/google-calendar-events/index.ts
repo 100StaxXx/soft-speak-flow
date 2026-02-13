@@ -5,107 +5,322 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
-interface GoogleEvent {
+type SyncMode = "send_only" | "full_sync";
+
+type Action =
+  | "createLinkedEvent"
+  | "updateLinkedEvent"
+  | "deleteLinkedEvent"
+  | "syncLinkedChanges"
+  | "legacySync"
+  | "legacyGetEvents"
+  | "legacyClearCache";
+
+interface CalendarConnection {
   id: string;
-  summary?: string;
-  description?: string;
-  start: { dateTime?: string; date?: string };
-  end: { dateTime?: string; date?: string };
-  location?: string;
-  colorId?: string;
-}
-
-interface ExternalEvent {
   user_id: string;
-  connection_id: string;
-  external_event_id: string;
-  title: string;
-  description: string | null;
-  start_time: string;
-  end_time: string;
-  is_all_day: boolean;
-  location: string | null;
-  color: string | null;
-  source: string;
-  raw_data: object;
-  synced_at: string;
+  provider: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
+  calendar_id: string | null;
+  primary_calendar_id: string | null;
+  primary_calendar_name: string | null;
+  sync_mode: SyncMode;
 }
 
-// Google Calendar color ID to hex mapping
-const GOOGLE_COLORS: Record<string, string> = {
-  "1": "#7986CB", // Lavender
-  "2": "#33B679", // Sage
-  "3": "#8E24AA", // Grape
-  "4": "#E67C73", // Flamingo
-  "5": "#F6BF26", // Banana
-  "6": "#F4511E", // Tangerine
-  "7": "#039BE5", // Peacock
-  "8": "#616161", // Graphite
-  "9": "#3F51B5", // Blueberry
-  "10": "#0B8043", // Basil
-  "11": "#D50000", // Tomato
-};
+interface DailyTask {
+  id: string;
+  user_id: string;
+  task_text: string;
+  task_date: string | null;
+  scheduled_time: string | null;
+  estimated_duration: number | null;
+  location: string | null;
+  notes: string | null;
+}
 
-async function refreshTokenIfNeeded(
-  supabase: any,
-  connection: any,
-  googleClientId: string,
-  googleClientSecret: string
-): Promise<string | null> {
-  // Check if token is expired or about to expire (within 5 minutes)
-  const expiresAt = new Date(connection.token_expires_at);
-  const now = new Date();
-  const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 
-  if (expiresAt > fiveMinutesFromNow) {
-    return connection.access_token;
+function normalizeAction(raw: string | undefined): Action | null {
+  if (!raw) return null;
+
+  const map: Record<string, Action> = {
+    createLinkedEvent: "createLinkedEvent",
+    create_linked_event: "createLinkedEvent",
+    updateLinkedEvent: "updateLinkedEvent",
+    update_linked_event: "updateLinkedEvent",
+    deleteLinkedEvent: "deleteLinkedEvent",
+    delete_linked_event: "deleteLinkedEvent",
+    syncLinkedChanges: "syncLinkedChanges",
+    sync_linked_changes: "syncLinkedChanges",
+
+    // Backward-compatible aliases
+    sync: "legacySync",
+    get_events: "legacyGetEvents",
+    clear_cache: "legacyClearCache",
+  };
+
+  return map[raw] ?? null;
+}
+
+function normalizeSyncMode(mode: unknown): SyncMode {
+  return mode === "full_sync" ? "full_sync" : "send_only";
+}
+
+function getBearerToken(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  return authHeader.replace("Bearer ", "").trim() || null;
+}
+
+async function getAuthedUserId(supabaseAdmin: ReturnType<typeof createClient>, req: Request): Promise<string> {
+  const token = getBearerToken(req);
+  if (!token) {
+    throw new Error("Missing Authorization bearer token");
   }
 
-  console.log("Token expired or expiring soon, refreshing...");
+  const {
+    data: { user },
+    error,
+  } = await supabaseAdmin.auth.getUser(token);
+
+  if (error || !user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  return user.id;
+}
+
+async function refreshAccessTokenIfNeeded(
+  supabase: ReturnType<typeof createClient>,
+  connection: CalendarConnection,
+  googleClientId: string,
+  googleClientSecret: string,
+): Promise<string> {
+  const existingAccessToken = connection.access_token;
+  const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+
+  const shouldRefresh =
+    !existingAccessToken ||
+    !expiresAt ||
+    Number.isNaN(expiresAt.getTime()) ||
+    expiresAt.getTime() <= Date.now() + 5 * 60 * 1000;
+
+  if (!shouldRefresh && existingAccessToken) {
+    return existingAccessToken;
+  }
 
   if (!connection.refresh_token) {
-    console.error("No refresh token available");
-    return null;
+    throw new Error("No refresh token available. Please reconnect your Google account.");
   }
 
-  try {
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: googleClientId,
-        client_secret: googleClientSecret,
-        refresh_token: connection.refresh_token,
-        grant_type: "refresh_token",
-      }),
-    });
+  const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: googleClientId,
+      client_secret: googleClientSecret,
+      refresh_token: connection.refresh_token,
+      grant_type: "refresh_token",
+    }),
+  });
 
-    if (!tokenResponse.ok) {
-      console.error("Token refresh failed:", await tokenResponse.text());
-      return null;
-    }
-
-    const tokens = await tokenResponse.json();
-    const newExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
-
-    // Update stored token
-    await supabase
-      .from("user_calendar_connections")
-      .update({
-        access_token: tokens.access_token,
-        token_expires_at: newExpiresAt,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", connection.id);
-
-    console.log("Token refreshed successfully");
-    return tokens.access_token;
-  } catch (error) {
-    console.error("Token refresh error:", error);
-    return null;
+  if (!tokenResponse.ok) {
+    const details = await tokenResponse.text();
+    throw new Error(`Failed to refresh Google token: ${details}`);
   }
+
+  const tokens = await tokenResponse.json();
+  const tokenExpiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
+
+  const { error: updateError } = await supabase
+    .from("user_calendar_connections")
+    .update({
+      access_token: tokens.access_token,
+      token_expires_at: tokenExpiresAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", connection.id);
+
+  if (updateError) {
+    throw new Error(`Failed to persist refreshed token: ${updateError.message}`);
+  }
+
+  return tokens.access_token as string;
+}
+
+function buildTimedDate(taskDate: string, hhmm: string): Date {
+  const [h, m] = hhmm.split(":").map(Number);
+  const base = new Date(`${taskDate}T00:00:00`);
+  base.setHours(h || 0, m || 0, 0, 0);
+  return base;
+}
+
+function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
+  isAllDay: boolean;
+  start: Date;
+  end: Date;
+} {
+  if (!task.task_date) {
+    throw new Error("Task must have a date before sending to calendar");
+  }
+
+  if (!task.scheduled_time) {
+    const start = new Date(`${task.task_date}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { isAllDay: true, start, end };
+  }
+
+  const start = buildTimedDate(task.task_date, task.scheduled_time);
+  const minutes = task.estimated_duration && task.estimated_duration > 0
+    ? task.estimated_duration
+    : fallbackDurationMinutes;
+
+  const end = new Date(start.getTime() + minutes * 60_000);
+  return { isAllDay: false, start, end };
+}
+
+function toGoogleEventPayload(task: DailyTask, override: Record<string, unknown> = {}) {
+  const window = getTaskEventWindow(task);
+
+  const title = (override.title as string | undefined) ?? task.task_text;
+  const location = (override.location as string | undefined) ?? task.location ?? undefined;
+  const description = (override.description as string | undefined) ?? task.notes ?? undefined;
+
+  if (window.isAllDay) {
+    return {
+      summary: title,
+      location,
+      description,
+      start: { date: task.task_date || undefined },
+      end: { date: new Date(window.end).toISOString().slice(0, 10) },
+    };
+  }
+
+  return {
+    summary: title,
+    location,
+    description,
+    start: { dateTime: window.start.toISOString() },
+    end: { dateTime: window.end.toISOString() },
+  };
+}
+
+function mapGoogleEventToTaskUpdate(event: Record<string, any>): Partial<DailyTask> {
+  const title = (event.summary as string | undefined) ?? "(No title)";
+  const location = (event.location as string | undefined) ?? null;
+  const notes = (event.description as string | undefined) ?? null;
+
+  const start = event.start || {};
+  const end = event.end || {};
+
+  if (start.date && end.date) {
+    return {
+      task_text: title,
+      task_date: String(start.date),
+      scheduled_time: null,
+      estimated_duration: 1440,
+      location,
+      notes,
+    };
+  }
+
+  const startIso = String(start.dateTime || "");
+  const endIso = String(end.dateTime || "");
+
+  if (!startIso) {
+    return {
+      task_text: title,
+      location,
+      notes,
+    };
+  }
+
+  const startDateObj = new Date(startIso);
+  const endDateObj = endIso ? new Date(endIso) : new Date(startDateObj.getTime() + 30 * 60_000);
+
+  const taskDate = startIso.slice(0, 10);
+  const scheduledTime = startIso.slice(11, 16);
+  const estimatedDuration = Math.max(1, Math.round((endDateObj.getTime() - startDateObj.getTime()) / 60_000));
+
+  return {
+    task_text: title,
+    task_date: taskDate,
+    scheduled_time: scheduledTime,
+    estimated_duration: estimatedDuration,
+    location,
+    notes,
+  };
+}
+
+async function googleApi(
+  accessToken: string,
+  path: string,
+  method = "GET",
+  body?: unknown,
+): Promise<any> {
+  const resp = await fetch(`${GOOGLE_CALENDAR_API}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (!resp.ok) {
+    const details = await resp.text();
+    throw new Error(`Google Calendar API ${method} ${path} failed: ${details}`);
+  }
+
+  if (resp.status === 204) return null;
+  return await resp.json();
+}
+
+async function getTaskById(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  taskId: string,
+): Promise<DailyTask> {
+  const { data, error } = await supabase
+    .from("daily_tasks")
+    .select("id, user_id, task_text, task_date, scheduled_time, estimated_duration, location, notes")
+    .eq("id", taskId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) {
+    throw new Error("Task not found");
+  }
+
+  return data as DailyTask;
+}
+
+async function getGoogleConnection(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<CalendarConnection> {
+  const { data, error } = await supabase
+    .from("user_calendar_connections")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("provider", "google")
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("No Google Calendar connection found");
+  }
+
+  return data as CalendarConnection;
 }
 
 Deno.serve(async (req) => {
@@ -115,251 +330,308 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const googleClientId = Deno.env.get("GOOGLE_CALENDAR_CLIENT_ID");
     const googleClientSecret = Deno.env.get("GOOGLE_CALENDAR_CLIENT_SECRET");
 
     if (!googleClientId || !googleClientSecret) {
-      console.error("Missing Google Calendar credentials");
-      return new Response(
-        JSON.stringify({ error: "Google Calendar integration not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Google Calendar integration not configured" }, 500);
     }
 
-    const { action, user_id, start_date, end_date } = await req.json();
-    console.log(`Google Calendar Events - Action: ${action}, User: ${user_id}`);
+    const body = await req.json().catch(() => ({}));
+    const action = normalizeAction(body?.action);
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!action) {
+      return jsonResponse({ error: "Invalid action" }, 400);
+    }
 
-    // Action: sync - Fetch events from Google and cache them
-    if (action === "sync") {
-      if (!user_id) {
-        return new Response(
-          JSON.stringify({ error: "user_id is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const userId = await getAuthedUserId(supabase, req);
+
+    // Backward-compatible legacy endpoints still used by older clients.
+    if (action === "legacyGetEvents") {
+      const startDate = (body?.startDate || body?.start_date) as string | undefined;
+      const endDate = (body?.endDate || body?.end_date) as string | undefined;
+
+      if (!startDate || !endDate) {
+        return jsonResponse({ error: "startDate and endDate are required" }, 400);
       }
 
-      // Get connection
-      const { data: connection, error: connError } = await supabase
-        .from("user_calendar_connections")
+      const { data: events, error } = await supabase
+        .from("external_calendar_events")
         .select("*")
-        .eq("user_id", user_id)
-        .eq("provider", "google")
-        .single();
+        .eq("user_id", userId)
+        .eq("source", "google")
+        .gte("start_time", new Date(startDate).toISOString())
+        .lte("start_time", new Date(endDate).toISOString())
+        .order("start_time", { ascending: true });
 
-      if (connError || !connection) {
-        console.error("No Google connection found:", connError);
-        return new Response(
-          JSON.stringify({ error: "No Google Calendar connection found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (error) {
+        return jsonResponse({ error: "Failed to fetch events", details: error.message }, 500);
       }
 
-      if (!connection.sync_enabled) {
-        return new Response(
-          JSON.stringify({ error: "Sync is disabled for this connection" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      return jsonResponse({ events: events ?? [] });
+    }
+
+    if (action === "legacyClearCache") {
+      const { error } = await supabase
+        .from("external_calendar_events")
+        .delete()
+        .eq("user_id", userId)
+        .eq("source", "google");
+
+      if (error) {
+        return jsonResponse({ error: "Failed to clear event cache", details: error.message }, 500);
       }
 
-      // Refresh token if needed
-      const accessToken = await refreshTokenIfNeeded(
-        supabase,
-        connection,
-        googleClientId,
-        googleClientSecret
+      return jsonResponse({ success: true });
+    }
+
+    const connection = await getGoogleConnection(supabase, userId);
+    const accessToken = await refreshAccessTokenIfNeeded(supabase, connection, googleClientId, googleClientSecret);
+
+    if (action === "createLinkedEvent") {
+      const taskId = (body?.taskId || body?.task_id) as string | undefined;
+      if (!taskId) {
+        return jsonResponse({ error: "taskId is required" }, 400);
+      }
+
+      const task = await getTaskById(supabase, userId, taskId);
+      const syncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode ?? connection.sync_mode);
+      const externalCalendarId =
+        (body?.calendarId || body?.calendar_id) as string | undefined ||
+        connection.primary_calendar_id ||
+        connection.calendar_id ||
+        "primary";
+
+      const eventPayload = toGoogleEventPayload(task, {
+        title: body?.title,
+        description: body?.description,
+        location: body?.location,
+      });
+
+      const event = await googleApi(
+        accessToken,
+        `/calendars/${encodeURIComponent(externalCalendarId)}/events`,
+        "POST",
+        eventPayload,
       );
 
-      if (!accessToken) {
-        return new Response(
-          JSON.stringify({ error: "Failed to get valid access token, please reconnect" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      const nowIso = new Date().toISOString();
+
+      const { error: linkError } = await supabase
+        .from("quest_calendar_links")
+        .upsert(
+          {
+            user_id: userId,
+            task_id: task.id,
+            connection_id: connection.id,
+            provider: "google",
+            external_calendar_id: externalCalendarId,
+            external_event_id: event.id,
+            sync_mode: syncMode,
+            last_app_sync_at: nowIso,
+            last_provider_sync_at: nowIso,
+            updated_at: nowIso,
+          },
+          { onConflict: "task_id,connection_id" },
         );
+
+      if (linkError) {
+        return jsonResponse({ error: "Failed to persist task link", details: linkError.message }, 500);
       }
 
-      // Calculate date range (default: 30 days back, 90 days forward)
-      const timeMin = start_date 
-        ? new Date(start_date).toISOString()
-        : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const timeMax = end_date
-        ? new Date(end_date).toISOString()
-        : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
-
-      console.log(`Fetching events from ${timeMin} to ${timeMax}`);
-
-      // Fetch events from Google Calendar
-      const eventsUrl = new URL(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(connection.calendar_id || "primary")}/events`);
-      eventsUrl.searchParams.set("timeMin", timeMin);
-      eventsUrl.searchParams.set("timeMax", timeMax);
-      eventsUrl.searchParams.set("singleEvents", "true");
-      eventsUrl.searchParams.set("orderBy", "startTime");
-      eventsUrl.searchParams.set("maxResults", "250");
-
-      const eventsResponse = await fetch(eventsUrl.toString(), {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      return jsonResponse({
+        success: true,
+        event,
+        link: {
+          taskId: task.id,
+          connectionId: connection.id,
+          externalEventId: event.id,
+          externalCalendarId,
+          syncMode,
+        },
       });
+    }
 
-      if (!eventsResponse.ok) {
-        const errorText = await eventsResponse.text();
-        console.error("Failed to fetch events:", errorText);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch events from Google Calendar", details: errorText }),
-          { status: eventsResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    if (action === "updateLinkedEvent") {
+      const taskId = (body?.taskId || body?.task_id) as string | undefined;
+      if (!taskId) {
+        return jsonResponse({ error: "taskId is required" }, 400);
       }
 
-      const eventsData = await eventsResponse.json();
-      const googleEvents: GoogleEvent[] = eventsData.items || [];
+      const task = await getTaskById(supabase, userId, taskId);
 
-      console.log(`Fetched ${googleEvents.length} events from Google`);
+      const { data: link, error: linkError } = await supabase
+        .from("quest_calendar_links")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("task_id", taskId)
+        .eq("provider", "google")
+        .maybeSingle();
 
-      // Transform to our format
-      const externalEvents: ExternalEvent[] = googleEvents.map((event) => {
-        const isAllDay = !event.start.dateTime;
-        const startTime = event.start.dateTime || `${event.start.date}T00:00:00Z`;
-        const endTime = event.end.dateTime || `${event.end.date}T23:59:59Z`;
+      if (linkError || !link) {
+        return jsonResponse({ error: "No linked Google calendar event found for task" }, 404);
+      }
 
-        return {
-          user_id,
-          connection_id: connection.id,
-          external_event_id: event.id,
-          title: event.summary || "(No title)",
-          description: event.description || null,
-          start_time: startTime,
-          end_time: endTime,
-          is_all_day: isAllDay,
-          location: event.location || null,
-          color: event.colorId ? GOOGLE_COLORS[event.colorId] || null : null,
-          source: "google",
-          raw_data: event,
-          synced_at: new Date().toISOString(),
-        };
+      const externalCalendarId =
+        ((body?.calendarId || body?.calendar_id) as string | undefined) ||
+        link.external_calendar_id ||
+        connection.primary_calendar_id ||
+        connection.calendar_id ||
+        "primary";
+
+      const eventPayload = toGoogleEventPayload(task, {
+        title: body?.title,
+        description: body?.description,
+        location: body?.location,
       });
 
-      // Delete old events for this connection in the date range and upsert new ones
-      if (externalEvents.length > 0) {
-        // Delete events in range first
-        await supabase
-          .from("external_calendar_events")
-          .delete()
-          .eq("connection_id", connection.id)
-          .gte("start_time", timeMin)
-          .lte("start_time", timeMax);
+      const event = await googleApi(
+        accessToken,
+        `/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+        "PATCH",
+        eventPayload,
+      );
 
-        // Insert new events
-        const { error: insertError } = await supabase
-          .from("external_calendar_events")
-          .upsert(externalEvents, {
-            onConflict: "connection_id,external_event_id",
-          });
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("quest_calendar_links")
+        .update({
+          external_calendar_id: externalCalendarId,
+          last_app_sync_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", link.id);
 
-        if (insertError) {
-          console.error("Failed to cache events:", insertError);
-          return new Response(
-            JSON.stringify({ error: "Failed to cache events", details: insertError.message }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return jsonResponse({ success: true, event });
+    }
+
+    if (action === "deleteLinkedEvent") {
+      const taskId = (body?.taskId || body?.task_id) as string | undefined;
+      if (!taskId) {
+        return jsonResponse({ error: "taskId is required" }, 400);
+      }
+
+      const { data: links, error: linksError } = await supabase
+        .from("quest_calendar_links")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("task_id", taskId)
+        .eq("provider", "google");
+
+      if (linksError) {
+        return jsonResponse({ error: "Failed to fetch linked event", details: linksError.message }, 500);
+      }
+
+      for (const link of links ?? []) {
+        const externalCalendarId =
+          link.external_calendar_id || connection.primary_calendar_id || connection.calendar_id || "primary";
+
+        try {
+          await googleApi(
+            accessToken,
+            `/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+            "DELETE",
           );
+        } catch {
+          // Best-effort delete; continue cleanup.
+        }
+
+        await supabase.from("quest_calendar_links").delete().eq("id", link.id);
+      }
+
+      return jsonResponse({ success: true, deletedLinks: (links ?? []).length });
+    }
+
+    if (action === "legacySync" || action === "syncLinkedChanges") {
+      const { data: links, error: linksError } = await supabase
+        .from("quest_calendar_links")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("provider", "google");
+
+      if (linksError) {
+        return jsonResponse({ error: "Failed to fetch links", details: linksError.message }, 500);
+      }
+
+      let synced = 0;
+      let pulledProviderChanges = 0;
+      let removedCancelled = 0;
+
+      for (const link of links ?? []) {
+        const externalCalendarId =
+          link.external_calendar_id || connection.primary_calendar_id || connection.calendar_id || "primary";
+
+        try {
+          const event = await googleApi(
+            accessToken,
+            `/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+            "GET",
+          );
+
+          const providerUpdatedAt = event?.updated ? new Date(event.updated) : null;
+          const appSyncedAt = link.last_app_sync_at ? new Date(link.last_app_sync_at) : null;
+
+          const providerWins =
+            !appSyncedAt ||
+            !providerUpdatedAt ||
+            Number.isNaN(providerUpdatedAt.getTime())
+              ? true
+              : providerUpdatedAt.getTime() >= appSyncedAt.getTime();
+
+          if (event?.status === "cancelled") {
+            await supabase.from("daily_tasks").delete().eq("id", link.task_id).eq("user_id", userId);
+            await supabase.from("quest_calendar_links").delete().eq("id", link.id);
+            removedCancelled += 1;
+            continue;
+          }
+
+          if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
+            const taskPatch = mapGoogleEventToTaskUpdate(event);
+            await supabase
+              .from("daily_tasks")
+              .update({
+                task_text: taskPatch.task_text,
+                task_date: taskPatch.task_date,
+                scheduled_time: taskPatch.scheduled_time,
+                estimated_duration: taskPatch.estimated_duration,
+                location: taskPatch.location,
+                notes: taskPatch.notes,
+              })
+              .eq("id", link.task_id)
+              .eq("user_id", userId);
+
+            pulledProviderChanges += 1;
+          }
+
+          await supabase
+            .from("quest_calendar_links")
+            .update({
+              last_provider_sync_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", link.id);
+
+          synced += 1;
+        } catch {
+          // If event no longer exists remotely, drop local link. Keep quest.
+          await supabase.from("quest_calendar_links").delete().eq("id", link.id);
         }
       }
 
-      // Update last synced timestamp
-      await supabase
-        .from("user_calendar_connections")
-        .update({
-          last_synced_at: new Date().toISOString(),
-          sync_token: eventsData.nextSyncToken || null,
-        })
-        .eq("id", connection.id);
-
-      console.log(`Cached ${externalEvents.length} events`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          events_synced: externalEvents.length,
-          sync_token: eventsData.nextSyncToken || null,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        success: true,
+        linksChecked: synced,
+        pulledProviderChanges,
+        removedCancelled,
+      });
     }
 
-    // Action: get_events - Get cached events for a date range
-    if (action === "get_events") {
-      if (!user_id || !start_date || !end_date) {
-        return new Response(
-          JSON.stringify({ error: "user_id, start_date, and end_date are required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const { data: events, error: fetchError } = await supabase
-        .from("external_calendar_events")
-        .select("*")
-        .eq("user_id", user_id)
-        .gte("start_time", new Date(start_date).toISOString())
-        .lte("start_time", new Date(end_date).toISOString())
-        .order("start_time", { ascending: true });
-
-      if (fetchError) {
-        console.error("Failed to fetch cached events:", fetchError);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch events" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      console.log(`Returning ${events?.length || 0} cached events`);
-
-      return new Response(
-        JSON.stringify({ events: events || [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Action: clear_cache - Clear all cached events for a user
-    if (action === "clear_cache") {
-      if (!user_id) {
-        return new Response(
-          JSON.stringify({ error: "user_id is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const { error: deleteError } = await supabase
-        .from("external_calendar_events")
-        .delete()
-        .eq("user_id", user_id)
-        .eq("source", "google");
-
-      if (deleteError) {
-        console.error("Failed to clear cache:", deleteError);
-        return new Response(
-          JSON.stringify({ error: "Failed to clear event cache" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      console.log("Cleared event cache for user:", user_id);
-
-      return new Response(
-        JSON.stringify({ success: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ error: "Invalid action" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-
+    return jsonResponse({ error: "Unsupported action" }, 400);
   } catch (error: unknown) {
-    console.error("Google Calendar Events error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    const status = message.toLowerCase().includes("unauthorized") ? 401 : 500;
+    return jsonResponse({ error: message }, status);
   }
 });

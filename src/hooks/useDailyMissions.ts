@@ -45,7 +45,7 @@ export const useDailyMissions = () => {
 
         if (generationError) {
           console.error('Mission generation failed:', generationError);
-          const message = generationError.message || 'Unable to generate missions right now.';
+          const message = generationError.message || 'Unable to refresh missions right now.';
           setGenerationErrorMessage(message);
           throw new Error(message);
         }
@@ -77,7 +77,7 @@ export const useDailyMissions = () => {
   useEffect(() => {
     if (error) {
       toast({
-        title: generationErrorMessage ? "Mission generation failed" : "Unable to load daily missions",
+        title: generationErrorMessage ? "Mission refresh failed" : "Unable to load daily missions",
         description: generationErrorMessage || error.message,
         variant: "destructive",
       });
@@ -94,14 +94,14 @@ export const useDailyMissions = () => {
       });
 
       if (error) {
-        const message = error.message || 'Unable to regenerate missions right now.';
+        const message = error.message || 'Unable to refresh missions right now.';
         setGenerationErrorMessage(message);
         throw new Error(message);
       }
 
       const newMissions = generated?.missions || [];
       if (newMissions.length === 0) {
-        const message = 'No missions were generated. Please try again soon.';
+        const message = 'No missions were ready. Please try again soon.';
         setGenerationErrorMessage(message);
         throw new Error(message);
       }
@@ -118,7 +118,7 @@ export const useDailyMissions = () => {
     },
     onError: (error: Error) => {
       toast({
-        title: "Mission generation failed",
+        title: "Mission refresh failed",
         description: error.message,
         variant: "destructive",
       });

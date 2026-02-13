@@ -11,10 +11,11 @@ import type { DailyTask } from './useTasksQuery';
  * Syncs:
  * - When tasks change
  * - When app resumes from background
- * - Force sync on mount if tasks exist
+ * - Force sync shortly after mount
  */
 export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
   const lastSyncRef = useRef<string>('');
+  const syncRef = useRef<(force?: boolean) => void>(() => {});
   const isIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
   
   const syncToWidget = useCallback(async (force = false) => {
@@ -22,28 +23,17 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     if (!isIOS) {
       return;
     }
+
+    // The home-screen widget should always represent real local "today"
+    const today = getLocalDateString();
+    if (taskDate !== today) {
+      return;
+    }
     
     // Separate quests and rituals
     const quests = tasks.filter(task => !task.habit_source_id);
     const rituals = tasks.filter(task => !!task.habit_source_id);
-    
-    // Create a fingerprint to avoid redundant syncs
-    const fingerprint = JSON.stringify({
-      questCount: quests.length,
-      questCompleted: quests.filter(t => t.completed).length,
-      ritualCount: rituals.length,
-      ritualCompleted: rituals.filter(t => t.completed).length,
-      ids: quests.slice(0, 10).map(t => t.id + ':' + t.completed),
-      date: taskDate,
-    });
-    
-    // Skip if nothing changed (unless force)
-    if (!force && fingerprint === lastSyncRef.current) {
-      return;
-    }
-    
-    lastSyncRef.current = fingerprint;
-    
+
     // Map quests to widget format (limit to 10 for performance)
     const widgetTasks: WidgetTask[] = quests.slice(0, 10).map(task => ({
       id: task.id,
@@ -56,60 +46,71 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
       scheduledTime: task.scheduled_time,
     }));
     
+    // Create a fingerprint to avoid redundant syncs
+    const fingerprint = JSON.stringify({
+      date: taskDate,
+      tasks: widgetTasks,
+      questCount: quests.length,
+      questCompleted: quests.filter(t => !!t.completed).length,
+      ritualCount: rituals.length,
+      ritualCompleted: rituals.filter(t => !!t.completed).length,
+    });
+    
+    // Skip if nothing changed (unless force)
+    if (!force && fingerprint === lastSyncRef.current) {
+      return;
+    }
+
     try {
-      console.log('[WidgetSync] Syncing', widgetTasks.length, 'quests +', rituals.length, 'rituals for', taskDate);
       await WidgetData.updateWidgetData({
         tasks: widgetTasks,
-        completedCount: quests.filter(t => t.completed).length,
+        completedCount: quests.filter(t => !!t.completed).length,
         totalCount: quests.length,
         ritualCount: rituals.length,
-        ritualCompleted: rituals.filter(t => t.completed).length,
+        ritualCompleted: rituals.filter(t => !!t.completed).length,
         date: taskDate,
       });
-      console.log('[WidgetSync] Sync complete');
+      lastSyncRef.current = fingerprint;
     } catch (error) {
       console.error('[WidgetSync] Failed to sync:', error);
     }
   }, [tasks, taskDate, isIOS]);
+
+  useEffect(() => {
+    syncRef.current = syncToWidget;
+  }, [syncToWidget]);
   
   // Sync whenever tasks change
   useEffect(() => {
-    if (tasks.length > 0) {
-      syncToWidget();
-    }
-  }, [syncToWidget, tasks.length]);
+    syncToWidget();
+  }, [syncToWidget]);
   
-  // Force sync on initial mount if we have tasks
+  // Force sync shortly after mount
   useEffect(() => {
-    if (isIOS && tasks.length > 0) {
-      // Small delay to ensure data is stable
-      const timer = setTimeout(() => {
-        syncToWidget(true);
-      }, 500);
-      return () => clearTimeout(timer);
+    if (!isIOS) {
+      return;
     }
-  }, [isIOS, tasks.length > 0]); // Only on first load with tasks
+
+    const timer = setTimeout(() => {
+      syncRef.current(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [isIOS]);
   
-  // Sync when app resumes from background
+  // Sync when app resumes from background (single listener, latest callback via ref)
   useEffect(() => {
     if (!isIOS) return;
     
-    const handleResume = () => {
-      console.log('[WidgetSync] App resumed, forcing sync');
-      syncToWidget(true);
-    };
-    
-    // Listen for app state changes
     const listener = App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
-        handleResume();
+        syncRef.current(true);
       }
     });
     
     return () => {
       listener.then(l => l.remove());
     };
-  }, [isIOS, syncToWidget]);
+  }, [isIOS]);
   
   return { syncToWidget };
 };
@@ -123,4 +124,11 @@ function getSection(scheduledTime: string | null): string {
   if (hour < 12) return 'morning';
   if (hour < 17) return 'afternoon';
   return 'evening';
+}
+
+function getLocalDateString(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

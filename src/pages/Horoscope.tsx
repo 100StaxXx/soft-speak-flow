@@ -209,7 +209,7 @@ const Horoscope = () => {
 
       toast({
         title: "Saved!",
-        description: "Your birth details have been updated. Generating your fresh Cosmiq reading...",
+        description: "Your birth details have been updated. Preparing your fresh Cosmiq reading...",
       });
 
       // Invalidate and refetch profile immediately
@@ -264,8 +264,8 @@ const Horoscope = () => {
       const today = new Date();
       if (generatedDate.toDateString() === today.toDateString()) {
         toast({
-        title: "Already Generated",
-        description: "You can only generate one cosmiq profile per day",
+        title: "Already Revealed",
+        description: "You can only reveal one cosmiq profile per day",
           variant: "destructive",
         });
         return;
@@ -280,8 +280,8 @@ const Horoscope = () => {
         // Handle rate limit (429) specifically
         if (error.message?.includes('already generated today') || error.message?.includes('once per 24 hours')) {
           toast({
-            title: "Already Generated",
-            description: "You can only generate one cosmiq profile per day",
+            title: "Already Revealed",
+            description: "You can only reveal one cosmiq profile per day",
             variant: "destructive",
           });
           return;
@@ -294,8 +294,8 @@ const Horoscope = () => {
         // Handle rate limit from response data
         if (errorMsg.includes('already generated today') || errorMsg.includes('once per 24 hours')) {
           toast({
-            title: "Already Generated",
-            description: "You can only generate one cosmiq profile per day",
+            title: "Already Revealed",
+            description: "You can only reveal one cosmiq profile per day",
             variant: "destructive",
           });
           return;

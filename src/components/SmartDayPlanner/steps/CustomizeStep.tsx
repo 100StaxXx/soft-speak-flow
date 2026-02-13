@@ -247,12 +247,12 @@ export function CustomizeStep({ context, updateContext, onNext, isGenerating }: 
           {isGenerating ? (
             <>
               <Sparkles className="h-4 w-4 animate-pulse" />
-              Generating your plan...
+              Building your plan...
             </>
           ) : (
             <>
               <Sparkles className="h-4 w-4" />
-              Generate My Plan
+              Build My Plan
             </>
           )}
         </Button>

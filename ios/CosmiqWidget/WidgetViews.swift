@@ -52,7 +52,7 @@ struct SmallWidgetView: View {
                 
                 if ritualCount > 0 {
                     Text("\(questCount)Q • \(ritualCount)R")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundColor(.cosmicSecondary)
                 } else if questCount > 0 {
                     Text("\(questCount) quests")
@@ -108,9 +108,7 @@ struct MediumWidgetView: View {
                 
                 if let tasks = entry.data?.tasks.prefix(4), !tasks.isEmpty {
                     ForEach(Array(tasks), id: \.id) { task in
-                        Link(destination: URL(string: "cosmiq://task/\(task.id)")!) {
-                            CosmicTaskRow(task: task)
-                        }
+                        CosmicTaskLinkRow(task: task)
                     }
                 } else {
                     CosmicEmptyState()
@@ -133,7 +131,7 @@ struct MediumWidgetView: View {
                         .foregroundColor(.cosmicGold)
                     if ritualCount > 0 {
                         Text("\(questCount)Q • \(ritualCount)R")
-                            .font(.system(size: 8))
+                            .font(.system(size: 10))
                             .foregroundColor(.cosmicSecondary)
                     } else {
                         Text("Done")
@@ -161,14 +159,6 @@ struct LargeWidgetView: View {
         entry.data?.totalAllCount ?? 0
     }
     
-    private var questCount: Int {
-        entry.data?.totalCount ?? 0
-    }
-    
-    private var ritualCount: Int {
-        entry.data?.ritualCount ?? 0
-    }
-    
     private var morningTasks: [WidgetTask] {
         entry.data?.tasks.filter { $0.section == "morning" } ?? []
     }
@@ -183,6 +173,24 @@ struct LargeWidgetView: View {
     
     private var unscheduledTasks: [WidgetTask] {
         entry.data?.tasks.filter { $0.section == "unscheduled" } ?? []
+    }
+
+    private var sectionedTasks: [(title: String, tasks: [WidgetTask])] {
+        [
+            (title: "🌅 Morning", tasks: morningTasks),
+            (title: "☀️ Afternoon", tasks: afternoonTasks),
+            (title: "🌙 Evening", tasks: eveningTasks),
+            (title: "📋 Anytime", tasks: unscheduledTasks)
+        ]
+    }
+
+    private var visibleSections: [(title: String, tasks: [WidgetTask])] {
+        sectionedTasks
+            .filter { !$0.tasks.isEmpty }
+            .prefix(3)
+            .map { section in
+                (title: section.title, tasks: Array(section.tasks.prefix(2)))
+            }
     }
     
     var body: some View {
@@ -230,28 +238,14 @@ struct LargeWidgetView: View {
                 )
                 .frame(height: 1)
             
-            // Sections
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !morningTasks.isEmpty {
-                        CosmicTaskSection(title: "🌅 Morning", tasks: morningTasks)
-                    }
-                    
-                    if !afternoonTasks.isEmpty {
-                        CosmicTaskSection(title: "☀️ Afternoon", tasks: afternoonTasks)
-                    }
-                    
-                    if !eveningTasks.isEmpty {
-                        CosmicTaskSection(title: "🌙 Evening", tasks: eveningTasks)
-                    }
-                    
-                    if !unscheduledTasks.isEmpty {
-                        CosmicTaskSection(title: "📋 Anytime", tasks: unscheduledTasks)
-                    }
-                    
-                    if morningTasks.isEmpty && afternoonTasks.isEmpty && eveningTasks.isEmpty && unscheduledTasks.isEmpty {
-                        CosmicEmptyState()
-                            .frame(maxWidth: .infinity)
+            // Sections (capped for deterministic WidgetKit layout)
+            VStack(alignment: .leading, spacing: 10) {
+                if visibleSections.isEmpty {
+                    CosmicEmptyState()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    ForEach(Array(visibleSections.enumerated()), id: \.offset) { item in
+                        CosmicTaskSection(title: item.element.title, tasks: item.element.tasks)
                     }
                 }
             }
@@ -262,10 +256,17 @@ struct LargeWidgetView: View {
     }
     
     private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d"
-        return formatter.string(from: Date())
+        Self.headerDateFormatter.string(from: Date())
     }
+
+    private static let headerDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter
+    }()
 }
 
 // MARK: - Cosmic Task Row
@@ -287,7 +288,7 @@ struct CosmicTaskRow: View {
                         .frame(width: 10, height: 10)
                     
                     Image(systemName: "checkmark")
-                        .font(.system(size: 6, weight: .bold))
+                        .font(.system(size: 7, weight: .bold))
                         .foregroundColor(.cosmicBackground)
                 }
             }
@@ -306,7 +307,7 @@ struct CosmicTaskRow: View {
             Spacer()
             
             Text("+\(task.xpReward)")
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(.cosmicGold)
         }
     }
@@ -332,10 +333,22 @@ struct CosmicTaskSection: View {
                 .foregroundColor(.cosmicPurple)
             
             ForEach(tasks.prefix(3), id: \.id) { task in
-                Link(destination: URL(string: "cosmiq://task/\(task.id)")!) {
-                    CosmicTaskRow(task: task)
-                }
+                CosmicTaskLinkRow(task: task)
             }
+        }
+    }
+}
+
+struct CosmicTaskLinkRow: View {
+    let task: WidgetTask
+
+    var body: some View {
+        if let url = taskDeepLink(task.id) {
+            Link(destination: url) {
+                CosmicTaskRow(task: task)
+            }
+        } else {
+            CosmicTaskRow(task: task)
         }
     }
 }
@@ -393,4 +406,12 @@ struct CosmicEmptyState: View {
         }
         .padding(.vertical, 8)
     }
+}
+
+private func taskDeepLink(_ taskId: String) -> URL? {
+    guard let encodedTaskId = taskId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+          !encodedTaskId.isEmpty else {
+        return nil
+    }
+    return URL(string: "cosmiq://task/\(encodedTaskId)")
 }

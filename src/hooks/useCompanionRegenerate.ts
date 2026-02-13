@@ -40,12 +40,12 @@ export const useCompanionRegenerate = () => {
 
       if (latestCompanionError) {
         console.error("Failed to verify regeneration count:", latestCompanionError);
-        throw new Error("Unable to verify regeneration status. Please try again.");
+        throw new Error("Unable to verify look refresh status. Please try again.");
       }
 
       const regenerationsUsed = latestCompanion?.image_regenerations_used ?? 0;
       if (regenerationsUsed >= MAX_REGENERATIONS) {
-        throw new Error("You've used all your regenerations");
+        throw new Error("You've used all your look refreshes");
       }
 
       // Start generation phase
@@ -95,7 +95,7 @@ export const useCompanionRegenerate = () => {
       if (updateError) {
         const errorCode = (updateError as { code?: string })?.code;
         if (errorCode === "PGRST116") {
-          throw new Error("Regeneration already consumed. Please refresh to continue.");
+          throw new Error("Look refresh already used. Please refresh to continue.");
         }
         throw updateError;
       }
@@ -115,9 +115,9 @@ export const useCompanionRegenerate = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       if (data.validationPassed) {
-        toast.success(`New look unlocked! ${data.regenerationsRemaining} regeneration${data.regenerationsRemaining === 1 ? '' : 's'} remaining.`);
+        toast.success(`New look unlocked! ${data.regenerationsRemaining} look refresh${data.regenerationsRemaining === 1 ? '' : 'es'} remaining.`);
       } else {
-        toast.success(`Companion created! ${data.regenerationsRemaining} regeneration${data.regenerationsRemaining === 1 ? '' : 's'} remaining. You can regenerate again if needed.`);
+        toast.success(`Companion created! ${data.regenerationsRemaining} look refresh${data.regenerationsRemaining === 1 ? '' : 'es'} remaining. You can refresh the look again if needed.`);
       }
       // Close dialog after successful regeneration
       setTimeout(() => setShowConfirmDialog(false), 1500);
@@ -125,7 +125,7 @@ export const useCompanionRegenerate = () => {
     onError: (error) => {
       console.error("Regeneration failed:", error);
       setGenerationPhase('starting');
-      toast.error(error instanceof Error ? error.message : "Failed to regenerate");
+      toast.error(error instanceof Error ? error.message : "Failed to refresh companion look");
     },
   });
 

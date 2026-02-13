@@ -40,10 +40,8 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         
         // Write to App Group shared container
         if let userDefaults = UserDefaults(suiteName: appGroupId) {
-            if let jsonData = try? JSONSerialization.data(withJSONObject: widgetData),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                userDefaults.set(jsonString, forKey: dataKey)
-                userDefaults.synchronize()
+            if let jsonData = try? JSONSerialization.data(withJSONObject: widgetData) {
+                userDefaults.set(jsonData, forKey: dataKey)
                 
                 // Trigger widget reload on iOS 14+
                 if #available(iOS 14.0, *) {
@@ -61,7 +59,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
     
     @objc func reloadWidget(_ call: CAPPluginCall) {
         if #available(iOS 14.0, *) {
-            WidgetCenter.shared.reloadAllTimelines()
+            WidgetCenter.shared.reloadTimelines(ofKind: "CosmiqWidget")
         }
         call.resolve()
     }

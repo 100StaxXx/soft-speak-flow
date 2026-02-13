@@ -22,66 +22,100 @@ export const DailyContentWidget = () => {
   const resolvedMentorId = getResolvedMentorId(profile);
 
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchDailyContent = async () => {
-      if (!resolvedMentorId) {
-        setLoading(false);
-        setContent({});
-        return;
+      setLoading(true);
+
+      try {
+        if (!resolvedMentorId) {
+          if (!isCancelled) {
+            setContent({});
+            setLoading(false);
+          }
+          return;
+        }
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+
+        // Get mentor details
+        const { data: mentor, error: mentorError } = await supabase
+          .from("mentors")
+          .select("slug, name")
+          .eq("id", resolvedMentorId)
+          .maybeSingle();
+
+        if (mentorError) {
+          throw mentorError;
+        }
+
+        if (!mentor) {
+          if (!isCancelled) {
+            setContent({});
+          }
+          return;
+        }
+
+        // Fetch both pep talk and quote in parallel
+        const [pepTalkResult, quoteResult] = await Promise.all([
+          supabase
+            .from("daily_pep_talks")
+            .select("*")
+            .eq("for_date", today)
+            .eq("mentor_slug", mentor.slug)
+            .maybeSingle(),
+          supabase
+            .from("daily_quotes")
+            .select(`
+              *,
+              quotes:quote_id (*)
+            `)
+            .eq("for_date", today)
+            .eq("mentor_slug", mentor.slug)
+            .maybeSingle()
+        ]);
+
+        if (pepTalkResult.error) {
+          throw pepTalkResult.error;
+        }
+        if (quoteResult.error) {
+          throw quoteResult.error;
+        }
+
+        // Extract quote from the daily_quotes join result
+        const quoteData = quoteResult.data?.quotes as unknown as { text: string; author: string | null; category: string | null } | null;
+        
+        if (!isCancelled) {
+          setContent({
+            pepTalk: pepTalkResult.data ? {
+              id: pepTalkResult.data.id,
+              title: pepTalkResult.data.title,
+              summary: pepTalkResult.data.summary,
+              audio_url: pepTalkResult.data.audio_url
+            } : null,
+            quote: quoteData ? {
+              text: quoteData.text,
+              author: quoteData.author || 'Unknown',
+              category: quoteData.category || undefined
+            } : null,
+          });
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setContent({});
+        }
+        console.error('[DailyContentWidget] Failed to fetch daily content:', error);
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
-
-      const today = format(new Date(), 'yyyy-MM-dd');
-
-      // Get mentor details
-      const { data: mentor } = await supabase
-        .from("mentors")
-        .select("slug, name")
-        .eq("id", resolvedMentorId)
-        .maybeSingle();
-
-      if (!mentor) {
-        setLoading(false);
-        return;
-      }
-
-      // Fetch both pep talk and quote in parallel
-      const [pepTalkResult, quoteResult] = await Promise.all([
-        supabase
-          .from("daily_pep_talks")
-          .select("*")
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle(),
-        supabase
-          .from("daily_quotes")
-          .select(`
-            *,
-            quotes:quote_id (*)
-          `)
-          .eq("for_date", today)
-          .eq("mentor_slug", mentor.slug)
-          .maybeSingle()
-      ]);
-
-      // Extract quote from the daily_quotes join result
-      const quoteData = quoteResult.data?.quotes as unknown as { text: string; author: string | null; category: string | null } | null;
-      
-      setContent({
-        pepTalk: pepTalkResult.data ? {
-          id: pepTalkResult.data.id,
-          title: pepTalkResult.data.title,
-          summary: pepTalkResult.data.summary,
-          audio_url: pepTalkResult.data.audio_url
-        } : null,
-        quote: quoteData ? {
-          text: quoteData.text,
-          author: quoteData.author || 'Unknown',
-          category: quoteData.category || undefined
-        } : null,
-      });
-      setLoading(false);
     };
 
-    fetchDailyContent();
+    void fetchDailyContent();
+    return () => {
+      isCancelled = true;
+    };
   }, [resolvedMentorId]);
 
   if (loading) {
@@ -103,15 +137,15 @@ export const DailyContentWidget = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-accent/10 to-background opacity-60" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/30 via-transparent to-accent/20 opacity-40" />
       
-      {/* Multiple Animated Glows */}
-      <div className="absolute -top-1/3 -right-1/3 w-2/3 h-2/3 bg-primary/20 blur-3xl rounded-full animate-pulse" />
-      <div className="absolute -bottom-1/3 -left-1/3 w-2/3 h-2/3 bg-accent/20 blur-3xl rounded-full animate-pulse" style={{ animationDelay: "1s" }} />
+      {/* Soft static glows */}
+      <div className="absolute -top-1/3 -right-1/3 w-2/3 h-2/3 bg-primary/20 blur-3xl rounded-full" />
+      <div className="absolute -bottom-1/3 -left-1/3 w-2/3 h-2/3 bg-accent/20 blur-3xl rounded-full" />
       
       <div className="relative p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+            <Sparkles className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Your Daily Boost
             </h2>

@@ -209,7 +209,7 @@ export const TodaysPepTalk = memo(() => {
 
       if (error) {
         console.error("Generation error:", error);
-        throw new Error(error.message || "Failed to generate pep talk");
+        throw new Error(error.message || "Failed to prepare pep talk");
       }
 
       if (data?.pepTalk) {
@@ -249,7 +249,7 @@ export const TodaysPepTalk = memo(() => {
       }
     } catch (err) {
       console.error("Error generating pep talk:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to generate pep talk";
+      const errorMessage = err instanceof Error ? err.message : "Failed to prepare pep talk";
       toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
@@ -547,14 +547,14 @@ export const TodaysPepTalk = memo(() => {
               {isGenerating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {generationStage === 'script' && 'Generating script...'}
+                  {generationStage === 'script' && 'Preparing script...'}
                   {generationStage === 'audio' && 'Creating audio...'}
                   {generationStage === 'loading' && 'Loading...'}
                 </>
               ) : (
                 <>
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Generate Today's Pep Talk
+                  Prepare Today's Pep Talk
                 </>
               )}
             </Button>
@@ -623,7 +623,7 @@ export const TodaysPepTalk = memo(() => {
                     {generationStage === 'audio' && 'Recording...'}
                     {generationStage === 'loading' && 'Loading...'}
                   </>
-                ) : "Generate today's"}
+                ) : "Refresh today's"}
               </Button>
             </div>
           )}

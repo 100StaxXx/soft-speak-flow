@@ -1,0 +1,11 @@
+framework module IONFilesystemLib {
+  umbrella header "IONFilesystemLib-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module IONFilesystemLib.Swift {
+  header "IONFilesystemLib-Swift.h"
+  requires objc
+}

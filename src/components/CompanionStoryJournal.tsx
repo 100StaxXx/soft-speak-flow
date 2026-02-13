@@ -331,7 +331,7 @@ export const CompanionStoryJournal = () => {
               <p className="text-muted-foreground mb-6">
                 {debouncedStage === 0 
                   ? "The beginning of your companion's story awaits..."
-                  : `Generate this chapter of your companion's story to continue the journey.`
+                  : `Write this chapter of your companion's story to continue the journey.`
                 }
               </p>
               
@@ -348,7 +348,7 @@ export const CompanionStoryJournal = () => {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
+                    Write {debouncedStage === 0 ? "Prologue" : `Chapter ${debouncedStage}`}
                   </>
                 )}
               </Button>

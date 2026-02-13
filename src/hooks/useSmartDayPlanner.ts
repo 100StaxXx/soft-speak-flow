@@ -522,8 +522,8 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
       return plan;
     } catch (err: any) {
       console.error('Error generating plan:', err);
-      setError(err.message || 'Failed to generate plan');
-      toast.error('Failed to generate your day plan');
+      setError(err.message || 'Failed to build plan');
+      toast.error('Failed to build your day plan');
       return null;
     } finally {
       setIsGenerating(false);
