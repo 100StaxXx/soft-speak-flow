@@ -44,6 +44,10 @@ vi.mock("@/components/StarfieldBackground", () => ({
   StarfieldBackground: () => null,
 }));
 
+vi.mock("@/components/BottomNav", () => ({
+  BottomNav: () => null,
+}));
+
 vi.mock("@/components/DatePillsScroller", () => ({
   DatePillsScroller: () => <div data-testid="date-pills" />,
 }));

@@ -26,9 +26,13 @@ vi.mock("@capacitor/haptics", () => ({
   },
 }));
 
-const createPointerDownEvent = (clientY: number, target?: Element) =>
+const createPointerDownEvent = (
+  clientY: number,
+  target?: Element,
+  pointerType: "mouse" | "touch" | "pen" = "mouse",
+) =>
   ({
-    pointerType: "mouse",
+    pointerType,
     button: 0,
     clientY,
     target: target ?? document.createElement("div"),
@@ -151,6 +155,20 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-row", "09:15");
+  });
+
+  it("starts drag from touch pointerdown events", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const rowProps = result.current.getRowDragProps("task-touch-pointer", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(120, undefined, "touch"));
+      dispatchPointerMove(140);
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-pointer", "09:15");
   });
 
   it("enters precision mode only when intentionally held near start", () => {

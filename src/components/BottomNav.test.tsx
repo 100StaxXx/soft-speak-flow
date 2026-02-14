@@ -96,7 +96,7 @@ describe("BottomNav", () => {
     vi.restoreAllMocks();
   });
 
-  it("scrolls to top when re-tapping the active tab", () => {
+  it("does not force scroll reset when re-tapping the active tab", () => {
     const scrollToSpy = vi.spyOn(window, "scrollTo");
     renderBottomNav("/mentor");
     scrollToSpy.mockClear();
@@ -104,7 +104,7 @@ describe("BottomNav", () => {
     fireEvent.click(screen.getByText("Mentor"));
 
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
-    expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, left: 0, behavior: "auto" });
+    expect(scrollToSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId("pathname")).toHaveTextContent("/mentor");
   });
 

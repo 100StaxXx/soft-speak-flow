@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
-import { format, differenceInDays } from "date-fns";
-import { motion, useReducedMotion } from "framer-motion";
+import { format, differenceInDays, isSameDay } from "date-fns";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { toast } from "sonner";
 import { 
   Flame, 
   Trophy, 
@@ -22,10 +23,11 @@ import {
   Brain,
   Heart,
   Dumbbell,
-  GripVertical,
   ArrowUpDown,
   MoreHorizontal,
   CalendarPlus,
+  CalendarArrowUp,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -34,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { HourlyViewModal } from "@/components/HourlyViewModal";
+import { DragTimeZoomRail } from "@/components/calendar/DragTimeZoomRail";
 import { CalendarTask, CalendarMilestone } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,11 +49,14 @@ import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
 
 import { type DragHandleProps } from "./DraggableTaskList";
-import { SwipeableTaskItem } from "./SwipeableTaskItem";
 import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
+import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
+import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
+import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
 
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
@@ -167,6 +173,7 @@ interface TodaysAgendaProps {
   onTimeSlotLongPress?: (date: Date, time: string) => void;
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
+  onTimelineDragPreviewTimeChange?: (time: string | null) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -176,6 +183,122 @@ const formatTime = (time: string) => {
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${minutes} ${ampm}`;
+};
+
+const COMBO_WINDOW_MS = 8000;
+const DAY_START_MINUTE = 6 * 60;
+const DAY_END_MINUTE = (24 * 60) - 1;
+const PLACEHOLDER_INTERVAL_MINUTES = 3 * 60;
+const MIN_PLACEHOLDER_EMPHASIS = 0.2;
+const MAX_PLACEHOLDER_EMPHASIS = 1;
+
+interface TimelineMarkerRow {
+  id: string;
+  minute: number;
+  time: string;
+  kind: "placeholder" | "now";
+  emphasis: number;
+}
+
+type TimelineRow =
+  | { kind: "marker"; marker: TimelineMarkerRow }
+  | { kind: "task"; task: Task };
+
+const parseTimeToMinute = (time: string | null | undefined): number | null => {
+  if (!time) return null;
+  const [hour, minute] = time.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return (hour * 60) + minute;
+};
+
+const minuteToTime = (minute: number) => {
+  const clamped = Math.max(0, Math.min((24 * 60) - 1, Math.round(minute)));
+  const hour = Math.floor(clamped / 60);
+  const mins = clamped % 60;
+  return `${String(hour).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+};
+
+const minuteToMarkerToken = (minute: number) => minuteToTime(minute).replace(":", "");
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+const normalizeModulo = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor;
+
+const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
+  const markerMinutes = new Set<number>([DAY_START_MINUTE]);
+
+  if (scheduledMinutes.length === 0) {
+    return Array.from(markerMinutes).sort((a, b) => a - b);
+  }
+
+  for (const scheduledMinute of scheduledMinutes) {
+    const offsetFromStart = scheduledMinute - DAY_START_MINUTE;
+    const remainder = normalizeModulo(offsetFromStart, PLACEHOLDER_INTERVAL_MINUTES);
+    const isOnBoundary = remainder === 0;
+
+    let lowerAnchor = isOnBoundary
+      ? scheduledMinute - PLACEHOLDER_INTERVAL_MINUTES
+      : scheduledMinute - remainder;
+    let upperAnchor = isOnBoundary
+      ? scheduledMinute + PLACEHOLDER_INTERVAL_MINUTES
+      : lowerAnchor + PLACEHOLDER_INTERVAL_MINUTES;
+
+    lowerAnchor = Math.max(DAY_START_MINUTE, lowerAnchor);
+    upperAnchor = Math.max(DAY_START_MINUTE, upperAnchor);
+
+    if (lowerAnchor <= DAY_END_MINUTE) markerMinutes.add(lowerAnchor);
+    if (upperAnchor <= DAY_END_MINUTE) markerMinutes.add(upperAnchor);
+  }
+
+  return Array.from(markerMinutes).sort((a, b) => a - b);
+};
+
+const buildPlaceholderEmphasis = (
+  placeholderMinutes: number[],
+  currentMinute: number,
+): Map<number, number> => {
+  const emphasisByMinute = new Map<number, number>();
+  for (const minute of placeholderMinutes) {
+    emphasisByMinute.set(minute, MIN_PLACEHOLDER_EMPHASIS);
+  }
+
+  if (placeholderMinutes.length === 0) {
+    return emphasisByMinute;
+  }
+
+  if (placeholderMinutes.length === 1) {
+    emphasisByMinute.set(placeholderMinutes[0], MAX_PLACEHOLDER_EMPHASIS);
+    return emphasisByMinute;
+  }
+
+  const firstMinute = placeholderMinutes[0];
+  const lastMinute = placeholderMinutes[placeholderMinutes.length - 1];
+
+  if (currentMinute <= firstMinute) {
+    emphasisByMinute.set(firstMinute, MAX_PLACEHOLDER_EMPHASIS);
+    return emphasisByMinute;
+  }
+
+  if (currentMinute >= lastMinute) {
+    emphasisByMinute.set(lastMinute, MAX_PLACEHOLDER_EMPHASIS);
+    return emphasisByMinute;
+  }
+
+  const upperIndex = placeholderMinutes.findIndex((minute) => minute >= currentMinute);
+  if (upperIndex <= 0) {
+    emphasisByMinute.set(firstMinute, MAX_PLACEHOLDER_EMPHASIS);
+    return emphasisByMinute;
+  }
+
+  const lowerMinute = placeholderMinutes[upperIndex - 1];
+  const upperMinute = placeholderMinutes[upperIndex];
+  const progress = clamp01((currentMinute - lowerMinute) / (upperMinute - lowerMinute));
+  const range = MAX_PLACEHOLDER_EMPHASIS - MIN_PLACEHOLDER_EMPHASIS;
+
+  emphasisByMinute.set(lowerMinute, MIN_PLACEHOLDER_EMPHASIS + ((1 - progress) * range));
+  emphasisByMinute.set(upperMinute, MIN_PLACEHOLDER_EMPHASIS + (progress * range));
+
+  return emphasisByMinute;
 };
 
 export const TodaysAgenda = memo(function TodaysAgenda({
@@ -198,8 +321,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onTimeSlotLongPress,
   onSendToCalendar,
   hasCalendarLink,
+  onTimelineDragPreviewTimeChange,
 }: TodaysAgendaProps) {
   const prefersReducedMotion = useReducedMotion();
+  const { capabilities } = useMotionProfile();
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
     const capacitor = (window as Window & {
@@ -207,7 +332,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }).Capacitor;
     return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
   }, []);
-  const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion);
+  const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -259,12 +384,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
-  const timelineDrag = useTimelineDrag({
-    containerRef: timelineDragContainerRef,
-    onDrop: (taskId, newTime) => {
-      onUpdateScheduledTime?.(taskId, newTime);
-    },
-  });
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showMonthView, setShowMonthView] = useState(false);
@@ -272,6 +391,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [comboCount, setComboCount] = useState(0);
+  const [showComboFx, setShowComboFx] = useState(false);
+  const lastComboAtRef = useRef<number | null>(null);
+  const comboResetTimerRef = useRef<number | null>(null);
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -285,6 +408,57 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
+
+  const scheduleComboReset = useCallback(() => {
+    if (comboResetTimerRef.current !== null) {
+      window.clearTimeout(comboResetTimerRef.current);
+    }
+    comboResetTimerRef.current = window.setTimeout(() => {
+      setComboCount(0);
+      setShowComboFx(false);
+      lastComboAtRef.current = null;
+      comboResetTimerRef.current = null;
+    }, COMBO_WINDOW_MS);
+  }, []);
+
+  const registerCompletionCombo = useCallback(() => {
+    const now = Date.now();
+    const canChain = lastComboAtRef.current !== null && now - lastComboAtRef.current <= COMBO_WINDOW_MS;
+    const nextCombo = canChain ? comboCount + 1 : 1;
+
+    setComboCount(nextCombo);
+    lastComboAtRef.current = now;
+    scheduleComboReset();
+
+    if (nextCombo > 1) {
+      setShowComboFx(true);
+      window.setTimeout(() => {
+        setShowComboFx(false);
+      }, useLiteAnimations ? 600 : 1000);
+    }
+  }, [comboCount, scheduleComboReset, useLiteAnimations]);
+
+  const resetCombo = useCallback(() => {
+    if (comboResetTimerRef.current !== null) {
+      window.clearTimeout(comboResetTimerRef.current);
+      comboResetTimerRef.current = null;
+    }
+    setComboCount(0);
+    setShowComboFx(false);
+    lastComboAtRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (comboResetTimerRef.current !== null) {
+        window.clearTimeout(comboResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    resetCombo();
+  }, [selectedDate, resetCombo]);
   
 
   // Priority weight for sorting
@@ -348,13 +522,217 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [tasks, sortBy, keepInPlace]);
 
   // Only quests go into the unified timeline (rituals grouped by campaign below)
-  const { scheduledItems, timelineItems } = useMemo(() => {
-    const scheduled = questTasks.filter(t => !!t.scheduled_time).sort((a, b) => 
-      (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
-    );
-    const anytime = questTasks.filter(t => !t.scheduled_time);
-    return { scheduledItems: scheduled, timelineItems: [...scheduled, ...anytime] };
-  }, [questTasks]);
+  const scheduledItems = useMemo(
+    () => questTasks
+      .filter((task) => !!task.scheduled_time)
+      .sort((a, b) => (a.scheduled_time || "").localeCompare(b.scheduled_time || "")),
+    [questTasks],
+  );
+  const anytimeItems = useMemo(
+    () => questTasks.filter((task) => !task.scheduled_time),
+    [questTasks],
+  );
+  const baseTimelineItems = useMemo(
+    () => [...scheduledItems, ...anytimeItems],
+    [scheduledItems, anytimeItems],
+  );
+
+  const draggableTimelineItems = useMemo(
+    () => [...baseTimelineItems, ...ritualTasks],
+    [baseTimelineItems, ritualTasks],
+  );
+
+  const timelineDrag = useTimelineDrag({
+    containerRef: timelineDragContainerRef,
+    snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+    onDrop: (taskId, newTime) => {
+      const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
+      onUpdateScheduledTime?.(taskId, newTime);
+      if (overlapCount > 0) {
+        toast(`Overlap: ${overlapCount} quest${overlapCount === 1 ? "" : "s"}`);
+      }
+    },
+  });
+
+  const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
+  const lastReportedPreviewTimeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const emitPreviewTime = timelineDrag.isDragging ? (timelineDrag.previewTime ?? null) : null;
+    if (lastReportedPreviewTimeRef.current === emitPreviewTime) return;
+    lastReportedPreviewTimeRef.current = emitPreviewTime;
+    onTimelineDragPreviewTimeChange?.(emitPreviewTime);
+  }, [onTimelineDragPreviewTimeChange, timelineDrag.isDragging, timelineDrag.previewTime]);
+
+  useEffect(() => {
+    return () => {
+      onTimelineDragPreviewTimeChange?.(null);
+    };
+  }, [onTimelineDragPreviewTimeChange]);
+
+  useEffect(() => {
+    if (!isSameDay(selectedDate, new Date())) return;
+
+    const tick = () => {
+      const minute = parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0;
+      setNowMarkerMinute(minute);
+    };
+
+    tick();
+    const interval = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(interval);
+  }, [selectedDate]);
+
+  const previewScheduledOverrides = useMemo(() => {
+    const activeTaskId = timelineDrag.draggingTaskId;
+    const previewTime = timelineDrag.previewTime;
+    if (!activeTaskId || !previewTime) return undefined;
+    return { [activeTaskId]: previewTime };
+  }, [timelineDrag.draggingTaskId, timelineDrag.previewTime]);
+
+  const scheduledFlow = useMemo(
+    () => buildTaskTimelineFlow(scheduledItems, previewScheduledOverrides),
+    [scheduledItems, previewScheduledOverrides],
+  );
+
+  const scheduledItemsById = useMemo(
+    () => new Map(scheduledItems.map((task) => [task.id, task])),
+    [scheduledItems],
+  );
+
+  const flowOrderedScheduledItems = useMemo(() => {
+    if (scheduledFlow.orderedTaskIds.length === 0) return scheduledItems;
+
+    const ordered: Task[] = [];
+    for (const taskId of scheduledFlow.orderedTaskIds) {
+      const task = scheduledItemsById.get(taskId);
+      if (task) {
+        ordered.push(task);
+      }
+    }
+
+    return ordered.length > 0 ? ordered : scheduledItems;
+  }, [scheduledFlow.orderedTaskIds, scheduledItems, scheduledItemsById]);
+
+  const timelineMarkerRows = useMemo(() => {
+    const isToday = isSameDay(selectedDate, new Date());
+    const scheduledMinutes = scheduledItems
+      .map((task) => parseTimeToMinute(task.scheduled_time))
+      .filter((minute): minute is number => minute !== null);
+    const placeholderMinutes = buildPlaceholderMinutes(scheduledMinutes);
+    const emphasisByMinute = isToday
+      ? buildPlaceholderEmphasis(placeholderMinutes, nowMarkerMinute)
+      : new Map<number, number>(
+          placeholderMinutes.map((minute) => [minute, MIN_PLACEHOLDER_EMPHASIS]),
+        );
+    const markers = new Map<number, TimelineMarkerRow>();
+
+    for (const minute of placeholderMinutes) {
+      markers.set(minute, {
+        id: `timeline-marker-placeholder-${minuteToMarkerToken(minute)}`,
+        minute,
+        time: minuteToTime(minute),
+        kind: "placeholder",
+        emphasis: emphasisByMinute.get(minute) ?? MIN_PLACEHOLDER_EMPHASIS,
+      });
+    }
+
+    if (isToday) {
+      const clampedNowMinute = Math.max(0, Math.min(DAY_END_MINUTE, nowMarkerMinute));
+      markers.set(clampedNowMinute, {
+        id: "timeline-marker-now",
+        minute: clampedNowMinute,
+        time: minuteToTime(clampedNowMinute),
+        kind: "now",
+        emphasis: MAX_PLACEHOLDER_EMPHASIS,
+      });
+    }
+
+    return Array.from(markers.values());
+  }, [nowMarkerMinute, scheduledItems, selectedDate]);
+
+  const timelineRows = useMemo<TimelineRow[]>(() => {
+    const scheduledRows: Array<TimelineRow & { minute: number; sortKey: string }> = [
+      ...timelineMarkerRows.map((marker) => ({
+        kind: "marker" as const,
+        marker,
+        minute: marker.minute,
+        sortKey: `0-${marker.minute}-${marker.id}`,
+      })),
+      ...flowOrderedScheduledItems
+        .map((task) => {
+          const effectiveTime = previewScheduledOverrides?.[task.id] ?? task.scheduled_time;
+          const minute = parseTimeToMinute(effectiveTime);
+          if (minute === null) return null;
+          return {
+            kind: "task" as const,
+            task,
+            minute,
+            sortKey: `1-${minute}-${task.id}`,
+          };
+        })
+        .filter((row): row is TimelineRow & { minute: number; sortKey: string } => !!row),
+    ].sort((a, b) => {
+      if (a.minute !== b.minute) return a.minute - b.minute;
+      return a.sortKey.localeCompare(b.sortKey);
+    });
+
+    const rows: TimelineRow[] = scheduledRows.map((row) => (
+      row.kind === "marker"
+        ? { kind: "marker", marker: row.marker }
+        : { kind: "task", task: row.task }
+    ));
+    rows.push(...anytimeItems.map((task) => ({ kind: "task" as const, task })));
+    return rows;
+  }, [anytimeItems, flowOrderedScheduledItems, previewScheduledOverrides, timelineMarkerRows]);
+
+  const baseTimelineConflictMap = useMemo(
+    () => buildTaskConflictMap(draggableTimelineItems),
+    [draggableTimelineItems],
+  );
+
+  const timelineConflictMap = useMemo(() => {
+    const activeTaskId = timelineDrag.draggingTaskId;
+    const previewTime = timelineDrag.previewTime;
+    if (!activeTaskId || !previewTime) return baseTimelineConflictMap;
+
+    const activeConflictIds = getTaskConflictSetForTask(activeTaskId, draggableTimelineItems, {
+      [activeTaskId]: previewTime,
+    });
+    const previousActiveConflictIds = baseTimelineConflictMap.get(activeTaskId) ?? new Set<string>();
+    const touchedTaskIds = new Set<string>([
+      ...previousActiveConflictIds,
+      ...activeConflictIds,
+    ]);
+    const nextMap = new Map(baseTimelineConflictMap);
+
+    for (const touchedTaskId of touchedTaskIds) {
+      const updatedConflicts = new Set(nextMap.get(touchedTaskId) ?? []);
+      updatedConflicts.delete(activeTaskId);
+      if (activeConflictIds.has(touchedTaskId)) {
+        updatedConflicts.add(activeTaskId);
+      }
+
+      if (updatedConflicts.size > 0) {
+        nextMap.set(touchedTaskId, updatedConflicts);
+      } else {
+        nextMap.delete(touchedTaskId);
+      }
+    }
+
+    if (activeConflictIds.size > 0) {
+      nextMap.set(activeTaskId, new Set(activeConflictIds));
+    } else {
+      nextMap.delete(activeTaskId);
+    }
+
+    return nextMap;
+  }, [
+    baseTimelineConflictMap,
+    draggableTimelineItems,
+    timelineDrag.draggingTaskId,
+    timelineDrag.previewTime,
+  ]);
 
   // Group rituals by campaign
   const campaignRitualGroups = useMemo(() => {
@@ -470,15 +848,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   };
 
-  type TimelineDragHandleProps = {
-    onPointerDown?: React.PointerEventHandler<HTMLElement>;
-    onTouchStart?: React.TouchEventHandler<HTMLElement>;
-    onTouchMove?: React.TouchEventHandler<HTMLElement>;
-    onTouchEnd?: React.TouchEventHandler<HTMLElement>;
-    onTouchCancel?: React.TouchEventHandler<HTMLElement>;
-  };
-
-  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, timelineDragHandleProps?: TimelineDragHandleProps) => {
+  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, overlapCount = 0) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
@@ -513,11 +883,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           next.delete(task.id);
           return next;
         });
+        resetCombo();
         triggerHaptic(ImpactStyle.Light);
         onUndoToggle(task.id, task.xp_reward);
       } else {
         // Complete: add to optimistic set immediately for instant strikethrough
         setOptimisticCompleted(prev => new Set(prev).add(task.id));
+        registerCompletionCombo();
         triggerHaptic(ImpactStyle.Medium);
         playStrikethrough();
         // Track for strikethrough animation
@@ -643,33 +1015,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 {formatTime(task.scheduled_time)}
               </span>
             )}
+            {overlapCount > 0 && (
+              <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                Overlaps: {overlapCount}
+              </span>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
-            {!!task.scheduled_time && !isRitual && !isComplete && !!timelineDragHandleProps && (
-              <button
-                type="button"
-                data-interactive="true"
-                aria-label="Drag to reschedule"
-                title="Drag handle to reschedule in 5-minute steps"
-                className={cn(
-                  "h-8 w-8 rounded-md flex items-center justify-center touch-none",
-                  "opacity-55 group-hover:opacity-100 transition-opacity",
-                  isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
-                )}
-                style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
-                onPointerDownCapture={(e) => e.stopPropagation()}
-                onTouchStartCapture={(e) => e.stopPropagation()}
-                {...timelineDragHandleProps}
-              >
-                <GripVertical className="w-4 h-4" />
-              </button>
-            )}
             {/* Quest action menu */}
-            {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar) && (
+            {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    data-interactive="true"
+                    aria-label="Quest actions"
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
@@ -701,6 +1061,29 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       {hasCalendarLink?.(task.id) ? "Re-send to calendar" : "Send to calendar"}
                     </DropdownMenuItem>
                   )}
+                  {onMoveQuestToNextDay && !isRitual && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveQuestToNextDay(task.id);
+                      }}
+                    >
+                      <CalendarArrowUp className="w-4 h-4 mr-2" />
+                      Move to tomorrow
+                    </DropdownMenuItem>
+                  )}
+                  {onDeleteQuest && (
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteQuest(task.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete quest
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -714,6 +1097,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {/* Chevron for expandable details - only shown if task has details */}
             {hasDetails && (
               <Button
+                data-interactive="true"
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 -m-1 flex-shrink-0"
@@ -860,24 +1244,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       </Collapsible>
     );
 
-    // Wrap with SwipeableTaskItem for swipe gestures (only for non-completed, non-dragging tasks)
-    if ((onDeleteQuest || onMoveQuestToNextDay) && !isComplete && !isDragging && !isActivated) {
-      // Don't allow "move to next day" for rituals - they're recurring and already exist every day
-      const isRitual = !!task.habit_source_id;
-      
-      return (
-        <SwipeableTaskItem
-          onSwipeDelete={() => onDeleteQuest?.(task.id)}
-          onSwipeMoveToNextDay={!isRitual && onMoveQuestToNextDay ? () => onMoveQuestToNextDay(task.id) : undefined}
-          disabled={isDragging || isActivated}
-        >
-          {taskContent}
-        </SwipeableTaskItem>
-      );
-    }
-
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo]);
 
 
   return (
@@ -928,6 +1296,44 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
           </div>
         </div>
+
+        <AnimatePresence>
+          {comboCount > 1 && (
+            <motion.div
+              key="combo-banner"
+              initial={useLiteAnimations ? { opacity: 1 } : { opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={useLiteAnimations ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: useLiteAnimations ? 0.1 : 0.24 }}
+              className={cn(
+                "mb-3 relative overflow-hidden rounded-xl border px-3 py-2",
+                "bg-gradient-to-r from-stardust-gold/12 via-primary/10 to-stardust-gold/12 border-stardust-gold/30",
+                showComboFx && !useLiteAnimations && "animate-combo-pop",
+              )}
+              data-testid="combo-banner"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-stardust-gold" />
+                  <span className="text-sm font-semibold text-stardust-gold">
+                    Combo x{comboCount}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Keep completing quests
+                </span>
+              </div>
+
+              {!useLiteAnimations && showComboFx && (
+                <div className="pointer-events-none absolute inset-0">
+                  <span className="absolute left-4 top-2 h-1.5 w-1.5 rounded-full bg-stardust-gold animate-combo-particle" />
+                  <span className="absolute left-1/2 top-1 h-1 w-1 rounded-full bg-primary animate-combo-particle [animation-delay:120ms]" />
+                  <span className="absolute right-5 bottom-2 h-1.5 w-1.5 rounded-full bg-celestial-blue animate-combo-particle [animation-delay:200ms]" />
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Timeline Content */}
         {tasks.length === 0 ? (
@@ -991,29 +1397,79 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
 
             {/* Scheduled Tasks Timeline */}
-            {timelineItems.length > 0 && (
+            {timelineRows.length > 0 && (
               <div ref={timelineDragContainerRef}>
-                {scheduledItems.length > 0 && (
+                {timelineRows.some((row) => row.kind === "marker" || !!row.task.scheduled_time) && (
                   <div className="flex items-center gap-2 pb-2">
                     <div className="w-9 flex-shrink-0" />
                     <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Scheduled
                     </span>
-                    <span className="text-[11px] text-muted-foreground/80">
-                      Drag handle to reschedule • 5m steps
-                    </span>
                   </div>
                 )}
-                {timelineItems.map((task, index) => {
+                {timelineRows.map((row, index) => {
+                  if (row.kind === "marker") {
+                    const marker = row.marker;
+                    const markerScale = marker.kind === "placeholder"
+                      ? 0.72 + (marker.emphasis * 0.28)
+                      : 1;
+                    const markerOpacity = marker.kind === "placeholder"
+                      ? 0.25 + (marker.emphasis * 0.65)
+                      : 0.72;
+                    return (
+                      <div
+                        key={marker.id}
+                        className="pointer-events-none select-none"
+                        style={{
+                          opacity: markerOpacity,
+                          transform: `scale(${markerScale})`,
+                          transformOrigin: "left center",
+                        }}
+                        data-testid={marker.id}
+                      >
+                        <TimelineTaskRow
+                          time={marker.time}
+                          overrideTime={marker.kind === "now" ? marker.time : undefined}
+                          showLine={index > 0}
+                          isLast={index === timelineRows.length - 1}
+                          className={marker.kind === "now" ? "opacity-70" : undefined}
+                        >
+                          {marker.kind === "now" ? (
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary/70" />
+                              <span className="text-[10px] font-medium uppercase tracking-wide text-primary/70">
+                                Now
+                              </span>
+                              <div className="h-px flex-1 bg-primary/30" />
+                            </div>
+                          ) : (
+                            <div className="pt-1">
+                              <div className="h-px w-full border-t border-dashed border-border/35" />
+                            </div>
+                          )}
+                        </TimelineTaskRow>
+                      </div>
+                    );
+                  }
+
+                  const task = row.task;
                   const isThisDragging = timelineDrag.draggingTaskId === task.id;
                   const isAnyDragging = timelineDrag.isDragging;
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
                   const isAnytimeTask = !task.scheduled_time;
-                  const showAnytimeLabel = isAnytimeTask
-                    && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
-                  const dragHandleProps = task.scheduled_time
-                    ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                  const rowFlow = scheduledFlow.byTaskId.get(task.id);
+                  const laneOffsetPx = rowFlow && rowFlow.overlapCount > 0 ? rowFlow.laneIndex * 10 : 0;
+                  const scheduledSpacingPx = rowFlow
+                    ? Math.min(24, Math.max(0, rowFlow.gapBeforeMinutes * 0.12))
+                    : 0;
+                  const previousRow = index > 0 ? timelineRows[index - 1] : undefined;
+                  const previousIsAnytimeTask = previousRow?.kind === "task" && !previousRow.task.scheduled_time;
+                  const showAnytimeLabel = isAnytimeTask && !previousIsAnytimeTask;
+                  const timelineRowDragProps = task.scheduled_time && !task.completed
+                    ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                     : undefined;
+                  const isRowDraggable = !!timelineRowDragProps;
+                  const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
 
                   const rowStyle: CSSProperties = {
                     WebkitUserSelect: 'none',
@@ -1029,6 +1485,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     borderRadius: isThisDragging ? 12 : 0,
                     transition: 'none',
                     willChange: isThisDragging ? "transform" : undefined,
+                    marginTop: task.scheduled_time ? scheduledSpacingPx : 0,
                   };
 
                   const rowContent = (
@@ -1037,10 +1494,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       label={showAnytimeLabel ? "Anytime" : undefined}
                       overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
                       showLine={index > 0}
-                      isLast={index === timelineItems.length - 1}
+                      isLast={index === timelineRows.length - 1}
                       isDragTarget={isThisDragging}
+                      durationMinutes={task.estimated_duration}
+                      laneIndex={rowFlow?.laneIndex}
+                      laneCount={rowFlow?.laneCount}
+                      overlapCount={rowFlow?.overlapCount}
+                      className={cn(
+                        isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
+                        isThisDragging && "cursor-grabbing",
+                      )}
+                      data-testid={`timeline-row-${task.id}`}
+                      {...timelineRowDragProps}
                     >
-                      {renderTaskItem(task, undefined, dragHandleProps)}
+                      {renderTaskItem(task, undefined, overlapCount)}
                     </TimelineTaskRow>
                   );
 
@@ -1054,13 +1521,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <motion.div
                       key={task.id}
                       className={cn("relative", isThisDragging && "z-50")}
+                      layout={!isThisDragging}
                       animate={bounceAnimation}
                       transition={bounceAnimation ? {
                         duration: 0.25,
                         ease: [0.25, 0.1, 0.25, 1],
-                      } : undefined}
+                        layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                      } : {
+                        layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                      }}
+                      data-timeline-lane={rowFlow?.laneIndex}
+                      data-timeline-lane-count={rowFlow?.laneCount}
+                      data-timeline-overlap={rowFlow?.overlapCount}
                       style={{
                         ...rowStyle,
+                        x: laneOffsetPx,
                         y: isThisDragging ? timelineDrag.dragOffsetY : 0,
                       }}
                     >
@@ -1137,11 +1612,25 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     {/* Collapsible Rituals */}
                     {isCampaignExpanded && (
                       <div className="border-t border-border/20 px-2 pb-1">
-                        {group.rituals.map(task => (
-                          <div key={task.id}>
-                            {renderTaskItem(task)}
-                          </div>
-                        ))}
+                        {group.rituals.map(task => {
+                          const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                          const isAnyDragging = timelineDrag.isDragging;
+                          const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+
+                          return (
+                            <motion.div
+                              key={task.id}
+                              className={cn("relative", isThisDragging && "z-50")}
+                              style={{
+                                y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                                pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
+                                opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                              }}
+                            >
+                              {renderTaskItem(task, undefined, overlapCount)}
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1199,6 +1688,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         onTaskDrop={() => {}}
         onTimeSlotLongPress={onTimeSlotLongPress}
       />
+
+      <DragTimeZoomRail rail={timelineDrag.zoomRail} />
     </div>
   );
 });

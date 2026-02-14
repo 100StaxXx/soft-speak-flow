@@ -35,7 +35,9 @@ interface UseTimelineDragOptions {
 
 interface DragHandleProps {
   onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
+  onPointerDownCapture?: (e: React.PointerEvent<HTMLElement>) => void;
   onTouchStart: (e: React.TouchEvent<HTMLElement>) => void;
+  onTouchStartCapture?: (e: React.TouchEvent<HTMLElement>) => void;
   onTouchMove: (e: React.TouchEvent<HTMLElement>) => void;
   onTouchEnd: (e: React.TouchEvent<HTMLElement>) => void;
   onTouchCancel: (e: React.TouchEvent<HTMLElement>) => void;
@@ -457,7 +459,6 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (draggingTaskIdRef.current) return;
       if (isInteractiveEventTarget(e.target)) return;
-      if (e.pointerType === "touch") return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
       e.preventDefault();
@@ -469,7 +470,9 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
   const getDragHandleProps = useCallback(
     (taskId: string, scheduledTime: string): DragHandleProps => ({
+      onPointerDownCapture: (e) => handlePointerDown(e, taskId, scheduledTime),
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
+      onTouchStartCapture: (e) => handleTouchStart(e, taskId, scheduledTime),
       onTouchStart: (e) => handleTouchStart(e, taskId, scheduledTime),
       onTouchMove: noopTouchMove,
       onTouchEnd: noopTouchEnd,
@@ -480,7 +483,9 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
   const getRowDragProps = useCallback(
     (taskId: string, scheduledTime: string): DragHandleProps => ({
+      onPointerDownCapture: (e) => handlePointerDown(e, taskId, scheduledTime),
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
+      onTouchStartCapture: (e) => handleTouchStart(e, taskId, scheduledTime),
       onTouchStart: (e) => handleTouchStart(e, taskId, scheduledTime),
       onTouchMove: noopTouchMove,
       onTouchEnd: noopTouchEnd,
