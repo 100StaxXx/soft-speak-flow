@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { playMissionComplete } from "@/utils/soundEffects";
 import { haptics } from "@/utils/haptics";
 import confetti from "canvas-confetti";
-import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 interface QuestClearCelebrationProps {
   show: boolean;
@@ -21,7 +20,6 @@ export const QuestClearCelebration = memo(function QuestClearCelebration({
   onDismiss 
 }: QuestClearCelebrationProps) {
   const [stage, setStage] = useState<'entering' | 'main' | 'exiting'>('entering');
-  const { capabilities, profile } = useMotionProfile();
   
   useEffect(() => {
     if (show) {
@@ -31,38 +29,41 @@ export const QuestClearCelebration = memo(function QuestClearCelebration({
       playMissionComplete();
       haptics.success();
       
-      if (capabilities.allowBackgroundAnimation) {
-        const baseCount = profile === "enhanced" ? 90 : 55;
+      // Fire confetti
+      const fireConfetti = () => {
+        // Center burst
         confetti({
-          particleCount: baseCount,
-          spread: 65,
-          origin: { y: 0.62 },
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
           colors: ['#FFD700', '#A855F7', '#EC4899', '#3B82F6'],
-          scalar: profile === "enhanced" ? 0.9 : 0.8,
         });
-
+        
+        // Side cannons
         setTimeout(() => {
           confetti({
-            particleCount: Math.round(baseCount * 0.45),
+            particleCount: 50,
             angle: 60,
-            spread: 50,
+            spread: 55,
             origin: { x: 0, y: 0.7 },
             colors: ['#FFD700', '#A855F7'],
           });
           confetti({
-            particleCount: Math.round(baseCount * 0.45),
+            particleCount: 50,
             angle: 120,
-            spread: 50,
+            spread: 55,
             origin: { x: 1, y: 0.7 },
             colors: ['#FFD700', '#A855F7'],
           });
-        }, 160);
-      }
+        }, 200);
+      };
+      
+      fireConfetti();
       
       // Transition to main stage
       setTimeout(() => setStage('main'), 300);
     }
-  }, [capabilities.allowBackgroundAnimation, profile, show]);
+  }, [show]);
   
   const handleDismiss = () => {
     setStage('exiting');

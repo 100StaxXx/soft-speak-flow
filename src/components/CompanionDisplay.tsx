@@ -35,7 +35,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { getStageName } from "@/config/companionStages";
-import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 const LONG_PRESS_DURATION_MS = 800;
 const MOVE_CANCEL_THRESHOLD_PX = 12;
@@ -127,12 +126,11 @@ export const CompanionDisplay = memo(() => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageKey, setImageKey] = useState(0); // Force image reload
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [creatureName, setCreatureName] = useState<string | null>(null);
-  const { profile: motionProfile, capabilities, signals } = useMotionProfile();
-  const prefersReducedMotion = signals.prefersReducedMotion || motionProfile === "reduced";
   
   // Long press detection refs
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -274,6 +272,15 @@ export const CompanionDisplay = memo(() => {
     return null;
   }, [equippedRewards]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+    
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
   // Show welcome back modal if user has been inactive
   useEffect(() => {
     if (needsWelcomeBack && !welcomeBackDismissed && companion) {
@@ -356,17 +363,6 @@ export const CompanionDisplay = memo(() => {
   const colorName = getColorName(companion.favorite_color);
   const safeNextEvolutionXP = nextEvolutionXP ?? companion.current_xp;
   const isMaxStage = companion.current_stage >= 20;
-  const motionScale = prefersReducedMotion || !capabilities.allowBackgroundAnimation
-    ? 0
-    : motionProfile === "enhanced"
-      ? 1
-      : 0.72;
-  const careStrength = Math.max(0.2, Math.min(1, care.overallCare));
-  const auraOpacity = (0.28 + careStrength * 0.34) * (motionScale || 0.45);
-  const orbitDuration = motionProfile === "enhanced" ? "14s" : "18s";
-  const pulseDuration = motionProfile === "enhanced" ? "4.6s" : "6.4s";
-  const enableLayeredIdle = motionScale > 0;
-  const vitalityRatio = Math.max(0.25, Math.min(1, (companion.vitality ?? 300) / 550));
 
   return (
     <>
@@ -413,36 +409,13 @@ export const CompanionDisplay = memo(() => {
           <div className="flex justify-center py-2 relative group" role="img" aria-label={`Your companion at stage ${companion.current_stage}: ${stageName}`}>
             {/* Cosmiq orbital glow effect */}
             <div 
-              className={`absolute inset-0 blur-3xl transition-opacity duration-500 ${enableLayeredIdle ? "animate-orbit" : "animate-none"}`}
+              className={`absolute inset-0 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : 'animate-orbit'}`}
               style={{
-                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${vitalityRatio}), hsl(var(--nebula-pink) / ${vitalityRatio}), transparent)`,
-                opacity: auraOpacity,
-                animationDuration: orbitDuration,
+                background: `radial-gradient(circle, hsl(var(--celestial-blue) / ${(companion.vitality ?? 300) / 600}), hsl(var(--nebula-pink) / ${(companion.vitality ?? 300) / 600}), transparent)`,
               }}
               aria-hidden="true" 
             />
-            <div
-              className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl transition-opacity duration-500 ${enableLayeredIdle ? "animate-pulse" : "animate-none"}`}
-              style={{
-                opacity: auraOpacity * 0.8,
-                animationDuration: pulseDuration,
-              }}
-              aria-hidden="true"
-            />
-            {enableLayeredIdle && (
-              <div
-                className="absolute inset-4 rounded-2xl animate-nebula-shift pointer-events-none"
-                style={{
-                  opacity: 0.14 + careStrength * 0.18,
-                  background:
-                    careStrength > 0.65
-                      ? "radial-gradient(circle at 30% 30%, hsl(var(--cosmiq-glow) / 0.5), transparent 60%)"
-                      : "radial-gradient(circle at 65% 35%, hsl(var(--nebula-pink) / 0.45), transparent 60%)",
-                  animationDuration: motionProfile === "enhanced" ? "11s" : "14s",
-                }}
-                aria-hidden="true"
-              />
-            )}
+            <div className={`absolute inset-0 bg-gradient-to-r from-celestial-blue/20 via-nebula-pink/20 to-cosmiq-glow/20 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity duration-500 ${prefersReducedMotion ? 'animate-none' : ''}`} aria-hidden="true" />
             <div 
               className="relative select-none focus-visible:ring-2 focus-visible:ring-primary/70 rounded-2xl outline-none"
               role="button"
@@ -458,12 +431,8 @@ export const CompanionDisplay = memo(() => {
               onKeyDown={handleKeyDown}
             >
               {/* Twinkling star particles around companion */}
-              <div className={`absolute inset-0 rounded-2xl ${enableLayeredIdle ? "star-shimmer" : ""}`} aria-hidden="true" />
-              <div
-                className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${enableLayeredIdle ? "animate-pulse" : ""}`}
-                style={enableLayeredIdle ? { animationDuration: pulseDuration } : undefined}
-                aria-hidden="true"
-              />
+              <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
+              <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
               {!imageLoaded && !imageError && (
                 <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading companion image">
                   <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
@@ -493,7 +462,7 @@ export const CompanionDisplay = memo(() => {
                 key={imageKey}
                 src={effectiveImageUrl}
                 alt={`${stageName} companion at stage ${companion.current_stage}`}
-                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 ${capabilities.allowParallax ? "group-hover:scale-105" : ""} ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''} ${animationClass}`}
+                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''} ${animationClass}`}
                 style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
                 onLoad={() => {
                   setImageLoaded(true);

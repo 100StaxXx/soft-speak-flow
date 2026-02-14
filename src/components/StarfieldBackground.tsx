@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useCallback, useRef, memo, useState } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, memo } from "react";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { useTimeColors, StarColor } from "@/hooks/useTimeColors";
 import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
-import { useMotionProfile } from "@/hooks/useMotionProfile";
-import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
 interface Star {
   id: number;
@@ -13,7 +11,7 @@ interface Star {
   opacity: number;
   animationDelay: number;
   animationDuration: number;
-  colorSeed: number;
+  colorSeed: number; // Use seed instead of fixed color for dynamic updates
 }
 
 interface DustParticle {
@@ -22,6 +20,8 @@ interface DustParticle {
   y: number;
   size: number;
   opacity: number;
+  driftDuration: number;
+  driftDelay: number;
 }
 
 interface ShootingStar {
@@ -33,69 +33,41 @@ interface ShootingStar {
   angle: number;
 }
 
-type StarfieldPalette = "time-adaptive" | "cool-night";
-type StarfieldQuality = "auto" | "lite" | "full";
-type StarfieldIntensity = "low" | "medium" | "high";
-type StarfieldParallaxMode = "off" | "pointer" | "device";
-
-interface StarfieldBackgroundProps {
-  palette?: StarfieldPalette;
-  quality?: StarfieldQuality;
-  intensity?: StarfieldIntensity;
-  parallax?: StarfieldParallaxMode;
-}
-
-interface StarfieldColorPalette {
-  primary: string;
-  accent: string;
-  nebula1: string;
-  nebula2: string;
-  nebula3: string;
-}
-
-const COOL_NIGHT_GRADIENT =
-  "linear-gradient(to bottom, hsl(240, 30%, 10%), hsl(250, 20%, 8%), hsl(0, 0%, 5%))";
-
-const COOL_NIGHT_COLORS: StarfieldColorPalette = {
-  primary: "hsl(252, 70%, 62%)",
-  accent: "hsl(205, 80%, 66%)",
-  nebula1: "hsl(265, 72%, 58%)",
-  nebula2: "hsl(224, 68%, 56%)",
-  nebula3: "hsl(286, 60%, 62%)",
+// Generate stars for a specific layer
+const generateStars = (count: number, sizeMin: number, sizeMax: number, opacityMin: number, opacityMax: number): Star[] => {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: Math.random() * (sizeMax - sizeMin) + sizeMin,
+    opacity: Math.random() * (opacityMax - opacityMin) + opacityMin,
+    animationDelay: Math.random() * 10,
+    animationDuration: Math.random() * 4 + 4,
+    colorSeed: Math.random(), // Store seed for color determination
+  }));
 };
 
-const COOL_NIGHT_STAR_DISTRIBUTION = {
-  white: 0.45,
-  blue: 0.3,
-  pink: 0.15,
-  gold: 0,
-  teal: 0.1,
-  orange: 0,
+// Generate dust particles
+const generateDust = (count: number): DustParticle[] => {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: Math.random() * 0.5 + 0.5,
+    opacity: Math.random() * 0.15 + 0.1,
+    driftDuration: Math.random() * 60 + 60,
+    driftDelay: Math.random() * 30,
+  }));
 };
 
-const INTENSITY_SCALE: Record<StarfieldIntensity, number> = {
-  low: 0.72,
-  medium: 1,
-  high: 1.24,
-};
+// Generate shooting stars with varied directions - long cycles so they appear rarely
+const generateShootingStars = (): ShootingStar[] => [
+  { id: 1, delay: 5, duration: 90, startX: 15, startY: 10, angle: 35 },
+  { id: 2, delay: 45, duration: 120, startX: 85, startY: 8, angle: 145 },
+  { id: 3, delay: 75, duration: 150, startX: 50, startY: 5, angle: 80 },
+];
 
-const QUALITY_COUNTS = {
-  lite: {
-    dust: 8,
-    backgroundStars: 10,
-    midLayerStars: 5,
-    brightStars: 2,
-    shootingStars: 0,
-  },
-  full: {
-    dust: 14,
-    backgroundStars: 14,
-    midLayerStars: 8,
-    brightStars: 4,
-    shootingStars: 3,
-  },
-};
-
+// Parallax multipliers for each layer (deeper = slower)
 const PARALLAX = {
   deepNebulae: 1,
   dust: 2,
@@ -106,154 +78,60 @@ const PARALLAX = {
   brightStars: 8,
 };
 
-const generateStars = (
-  count: number,
-  sizeMin: number,
-  sizeMax: number,
-  opacityMin: number,
-  opacityMax: number,
-): Star[] => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * (sizeMax - sizeMin) + sizeMin,
-    opacity: Math.random() * (opacityMax - opacityMin) + opacityMin,
-    animationDelay: Math.random() * 10,
-    animationDuration: Math.random() * 4 + 4,
-    colorSeed: Math.random(),
-  }));
-};
-
-const generateDust = (count: number): DustParticle[] => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 0.5 + 0.5,
-    opacity: Math.random() * 0.15 + 0.1,
-  }));
-};
-
-const generateShootingStars = (): ShootingStar[] => [
-  { id: 1, delay: 5, duration: 90, startX: 15, startY: 10, angle: 35 },
-  { id: 2, delay: 45, duration: 120, startX: 85, startY: 8, angle: 145 },
-  { id: 3, delay: 75, duration: 150, startX: 50, startY: 5, angle: 80 },
-];
-
-export const StarfieldBackground = memo(({
-  palette = "time-adaptive",
-  quality = "auto",
-  intensity = "medium",
-  parallax = "pointer",
-}: StarfieldBackgroundProps) => {
-  const [isDocumentVisible, setIsDocumentVisible] = useState(
-    typeof document === "undefined" ? true : document.visibilityState === "visible",
-  );
+export const StarfieldBackground = memo(() => {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const backgroundRef = useRef<HTMLDivElement>(null);
   const parallaxRafRef = useRef<number | null>(null);
   const parallaxTargetRef = useRef({ x: 0, y: 0 });
-  const { profile, capabilities } = useMotionProfile();
-  const { isTabActive } = useMainTabVisibility();
-  const shouldUseDeviceParallax =
-    parallax === "device"
-    && capabilities.allowParallax
-    && profile !== "reduced"
-    && isDocumentVisible
-    && isTabActive;
-  const { gamma, beta, permitted } = useDeviceOrientation({ enabled: shouldUseDeviceParallax });
+  const isNativeIOS = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const capacitor = (window as Window & {
+      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
+    }).Capacitor;
+    return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
+  }, []);
+  const useLiteMode = prefersReducedMotion || isNativeIOS;
+  const { gamma, beta, permitted } = useDeviceOrientation({ enabled: !useLiteMode });
   const { period, colors, rotationHue, starDistribution, getStarHSL, getStarGlow } = useTimeColors();
   const { presence: companionPresence } = useCompanionPresence();
-
-  const isSceneActive = isDocumentVisible && isTabActive;
-
-  const resolvedQuality = useMemo<"lite" | "full">(() => {
-    if (quality === "lite" || quality === "full") return quality;
-    if (profile === "enhanced") return "full";
-    return "lite";
-  }, [profile, quality]);
-
-  const parallaxMode = useMemo<StarfieldParallaxMode>(() => {
-    if (!capabilities.allowParallax || !isSceneActive || profile === "reduced") {
-      return "off";
-    }
-    return parallax;
-  }, [capabilities.allowParallax, isSceneActive, parallax, profile]);
-
-  const activeColors = useMemo<StarfieldColorPalette>(
-    () => (palette === "cool-night" ? COOL_NIGHT_COLORS : colors),
-    [palette, colors],
-  );
-
-  const activeStarDistribution = useMemo(
-    () => (palette === "cool-night" ? COOL_NIGHT_STAR_DISTRIBUTION : starDistribution),
-    [palette, starDistribution],
-  );
-
-  const layerCounts = useMemo(() => {
-    const base = QUALITY_COUNTS[resolvedQuality];
-    const scale = INTENSITY_SCALE[intensity];
-
-    const scaled = {
-      dust: Math.round(base.dust * scale),
-      backgroundStars: Math.round(base.backgroundStars * scale),
-      midLayerStars: Math.round(base.midLayerStars * scale),
-      brightStars: Math.round(base.brightStars * scale),
-      shootingStars: Math.max(0, Math.round(base.shootingStars * scale)),
-    };
-
-    const totalParticles = scaled.dust + scaled.backgroundStars + scaled.midLayerStars + scaled.brightStars;
-    if (capabilities.maxParticles <= 0 || totalParticles <= 0) {
-      return {
-        dust: 0,
-        backgroundStars: 0,
-        midLayerStars: 0,
-        brightStars: 0,
-        shootingStars: 0,
-      };
-    }
-
-    if (totalParticles <= capabilities.maxParticles) {
-      return scaled;
-    }
-
-    const ratio = capabilities.maxParticles / totalParticles;
-    return {
-      dust: Math.max(1, Math.floor(scaled.dust * ratio)),
-      backgroundStars: Math.max(1, Math.floor(scaled.backgroundStars * ratio)),
-      midLayerStars: Math.max(1, Math.floor(scaled.midLayerStars * ratio)),
-      brightStars: Math.max(1, Math.floor(scaled.brightStars * ratio)),
-      shootingStars: Math.max(0, Math.floor(scaled.shootingStars * ratio)),
-    };
-  }, [capabilities.maxParticles, intensity, resolvedQuality]);
-
-  const allowAnimation = capabilities.allowBackgroundAnimation && isSceneActive && profile !== "reduced";
-
+  
+  // Companion mood-based visual modifiers
   const moodHueShift = useMemo(() => {
     const { mood } = companionPresence;
+
+    // Hue shift: warm when joyful, cool when quiet, none when neutral
+    let hueShift = 0;
+    
     switch (mood) {
-      case "joyful":
-        return 10;
-      case "content":
-        return 5;
-      case "reserved":
-        return -5;
-      case "quiet":
-        return -10;
-      default:
-        return 0;
+      case 'joyful':
+        hueShift = 10;
+        break;
+      case 'content':
+        hueShift = 5;
+        break;
+      case 'neutral':
+        hueShift = 0;
+        break;
+      case 'reserved':
+        hueShift = -5;
+        break;
+      case 'quiet':
+        hueShift = -10;
+        break;
+      case 'dormant':
+        hueShift = 0;
+        break;
     }
+    
+    return hueShift;
   }, [companionPresence]);
 
   useEffect(() => {
-    const handleVisibility = () => {
-      setIsDocumentVisible(document.visibilityState === "visible");
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mediaQuery.matches);
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   const scheduleParallaxUpdate = useCallback((x: number, y: number) => {
@@ -268,8 +146,9 @@ export const StarfieldBackground = memo(({
     });
   }, []);
 
+  // Mouse movement handler for desktop (without rerendering)
   useEffect(() => {
-    if (parallaxMode !== "pointer") {
+    if (useLiteMode) {
       scheduleParallaxUpdate(0, 0);
       return;
     }
@@ -280,19 +159,18 @@ export const StarfieldBackground = memo(({
       scheduleParallaxUpdate(x, y);
     };
 
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [parallaxMode, scheduleParallaxUpdate]);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [scheduleParallaxUpdate, useLiteMode]);
 
+  // Use device orientation for mobile tilt parallax (disabled in lite mode)
   useEffect(() => {
-    if (parallaxMode !== "device" || !permitted || !isSceneActive) {
-      return;
-    }
+    if (useLiteMode || !permitted) return;
 
     const x = Math.max(-1, Math.min(1, gamma / 30));
     const y = Math.max(-1, Math.min(1, (beta - 45) / 30));
     scheduleParallaxUpdate(x, y);
-  }, [beta, gamma, isSceneActive, parallaxMode, permitted, scheduleParallaxUpdate]);
+  }, [gamma, beta, permitted, scheduleParallaxUpdate, useLiteMode]);
 
   useEffect(() => {
     return () => {
@@ -302,106 +180,85 @@ export const StarfieldBackground = memo(({
     };
   }, []);
 
+  // Get transform style for a layer
   const getParallaxStyle = useCallback((multiplier: number) => {
-    if (parallaxMode === "off") return {};
-
+    if (useLiteMode) return {};
     return {
       transform: `translate(calc(var(--parallax-x, 0) * ${multiplier}px), calc(var(--parallax-y, 0) * ${multiplier}px))`,
-      transition: "transform 0.22s ease-out",
-      willChange: "transform" as const,
+      transition: 'transform 0.22s ease-out',
+      willChange: 'transform' as const,
     };
-  }, [parallaxMode]);
+  }, [useLiteMode]);
 
+  // Convert seed to star color based on current period distribution
   const getStarColorFromSeed = useCallback((seed: number): StarColor => {
-    const dist = activeStarDistribution;
+    const dist = starDistribution;
     let cumulative = 0;
-    if ((cumulative += dist.orange) > seed && dist.orange > 0) return "orange";
-    if ((cumulative += dist.gold) > seed) return "gold";
-    if ((cumulative += dist.teal) > seed) return "teal";
-    if ((cumulative += dist.pink) > seed) return "pink";
-    if ((cumulative += dist.blue) > seed) return "blue";
-    return "white";
-  }, [activeStarDistribution]);
+    if ((cumulative += dist.orange) > seed && dist.orange > 0) return 'orange';
+    if ((cumulative += dist.gold) > seed) return 'gold';
+    if ((cumulative += dist.teal) > seed) return 'teal';
+    if ((cumulative += dist.pink) > seed) return 'pink';
+    if ((cumulative += dist.blue) > seed) return 'blue';
+    return 'white';
+  }, [starDistribution]);
 
-  const dustParticles = useMemo(
-    () => generateDust(layerCounts.dust),
-    [layerCounts.dust],
-  );
-  const backgroundStars = useMemo(
-    () => generateStars(layerCounts.backgroundStars, 0.8, 1.5, 0.3, 0.5),
-    [layerCounts.backgroundStars],
-  );
-  const midLayerStars = useMemo(
-    () => generateStars(layerCounts.midLayerStars, 1.5, 2.5, 0.4, 0.7),
-    [layerCounts.midLayerStars],
-  );
-  const brightStars = useMemo(
-    () => generateStars(layerCounts.brightStars, 2.5, 4, 0.7, 1),
-    [layerCounts.brightStars],
-  );
-  const shootingStars = useMemo(
-    () => (layerCounts.shootingStars > 0 ? generateShootingStars().slice(0, layerCounts.shootingStars) : []),
-    [layerCounts.shootingStars],
-  );
+  // Memoize all generated elements
+  const dustParticles = useMemo(() => generateDust(useLiteMode ? 8 : 14), [useLiteMode]);
+  const backgroundStars = useMemo(() => generateStars(useLiteMode ? 10 : 14, 0.8, 1.5, 0.3, 0.5), [useLiteMode]);
+  const midLayerStars = useMemo(() => generateStars(useLiteMode ? 5 : 8, 1.5, 2.5, 0.4, 0.7), [useLiteMode]);
+  const brightStars = useMemo(() => generateStars(useLiteMode ? 2 : 4, 2.5, 4, 0.7, 1), [useLiteMode]);
+  const shootingStars = useMemo(() => (useLiteMode ? [] : generateShootingStars()), [useLiteMode]);
 
+  // Dynamic gradient based on time period
   const baseGradient = useMemo(() => {
-    if (palette === "cool-night") {
-      return COOL_NIGHT_GRADIENT;
-    }
-
     const gradients: Record<string, string> = {
-      dawn: "linear-gradient(to bottom, hsl(350, 30%, 12%), hsl(25, 25%, 10%), hsl(240, 15%, 8%))",
-      morning: "linear-gradient(to bottom, hsl(200, 35%, 12%), hsl(190, 25%, 10%), hsl(240, 15%, 8%))",
-      afternoon: "linear-gradient(to bottom, hsl(35, 30%, 12%), hsl(180, 20%, 10%), hsl(240, 15%, 8%))",
-      sunset: "linear-gradient(to bottom, hsl(340, 35%, 15%), hsl(20, 30%, 12%), hsl(270, 25%, 10%))",
-      night: "linear-gradient(to bottom, hsl(240, 30%, 10%), hsl(250, 20%, 8%), hsl(0, 0%, 5%))",
+      dawn: 'linear-gradient(to bottom, hsl(350, 30%, 12%), hsl(25, 25%, 10%), hsl(240, 15%, 8%))',
+      morning: 'linear-gradient(to bottom, hsl(200, 35%, 12%), hsl(190, 25%, 10%), hsl(240, 15%, 8%))',
+      afternoon: 'linear-gradient(to bottom, hsl(35, 30%, 12%), hsl(180, 20%, 10%), hsl(240, 15%, 8%))',
+      sunset: 'linear-gradient(to bottom, hsl(340, 35%, 15%), hsl(20, 30%, 12%), hsl(270, 25%, 10%))',
+      night: 'linear-gradient(to bottom, hsl(240, 30%, 10%), hsl(250, 20%, 8%), hsl(0, 0%, 5%))',
     };
     return gradients[period];
-  }, [palette, period]);
+  }, [period]);
 
-  const hueShift = (palette === "cool-night" ? 0 : rotationHue * 0.1) + Math.max(-8, Math.min(8, moodHueShift));
+  // Small hue shift for variety + companion mood influence
+  const hueShift = rotationHue * 0.1 + moodHueShift;
 
   return (
-    <div
-      ref={backgroundRef}
-      className="fixed inset-0 overflow-hidden pointer-events-none -z-10"
-      data-starfield-active={isSceneActive}
-      data-starfield-quality={resolvedQuality}
-      data-starfield-intensity={intensity}
-      data-starfield-parallax={parallaxMode}
-      data-starfield-animated={allowAnimation}
-    >
-      <div
+    <div ref={backgroundRef} className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+      {/* Layer 1: Time-based deep space gradient */}
+      <div 
         className="absolute inset-0 transition-all [transition-duration:3000ms]"
         style={{ background: baseGradient }}
       />
 
+      {/* Layer 2: Deep background nebulae with time-based colors */}
       <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.deepNebulae)}>
-        <div
+        <div 
           className="absolute w-[900px] h-[900px] rounded-full blur-[150px] transition-colors [transition-duration:5000ms]"
           style={{
-            top: "-15%",
-            right: "-10%",
-            background: `radial-gradient(ellipse at center, ${activeColors.nebula1.replace(")", " / 0.25)")}, transparent 70%)`,
-            animation: allowAnimation ? "nebula-drift-slow 55s ease-in-out infinite" : "none",
+            top: '-15%',
+            right: '-10%',
+            background: `radial-gradient(ellipse at center, ${colors.nebula1.replace(')', ' / 0.25)')}, transparent 70%)`,
+            animation: useLiteMode ? 'none' : 'nebula-drift-slow 55s ease-in-out infinite',
           }}
         />
-        <div
+        <div 
           className="absolute w-[800px] h-[800px] rounded-full blur-[140px] transition-colors [transition-duration:5000ms]"
           style={{
-            bottom: "-20%",
-            left: "-15%",
-            background: `radial-gradient(ellipse at center, ${activeColors.nebula2.replace(")", " / 0.2)")}, transparent 70%)`,
-            animation: allowAnimation ? "nebula-drift-slow 65s ease-in-out infinite reverse" : "none",
+            bottom: '-20%',
+            left: '-15%',
+            background: `radial-gradient(ellipse at center, ${colors.nebula2.replace(')', ' / 0.2)')}, transparent 70%)`,
+            animation: useLiteMode ? 'none' : 'nebula-drift-slow 65s ease-in-out infinite reverse',
           }}
         />
       </div>
 
+      {/* Layer 3: Cosmic dust particles */}
       <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.dust)}>
         {dustParticles.map((particle) => (
           <div
             key={`dust-${particle.id}`}
-            data-star-layer="dust"
             className="absolute rounded-full transition-colors [transition-duration:3000ms]"
             style={{
               left: `${particle.x}%`,
@@ -409,19 +266,19 @@ export const StarfieldBackground = memo(({
               width: `${particle.size}px`,
               height: `${particle.size}px`,
               opacity: particle.opacity,
-              backgroundColor: `${activeColors.nebula3.replace(")", " / 0.4)")}`,
+              backgroundColor: `${colors.nebula3.replace(')', ' / 0.4)')}`,
             }}
           />
         ))}
       </div>
 
+      {/* Layer 4: Background stars with time-based colors */}
       <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.backgroundStars)}>
         {backgroundStars.map((star) => {
           const starColor = getStarColorFromSeed(star.colorSeed);
           return (
             <div
               key={`bg-star-${star.id}`}
-              data-star-layer="background-star"
               className="absolute rounded-full transition-colors [transition-duration:2000ms]"
               style={{
                 left: `${star.x}%`,
@@ -431,41 +288,42 @@ export const StarfieldBackground = memo(({
                 opacity: star.opacity,
                 backgroundColor: getStarHSL(starColor, hueShift),
                 boxShadow: getStarGlow(starColor, star.opacity * 0.5, hueShift),
-                animation: allowAnimation
-                  ? `twinkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`
-                  : "none",
+                animation: useLiteMode
+                  ? 'none' 
+                  : `twinkle ${star.animationDuration}s ease-in-out ${star.animationDelay}s infinite`,
               }}
             />
           );
         })}
       </div>
 
+      {/* Layer 5: Mid-layer nebula wisps with time-based colors */}
       <div className="absolute inset-0 opacity-30" style={getParallaxStyle(PARALLAX.midNebulae)}>
-        <div
+        <div 
           className="absolute w-[600px] h-[300px] blur-[100px] -rotate-12 transition-colors [transition-duration:5000ms]"
           style={{
-            top: "10%",
-            right: "5%",
-            background: `linear-gradient(135deg, ${activeColors.nebula1.replace(")", " / 0.35)")}, ${activeColors.nebula3.replace(")", " / 0.15)")}, transparent)`,
+            top: '10%',
+            right: '5%',
+            background: `linear-gradient(135deg, ${colors.nebula1.replace(')', ' / 0.35)')}, ${colors.nebula3.replace(')', ' / 0.15)')}, transparent)`,
           }}
         />
-        <div
+        <div 
           className="absolute w-[500px] h-[250px] blur-[90px] rotate-12 transition-colors [transition-duration:5000ms]"
           style={{
-            bottom: "15%",
-            left: "10%",
-            background: `linear-gradient(135deg, ${activeColors.nebula2.replace(")", " / 0.3)")}, ${activeColors.accent.replace(")", " / 0.15)")}, transparent)`,
+            bottom: '15%',
+            left: '10%',
+            background: `linear-gradient(135deg, ${colors.nebula2.replace(')', ' / 0.3)')}, ${colors.accent.replace(')', ' / 0.15)')}, transparent)`,
           }}
         />
       </div>
 
+      {/* Layer 6: Mid-layer stars */}
       <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.midStars)}>
         {midLayerStars.map((star) => {
           const starColor = getStarColorFromSeed(star.colorSeed);
           return (
             <div
               key={`mid-star-${star.id}`}
-              data-star-layer="mid-star"
               className="absolute rounded-full transition-colors [transition-duration:2000ms]"
               style={{
                 left: `${star.x}%`,
@@ -481,27 +339,29 @@ export const StarfieldBackground = memo(({
         })}
       </div>
 
+      {/* Layer 7: Foreground nebula highlights */}
       <div className="absolute inset-0 opacity-25" style={getParallaxStyle(PARALLAX.foregroundNebulae)}>
-        <div
+        <div 
           className="absolute w-[350px] h-[350px] rounded-full blur-[70px] transition-colors [transition-duration:5000ms]"
           style={{
-            top: "25%",
-            right: "20%",
-            background: `radial-gradient(ellipse at center, ${activeColors.primary.replace(")", " / 0.5)")}, transparent 60%)`,
-            animation: allowAnimation ? "nebula-pulse 25s ease-in-out infinite" : "none",
+            top: '25%',
+            right: '20%',
+            background: `radial-gradient(ellipse at center, ${colors.primary.replace(')', ' / 0.5)')}, transparent 60%)`,
+            animation: useLiteMode ? 'none' : 'nebula-pulse 25s ease-in-out infinite',
           }}
         />
-        <div
+        <div 
           className="absolute w-[300px] h-[300px] rounded-full blur-[60px] transition-colors [transition-duration:5000ms]"
           style={{
-            bottom: "30%",
-            left: "25%",
-            background: `radial-gradient(ellipse at center, ${activeColors.accent.replace(")", " / 0.45)")}, transparent 60%)`,
-            animation: allowAnimation ? "nebula-pulse 30s ease-in-out 8s infinite reverse" : "none",
+            bottom: '30%',
+            left: '25%',
+            background: `radial-gradient(ellipse at center, ${colors.accent.replace(')', ' / 0.45)')}, transparent 60%)`,
+            animation: useLiteMode ? 'none' : 'nebula-pulse 30s ease-in-out 8s infinite reverse',
           }}
         />
       </div>
 
+      {/* Layer 8: Bright stars (fastest parallax) */}
       <div className="absolute inset-0" style={getParallaxStyle(PARALLAX.brightStars)}>
         {brightStars.map((star) => {
           const starColor = getStarColorFromSeed(star.colorSeed);
@@ -509,7 +369,6 @@ export const StarfieldBackground = memo(({
           return (
             <div
               key={`bright-star-${star.id}`}
-              data-star-layer="bright-star"
               className="absolute rounded-full transition-colors [transition-duration:2000ms]"
               style={{
                 left: `${star.x}%`,
@@ -524,16 +383,16 @@ export const StarfieldBackground = memo(({
         })}
       </div>
 
-      {allowAnimation && shootingStars.map((shootingStar) => (
+      {/* Layer 9: Shooting stars */}
+      {!useLiteMode && shootingStars.map((shootingStar) => (
         <div
           key={`shooting-${shootingStar.id}`}
-          data-star-layer="shooting-star"
           className="absolute w-[3px] h-[3px] rounded-full"
           style={{
             left: `${shootingStar.startX}%`,
             top: `${shootingStar.startY}%`,
-            background: "linear-gradient(to right, transparent, white, white)",
-            boxShadow: "0 0 6px 2px rgba(255, 255, 255, 0.9), -20px 0 15px rgba(255, 255, 255, 0.4), -40px 0 25px rgba(255, 255, 255, 0.2)",
+            background: 'linear-gradient(to right, transparent, white, white)',
+            boxShadow: '0 0 6px 2px rgba(255, 255, 255, 0.9), -20px 0 15px rgba(255, 255, 255, 0.4), -40px 0 25px rgba(255, 255, 255, 0.2)',
             animation: `shooting-star-${shootingStar.id} ${shootingStar.duration}s ease-out ${shootingStar.delay}s infinite`,
           }}
         />
@@ -542,4 +401,4 @@ export const StarfieldBackground = memo(({
   );
 });
 
-StarfieldBackground.displayName = "StarfieldBackground";
+StarfieldBackground.displayName = 'StarfieldBackground';

@@ -1,7 +1,6 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import { useCompanionPresence } from "@/contexts/CompanionPresenceContext";
 import { useCompanionAuraColors } from "@/hooks/useCompanionAuraColors";
-import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 interface Particle {
   id: number;
@@ -19,84 +18,112 @@ const generateParticles = (count: number): Particle[] => {
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 100,
-    size: Math.random() * 3 + 2,
+    size: Math.random() * 3 + 2, // 2-5px
     animationDelay: Math.random() * 10,
-    animationDuration: Math.random() * 20 + 30,
-    twinkleDuration: Math.random() * 2 + 3,
-    opacity: Math.random() * 0.4 + 0.3,
+    animationDuration: Math.random() * 20 + 30, // 30-50s drift
+    twinkleDuration: Math.random() * 2 + 3, // 3-5s twinkle
+    opacity: Math.random() * 0.4 + 0.3, // 0.3-0.7
   }));
-};
-
-const getCompanionParticleCap = (profile: "reduced" | "balanced" | "enhanced") => {
-  switch (profile) {
-    case "enhanced":
-      return 12;
-    case "balanced":
-      return 8;
-    default:
-      return 0;
-  }
 };
 
 export const CompanionAmbientParticles = memo(() => {
   const { presence, isLoading } = useCompanionPresence();
   const { particleColor } = useCompanionAuraColors();
-  const { profile, capabilities } = useMotionProfile();
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
-  const particleCount = Math.min(
-    presence.particleCount,
-    getCompanionParticleCap(profile),
-  );
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mediaQuery.matches);
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
 
   const particles = useMemo(() => {
-    return generateParticles(particleCount);
-  }, [particleCount]);
+    return generateParticles(presence.particleCount);
+  }, [presence.particleCount]);
 
-  if (
-    isLoading
-    || particleCount === 0
-    || !capabilities.allowBackgroundAnimation
-    || !presence.isPresent
-  ) {
+  // Don't render if no particles, loading, or reduced motion
+  if (isLoading || presence.particleCount === 0 || prefersReducedMotion) {
     return null;
   }
 
+  const getAnimationStyle = (particle: Particle) => {
+    const effect = presence.particleEffect;
+    
+    if (effect === 'sparkle') {
+      return {
+        animation: `
+          companion-particle-drift ${particle.animationDuration}s ease-in-out ${particle.animationDelay}s infinite,
+          companion-particle-twinkle ${particle.twinkleDuration}s ease-in-out ${particle.animationDelay}s infinite
+        `,
+      };
+    }
+    
+    if (effect === 'gentle') {
+      return {
+        animation: `companion-particle-drift ${particle.animationDuration * 1.5}s ease-in-out ${particle.animationDelay}s infinite`,
+      };
+    }
+    
+    // minimal
+    return {
+      animation: `companion-particle-drift ${particle.animationDuration * 2}s ease-in-out ${particle.animationDelay}s infinite`,
+    };
+  };
+
   return (
-    <div
+    <div 
       className="fixed inset-0 overflow-hidden pointer-events-none z-[1]"
       aria-hidden="true"
     >
-      {particles.map((particle) => {
-        const effectClass =
-          presence.particleEffect === "sparkle"
-            ? "companion-particle-sparkle"
-            : presence.particleEffect === "gentle"
-              ? "companion-particle-gentle"
-              : "companion-particle-minimal";
+      {particles.map((particle) => (
+        <div
+          key={particle.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${particle.x}%`,
+            top: `${particle.y}%`,
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            backgroundColor: particleColor,
+            opacity: particle.opacity * (presence.overallCare * 0.5 + 0.5),
+            boxShadow: presence.particleEffect === 'sparkle' 
+              ? `0 0 ${particle.size * 2}px ${particleColor}`
+              : 'none',
+            willChange: 'transform, opacity',
+            ...getAnimationStyle(particle),
+          }}
+        />
+      ))}
 
-        return (
-          <div
-            key={particle.id}
-            className={`absolute rounded-full companion-particle-base ${effectClass}`}
-            style={{
-              left: `${particle.x}%`,
-              top: `${particle.y}%`,
-              width: `${particle.size}px`,
-              height: `${particle.size}px`,
-              backgroundColor: particleColor,
-              opacity: particle.opacity * (presence.overallCare * 0.5 + 0.5),
-              boxShadow:
-                presence.particleEffect === "sparkle"
-                  ? `0 0 ${particle.size * 2}px ${particleColor}`
-                  : "none",
-              animationDelay: `${particle.animationDelay}s`,
-              animationDuration: `${particle.animationDuration}s, ${particle.twinkleDuration}s`,
-            }}
-          />
-        );
-      })}
+      <style>{`
+        @keyframes companion-particle-drift {
+          0%, 100% {
+            transform: translate(0, 0) scale(1);
+          }
+          25% {
+            transform: translate(30px, -40px) scale(1.1);
+          }
+          50% {
+            transform: translate(-20px, -80px) scale(0.9);
+          }
+          75% {
+            transform: translate(40px, -40px) scale(1.05);
+          }
+        }
+
+        @keyframes companion-particle-twinkle {
+          0%, 100% {
+            opacity: 0.4;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 });
 
-CompanionAmbientParticles.displayName = "CompanionAmbientParticles";
+CompanionAmbientParticles.displayName = 'CompanionAmbientParticles';

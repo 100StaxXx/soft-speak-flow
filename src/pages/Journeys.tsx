@@ -8,6 +8,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { useLocation } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { BottomNav } from "@/components/BottomNav";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
@@ -34,7 +35,6 @@ import { useOnboardingTaskCleanup } from "@/hooks/useOnboardingTaskCleanup";
 import { useEpics } from "@/hooks/useEpics";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
-import { MOTION_DURATION } from "@/lib/motionTokens";
 
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { QuickAdjustDrawer } from "@/components/SmartDayPlanner/components/QuickAdjustDrawer";
@@ -81,15 +81,6 @@ const Journeys = () => {
   const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
   const previousPathRef = useRef<string | null>(location.pathname);
   const activePathRef = useRef(location.pathname);
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    const timer = logger.time("journeys_mount", "Journeys");
-    const frame = window.requestAnimationFrame(() => {
-      timer.end({ screen: "journeys" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -719,13 +710,13 @@ const Journeys = () => {
 
   return (
     <PageTransition mode="instant">
-      <StarfieldBackground palette="cool-night" quality="auto" intensity="medium" parallax="pointer" />
+      <StarfieldBackground />
       <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
         {/* Hero Header */}
         <motion.div
           initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
           className="mb-6 text-center relative"
         >
           <div className="absolute right-0 top-0">
@@ -746,10 +737,7 @@ const Journeys = () => {
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              delay: prefersReducedMotion ? 0 : 0.04,
-              duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium,
-            }}
+            transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
             className="mb-4"
           >
             <DatePillsScroller
@@ -763,10 +751,7 @@ const Journeys = () => {
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: prefersReducedMotion ? 0 : 0.1,
-              duration: prefersReducedMotion ? 0 : MOTION_DURATION.medium,
-            }}
+            transition={{ delay: prefersReducedMotion ? 0 : 0.1, duration: prefersReducedMotion ? 0 : 0.2 }}
           >
             {/* Today's Agenda */}
             <TodaysAgenda
@@ -879,7 +864,7 @@ const Journeys = () => {
           <motion.button
             initial={prefersReducedMotion ? false : { scale: 0.9, opacity: 0 }}
             animate={{ scale: 1 }}
-            transition={{ duration: prefersReducedMotion ? 0 : MOTION_DURATION.quick }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
             className="fixed bottom-24 right-4 z-40 p-3 rounded-full bg-card/92 backdrop-blur-xl border border-border/60 shadow-[0_10px_24px_rgba(0,0,0,0.28)] active:scale-95 transition-transform"
             onClick={() => setShowQuickAdjust(true)}
             aria-label="Open quick adjust"
@@ -921,6 +906,8 @@ const Journeys = () => {
           setShowAddSheet(true);
         }} />
       </div>
+
+      <BottomNav />
     </PageTransition>
   );
 };

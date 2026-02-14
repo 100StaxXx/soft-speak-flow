@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useCompanion } from "@/hooks/useCompanion";
+import { BottomNav } from "@/components/BottomNav";
 import { useTheme } from "@/contexts/ThemeContext";
 import { PageTransition } from "@/components/PageTransition";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -211,7 +212,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   return (
     <PageTransition mode={enableOnboardingGuard ? "animated" : "instant"}>
       {/* Cosmiq Starfield Background */}
-      <StarfieldBackground palette="cool-night" />
+      <StarfieldBackground />
       
       {/* Fixed Background Image */}
       {mentorImage && (
@@ -340,6 +341,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         </div>
       </div>
       
+      <ErrorBoundary>
+        <BottomNav />
+      </ErrorBoundary>
       <MentorTutorialModal open={showModal} onClose={dismissModal} />
     </PageTransition>
   );

@@ -274,6 +274,18 @@ export const GameHUD = memo(({
         </div>
       )}
 
+      {/* Inline styles for stat-pill with enhanced glass effect */}
+      <style>{`
+        .stat-pill {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 });
@@ -530,3 +542,4 @@ export const FeedbackOverlay = memo(({ type }: FeedbackOverlayProps) => {
   );
 });
 FeedbackOverlay.displayName = 'FeedbackOverlay';
+

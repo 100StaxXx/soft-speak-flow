@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getResolvedMentorId } from "@/utils/mentor";
+import { MAIN_TAB_REFRESH_EVENT, type MainTabRefreshEventDetail } from "@/utils/mainTabRefresh";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -186,6 +187,19 @@ export const TodaysPepTalk = memo(() => {
 
   useEffect(() => {
     void fetchDailyPepTalk();
+  }, [fetchDailyPepTalk]);
+
+  useEffect(() => {
+    const handleMainTabRefresh = (event: CustomEvent<MainTabRefreshEventDetail>) => {
+      if (event.detail.path !== "/mentor") return;
+      if (event.detail.source !== "pull-to-refresh") return;
+      void fetchDailyPepTalk();
+    };
+
+    window.addEventListener(MAIN_TAB_REFRESH_EVENT, handleMainTabRefresh as EventListener);
+    return () => {
+      window.removeEventListener(MAIN_TAB_REFRESH_EVENT, handleMainTabRefresh as EventListener);
+    };
   }, [fetchDailyPepTalk]);
 
   // Handle user-triggered pep talk generation

@@ -304,7 +304,6 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
           showCompanion={true}
           milestones={trailMilestones}
           epicId={epic.id}
-          surface="card"
         />
 
         {/* Compact Stats Bar */}
