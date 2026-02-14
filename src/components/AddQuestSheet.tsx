@@ -629,7 +629,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-1"
             >
               <Map className="w-3.5 h-3.5" />
-              Or create a Campaign
+              <span>Or create a Campaign</span>
+              <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] leading-none text-muted-foreground/80">
+                Max 2 active
+              </span>
             </button>
           )}
         </div>

@@ -4,6 +4,7 @@ interface TimelineTaskRowProps extends React.HTMLAttributes<HTMLDivElement> {
   time?: string | null;
   overrideTime?: string | null;
   label?: string | null;
+  tone?: "default" | "now";
   durationMinutes?: number | null;
   laneIndex?: number;
   laneCount?: number;
@@ -31,6 +32,7 @@ export function TimelineTaskRow({
   time,
   overrideTime,
   label,
+  tone = "default",
   durationMinutes,
   laneIndex = 0,
   laneCount = 1,
@@ -44,6 +46,7 @@ export function TimelineTaskRow({
 }: TimelineTaskRowProps) {
   const displayTime = overrideTime ?? time;
   const isOverridden = overrideTime != null;
+  const isNowTone = tone === "now";
   const effectiveDurationMinutes = Number.isFinite(durationMinutes) && (durationMinutes ?? 0) > 0
     ? Number(durationMinutes)
     : 30;
@@ -65,7 +68,9 @@ export function TimelineTaskRow({
         {displayTime ? (
           <span className={cn(
             "text-[10px] font-medium leading-none transition-colors",
-            isOverridden
+            isNowTone
+              ? "font-semibold text-stardust-gold"
+              : isOverridden
               ? "text-primary font-bold"
               : "text-muted-foreground"
           )}>
@@ -89,7 +94,9 @@ export function TimelineTaskRow({
         {/* Dot */}
         <div className={cn(
           "w-2 h-2 rounded-full flex-shrink-0 z-10",
-          time 
+          isNowTone
+            ? "bg-stardust-gold ring-2 ring-stardust-gold/30"
+            : time
             ? "bg-primary/70 ring-2 ring-primary/20" 
             : "bg-muted-foreground/40 ring-2 ring-muted/30"
         )} />
@@ -98,7 +105,9 @@ export function TimelineTaskRow({
           <div
             className={cn(
               "relative mt-1 mb-1 w-[3px] rounded-full",
-              hasOverlap
+              isNowTone
+                ? "bg-stardust-gold/45"
+                : hasOverlap
                 ? "bg-primary/55"
                 : hasMultipleLanes
                   ? "bg-primary/40"

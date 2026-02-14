@@ -122,6 +122,7 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     children,
     overrideTime,
     time,
+    tone,
     durationMinutes,
     laneIndex,
     laneCount,
@@ -135,6 +136,7 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     children: ReactNode;
     overrideTime?: string | null;
     time?: string | null;
+    tone?: "default" | "now";
     durationMinutes?: number | null;
     laneIndex?: number;
     laneCount?: number;
@@ -143,24 +145,28 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     showLine?: boolean;
     isLast?: boolean;
     isDragTarget?: boolean;
-  } & Record<string, unknown>) => (
-    <div
-      data-testid="timeline-row"
-      data-timeline-lane={laneIndex}
-      data-timeline-lane-count={laneCount}
-      data-timeline-overlap={overlapCount}
-      {...props}
-    >
-      {overrideTime ? <span>{overrideTime}</span> : null}
-      {time ? (
-        <div
-          data-testid="timeline-duration-indicator"
-          data-duration-minutes={durationMinutes ?? 30}
-        />
-      ) : null}
-      {children}
-    </div>
-  ),
+  } & Record<string, unknown>) => {
+    const displayTime = overrideTime ?? time;
+    return (
+      <div
+        data-testid="timeline-row"
+        data-timeline-lane={laneIndex}
+        data-timeline-lane-count={laneCount}
+        data-timeline-overlap={overlapCount}
+        data-timeline-tone={tone}
+        {...props}
+      >
+        {displayTime ? <span data-testid="timeline-row-time">{displayTime}</span> : null}
+        {time ? (
+          <div
+            data-testid="timeline-duration-indicator"
+            data-duration-minutes={durationMinutes ?? 30}
+          />
+        ) : null}
+        {children}
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/components/ui/marquee-text", () => ({
@@ -758,6 +764,81 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     ]);
   });
 
+  it("keeps dragged row lane metadata anchored while overlap status updates live", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-2";
+    mocks.timelineDragState.isDragging = true;
+    mocks.timelineDragState.previewTime = "09:30";
+
+    const tasks = [
+      {
+        id: "task-scheduled-1",
+        task_text: "Deep work",
+        completed: false,
+        xp_reward: 25,
+        scheduled_time: "09:00",
+        estimated_duration: 60,
+      },
+      {
+        id: "task-scheduled-2",
+        task_text: "Standup",
+        completed: false,
+        xp_reward: 15,
+        scheduled_time: "09:30",
+        estimated_duration: 30,
+      },
+    ];
+
+    const { container, rerender } = render(
+      <TodaysAgenda
+        tasks={tasks}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const initiallyDraggedRow = screen.getByTestId("timeline-row-task-scheduled-2").parentElement;
+    expect(initiallyDraggedRow).toBeTruthy();
+    expect(initiallyDraggedRow).toHaveAttribute("data-timeline-lane", "1");
+    expect(initiallyDraggedRow).toHaveAttribute("data-timeline-lane-count", "2");
+    expect(initiallyDraggedRow).toHaveAttribute("data-timeline-overlap", "1");
+
+    mocks.timelineDragState.previewTime = "08:30";
+    rerender(
+      <TodaysAgenda
+        tasks={tasks}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+    );
+
+    const orderedRowIds = Array.from(
+      container.querySelectorAll('[data-testid^="timeline-row-task-scheduled-"]'),
+    ).map((element) => element.getAttribute("data-testid"));
+    expect(orderedRowIds).toEqual([
+      "timeline-row-task-scheduled-2",
+      "timeline-row-task-scheduled-1",
+    ]);
+
+    const draggedRowAfterPreviewShift = screen.getByTestId("timeline-row-task-scheduled-2").parentElement;
+    expect(draggedRowAfterPreviewShift).toBeTruthy();
+    expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-lane", "1");
+    expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-lane-count", "2");
+    expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-overlap", "0");
+  });
+
   it("exposes lane metadata for overlapping scheduled rows", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -1143,9 +1224,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("timeline-marker-placeholder-0600")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-marker-placeholder-0900")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-marker-placeholder-1200")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-1330")).toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-marker-placeholder-0900")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-marker-placeholder-1200")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-0000")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1800")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-2359")).not.toBeInTheDocument();
@@ -1179,9 +1261,49 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("timeline-marker-placeholder-0600")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-marker-placeholder-1200")).toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-0900")).not.toBeInTheDocument();
+  });
+
+  it("does not render placeholders at or before the first scheduled quest", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:30",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Review",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "16:30",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const firstQuestMinute = minuteFromTime("10:30");
+    const placeholderMinutes = getRenderedPlaceholderMinutes();
+    expect(placeholderMinutes.every((minute) => minute > firstQuestMinute)).toBe(true);
   });
 
   it("renders exactly one placeholder between far-apart consecutive scheduled quests", () => {
@@ -1222,7 +1344,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const betweenPlaceholders = getRenderedPlaceholderMinutes().filter((minute) => (
       minute > minuteFromTime("10:30") && minute < minuteFromTime("16:30")
     ));
-    expect(betweenPlaceholders).toEqual([minuteFromTime("12:00")]);
+    expect(betweenPlaceholders).toEqual([minuteFromTime("13:30")]);
     expect(screen.queryByTestId("timeline-marker-placeholder-1500")).not.toBeInTheDocument();
   });
 
@@ -1378,6 +1500,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByTestId("timeline-marker-placeholder-1500")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-marker-placeholder-1800")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    expect(within(screen.getByTestId("timeline-marker-now")).getByText("16:34")).toBeInTheDocument();
 
     vi.useRealTimers();
   });
@@ -1416,6 +1539,44 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1500")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1800")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("keeps now marker at exact current minute before the first quest", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T07:12:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:30",
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    expect(within(screen.getByTestId("timeline-marker-now")).getByText("07:12")).toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });

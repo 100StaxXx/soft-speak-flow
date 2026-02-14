@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
+import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays, isSameDay } from "date-fns";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "sonner";
 import { 
@@ -187,7 +187,7 @@ const formatTime = (time: string) => {
 };
 
 const COMBO_WINDOW_MS = 8000;
-const DAY_START_MINUTE = 6 * 60;
+const DEFAULT_DAY_START_MINUTE = 6 * 60;
 const DAY_END_MINUTE = (24 * 60) - 1;
 const PLACEHOLDER_INTERVAL_MINUTES = 3 * 60;
 const MIN_PLACEHOLDER_EMPHASIS = 0.2;
@@ -195,6 +195,7 @@ const MAX_PLACEHOLDER_EMPHASIS = 1;
 const GAP_FREE_MINUTES = 60;
 const GAP_SCALE = 0.05;
 const GAP_MAX_PX = 10;
+const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 
 interface TimelineMarkerRow {
@@ -208,6 +209,15 @@ interface TimelineMarkerRow {
 type TimelineRow =
   | { kind: "marker"; marker: TimelineMarkerRow }
   | { kind: "task"; task: Task };
+
+interface DraggedTimelineRowSnapshot {
+  taskId: string;
+  anchorTopPx: number;
+  laneIndex: number;
+  laneCount: number;
+  laneOffsetPx: number;
+  marginTopPx: number;
+}
 
 const parseTimeToMinute = (time: string | null | undefined): number | null => {
   if (!time) return null;
@@ -229,14 +239,29 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 const normalizeModulo = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor;
 
-const getHourlyPlaceholderCandidatesBetween = (startMinute: number, endMinute: number): number[] => {
+const getLaneOffsetPx = (laneIndex: number, overlapCount: number) => {
+  return overlapCount > 0 ? laneIndex * LANE_OFFSET_STEP_PX : 0;
+};
+
+const getScheduledSpacingPx = (gapBeforeMinutes: number) => {
+  return Math.min(
+    GAP_MAX_PX,
+    Math.max(0, (gapBeforeMinutes - GAP_FREE_MINUTES) * GAP_SCALE),
+  );
+};
+
+const getHourlyPlaceholderCandidatesBetween = (
+  startMinute: number,
+  endMinute: number,
+  dayStartMinute: number,
+): number[] => {
   if (endMinute - startMinute <= 1) return [];
 
   const firstCandidateMinute = Math.ceil((startMinute + 1) / 60) * 60;
   const candidates: number[] = [];
 
   for (let minute = firstCandidateMinute; minute < endMinute; minute += 60) {
-    if (minute >= DAY_START_MINUTE && minute <= DAY_END_MINUTE) {
+    if (minute >= dayStartMinute && minute <= DAY_END_MINUTE) {
       candidates.push(minute);
     }
   }
@@ -244,16 +269,20 @@ const getHourlyPlaceholderCandidatesBetween = (startMinute: number, endMinute: n
   return candidates;
 };
 
-const getThreeHourPlaceholderCandidatesBetween = (startMinute: number, endMinute: number): number[] => {
+const getThreeHourPlaceholderCandidatesBetween = (
+  startMinute: number,
+  endMinute: number,
+  dayStartMinute: number,
+): number[] => {
   if (endMinute - startMinute <= 1) return [];
 
-  const firstCandidateMinute = DAY_START_MINUTE + (
-    Math.ceil((startMinute + 1 - DAY_START_MINUTE) / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES
+  const firstCandidateMinute = dayStartMinute + (
+    Math.ceil((startMinute + 1 - dayStartMinute) / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES
   );
   const candidates: number[] = [];
 
   for (let minute = firstCandidateMinute; minute < endMinute; minute += PLACEHOLDER_INTERVAL_MINUTES) {
-    if (minute >= DAY_START_MINUTE && minute <= DAY_END_MINUTE) {
+    if (minute >= dayStartMinute && minute <= DAY_END_MINUTE) {
       candidates.push(minute);
     }
   }
@@ -283,14 +312,18 @@ const pickClosestMinuteToMidpoint = (candidates: number[], midpoint: number): nu
   return bestMinute;
 };
 
-const selectPairPlaceholderMinute = (startMinute: number, endMinute: number): number | null => {
+const selectPairPlaceholderMinute = (
+  startMinute: number,
+  endMinute: number,
+  dayStartMinute: number,
+): number | null => {
   const gapMinutes = endMinute - startMinute;
   if (gapMinutes < 60) return null;
 
   const midpoint = (startMinute + endMinute) / 2;
   const candidates = gapMinutes < PLACEHOLDER_INTERVAL_MINUTES
-    ? getHourlyPlaceholderCandidatesBetween(startMinute, endMinute)
-    : getThreeHourPlaceholderCandidatesBetween(startMinute, endMinute);
+    ? getHourlyPlaceholderCandidatesBetween(startMinute, endMinute, dayStartMinute)
+    : getThreeHourPlaceholderCandidatesBetween(startMinute, endMinute, dayStartMinute);
 
   return pickClosestMinuteToMidpoint(candidates, midpoint);
 };
@@ -309,16 +342,19 @@ const isStrictlyBetweenConsecutiveQuestTimes = (
   return false;
 };
 
-const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
+const buildPlaceholderMinutes = (
+  scheduledMinutes: number[],
+  dayStartMinute: number,
+): number[] => {
   const sortedScheduledMinutes = [...scheduledMinutes].sort((a, b) => a - b);
-  const markerMinutes = new Set<number>([DAY_START_MINUTE]);
+  const markerMinutes = new Set<number>([dayStartMinute]);
 
   if (sortedScheduledMinutes.length === 0) {
     return Array.from(markerMinutes).sort((a, b) => a - b);
   }
 
   for (const scheduledMinute of sortedScheduledMinutes) {
-    const offsetFromStart = scheduledMinute - DAY_START_MINUTE;
+    const offsetFromStart = scheduledMinute - dayStartMinute;
     const remainder = normalizeModulo(offsetFromStart, PLACEHOLDER_INTERVAL_MINUTES);
     const isOnBoundary = remainder === 0;
 
@@ -329,8 +365,8 @@ const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
       ? scheduledMinute + PLACEHOLDER_INTERVAL_MINUTES
       : lowerAnchor + PLACEHOLDER_INTERVAL_MINUTES;
 
-    lowerAnchor = Math.max(DAY_START_MINUTE, lowerAnchor);
-    upperAnchor = Math.max(DAY_START_MINUTE, upperAnchor);
+    lowerAnchor = Math.max(dayStartMinute, lowerAnchor);
+    upperAnchor = Math.max(dayStartMinute, upperAnchor);
 
     if (lowerAnchor <= DAY_END_MINUTE) markerMinutes.add(lowerAnchor);
     if (upperAnchor <= DAY_END_MINUTE) markerMinutes.add(upperAnchor);
@@ -338,7 +374,7 @@ const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
 
   if (sortedScheduledMinutes.length > 1) {
     for (const minute of Array.from(markerMinutes)) {
-      if (minute === DAY_START_MINUTE) continue;
+      if (minute === dayStartMinute) continue;
       if (isStrictlyBetweenConsecutiveQuestTimes(minute, sortedScheduledMinutes)) {
         markerMinutes.delete(minute);
       }
@@ -347,7 +383,7 @@ const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
     for (let index = 1; index < sortedScheduledMinutes.length; index += 1) {
       const previousMinute = sortedScheduledMinutes[index - 1];
       const nextMinute = sortedScheduledMinutes[index];
-      const selectedMinute = selectPairPlaceholderMinute(previousMinute, nextMinute);
+      const selectedMinute = selectPairPlaceholderMinute(previousMinute, nextMinute, dayStartMinute);
       if (selectedMinute !== null) {
         markerMinutes.add(selectedMinute);
       }
@@ -699,10 +735,81 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return { [activeTaskId]: previewTime };
   }, [timelineDrag.draggingTaskId, timelineDrag.previewTime]);
 
+  const baseScheduledFlow = useMemo(
+    () => buildTaskTimelineFlow(scheduledItems),
+    [scheduledItems],
+  );
+
   const scheduledFlow = useMemo(
     () => buildTaskTimelineFlow(scheduledItems, previewScheduledOverrides),
     [scheduledItems, previewScheduledOverrides],
   );
+
+  const timelineRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const draggedTimelineRowSnapshotRef = useRef<DraggedTimelineRowSnapshot | null>(null);
+  const dragLayoutCompensationY = useMotionValue(0);
+  const composedDragOffsetY = useTransform(() => {
+    const dragOffsetSource = timelineDrag.dragOffsetY;
+    const dragOffsetY = typeof dragOffsetSource === "number" ? dragOffsetSource : dragOffsetSource.get();
+    return dragOffsetY + dragLayoutCompensationY.get();
+  });
+
+  const setTimelineRowRef = useCallback((taskId: string, node: HTMLDivElement | null) => {
+    if (node) {
+      timelineRowRefs.current.set(taskId, node);
+    } else {
+      timelineRowRefs.current.delete(taskId);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    const activeTaskId = timelineDrag.draggingTaskId;
+    if (!activeTaskId) {
+      draggedTimelineRowSnapshotRef.current = null;
+      dragLayoutCompensationY.set(0);
+      return;
+    }
+
+    const rowNode = timelineRowRefs.current.get(activeTaskId);
+    const existingSnapshot = draggedTimelineRowSnapshotRef.current;
+    if (!existingSnapshot || existingSnapshot.taskId !== activeTaskId) {
+      if (!rowNode) {
+        dragLayoutCompensationY.set(0);
+        return;
+      }
+
+      const baseFlowEntry = baseScheduledFlow.byTaskId.get(activeTaskId);
+      const laneIndex = baseFlowEntry?.laneIndex ?? 0;
+      const laneCount = baseFlowEntry?.laneCount ?? 1;
+      const laneOffsetPx = getLaneOffsetPx(laneIndex, baseFlowEntry?.overlapCount ?? 0);
+      const marginTopPx = baseFlowEntry ? getScheduledSpacingPx(baseFlowEntry.gapBeforeMinutes) : 0;
+
+      draggedTimelineRowSnapshotRef.current = {
+        taskId: activeTaskId,
+        anchorTopPx: rowNode.getBoundingClientRect().top,
+        laneIndex,
+        laneCount,
+        laneOffsetPx,
+        marginTopPx,
+      };
+      dragLayoutCompensationY.set(0);
+      return;
+    }
+
+    if (!rowNode) {
+      dragLayoutCompensationY.set(0);
+      return;
+    }
+
+    const currentTopPx = rowNode.getBoundingClientRect().top;
+    const compensation = existingSnapshot.anchorTopPx - currentTopPx;
+    dragLayoutCompensationY.set(Number.isFinite(compensation) ? compensation : 0);
+  }, [
+    baseScheduledFlow.byTaskId,
+    dragLayoutCompensationY,
+    timelineDrag.draggingTaskId,
+    timelineDrag.previewTime,
+  ]);
 
   const scheduledItemsById = useMemo(
     () => new Map(scheduledItems.map((task) => [task.id, task])),
@@ -728,16 +835,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const scheduledMinutes = scheduledItems
       .map((task) => parseTimeToMinute(task.scheduled_time))
       .filter((minute): minute is number => minute !== null);
-    const placeholderMinutes = buildPlaceholderMinutes(scheduledMinutes);
-    const nowAnchorMinute = Math.max(DAY_START_MINUTE, Math.min(DAY_END_MINUTE, nowMarkerMinute));
+    const timelineStartMinute = scheduledMinutes.length > 0
+      ? Math.min(...scheduledMinutes)
+      : DEFAULT_DAY_START_MINUTE;
+    let placeholderMinutes = buildPlaceholderMinutes(scheduledMinutes, timelineStartMinute);
+    if (scheduledMinutes.length > 0) {
+      placeholderMinutes = placeholderMinutes.filter((minute) => minute > timelineStartMinute);
+    }
+    const nowAnchorMinute = Math.max(timelineStartMinute, Math.min(DAY_END_MINUTE, nowMarkerMinute));
     if (isToday && scheduledMinutes.length === 0) {
-      const nowOffset = nowAnchorMinute - DAY_START_MINUTE;
-      const lowerNowAnchor = DAY_START_MINUTE + (Math.floor(nowOffset / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES);
+      const nowOffset = nowAnchorMinute - timelineStartMinute;
+      const lowerNowAnchor = timelineStartMinute + (Math.floor(nowOffset / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES);
       const upperNowAnchor = lowerNowAnchor + PLACEHOLDER_INTERVAL_MINUTES;
-      if (lowerNowAnchor >= DAY_START_MINUTE && lowerNowAnchor <= DAY_END_MINUTE) {
+      if (lowerNowAnchor >= timelineStartMinute && lowerNowAnchor <= DAY_END_MINUTE) {
         placeholderMinutes.push(lowerNowAnchor);
       }
-      if (upperNowAnchor >= DAY_START_MINUTE && upperNowAnchor <= DAY_END_MINUTE) {
+      if (upperNowAnchor >= timelineStartMinute && upperNowAnchor <= DAY_END_MINUTE) {
         placeholderMinutes.push(upperNowAnchor);
       }
     }
@@ -1569,7 +1682,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       : 1;
                     const markerOpacity = marker.kind === "placeholder"
                       ? 0.25 + (marker.emphasis * 0.65)
-                      : 0.72;
+                      : 1;
                     return (
                       <div
                         ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
@@ -1584,18 +1697,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       >
                         <TimelineTaskRow
                           time={marker.time}
-                          overrideTime={marker.kind === "now" ? marker.time : undefined}
+                          tone={marker.kind === "now" ? "now" : "default"}
                           showLine={index > 0}
                           isLast={index === timelineRows.length - 1}
-                          className={marker.kind === "now" ? "opacity-70" : undefined}
                         >
                           {marker.kind === "now" ? (
                             <div className="flex items-center gap-2 pt-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-primary/70" />
-                              <span className="text-[10px] font-medium uppercase tracking-wide text-primary/70">
+                              <span className="h-1.5 w-1.5 rounded-full bg-stardust-gold" />
+                              <span className="text-[10px] font-medium uppercase tracking-wide text-stardust-gold">
                                 Now
                               </span>
-                              <div className="h-px flex-1 bg-primary/30" />
+                              <div className="h-px flex-1 bg-stardust-gold/40" />
                             </div>
                           ) : (
                             <div className="pt-1">
@@ -1613,13 +1725,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
                   const isAnytimeTask = !task.scheduled_time;
                   const rowFlow = scheduledFlow.byTaskId.get(task.id);
-                  const laneOffsetPx = rowFlow && rowFlow.overlapCount > 0 ? rowFlow.laneIndex * 10 : 0;
-                  const scheduledSpacingPx = rowFlow
-                    ? Math.min(
-                        GAP_MAX_PX,
-                        Math.max(0, (rowFlow.gapBeforeMinutes - GAP_FREE_MINUTES) * GAP_SCALE),
-                      )
-                    : 0;
+                  const rowSnapshot = draggedTimelineRowSnapshotRef.current;
+                  const hasFrozenRowMetrics = isThisDragging && rowSnapshot?.taskId === task.id;
+                  const laneIndex = hasFrozenRowMetrics ? rowSnapshot.laneIndex : rowFlow?.laneIndex;
+                  const laneCount = hasFrozenRowMetrics ? rowSnapshot.laneCount : rowFlow?.laneCount;
+                  const laneOffsetPx = hasFrozenRowMetrics
+                    ? rowSnapshot.laneOffsetPx
+                    : rowFlow
+                      ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
+                      : 0;
+                  const scheduledSpacingPx = hasFrozenRowMetrics
+                    ? rowSnapshot.marginTopPx
+                    : rowFlow
+                      ? getScheduledSpacingPx(rowFlow.gapBeforeMinutes)
+                      : 0;
                   const previousRow = index > 0 ? timelineRows[index - 1] : undefined;
                   const previousIsAnytimeTask = previousRow?.kind === "task" && !previousRow.task.scheduled_time;
                   const showAnytimeLabel = isAnytimeTask && !previousIsAnytimeTask;
@@ -1655,8 +1774,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       isLast={index === timelineRows.length - 1}
                       isDragTarget={isThisDragging}
                       durationMinutes={task.estimated_duration}
-                      laneIndex={rowFlow?.laneIndex}
-                      laneCount={rowFlow?.laneCount}
+                      laneIndex={laneIndex}
+                      laneCount={laneCount}
                       overlapCount={rowFlow?.overlapCount}
                       className={cn(
                         isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
@@ -1678,6 +1797,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   return (
                     <motion.div
                       key={task.id}
+                      ref={(node) => setTimelineRowRef(task.id, node)}
                       className={cn("relative", isThisDragging && "z-50")}
                       layout={!isThisDragging}
                       animate={bounceAnimation}
@@ -1688,13 +1808,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       } : {
                         layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
                       }}
-                      data-timeline-lane={rowFlow?.laneIndex}
-                      data-timeline-lane-count={rowFlow?.laneCount}
+                      data-timeline-lane={laneIndex}
+                      data-timeline-lane-count={laneCount}
                       data-timeline-overlap={rowFlow?.overlapCount}
                       style={{
                         ...rowStyle,
                         x: laneOffsetPx,
-                        y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                        y: isThisDragging ? composedDragOffsetY : 0,
                       }}
                     >
                       {rowContent}

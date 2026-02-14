@@ -42,6 +42,21 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 
+  it("shows campaign creation CTA with inline max cap hint", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        onCreateCampaign={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Or create a Campaign")).toBeInTheDocument();
+    expect(screen.getByText("Max 2 active")).toBeInTheDocument();
+  });
+
   it("keeps Create Quest disabled until title and time are both set", () => {
     render(
       <AddQuestSheet
