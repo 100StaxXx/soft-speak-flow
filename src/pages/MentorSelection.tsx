@@ -129,7 +129,7 @@ const MentorSelection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-obsidian py-16 px-4 md:px-8">
+    <div className="min-h-screen pb-nav-safe bg-obsidian py-16 px-4 md:px-8">
       <div className="max-w-7xl mx-auto space-y-16">
         {/* Header */}
         <div className="text-center space-y-6 animate-fade-in">

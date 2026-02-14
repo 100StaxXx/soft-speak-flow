@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Heart, Download, Clock, Quote, Headphones, ArrowLeft } from "lucide-react";
@@ -275,7 +274,6 @@ export default function Library() {
         </div>
       </div>
 
-      <BottomNav />
     </PageTransition>
   );
 }

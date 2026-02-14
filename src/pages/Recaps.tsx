@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { BottomNav } from "@/components/BottomNav";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageTransition } from "@/components/PageTransition";
 import { useWeeklyRecap, WeeklyRecap } from "@/hooks/useWeeklyRecap";
@@ -137,7 +136,6 @@ const Recaps = () => {
       </div>
 
       <WeeklyRecapModal />
-      <BottomNav />
     </PageTransition>
   );
 };

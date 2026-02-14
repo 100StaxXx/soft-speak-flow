@@ -465,7 +465,7 @@ const Admin = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-cream-glow to-petal-pink/30 flex items-center justify-center">
+      <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-cream-glow to-petal-pink/30 flex items-center justify-center">
         <div className="text-foreground text-xl">Loading...</div>
       </div>
     );
@@ -476,7 +476,7 @@ const Admin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-cream-glow to-petal-pink/30 py-8 px-4">
+    <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-cream-glow to-petal-pink/30 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="font-heading text-4xl font-bold text-foreground mb-2">

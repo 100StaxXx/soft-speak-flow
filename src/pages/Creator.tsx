@@ -93,7 +93,7 @@ export default function Creator() {
 
   if (result) {
     return (
-      <div className="min-h-screen relative overflow-hidden">
+      <div className="min-h-screen pb-nav-safe relative overflow-hidden">
         <StarfieldBackground />
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
           <Card className="w-full max-w-lg p-8 cosmic-glass">
@@ -208,7 +208,7 @@ export default function Creator() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen pb-nav-safe relative overflow-hidden">
       <StarfieldBackground />
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-8 cosmic-glass">

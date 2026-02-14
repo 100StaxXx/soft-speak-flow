@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Headphones, Brain, Target, Sparkles, X } from "lucide-react";
@@ -284,7 +283,6 @@ export default function PepTalks() {
           tip="Listen to a pep talk each morning to start your day with the right energy!"
         />
         
-        <BottomNav />
       </div>
     </PageTransition>
   );

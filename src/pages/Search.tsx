@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, MessageSquare } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -154,7 +153,6 @@ const Search = () => {
             )}
           </AnimatePresence>
         </div>
-        <BottomNav />
         
         <SearchTutorialModal open={showTutorial} onClose={dismissTutorial} />
       </div>

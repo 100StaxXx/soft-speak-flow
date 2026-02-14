@@ -8,7 +8,6 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { useLocation } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { BottomNav } from "@/components/BottomNav";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
@@ -757,6 +756,7 @@ const Journeys = () => {
             <TodaysAgenda
             tasks={dailyTasks}
             selectedDate={selectedDate}
+            isVisible={location.pathname === JOURNEYS_ROUTE}
             onToggle={handleToggleTask}
             onAddQuest={() => {
               setPrefilledTime(null);
@@ -907,7 +907,6 @@ const Journeys = () => {
         }} />
       </div>
 
-      <BottomNav />
     </PageTransition>
   );
 };

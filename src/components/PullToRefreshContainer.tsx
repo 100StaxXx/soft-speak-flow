@@ -140,6 +140,7 @@ export function PullToRefreshContainer({
 
   const reachedThreshold = !isRefreshing && pullDistance >= threshold;
   const showIndicator = isRefreshing || pullDistance > 0;
+  const hasActivePull = pullDistance > 0;
   const indicatorLabel = isRefreshing
     ? "Refreshing..."
     : reachedThreshold
@@ -183,8 +184,11 @@ export function PullToRefreshContainer({
       </div>
 
       <div
-        className={cn("will-change-transform", isTouching ? "transition-none" : "transition-transform duration-150")}
-        style={{ transform: `translateY(${pullDistance}px)` }}
+        className={cn(
+          hasActivePull && "will-change-transform",
+          isTouching ? "transition-none" : "transition-transform duration-150",
+        )}
+        style={hasActivePull ? { transform: `translateY(${pullDistance}px)` } : undefined}
       >
         {children}
       </div>

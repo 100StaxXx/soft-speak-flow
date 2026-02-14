@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const windowScrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
 const mocks = vi.hoisted(() => {
   const subtaskEqMock = vi.fn();
   const subtaskUpdateMock = vi.fn();
@@ -174,6 +176,10 @@ const createWrapper = (client: QueryClient) => {
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
 };
+
+beforeEach(() => {
+  windowScrollToSpy.mockClear();
+});
 
 describe("TodaysAgenda subtasks", () => {
   beforeEach(() => {
@@ -386,6 +392,128 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.rowTouchStartSpy.mockClear();
     mocks.getDragHandlePropsMock.mockClear();
     mocks.getRowDragPropsMock.mockClear();
+  });
+
+  it("auto-centers around now when today is visible", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    expect(windowScrollToSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        behavior: "smooth",
+        top: expect.any(Number),
+      }),
+    );
+  });
+
+  it("does not auto-center for non-today dates", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(windowScrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-centers when today remains selected and visibility toggles on", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { rerender } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date()}
+        isVisible={false}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(windowScrollToSpy).not.toHaveBeenCalled();
+
+    rerender(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date()}
+        isVisible
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+    );
+
+    expect(windowScrollToSpy).toHaveBeenCalled();
   });
 
   it("shows scheduled header without a dedicated drag-handle button", () => {
@@ -700,6 +828,47 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     expect(explicitDuration).toHaveAttribute("data-duration-minutes", "45");
     expect(fallbackDuration).toHaveAttribute("data-duration-minutes", "30");
+  });
+
+  it("caps large scheduled gaps to compact spacing", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Late night review",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "23:00",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const secondRow = screen.getByTestId("timeline-row-task-scheduled-2").parentElement;
+    expect(secondRow).toBeTruthy();
+    const marginTop = Number.parseFloat(secondRow?.style.marginTop || "0");
+    expect(marginTop).toBeLessThanOrEqual(10);
   });
 
   it("uses drag preview time in timeline row during active drag", () => {
@@ -1027,6 +1196,45 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByTestId("timeline-marker-placeholder-0900")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1200")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-now")).not.toBeInTheDocument();
+  });
+
+  it("adds around-now placeholders for today without scheduled quests", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T16:34:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-unscheduled-1",
+            task_text: "Anytime focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: null,
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-marker-placeholder-0600")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-1500")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-1800")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 
   it("shows a subtle now marker only on today", () => {

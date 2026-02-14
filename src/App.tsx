@@ -38,6 +38,8 @@ import { safeSessionStorage } from "@/utils/storage";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { TutorialOrchestrator } from "@/components/TutorialOrchestrator";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
+import { BottomNav } from "@/components/BottomNav";
+import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -252,6 +254,7 @@ const AppContent = memo(() => {
   
   const resolvedMentorId = getResolvedMentorId(profile);
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
+  const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
 
   return (
     <ThemeProvider mentorId={resolvedMentorId}>
@@ -315,6 +318,7 @@ const AppContent = memo(() => {
                   </Routes>
                 </AnimatePresence>
                 )}
+                {showBottomNav && <BottomNav />}
                 <TutorialOrchestrator />
                 </Suspense>
                 </AstralEncounterProvider>

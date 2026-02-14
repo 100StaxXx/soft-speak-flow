@@ -1,5 +1,4 @@
 import { PageTransition } from "@/components/PageTransition";
-import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -205,7 +204,6 @@ export default function SharedEpics() {
           )}
         </div>
       </div>
-      <BottomNav />
     </PageTransition>
   );
 }

@@ -22,7 +22,6 @@ import {
   TrendingUp,
   Calendar
 } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -536,7 +535,6 @@ const HelpCenter = () => {
         </div>
       </div>
       
-      <BottomNav />
     </PageTransition>
   );
 };

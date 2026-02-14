@@ -81,7 +81,7 @@ export default function Premium() {
   // Show premium user view
   if (isActive) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen pb-nav-safe bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center shadow-glow">
             <Crown className="h-12 w-12 text-primary-foreground" />
@@ -113,7 +113,7 @@ export default function Premium() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
+    <div className="min-h-screen pb-nav-safe bg-gradient-to-br from-background via-background to-primary/5 p-6">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">

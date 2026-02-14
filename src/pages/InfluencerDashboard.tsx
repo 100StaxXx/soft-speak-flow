@@ -216,7 +216,7 @@ const InfluencerDashboard = () => {
   // Code verification screen
   if (!verifiedCode) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-primary/5 py-12 px-4">
+      <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 py-12 px-4">
         <div className="max-w-md mx-auto">
           <Card className="p-8 rounded-3xl shadow-soft">
             <div className="text-center mb-6">
@@ -266,7 +266,7 @@ const InfluencerDashboard = () => {
   // Loading state
   if (codeLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-primary/5 flex items-center justify-center">
+      <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -275,7 +275,7 @@ const InfluencerDashboard = () => {
   // Invalid code
   if (!referralCode) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-primary/5 py-12 px-4">
+      <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 py-12 px-4">
         <div className="max-w-md mx-auto">
           <Card className="p-8 rounded-3xl shadow-soft text-center">
             <h1 className="font-heading text-2xl font-bold mb-4 text-destructive">
@@ -295,7 +295,7 @@ const InfluencerDashboard = () => {
 
   // Dashboard view
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-primary/5 py-8 px-4">
+    <div className="min-h-screen pb-nav-safe bg-gradient-to-b from-background via-background/95 to-primary/5 py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">

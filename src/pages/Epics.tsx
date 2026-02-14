@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { PageTransition } from "@/components/PageTransition";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EpicCard } from "@/components/EpicCard";
@@ -71,7 +70,6 @@ const Epics = () => {
       <PageTransition>
         <StarfieldBackground />
         <EpicsPageSkeleton />
-        <BottomNav />
       </PageTransition>
     );
   }
@@ -292,7 +290,6 @@ const Epics = () => {
         />
       </div>
 
-      <BottomNav />
     </PageTransition>
   );
 };

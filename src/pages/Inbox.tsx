@@ -5,7 +5,6 @@ import { Inbox as InboxIcon, Check, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
-import { BottomNav } from "@/components/BottomNav";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -292,7 +291,6 @@ const InboxPage = memo(function InboxPage() {
           isDeleting={false}
         />
 
-        <BottomNav />
       </div>
     </PageTransition>
   );

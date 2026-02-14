@@ -36,7 +36,7 @@ export default function PremiumSuccess() {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen pb-nav-safe bg-background flex items-center justify-center p-4">
         <Card className="p-8 text-center max-w-md">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Activating your subscription...</h2>
@@ -47,7 +47,7 @@ export default function PremiumSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen pb-nav-safe bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
       {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
 
       <Card className="p-8 text-center max-w-md shadow-2xl border-primary/20">

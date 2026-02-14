@@ -49,7 +49,7 @@ export default function AccountDeletionHelp() {
   }, [user, navigate]);
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground">
+    <div className="relative min-h-screen pb-nav-safe bg-background text-foreground">
       <StarfieldBackground />
       <div className="relative z-10 max-w-4xl mx-auto px-4 py-12 space-y-8">
         <Button

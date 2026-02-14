@@ -51,6 +51,34 @@ describe("PullToRefreshContainer", () => {
     });
   });
 
+  it("only applies transform during an active pull", async () => {
+    setScrollY(0);
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+
+    const { getByTestId } = render(
+      <PullToRefreshContainer onRefresh={onRefresh} threshold={72}>
+        <div data-testid="content">content</div>
+      </PullToRefreshContainer>,
+    );
+
+    const transformedLayer = getByTestId("content").parentElement as HTMLElement;
+    const container = transformedLayer.parentElement as HTMLElement;
+
+    expect(transformedLayer.style.transform).toBe("");
+
+    startPull(container, 0, 0);
+    movePull(container, 0, 140);
+    expect(transformedLayer.style.transform).toMatch(/^translateY\(/);
+
+    await act(async () => {
+      endPull(container);
+    });
+
+    await waitFor(() => {
+      expect(transformedLayer.style.transform).toBe("");
+    });
+  });
+
   it("refreshes exactly once when pull exceeds threshold", async () => {
     setScrollY(0);
     const onRefresh = vi.fn().mockResolvedValue(undefined);

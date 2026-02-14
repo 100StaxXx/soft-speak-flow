@@ -6,7 +6,6 @@ import { AskMentorChat } from "@/components/AskMentorChat";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { MentorTutorialModal } from "@/components/MentorTutorialModal";
@@ -226,7 +225,6 @@ export default function MentorChat() {
         </div>
       </div>
       
-      <BottomNav />
       
       <PageInfoModal
         open={showPageInfo}

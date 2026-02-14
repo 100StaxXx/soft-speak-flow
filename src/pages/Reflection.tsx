@@ -9,7 +9,6 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MoodSelector } from "@/components/MoodSelector";
-import { BottomNav } from "@/components/BottomNav";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 
@@ -188,7 +187,6 @@ export default function Reflection() {
             </Card>
           </div>
         </div>
-        <BottomNav />
       </PageTransition>
     );
   }
@@ -248,7 +246,6 @@ export default function Reflection() {
           </Card>
         </div>
       </div>
-      <BottomNav />
     </PageTransition>
   );
 }

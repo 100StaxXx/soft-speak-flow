@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { GlassCard } from "@/components/ui/glass-card";
-import { BottomNav } from "@/components/BottomNav";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface CaptionWord {
@@ -135,7 +134,6 @@ const PepTalkDetail = () => {
               <Skeleton className="h-2 w-full rounded-full" />
             </GlassCard>
           </div>
-          <BottomNav />
         </div>
       </PageTransition>
     );
@@ -285,7 +283,6 @@ const PepTalkDetail = () => {
           </div>
         </div>
 
-        <BottomNav />
       </div>
     </PageTransition>
   );

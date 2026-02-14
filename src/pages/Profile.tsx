@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -303,7 +302,6 @@ const Profile = () => {
             <h2 className="text-3xl font-bold mb-4">Sign in to view your profile</h2>
             <Button onClick={() => navigate("/auth")}>Sign In</Button>
           </div>
-          <BottomNav />
         </div>
       </PageTransition>
     );
@@ -577,7 +575,6 @@ const Profile = () => {
           </div>
         </div>
       </div>
-      <BottomNav />
 
       {/* Delete Account Dialog */}
       <AlertDialog

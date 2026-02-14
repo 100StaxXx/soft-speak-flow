@@ -1,4 +1,3 @@
-import { BottomNav } from "@/components/BottomNav";
 import { CompanionDisplay } from "@/components/CompanionDisplay";
 import { CompanionErrorBoundary } from "@/components/CompanionErrorBoundary";
 import { NextEvolutionPreview } from "@/components/NextEvolutionPreview";
@@ -250,7 +249,6 @@ const Companion = () => {
           {renderContent()}
         </div>
       </CompanionErrorBoundary>
-      <BottomNav />
       
       <CompanionTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </PageTransition>

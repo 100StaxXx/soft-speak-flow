@@ -136,6 +136,7 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
 interface TodaysAgendaProps {
   tasks: Task[];
   selectedDate: Date;
+  isVisible?: boolean;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
   completedCount: number;
@@ -191,6 +192,10 @@ const DAY_END_MINUTE = (24 * 60) - 1;
 const PLACEHOLDER_INTERVAL_MINUTES = 3 * 60;
 const MIN_PLACEHOLDER_EMPHASIS = 0.2;
 const MAX_PLACEHOLDER_EMPHASIS = 1;
+const GAP_FREE_MINUTES = 60;
+const GAP_SCALE = 0.05;
+const GAP_MAX_PX = 10;
+const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 
 interface TimelineMarkerRow {
   id: string;
@@ -304,6 +309,7 @@ const buildPlaceholderEmphasis = (
 export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
+  isVisible = true,
   onToggle,
   onAddQuest,
   completedCount,
@@ -556,6 +562,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
   const lastReportedPreviewTimeRef = useRef<string | null>(null);
+  const nowMarkerRowRef = useRef<HTMLDivElement | null>(null);
+  const wasVisibleRef = useRef(isVisible);
+  const wasTodayRef = useRef(isSameDay(selectedDate, new Date()));
+  const hadNowMarkerRef = useRef(false);
 
   useEffect(() => {
     const emitPreviewTime = timelineDrag.isDragging ? (timelineDrag.previewTime ?? null) : null;
@@ -620,14 +630,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       .map((task) => parseTimeToMinute(task.scheduled_time))
       .filter((minute): minute is number => minute !== null);
     const placeholderMinutes = buildPlaceholderMinutes(scheduledMinutes);
+    const nowAnchorMinute = Math.max(DAY_START_MINUTE, Math.min(DAY_END_MINUTE, nowMarkerMinute));
+    if (isToday) {
+      const nowOffset = nowAnchorMinute - DAY_START_MINUTE;
+      const lowerNowAnchor = DAY_START_MINUTE + (Math.floor(nowOffset / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES);
+      const upperNowAnchor = lowerNowAnchor + PLACEHOLDER_INTERVAL_MINUTES;
+      if (lowerNowAnchor >= DAY_START_MINUTE && lowerNowAnchor <= DAY_END_MINUTE) {
+        placeholderMinutes.push(lowerNowAnchor);
+      }
+      if (upperNowAnchor >= DAY_START_MINUTE && upperNowAnchor <= DAY_END_MINUTE) {
+        placeholderMinutes.push(upperNowAnchor);
+      }
+    }
+    const uniquePlaceholderMinutes = Array.from(new Set(placeholderMinutes)).sort((a, b) => a - b);
     const emphasisByMinute = isToday
-      ? buildPlaceholderEmphasis(placeholderMinutes, nowMarkerMinute)
+      ? buildPlaceholderEmphasis(uniquePlaceholderMinutes, nowMarkerMinute)
       : new Map<number, number>(
-          placeholderMinutes.map((minute) => [minute, MIN_PLACEHOLDER_EMPHASIS]),
+          uniquePlaceholderMinutes.map((minute) => [minute, MIN_PLACEHOLDER_EMPHASIS]),
         );
     const markers = new Map<number, TimelineMarkerRow>();
 
-    for (const minute of placeholderMinutes) {
+    for (const minute of uniquePlaceholderMinutes) {
       markers.set(minute, {
         id: `timeline-marker-placeholder-${minuteToMarkerToken(minute)}`,
         minute,
@@ -685,6 +708,38 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     rows.push(...anytimeItems.map((task) => ({ kind: "task" as const, task })));
     return rows;
   }, [anytimeItems, flowOrderedScheduledItems, previewScheduledOverrides, timelineMarkerRows]);
+  const hasNowMarkerRow = useMemo(
+    () => timelineRows.some((row) => row.kind === "marker" && row.marker.kind === "now"),
+    [timelineRows],
+  );
+  const hasRenderableNowMarker = hasNowMarkerRow && tasks.length > 0;
+
+  useEffect(() => {
+    const isToday = isSameDay(selectedDate, new Date());
+    const becameVisible = isVisible && !wasVisibleRef.current;
+    const becameToday = isToday && !wasTodayRef.current;
+    const gainedNowMarker = hasRenderableNowMarker && !hadNowMarkerRef.current;
+    const shouldCenter =
+      isVisible &&
+      isToday &&
+      hasRenderableNowMarker &&
+      !timelineDrag.isDragging &&
+      (becameVisible || becameToday || gainedNowMarker);
+
+    if (shouldCenter && nowMarkerRowRef.current && typeof window !== "undefined") {
+      const markerRect = nowMarkerRowRef.current.getBoundingClientRect();
+      const markerMidpoint = markerRect.top + (markerRect.height / 2);
+      const targetScrollTop = Math.max(
+        0,
+        window.scrollY + markerMidpoint - (window.innerHeight * NOW_MARKER_VIEWPORT_TARGET),
+      );
+      window.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+    }
+
+    wasVisibleRef.current = isVisible;
+    wasTodayRef.current = isToday;
+    hadNowMarkerRef.current = hasRenderableNowMarker;
+  }, [hasRenderableNowMarker, isVisible, selectedDate, timelineDrag.isDragging]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -911,8 +966,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         <div
           className={cn(
             "flex items-center gap-3 transition-all relative group",
-            "select-none min-h-[52px]",
-            isRitual ? "py-4" : "py-3",
+            "select-none min-h-[46px]",
+            isRitual ? "py-3" : "py-2",
             isComplete && "opacity-60",
             isDragging && "cursor-grabbing",
             isActivated && !isDragging && "bg-muted/30 rounded-lg"
@@ -1418,6 +1473,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       : 0.72;
                     return (
                       <div
+                        ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
                         key={marker.id}
                         className="pointer-events-none select-none"
                         style={{
@@ -1460,7 +1516,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const rowFlow = scheduledFlow.byTaskId.get(task.id);
                   const laneOffsetPx = rowFlow && rowFlow.overlapCount > 0 ? rowFlow.laneIndex * 10 : 0;
                   const scheduledSpacingPx = rowFlow
-                    ? Math.min(24, Math.max(0, rowFlow.gapBeforeMinutes * 0.12))
+                    ? Math.min(
+                        GAP_MAX_PX,
+                        Math.max(0, (rowFlow.gapBeforeMinutes - GAP_FREE_MINUTES) * GAP_SCALE),
+                      )
                     : 0;
                   const previousRow = index > 0 ? timelineRows[index - 1] : undefined;
                   const previousIsAnytimeTask = previousRow?.kind === "task" && !previousRow.task.scheduled_time;
