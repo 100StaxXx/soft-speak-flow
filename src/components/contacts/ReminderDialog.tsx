@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CalendarIcon, Bell, Clock } from 'lucide-react';
-import { format, addDays, addWeeks, setHours, setMinutes } from 'date-fns';
+import { format, addDays, setHours, setMinutes } from 'date-fns';
 import {
   Dialog,
   DialogContent,

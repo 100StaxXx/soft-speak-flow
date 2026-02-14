@@ -854,4 +854,174 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     expect(mocks.swipeableDisabledStates.at(-1)).toBe(true);
   });
+
+  it("emits drag preview time updates and resets when drag ends", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onTimelineDragPreviewTimeChange = vi.fn();
+
+    const { rerender } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        onTimelineDragPreviewTimeChange={onTimelineDragPreviewTimeChange}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.timelineDragState.previewTime = "10:15";
+
+    rerender(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        onTimelineDragPreviewTimeChange={onTimelineDragPreviewTimeChange}
+      />,
+    );
+
+    expect(onTimelineDragPreviewTimeChange).toHaveBeenCalledWith("10:15");
+
+    mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.isDragging = false;
+    mocks.timelineDragState.previewTime = undefined;
+
+    rerender(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        onTimelineDragPreviewTimeChange={onTimelineDragPreviewTimeChange}
+      />,
+    );
+
+    expect(onTimelineDragPreviewTimeChange).toHaveBeenCalledWith(null);
+  });
+
+  it("renders six-hour timeline placeholders including end-of-day marker", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-marker-placeholder-0000")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-0600")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-1200")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-1800")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-2359")).toBeInTheDocument();
+  });
+
+  it("shows a subtle now marker only on today", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { rerender } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+
+    rerender(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+    );
+
+    expect(screen.queryByTestId("timeline-marker-now")).not.toBeInTheDocument();
+  });
 });

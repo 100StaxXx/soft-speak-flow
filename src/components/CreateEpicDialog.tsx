@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Target, Zap, Plus, Swords, Sparkles, Leaf, Sun, ChevronLeft, ChevronRight } from "lucide-react";
+import { Target, Zap, Swords, Sparkles, Leaf, Sun, ChevronLeft, ChevronRight } from "lucide-react";
 import { EpicHabitForm } from "@/components/EpicHabitForm";
 import { EpicHabitList } from "@/components/EpicHabitList";
 import { StoryTypeSelector } from "@/components/narrative/StoryTypeSelector";

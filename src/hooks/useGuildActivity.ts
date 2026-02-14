@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "./useAuth";
 import { useEffect } from "react";
 import { logger } from "@/utils/logger";
 
@@ -14,7 +13,6 @@ export interface GuildActivity {
 }
 
 export const useGuildActivity = (epicId?: string) => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: activities, isLoading } = useQuery<GuildActivity[]>({

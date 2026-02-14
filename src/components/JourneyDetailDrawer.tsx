@@ -13,17 +13,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { 
   Map, 
-  Calendar, 
   CheckCircle2, 
-  Circle, 
   Star, 
   AlertCircle,
   ChevronRight,
-  Sparkles,
   Wand2,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { format, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
@@ -63,9 +59,7 @@ export const JourneyDetailDrawer = ({
     completeMilestone,
     uncompleteMilestone,
     getCurrentPhase,
-    getPhaseStats,
     isMilestoneOverdue,
-    getDaysUntilMilestone,
     isCompleting,
   } = useMilestones(epicId);
 
@@ -76,8 +70,6 @@ export const JourneyDetailDrawer = ({
   const { regeneratePathForMilestone } = useJourneyPathImage(epicId);
 
   const currentPhase = getCurrentPhase();
-  const phaseStats = getPhaseStats();
-
   // Get postcards for this epic
   const epicPostcards = useMemo(() => 
     postcards?.filter(p => p.epic_id === epicId) || [], 

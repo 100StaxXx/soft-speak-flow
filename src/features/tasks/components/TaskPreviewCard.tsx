@@ -139,9 +139,7 @@ export function TaskPreviewCard({
     classify,
     isClassifying: isCheckingEpic,
     needsEpicClarification,
-    epicClarifyingQuestions,
     isEpicDetected,
-    reset: resetClassification
   } = useIntentClassifier({ debounceMs: 0, minInputLength: 10 });
   
   const [hasCheckedEpic, setHasCheckedEpic] = useState(false);

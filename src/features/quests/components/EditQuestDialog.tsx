@@ -25,7 +25,7 @@ import { QuestImageThumbnail } from "@/components/QuestImageThumbnail";
 import { QuestImagePicker } from "@/components/QuestImagePicker";
 import { useQuestImagePicker } from "@/hooks/useQuestImagePicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
-import { DIFFICULTY_COLORS, DifficultyIconMap, formatTime12, TIME_SLOTS, DURATION_OPTIONS } from "@/components/quest-shared";
+import { DIFFICULTY_COLORS, formatTime12, TIME_SLOTS, DURATION_OPTIONS } from "@/components/quest-shared";
 import type { QuestDifficulty } from "../types";
 import {
   normalizeQuestDifficulty,
@@ -115,7 +115,7 @@ export function EditQuestDialog({
   const selectedTimeRef = useRef<HTMLButtonElement>(null);
 
   const { deleteImage } = useQuestImagePicker();
-  const { subtasks, addSubtask, toggleSubtask, deleteSubtask, isAdding: isAddingSubtask } = useSubtasks(task?.id ?? null);
+  const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
 
   // Initialize state from task
   useEffect(() => {
@@ -226,8 +226,6 @@ export function EditQuestDialog({
       setNewSubtaskText("");
     }
   }, [newSubtaskText, addSubtask]);
-
-  const DifficultyIcon = DifficultyIconMap[difficulty];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

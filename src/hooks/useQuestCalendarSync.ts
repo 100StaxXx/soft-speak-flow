@@ -36,6 +36,10 @@ interface TaskLite {
   notes: string | null;
 }
 
+interface QuestCalendarSyncOptions {
+  enabled?: boolean;
+}
+
 function toIsoRange(task: TaskLite) {
   if (!task.task_date) {
     throw new Error('TASK_DATE_REQUIRED');
@@ -62,14 +66,15 @@ function toIsoRange(task: TaskLite) {
   };
 }
 
-export function useQuestCalendarSync() {
+export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { connections, defaultProvider } = useCalendarIntegrations();
+  const { enabled = true } = options;
+  const { connections, defaultProvider } = useCalendarIntegrations({ enabled });
 
   const linksQuery = useQuery({
     queryKey: ['quest-calendar-links', user?.id],
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
 

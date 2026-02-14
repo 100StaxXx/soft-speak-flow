@@ -8,7 +8,7 @@ import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
 import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
-import React, { useRef, createElement } from "react";
+import { useRef, createElement } from "react";
 import { getEffectiveQuestXP } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";

@@ -1,5 +1,5 @@
-import { memo, useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { memo, useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePromotionOpportunities, PromotionOpportunity } from '@/hooks/usePromotionOpportunities';

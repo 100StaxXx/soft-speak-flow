@@ -45,8 +45,8 @@ export const StellarFlowGame = ({
   onComplete,
   onDamage,
   difficulty = 'medium',
-  isPractice = false,
-  compact = false,
+  isPractice: _isPractice = false,
+  compact: _compact = false,
 }: StellarFlowGameProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(350);
@@ -143,9 +143,6 @@ export const StellarFlowGame = ({
       triggerHaptic('success');
       
       const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-      const baseXP = { easy: 15, medium: 25, hard: 35, expert: 45, master: 50 }[difficultyKey] || 25;
-      const timeBonus = Math.max(0, Math.floor((180 - timeTaken) / 10));
-      const perfectBonus = resetCount === 0 ? 15 : 0;
       
       const accuracy = Math.min(100, 80 + Math.floor(20 * (1 - timeTaken / 300)));
       const result: EncounterResult = accuracy >= 90 ? 'perfect' : accuracy >= 60 ? 'good' : 'fail';
@@ -361,7 +358,6 @@ export const StellarFlowGame = ({
     for (const pair of puzzle.pairs) {
       const path = paths.get(pair.color);
       if (path && path.length >= 2) {
-        const first = path[0];
         const last = path[path.length - 1];
         const lastCell = grid[last.row]?.[last.col];
         if (lastCell?.isEndpoint && lastCell.color === pair.color) {

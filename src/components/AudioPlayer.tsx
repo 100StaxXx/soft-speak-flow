@@ -19,7 +19,6 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isGloballyMuted, setIsGloballyMuted] = useState(globalAudio.getMuted());
 
   // Initialize audio element with iOS optimizations
   useEffect(() => {
@@ -67,7 +66,6 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   // Listen for global mute changes
   useEffect(() => {
     const unsubscribe = globalAudio.subscribe((muted) => {
-      setIsGloballyMuted(muted);
       const audio = audioRef.current;
       if (audio) {
         // Use muted property for proper iOS support
@@ -165,9 +163,6 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
-
-  // Calculate progress percentage for gradient
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <GlassCard variant="elevated" glow="soft" className="w-full p-6">

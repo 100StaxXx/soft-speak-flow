@@ -11,10 +11,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X, Swords } from "lucide-react";
+import { Trophy, Flame, Target, Calendar, Zap, Share2, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { ConstellationTrail } from "./ConstellationTrail";
 import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 // HIDDEN: Boss battle feature disabled
@@ -22,7 +22,6 @@ import { EpicCheckInDrawer } from "./EpicCheckInDrawer";
 import { EpicRewardReveal } from "./EpicRewardReveal";
 import { SmartAdjustPlanDrawer } from "./SmartAdjustPlanDrawer";
 import { cn, stripMarkdown } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
@@ -34,7 +33,6 @@ import { useEpicRewards } from "@/hooks/useEpicRewards";
 // import type { StorySeed, BossBattleContext } from "@/types/narrativeTypes";
 // import type { Adversary, AstralEncounter } from "@/types/astralEncounters";
 import type { RewardRevealData } from "@/types/epicRewards";
-import { STORY_TYPE_BADGES } from "@/types/epicRewards";
 
 type EpicTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Check, 
@@ -9,7 +9,6 @@ import {
   Star,
   MoreHorizontal,
   Sparkles,
-  User,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
@@ -70,7 +69,7 @@ export function EnhancedTaskCard({
   task,
   onToggleComplete,
   onUpdatePriority,
-  onUpdateEnergy,
+  onUpdateEnergy: _onUpdateEnergy,
   onToggleTopThree,
   onStartFocus,
   onDelete,
@@ -82,7 +81,7 @@ export function EnhancedTaskCard({
   const [showDecomposeDialog, setShowDecomposeDialog] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
   const { subtasks, progressPercent } = useSubtasks(task.id);
-  const { blockers, isBlocked, incompleteBlockers } = useTaskDependencies(task.id);
+  const { isBlocked, incompleteBlockers } = useTaskDependencies(task.id);
   const { success, light } = useHapticFeedback();
 
   const hasSubtasks = subtasks.length > 0;

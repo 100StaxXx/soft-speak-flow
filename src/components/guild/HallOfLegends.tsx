@@ -6,7 +6,7 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Scroll, Trophy, Star, Flame, Crown, Swords, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -159,7 +159,7 @@ export const HallOfLegends = ({
                                 <div className="flex items-center gap-2 mt-3">
                                   <span className="text-xs text-muted-foreground">Heroes:</span>
                                   <div className="flex -space-x-2">
-                                    {legend.heroes.slice(0, 5).map((hero, i) => (
+                                    {legend.heroes.slice(0, 5).map((hero) => (
                                       <Avatar key={hero.id} className="h-6 w-6 border-2 border-background">
                                         <AvatarFallback className="text-xs">
                                           {getUserDisplayName(hero).slice(0, 1).toUpperCase()}

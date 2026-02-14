@@ -19,14 +19,21 @@ const mocks = vi.hoisted(() => ({
   hasLinkedEvent: vi.fn(() => false),
   createEpic: vi.fn(),
   trackDailyPlanOutcome: vi.fn(),
+  surfaceAllEpicHabits: vi.fn(),
+  spawnRecurringTasks: vi.fn(),
   handleTaskCompleted: vi.fn(),
   logInteraction: vi.fn(),
   skipInteraction: vi.fn(),
   closeInteractionModal: vi.fn(),
   clearPendingTask: vi.fn(),
+  pendingTaskId: null as string | null,
   useFreeze: vi.fn(),
   resetStreak: vi.fn(),
   addAppListener: vi.fn(async () => ({ remove: vi.fn(async () => {}) })),
+  isTabActive: true,
+  unsurfacedEpicHabitsCount: 0,
+  pendingRecurringCount: 0,
+  calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
 }));
 
 vi.mock("@/components/PageTransition", () => ({
@@ -177,7 +184,7 @@ vi.mock("@/hooks/useQuestCalendarSync", () => ({
 
 vi.mock("@/hooks/useCalendarIntegrations", () => ({
   useCalendarIntegrations: () => ({
-    connections: [],
+    connections: mocks.calendarConnections,
   }),
 }));
 
@@ -229,15 +236,21 @@ vi.mock("@/hooks/useCalendarTasks", () => ({
 
 vi.mock("@/hooks/useHabitSurfacing", () => ({
   useHabitSurfacing: () => ({
-    surfaceAllEpicHabits: vi.fn(),
-    unsurfacedEpicHabitsCount: 0,
+    surfaceAllEpicHabits: mocks.surfaceAllEpicHabits,
+    unsurfacedEpicHabitsCount: mocks.unsurfacedEpicHabitsCount,
   }),
 }));
 
 vi.mock("@/hooks/useRecurringTaskSpawner", () => ({
   useRecurringTaskSpawner: () => ({
-    pendingRecurringCount: 0,
-    spawnRecurringTasks: vi.fn(),
+    pendingRecurringCount: mocks.pendingRecurringCount,
+    spawnRecurringTasks: mocks.spawnRecurringTasks,
+  }),
+}));
+
+vi.mock("@/contexts/MainTabVisibilityContext", () => ({
+  useMainTabVisibility: () => ({
+    isTabActive: mocks.isTabActive,
   }),
 }));
 
@@ -247,7 +260,7 @@ vi.mock("@/hooks/useOnboardingTaskCleanup", () => ({
 
 vi.mock("@/contexts/DeepLinkContext", () => ({
   useDeepLink: () => ({
-    pendingTaskId: null,
+    pendingTaskId: mocks.pendingTaskId,
     clearPendingTask: mocks.clearPendingTask,
   }),
 }));
@@ -307,6 +320,11 @@ import Journeys from "./Journeys";
 describe("Journeys row drag integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isTabActive = true;
+    mocks.pendingTaskId = null;
+    mocks.unsurfacedEpicHabitsCount = 0;
+    mocks.pendingRecurringCount = 0;
+    mocks.calendarConnections = [];
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       writable: true,
@@ -334,11 +352,19 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
       fireEvent(row, createPointerDownEvent(100));
       dispatchPointerMove(820);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Dragging to 8:00 PM")).toBeInTheDocument();
+    });
+
+    act(() => {
       window.dispatchEvent(new Event("pointerup"));
     });
 
@@ -350,5 +376,64 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+  });
+
+  it("skips polling and auto-surface side effects while tab is inactive", async () => {
+    mocks.isTabActive = false;
+    mocks.unsurfacedEpicHabitsCount = 2;
+    mocks.pendingRecurringCount = 2;
+    mocks.calendarConnections = [
+      {
+        provider: "google",
+        sync_mode: "full_sync",
+      },
+    ];
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+    });
+
+    expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();
+    expect(mocks.spawnRecurringTasks).not.toHaveBeenCalled();
+    expect(mocks.syncProviderPullMutate).not.toHaveBeenCalled();
+  });
+
+  it("processes deep-linked task edit flow when journeys tab is active", async () => {
+    mocks.pendingTaskId = "task-1";
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.clearPendingTask).toHaveBeenCalledTimes(1);
+    });
   });
 });

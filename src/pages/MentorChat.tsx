@@ -15,7 +15,7 @@ import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { PageTransition } from "@/components/PageTransition";
-import { getResolvedMentorId } from "@/utils/mentor";
+import { useMentorConnectionHealth } from "@/hooks/useMentorConnectionHealth";
 
 
 export default function MentorChat() {
@@ -28,7 +28,11 @@ export default function MentorChat() {
   const [isRetrying, setIsRetrying] = useState(false);
   const haptics = useHapticFeedback();
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('mentor');
-  const resolvedMentorId = getResolvedMentorId(profile);
+  const {
+    effectiveMentorId: resolvedMentorId,
+    status: mentorConnectionStatus,
+    refreshConnection,
+  } = useMentorConnectionHealth();
 
   // Get briefing context from navigation state
   const briefingContext = location.state?.briefingContext;
@@ -54,6 +58,7 @@ export default function MentorChat() {
     setIsRetrying(true);
     try {
       await refetchProfile();
+      await refreshConnection();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['mentor'] }),
         queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
@@ -67,7 +72,7 @@ export default function MentorChat() {
   };
 
   // Show loading state while profile or mentor is loading
-  if (!user || profileLoading || mentorLoading) {
+  if (!user || profileLoading || mentorLoading || mentorConnectionStatus === "recovering") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-3">
@@ -94,7 +99,7 @@ export default function MentorChat() {
     );
   }
 
-  if (!resolvedMentorId) {
+  if (mentorConnectionStatus === "missing") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-md">

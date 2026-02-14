@@ -264,7 +264,7 @@ export function useAIInteractionTracker() {
    * Track daily plan task outcomes for learning
    */
   const trackDailyPlanOutcome = useCallback(async (
-    taskId: string,
+    _taskId: string,
     outcome: 'completed' | 'skipped' | 'deleted' | 'rescheduled',
     metadata?: {
       scheduledTime?: string;

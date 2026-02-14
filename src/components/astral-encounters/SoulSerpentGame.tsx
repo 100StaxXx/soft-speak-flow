@@ -52,7 +52,6 @@ const CELL_SIZE = DEFAULT_CELL_SIZE; // Used by sub-components
 const TRAIL_LIFETIME = 600;
 const MAX_TRAIL_PARTICLES = 30;
 const MIN_SWIPE_DISTANCE = 30;
-const INTERPOLATION_STEPS = 8; // Smoothness - higher = smoother movement
 
 // Dynamic cell size based on viewport height
 const getCellSize = () => {
@@ -454,13 +453,13 @@ const Stardust = memo(({ position }: { position: Position }) => (
 Stardust.displayName = 'Stardust';
 
 export const SoulSerpentGame = ({
-  companionStats,
+  companionStats: _companionStats,
   onComplete,
   onDamage,
   tierAttackDamage = 15,
   difficulty = 'medium',
   questIntervalScale = 0,
-  maxTimer,
+  maxTimer: _maxTimer,
   isPractice = false,
   compact = false,
 }: SoulSerpentGameProps) => {
@@ -477,7 +476,6 @@ export const SoulSerpentGame = ({
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [interpolation, setInterpolation] = useState(0); // 0 to 1 for smooth movement
   
-  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const trailCleanupRef = useRef<NodeJS.Timeout | null>(null);
   const directionRef = useRef<Direction>('right');
   const lastDirectionRef = useRef<Direction>('right'); // Track last applied direction
@@ -487,7 +485,6 @@ export const SoulSerpentGame = ({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const lastMoveTimeRef = useRef<number>(0);
 
   // Dynamic cell size based on viewport
   const cellSize = useMemo(() => getCellSize(), []);

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { GeneratedTask } from '@/hooks/useSmartDayPlanner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

@@ -15,7 +15,6 @@ export const AdminReferralTesting = () => {
   
   // Test 2: Simulate user signup
   const [testCode, setTestCode] = useState("");
-  const [testUserId, setTestUserId] = useState("");
   
   // Test 3: Simulate subscription
   const [subUserId, setSubUserId] = useState("");

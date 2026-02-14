@@ -6,8 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Sparkles, Calendar, Clock, Star, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface CompanionMemorial {
   id: string;
@@ -23,11 +22,7 @@ interface CompanionMemorial {
   legacy_traits_passed: Array<{ trait: string; description: string }> | null;
 }
 
-interface MemorialWallProps {
-  onClose?: () => void;
-}
-
-export const MemorialWall = memo(({ onClose }: MemorialWallProps) => {
+export const MemorialWall = memo(() => {
   const { user } = useAuth();
   const [selectedMemorial, setSelectedMemorial] = useState<CompanionMemorial | null>(null);
 

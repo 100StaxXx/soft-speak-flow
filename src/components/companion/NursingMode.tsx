@@ -3,7 +3,6 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Heart, Sparkles, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
 
 interface NursingModeProps {
   companionImageUrl: string;
@@ -22,7 +21,7 @@ const RECOVERY_MESSAGES = [
 export const NursingMode = memo(({
   companionImageUrl,
   recoveryProgress,
-  daysInactive,
+  daysInactive: _daysInactive,
   spiritAnimal,
 }: NursingModeProps) => {
   // Get appropriate message based on recovery progress

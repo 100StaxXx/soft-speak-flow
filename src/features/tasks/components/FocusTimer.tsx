@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Square, Zap, Brain, Coffee, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ interface FocusTimerProps {
   onComplete?: () => void;
 }
 
-export function FocusTimer({ taskId, taskName, compact = false, onComplete }: FocusTimerProps) {
+export function FocusTimer({ taskId, taskName, compact = false, onComplete: _onComplete }: FocusTimerProps) {
   const {
     timerState,
     startSession,

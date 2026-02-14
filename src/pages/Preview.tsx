@@ -208,7 +208,7 @@ const Preview = () => {
                   { icon: Trophy, text: "Epic quests and achievement system" },
                   { icon: Heart, text: "Companion that evolves with your progress" },
                   { icon: Star, text: "Mentors with unique personalities" },
-                ].map((feature, index) => (
+                ].map((feature) => (
                   <div key={feature.text} className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
                       <feature.icon className="h-4 w-4 text-primary" />

@@ -73,7 +73,6 @@ export function useRescheduleIntelligence(
     const smartQuickActions: RescheduleIntelligence['smartQuickActions'] = [];
     
     // Calculate velocity and projections
-    const completedMilestones = milestones.filter(m => m.completed_at);
     const totalMilestones = totalCount;
     
     // Get epic dates from milestones or props
@@ -88,8 +87,6 @@ export function useRescheduleIntelligence(
         : now);
     
     const daysElapsed = Math.max(1, differenceInDays(now, epicStart));
-    const totalDays = Math.max(1, differenceInDays(epicEnd, epicStart));
-    const daysRemaining = Math.max(0, differenceInDays(epicEnd, now));
     
     // Velocity calculation
     const velocityPerDay = completedCount / daysElapsed;

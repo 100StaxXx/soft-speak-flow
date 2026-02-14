@@ -1,10 +1,9 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Clock, Zap, TrendingUp, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useFocusSession, FocusSession } from '../hooks/useFocusSession';
-import { format, isToday, isYesterday, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface FocusStatsProps {
   className?: string;

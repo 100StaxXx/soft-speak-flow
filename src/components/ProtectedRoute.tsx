@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
   requireMentor?: boolean;
 }
 
-export const ProtectedRoute = ({ children, requireMentor = true }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const { hasAccess, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();

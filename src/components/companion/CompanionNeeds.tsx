@@ -17,13 +17,11 @@ const NeedIndicator = memo(({
   label, 
   value, 
   color,
-  critical = false,
 }: { 
   icon: typeof Utensils; 
   label: string; 
   value: number; 
   color: string;
-  critical?: boolean;
 }) => {
   const isCritical = value < 30;
   
@@ -73,9 +71,6 @@ export const CompanionNeeds = memo(({
   recoveryProgress,
   className,
 }: CompanionNeedsProps) => {
-  // Calculate overall health for body stat
-  const overallHealth = Math.round((hunger + happiness + health) / 3);
-  
   return (
     <div className={cn("space-y-2", className)}>
       {/* Recovery Banner */}

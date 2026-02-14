@@ -1,3 +1,6 @@
+import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -24,7 +27,25 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { fetchDailyTasks } from "./useTasksQuery";
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
+
+import { fetchDailyTasks, useTasksQuery } from "./useTasksQuery";
+
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
+};
 
 describe("fetchDailyTasks", () => {
   beforeEach(() => {
@@ -106,5 +127,21 @@ describe("fetchDailyTasks", () => {
     expect(result[0].epic_title).toBe("Growth Sprint");
     expect(result[0].contact?.name).toBe("Jordan");
     expect(result[0].subtasks?.map((subtask) => subtask.id)).toEqual(["s1", "s2", "s3"]);
+  });
+});
+
+describe("useTasksQuery", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("does not fetch when disabled", () => {
+    const { result } = renderHook(
+      () => useTasksQuery(new Date("2026-02-13T00:00:00.000Z"), { enabled: false }),
+      { wrapper: createWrapper() },
+    );
+
+    expect(result.current.tasks).toEqual([]);
+    expect(mocks.selectMock).not.toHaveBeenCalled();
   });
 });

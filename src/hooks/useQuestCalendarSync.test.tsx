@@ -7,11 +7,13 @@ const mocks = vi.hoisted(() => {
   const questLinksEqMock = vi.fn();
   const dailyTaskSingleMock = vi.fn();
   const functionsInvokeMock = vi.fn();
+  const useCalendarIntegrationsMock = vi.fn();
 
   return {
     questLinksEqMock,
     dailyTaskSingleMock,
     functionsInvokeMock,
+    useCalendarIntegrationsMock,
   };
 });
 
@@ -22,22 +24,7 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/hooks/useCalendarIntegrations", () => ({
-  useCalendarIntegrations: () => ({
-    connections: [
-      {
-        id: "conn-1",
-        provider: "google",
-        calendar_email: "user@example.com",
-        primary_calendar_id: "primary-calendar",
-        primary_calendar_name: "Primary Calendar",
-        sync_mode: "send_only",
-        sync_enabled: true,
-        platform: "web",
-        last_synced_at: null,
-      },
-    ],
-    defaultProvider: "google",
-  }),
+  useCalendarIntegrations: (...args: unknown[]) => mocks.useCalendarIntegrationsMock(...args),
 }));
 
 vi.mock("@/plugins/NativeCalendarPlugin", () => ({
@@ -109,8 +96,34 @@ const createWrapper = () => {
 describe("useQuestCalendarSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-1",
+          provider: "google",
+          calendar_email: "user@example.com",
+          primary_calendar_id: "primary-calendar",
+          primary_calendar_name: "Primary Calendar",
+          sync_mode: "send_only",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "google",
+    });
     mocks.questLinksEqMock.mockResolvedValue({ data: [], error: null });
     mocks.functionsInvokeMock.mockResolvedValue({ data: null, error: null });
+  });
+
+  it("does not fetch quest links when disabled", () => {
+    const { result } = renderHook(() => useQuestCalendarSync({ enabled: false }), {
+      wrapper: createWrapper(),
+    });
+
+    expect(mocks.useCalendarIntegrationsMock).toHaveBeenCalledWith({ enabled: false });
+    expect(mocks.questLinksEqMock).not.toHaveBeenCalled();
+    expect(result.current.links).toEqual([]);
   });
 
   it("throws TASK_DATE_REQUIRED when sending a task with no date", async () => {

@@ -79,7 +79,7 @@ const shuffle = <T>(array: T[]): T[] => {
 const generatePath = (
   grid: (ColorId | null)[][],
   start: Position,
-  color: ColorId,
+  _color: ColorId,
   minLength: number,
   maxLength: number
 ): Position[] | null => {
@@ -125,13 +125,6 @@ const generatePath = (
 const fillPath = (grid: (ColorId | null)[][], path: Position[], color: ColorId): void => {
   for (const pos of path) {
     grid[pos.row][pos.col] = color;
-  }
-};
-
-// Clear a path from the grid
-const clearPath = (grid: (ColorId | null)[][], path: Position[]): void => {
-  for (const pos of path) {
-    grid[pos.row][pos.col] = null;
   }
 };
 
@@ -265,7 +258,7 @@ const generateFallbackPuzzle = (size: number, numPairs: number): Puzzle => {
 
 // Check if the puzzle is solved (all pairs connected - no need for 100% grid fill)
 export const isPuzzleSolved = (
-  grid: Cell[][],
+  _grid: Cell[][],
   originalPairs: ColorPair[],
   paths: Map<ColorId, { row: number; col: number }[]>
 ): boolean => {

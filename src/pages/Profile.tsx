@@ -5,14 +5,12 @@ import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Crown, User, Users, Bell, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, type LucideIcon } from "lucide-react";
+import { User, Users, Repeat, LogOut, BookHeart, FileText, Shield, Gift, Trash2, Sparkles, HelpCircle, ChevronRight, ExternalLink, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLongPress } from "@/hooks/useLongPress";
 import { useToast } from "@/hooks/use-toast";
-import { toast as sonnerToast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +34,7 @@ import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsS
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
+import { applyMentorChange } from "@/pages/profileMentorChange";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -203,26 +202,24 @@ const Profile = () => {
           ? (profile.onboarding_data as Record<string, unknown>)
           : {};
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          selected_mentor_id: mentorId,
-          onboarding_data: {
-            ...onboardingData,
-            mentorId,
-          },
-          timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-        })
-        .eq("id", user.id);
-      if (error) throw error;
+      await applyMentorChange({
+        mentorId,
+        onboardingData,
+        queryClient,
+        supabaseClient: supabase,
+        timezone: profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        userId: user.id,
+        navigate,
+      });
+
       toast({ title: "Mentor Updated", description: "Your mentor has been changed successfully" });
-      window.location.reload();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to change mentor";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } finally {
       setIsChangingMentor(false);
     }
-  }, [user, isChangingMentor, profile?.onboarding_data, profile?.timezone, toast]);
+  }, [navigate, profile?.onboarding_data, profile?.timezone, queryClient, toast, user, isChangingMentor]);
 
   const handleSignOut = useCallback(async () => {
     if (isSigningOut) return;

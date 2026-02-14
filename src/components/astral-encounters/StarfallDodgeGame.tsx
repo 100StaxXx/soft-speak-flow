@@ -376,7 +376,7 @@ export const StarfallDodgeGame = ({
   const smoothPlayerXRef = useRef(50);
 
   // Device orientation hook - use landscape function for this game
-  const { available, permitted, requestPermission, getLandscapePositionFromTilt } = useDeviceOrientation();
+  const { available, permitted: _permitted, requestPermission, getLandscapePositionFromTilt } = useDeviceOrientation();
 
   // Sync refs
   useEffect(() => { playerXRef.current = playerX; }, [playerX]);
@@ -471,7 +471,7 @@ export const StarfallDodgeGame = ({
   }, []);
 
   // Spawn object helper
-  const spawnObject = useCallback((time: number, playerX: number) => {
+  const spawnObject = useCallback((_time: number, playerX: number) => {
     const rand = Math.random();
     
     // Spawn probabilities (cumulative):
@@ -691,9 +691,6 @@ export const StarfallDodgeGame = ({
   // Complete game - calculate result based on survival time and crystals
   useEffect(() => {
     if (gameState !== 'complete') return;
-    
-    const survivalBonus = Math.round(survivalTime * 2);
-    const score = crystalsCollected * 10 + survivalBonus;
     
     // Accuracy based on survival time
     const timeThresholds = { beginner: 90, easy: 60, medium: 45, hard: 30, master: 20 };

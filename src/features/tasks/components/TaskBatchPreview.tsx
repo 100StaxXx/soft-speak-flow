@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   Check, 
   Clock, 
@@ -130,7 +130,6 @@ export function TaskBatchPreview({
   };
 
   const selectedTasks = tasks.filter(t => t.selected);
-  const extractedCount = tasks.filter(t => !t.isSuggestion && t.selected).length;
   const suggestedCount = tasks.filter(t => t.isSuggestion && t.selected).length;
 
   const handleConfirm = () => {

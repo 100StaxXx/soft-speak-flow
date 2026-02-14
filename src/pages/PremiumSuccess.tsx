@@ -3,14 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Crown, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useProfile } from "@/hooks/useProfile";
 import { useSubscription } from "@/hooks/useSubscription";
 import Confetti from "react-confetti";
 
 export default function PremiumSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { profile, loading } = useProfile();
   const { refetch: refetchSubscription } = useSubscription();
   const [showConfetti, setShowConfetti] = useState(true);
   const [isVerifying, setIsVerifying] = useState(true);

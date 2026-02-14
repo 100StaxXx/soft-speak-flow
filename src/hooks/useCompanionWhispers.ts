@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { useCompanionPresence, CompanionMood } from "@/contexts/CompanionPresenceContext";
 import { useCompanion } from "./useCompanion";

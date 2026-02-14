@@ -5,7 +5,6 @@ import {
   AdversaryTheme, 
   AdversaryTier, 
   TriggerType,
-  MiniGameType,
   THEME_MINIGAME_MAP,
   THEME_STAT_MAP,
   TIER_CONFIG,

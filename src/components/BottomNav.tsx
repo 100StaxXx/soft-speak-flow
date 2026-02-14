@@ -8,12 +8,18 @@ import { useProfile } from "@/hooks/useProfile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
-import { useCompanion } from "@/hooks/useCompanion";
+import { fetchCompanion, getCompanionQueryKey, useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
-import { useInboxCount } from "@/hooks/useInboxTasks";
+import {
+  fetchInboxCount,
+  fetchInboxTasks,
+  getInboxCountQueryKey,
+  getInboxTasksQueryKey,
+  useInboxCount,
+} from "@/hooks/useInboxTasks";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
@@ -27,6 +33,19 @@ import {
 import type { MainTabPath } from "@/utils/mainTabRefresh";
 
 type PrefetchTarget = "mentor" | "inbox" | "journeys" | "companion";
+const COMPANION_STALE_TIME_MS = 60 * 1000;
+const COMPANION_GC_TIME_MS = 30 * 60 * 1000;
+const MENTOR_STALE_TIME_MS = 10 * 60 * 1000;
+
+const fetchSelectedMentorById = async (mentorId: string) => {
+  const { data, error } = await supabase
+    .from("mentors")
+    .select("slug, name, primary_color")
+    .eq("id", mentorId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+};
 
 export const BottomNav = memo(() => {
   const queryClient = useQueryClient();
@@ -36,8 +55,38 @@ export const BottomNav = memo(() => {
   const { capabilities } = useMotionProfile();
   const { companion, progressToNext } = useCompanion();
   const { inboxCount } = useInboxCount();
+  const resolvedMentorId = getResolvedMentorId(profile);
 
-  const prefetchJourneysTasks = useCallback(() => {
+  const prefetchMentorTab = useCallback(() => {
+    if (!resolvedMentorId) return;
+
+    void queryClient.prefetchQuery({
+      queryKey: ["selected-mentor", resolvedMentorId],
+      queryFn: () => fetchSelectedMentorById(resolvedMentorId),
+      staleTime: MENTOR_STALE_TIME_MS,
+    }).catch(() => undefined);
+  }, [queryClient, resolvedMentorId]);
+
+  const prefetchInboxTab = useCallback(() => {
+    if (!user?.id) return;
+
+    const inboxTasksPromise = queryClient.prefetchQuery({
+      queryKey: getInboxTasksQueryKey(user.id),
+      queryFn: () => fetchInboxTasks(user.id),
+      staleTime: 30 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
+    const inboxCountPromise = queryClient.prefetchQuery({
+      queryKey: getInboxCountQueryKey(user.id),
+      queryFn: () => fetchInboxCount(user.id),
+      staleTime: 30 * 1000,
+      gcTime: 30 * 60 * 1000,
+    });
+
+    void Promise.all([inboxTasksPromise, inboxCountPromise]).catch(() => undefined);
+  }, [queryClient, user?.id]);
+
+  const prefetchJourneysTab = useCallback(() => {
     if (!user?.id) return;
 
     const today = format(new Date(), "yyyy-MM-dd");
@@ -49,12 +98,36 @@ export const BottomNav = memo(() => {
     }).catch(() => undefined);
   }, [queryClient, user?.id]);
 
-  // Prefetch on hover/focus for even faster perceived navigation
+  const prefetchCompanionTab = useCallback(() => {
+    if (!user?.id) return;
+
+    void queryClient.prefetchQuery({
+      queryKey: getCompanionQueryKey(user.id),
+      queryFn: () => fetchCompanion(user.id),
+      staleTime: COMPANION_STALE_TIME_MS,
+      gcTime: COMPANION_GC_TIME_MS,
+    }).catch(() => undefined);
+  }, [queryClient, user?.id]);
+
+  // Prefetch on pointer intent/hover/focus for faster tab activation.
   const handlePrefetch = useCallback((page: PrefetchTarget) => {
-    if (page === "journeys") {
-      prefetchJourneysTasks();
+    switch (page) {
+      case "mentor":
+        prefetchMentorTab();
+        break;
+      case "inbox":
+        prefetchInboxTab();
+        break;
+      case "journeys":
+        prefetchJourneysTab();
+        break;
+      case "companion":
+        prefetchCompanionTab();
+        break;
+      default:
+        break;
     }
-  }, [prefetchJourneysTasks]);
+  }, [prefetchCompanionTab, prefetchInboxTab, prefetchJourneysTab, prefetchMentorTab]);
 
   const handleTabClick = useCallback(
     (path: MainTabPath) => (event: MouseEvent<HTMLAnchorElement>) => {
@@ -67,24 +140,15 @@ export const BottomNav = memo(() => {
     [location.pathname],
   );
 
-  const resolvedMentorId = getResolvedMentorId(profile);
-
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],
     enabled: !!resolvedMentorId,
-    staleTime: 10 * 60 * 1000, // Cache mentor data for 10 minutes
+    staleTime: MENTOR_STALE_TIME_MS,
     queryFn: async () => {
       if (!resolvedMentorId) {
         throw new Error('No mentor selected');
       }
-
-      const { data, error } = await supabase
-        .from("mentors")
-        .select("slug, name, primary_color") // Select only needed fields
-        .eq("id", resolvedMentorId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      return fetchSelectedMentorById(resolvedMentorId);
     },
   });
 
@@ -103,6 +167,7 @@ export const BottomNav = memo(() => {
             activeClassName="bg-orange-500/12"
             data-tour="mentor-tab"
             onClick={handleTabClick("/mentor")}
+            onPointerDown={() => handlePrefetch("mentor")}
             onMouseEnter={() => handlePrefetch('mentor')}
             onFocus={() => handlePrefetch('mentor')}
           >
@@ -153,6 +218,7 @@ export const BottomNav = memo(() => {
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
             activeClassName="bg-celestial-blue/12"
             onClick={handleTabClick("/inbox")}
+            onPointerDown={() => handlePrefetch("inbox")}
             onMouseEnter={() => handlePrefetch('inbox')}
             onFocus={() => handlePrefetch('inbox')}
           >
@@ -198,7 +264,7 @@ export const BottomNav = memo(() => {
             activeClassName="bg-cosmiq-glow/12"
             data-tour="quests-tab"
             onClick={handleTabClick("/journeys")}
-            onPointerDown={prefetchJourneysTasks}
+            onPointerDown={() => handlePrefetch("journeys")}
             onMouseEnter={() => handlePrefetch('journeys')}
             onFocus={() => handlePrefetch('journeys')}
           >
@@ -237,6 +303,7 @@ export const BottomNav = memo(() => {
             activeClassName="bg-stardust-gold/12"
             data-tour="companion-tab"
             onClick={handleTabClick("/companion")}
+            onPointerDown={() => handlePrefetch("companion")}
             onMouseEnter={() => handlePrefetch('companion')}
             onFocus={() => handlePrefetch('companion')}
           >

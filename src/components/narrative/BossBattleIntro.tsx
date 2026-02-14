@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { 
   Sword, Shield, Sparkles, Skull, 
   Eye, Zap, Star, ChevronRight, Info 
@@ -48,7 +47,6 @@ interface BossBattleIntroProps {
 
 export const BossBattleIntro = ({ context, onBeginBattle, onCancel }: BossBattleIntroProps) => {
   const [phase, setPhase] = useState<"lore" | "intel" | "ready">("lore");
-  const [showIntel, setShowIntel] = useState(false);
 
   const ThemeIcon = themeIcons[context.bossTheme] || Skull;
   const gradient = themeColors[context.bossTheme] || "from-slate-900 to-black";

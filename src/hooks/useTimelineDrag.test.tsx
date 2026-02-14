@@ -58,6 +58,10 @@ const dispatchPointerUp = () => {
   window.dispatchEvent(new Event("pointerup"));
 };
 
+const dispatchScroll = () => {
+  window.dispatchEvent(new Event("scroll"));
+};
+
 const dispatchTouchMove = (clientY: number) => {
   const event = new Event("touchmove", { cancelable: true }) as TouchEvent;
   Object.defineProperty(event, "touches", { value: [{ clientY }] });
@@ -296,16 +300,42 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-1", "09:15");
   });
 
-  it("clamps time range to 00:00 through 23:55", () => {
+  it("advances preview time while scrolling at the edge without extra pointer movement", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
 
-    const upperClamp = result.current.getDragHandleProps("task-upper", "23:55");
+    const handleProps = result.current.getDragHandleProps("task-scroll", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(790));
+      dispatchPointerMove(790);
+    });
+
+    expect(result.current.previewTime).toBe("09:00");
+
+    act(() => {
+      (window as Window & { scrollY: number }).scrollY = 120;
+      dispatchScroll();
+    });
+
+    expect(result.current.previewTime).toBe("10:00");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-scroll", "10:00");
+  });
+
+  it("clamps time range to 00:00 through 23:59", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const upperClamp = result.current.getDragHandleProps("task-upper", "23:59");
     act(() => {
       upperClamp.onPointerDown(createPointerDownEvent(100));
       dispatchPointerMove(400);
     });
-    expect(result.current.previewTime).toBe("23:55");
+    expect(result.current.previewTime).toBe("23:59");
     act(() => {
       dispatchPointerUp();
     });

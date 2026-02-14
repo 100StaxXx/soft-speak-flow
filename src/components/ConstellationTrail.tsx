@@ -892,7 +892,7 @@ const getMoodStyles = (mood?: string) => {
 
 export const ConstellationTrail = memo(function ConstellationTrail({ 
   progress, 
-  targetDays,
+  targetDays: _targetDays,
   className,
   companionImageUrl,
   companionMood,

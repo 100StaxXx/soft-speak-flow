@@ -28,7 +28,7 @@ interface MentorResultProps {
 export const MentorResult = ({
   mentor,
   explanation,
-  compatibilityScore,
+  compatibilityScore: _compatibilityScore,
   onConfirm,
   onSeeAll,
   isConfirming = false

@@ -48,14 +48,50 @@ interface WindowListeners {
   touchmove?: (e: TouchEvent) => void;
   touchend?: () => void;
   touchcancel?: () => void;
+  scroll?: () => void;
+  scrollContext?: ScrollContext;
 }
 
 const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+
+type ScrollContext =
+  | { kind: "window" }
+  | { kind: "element"; element: HTMLElement };
 
 const getViewportHeight = () => {
   if (typeof window === "undefined") return 720;
   const candidate = window.visualViewport?.height ?? window.innerHeight;
   return Number.isFinite(candidate) ? candidate : 720;
+};
+
+const isScrollableElement = (element: HTMLElement) => {
+  if (typeof window === "undefined") return false;
+  const style = window.getComputedStyle(element);
+  const overflowY = style.overflowY || style.overflow;
+  const canScroll = /(auto|scroll|overlay)/i.test(overflowY);
+  return canScroll && element.scrollHeight > element.clientHeight;
+};
+
+const findNearestScrollContext = (container: HTMLElement | null): ScrollContext => {
+  if (!container) return { kind: "window" };
+
+  let current: HTMLElement | null = container;
+  while (current) {
+    if (isScrollableElement(current)) {
+      return { kind: "element", element: current };
+    }
+    current = current.parentElement;
+  }
+
+  return { kind: "window" };
+};
+
+const getScrollOffset = (context: ScrollContext): number => {
+  if (context.kind === "window") {
+    if (typeof window === "undefined") return 0;
+    return Number.isFinite(window.scrollY) ? window.scrollY : window.pageYOffset;
+  }
+  return context.element.scrollTop;
 };
 
 export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelineDragOptions) {
@@ -86,6 +122,9 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   const windowListenersRef = useRef<WindowListeners>({});
   const lastLightHapticAtRef = useRef(0);
   const snapModeRef = useRef<DragSnapMode>("coarse");
+  const scrollContextRef = useRef<ScrollContext>({ kind: "window" });
+  const dragStartScrollOffsetRef = useRef(0);
+  const lastPointerClientYRef = useRef(0);
 
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -114,6 +153,13 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     if (listeners.touchmove) window.removeEventListener("touchmove", listeners.touchmove);
     if (listeners.touchend) window.removeEventListener("touchend", listeners.touchend);
     if (listeners.touchcancel) window.removeEventListener("touchcancel", listeners.touchcancel);
+    if (listeners.scroll) {
+      if (listeners.scrollContext?.kind === "element") {
+        listeners.scrollContext.element.removeEventListener("scroll", listeners.scroll);
+      } else {
+        window.removeEventListener("scroll", listeners.scroll);
+      }
+    }
     windowListenersRef.current = {};
   }, []);
 
@@ -194,20 +240,27 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   ]);
 
   const handleMove = useCallback(
-    (clientY: number) => {
+    (clientY: number, options?: { skipAutoscrollUpdate?: boolean }) => {
       if (!draggingTaskIdRef.current) return;
 
       const safeClientY = Number.isFinite(clientY) ? clientY : dragStartYRef.current;
-      const deltaY = safeClientY - dragStartYRef.current;
-      dragOffsetY.set(deltaY);
-      updateAutoscroll(safeClientY);
+      lastPointerClientYRef.current = safeClientY;
 
-      updatePrecisionMode(safeClientY);
+      if (!options?.skipAutoscrollUpdate) {
+        updateAutoscroll(safeClientY);
+      }
+
+      const scrollDelta = getScrollOffset(scrollContextRef.current) - dragStartScrollOffsetRef.current;
+      const effectiveClientY = safeClientY + scrollDelta;
+      const deltaY = effectiveClientY - dragStartYRef.current;
+      dragOffsetY.set(deltaY);
+
+      updatePrecisionMode(effectiveClientY);
 
       const computed = computeAdaptiveMinute({
         startMinute: originalMinutesRef.current,
         startClientY: dragStartYRef.current,
-        currentClientY: safeClientY,
+        currentClientY: effectiveClientY,
         mode: snapModeRef.current,
         lastSnappedMinute: lastSnappedMinutesRef.current,
         fineAnchorMinute: fineAnchorMinuteRef.current,
@@ -262,6 +315,9 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     setPreviewTime(null);
     dragOffsetY.set(0);
     stopScroll();
+    scrollContextRef.current = { kind: "window" };
+    dragStartScrollOffsetRef.current = 0;
+    lastPointerClientYRef.current = 0;
     resetSnapState();
   }, [
     clearDropResetTimer,
@@ -282,12 +338,17 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       const safeStartY = Number.isFinite(startY) ? startY : 0;
       const startMinute = time24ToMinute(scheduledTime, resolvedSnapConfig);
       const normalizedStartTime = minuteToTime24(startMinute, resolvedSnapConfig);
+      const scrollContext = findNearestScrollContext(containerRef.current);
+      const dragStartScrollOffset = getScrollOffset(scrollContext);
 
       draggingTaskIdRef.current = taskId;
       originalTimeRef.current = normalizedStartTime;
       originalMinutesRef.current = startMinute;
       lastSnappedMinutesRef.current = startMinute;
       dragStartYRef.current = safeStartY;
+      scrollContextRef.current = scrollContext;
+      dragStartScrollOffsetRef.current = dragStartScrollOffset;
+      lastPointerClientYRef.current = safeStartY;
       precisionEligibleRef.current = resolvedSnapConfig.precisionActivationMode !== "none";
       precisionHoldOriginYRef.current = safeStartY;
       precisionHoldStartedAtRef.current = nowMs();
@@ -326,6 +387,10 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       const touchEnd = () => {
         finishDrag();
       };
+      const scrollListener = () => {
+        if (!draggingTaskIdRef.current) return;
+        handleMove(lastPointerClientYRef.current, { skipAutoscrollUpdate: true });
+      };
 
       windowListenersRef.current = {
         pointermove: pointerMove,
@@ -334,6 +399,8 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
         touchmove: touchMove,
         touchend: touchEnd,
         touchcancel: touchEnd,
+        scroll: scrollListener,
+        scrollContext,
       };
 
       window.addEventListener("pointermove", pointerMove);
@@ -342,8 +409,14 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       window.addEventListener("touchmove", touchMove, { passive: false });
       window.addEventListener("touchend", touchEnd);
       window.addEventListener("touchcancel", touchEnd);
+      if (scrollContext.kind === "element") {
+        scrollContext.element.addEventListener("scroll", scrollListener, { passive: true });
+      } else {
+        window.addEventListener("scroll", scrollListener, { passive: true });
+      }
     },
     [
+      containerRef,
       dragOffsetY,
       finishDrag,
       handleMove,

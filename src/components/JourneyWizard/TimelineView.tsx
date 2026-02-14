@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { 
   Flag, 
   Calendar, 
   Sparkles, 
-  ChevronRight,
   Clock,
   Star,
 } from 'lucide-react';
@@ -62,8 +61,6 @@ export function TimelineView({
   };
 
   const colors = feasibilityColors[feasibilityAssessment.feasibility] || feasibilityColors.achievable;
-
-  const postcardMilestones = milestones.filter(m => m.isPostcardMilestone);
 
   return (
     <div className="space-y-4">

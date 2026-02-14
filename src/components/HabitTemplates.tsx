@@ -1,9 +1,8 @@
 import { Card } from "./ui/card";
-import { Button } from "./ui/button";
 import { 
   Dumbbell, Droplet, Sun, Smartphone, Cigarette, Plus, 
   Book, Utensils, Moon, Bike, Coffee, BedDouble,
-  Apple, Brain, Music, MessageCircle, Clock, Heart
+  Apple, Brain, Music, MessageCircle, Heart
 } from "lucide-react";
 import {
   Select,
@@ -12,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 
 const HABIT_TEMPLATES = [
   // Top featured habits

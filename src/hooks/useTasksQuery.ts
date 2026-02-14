@@ -99,8 +99,13 @@ export const fetchDailyTasks = async (userId: string, taskDate: string): Promise
   })) as DailyTask[];
 };
 
-export const useTasksQuery = (selectedDate?: Date) => {
+interface TasksQueryOptions {
+  enabled?: boolean;
+}
+
+export const useTasksQuery = (selectedDate?: Date, options: TasksQueryOptions = {}) => {
   const { user } = useAuth();
+  const { enabled = true } = options;
   
   // Using local device date for task queries
   const taskDate = selectedDate 
@@ -116,7 +121,7 @@ export const useTasksQuery = (selectedDate?: Date) => {
 
       return fetchDailyTasks(user.id, taskDate);
     },
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: DAILY_TASKS_STALE_TIME,
     gcTime: DAILY_TASKS_GC_TIME,
     placeholderData: (previousData) => previousData,

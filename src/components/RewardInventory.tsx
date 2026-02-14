@@ -7,7 +7,6 @@ import { useState, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Image, Frame, Wand2, Gem, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,7 +33,7 @@ const REWARD_TYPE_LABELS: Record<RewardType, string> = {
 };
 
 export const RewardInventory = memo(({ className }: RewardInventoryProps) => {
-  const { allRewards, userRewards, equippedRewards, equipReward, isEquipping, isLoading } = useEpicRewards();
+  const { allRewards, userRewards, equipReward, isEquipping, isLoading } = useEpicRewards();
   const [activeTab, setActiveTab] = useState<RewardType>('background');
 
   // Group user rewards by type
@@ -225,7 +224,7 @@ interface LockedRewardCardProps {
   reward: { id: string; name: string; rarity: RewardRarity; reward_type: RewardType };
 }
 
-const LockedRewardCard = ({ reward }: LockedRewardCardProps) => {
+const LockedRewardCard = ({ reward: _reward }: LockedRewardCardProps) => {
   return (
     <motion.div
       layout

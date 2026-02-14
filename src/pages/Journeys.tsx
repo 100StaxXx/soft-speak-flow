@@ -52,6 +52,8 @@ import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { getTodayIfDateStale, JOURNEYS_ROUTE, shouldResetJourneysDate } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
+import { formatTime12 } from "@/components/quest-shared";
+import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -64,6 +66,7 @@ interface CreatedCampaignData {
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
   const location = useLocation();
+  const { isTabActive } = useMainTabVisibility();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -75,6 +78,7 @@ const Journeys = () => {
   const [showPathfinder, setShowPathfinder] = useState(false);
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
+  const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
   const previousPathRef = useRef<string | null>(location.pathname);
   const activePathRef = useRef(location.pathname);
 
@@ -120,6 +124,7 @@ const Journeys = () => {
   }, []);
 
   useEffect(() => {
+    if (!isTabActive) return;
     if (Capacitor.isNativePlatform()) return;
 
     const handleVisibilityChange = () => {
@@ -131,9 +136,10 @@ const Journeys = () => {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [syncSelectedDateToTodayIfJourneysActive]);
+  }, [isTabActive, syncSelectedDateToTodayIfJourneysActive]);
 
   useEffect(() => {
+    if (!isTabActive) return;
     if (!Capacitor.isNativePlatform()) return;
 
     let isDisposed = false;
@@ -161,7 +167,7 @@ const Journeys = () => {
         void listenerHandle.remove();
       }
     };
-  }, [syncSelectedDateToTodayIfJourneysActive]);
+  }, [isTabActive, syncSelectedDateToTodayIfJourneysActive]);
   
   // Combo tracking
   
@@ -170,15 +176,17 @@ const Journeys = () => {
   const { trackDailyPlanOutcome } = useAIInteractionTracker();
   
   // Epics for plan my day questions and campaign strip
-  const { epics, createEpic, isCreating: isCreatingCampaign } = useEpics();
+  const { epics, createEpic, isCreating: isCreatingCampaign } = useEpics({ enabled: isTabActive });
   const activeEpics = useMemo(() =>
     epics?.filter(e => e.status === 'active').slice(0, 5) || [],
     [epics]
   );
   
   const { currentStreak } = useStreakMultiplier();
-  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, syncProviderPull, hasLinkedEvent } = useQuestCalendarSync();
-  const { connections: calendarConnections } = useCalendarIntegrations();
+  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, syncProviderPull, hasLinkedEvent } = useQuestCalendarSync({
+    enabled: isTabActive,
+  });
+  const { connections: calendarConnections } = useCalendarIntegrations({ enabled: isTabActive });
   
   // Contact interaction logging
   const {
@@ -204,7 +212,7 @@ const Journeys = () => {
     isAdding,
     isUpdating,
     isDeleting
-  } = useDailyTasks(selectedDate);
+  } = useDailyTasks(selectedDate, { enabled: isTabActive });
   
   
   // Edit quest state (for regular quests)
@@ -228,7 +236,7 @@ const Journeys = () => {
   
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
-  const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month");
+  const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   
   // Habit surfacing - auto-surface ALL active habits (not just epic-linked) as daily tasks
   const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
@@ -242,6 +250,7 @@ const Journeys = () => {
   const dateKeyRef = useRef(format(selectedDate, 'yyyy-MM-dd'));
 
   useEffect(() => {
+    if (!isTabActive) return;
     const currentDateKey = format(selectedDate, 'yyyy-MM-dd');
     
     // Reset if date changed
@@ -262,7 +271,7 @@ const Journeys = () => {
       hasSpawnedRecurringRef.current = true;
       spawnRecurringTasks();
     }
-  }, [unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
+  }, [isTabActive, unsurfacedEpicHabitsCount, pendingRecurringCount, selectedDate, surfaceAllEpicHabits, spawnRecurringTasks]);
   
   // Cleanup legacy onboarding pseudo-quests for users who completed onboarding
   // and/or walkthrough, once profile state has resolved.
@@ -328,6 +337,7 @@ const Journeys = () => {
   const deepLinkProcessedRef = useRef<string | null>(null);
   
   useEffect(() => {
+    if (!isTabActive) return;
     // Skip if no pending task or already processed this task
     if (!pendingTaskId || deepLinkProcessedRef.current === pendingTaskId) {
       return;
@@ -352,7 +362,7 @@ const Journeys = () => {
       deepLinkProcessedRef.current = pendingTaskId;
       clearPendingTask();
     }
-  }, [pendingTaskId, dailyTasks, dailyTasksLoading, clearPendingTask, handleEditQuest]);
+  }, [isTabActive, pendingTaskId, dailyTasks, dailyTasksLoading, clearPendingTask, handleEditQuest]);
   
   const tasksPerDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -664,6 +674,7 @@ const Journeys = () => {
 
   // Pull external updates for full-sync providers on an interval.
   useEffect(() => {
+    if (!isTabActive) return;
     const fullSyncProviders = calendarConnections
       .filter((connection) => connection.sync_mode === 'full_sync' && (connection.provider === 'google' || connection.provider === 'outlook'))
       .map((connection) => connection.provider as 'google' | 'outlook');
@@ -684,7 +695,7 @@ const Journeys = () => {
     return () => {
       window.clearInterval(id);
     };
-  }, [calendarConnections, syncProviderPull]);
+  }, [isTabActive, calendarConnections, syncProviderPull]);
 
   // Handle campaign creation
   const handleCreateCampaign = useCallback(async (data: Parameters<typeof createEpic>[0]) => {
@@ -725,7 +736,9 @@ const Journeys = () => {
           <h1 className="text-3xl font-semibold tracking-tight mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Quests
           </h1>
-          <p className="text-sm text-muted-foreground/90">Daily quests. Your path to progress.</p>
+          <p className="text-sm text-muted-foreground/90">
+            {headerDragTime ? `Dragging to ${formatTime12(headerDragTime)}` : "Daily quests. Your path to progress."}
+          </p>
         </motion.div>
 
         <QuestsErrorBoundary>
@@ -786,6 +799,7 @@ const Journeys = () => {
               setPrefilledTime(time);
               setShowAddSheet(true);
             }}
+            onTimelineDragPreviewTimeChange={setHeaderDragTime}
           />
           </motion.div>
         </QuestsErrorBoundary>

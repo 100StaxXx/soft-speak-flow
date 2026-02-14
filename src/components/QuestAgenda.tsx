@@ -53,11 +53,11 @@ export function QuestAgenda({
   onToggle,
   onDelete,
   onEdit,
-  onSetMainQuest,
+  onSetMainQuest: _onSetMainQuest,
   onAddQuest,
   onQuickAdd,
-  tutorialQuestId,
-  isToggling = false,
+  tutorialQuestId: _tutorialQuestId,
+  isToggling: _isToggling = false,
 }: QuestAgendaProps) {
   const { currentStreak, multiplier } = useStreakMultiplier();
   const completedCount = tasks.filter(t => t.completed).length;

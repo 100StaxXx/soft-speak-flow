@@ -38,7 +38,7 @@ export const DormancyWarning = ({ daysUntilDormancy = 2, show }: DormancyWarning
 interface DormantOverlayProps {
   isDormant: boolean;
   recoveryDays: number;
-  daysUntilWake: number;
+  daysUntilWake?: number;
 }
 
 // Context-aware recovery messages for each day
@@ -51,7 +51,7 @@ const RECOVERY_DAY_MESSAGES: Record<number, string> = {
   5: "Ready to wake!",
 };
 
-export const DormantOverlay = ({ isDormant, recoveryDays, daysUntilWake }: DormantOverlayProps) => {
+export const DormantOverlay = ({ isDormant, recoveryDays, daysUntilWake: _daysUntilWake }: DormantOverlayProps) => {
   if (!isDormant) return null;
 
   const recoveryMessage = RECOVERY_DAY_MESSAGES[Math.min(recoveryDays, 5)] || RECOVERY_DAY_MESSAGES[0];

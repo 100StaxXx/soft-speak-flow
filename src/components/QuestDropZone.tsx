@@ -18,12 +18,12 @@ interface QuestDropZoneProps {
 }
 
 export const QuestDropZone = ({
-  isOver,
-  canDrop,
+  isOver: _isOver,
+  canDrop: _canDrop,
   hasConflict,
   onDrop,
   children,
-  time,
+  time: _time,
   className,
   onTouchStart,
   onTouchEnd,

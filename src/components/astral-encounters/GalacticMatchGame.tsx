@@ -68,7 +68,7 @@ const MAX_XP = 150;
 // Get level configuration
 // Before 3 pairs: 1 puzzle each
 // At 3+ pairs: 2 puzzles each (round 1 and round 2)
-const getLevelConfig = (level: number, round: number = 1, startPairs: number = 2, revealTimeMultiplier: number = 1.0) => {
+const getLevelConfig = (level: number, _round: number = 1, startPairs: number = 2, revealTimeMultiplier: number = 1.0) => {
   // Calculate pairs based on level progression:
   // Level 1 = startPairs (e.g., 2)
   // Level 2 = startPairs + 1 (e.g., 3) - this is where 2 rounds start if startPairs < 3
@@ -193,13 +193,13 @@ MatchEffect.displayName = 'MatchEffect';
 type GamePhase = 'countdown' | 'revealing' | 'hiding' | 'playing' | 'levelComplete' | 'gameOver';
 
 export const GalacticMatchGame = ({
-  companionStats,
+  companionStats: _companionStats,
   onComplete,
   onDamage,
   tierAttackDamage = 15,
   difficulty = 'medium',
-  questIntervalScale = 0,
-  maxTimer,
+  questIntervalScale: _questIntervalScale = 0,
+  maxTimer: _maxTimer,
   isPractice = false,
   compact = false,
 }: GalacticMatchGameProps) => {
@@ -214,7 +214,6 @@ export const GalacticMatchGame = ({
   const [matchedPairs, setMatchedPairs] = useState(0);
   const [combo, setCombo] = useState(0);
   const [score, setScore] = useState(0);
-  const [totalAttempts, setTotalAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [matchEffects, setMatchEffects] = useState<{ id: string; color: string }[]>([]);
   const [countdown, setCountdown] = useState(3);
@@ -379,7 +378,6 @@ export const GalacticMatchGame = ({
 
     const maxPossibleScore = 500; // Reasonable estimate for accuracy calc
     const accuracy = Math.min(100, Math.round((score / maxPossibleScore) * 100));
-    const cappedXP = Math.min(score, MAX_XP);
 
     const result: 'perfect' | 'good' | 'fail' = level >= 3 
       ? (level >= 6 ? 'perfect' : 'good')
@@ -425,7 +423,6 @@ export const GalacticMatchGame = ({
     // Check for match when 2 cards are flipped
     if (newFlipped.length === 2) {
       setIsLocked(true);
-      setTotalAttempts(prev => prev + 1);
       
       const [firstId, secondId] = newFlipped;
       const firstCard = cards.find(c => c.id === firstId)!;

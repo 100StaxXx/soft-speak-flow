@@ -333,8 +333,8 @@ const GameScene = ({ gameState, playerLane, hasShield, speed, obstacles, onObsta
 };
 
 // Moving obstacle wrapper - position now controlled by parent state
-const MovingObstacle = memo(({ id, lane, z, type }: { 
-  id: string; lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield';
+const MovingObstacle = memo(({ lane, z, type }: {
+  lane: number; z: number; type: 'asteroid' | 'crystal' | 'shield';
 }) => {
   return (
     <group position={[0, 0, z]}>
@@ -445,7 +445,7 @@ LaneControls.displayName = 'LaneControls';
 
 // Main game component - ENDLESS until lives = 0
 export const AstralFrequencyGame = ({
-  companionStats,
+  companionStats: _companionStats,
   onComplete,
   onDamage,
   tierAttackDamage = 15,
@@ -624,9 +624,6 @@ export const AstralFrequencyGame = ({
     if (gameState !== 'complete') return;
     
     // Score based on distance traveled + crystals collected
-    const distanceBonus = Math.round(distance * 0.5);
-    const finalScore = score + distanceBonus;
-    
     // Accuracy based on how far they got relative to difficulty
     const distanceThresholds: Record<ArcadeDifficulty, number> = { 
       beginner: 600, 

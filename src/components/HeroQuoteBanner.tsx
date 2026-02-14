@@ -3,7 +3,6 @@ import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
-import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getResolvedMentorId } from "@/utils/mentor";
 
 interface QuoteData {

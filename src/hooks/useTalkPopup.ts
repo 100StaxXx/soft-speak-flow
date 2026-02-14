@@ -3,7 +3,7 @@
   * Handles visibility, message queue, and companion info
   */
  
- import { useState, useCallback, useRef, useMemo } from "react";
+ import { useState, useCallback, useRef } from "react";
  import { useCompanion } from "@/hooks/useCompanion";
  import { supabase } from "@/integrations/supabase/client";
  

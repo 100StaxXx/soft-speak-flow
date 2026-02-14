@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -9,8 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Trash2, Edit, Plus, Upload, X, Loader2, Music, Download, Share } from "lucide-react";
-import { AudioGenerator } from "@/components/AudioGenerator";
+import { Trash2, Edit, Plus, Upload, X, Loader2, Music, Download } from "lucide-react";
 import { AdminPayouts } from "@/components/AdminPayouts";
 import { AdminReferralCodes } from "@/components/AdminReferralCodes";
 import { AdminReferralTesting } from "@/components/AdminReferralTesting";
@@ -18,7 +16,6 @@ import { AdminReferralConfig } from "@/components/AdminReferralConfig";
 import { AdminReferralAnalytics } from "@/components/AdminReferralAnalytics";
 import { EvolutionCardFlip } from "@/components/EvolutionCardFlip";
 import { AdminCompanionImageTester } from "@/components/AdminCompanionImageTester";
-import { Capacitor } from '@capacitor/core';
 import { globalAudio } from "@/utils/globalAudio";
 import { downloadImage } from "@/utils/imageDownload";
 
@@ -41,7 +38,6 @@ interface PepTalk {
 
 const Admin = () => {
   const { user, loading: authLoadingFromHook } = useAuth();
-  const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [pepTalks, setPepTalks] = useState<PepTalk[]>([]);
@@ -51,7 +47,6 @@ const Admin = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [aiGenerating, setAiGenerating] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   
   // Sample Card Generator State
@@ -183,7 +178,7 @@ const Admin = () => {
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("pep-talk-audio")
         .upload(filePath, audioFile);
 
@@ -465,68 +460,6 @@ const Admin = () => {
       toast.error(error.message || "Failed to generate postcard");
     } finally {
       setGeneratingPostcard(false);
-    }
-  };
-
-  const handleFullAIGenerate = async () => {
-    if (!formData.mentor_id) {
-      toast.error("Please select a mentor first");
-      return;
-    }
-
-    const mentor = mentors.find(m => m.id === formData.mentor_id);
-    if (!mentor) {
-      toast.error("Invalid mentor selected");
-      return;
-    }
-
-    setAiGenerating(true);
-    try {
-      // Step 1: Generate complete pep talk content
-      toast.info("Generating pep talk content...");
-      const { data: contentData, error: contentError } = await supabase.functions.invoke(
-        "generate-complete-pep-talk",
-        {
-          body: {
-            mentorSlug: mentor.slug,
-            category: formData.category || "motivation",
-          },
-        }
-      );
-
-      if (contentError) throw contentError;
-
-      // Step 2: Generate audio from the script
-      toast.info("Generating audio...");
-      const { data: audioData, error: audioError } = await supabase.functions.invoke(
-        "generate-mentor-audio",
-        {
-          body: {
-            mentorSlug: mentor.slug,
-            script: contentData.script,
-          },
-        }
-      );
-
-      if (audioError) throw audioError;
-
-      // Update form with all generated data
-      setFormData(prev => ({
-        ...prev,
-        title: contentData.title,
-        quote: contentData.quote,
-        description: contentData.description,
-        category: contentData.category,
-        audio_url: audioData.audioUrl,
-      }));
-
-      setIsEditing(true);
-      toast.success("Complete pep talk generated successfully!");
-    } catch (error) {
-      console.error("Error generating complete pep talk:", error);
-      toast.error(error.message || "Failed to generate pep talk");
-    } finally {
-      setAiGenerating(false);
     }
   };
 

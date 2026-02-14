@@ -2,12 +2,11 @@ import { useState, useCallback, useEffect, lazy, Suspense, useRef } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
-import { DamageEvent, calculateResultFromHP, TIER_BATTLE_DURATION } from '@/types/battleSystem';
+import { DamageEvent, TIER_BATTLE_DURATION } from '@/types/battleSystem';
 import { BattleVSScreen } from './BattleVSScreen';
 import { EncounterResultScreen } from './EncounterResult';
 import { GameInstructionsOverlay } from './GameInstructionsOverlay';
 import { PracticeRoundWrapper } from './PracticeRoundWrapper';
-import { BattleSceneHeader } from './BattleSceneHeader';
 import { BossBattleIntro } from '@/components/narrative/BossBattleIntro';
 import { BattleOverlay, DamageNumberContainer } from './battle';
 import { useCompanion } from '@/hooks/useCompanion';

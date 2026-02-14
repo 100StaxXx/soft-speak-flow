@@ -6,9 +6,6 @@ import {
   TrendingUp, 
   Lightbulb, 
   Zap,
-  Sun,
-  Sunset,
-  Moon,
   ChevronRight,
   X
 } from 'lucide-react';
@@ -47,12 +44,6 @@ const insightConfig = {
     bgColor: 'bg-purple-500/10',
     borderColor: 'border-purple-500/30',
   },
-};
-
-const energyConfig = {
-  low: { color: 'text-red-400', label: 'Low' },
-  medium: { color: 'text-yellow-400', label: 'Med' },
-  high: { color: 'text-green-400', label: 'High' },
 };
 
 export const DailyInsightCard = memo(function DailyInsightCard({
@@ -119,14 +110,12 @@ interface DailyCoachPanelProps {
 }
 
 export const DailyCoachPanel = memo(function DailyCoachPanel({
-  compact = false,
+  compact: _compact = false,
   maxInsights = 3,
   onInsightAction,
 }: DailyCoachPanelProps) {
   const { 
     insights, 
-    energyForecast, 
-    overallReadiness, 
     isLoading,
   } = useDailyPlanOptimization();
 

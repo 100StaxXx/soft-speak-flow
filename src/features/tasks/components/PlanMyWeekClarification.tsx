@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CalendarDays, Battery, BatteryLow, BatteryFull, Target, Shield, 
-  Clock, ChevronRight, X, Loader2, Calendar
+  ChevronRight, X, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

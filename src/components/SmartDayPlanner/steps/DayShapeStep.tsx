@@ -109,7 +109,7 @@ function DayCurve({ heights, isSelected }: { heights: number[]; isSelected: bool
   );
 }
 
-export function DayShapeStep({ context, updateContext, onNext, isGenerating }: DayShapeStepProps) {
+export function DayShapeStep({ context, updateContext, onNext, isGenerating: _isGenerating }: DayShapeStepProps) {
   const handleShapeSelect = (value: DayShape) => {
     updateContext({ dayShape: value });
   };

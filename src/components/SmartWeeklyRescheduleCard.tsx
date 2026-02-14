@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, Scale, Sun, ArrowRight, X, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, Scale, Sun, ArrowRight, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWeeklyReschedule } from '@/hooks/useWeeklyReschedule';
 import { useQueryClient } from '@tanstack/react-query';

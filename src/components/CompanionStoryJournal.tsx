@@ -39,7 +39,7 @@ export const CompanionStoryJournal = ({ campaignRecaps = [] }: CompanionStoryJou
   );
 
   // Fetch companion evolution image for current stage with Stage 0 handling
-  const { data: evolutionImage, isLoading: isImageLoading } = useQuery<string | null>({
+  const { data: evolutionImage } = useQuery<string | null>({
     queryKey: ["companion-evolution-image", companion?.id, debouncedStage],
     queryFn: async () => {
       if (!companion) return null;

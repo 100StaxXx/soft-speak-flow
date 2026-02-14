@@ -232,7 +232,7 @@ export async function hasActiveNativePushSubscription(userId: string): Promise<b
 /**
  * Debug function to manually test registration
  */
-export async function debugTestRegistration(userId: string): Promise<{
+export async function debugTestRegistration(_userId: string): Promise<{
   platform: string;
   isNative: boolean;
   isSupported: boolean;

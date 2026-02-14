@@ -77,7 +77,7 @@ export const AnalyticsDashboard = () => {
         <Card className="p-6 bg-card border-border shadow-soft">
           <h3 className="font-display text-xl text-foreground mb-4">30-Day Habit Trend</h3>
           <div className="h-48 flex items-end justify-between gap-1">
-            {habitTrends?.map((day, index) => {
+            {habitTrends?.map((day) => {
               const maxCount = Math.max(...(habitTrends.map(d => d.count) || [1]));
               const height = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
               return (
@@ -106,7 +106,7 @@ export const AnalyticsDashboard = () => {
           <Card className="p-6 bg-card border-border shadow-soft">
             <h3 className="font-display text-xl text-foreground mb-4">Mood Distribution</h3>
             <div className="space-y-3">
-              {moodTrends.map((mood, index) => {
+              {moodTrends.map((mood) => {
                 const maxCount = Math.max(...moodTrends.map(m => m.count));
                 const percentage = (mood.count / maxCount) * 100;
                 return (

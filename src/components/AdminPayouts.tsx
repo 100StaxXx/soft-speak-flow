@@ -4,14 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   DollarSign,
   CheckCircle2,
   XCircle,
-  Clock,
   Send,
   Loader2,
   Users,
@@ -235,45 +233,6 @@ export const AdminPayouts = () => {
     onError: (error) => {
       console.error("Failed to process payout:", error);
       toast.error(`Failed to process payout: ${error.message}`);
-      setProcessingId(null);
-    },
-  });
-
-  // Retry failed payout mutation
-  const retryPayoutMutation = useMutation({
-    mutationFn: async (payoutId: string) => {
-      setProcessingId(payoutId);
-      // First reset the payout status to approved so it can be processed again
-      const { error: updateError } = await supabase
-        .from("referral_payouts")
-        .update({
-          status: "approved",
-          failure_reason: null,
-        })
-        .eq("id", payoutId);
-
-      if (updateError) throw updateError;
-
-      // Then process it
-      const { data, error } = await supabase.functions.invoke(
-        "process-paypal-payout",
-        {
-          body: { payout_id: payoutId },
-        }
-      );
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-referral-payouts"] });
-      toast.success(`Retry successful! PayPal Batch ID: ${data.payout_batch_id}`);
-      setProcessingId(null);
-    },
-    onError: (error) => {
-      console.error("Failed to retry payout:", error);
-      toast.error(`Failed to retry payout: ${error.message}`);
       setProcessingId(null);
     },
   });

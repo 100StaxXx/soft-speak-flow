@@ -4,7 +4,6 @@ import {
   Zap, 
   Circle, 
   Rocket,
-  Moon,
   Sparkles,
   Music,
   Brain,

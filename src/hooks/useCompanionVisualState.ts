@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { CompanionMoodState } from './useCompanionHealth';
-import { useCompanionCareSignals, type CareSignals } from './useCompanionCareSignals';
+import { useCompanionCareSignals } from './useCompanionCareSignals';
 
 interface VisualState {
   filter: string;
@@ -17,11 +17,11 @@ interface VisualState {
  * Users see the effects but never the underlying numbers.
  */
 export const useCompanionVisualState = (
-  moodState: CompanionMoodState,
-  hunger: number,
-  happiness: number,
+  _moodState: CompanionMoodState,
+  _hunger: number,
+  _happiness: number,
   isAlive: boolean,
-  recoveryProgress: number
+  _recoveryProgress: number
 ) => {
   const { care } = useCompanionCareSignals();
 

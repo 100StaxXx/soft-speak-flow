@@ -13,12 +13,25 @@ import type { DailyTask } from './useTasksQuery';
  * - When app resumes from background
  * - Force sync shortly after mount
  */
-export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
+interface WidgetSyncOptions {
+  enabled?: boolean;
+}
+
+export const useWidgetSync = (
+  tasks: DailyTask[],
+  taskDate: string,
+  options: WidgetSyncOptions = {},
+) => {
+  const { enabled = true } = options;
   const lastSyncRef = useRef<string>('');
   const syncRef = useRef<(force?: boolean) => void>(() => {});
   const isIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
   
   const syncToWidget = useCallback(async (force = false) => {
+    if (!enabled) {
+      return;
+    }
+
     // Only run on iOS native platform
     if (!isIOS) {
       return;
@@ -74,7 +87,7 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     } catch (error) {
       console.error('[WidgetSync] Failed to sync:', error);
     }
-  }, [tasks, taskDate, isIOS]);
+  }, [enabled, tasks, taskDate, isIOS]);
 
   useEffect(() => {
     syncRef.current = syncToWidget;
@@ -82,12 +95,15 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
   
   // Sync whenever tasks change
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     syncToWidget();
-  }, [syncToWidget]);
+  }, [enabled, syncToWidget]);
   
   // Force sync shortly after mount
   useEffect(() => {
-    if (!isIOS) {
+    if (!enabled || !isIOS) {
       return;
     }
 
@@ -95,11 +111,11 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
       syncRef.current(true);
     }, 500);
     return () => clearTimeout(timer);
-  }, [isIOS]);
+  }, [enabled, isIOS]);
   
   // Sync when app resumes from background (single listener, latest callback via ref)
   useEffect(() => {
-    if (!isIOS) return;
+    if (!enabled || !isIOS) return;
     
     const listener = App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
@@ -110,7 +126,7 @@ export const useWidgetSync = (tasks: DailyTask[], taskDate: string) => {
     return () => {
       listener.then(l => l.remove());
     };
-  }, [isIOS]);
+  }, [enabled, isIOS]);
   
   return { syncToWidget };
 };

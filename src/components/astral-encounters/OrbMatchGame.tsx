@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
-import { triggerHaptic, useStaticStars } from './gameUtils';
+import { triggerHaptic } from './gameUtils';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -283,7 +283,7 @@ const LevelCompleteOverlay = memo(({
 LevelCompleteOverlay.displayName = 'LevelCompleteOverlay';
 
 // Level Indicator Badge - compact
-const LevelIndicator = memo(({ level, progress, targetScore }: { level: number; progress: number; targetScore: number }) => (
+const LevelIndicator = memo(({ level, progress }: { level: number; progress: number }) => (
   <div className="absolute left-1 top-1 z-40">
     <div className="flex items-center gap-1.5 px-2 py-1 bg-black/60 rounded-full border border-purple-500/40 backdrop-blur-sm">
       <span className="text-[10px] font-bold text-purple-400">LVL</span>
@@ -463,9 +463,9 @@ CosmicNovaEffect.displayName = 'CosmicNovaEffect';
 
 // OPTIMIZED Orb Component - CSS transforms only, no Framer layout
 const OrbComponent = memo(({ 
-  orb, cellSize, isSelected, isDragging, isInPath, isReverting, showAccessibility,
+  orb, cellSize, isSelected, isInPath, isReverting, showAccessibility,
 }: { 
-  orb: Orb; cellSize: number; isSelected: boolean; isDragging: boolean;
+  orb: Orb; cellSize: number; isSelected: boolean;
   isInPath: boolean; isReverting?: boolean; showAccessibility?: boolean;
 }) => {
   const colorConfig = ORB_COLORS[orb.color];
@@ -1266,7 +1266,7 @@ export const OrbMatchGame = ({
       />
 
       <div className="relative w-full max-w-xs mb-2">
-        <LevelIndicator level={level} progress={scoreProgress} targetScore={levelConfig.targetScore} />
+        <LevelIndicator level={level} progress={scoreProgress} />
         <div className="absolute right-0 top-0">
           <ScoreProgressRing progress={scoreProgress} isComplete={score >= levelConfig.targetScore} />
         </div>
@@ -1309,7 +1309,7 @@ export const OrbMatchGame = ({
         {orbs.map(orb => (
           <OrbComponent
             key={orb.id} orb={orb} cellSize={cellSize}
-            isSelected={selectedOrb?.id === orb.id} isDragging={isDraggingRef.current}
+            isSelected={selectedOrb?.id === orb.id}
             isInPath={dragPath.includes(orb.id)} isReverting={revertingOrbs.has(orb.id)}
             showAccessibility={showAccessibility}
           />

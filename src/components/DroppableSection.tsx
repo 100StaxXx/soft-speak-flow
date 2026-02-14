@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sunrise, Sun, Moon, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";

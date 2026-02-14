@@ -152,7 +152,7 @@ export const useGuildBlessings = ({ epicId, communityId }: UseGuildBlessingsOpti
   });
 
   // Fetch recent blessings in the guild (feed)
-  const { data: recentBlessings, isLoading: isLoadingRecent } = useQuery({
+  const { data: recentBlessings } = useQuery({
     queryKey: ["guild-blessings-feed", epicId, communityId],
     queryFn: async () => {
       let query = supabase

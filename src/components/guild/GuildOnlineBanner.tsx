@@ -4,7 +4,7 @@
  */
 
 import { motion } from "framer-motion";
-import { Users, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GuildMemberPresence } from "@/hooks/useGuildPresence";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

@@ -1,8 +1,6 @@
-import React from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { Target, Star, Check, GripVertical } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 

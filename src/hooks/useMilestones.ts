@@ -181,7 +181,6 @@ export const useMilestones = (epicId?: string) => {
     
     const totalDays = differenceInDays(endDate, startDate);
     const daysElapsed = differenceInDays(today, startDate);
-    const daysRemaining = differenceInDays(endDate, today);
     
     if (totalDays <= 0) return null;
 
@@ -282,7 +281,7 @@ export const useMilestones = (epicId?: string) => {
   const completeMilestone = useMutation({
     mutationFn: async ({ 
       milestoneId,
-      epicId: mutationEpicId,
+      epicId: _mutationEpicId,
       onPostcardTrigger 
     }: {
       milestoneId: string;

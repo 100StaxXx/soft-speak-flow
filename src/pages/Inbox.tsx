@@ -18,6 +18,7 @@ import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { haptics } from "@/utils/haptics";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
+import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,14 +26,19 @@ const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const InboxPage = memo(function InboxPage() {
   const prefersReducedMotion = useReducedMotion();
   const { user } = useAuth();
+  const { isTabActive } = useMainTabVisibility();
   const queryClient = useQueryClient();
-  const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask } = useInboxTasks();
+  const { inboxTasks, inboxCount, isLoading, toggleInboxTask, deleteInboxTask } = useInboxTasks({
+    enabled: isTabActive,
+  });
 
   const [showAddQuest, setShowAddQuest] = useState(false);
   const [editingTask, setEditingTask] = useState<typeof inboxTasks[number] | null>(null);
 
   const { addTask, updateTask, isUpdating } = useTaskMutations(format(new Date(), "yyyy-MM-dd"));
-  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync();
+  const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync({
+    enabled: isTabActive,
+  });
 
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
     let taskDateOverride: string | undefined;

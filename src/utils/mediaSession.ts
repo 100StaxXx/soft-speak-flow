@@ -23,8 +23,6 @@ interface MediaSessionState {
   playbackState?: MediaSessionPlaybackState;
 }
 
-let currentHandlers: MediaSessionHandlers | null = null;
-
 /**
  * Setup Media Session API with handlers
  */
@@ -32,8 +30,6 @@ export function setupMediaSession(handlers: MediaSessionHandlers & { title?: str
   if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) {
     return; // Media Session API not supported
   }
-
-  currentHandlers = handlers;
 
   const { mediaSession } = navigator;
 
@@ -58,13 +54,13 @@ export function setupMediaSession(handlers: MediaSessionHandlers & { title?: str
   }
 
   if (handlers.onSeekBackward) {
-    mediaSession.setActionHandler('seekbackward', (details) => {
+    mediaSession.setActionHandler('seekbackward', () => {
       handlers.onSeekBackward?.();
     });
   }
 
   if (handlers.onSeekForward) {
-    mediaSession.setActionHandler('seekforward', (details) => {
+    mediaSession.setActionHandler('seekforward', () => {
       handlers.onSeekForward?.();
     });
   }
@@ -164,5 +160,4 @@ export function clearMediaSession() {
   // Clear playback state
   mediaSession.playbackState = 'none';
 
-  currentHandlers = null;
 }

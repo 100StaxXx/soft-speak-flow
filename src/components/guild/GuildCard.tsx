@@ -29,7 +29,7 @@ export const GuildCard = ({ community, isSelected, onClick, memberCount }: Guild
   const {
     banner_style = 'cosmic',
     emblem_icon = 'shield',
-    frame_style = 'ornate',
+    frame_style: _frame_style = 'ornate',
     glow_effect = 'pulse',
     particle_effect = 'stars',
   } = community;

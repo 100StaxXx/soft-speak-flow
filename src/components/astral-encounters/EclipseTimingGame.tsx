@@ -243,7 +243,7 @@ HitEffect.displayName = 'HitEffect';
 // Enhanced lane button with better touch handling
 const LaneButton = memo(({ 
   lane, 
-  laneIndex, 
+  laneIndex: _laneIndex, 
   onTap, 
   isPressed,
   hasApproachingNote,
@@ -386,18 +386,17 @@ const TrackLoadingScreen = memo(({ isGenerating }: { isGenerating?: boolean }) =
 TrackLoadingScreen.displayName = 'TrackLoadingScreen';
 
 export const EclipseTimingGame = ({
-  companionStats,
+  companionStats: _companionStats,
   onComplete,
   onDamage,
-  tierAttackDamage = 15,
+  tierAttackDamage: _tierAttackDamage = 15,
   difficulty = 'medium',
-  questIntervalScale = 0,
-  maxTimer,
+  questIntervalScale: _questIntervalScale = 0,
+  maxTimer: _maxTimer,
   isPractice = false,
   compact = false,
 }: EclipseTimingGameProps) => {
   const [gameState, setGameState] = useState<'loading' | 'countdown' | 'playing' | 'paused' | 'rating' | 'complete'>('loading');
-  const [songsPlayed, setSongsPlayed] = useState(0);
   const [gameStats, setGameStats] = useState<GameStats>(initialGameStats);
   const [visibleNotes, setVisibleNotes] = useState<Note[]>([]);
   const [hitEffects, setHitEffects] = useState<{ id: number; lane: LaneType; result: HitResult }[]>([]);
@@ -420,9 +419,8 @@ export const EclipseTimingGame = ({
   const loadingStartRef = useRef<number>(0);
   
   const stars = useStaticStars(20);
-  const config = DIFFICULTY_CONFIG[difficulty];
-  
-  const { track, isLoading, isGenerating, error, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
+
+  const { isGenerating, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
 
   
 
@@ -675,7 +673,6 @@ export const EclipseTimingGame = ({
     setVisibleNotes([]);
     setHitEffects([]);
     setGameResult(null);
-    setSongsPlayed(prev => prev + 1);
     setGameState('loading');
     loadingStartRef.current = Date.now();
     

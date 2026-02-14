@@ -1,9 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, AlertTriangle, Heart, Moon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
-import { useProfile } from "@/hooks/useProfile";
-import { useAuth } from "@/hooks/useAuth";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionVisualState } from "@/hooks/useCompanionVisualState";
@@ -22,7 +20,6 @@ import { EvolutionPathBadge } from "@/components/companion/EvolutionPathBadge";
 import { DormancyWarning, DormantOverlay } from "@/components/companion/DormancyWarning";
 import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
-import { NursingMode } from "@/components/companion/NursingMode";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,14 +92,12 @@ const getColorName = (hexColor: string): string => {
 };
 
 export const CompanionDisplay = memo(() => {
-  const { user } = useAuth();
-  const { profile } = useProfile();
-  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, error, canEvolve, triggerManualEvolution } = useCompanion();
+  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, canEvolve, triggerManualEvolution } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
-  const { isEvolvingLoading } = useEvolution();
+  useEvolution();
   
   // Wake-up celebration detection
   const {

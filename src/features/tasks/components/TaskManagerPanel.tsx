@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Timer, BarChart3, Target } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,8 +30,8 @@ export function TaskManagerPanel({
   className,
 }: TaskManagerPanelProps) {
   const [activeTab, setActiveTab] = useState('focus');
-  const [focusTaskId, setFocusTaskId] = useState<string | undefined>();
-  const [focusTaskName, setFocusTaskName] = useState<string | undefined>();
+  const [focusTaskId] = useState<string | undefined>();
+  const [focusTaskName] = useState<string | undefined>();
 
   const handleTaskAdd = (parsed: ParsedTask) => {
     onAddTask(parsed.text, {

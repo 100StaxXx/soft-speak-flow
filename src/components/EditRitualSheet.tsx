@@ -25,7 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { HabitDifficultySelector } from "@/components/HabitDifficultySelector";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { NaturalLanguageEditor } from "@/features/quests/components/NaturalLanguageEditor";
-import { FrequencyPresets, getDefaultDaysForFrequency } from "@/components/Pathfinder/FrequencyPresets";
+import { FrequencyPresets } from "@/components/Pathfinder/FrequencyPresets";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";

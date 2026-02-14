@@ -15,7 +15,6 @@ import {
   Trash2,
   DollarSign,
   Percent,
-  Clock,
   Shield,
 } from "lucide-react";
 

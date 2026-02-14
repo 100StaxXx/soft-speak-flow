@@ -16,7 +16,7 @@ interface EphemeralReorderState {
 export function useEphemeralReorder<T>({
   items,
   onCommitOrder,
-  getKey,
+  getKey: _getKey,
   swapThreshold = 0.6,
 }: UseEphemeralReorderOptions<T>) {
   // Visual order stored in ref (no re-renders during drag)

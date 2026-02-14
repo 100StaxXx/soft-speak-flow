@@ -60,6 +60,20 @@ export interface Companion {
 
 export const XP_REWARDS = SYSTEM_XP_REWARDS;
 
+export const getCompanionQueryKey = (userId: string | undefined) =>
+  ["companion", userId] as const;
+
+export const fetchCompanion = async (userId: string): Promise<Companion | null> => {
+  const { data, error } = await supabase
+    .from("user_companion")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as Companion | null;
+};
+
 export const useCompanion = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -74,18 +88,11 @@ export const useCompanion = () => {
   const companionCreationInProgress = useRef(false);
 
   const { data: companion, isLoading, error, refetch } = useQuery({
-    queryKey: ["companion", user?.id],
+    queryKey: getCompanionQueryKey(user?.id),
     queryFn: async () => {
       if (!user) return null;
-      
-      const { data, error } = await supabase
-        .from("user_companion")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
 
-      if (error) throw error;
-      return data as Companion | null;
+      return fetchCompanion(user.id);
     },
     enabled: !!user,
     staleTime: 60000, // 1 minute - prevents unnecessary refetches and tab flash
@@ -264,7 +271,7 @@ export const useCompanion = () => {
         const generateStoryWithRetry = async (attempts = 3) => {
           for (let attempt = 1; attempt <= attempts; attempt++) {
             try {
-              const { data, error } = await supabase.functions.invoke('generate-companion-story', {
+              const { error } = await supabase.functions.invoke('generate-companion-story', {
                 body: {
                   companionId: companionData.id,
                   stage: 0,
@@ -369,7 +376,7 @@ export const useCompanion = () => {
         xpInProgress.current = false;
       }
     },
-    onSuccess: async ({ shouldEvolve, newStage, newXP }) => {
+    onSuccess: async ({ shouldEvolve, newStage }) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
       if (shouldEvolve && companion) {
@@ -392,8 +399,8 @@ export const useCompanion = () => {
   const performXPAward = async (
     companionData: Companion,
     xpAmount: number,
-    eventType: string,
-    metadata: Record<string, string | number | boolean | undefined>,
+    _eventType: string,
+    _metadata: Record<string, string | number | boolean | undefined>,
     currentUser: typeof user
   ) => {
     if (!currentUser?.id) {
@@ -523,7 +530,7 @@ export const useCompanion = () => {
   };
 
   const evolveCompanion = useMutation({
-    mutationFn: async ({ newStage, currentXP }: { newStage: number; currentXP: number }) => {
+    mutationFn: async ({ newStage: _newStage, currentXP: _currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
       if (evolutionInProgress.current) {
         logger.log('Evolution already in progress, rejecting duplicate request');
@@ -596,7 +603,6 @@ export const useCompanion = () => {
           return null; // Return null instead of throwing when evolution isn't needed
         }
 
-      const evolutionId = evolutionData.evolution_id;
         const newStage = evolutionData.new_stage;
         const oldStage = companion.current_stage;
 

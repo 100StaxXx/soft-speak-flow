@@ -63,12 +63,6 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
     return hourTasks.length > 1;
   };
 
-  const difficultyColors = {
-    easy: "border-l-4 border-l-emerald-500 bg-emerald-500/10",
-    medium: "border-l-4 border-l-amber-500 bg-amber-500/10",
-    hard: "border-l-4 border-l-rose-500 bg-rose-500/10"
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

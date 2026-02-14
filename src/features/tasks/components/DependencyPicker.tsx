@@ -16,7 +16,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { useTaskDependencies } from '../hooks/useTaskDependencies';
-import { useTasksQuery, DailyTask } from '@/hooks/useTasksQuery';
+import { useTasksQuery } from '@/hooks/useTasksQuery';
 import { cn } from '@/lib/utils';
 
 interface DependencyPickerProps {

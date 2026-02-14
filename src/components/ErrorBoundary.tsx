@@ -1,6 +1,5 @@
 import React, { Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
 

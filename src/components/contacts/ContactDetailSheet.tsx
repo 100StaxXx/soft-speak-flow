@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Mail, Phone, Building2, Star, Plus, Bell } from 'lucide-react';
+import { Mail, Phone, Star, Plus, Bell } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -18,7 +18,6 @@ import { InteractionDialog } from './InteractionDialog';
 import { InteractionsList } from './InteractionsList';
 import { ReminderDialog } from './ReminderDialog';
 import { RemindersList } from './RemindersList';
-import { cn } from '@/lib/utils';
 
 interface ContactDetailSheetProps {
   contact: Contact | null;

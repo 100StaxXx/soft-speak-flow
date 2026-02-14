@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Trophy, Flame } from "lucide-react";
 import confetti from "canvas-confetti";
 import { haptics } from "@/utils/haptics";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ShareableStreakBadge } from "./ShareableStreakBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -22,8 +22,6 @@ export const MilestoneModal = ({
   habitTitle,
   mentorName 
 }: MilestoneModalProps) => {
-  const [audioPlaying, setAudioPlaying] = useState(false);
-
   useEffect(() => {
     if (open) {
       haptics.success(); // Haptic celebration

@@ -4,7 +4,6 @@ import { Plus, Clock, RotateCcw, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { RitualCard } from './RitualCard';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';

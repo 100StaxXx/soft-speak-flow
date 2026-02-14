@@ -8,8 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Skull,
@@ -49,8 +47,8 @@ export const GuildBossCard = ({
   timeRemaining,
   damageLeaderboard,
   myTotalDamage,
-  recentDamage,
-  onViewDetails,
+  recentDamage: _recentDamage,
+  onViewDetails: _onViewDetails,
 }: GuildBossCardProps) => {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [animatedHp, setAnimatedHp] = useState(hpPercentage);

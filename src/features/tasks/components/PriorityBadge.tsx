@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Flag, AlertTriangle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { AlertTriangle, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';

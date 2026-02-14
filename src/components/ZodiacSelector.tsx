@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import ariesImg from "@/assets/zodiac-aries.png";
 import taurusImg from "@/assets/zodiac-taurus.png";

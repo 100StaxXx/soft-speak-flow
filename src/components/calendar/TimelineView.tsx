@@ -34,7 +34,7 @@ export function TimelineView({
   milestones = [],
   onTaskClick,
   onTaskLongPress,
-  onTimeSlotLongPress,
+  onTimeSlotLongPress: _onTimeSlotLongPress,
   onMilestoneClick,
   onAddClick,
   onTaskReschedule,

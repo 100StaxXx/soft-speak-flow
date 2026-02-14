@@ -33,17 +33,22 @@ interface ProviderCalendarOption {
   isPrimary?: boolean;
 }
 
+interface CalendarIntegrationsOptions {
+  enabled?: boolean;
+}
+
 const providerToFunction = (provider: CalendarProvider) => `${provider}-calendar-auth`;
 
 const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 
-export function useCalendarIntegrations() {
+export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { enabled = true } = options;
 
   const settingsQuery = useQuery({
     queryKey: ['calendar-user-settings', user?.id],
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return null;
 
@@ -60,7 +65,7 @@ export function useCalendarIntegrations() {
 
   const connectionsQuery = useQuery({
     queryKey: ['calendar-connections', user?.id],
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     queryFn: async () => {
       if (!user?.id) return [];
 

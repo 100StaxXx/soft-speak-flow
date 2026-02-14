@@ -59,7 +59,7 @@ const DEFAULT_ADAPTIVE_SNAP_CONFIG: AdaptiveSnapConfig = {
   coarseStepMinutes: 15,
   fineStepMinutes: 5,
   minMinute: 0,
-  maxMinute: (24 * 60) - 5,
+  maxMinute: (24 * 60) - 1,
   coarseHoursPerViewport: 6,
   fineHoursPerViewport: 2,
   precisionActivationMode: "manual-hold",

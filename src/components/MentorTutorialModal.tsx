@@ -1,5 +1,5 @@
 import { TutorialModal } from "@/components/ui/TutorialModal";
-import { MessageCircle, Mic, Sun, Moon, HelpCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Mic, Sun, HelpCircle, Sparkles } from "lucide-react";
 
 interface MentorTutorialModalProps {
   open: boolean;

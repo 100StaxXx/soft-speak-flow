@@ -25,17 +25,6 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useMilestones } from "@/hooks/useMilestones";
 
-type JourneyTheme = 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
-
-const themeGradients: Record<JourneyTheme, string> = {
-  heroic: "from-epic-heroic/15 to-purple-500/15",
-  warrior: "from-epic-warrior/15 to-orange-500/15",
-  mystic: "from-epic-mystic/15 to-blue-500/15",
-  nature: "from-epic-nature/15 to-emerald-500/15",
-  solar: "from-epic-solar/15 to-amber-500/15"
-};
-
-
 interface Journey {
   id: string;
   user_id: string;
@@ -95,8 +84,6 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
   );
   const isCompleted = journey.status === "completed";
   const isActive = journey.status === "active";
-  const theme = (journey.theme_color || 'heroic') as JourneyTheme;
-  const themeGradient = themeGradients[theme];
   
   // Track if we've attempted backfill to prevent duplicate calls
   const backfillAttempted = useRef(false);

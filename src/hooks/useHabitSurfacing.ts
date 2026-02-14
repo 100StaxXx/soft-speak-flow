@@ -68,7 +68,7 @@ function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number): boolean {
   }
 }
 
-export function useHabitSurfacing(selectedDate?: Date) {
+export function useHabitSurfacing(_selectedDate?: Date) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   

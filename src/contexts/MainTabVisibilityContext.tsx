@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 interface MainTabVisibilityContextValue {
   isTabActive: boolean;
@@ -15,8 +15,10 @@ export const MainTabVisibilityProvider = ({
   isTabActive: boolean;
   children: ReactNode;
 }) => {
+  const value = useMemo(() => ({ isTabActive }), [isTabActive]);
+
   return (
-    <MainTabVisibilityContext.Provider value={{ isTabActive }}>
+    <MainTabVisibilityContext.Provider value={value}>
       {children}
     </MainTabVisibilityContext.Provider>
   );

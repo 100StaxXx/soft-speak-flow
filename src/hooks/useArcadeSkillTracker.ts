@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { MiniGameType } from '@/types/astralEncounters';
-import { ArcadeDifficulty, DIFFICULTY_ORDER, getNextDifficulty, getPrevDifficulty } from '@/types/arcadeDifficulty';
+import { ArcadeDifficulty, getNextDifficulty, getPrevDifficulty } from '@/types/arcadeDifficulty';
 import { safeLocalStorage } from '@/utils/storage';
 
 interface GameResult {

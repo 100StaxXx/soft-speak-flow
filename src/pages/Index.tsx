@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, memo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,14 +21,10 @@ import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
-import {
-  getOnboardingMentorId,
-  getResolvedMentorId,
-  isInvalidMentorReferenceError,
-  stripOnboardingMentorId,
-} from "@/utils/mentor";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { useMentorConnectionHealth } from "@/hooks/useMentorConnectionHealth";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -36,6 +32,7 @@ type IndexProps = {
 
 const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { user } = useAuth();
+  const { isTabActive } = useMainTabVisibility();
   const { profile, loading: profileLoading } = useProfile();
   const { companion, isLoading: companionLoading } = useCompanion();
   const { isTransitioning } = useTheme();
@@ -48,47 +45,11 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     window.scrollTo(0, 0);
   }, []);
 
-  // Combined initialization effect for better performance
-  const resolvedMentorId = useMemo(() => getResolvedMentorId(profile), [profile]);
-
-  // Backfill mentor selection for users who completed onboarding but never persisted the mentor ID
-  useEffect(() => {
-    const syncMentorSelection = async () => {
-      if (!user || !profile) return;
-
-      const onboardingMentorId = getOnboardingMentorId(profile);
-      const needsBackfill = profile.onboarding_completed && !profile.selected_mentor_id && onboardingMentorId;
-
-      if (!needsBackfill) return;
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ selected_mentor_id: onboardingMentorId })
-        .eq("id", user.id);
-
-      if (error) {
-        console.error("Failed to backfill mentor selection:", error);
-        if (isInvalidMentorReferenceError(error)) {
-          const sanitizedOnboardingData = stripOnboardingMentorId(profile.onboarding_data);
-          const { error: cleanupError } = await supabase
-            .from("profiles")
-            .update({ onboarding_data: sanitizedOnboardingData })
-            .eq("id", user.id);
-
-          if (cleanupError) {
-            console.error("Failed to clear stale onboarding mentor ID:", cleanupError);
-          } else {
-            await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-          }
-        }
-        return;
-      }
-
-      await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
-    };
-
-    void syncMentorSelection();
-  }, [profile, queryClient, user]);
+  const {
+    effectiveMentorId,
+    status: mentorConnectionStatus,
+    refreshConnection,
+  } = useMentorConnectionHealth();
 
   // Use React Query for mentor data with proper caching
   const {
@@ -96,14 +57,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     isLoading: mentorPageDataLoading,
     isError: mentorPageDataError,
   } = useQuery({
-    queryKey: ['mentor-page-data', resolvedMentorId],
+    queryKey: ['mentor-page-data', effectiveMentorId],
     queryFn: async () => {
-      if (!resolvedMentorId) return null;
+      if (!effectiveMentorId) return null;
 
       const { data: mentorData, error: mentorError } = await supabase
         .from("mentors")
         .select("avatar_url, slug")
-        .eq("id", resolvedMentorId)
+        .eq("id", effectiveMentorId)
         .maybeSingle();
 
       if (mentorError) throw mentorError;
@@ -151,7 +112,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
 
       return { mentorImage: imageUrl, todaysQuote: quote };
     },
-    enabled: !!resolvedMentorId,
+    enabled: isTabActive && !!effectiveMentorId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     placeholderData: (previousData) => previousData, // Keep showing cached data during refetch
   });
@@ -165,7 +126,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     // Wait for both profile and companion to finish loading
     const loadingComplete = !profileLoading && !companionLoading;
 
-    const hasMentor = !!resolvedMentorId;
+    const hasMentor = !!effectiveMentorId;
 
     // Mentor is ready if: no mentor needed, OR we have cached data, OR initial load complete
     const mentorDataReady = !hasMentor || !!mentorPageData || !mentorPageDataLoading;
@@ -175,17 +136,15 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     user,
     profileLoading,
     companionLoading,
-    resolvedMentorId,
+    effectiveMentorId,
     mentorPageData,
     mentorPageDataLoading,
   ]);
 
-  const mentorConnectionMissing =
-    !enableOnboardingGuard &&
-    (!resolvedMentorId || (Boolean(resolvedMentorId) && !mentorPageDataLoading && !mentorPageData && !mentorPageDataError));
+  const mentorConnectionMissing = !enableOnboardingGuard && mentorConnectionStatus === "missing";
   const mentorConnectionIssue =
     !enableOnboardingGuard &&
-    Boolean(resolvedMentorId) &&
+    Boolean(effectiveMentorId) &&
     !mentorPageDataLoading &&
     !mentorPageData &&
     mentorPageDataError;
@@ -210,14 +169,14 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
     // If onboarding is explicitly completed, don't force users back into the flow
     if (profile.onboarding_completed === true) return;
 
-    const missingMentor = !resolvedMentorId;
+    const missingMentor = !effectiveMentorId;
     const explicitlyIncomplete = profile.onboarding_completed === false;
     const missingCompanion = !companion && !companionLoading;
 
     if (missingMentor || explicitlyIncomplete || missingCompanion) {
       navigate("/onboarding");
     }
-  }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, resolvedMentorId]);
+  }, [enableOnboardingGuard, user, isReady, profile, companion, companionLoading, navigate, effectiveMentorId]);
 
   // Show loading state with skeleton while critical data loads
   if (isTransitioning || !isReady) {
@@ -282,6 +241,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                 </div>
                 <Button
                   onClick={() => {
+                    void refreshConnection();
                     void queryClient.refetchQueries({ queryKey: ["mentor-page-data"] });
                     void queryClient.refetchQueries({ queryKey: ["mentor-personality"] });
                   }}

@@ -41,8 +41,6 @@ export const SendShoutDrawer = ({
   const [selectedType, setSelectedType] = useState<ShoutType>('hype');
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
-  const messages = getShoutsByType(selectedType);
-
   const handleSend = () => {
     if (!selectedMessage) return;
     onSendShout(selectedType, selectedMessage);

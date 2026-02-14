@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Repeat, Flag, Sparkles } from 'lucide-react';
+import { Check, Repeat, Flag } from 'lucide-react';
 import { cn, stripMarkdown } from '@/lib/utils';
 import type { EpicSuggestion } from '@/hooks/useEpicSuggestions';
 

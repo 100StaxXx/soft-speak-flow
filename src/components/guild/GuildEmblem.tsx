@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { 
   Shield, Sword, Crown, Star, Flame, Snowflake,
-  Zap, Moon, Sun, Heart, Diamond, Hexagon
+  Zap, Moon, Diamond, Hexagon
 } from "lucide-react";
 
 export type EmblemIcon = 'shield' | 'sword' | 'dragon' | 'crown' | 'phoenix' | 'wolf' | 'star' | 'crystal' | 'flame' | 'ice' | 'lightning' | 'moon';

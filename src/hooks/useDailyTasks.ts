@@ -2,21 +2,26 @@ import { useTasksQuery, type DailyTask } from "./useTasksQuery";
 import { useTaskMutations, type AddTaskParams } from "./useTaskMutations";
 import { useWidgetSync } from "./useWidgetSync";
 
+interface DailyTasksOptions {
+  enabled?: boolean;
+}
+
 /**
  * Composite hook for daily tasks - maintains backward compatibility
  * while using smaller, focused hooks internally
  */
-export const useDailyTasks = (selectedDate?: Date) => {
+export const useDailyTasks = (selectedDate?: Date, options: DailyTasksOptions = {}) => {
+  const { enabled = true } = options;
   const { 
     tasks, 
     isLoading, 
     taskDate, 
     completedCount, 
     totalCount 
-  } = useTasksQuery(selectedDate);
+  } = useTasksQuery(selectedDate, { enabled });
   
   // Sync tasks to iOS WidgetKit extension
-  useWidgetSync(tasks, taskDate);
+  useWidgetSync(tasks, taskDate, { enabled });
   
   const { 
     addTask, 

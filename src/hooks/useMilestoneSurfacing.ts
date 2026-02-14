@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
-import { calculateChapterMilestones, getCurrentChapter } from '@/utils/epicMilestones';
+import { calculateChapterMilestones } from '@/utils/epicMilestones';
 
 export interface EpicMilestone {
   id: string;
@@ -55,13 +55,11 @@ export function useMilestoneSurfacing(selectedDate?: Date) {
       for (const epic of epics || []) {
         const totalChapters = epic.total_chapters || 5;
         const chapterMilestones = calculateChapterMilestones(totalChapters);
-        const currentChapter = getCurrentChapter(epic.progress_percentage || 0, totalChapters);
 
         chapterMilestones.forEach((percent, index) => {
           const key = `${epic.id}-${percent}`;
           const existing = milestoneMap.get(key);
           const chapterNum = index + 1;
-          const isReached = (epic.progress_percentage || 0) >= percent;
 
           allMilestones.push({
             id: existing?.id || key,

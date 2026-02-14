@@ -13,7 +13,7 @@ export interface FallbackResponse {
  */
 export const getFallbackResponse = (
   userMessage: string,
-  mentorName: string,
+  _mentorName: string,
   mentorTone: string
 ): FallbackResponse => {
   const lowerMessage = userMessage.toLowerCase();
@@ -143,7 +143,7 @@ function getDefaultResponse(isTough: boolean, isEmpathetic: boolean): string {
 /**
  * Get a connection error fallback message
  */
-export const getConnectionErrorFallback = (mentorName: string): FallbackResponse => {
+export const getConnectionErrorFallback = (_mentorName: string): FallbackResponse => {
   return {
     content: `I'm having trouble connecting right now, but I'm here for you. While we work on restoring the connection, remember: you already have the strength and wisdom within you to move forward. Trust yourself and take action on what you know you need to do.`,
     isFallback: true
@@ -153,7 +153,7 @@ export const getConnectionErrorFallback = (mentorName: string): FallbackResponse
 /**
  * Get a rate limit fallback message
  */
-export const getRateLimitFallback = (mentorName: string): FallbackResponse => {
+export const getRateLimitFallback = (_mentorName: string): FallbackResponse => {
   return {
     content: `You've been very active today - that's great commitment! While you've reached today's message limit, use this time to take action on the guidance we've discussed. Sometimes doing is more powerful than talking about doing. See you tomorrow!`,
     isFallback: true

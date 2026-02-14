@@ -1,7 +1,4 @@
 import { useActivityFeed } from "@/hooks/useActivityFeed";
-import { SkeletonTimeline } from "@/components/SkeletonCard";
-import { EmptyState } from "@/components/EmptyState";
-import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { CheckCircle, MessageSquare, Heart, Target, Calendar, Volume2, Sparkles, Reply, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -42,7 +39,7 @@ const activityLabels: Record<string, string> = {
 
 export const ActivityTimeline = () => {
   const { user } = useAuth();
-  const { activities, isLoading, markAsRead } = useActivityFeed();
+  const { activities, markAsRead } = useActivityFeed();
   const queryClient = useQueryClient();
   const personality = useMentorPersonality();
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
@@ -61,7 +58,7 @@ export const ActivityTimeline = () => {
     setIsSubmitting(true);
     try {
       // Generate AI response to the user's reply
-      const { data, error } = await supabase.functions.invoke('generate-activity-comment', {
+      const { error } = await supabase.functions.invoke('generate-activity-comment', {
         body: { 
           activityId,
           userReply: replyText.trim()
@@ -81,7 +78,7 @@ export const ActivityTimeline = () => {
     }
   };
 
-  const handleTouchStart = useCallback((e: React.TouchEvent, activityId: string) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent, _activityId: string) => {
     touchStart.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,

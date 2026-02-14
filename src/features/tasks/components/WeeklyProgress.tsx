@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { format, parseISO, isToday } from 'date-fns';
 import { CheckCircle2, Clock, Zap, TrendingUp } from 'lucide-react';

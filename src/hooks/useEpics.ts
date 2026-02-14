@@ -72,11 +72,16 @@ interface CreatedEpic {
   invite_code: string;
 }
 
-export const useEpics = () => {
+interface EpicsOptions {
+  enabled?: boolean;
+}
+
+export const useEpics = (options: EpicsOptions = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { trackEpicOutcome } = useAIInteractionTracker();
+  const { enabled = true } = options;
 
   // Fetch all epics for the user
   const { data: epics, isLoading, error: epicsError } = useQuery({
@@ -103,7 +108,7 @@ export const useEpics = () => {
       }
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 3 * 60 * 1000, // 3 minutes - epics don't change frequently
     refetchOnWindowFocus: false,
     retry: 2, // Retry failed requests up to 2 times

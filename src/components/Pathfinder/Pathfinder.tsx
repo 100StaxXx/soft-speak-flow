@@ -36,14 +36,12 @@ import { useAIInteractionTracker } from '@/hooks/useAIInteractionTracker';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useJourneySchedule, type JourneyRitual } from '@/hooks/useJourneySchedule';
 import { useIntentClassifier } from '@/hooks/useIntentClassifier';
-import { SuggestionCard } from './SuggestionCard';
 import { RitualEditor } from './RitualEditor';
 import { PostcardPreview } from './PostcardPreview';
 import { getDefaultDaysForFrequency } from './FrequencyPresets';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { themeColors } from './StoryStep';
 import { EpicClarificationFlow } from '@/features/tasks/components/EpicClarificationFlow';
-import { storyTypes } from '@/components/narrative/StoryTypeSelector';
 import { DeadlinePicker } from '@/components/JourneyWizard/DeadlinePicker';
 import { TimelineView } from '@/components/JourneyWizard/TimelineView';
 import { AdjustmentInput } from '@/components/JourneyWizard/AdjustmentInput';
@@ -129,7 +127,7 @@ export function Pathfinder({
   initialGoal = '',
   initialTargetDays,
   template,
-  showTemplatesFirst = false,
+  showTemplatesFirst: _showTemplatesFirst = false,
   clarificationAnswers,
   epicContext,
 }: PathfinderProps) {
@@ -151,7 +149,6 @@ export function Pathfinder({
   const {
     classify,
     isClassifying,
-    classification,
     clarifyEpic,
     reset: resetClassification,
   } = useIntentClassifier({ useOrchestrator: false });
@@ -176,15 +173,10 @@ export function Pathfinder({
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(template || null);
   const { medium, success, light, tap } = useHapticFeedback();
   
-  const { templates, incrementPopularity } = useEpicTemplates();
+  useEpicTemplates();
   const {
     suggestions,
-    isLoading: isGenerating,
     error,
-    generateSuggestions,
-    toggleSuggestion,
-    selectAll,
-    deselectAll,
     getSelectedSuggestions,
     reset: resetSuggestions,
   } = useEpicSuggestions();

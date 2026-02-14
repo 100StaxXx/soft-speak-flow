@@ -6,8 +6,6 @@
 const DB_NAME = "cosmiq-offline-db";
 const DB_VERSION = 1;
 
-type StoreName = "tasks" | "pendingActions" | "cache";
-
 interface PendingAction {
   id: string;
   type: "COMPLETE_TASK" | "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK";

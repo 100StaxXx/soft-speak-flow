@@ -9,11 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 
-interface PresenceState {
-  odentified: boolean;
-  presence_ref: string;
-}
-
 export interface GuildMemberPresence {
   userId: string;
   onlineAt: string;

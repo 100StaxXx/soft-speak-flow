@@ -174,7 +174,7 @@ export const CosmiqGridGame = ({
   onComplete,
   onDamage,
   difficulty = 'medium',
-  isPractice = false,
+  isPractice: _isPractice = false,
 }: CosmiqGridGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
   
@@ -260,10 +260,6 @@ export const CosmiqGridGame = ({
     triggerHaptic('success');
     
     const timeUsed = config.timeLimit - timeRemaining;
-    const difficultyIndex = Object.keys(DIFFICULTY_CONFIG).indexOf(difficulty);
-    const baseXP = [25, 40, 60, 80, 100][difficultyIndex];
-    const timeBonus = Math.round((timeRemaining / config.timeLimit) * 50);
-    const hintPenalty = hintsUsed * 5;
     
     setTimeout(() => {
       const result: MiniGameResult = {

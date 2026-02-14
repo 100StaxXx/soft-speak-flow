@@ -13,9 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Gem, Lock, Sparkles, Trophy, Shield, Sword, Crown, Star } from "lucide-react";
+import { Gem, Lock, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 interface GuildArtifact {
@@ -95,23 +94,6 @@ export const GuildArtifactsDisplay = ({
     }
   };
 
-  const getArtifactIcon = (type: string) => {
-    switch (type) {
-      case 'banner':
-        return Trophy;
-      case 'relic':
-        return Gem;
-      case 'weapon':
-        return Sword;
-      case 'armor':
-        return Shield;
-      case 'crown':
-        return Crown;
-      default:
-        return Star;
-    }
-  };
-
   if (isLoading) {
     return (
       <Card className="cosmic-card">
@@ -144,7 +126,6 @@ export const GuildArtifactsDisplay = ({
                 const isUnlocked = unlockedIds.has(artifact.id);
                 const unlockInfo = unlockedArtifacts.find(u => u.artifact_id === artifact.id);
                 const config = getRarityConfig(artifact.rarity);
-                const Icon = getArtifactIcon(artifact.artifact_type);
 
                 return (
                   <Tooltip key={artifact.id}>

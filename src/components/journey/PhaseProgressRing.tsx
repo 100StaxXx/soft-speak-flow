@@ -28,7 +28,7 @@ export function PhaseProgressRing({
   size = 'md',
   className,
 }: PhaseProgressRingProps) {
-  const { outer, stroke, inner, fontSize } = sizeConfig[size];
+  const { outer, stroke, fontSize } = sizeConfig[size];
   const radius = (outer - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const center = outer / 2;

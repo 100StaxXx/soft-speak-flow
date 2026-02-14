@@ -1,7 +1,6 @@
 import { Users, Settings, ShieldAlert } from 'lucide-react';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,

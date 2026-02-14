@@ -84,8 +84,8 @@ describe("dragSnap", () => {
 
   it("clamps minute and time output to day bounds", () => {
     expect(clampMinuteToRange(-10)).toBe(0);
-    expect(clampMinuteToRange((24 * 60) + 40)).toBe((24 * 60) - 5);
-    expect(minuteToTime24((24 * 60) + 40)).toBe("23:55");
+    expect(clampMinuteToRange((24 * 60) + 40)).toBe((24 * 60) - 1);
+    expect(minuteToTime24((24 * 60) + 40)).toBe("23:59");
   });
 
   it("maps row offsets to raw minutes before snapping", () => {

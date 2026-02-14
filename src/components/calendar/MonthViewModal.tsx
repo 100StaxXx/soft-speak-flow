@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, setYear } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, subMonths, startOfWeek, endOfWeek, setYear } from "date-fns";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -37,10 +37,6 @@ export function MonthViewModal({
 
   const handlePrevMonth = () => {
     onDateSelect(subMonths(selectedDate, 1));
-  };
-
-  const handleNextMonth = () => {
-    onDateSelect(addMonths(selectedDate, 1));
   };
 
   const handleDateClick = (date: Date) => {

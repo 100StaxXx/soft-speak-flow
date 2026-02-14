@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth";
 
 import { ProfilePreferences } from "@/types/profile";
 
-interface Profile {
+export interface Profile {
   id: string;
   email: string | null;
   is_premium: boolean;

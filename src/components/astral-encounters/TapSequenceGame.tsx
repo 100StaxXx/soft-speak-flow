@@ -50,9 +50,6 @@ const getLevelConfig = (level: number) => {
   return { orbs, showTimePerOrb };
 };
 
-// XP cap to prevent breaking the game economy
-const MAX_XP_FROM_GAME = 150;
-
 // Memoized star background component
 const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">

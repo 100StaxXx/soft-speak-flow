@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   hapticsLight: vi.fn(),
+  inboxCount: 0,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -38,7 +39,7 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/hooks/useInboxTasks", () => ({
   useInboxCount: () => ({
-    inboxCount: 0,
+    inboxCount: mocks.inboxCount,
   }),
 }));
 
@@ -87,6 +88,7 @@ describe("BottomNav", () => {
   beforeEach(() => {
     mocks.prefetchQuery.mockClear();
     mocks.hapticsLight.mockClear();
+    mocks.inboxCount = 0;
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   });
 
@@ -118,5 +120,14 @@ describe("BottomNav", () => {
     });
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
     expect(scrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps inbox badge accurate while viewing a different tab", () => {
+    mocks.inboxCount = 5;
+
+    renderBottomNav("/mentor");
+
+    expect(screen.getByTestId("pathname")).toHaveTextContent("/mentor");
+    expect(screen.getByText("5")).toBeInTheDocument();
   });
 });

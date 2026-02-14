@@ -17,7 +17,6 @@ import { CompanionPersonalization } from "@/components/CompanionPersonalization"
 import { JourneyBegins } from "./JourneyBegins";
 import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
-import { type ZodiacSign } from "@/utils/zodiacCalculator";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
 import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";

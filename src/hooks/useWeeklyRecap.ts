@@ -61,7 +61,7 @@ export const useWeeklyRecap = () => {
     };
   };
 
-  const { start: currentWeekStart, end: currentWeekEnd } = getWeekBoundaries();
+  const { start: currentWeekStart } = getWeekBoundaries();
 
   // Recalculates on each render for accuracy
   const isSunday = new Date().getDay() === 0;

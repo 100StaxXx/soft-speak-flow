@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useCallback, memo } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -44,7 +44,6 @@ export const HabitCard = memo(({
 }: HabitCardProps) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [showActions, setShowActions] = useState(false);
 
   const handleDelete = useCallback(() => {
     if (onDelete) {

@@ -1,7 +1,7 @@
 import { useCompanion, XP_REWARDS } from "@/hooks/useCompanion";
 import { useXPToast } from "@/contexts/XPContext";
 import { useCompanionAttributes } from "@/hooks/useCompanionAttributes";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
@@ -70,21 +70,6 @@ export const useXPRewards = () => {
     const normalizedMultiplier = streakMultiplier ?? 1;
     return Math.round(baseAmount * normalizedMultiplier);
   };
-
-  // Fetch current habit streak for resilience updates
-  const { data: profile } = useQuery({
-    queryKey: ['profile', user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data } = await supabase
-        .from('profiles')
-        .select('current_habit_streak')
-        .eq('id', user.id)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user,
-  });
 
   const awardHabitCompletion = async () => {
     if (!companion || awardXP.isPending) return;

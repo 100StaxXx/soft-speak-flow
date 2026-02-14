@@ -17,8 +17,7 @@ import {
   initializeNativePush, 
   unregisterNativePush,
   hasActiveNativePushSubscription,
-  debugTestRegistration,
-  getPermissionStatus
+  debugTestRegistration
 } from "@/utils/nativePushNotifications";
 
 const timeOptions = [

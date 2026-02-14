@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { 
   Calendar, 
-  Clock, 
   MapPin, 
   Timer, 
   Zap, 

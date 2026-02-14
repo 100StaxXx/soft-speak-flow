@@ -54,31 +54,6 @@ export function useAccessStatus(): AccessStatus {
       trialEndsAt = new Date(new Date(profile.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
     }
     
-    const now = new Date();
-    
-    // Calculate trial status
-    const trialExpired = trialEndsAt ? now > trialEndsAt : false;
-    const isInTrial = trialEndsAt ? now <= trialEndsAt : true;
-    
-    // Calculate days remaining (round up to show "1 day" until it's actually expired)
-    let trialDaysRemaining = 0;
-    if (trialEndsAt && !trialExpired) {
-      const msRemaining = trialEndsAt.getTime() - now.getTime();
-      trialDaysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
-    }
-
-    // Determine access source and overall access
-    let accessSource: AccessSource = 'none';
-    let hasAccess = false;
-
-    if (isSubscribed) {
-      accessSource = 'subscription';
-      hasAccess = true;
-    } else if (isInTrial) {
-      accessSource = 'trial';
-      hasAccess = true;
-    }
-
     // MONETIZATION DISABLED - Always grant access
     // To re-enable: restore original hasAccess, isInTrial, trialExpired logic
     return {

@@ -120,7 +120,7 @@ export const useGuildBoss = ({ epicId, communityId }: UseGuildBossOptions) => {
   }, [activeBoss?.id, queryClient]);
 
   // Fetch damage log
-  const { data: damageLog, isLoading: isLoadingLog } = useQuery({
+  const { data: damageLog } = useQuery({
     queryKey: ["boss-damage-log", activeBoss?.id],
     queryFn: async () => {
       if (!activeBoss) return [];

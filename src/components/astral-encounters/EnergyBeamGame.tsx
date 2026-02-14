@@ -599,12 +599,12 @@ const generateEnemies = (wave: number, config: typeof DIFFICULTY_CONFIG['easy'])
 };
 
 export function EnergyBeamGame({
-  companionStats,
+  companionStats: _companionStats,
   onComplete,
   onDamage,
   tierAttackDamage = 15,
   difficulty = 'medium',
-  questIntervalScale = 1,
+  questIntervalScale: _questIntervalScale = 1,
   isPractice = false,
   compact = false,
 }: EnergyBeamGameProps) {

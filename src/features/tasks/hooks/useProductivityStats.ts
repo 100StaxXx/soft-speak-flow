@@ -214,7 +214,7 @@ export function useProductivityStats() {
   // Log productivity event
   const logEventMutation = useMutation({
     mutationFn: async ({ 
-      eventType, 
+      eventType: _eventType, 
       xpEarned 
     }: { 
       eventType: string; 

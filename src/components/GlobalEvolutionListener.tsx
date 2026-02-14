@@ -23,7 +23,7 @@ export const GlobalEvolutionListener = () => {
     mentorSlug?: string;
     element?: string;
   } | null>(null);
-  const [previousStage, setPreviousStage] = useState<number | null>(null);
+  const [, setPreviousStage] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;

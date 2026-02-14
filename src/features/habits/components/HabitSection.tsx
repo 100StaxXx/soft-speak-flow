@@ -27,7 +27,7 @@ export function HabitSection({
   habitProgress,
   onAddHabit,
   onToggleHabit,
-  onDeleteHabit,
+  onDeleteHabit: _onDeleteHabit,
   onReorderHabits,
   isAddingHabit,
 }: HabitSectionProps) {

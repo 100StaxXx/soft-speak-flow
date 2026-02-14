@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { 
   Flag, 
   CheckCircle2, 
-  Circle,
   Sparkles,
   MapPin,
 } from 'lucide-react';

@@ -3,8 +3,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
 
-export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "week") => {
+interface CalendarTasksOptions {
+  enabled?: boolean;
+}
+
+export const useCalendarTasks = (
+  selectedDate: Date,
+  view: "list" | "month" | "week",
+  options: CalendarTasksOptions = {},
+) => {
   const { user } = useAuth();
+  const { enabled = true } = options;
 
   const getDateRange = () => {
     if (view === "month") {
@@ -48,7 +57,7 @@ export const useCalendarTasks = (selectedDate: Date, view: "list" | "month" | "w
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user,
+    enabled: enabled && !!user,
     staleTime: 2 * 60 * 1000, // 2 minutes - calendar data changes infrequently
     refetchOnWindowFocus: false,
   });

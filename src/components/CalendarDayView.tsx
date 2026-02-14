@@ -324,10 +324,6 @@ export const CalendarDayView = ({
     let powerUpXP = 0;
 
     // Power Hour bonus (3+ consecutive hours)
-    const sortedTasks = [...scheduledTasks].sort((a, b) =>
-      a.scheduled_time!.localeCompare(b.scheduled_time!)
-    );
-
     // Morning Warrior (before 9am)
     const morningTasks = scheduledTasks.filter(t => {
       const parts = getScheduledTimeParts(t.scheduled_time);

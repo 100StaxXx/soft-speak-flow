@@ -1,6 +1,6 @@
 import { safeLocalStorage } from './storage';
 import { globalAudio } from './globalAudio';
-import { getSharedAudioContext, isIOS, resumeAudioContext, createIOSOptimizedAudio, iosAudioManager } from './iosAudio';
+import { getSharedAudioContext, resumeAudioContext } from './iosAudio';
 
 // Sound effects management system
 class SoundManager {
@@ -8,7 +8,6 @@ class SoundManager {
   private masterVolume = 0.5;
   private isMuted = false;
   private isGloballyMuted = false;
-  private sounds: Map<string, HTMLAudioElement> = new Map();
   private activeIntervals: Set<NodeJS.Timeout> = new Set();
   private globalMuteUnsubscribe: (() => void) | null = null;
 

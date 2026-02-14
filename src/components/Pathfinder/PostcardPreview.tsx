@@ -11,7 +11,7 @@ interface PostcardPreviewProps {
   className?: string;
 }
 
-export const PostcardPreview = memo(function PostcardPreview({ milestones, storyType, className }: PostcardPreviewProps) {
+export const PostcardPreview = memo(function PostcardPreview({ milestones, storyType: _storyType, className }: PostcardPreviewProps) {
   const postcardMilestones = useMemo(() => 
     milestones.filter(m => m.isPostcardMilestone),
     [milestones]

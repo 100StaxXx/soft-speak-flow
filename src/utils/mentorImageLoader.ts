@@ -3,8 +3,6 @@
  * Only loads the mentor image that's actually needed, not all 23MB upfront!
  */
 
-type MentorSlug = 'atlas' | 'eli' | 'sienna' | 'stryker' | 'carmen' | 'reign' | 'solace';
-
 // Cache loaded images to avoid re-importing
 const imageCache = new Map<string, string>();
 

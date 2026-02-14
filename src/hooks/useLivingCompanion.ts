@@ -149,17 +149,6 @@ import { useTalkPopupContext, useTalkPopupContextSafe } from "@/contexts/TalkPop
    };
  };
 
-// No-op return type for safe hook
-const noopReturn = {
-  triggerReaction: async () => false,
-  triggerResistVictory: async () => false,
-  triggerQuestComplete: async () => false,
-  triggerRitualComplete: async () => false,
-  triggerPomodoroComplete: async () => false,
-  triggerComeback: async () => false,
-  isLateNight: () => false,
-};
-
 /**
  * Safe version of useLivingCompanion that returns no-op functions
  * when used outside TalkPopupProvider. This allows hooks to be called
@@ -170,10 +159,6 @@ export const useLivingCompanionSafe = () => {
   const talkPopup = useTalkPopupContextSafe();
   const { checkBudget, incrementBudget } = useReactionBudget();
   const { selectReaction, recordReaction } = useReactionSelector();
-
-  // Check if we have a real context by checking if show does something
-  // useTalkPopupContextSafe returns async no-op show when context missing
-  const hasContext = talkPopup.isVisible !== undefined;
 
   const triggerReaction = useCallback(async (
     source: SourceSystem,

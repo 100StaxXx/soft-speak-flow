@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, MessageSquare, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
 
 interface MentorChatFeedbackProps {
   messageContent: string;

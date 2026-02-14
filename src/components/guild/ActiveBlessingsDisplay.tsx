@@ -49,10 +49,9 @@ export const ActiveBlessingsDisplay = ({
 
   if (compact) {
     return (
-      <TooltipProvider>
-        <div className={cn("flex items-center gap-1", className)}>
+        <TooltipProvider>
+          <div className={cn("flex items-center gap-1", className)}>
           {blessings.slice(0, 4).map((blessing, index) => {
-            const Icon = getEffectIcon(blessing.blessing_type?.effect_type || '');
             return (
               <Tooltip key={blessing.id}>
                 <TooltipTrigger asChild>

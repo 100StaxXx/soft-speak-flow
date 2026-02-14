@@ -31,7 +31,7 @@ const parseValidDate = (dateString?: string | null) => {
 export function YearView({ 
   selectedDate, 
   onMonthSelect, 
-  onBack,
+  onBack: _onBack,
   onClose,
   onYearChange,
   tasks,

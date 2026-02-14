@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
-import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 
@@ -110,21 +109,6 @@ export default function Library() {
     },
     staleTime: 5 * 60 * 1000,
   });
-
-  const handleRemoveFavorite = useCallback(async (favoriteId: string) => {
-    try {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("id", favoriteId);
-
-      if (error) throw error;
-      toast.success("Removed from favorites");
-    } catch (error) {
-      toast.error("Failed to remove favorite");
-      console.error(error);
-    }
-  }, []);
 
   return (
     <PageTransition>

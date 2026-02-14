@@ -7,10 +7,9 @@ import { EpicCard } from "@/components/EpicCard";
 import { CreateEpicDialog } from "@/components/CreateEpicDialog";
 import { Pathfinder } from "@/components/Pathfinder";
 import { useEpics } from "@/hooks/useEpics";
-import { useAuth } from "@/hooks/useAuth";
-import { Target, Trophy, Plus, Sparkles, Users, BookOpen, ChevronRight, Wand2 } from "lucide-react";
+import { Target, Trophy, Plus, Sparkles, Users, ChevronRight, Wand2 } from "lucide-react";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { JoinEpicDialog } from "@/components/JoinEpicDialog";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
@@ -32,7 +31,6 @@ const Epics = () => {
   const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EpicTemplate | null>(null);
-  const { user } = useAuth();
   const {
     activeEpics,
     completedEpics,

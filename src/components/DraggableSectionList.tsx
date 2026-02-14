@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { DroppableSection, TimeSection, sectionConfig } from "./DroppableSection";
+import { DroppableSection, TimeSection } from "./DroppableSection";
 import { DraggableTaskList, type DragHandleProps } from "./DraggableTaskList";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Drawer,
@@ -14,7 +14,6 @@ import {
   Loader2, 
   Wand2,
   Clock,
-  ArrowRight,
   Calendar,
   Target,
   Sparkles
@@ -46,7 +45,7 @@ interface QuickAdjustDrawerProps {
 }
 
 interface QuickAction {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   prompt: string;
 }

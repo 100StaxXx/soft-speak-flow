@@ -153,7 +153,7 @@ function getTierGlow(tier: ProgressTier): string {
 export function MilestonePostcardPreview({
   currentProgress,
   targetPercent,
-  milestoneTitle,
+  milestoneTitle: _milestoneTitle,
   chapterNumber,
   className,
   compact = false,

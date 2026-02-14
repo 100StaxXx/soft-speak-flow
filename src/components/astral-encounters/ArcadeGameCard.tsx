@@ -1,6 +1,6 @@
 import { memo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { LucideIcon, Star, Lock, Zap } from 'lucide-react';
+import { LucideIcon, Star, Zap } from 'lucide-react';
 import { MiniGameType } from '@/types/astralEncounters';
 import { cn } from '@/lib/utils';
 import { playArcadeSelect } from '@/utils/soundEffects';
@@ -49,7 +49,7 @@ export const ArcadeGameCard = memo(({
   stat,
   highScoreDisplay,
   onSelect,
-  index = 0,
+  index: _index = 0,
 }: ArcadeGameCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const config = STAT_CONFIG[stat];

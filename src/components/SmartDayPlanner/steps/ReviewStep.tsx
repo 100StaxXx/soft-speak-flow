@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EditableTaskCard } from '../components/EditableTaskCard';
-import { analyzePlan, getSmartAdjustments, getConflictingTaskIds, TimeConflict } from '../utils/planAnalyzer';
-import { DraggableTaskList, DragHandleProps } from '@/components/DraggableTaskList';
+import { analyzePlan, getSmartAdjustments, getConflictingTaskIds } from '../utils/planAnalyzer';
+import { DraggableTaskList } from '@/components/DraggableTaskList';
 import { ConflictBanner } from '../components/ConflictBanner';
 
 interface ReviewStepProps {

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, isSameDay } from "date-fns";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "sonner";
@@ -172,6 +172,7 @@ interface TodaysAgendaProps {
   onTimeSlotLongPress?: (date: Date, time: string) => void;
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
+  onTimelineDragPreviewTimeChange?: (time: string | null) => void;
 }
 
 // Helper to format time in 12-hour format
@@ -184,6 +185,32 @@ const formatTime = (time: string) => {
 };
 
 const COMBO_WINDOW_MS = 8000;
+const TIMELINE_PLACEHOLDER_TIMES = ["00:00", "06:00", "12:00", "18:00", "23:59"] as const;
+
+interface TimelineMarkerRow {
+  id: string;
+  minute: number;
+  time: string;
+  kind: "placeholder" | "now";
+}
+
+type TimelineRow =
+  | { kind: "marker"; marker: TimelineMarkerRow }
+  | { kind: "task"; task: Task };
+
+const parseTimeToMinute = (time: string | null | undefined): number | null => {
+  if (!time) return null;
+  const [hour, minute] = time.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return (hour * 60) + minute;
+};
+
+const minuteToTime = (minute: number) => {
+  const clamped = Math.max(0, Math.min((24 * 60) - 1, Math.round(minute)));
+  const hour = Math.floor(clamped / 60);
+  const mins = clamped % 60;
+  return `${String(hour).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+};
 
 export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
@@ -205,6 +232,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onTimeSlotLongPress,
   onSendToCalendar,
   hasCalendarLink,
+  onTimelineDragPreviewTimeChange,
 }: TodaysAgendaProps) {
   const prefersReducedMotion = useReducedMotion();
   const { capabilities } = useMotionProfile();
@@ -437,6 +465,35 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     },
   });
 
+  const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
+  const lastReportedPreviewTimeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const emitPreviewTime = timelineDrag.isDragging ? (timelineDrag.previewTime ?? null) : null;
+    if (lastReportedPreviewTimeRef.current === emitPreviewTime) return;
+    lastReportedPreviewTimeRef.current = emitPreviewTime;
+    onTimelineDragPreviewTimeChange?.(emitPreviewTime);
+  }, [onTimelineDragPreviewTimeChange, timelineDrag.isDragging, timelineDrag.previewTime]);
+
+  useEffect(() => {
+    return () => {
+      onTimelineDragPreviewTimeChange?.(null);
+    };
+  }, [onTimelineDragPreviewTimeChange]);
+
+  useEffect(() => {
+    if (!isSameDay(selectedDate, new Date())) return;
+
+    const tick = () => {
+      const minute = parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0;
+      setNowMarkerMinute(minute);
+    };
+
+    tick();
+    const interval = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(interval);
+  }, [selectedDate]);
+
   const previewScheduledOverrides = useMemo(() => {
     const activeTaskId = timelineDrag.draggingTaskId;
     const previewTime = timelineDrag.previewTime;
@@ -468,10 +525,67 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return ordered.length > 0 ? ordered : scheduledItems;
   }, [scheduledFlow.orderedTaskIds, scheduledItems, scheduledItemsById]);
 
-  const timelineItems = useMemo(
-    () => [...flowOrderedScheduledItems, ...anytimeItems],
-    [flowOrderedScheduledItems, anytimeItems],
-  );
+  const timelineMarkerRows = useMemo(() => {
+    const markers = new Map<number, TimelineMarkerRow>();
+
+    for (const time of TIMELINE_PLACEHOLDER_TIMES) {
+      const minute = parseTimeToMinute(time);
+      if (minute === null) continue;
+      markers.set(minute, {
+        id: `timeline-marker-placeholder-${time.replace(":", "")}`,
+        minute,
+        time,
+        kind: "placeholder",
+      });
+    }
+
+    if (isSameDay(selectedDate, new Date())) {
+      const clampedNowMinute = Math.max(0, Math.min((24 * 60) - 1, nowMarkerMinute));
+      markers.set(clampedNowMinute, {
+        id: "timeline-marker-now",
+        minute: clampedNowMinute,
+        time: minuteToTime(clampedNowMinute),
+        kind: "now",
+      });
+    }
+
+    return Array.from(markers.values());
+  }, [nowMarkerMinute, selectedDate]);
+
+  const timelineRows = useMemo<TimelineRow[]>(() => {
+    const scheduledRows: Array<TimelineRow & { minute: number; sortKey: string }> = [
+      ...timelineMarkerRows.map((marker) => ({
+        kind: "marker" as const,
+        marker,
+        minute: marker.minute,
+        sortKey: `0-${marker.minute}-${marker.id}`,
+      })),
+      ...flowOrderedScheduledItems
+        .map((task) => {
+          const effectiveTime = previewScheduledOverrides?.[task.id] ?? task.scheduled_time;
+          const minute = parseTimeToMinute(effectiveTime);
+          if (minute === null) return null;
+          return {
+            kind: "task" as const,
+            task,
+            minute,
+            sortKey: `1-${minute}-${task.id}`,
+          };
+        })
+        .filter((row): row is TimelineRow & { minute: number; sortKey: string } => !!row),
+    ].sort((a, b) => {
+      if (a.minute !== b.minute) return a.minute - b.minute;
+      return a.sortKey.localeCompare(b.sortKey);
+    });
+
+    const rows: TimelineRow[] = scheduledRows.map((row) => (
+      row.kind === "marker"
+        ? { kind: "marker", marker: row.marker }
+        : { kind: "task", task: row.task }
+    ));
+    rows.push(...anytimeItems.map((task) => ({ kind: "task" as const, task })));
+    return rows;
+  }, [anytimeItems, flowOrderedScheduledItems, previewScheduledOverrides, timelineMarkerRows]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -1176,9 +1290,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
 
             {/* Scheduled Tasks Timeline */}
-            {timelineItems.length > 0 && (
+            {timelineRows.length > 0 && (
               <div ref={timelineDragContainerRef}>
-                {scheduledItems.length > 0 && (
+                {timelineRows.some((row) => row.kind === "marker" || !!row.task.scheduled_time) && (
                   <div className="flex items-center gap-2 pb-2">
                     <div className="w-9 flex-shrink-0" />
                     <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -1186,7 +1300,40 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     </span>
                   </div>
                 )}
-                {timelineItems.map((task, index) => {
+                {timelineRows.map((row, index) => {
+                  if (row.kind === "marker") {
+                    const marker = row.marker;
+                    return (
+                      <div
+                        key={marker.id}
+                        className="pointer-events-none select-none"
+                        data-testid={marker.id}
+                      >
+                        <TimelineTaskRow
+                          time={marker.time}
+                          showLine={index > 0}
+                          isLast={index === timelineRows.length - 1}
+                          className="opacity-55"
+                        >
+                          {marker.kind === "now" ? (
+                            <div className="flex items-center gap-2 pt-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary/70" />
+                              <span className="text-[10px] font-medium uppercase tracking-wide text-primary/70">
+                                Now
+                              </span>
+                              <div className="h-px flex-1 bg-primary/30" />
+                            </div>
+                          ) : (
+                            <div className="pt-1">
+                              <div className="h-px w-full border-t border-dashed border-border/35" />
+                            </div>
+                          )}
+                        </TimelineTaskRow>
+                      </div>
+                    );
+                  }
+
+                  const task = row.task;
                   const isThisDragging = timelineDrag.draggingTaskId === task.id;
                   const isAnyDragging = timelineDrag.isDragging;
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
@@ -1196,8 +1343,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const scheduledSpacingPx = rowFlow
                     ? Math.min(24, Math.max(0, rowFlow.gapBeforeMinutes * 0.12))
                     : 0;
-                  const showAnytimeLabel = isAnytimeTask
-                    && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
+                  const previousRow = index > 0 ? timelineRows[index - 1] : undefined;
+                  const previousIsAnytimeTask = previousRow?.kind === "task" && !previousRow.task.scheduled_time;
+                  const showAnytimeLabel = isAnytimeTask && !previousIsAnytimeTask;
                   const timelineRowDragProps = task.scheduled_time && !task.completed
                     ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                     : undefined;
@@ -1227,7 +1375,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       label={showAnytimeLabel ? "Anytime" : undefined}
                       overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
                       showLine={index > 0}
-                      isLast={index === timelineItems.length - 1}
+                      isLast={index === timelineRows.length - 1}
                       isDragTarget={isThisDragging}
                       durationMinutes={task.estimated_duration}
                       laneIndex={rowFlow?.laneIndex}

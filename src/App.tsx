@@ -18,13 +18,10 @@ import { DeepLinkProvider } from "@/contexts/DeepLinkContext";
 import { useProfile } from "@/hooks/useProfile";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { useAuth } from "@/hooks/useAuth";
-import { useEvolution } from "@/contexts/EvolutionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { RealtimeSyncProvider } from "@/components/RealtimeSyncProvider";
-import { SubscriptionGate } from "@/components/SubscriptionGate";
-import { queryRetryConfig } from "@/utils/retry";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
 
@@ -35,11 +32,10 @@ import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
-import { useCompanion } from "@/hooks/useCompanion";
 import { useAuthSync } from "@/hooks/useAuthSync";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { safeSessionStorage } from "@/utils/storage";
- import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
+import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { TutorialOrchestrator } from "@/components/TutorialOrchestrator";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
 import { BottomNav } from "@/components/BottomNav";
@@ -73,14 +69,8 @@ const Epics = lazy(() => import("./pages/Epics"));
 const SharedEpics = lazy(() => import("./pages/SharedEpics"));
 const Partners = lazy(() => import("./pages/Partners"));
 const JoinEpic = lazy(() => import("./pages/JoinEpic"));
-// Campaigns consolidated into Journeys - redirect only
-// HIDDEN: Astral Encounters feature disabled
-// const AstralArcade = lazy(() => import("./pages/AstralArcade"));
-// const Horoscope = lazy(() => import("./pages/Horoscope")); // Shelved
 const Creator = lazy(() => import("./pages/Creator"));
 const InfluencerDashboard = lazy(() => import("./pages/InfluencerDashboard"));
-
-// const CosmiqDeepDive = lazy(() => import("./pages/CosmicDeepDive")); // Shelved
 const AccountDeletionHelp = lazy(() => import("./pages/AccountDeletionHelp"));
 const Recaps = lazy(() => import("./pages/Recaps"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -311,8 +301,6 @@ const AppContent = memo(() => {
                   <Route path="/epics" element={<ProtectedRoute><Epics /></ProtectedRoute>} />
                   <Route path="/join/:code" element={<JoinEpic />} />
                   <Route path="/shared-epics" element={<ProtectedRoute><SharedEpics /></ProtectedRoute>} />
-                  {/* HIDDEN: Arcade route disabled */}
-                  {/* <Route path="/arcade" element={<ProtectedRoute><AstralArcade /></ProtectedRoute>} /> */}
                   <Route path="/mentor-chat" element={<ProtectedRoute><MentorChat /></ProtectedRoute>} />
                   <Route path="/horoscope" element={<Navigate to="/journeys" replace />} />
                   <Route path="/cosmic/:placement/:sign" element={<Navigate to="/journeys" replace />} />

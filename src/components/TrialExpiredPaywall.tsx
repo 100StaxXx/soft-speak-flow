@@ -42,7 +42,7 @@ export const TrialExpiredPaywall = () => {
     hasLoadedProducts,
   } = useAppleSubscription();
   const { toast } = useToast();
-  const { signOut, session } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
 
   const productMap = useMemo(() => {

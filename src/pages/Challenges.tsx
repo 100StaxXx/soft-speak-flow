@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/EmptyState";
-import { Target, TrendingUp, Calendar, CheckCircle2, Circle, ArrowLeft, Trophy, Dumbbell, Clock } from "lucide-react";
+import { Target, TrendingUp, Calendar, CheckCircle2, ArrowLeft, Trophy, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";

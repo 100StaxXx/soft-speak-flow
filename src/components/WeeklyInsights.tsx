@@ -2,11 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { TrendingUp, Sunrise, CheckCircle2, Swords } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
 import { SlideUp } from "./PageTransition";
 
 export const WeeklyInsights = () => {
@@ -26,7 +23,7 @@ export const WeeklyInsights = () => {
     return { start: startOfWeek.toISOString(), end: endOfWeek.toISOString() };
   };
 
-  const { data: weeklyData, refetch } = useQuery({
+  const { data: weeklyData } = useQuery({
     queryKey: ['weekly-insights', user?.id],
     queryFn: async () => {
       if (!user) return null;
