@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-interface TimelineTaskRowProps {
+interface TimelineTaskRowProps extends React.HTMLAttributes<HTMLDivElement> {
   time?: string | null;
   overrideTime?: string | null;
   label?: string | null;
@@ -26,13 +26,18 @@ export function TimelineTaskRow({
   showLine = true,
   isLast = false,
   isDragTarget = false,
+  className,
   children,
+  ...rootProps
 }: TimelineTaskRowProps) {
   const displayTime = overrideTime ?? time;
   const isOverridden = overrideTime != null;
 
   return (
-    <div className={cn("relative flex gap-2", isDragTarget && "rounded-lg")}>
+    <div
+      className={cn("relative flex gap-2", isDragTarget && "rounded-lg", className)}
+      {...rootProps}
+    >
       {/* Time label column - fixed width */}
       <div className="w-9 flex-shrink-0 pt-[22px] text-left">
         {displayTime ? (

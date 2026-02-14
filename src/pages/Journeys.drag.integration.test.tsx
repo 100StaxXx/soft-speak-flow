@@ -304,7 +304,7 @@ const createPointerDownEvent = (clientY: number) => {
 
 import Journeys from "./Journeys";
 
-describe("Journeys grip drag integration", () => {
+describe("Journeys row drag integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(window, "innerHeight", {
@@ -318,7 +318,7 @@ describe("Journeys grip drag integration", () => {
     });
   });
 
-  it("reschedules a quest from the handle drag path on /journeys", async () => {
+  it("reschedules a quest from the timeline row drag path on /journeys", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -334,10 +334,10 @@ describe("Journeys grip drag integration", () => {
       </QueryClientProvider>,
     );
 
-    const grip = await screen.findByRole("button", { name: /drag to reschedule/i });
+    const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
-      fireEvent(grip, createPointerDownEvent(100));
+      fireEvent(row, createPointerDownEvent(100));
       dispatchPointerMove(820);
       window.dispatchEvent(new Event("pointerup"));
     });

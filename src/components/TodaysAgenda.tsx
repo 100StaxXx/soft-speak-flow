@@ -23,7 +23,6 @@ import {
   Brain,
   Heart,
   Dumbbell,
-  GripVertical,
   ArrowUpDown,
   MoreHorizontal,
   CalendarPlus,
@@ -592,15 +591,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   };
 
-  type TimelineDragHandleProps = {
-    onPointerDown?: React.PointerEventHandler<HTMLElement>;
-    onTouchStart?: React.TouchEventHandler<HTMLElement>;
-    onTouchMove?: React.TouchEventHandler<HTMLElement>;
-    onTouchEnd?: React.TouchEventHandler<HTMLElement>;
-    onTouchCancel?: React.TouchEventHandler<HTMLElement>;
-  };
-
-  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, timelineDragHandleProps?: TimelineDragHandleProps, overlapCount = 0) => {
+  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, overlapCount = 0) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
     const isDragging = dragProps?.isDragging ?? false;
@@ -775,23 +766,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
           
           <div className="flex items-center gap-2">
-            {!!task.scheduled_time && !isRitual && !isComplete && !!timelineDragHandleProps && (
-              <button
-                type="button"
-                aria-label="Drag to reschedule"
-                title="Drag to reschedule (15-minute snap; hold near start before moving for 5-minute precision)"
-                className={cn(
-                  "h-8 w-8 rounded-md flex items-center justify-center touch-none",
-                  "opacity-55 group-hover:opacity-100 transition-opacity",
-                  isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
-                )}
-                style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
-                // Keep drag start handlers in bubble phase; capture stopPropagation here blocks handle drag start.
-                {...timelineDragHandleProps}
-              >
-                <GripVertical className="w-4 h-4" />
-              </button>
-            )}
             {/* Quest action menu */}
             {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar) && (
               <DropdownMenu>
@@ -1175,9 +1149,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const isAnytimeTask = !task.scheduled_time;
                   const showAnytimeLabel = isAnytimeTask
                     && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
-                  const dragHandleProps = task.scheduled_time
-                    ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                  const timelineRowDragProps = task.scheduled_time && !task.completed
+                    ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                     : undefined;
+                  const isRowDraggable = !!timelineRowDragProps;
                   const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
 
                   const rowStyle: CSSProperties = {
@@ -1204,8 +1179,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       showLine={index > 0}
                       isLast={index === timelineItems.length - 1}
                       isDragTarget={isThisDragging}
+                      className={cn(
+                        isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
+                        isThisDragging && "cursor-grabbing",
+                      )}
+                      data-testid={`timeline-row-${task.id}`}
+                      {...timelineRowDragProps}
                     >
-                      {renderTaskItem(task, undefined, dragHandleProps, overlapCount)}
+                      {renderTaskItem(task, undefined, overlapCount)}
                     </TimelineTaskRow>
                   );
 
@@ -1317,7 +1298,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                                 opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
                               }}
                             >
-                              {renderTaskItem(task, undefined, undefined, overlapCount)}
+                              {renderTaskItem(task, undefined, overlapCount)}
                             </motion.div>
                           );
                         })}
