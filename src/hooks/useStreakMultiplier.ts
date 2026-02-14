@@ -10,20 +10,24 @@ export const useStreakMultiplier = () => {
     
     // Calculate multiplier
     let multiplier = 1.0;
-    if (currentStreak >= 30) {
-      multiplier = 2.0; // 2x XP at 30+ days (capped to prevent burnout)
+    if (currentStreak >= 60) {
+      multiplier = 1.75;
+    } else if (currentStreak >= 30) {
+      multiplier = 1.5;
     } else if (currentStreak >= 7) {
-      multiplier = 1.5; // 1.5x XP at 7-29 days
+      multiplier = 1.25;
     }
 
     // Calculate next milestone
     let nextMilestone;
     if (currentStreak < 7) {
-      nextMilestone = { days: 7, multiplier: 1.5, daysRemaining: 7 - currentStreak };
+      nextMilestone = { days: 7, multiplier: 1.25, daysRemaining: 7 - currentStreak };
     } else if (currentStreak < 30) {
-      nextMilestone = { days: 30, multiplier: 2, daysRemaining: 30 - currentStreak };
+      nextMilestone = { days: 30, multiplier: 1.5, daysRemaining: 30 - currentStreak };
+    } else if (currentStreak < 60) {
+      nextMilestone = { days: 60, multiplier: 1.75, daysRemaining: 60 - currentStreak };
     } else {
-      nextMilestone = { days: 30, multiplier: 2, daysRemaining: 0 };
+      nextMilestone = { days: 60, multiplier: 1.75, daysRemaining: 0 };
     }
 
     return {

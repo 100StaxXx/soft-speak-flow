@@ -21,6 +21,7 @@ interface DatePillsScrollerProps {
 
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
+const CENTER_RETRY_ATTEMPTS = 8;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -139,29 +140,70 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     };
   }, [rangeEnd, rangeStart]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     shouldCenterOnSelectedRef.current = true;
   }, [selectedDate]);
 
   // Scroll selected date to center only after explicit selected-date changes.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!shouldCenterOnSelectedRef.current) return;
-    if (!selectedRef.current || !scrollRef.current) return;
 
-    const container = scrollRef.current;
-    const selected = selectedRef.current;
-    const containerWidth = container.offsetWidth;
-    const selectedLeft = selected.offsetLeft;
-    const selectedWidth = selected.offsetWidth;
-    const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
-    const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
-    const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
+    let frameId: number | null = null;
+    let isCancelled = false;
 
-    container.scrollTo({
-      left: clampedLeft,
-      behavior: "smooth",
-    });
-    shouldCenterOnSelectedRef.current = false;
+    const centerSelectedDate = (remainingAttempts: number) => {
+      if (isCancelled || !shouldCenterOnSelectedRef.current) return;
+
+      const container = scrollRef.current;
+      const selected = selectedRef.current;
+
+      if (!container || !selected) {
+        if (remainingAttempts > 0 && typeof window !== "undefined") {
+          frameId = window.requestAnimationFrame(() => {
+            centerSelectedDate(remainingAttempts - 1);
+          });
+        }
+        return;
+      }
+
+      const containerWidth = container.offsetWidth;
+      const selectedWidth = selected.offsetWidth;
+
+      if ((containerWidth === 0 || selectedWidth === 0) && remainingAttempts > 0 && typeof window !== "undefined") {
+        frameId = window.requestAnimationFrame(() => {
+          centerSelectedDate(remainingAttempts - 1);
+        });
+        return;
+      }
+
+      if (containerWidth === 0 || selectedWidth === 0) return;
+
+      const selectedLeft = selected.offsetLeft;
+      const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
+      const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
+      const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
+
+      try {
+        container.scrollTo({
+          left: clampedLeft,
+          behavior: "smooth",
+        });
+      } catch {
+        // Some WebViews/Safari states can throw; scrollLeft fallback below is deterministic.
+      }
+
+      container.scrollLeft = clampedLeft;
+      shouldCenterOnSelectedRef.current = false;
+    };
+
+    centerSelectedDate(CENTER_RETRY_ATTEMPTS);
+
+    return () => {
+      isCancelled = true;
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
   }, [dates, selectedDate]);
 
   return (

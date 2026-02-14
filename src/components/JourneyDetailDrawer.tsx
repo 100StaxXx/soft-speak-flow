@@ -25,7 +25,6 @@ import { useMilestones, Milestone } from "@/hooks/useMilestones";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useXPRewards } from "@/hooks/useXPRewards";
-import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import { useJourneyPathImage } from "@/hooks/useJourneyPathImage";
 import { RescheduleDrawer } from "./RescheduleDrawer";
 import { PostcardUnlockCelebration } from "./PostcardUnlockCelebration";
@@ -66,7 +65,6 @@ export const JourneyDetailDrawer = ({
   const { postcards, checkMilestoneForPostcard, postcardJustUnlocked, clearPostcardUnlocked } = useCompanionPostcards();
   const { companion } = useCompanion();
   const { awardMilestoneComplete, awardPhaseComplete, awardEpicComplete } = useXPRewards();
-  const { multiplier: streakMultiplier } = useStreakMultiplier();
   const { regeneratePathForMilestone } = useJourneyPathImage(epicId);
 
   const currentPhase = getCurrentPhase();
@@ -96,10 +94,10 @@ export const JourneyDetailDrawer = ({
   };
 
   // Check if epic is complete after milestone completion
-  const checkEpicCompletion = () => {
+  const checkEpicCompletion = (completedMilestone: Milestone) => {
     // After this milestone, check if all will be complete
     const allComplete = milestones.every(m => 
-      m.id === selectedMilestone?.id || m.completed_at
+      m.id === completedMilestone.id || m.completed_at
     );
     
     if (allComplete && totalCount > 0) {
@@ -123,22 +121,24 @@ export const JourneyDetailDrawer = ({
           fur_color: companion?.fur_color,
         });
       },
+    }, {
+      onSuccess: () => {
+        // Regenerate journey path image to reflect new location
+        if (milestoneIndex >= 0) {
+          regeneratePathForMilestone(milestoneIndex + 1); // +1 because 0 is initial
+        }
+
+        // Award XP
+        awardMilestoneComplete(milestone.is_postcard_milestone || false);
+
+        // Check for phase/epic completion bonuses
+        checkPhaseCompletion(milestone);
+        checkEpicCompletion(milestone);
+
+        // Close the detail drawer
+        setSelectedMilestone(null);
+      },
     });
-    
-    // Regenerate journey path image to reflect new location
-    if (milestoneIndex >= 0) {
-      regeneratePathForMilestone(milestoneIndex + 1); // +1 because 0 is initial
-    }
-    
-    // Award XP
-    awardMilestoneComplete(milestone.is_postcard_milestone || false);
-    
-    // Check for phase/epic completion bonuses
-    checkPhaseCompletion(milestone);
-    checkEpicCompletion();
-    
-    // Close the detail drawer
-    setSelectedMilestone(null);
   };
 
   const handleMilestoneUncomplete = (milestone: Milestone) => {
@@ -299,7 +299,6 @@ export const JourneyDetailDrawer = ({
       isCompleting={isCompleting}
       status={selectedMilestone ? getMilestoneStatus(selectedMilestone) : "pending"}
       postcard={selectedMilestone ? getPostcardForMilestone(selectedMilestone) : undefined}
-      streakMultiplier={streakMultiplier ?? 1}
     />
     </>
   );

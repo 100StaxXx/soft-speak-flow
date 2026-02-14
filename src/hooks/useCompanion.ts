@@ -77,7 +77,6 @@ export const useCompanion = () => {
   // Prevent duplicate evolution/XP/companion creation requests during lag
   const evolutionInProgress = useRef(false);
   const evolutionPromise = useRef<Promise<unknown> | null>(null);
-  const xpInProgress = useRef(false);
   const companionCreationInProgress = useRef(false);
 
   const { data: companion, isLoading, error, refetch } = useQuery({
@@ -335,44 +334,34 @@ export const useCompanion = () => {
       eventType,
       xpAmount,
       metadata = {},
+      idempotencyKey,
     }: {
       eventType: string;
       xpAmount: number;
       metadata?: Record<string, string | number | boolean | undefined>;
+      idempotencyKey?: string;
     }) => {
       if (!user) throw new Error("No user found");
-      
-      // Prevent duplicate XP awards - check and set flag IMMEDIATELY before any async operations
-      if (xpInProgress.current) {
-        throw new Error("XP award already in progress");
-      }
-      xpInProgress.current = true;
-      
-      try {
-        // CRITICAL: Ensure companion is loaded before awarding XP
-        let companionToUse = companion;
-        
+
+      // Ensure companion is loaded before awarding XP
+      let companionToUse = companion;
+
+      if (!companionToUse) {
+        logger.warn('Companion not loaded yet, fetching...');
+        await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
+        companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
+
         if (!companionToUse) {
-          logger.warn('Companion not loaded yet, fetching...');
-          // Refetch companion data and wait for it to complete
-          await queryClient.refetchQueries({ queryKey: ["companion", user.id] });
-          companionToUse = queryClient.getQueryData(["companion", user.id]) as Companion | null;
-          
-          if (!companionToUse) {
-            throw new Error("No companion found. Please create one first.");
-          }
+          throw new Error("No companion found. Please create one first.");
         }
-        
-        return await performXPAward(companionToUse, xpAmount, eventType, metadata, user);
-      } finally {
-        // Always reset flag in finally block to ensure cleanup
-        xpInProgress.current = false;
       }
+
+      return await performXPAward(companionToUse, xpAmount, eventType, metadata, user, idempotencyKey);
     },
     onSuccess: async ({ shouldEvolve, newStage }) => {
       queryClient.invalidateQueries({ queryKey: ["companion"] });
       
-      if (shouldEvolve && companion) {
+      if (shouldEvolve) {
         // Check for companion stage achievements
         await checkCompanionAchievements(newStage);
         
@@ -392,53 +381,63 @@ export const useCompanion = () => {
   const performXPAward = async (
     companionData: Companion,
     xpAmount: number,
-    _eventType: string,
-    _metadata: Record<string, string | number | boolean | undefined>,
-    currentUser: typeof user
+    eventType: string,
+    metadata: Record<string, string | number | boolean | undefined>,
+    currentUser: typeof user,
+    idempotencyKey?: string
   ) => {
     if (!currentUser?.id) {
       throw new Error("Not authenticated");
     }
-    // Note: xpInProgress flag is managed by the caller (awardXP mutation)
-    // Setting it here would cause issues with error handling
 
-    const newXP = companionData.current_xp + xpAmount;
-    const nextStage = companionData.current_stage + 1;
-    const nextThreshold = getThreshold(nextStage);
-    
-    logger.log('[XP Award Debug]', {
-      currentStage: companionData.current_stage,
-      currentXP: companionData.current_xp,
-      xpAmount,
-      newXP,
-      nextStage,
-      nextThreshold,
-      willEvolve: nextThreshold && newXP >= nextThreshold
+    const sanitizedMetadata = Object.fromEntries(
+      Object.entries(metadata).filter(([, value]) => value !== undefined),
+    ) as Record<string, string | number | boolean>;
+    const requestIdempotencyKey = idempotencyKey ?? (
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    );
+
+    const { data, error } = await supabase.rpc("award_xp_v2", {
+      p_event_type: eventType,
+      p_xp_amount: xpAmount,
+      p_event_metadata: sanitizedMetadata,
+      p_idempotency_key: requestIdempotencyKey,
     });
-    
-    // Check if evolution is needed using centralized logic
-    const shouldEvolveNow = shouldEvolve(companionData.current_stage, newXP);
-    let newStage = companionData.current_stage;
-    
-    if (shouldEvolveNow) {
-      newStage = nextStage;
-      logger.log('[Evolution Triggered]', { newStage, newXP, nextThreshold });
+
+    if (error) throw error;
+
+    const awardResult = Array.isArray(data) ? data[0] : data;
+    if (!awardResult) {
+      throw new Error("XP award returned no data");
     }
 
-    // XP events are logged server-side via triggers/functions
-    // Client-side insert removed due to RLS policy restrictions
+    const shouldEvolveNow = Boolean(awardResult.should_evolve);
+    const newXP = awardResult.xp_after ?? companionData.current_xp;
+    const newStage = shouldEvolveNow ? companionData.current_stage + 1 : companionData.current_stage;
 
+    logger.log("[XP Award Debug]", {
+      eventType,
+      requestedXP: xpAmount,
+      awardedXP: awardResult.xp_awarded,
+      capApplied: awardResult.cap_applied,
+      currentStage: companionData.current_stage,
+      currentXP: awardResult.xp_before,
+      newXP,
+      nextThreshold: awardResult.next_threshold,
+      shouldEvolve: shouldEvolveNow,
+      idempotencyKey: requestIdempotencyKey,
+    });
 
-    // Update companion XP
-    const { error: updateError } = await supabase
-      .from("user_companion")
-      .update({ current_xp: newXP })
-      .eq("id", companionData.id)
-      .eq("user_id", currentUser.id);
-
-    if (updateError) throw updateError;
-
-    return { shouldEvolve: shouldEvolveNow, newStage, newXP };
+    return {
+      shouldEvolve: shouldEvolveNow,
+      newStage,
+      newXP,
+      xpAwarded: awardResult.xp_awarded ?? 0,
+      capApplied: Boolean(awardResult.cap_applied),
+      nextThreshold: awardResult.next_threshold ?? null,
+    };
   };
 
 
@@ -775,9 +774,12 @@ export const useCompanion = () => {
 
   const progressToNext = useMemo(() => {
     if (!companion || !nextEvolutionXP) return 0;
-    const progress = (companion.current_xp / nextEvolutionXP) * 100;
+    const currentStageThreshold = getThreshold(companion.current_stage) ?? 0;
+    const stageRange = nextEvolutionXP - currentStageThreshold;
+    if (stageRange <= 0) return 100;
+    const progress = ((companion.current_xp - currentStageThreshold) / stageRange) * 100;
     return Math.min(100, Math.max(0, progress));
-  }, [companion, nextEvolutionXP]);
+  }, [companion, getThreshold, nextEvolutionXP]);
 
   // Check if companion can evolve (XP meets threshold for next stage)
   const canEvolve = useMemo(() => {

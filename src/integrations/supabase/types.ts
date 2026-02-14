@@ -7544,6 +7544,7 @@ export type Database = {
           event_metadata: Json | null
           event_type: string
           id: string
+          idempotency_key: string | null
           user_id: string
           xp_earned: number
         }
@@ -7553,6 +7554,7 @@ export type Database = {
           event_metadata?: Json | null
           event_type: string
           id?: string
+          idempotency_key?: string | null
           user_id: string
           xp_earned: number
         }
@@ -7562,6 +7564,7 @@ export type Database = {
           event_metadata?: Json | null
           event_type?: string
           id?: string
+          idempotency_key?: string | null
           user_id?: string
           xp_earned?: number
         }
@@ -7667,6 +7670,22 @@ export type Database = {
       }
     }
     Functions: {
+      award_xp_v2: {
+        Args: {
+          p_event_metadata?: Json
+          p_event_type: string
+          p_idempotency_key?: string
+          p_xp_amount: number
+        }
+        Returns: {
+          cap_applied: boolean
+          next_threshold: number | null
+          should_evolve: boolean
+          xp_after: number
+          xp_awarded: number
+          xp_before: number
+        }[]
+      }
       apply_referral_code_secure: {
         Args: { p_referral_code: string; p_user_id: string }
         Returns: {

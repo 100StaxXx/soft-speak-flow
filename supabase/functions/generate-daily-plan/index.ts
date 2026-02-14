@@ -3,6 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { QUEST_XP_REWARDS } from "../../../src/config/xpRewards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -310,8 +311,12 @@ Available habits with streaks: ${habitsToProtect.length > 0 ? habitsToProtect.ma
     const planData = JSON.parse(toolCall.function.arguments);
     const generatedTasks: GeneratedTask[] = planData.tasks || [];
 
-    // Calculate XP rewards based on difficulty
-    const xpByDifficulty = { easy: 10, medium: 25, hard: 50 };
+    // Keep quest XP generation in sync with shared economy config
+    const xpByDifficulty: Record<GeneratedTask["difficulty"], number> = {
+      easy: QUEST_XP_REWARDS.EASY,
+      medium: QUEST_XP_REWARDS.MEDIUM,
+      hard: QUEST_XP_REWARDS.HARD,
+    };
 
     // Insert tasks into database
     const tasksToInsert = generatedTasks.map(task => ({
@@ -322,7 +327,7 @@ Available habits with streaks: ${habitsToProtect.length > 0 ? habitsToProtect.ma
       difficulty: task.difficulty,
       estimated_duration: task.estimated_minutes,
       scheduled_time: task.suggested_time,
-      xp_reward: xpByDifficulty[task.difficulty] || 15,
+      xp_reward: xpByDifficulty[task.difficulty] || QUEST_XP_REWARDS.MEDIUM,
       ai_generated: true,
       source: 'plan_my_day',
       completed: false,

@@ -19,7 +19,7 @@ export interface EveningReflection {
 export const useEveningReflection = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { awardCustomXP } = useXPRewards();
+  const { awardCustomXP, XP_REWARDS } = useXPRewards();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Use current date (recalculates on each render for accuracy)
@@ -78,7 +78,7 @@ export const useEveningReflection = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["evening-reflection"] });
-      awardCustomXP(3, "evening_reflection", "Evening Reflection");
+      awardCustomXP(XP_REWARDS.EVENING_REFLECTION, "evening_reflection", "Evening Reflection");
       setIsDrawerOpen(false);
     },
   });

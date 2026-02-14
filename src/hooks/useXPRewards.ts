@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { logger } from "@/utils/logger";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
- import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
 import {
   FOCUS_XP_REWARDS,
   SUBTASK_XP_REWARDS,
@@ -16,6 +16,9 @@ import {
   SCHEDULING_XP_REWARDS,
   MILESTONE_XP_REWARDS,
 } from "@/config/xpRewards";
+
+type XPEventMetadata = Record<string, string | number | boolean | undefined>;
+const REPEATABLE_STREAK_EVENTS = new Set(["task_complete", "habit_complete", "focus_session"]);
 
 // Helper to mark user as active (resets companion decay)
 const markUserActive = async (userId: string) => {
@@ -46,29 +49,71 @@ export const useXPRewards = () => {
     updateAlignmentFromReflection,
     updateFromStreakMilestone,
   } = useCompanionAttributes();
- 
-   // Living companion reaction system - safe hook returns no-op when outside provider
-   const { triggerQuestComplete } = useLivingCompanionSafe();
-   
-   // Helper to check if this is the first quest completion today
-   const checkIsFirstQuestToday = async (): Promise<boolean> => {
-     if (!user?.id) return false;
-     const today = new Date().toISOString().split('T')[0];
-     
-     const { count } = await supabase
-       .from('daily_tasks')
-       .select('*', { count: 'exact', head: true })
-       .eq('user_id', user.id)
-       .eq('task_date', today)
-       .eq('completed', true);
-     
-     // First if count is 0 (this will be the first) or 1 (just completed)
-     return (count ?? 0) <= 1;
-   };
+  // Living companion reaction system - safe hook returns no-op when outside provider
+  const { triggerQuestComplete } = useLivingCompanionSafe();
 
-  const applyStreakMultiplier = (baseAmount: number) => {
+  // Helper to check if this is the first quest completion today
+  const checkIsFirstQuestToday = async (): Promise<boolean> => {
+    if (!user?.id) return false;
+    const today = new Date().toISOString().split('T')[0];
+
+    const { count } = await supabase
+      .from('daily_tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('task_date', today)
+      .eq('completed', true);
+
+    // First if count is 0 (this will be the first) or 1 (just completed)
+    return (count ?? 0) <= 1;
+  };
+
+  const applyStreakMultiplier = (baseAmount: number, eventType: string) => {
+    if (!REPEATABLE_STREAK_EVENTS.has(eventType)) return baseAmount;
     const normalizedMultiplier = streakMultiplier ?? 1;
     return Math.round(baseAmount * normalizedMultiplier);
+  };
+
+  const createIdempotencyKey = (eventType: string, metadata?: XPEventMetadata) => {
+    const metadataDigest = metadata
+      ? Object.entries(metadata)
+          .filter(([, value]) => value !== undefined)
+          .map(([key, value]) => `${key}:${String(value)}`)
+          .sort()
+          .join("|")
+      : "none";
+    const randomPart = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return `${eventType}:${metadataDigest}:${randomPart}`;
+  };
+
+  const awardXPEvent = (
+    eventType: string,
+    xpAmount: number,
+    metadata?: XPEventMetadata,
+    idempotencyKey?: string,
+  ) => {
+    awardXP.mutate({
+      eventType,
+      xpAmount,
+      metadata,
+      idempotencyKey: idempotencyKey ?? createIdempotencyKey(eventType, metadata),
+    });
+  };
+
+  const awardXPEventAsync = (
+    eventType: string,
+    xpAmount: number,
+    metadata?: XPEventMetadata,
+    idempotencyKey?: string,
+  ) => {
+    return awardXP.mutateAsync({
+      eventType,
+      xpAmount,
+      metadata,
+      idempotencyKey: idempotencyKey ?? createIdempotencyKey(eventType, metadata),
+    });
   };
 
   const awardHabitCompletion = async () => {
@@ -82,12 +127,9 @@ export const useXPRewards = () => {
         });
       }
       
-      const reward = applyStreakMultiplier(XP_REWARDS.HABIT_COMPLETE);
+      const reward = applyStreakMultiplier(XP_REWARDS.HABIT_COMPLETE, "habit_complete");
       showXPToast(reward, "Habit Completed!");
-      awardXP.mutate({
-        eventType: "habit_complete",
-        xpAmount: reward,
-      });
+      awardXPEvent("habit_complete", reward);
       
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
@@ -113,12 +155,9 @@ export const useXPRewards = () => {
 
   const awardAllHabitsComplete = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(XP_REWARDS.ALL_HABITS_COMPLETE);
+    const reward = XP_REWARDS.ALL_HABITS_COMPLETE;
     showXPToast(reward, "All Habits Complete!");
-    awardXP.mutate({
-      eventType: "all_habits_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("all_habits_complete", reward);
   };
 
   const awardChallengeCompletion = () => {
@@ -131,12 +170,9 @@ export const useXPRewards = () => {
       });
     }
     
-    const reward = applyStreakMultiplier(XP_REWARDS.CHALLENGE_COMPLETE);
+    const reward = XP_REWARDS.CHALLENGE_COMPLETE;
     showXPToast(reward, "Challenge Complete!");
-    awardXP.mutate({
-      eventType: "challenge_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("challenge_complete", reward);
   };
 
   const awardWeeklyChallengeCompletion = () => {
@@ -149,23 +185,16 @@ export const useXPRewards = () => {
       });
     }
     
-    const reward = applyStreakMultiplier(XP_REWARDS.WEEKLY_CHALLENGE);
+    const reward = XP_REWARDS.WEEKLY_CHALLENGE;
     showXPToast(reward, "Weekly Challenge Done!");
-    awardXP.mutate({
-      eventType: "weekly_challenge",
-      xpAmount: reward,
-    });
+    awardXPEvent("weekly_challenge", reward);
   };
 
   const awardPepTalkListened = (metadata?: Record<string, string | number | boolean | undefined>) => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(XP_REWARDS.PEP_TALK_LISTEN);
+    const reward = XP_REWARDS.PEP_TALK_LISTEN;
     showXPToast(reward, "Pep Talk Listened!");
-    awardXP.mutate({
-      eventType: "pep_talk_listen",
-      xpAmount: reward,
-      metadata,
-    });
+    awardXPEvent("pep_talk_listen", reward, metadata);
   };
 
   const awardCheckInComplete = async () => {
@@ -179,12 +208,9 @@ export const useXPRewards = () => {
         });
       }
       
-      const reward = applyStreakMultiplier(XP_REWARDS.CHECK_IN);
+      const reward = XP_REWARDS.CHECK_IN;
       showXPToast(reward, "Check-In Complete!");
-      awardXP.mutate({
-        eventType: "check_in",
-        xpAmount: reward,
-      });
+      awardXPEvent("check_in", reward);
       
       // Update attributes in background without waiting - verify companion exists at call time
       const companionId = companion.id;
@@ -205,13 +231,9 @@ export const useXPRewards = () => {
     if (!companion || awardXP.isPending) return;
     
     try {
-      const reward = applyStreakMultiplier(XP_REWARDS.STREAK_MILESTONE);
+      const reward = XP_REWARDS.STREAK_MILESTONE;
       showXPToast(reward, `${milestone} Day Streak!`);
-      awardXP.mutate({
-        eventType: "streak_milestone",
-        xpAmount: reward,
-        metadata: { milestone },
-      });
+      awardXPEvent("streak_milestone", reward, { milestone });
       
       // Update soul in background without waiting - verify companion exists at call time
       const companionId = companion.id;
@@ -250,12 +272,9 @@ export const useXPRewards = () => {
     if (!companion || awardXP.isPending) return;
     
     try {
-      const reward = applyStreakMultiplier(XP_REWARDS.CHECK_IN);
+      const reward = XP_REWARDS.EVENING_REFLECTION;
       showXPToast(reward, "Reflection Saved!");
-      awardXP.mutate({
-        eventType: "reflection",
-        xpAmount: reward,
-      });
+      awardXPEvent("evening_reflection", reward);
       
       // Update soul in background without waiting - verify companion exists at call time
       const companionId = companion.id;
@@ -271,12 +290,9 @@ export const useXPRewards = () => {
 
   const awardQuoteShared = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(XP_REWARDS.PEP_TALK_LISTEN);
+    const reward = XP_REWARDS.PEP_TALK_LISTEN;
     showXPToast(reward, "Quote Shared!");
-    awardXP.mutate({
-      eventType: "quote_shared",
-      xpAmount: reward,
-    });
+    awardXPEvent("quote_shared", reward);
   };
 
   // ============================================
@@ -303,13 +319,9 @@ export const useXPRewards = () => {
       label = isPerfect ? "Bonus Focus! 🎯" : "Bonus Focus Session!";
     }
 
-    const reward = applyStreakMultiplier(baseReward);
+    const reward = applyStreakMultiplier(baseReward, "focus_session");
     showXPToast(reward, label);
-    awardXP.mutate({
-      eventType: "focus_session",
-      xpAmount: reward,
-      metadata: { isPerfect, isUnderCap },
-    });
+    awardXPEvent("focus_session", reward, { isPerfect, isUnderCap });
   };
 
   // ============================================
@@ -320,20 +332,14 @@ export const useXPRewards = () => {
     if (!companion) return;
     const reward = SUBTASK_XP_REWARDS.SUBTASK_COMPLETE;
     showXPToast(reward, "Subtask Done!");
-    awardXP.mutate({
-      eventType: "subtask_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("subtask_complete", reward);
   };
 
   const awardAllSubtasksComplete = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(SUBTASK_XP_REWARDS.ALL_SUBTASKS_BONUS);
+    const reward = SUBTASK_XP_REWARDS.ALL_SUBTASKS_BONUS;
     showXPToast(reward, "All Subtasks Complete! 🎉");
-    awardXP.mutate({
-      eventType: "all_subtasks_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("all_subtasks_complete", reward);
   };
 
   // ============================================
@@ -342,32 +348,23 @@ export const useXPRewards = () => {
 
   const awardTopThreeComplete = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRIORITY_XP_REWARDS.TOP_THREE_COMPLETE);
+    const reward = PRIORITY_XP_REWARDS.TOP_THREE_COMPLETE;
     showXPToast(reward, "Top 3 Task Done! 🎯");
-    awardXP.mutate({
-      eventType: "top_three_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("top_three_complete", reward);
   };
 
   const awardAllTopThreeComplete = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRIORITY_XP_REWARDS.ALL_TOP_THREE_BONUS);
+    const reward = PRIORITY_XP_REWARDS.ALL_TOP_THREE_BONUS;
     showXPToast(reward, "All Top 3 Complete! 🏆");
-    awardXP.mutate({
-      eventType: "all_top_three_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("all_top_three_complete", reward);
   };
 
   const awardUrgentTaskComplete = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRIORITY_XP_REWARDS.URGENT_IMPORTANT);
+    const reward = PRIORITY_XP_REWARDS.URGENT_IMPORTANT;
     showXPToast(reward, "Urgent Task Done!");
-    awardXP.mutate({
-      eventType: "urgent_task_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent("urgent_task_complete", reward);
   };
 
   // ============================================
@@ -378,30 +375,21 @@ export const useXPRewards = () => {
     if (!companion) return;
     const reward = INBOX_XP_REWARDS.PROCESS_INBOX;
     // Silent - no toast for small XP
-    awardXP.mutate({
-      eventType: "inbox_processed",
-      xpAmount: reward,
-    });
+    awardXPEvent("inbox_processed", reward);
   };
 
   const awardInboxZero = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(INBOX_XP_REWARDS.INBOX_ZERO);
+    const reward = INBOX_XP_REWARDS.INBOX_ZERO;
     showXPToast(reward, "Inbox Zero! 📭");
-    awardXP.mutate({
-      eventType: "inbox_zero",
-      xpAmount: reward,
-    });
+    awardXPEvent("inbox_zero", reward);
   };
 
   const awardVoiceCapture = () => {
     if (!companion) return;
     const reward = INBOX_XP_REWARDS.VOICE_CAPTURE;
     // Silent - no toast for small XP
-    awardXP.mutate({
-      eventType: "voice_capture",
-      xpAmount: reward,
-    });
+    awardXPEvent("voice_capture", reward);
   };
 
   // ============================================
@@ -410,42 +398,30 @@ export const useXPRewards = () => {
 
   const awardWeeklyReview = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.WEEKLY_REVIEW);
+    const reward = PRODUCTIVITY_XP_REWARDS.WEEKLY_REVIEW;
     showXPToast(reward, "Weekly Review Complete! 📊");
-    awardXP.mutate({
-      eventType: "weekly_review",
-      xpAmount: reward,
-    });
+    awardXPEvent("weekly_review", reward);
   };
 
   const awardDailyReview = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.DAILY_REVIEW);
+    const reward = PRODUCTIVITY_XP_REWARDS.DAILY_REVIEW;
     showXPToast(reward, "Daily Review Done!");
-    awardXP.mutate({
-      eventType: "daily_review",
-      xpAmount: reward,
-    });
+    awardXPEvent("daily_review", reward);
   };
 
   const awardHighProductivityDay = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.HIGH_PRODUCTIVITY_DAY);
+    const reward = PRODUCTIVITY_XP_REWARDS.HIGH_PRODUCTIVITY_DAY;
     showXPToast(reward, "Productive Day! 📈");
-    awardXP.mutate({
-      eventType: "high_productivity_day",
-      xpAmount: reward,
-    });
+    awardXPEvent("high_productivity_day", reward);
   };
 
   const awardPerfectDay = () => {
     if (!companion) return;
-    const reward = applyStreakMultiplier(PRODUCTIVITY_XP_REWARDS.PERFECT_DAY);
+    const reward = PRODUCTIVITY_XP_REWARDS.PERFECT_DAY;
     showXPToast(reward, "Perfect Day! ⭐");
-    awardXP.mutate({
-      eventType: "perfect_day",
-      xpAmount: reward,
-    });
+    awardXPEvent("perfect_day", reward);
   };
 
   // ============================================
@@ -456,20 +432,14 @@ export const useXPRewards = () => {
     if (!companion) return;
     const reward = SCHEDULING_XP_REWARDS.ON_TIME_COMPLETION;
     // Silent - no toast for small XP
-    awardXP.mutate({
-      eventType: "on_time_completion",
-      xpAmount: reward,
-    });
+    awardXPEvent("on_time_completion", reward);
   };
 
   const awardContextMatch = () => {
     if (!companion) return;
     const reward = SCHEDULING_XP_REWARDS.CONTEXT_MATCH;
     // Silent - no toast for small XP
-    awardXP.mutate({
-      eventType: "context_match",
-      xpAmount: reward,
-    });
+    awardXPEvent("context_match", reward);
   };
 
   // ============================================
@@ -482,36 +452,25 @@ export const useXPRewards = () => {
     const baseReward = isPostcardMilestone
       ? MILESTONE_XP_REWARDS.POSTCARD
       : MILESTONE_XP_REWARDS.REGULAR;
-    const reward = applyStreakMultiplier(baseReward);
+    const reward = baseReward;
     const label = isPostcardMilestone ? "Celebration Milestone!" : "Milestone Complete!";
 
     showXPToast(reward, label);
-    awardXP.mutate({
-      eventType: isPostcardMilestone ? "postcard_milestone" : "milestone_complete",
-      xpAmount: reward,
-    });
+    awardXPEvent(isPostcardMilestone ? "postcard_milestone" : "milestone_complete", reward);
   };
 
   const awardPhaseComplete = (phaseName: string) => {
     if (!companion || awardXP.isPending) return;
-    const reward = applyStreakMultiplier(MILESTONE_XP_REWARDS.PHASE_COMPLETE);
+    const reward = MILESTONE_XP_REWARDS.PHASE_COMPLETE;
     showXPToast(reward, `Phase Complete: ${phaseName}!`);
-    awardXP.mutate({
-      eventType: "phase_complete",
-      xpAmount: reward,
-      metadata: { phaseName },
-    });
+    awardXPEvent("phase_complete", reward, { phaseName });
   };
 
   const awardEpicComplete = (epicTitle: string) => {
     if (!companion || awardXP.isPending) return;
-    const reward = applyStreakMultiplier(MILESTONE_XP_REWARDS.EPIC_COMPLETE);
+    const reward = MILESTONE_XP_REWARDS.EPIC_COMPLETE;
     showXPToast(reward, "Epic Complete! 🏆");
-    awardXP.mutate({
-      eventType: "epic_complete",
-      xpAmount: reward,
-      metadata: { epicTitle },
-    });
+    awardXPEvent("epic_complete", reward, { epicTitle });
     
     // Create epic complete memory (non-blocking)
     const companionId = companion.id;
@@ -535,7 +494,12 @@ export const useXPRewards = () => {
     }
   };
 
-  const awardCustomXP = async (xpAmount: number, eventType: string, displayReason?: string, metadata?: Record<string, string | number | boolean | undefined>) => {
+  const awardCustomXP = async (
+    xpAmount: number,
+    eventType: string,
+    displayReason?: string,
+    metadata?: XPEventMetadata,
+  ) => {
     // Guard: Don't attempt XP award if companion not loaded or mutation in progress
     if (!companion) {
       logger.warn('Cannot award XP: companion not loaded yet');
@@ -545,16 +509,13 @@ export const useXPRewards = () => {
       logger.warn('Cannot award XP: previous award still in progress');
       return;
     }
-    if (displayReason && xpAmount > 0) {
-      showXPToast(xpAmount, displayReason);
+    const effectiveAmount = applyStreakMultiplier(xpAmount, eventType);
+    if (displayReason && effectiveAmount > 0) {
+      showXPToast(effectiveAmount, displayReason);
     }
 
     try {
-      await awardXP.mutateAsync({
-        eventType,
-        xpAmount,
-        metadata,
-      });
+      return await awardXPEventAsync(eventType, effectiveAmount, metadata);
     } catch (error) {
       logger.error('Error awarding custom XP:', error);
     }

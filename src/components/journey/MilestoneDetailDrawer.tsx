@@ -36,7 +36,6 @@ interface MilestoneDetailDrawerProps {
   isCompleting: boolean;
   status: "completed" | "overdue" | "pending";
   postcard?: CompanionPostcard;
-  streakMultiplier?: number;
 }
 
 export const MilestoneDetailDrawer = ({
@@ -48,7 +47,6 @@ export const MilestoneDetailDrawer = ({
   isCompleting,
   status,
   postcard,
-  streakMultiplier = 1,
 }: MilestoneDetailDrawerProps) => {
   if (!milestone) return null;
 
@@ -60,7 +58,7 @@ export const MilestoneDetailDrawer = ({
   const baseXP = isPostcardMilestone
     ? MILESTONE_XP_REWARDS.POSTCARD
     : MILESTONE_XP_REWARDS.REGULAR;
-  const displayXP = Math.round(baseXP * streakMultiplier);
+  const displayXP = baseXP;
 
   // Calculate days until/since target
   const getDaysInfo = () => {

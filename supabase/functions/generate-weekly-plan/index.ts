@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { QUEST_XP_REWARDS } from "../../../src/config/xpRewards.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -316,7 +317,11 @@ ${dailyPlans.map(d => `- ${d.dayName} (${d.date}): ${d.taskCount} tasks, ${d.ene
       category: ['mind', 'body', 'soul'].includes(task.category || '') ? task.category : null,
       priority: task.priority || 'medium',
       ai_generated: true,
-      xp_reward: task.difficulty === 'hard' ? 30 : task.difficulty === 'easy' ? 10 : 20,
+      xp_reward: task.difficulty === 'hard'
+        ? QUEST_XP_REWARDS.HARD
+        : task.difficulty === 'easy'
+          ? QUEST_XP_REWARDS.EASY
+          : QUEST_XP_REWARDS.MEDIUM,
     }));
 
     const { data: insertedTasks, error: insertError } = await supabase

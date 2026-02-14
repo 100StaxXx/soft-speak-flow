@@ -9,11 +9,13 @@ import { DailyXPTracker } from "@/components/DailyXPTracker";
 import { QuestSectionTooltip } from "@/components/QuestSectionTooltip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getEffectiveQuestXP, getQuestXPMultiplier } from "@/config/xpRewards";
+import {
+  getEffectiveQuestXP,
+  getQuestXPMultiplier,
+  MAIN_QUEST_XP_MULTIPLIER,
+} from "@/config/xpRewards";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
 import type { DailyTask } from "@/hooks/useTasksQuery";
-
-const MAIN_QUEST_MULTIPLIER = 1.5;
 
 interface QuestAgendaProps {
   tasks: DailyTask[];
@@ -67,7 +69,7 @@ export function QuestAgenda({
   const totalXP = useMemo(() => {
     return tasks.reduce((sum, task) => {
       if (!task.completed) return sum;
-      const reward = task.is_main_quest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward;
+      const reward = task.is_main_quest ? task.xp_reward * MAIN_QUEST_XP_MULTIPLIER : task.xp_reward;
       return sum + reward;
     }, 0);
   }, [tasks]);
@@ -132,7 +134,7 @@ export function QuestAgenda({
       onToggleComplete={(taskId, completed) => onToggle(
         taskId, 
         completed, 
-        isMainQuest ? task.xp_reward * MAIN_QUEST_MULTIPLIER : task.xp_reward
+        isMainQuest ? task.xp_reward * MAIN_QUEST_XP_MULTIPLIER : task.xp_reward
       )}
       onDelete={(taskId) => onDelete(taskId)}
       onEdit={(taskId) => {

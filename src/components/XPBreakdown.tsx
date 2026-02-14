@@ -44,6 +44,7 @@ export const XPBreakdown = memo(() => {
     habit_complete: "Habits",
     task_complete: "Quests",
     check_in: "Check-in",
+    evening_reflection: "Evening Reflection",
     pep_talk: "Pep Talk",
     pep_talk_listen: "Pep Talk Listen",
     all_habits_complete: "All Habits Bonus",

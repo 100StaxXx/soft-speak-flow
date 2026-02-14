@@ -46,7 +46,7 @@ export const QuestSectionTooltip = () => {
               <span className="text-xs font-semibold text-orange-400 mt-0.5">🔥</span>
               <div>
                 <p className="text-xs font-semibold text-orange-400">Difficulty Levels</p>
-                <p className="text-xs text-muted-foreground">Easy (8 XP) • Medium (16 XP) • Hard (28 XP)</p>
+                <p className="text-xs text-muted-foreground">Easy (12 XP) • Medium (16 XP) • Hard (22 XP)</p>
               </div>
             </div>
           </div>

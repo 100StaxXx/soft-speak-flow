@@ -9,7 +9,7 @@ import { useXPToast } from "@/contexts/XPContext";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { useSchedulingLearner } from "@/hooks/useSchedulingLearner";
 import { useRef, createElement } from "react";
-import { getEffectiveQuestXP } from "@/config/xpRewards";
+import { getEffectiveQuestXP, MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";
 import {
@@ -307,6 +307,7 @@ export const useTaskMutations = (taskDate: string) => {
         .from('daily_tasks')
         .select(`
           completed_at, task_text, habit_source_id, task_date, difficulty, scheduled_time, category,
+          is_main_quest, xp_reward,
           contact_id, auto_log_interaction,
           contact:contacts!contact_id(id, name, avatar_url)
         `)
@@ -320,6 +321,12 @@ export const useTaskMutations = (taskDate: string) => {
       const taskText = existingTask?.task_text || 'Task';
       const habitSourceId = existingTask?.habit_source_id;
       const taskDateValue = existingTask?.task_date || format(new Date(), 'yyyy-MM-dd');
+      const isMainQuest = existingTask?.is_main_quest === true;
+      const storedTaskXP = Number(existingTask?.xp_reward ?? xpReward);
+      const mainQuestXP = Math.round(storedTaskXP * MAIN_QUEST_XP_MULTIPLIER);
+      const normalizedTaskXP = isMainQuest && xpReward <= storedTaskXP
+        ? mainQuestXP
+        : xpReward;
 
       // Allow undo if forceUndo is true, otherwise block unchecking
       if (wasAlreadyCompleted && !completed && !forceUndo) {
@@ -337,8 +344,8 @@ export const useTaskMutations = (taskDate: string) => {
         if (error) throw error;
 
         // Deduct the XP that was awarded
-        if (xpReward > 0) {
-          await awardCustomXP(-xpReward, 'task_undo', 'Quest undone', { task_id: taskId });
+        if (normalizedTaskXP > 0) {
+          await awardCustomXP(-normalizedTaskXP, 'task_undo', 'Quest undone', { task_id: taskId });
         }
 
         // If this was a habit-sourced task, remove the habit completion
@@ -376,8 +383,8 @@ export const useTaskMutations = (taskDate: string) => {
         return { taskId, completed: false, xpAwarded: 0, wasAlreadyCompleted, isUndo: false, taskText, habitSourceId };
       }
 
-      const { bonusXP, toastReason } = await calculateGuildBonus(user.id, xpReward);
-      const totalXP = xpReward + bonusXP;
+      const { bonusXP, toastReason } = await calculateGuildBonus(user.id, normalizedTaskXP);
+      const totalXP = normalizedTaskXP + bonusXP;
 
       const { data: updateResult, error: updateError } = await supabase
         .from('daily_tasks')
@@ -392,7 +399,8 @@ export const useTaskMutations = (taskDate: string) => {
         throw new Error('Task was already completed');
       }
 
-      await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
+      const awardResult = await awardCustomXP(totalXP, 'task_complete', toastReason, { task_id: taskId });
+      const awardedXP = awardResult?.xpAwarded ?? 0;
 
       // If this is a habit-sourced task, sync with habit_completions
       if (habitSourceId) {
@@ -421,7 +429,7 @@ export const useTaskMutations = (taskDate: string) => {
       return { 
         taskId, 
         completed: true, 
-        xpAwarded: totalXP, 
+        xpAwarded: awardedXP, 
         bonusXP, 
         toastReason, 
         wasAlreadyCompleted, 

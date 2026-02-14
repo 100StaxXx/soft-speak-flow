@@ -8,15 +8,13 @@ import {
   DragSnapMode,
   DragZoomRailState,
   buildAdaptiveSnapRuntimeScale,
-  buildDragZoomRailState,
-  computeAdaptiveMinute,
   minuteToTime24,
   resolveAdaptiveSnapConfig,
+  snapMinuteByMode,
   time24ToMinute,
 } from "@/components/calendar/dragSnap";
 
 const DROP_BOUNCE_MS = 300;
-const LIGHT_HAPTIC_MIN_INTERVAL_MS = 45;
 const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
 
 const triggerHaptic = async (style: ImpactStyle) => {
@@ -53,8 +51,6 @@ interface WindowListeners {
   scroll?: () => void;
   scrollContext?: ScrollContext;
 }
-
-const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 type ScrollContext =
   | { kind: "window" }
@@ -110,20 +106,15 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   const draggingTaskIdRef = useRef<string | null>(null);
   const originalTimeRef = useRef<string>("09:00");
   const originalMinutesRef = useRef(540);
+  const currentRawMinutesRef = useRef(540);
+  const lastPreviewMinuteRef = useRef(540);
   const dragStartYRef = useRef(0);
-  const lastSnappedMinutesRef = useRef(540);
-  const fineAnchorMinuteRef = useRef<number | null>(null);
-  const fineAnchorClientYRef = useRef<number | null>(null);
-  const precisionEligibleRef = useRef(true);
-  const precisionHoldOriginYRef = useRef(0);
-  const precisionHoldStartedAtRef = useRef(0);
+  const dragMovedRef = useRef(false);
   const runtimeScaleRef = useRef<AdaptiveSnapRuntimeScale>(
     buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight()),
   );
   const dropResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowListenersRef = useRef<WindowListeners>({});
-  const lastLightHapticAtRef = useRef(0);
-  const snapModeRef = useRef<DragSnapMode>("coarse");
   const scrollContextRef = useRef<ScrollContext>({ kind: "window" });
   const dragStartScrollOffsetRef = useRef(0);
   const lastPointerClientYRef = useRef(0);
@@ -166,80 +157,10 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   }, []);
 
   const resetSnapState = useCallback(() => {
-    snapModeRef.current = "coarse";
     setSnapMode("coarse");
     setZoomRail(null);
-    fineAnchorMinuteRef.current = null;
-    fineAnchorClientYRef.current = null;
-    precisionEligibleRef.current = true;
-    precisionHoldOriginYRef.current = 0;
-    precisionHoldStartedAtRef.current = 0;
     runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight());
   }, [resolvedSnapConfig]);
-
-  const setFineMode = useCallback((clientY: number) => {
-    if (snapModeRef.current === "fine") return;
-    snapModeRef.current = "fine";
-    setSnapMode("fine");
-    fineAnchorMinuteRef.current = lastSnappedMinutesRef.current;
-    fineAnchorClientYRef.current = clientY;
-  }, []);
-
-  const setCoarseMode = useCallback(() => {
-    if (snapModeRef.current === "coarse") return;
-    snapModeRef.current = "coarse";
-    setSnapMode("coarse");
-    fineAnchorMinuteRef.current = null;
-    fineAnchorClientYRef.current = null;
-  }, []);
-
-  const updatePrecisionMode = useCallback((clientY: number) => {
-    const mode = resolvedSnapConfig.precisionActivationMode;
-
-    if (mode === "none") {
-      precisionEligibleRef.current = false;
-      setCoarseMode();
-      return;
-    }
-
-    if (snapModeRef.current === "fine") {
-      const anchorY = fineAnchorClientYRef.current ?? clientY;
-      if (Math.abs(clientY - anchorY) > resolvedSnapConfig.precisionExitMovementPx) {
-        setCoarseMode();
-      }
-      return;
-    }
-
-    if (!precisionEligibleRef.current) return;
-
-    if (mode === "manual-hold") {
-      const distanceFromStart = Math.abs(clientY - dragStartYRef.current);
-      if (distanceFromStart > resolvedSnapConfig.precisionActivationWindowPx) {
-        precisionEligibleRef.current = false;
-        return;
-      }
-    }
-
-    const holdDistance = Math.abs(clientY - precisionHoldOriginYRef.current);
-    if (holdDistance > resolvedSnapConfig.precisionHoldMovementPx) {
-      precisionHoldOriginYRef.current = clientY;
-      precisionHoldStartedAtRef.current = nowMs();
-      return;
-    }
-
-    const holdDuration = nowMs() - precisionHoldStartedAtRef.current;
-    if (holdDuration >= resolvedSnapConfig.precisionHoldMs) {
-      setFineMode(clientY);
-    }
-  }, [
-    resolvedSnapConfig.precisionActivationMode,
-    resolvedSnapConfig.precisionActivationWindowPx,
-    resolvedSnapConfig.precisionExitMovementPx,
-    resolvedSnapConfig.precisionHoldMovementPx,
-    resolvedSnapConfig.precisionHoldMs,
-    setCoarseMode,
-    setFineMode,
-  ]);
 
   const handleMove = useCallback(
     (clientY: number, options?: { skipAutoscrollUpdate?: boolean }) => {
@@ -256,50 +177,29 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       const effectiveClientY = safeClientY + scrollDelta;
       const deltaY = effectiveClientY - dragStartYRef.current;
       dragOffsetY.set(deltaY);
-
-      updatePrecisionMode(effectiveClientY);
-
-      const computed = computeAdaptiveMinute({
-        startMinute: originalMinutesRef.current,
-        startClientY: dragStartYRef.current,
-        currentClientY: effectiveClientY,
-        mode: snapModeRef.current,
-        lastSnappedMinute: lastSnappedMinutesRef.current,
-        fineAnchorMinute: fineAnchorMinuteRef.current,
-        fineAnchorClientY: fineAnchorClientYRef.current,
-        runtimeScale: runtimeScaleRef.current,
-        config: resolvedSnapConfig,
-      });
-
-      fineAnchorMinuteRef.current = computed.fineAnchorMinute;
-      fineAnchorClientYRef.current = computed.fineAnchorClientY;
-
-      const newMinutes = computed.snappedMinute;
-      if (newMinutes !== lastSnappedMinutesRef.current) {
-        lastSnappedMinutesRef.current = newMinutes;
-        setPreviewTime(minuteToTime24(newMinutes, resolvedSnapConfig));
-        const now = nowMs();
-        if (now - lastLightHapticAtRef.current >= LIGHT_HAPTIC_MIN_INTERVAL_MS) {
-          lastLightHapticAtRef.current = now;
-          void triggerHaptic(ImpactStyle.Light);
-        }
+      if (!dragMovedRef.current && Math.abs(deltaY) > 0.5) {
+        dragMovedRef.current = true;
       }
 
-      setZoomRail(buildDragZoomRailState(
-        snapModeRef.current,
-        safeClientY,
-        newMinutes,
-        resolvedSnapConfig,
-      ));
+      const rawMinute = originalMinutesRef.current + (deltaY / runtimeScaleRef.current.coarsePixelsPerMinute);
+      currentRawMinutesRef.current = rawMinute;
+      const previewMinute = snapMinuteByMode(rawMinute, "fine", resolvedSnapConfig);
+      if (previewMinute !== lastPreviewMinuteRef.current) {
+        lastPreviewMinuteRef.current = previewMinute;
+        setPreviewTime(minuteToTime24(previewMinute, resolvedSnapConfig));
+      }
     },
-    [dragOffsetY, resolvedSnapConfig, updateAutoscroll, updatePrecisionMode],
+    [dragOffsetY, resolvedSnapConfig, updateAutoscroll],
   );
 
   const finishDrag = useCallback(() => {
     removeWindowListeners();
 
     const taskId = draggingTaskIdRef.current;
-    const finalTime = minuteToTime24(lastSnappedMinutesRef.current, resolvedSnapConfig);
+    const finalMinute = snapMinuteByMode(currentRawMinutesRef.current, "fine", resolvedSnapConfig);
+    const finalTime = dragMovedRef.current
+      ? minuteToTime24(finalMinute, resolvedSnapConfig)
+      : originalTimeRef.current;
     const didChange = taskId && finalTime !== originalTimeRef.current;
 
     if (taskId && didChange) {
@@ -320,6 +220,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     scrollContextRef.current = { kind: "window" };
     dragStartScrollOffsetRef.current = 0;
     lastPointerClientYRef.current = 0;
+    dragMovedRef.current = false;
     resetSnapState();
   }, [
     clearDropResetTimer,
@@ -332,7 +233,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   ]);
 
   const startDrag = useCallback(
-    (taskId: string, scheduledTime: string, startY: number) => {
+    (taskId: string, scheduledTime: string, startY: number, inputSource: "pointer" | "touch") => {
       if (draggingTaskIdRef.current) return;
 
       removeWindowListeners();
@@ -346,14 +247,13 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       draggingTaskIdRef.current = taskId;
       originalTimeRef.current = normalizedStartTime;
       originalMinutesRef.current = startMinute;
-      lastSnappedMinutesRef.current = startMinute;
+      currentRawMinutesRef.current = startMinute;
+      lastPreviewMinuteRef.current = startMinute;
       dragStartYRef.current = safeStartY;
       scrollContextRef.current = scrollContext;
       dragStartScrollOffsetRef.current = dragStartScrollOffset;
       lastPointerClientYRef.current = safeStartY;
-      precisionEligibleRef.current = resolvedSnapConfig.precisionActivationMode !== "none";
-      precisionHoldOriginYRef.current = safeStartY;
-      precisionHoldStartedAtRef.current = nowMs();
+      dragMovedRef.current = false;
       runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(
         resolvedSnapConfig,
         getViewportHeight(),
@@ -362,15 +262,8 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       setDraggingTaskId(taskId);
       setPreviewTime(normalizedStartTime);
       dragOffsetY.set(0);
-      lastLightHapticAtRef.current = 0;
-
-      snapModeRef.current = "coarse";
       setSnapMode("coarse");
-      fineAnchorMinuteRef.current = null;
-      fineAnchorClientYRef.current = null;
-      setZoomRail(buildDragZoomRailState("coarse", safeStartY, startMinute, resolvedSnapConfig));
-
-      void triggerHaptic(ImpactStyle.Medium);
+      setZoomRail(null);
 
       const pointerMove = (e: PointerEvent) => {
         handleMove(e.clientY);
@@ -395,22 +288,25 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       };
 
       windowListenersRef.current = {
-        pointermove: pointerMove,
-        pointerup: pointerEnd,
-        pointercancel: pointerEnd,
-        touchmove: touchMove,
-        touchend: touchEnd,
-        touchcancel: touchEnd,
         scroll: scrollListener,
         scrollContext,
       };
 
-      window.addEventListener("pointermove", pointerMove);
-      window.addEventListener("pointerup", pointerEnd);
-      window.addEventListener("pointercancel", pointerEnd);
-      window.addEventListener("touchmove", touchMove, { passive: false });
-      window.addEventListener("touchend", touchEnd);
-      window.addEventListener("touchcancel", touchEnd);
+      if (inputSource === "touch") {
+        windowListenersRef.current.touchmove = touchMove;
+        windowListenersRef.current.touchend = touchEnd;
+        windowListenersRef.current.touchcancel = touchEnd;
+        window.addEventListener("touchmove", touchMove, { passive: false });
+        window.addEventListener("touchend", touchEnd);
+        window.addEventListener("touchcancel", touchEnd);
+      } else {
+        windowListenersRef.current.pointermove = pointerMove;
+        windowListenersRef.current.pointerup = pointerEnd;
+        windowListenersRef.current.pointercancel = pointerEnd;
+        window.addEventListener("pointermove", pointerMove);
+        window.addEventListener("pointerup", pointerEnd);
+        window.addEventListener("pointercancel", pointerEnd);
+      }
       if (scrollContext.kind === "element") {
         scrollContext.element.addEventListener("scroll", scrollListener, { passive: true });
       } else {
@@ -436,7 +332,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
       e.preventDefault();
       e.stopPropagation();
-      startDrag(taskId, scheduledTime, touch.clientY);
+      startDrag(taskId, scheduledTime, touch.clientY, "touch");
     },
     [isInteractiveEventTarget, startDrag],
   );
@@ -463,7 +359,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
       e.preventDefault();
       e.stopPropagation();
-      startDrag(taskId, scheduledTime, e.clientY);
+      startDrag(taskId, scheduledTime, e.clientY, "pointer");
     },
     [isInteractiveEventTarget, startDrag],
   );

@@ -79,12 +79,12 @@ describe("TimelineView drag integration", () => {
     act(() => {
       fireEvent(dragHandle, createPointerDownEvent(100));
 
-      dispatchPointerMove(120); // +20px => coarse snap to +15m
+      dispatchPointerMove(120); // +20px => shared profile preview/drop +20m
       window.dispatchEvent(new Event("pointerup"));
     });
 
     await waitFor(() => {
-      expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:15");
+      expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:20");
     });
   });
 

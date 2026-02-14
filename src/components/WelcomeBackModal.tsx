@@ -39,11 +39,8 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
   const handleWelcomeBack = async () => {
     // Trigger reunion animation
     setShowReunion(true);
-    
-    // Mark user as active
-    await markUserActive();
-    
-    // Award welcome back XP bonus (only once)
+
+    // Award welcome back XP bonus (only once) before activity reset.
     if (!hasAwarded) {
       await awardCustomXP(
         XP_REWARDS.WELCOME_BACK_BONUS,
@@ -53,6 +50,9 @@ export const WelcomeBackModal = ({ isOpen, onClose }: WelcomeBackModalProps) => 
       );
       setHasAwarded(true);
     }
+
+    // Mark user as active after XP gating has evaluated inactivity.
+    await markUserActive();
     
     // Trigger comeback reaction for returning users (3+ days inactive)
     if (health.daysInactive >= 3) {

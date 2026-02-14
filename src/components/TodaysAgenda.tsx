@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays, isSameDay } from "date-fns";
-import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "sonner";
 import { 
@@ -44,6 +44,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 
 import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
@@ -209,15 +210,6 @@ interface TimelineMarkerRow {
 type TimelineRow =
   | { kind: "marker"; marker: TimelineMarkerRow }
   | { kind: "task"; task: Task };
-
-interface DraggedTimelineRowSnapshot {
-  taskId: string;
-  anchorTopPx: number;
-  laneIndex: number;
-  laneCount: number;
-  laneOffsetPx: number;
-  marginTopPx: number;
-}
 
 const parseTimeToMinute = (time: string | null | undefined): number | null => {
   if (!time) return null;
@@ -728,88 +720,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return () => window.clearInterval(interval);
   }, [selectedDate]);
 
-  const previewScheduledOverrides = useMemo(() => {
-    const activeTaskId = timelineDrag.draggingTaskId;
-    const previewTime = timelineDrag.previewTime;
-    if (!activeTaskId || !previewTime) return undefined;
-    return { [activeTaskId]: previewTime };
-  }, [timelineDrag.draggingTaskId, timelineDrag.previewTime]);
-
-  const baseScheduledFlow = useMemo(
+  const scheduledFlow = useMemo(
     () => buildTaskTimelineFlow(scheduledItems),
     [scheduledItems],
   );
-
-  const scheduledFlow = useMemo(
-    () => buildTaskTimelineFlow(scheduledItems, previewScheduledOverrides),
-    [scheduledItems, previewScheduledOverrides],
-  );
-
-  const timelineRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const draggedTimelineRowSnapshotRef = useRef<DraggedTimelineRowSnapshot | null>(null);
-  const dragLayoutCompensationY = useMotionValue(0);
-  const composedDragOffsetY = useTransform(() => {
-    const dragOffsetSource = timelineDrag.dragOffsetY;
-    const dragOffsetY = typeof dragOffsetSource === "number" ? dragOffsetSource : dragOffsetSource.get();
-    return dragOffsetY + dragLayoutCompensationY.get();
-  });
-
-  const setTimelineRowRef = useCallback((taskId: string, node: HTMLDivElement | null) => {
-    if (node) {
-      timelineRowRefs.current.set(taskId, node);
-    } else {
-      timelineRowRefs.current.delete(taskId);
-    }
-  }, []);
-
-  useLayoutEffect(() => {
-    const activeTaskId = timelineDrag.draggingTaskId;
-    if (!activeTaskId) {
-      draggedTimelineRowSnapshotRef.current = null;
-      dragLayoutCompensationY.set(0);
-      return;
-    }
-
-    const rowNode = timelineRowRefs.current.get(activeTaskId);
-    const existingSnapshot = draggedTimelineRowSnapshotRef.current;
-    if (!existingSnapshot || existingSnapshot.taskId !== activeTaskId) {
-      if (!rowNode) {
-        dragLayoutCompensationY.set(0);
-        return;
-      }
-
-      const baseFlowEntry = baseScheduledFlow.byTaskId.get(activeTaskId);
-      const laneIndex = baseFlowEntry?.laneIndex ?? 0;
-      const laneCount = baseFlowEntry?.laneCount ?? 1;
-      const laneOffsetPx = getLaneOffsetPx(laneIndex, baseFlowEntry?.overlapCount ?? 0);
-      const marginTopPx = baseFlowEntry ? getScheduledSpacingPx(baseFlowEntry.gapBeforeMinutes) : 0;
-
-      draggedTimelineRowSnapshotRef.current = {
-        taskId: activeTaskId,
-        anchorTopPx: rowNode.getBoundingClientRect().top,
-        laneIndex,
-        laneCount,
-        laneOffsetPx,
-        marginTopPx,
-      };
-      dragLayoutCompensationY.set(0);
-      return;
-    }
-
-    if (!rowNode) {
-      dragLayoutCompensationY.set(0);
-      return;
-    }
-
-    const currentTopPx = rowNode.getBoundingClientRect().top;
-    const compensation = existingSnapshot.anchorTopPx - currentTopPx;
-    dragLayoutCompensationY.set(Number.isFinite(compensation) ? compensation : 0);
-  }, [
-    baseScheduledFlow.byTaskId,
-    dragLayoutCompensationY,
-    timelineDrag.draggingTaskId,
-    timelineDrag.previewTime,
-  ]);
 
   const scheduledItemsById = useMemo(
     () => new Map(scheduledItems.map((task) => [task.id, task])),
@@ -896,8 +810,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       })),
       ...flowOrderedScheduledItems
         .map((task) => {
-          const effectiveTime = previewScheduledOverrides?.[task.id] ?? task.scheduled_time;
-          const minute = parseTimeToMinute(effectiveTime);
+          const minute = parseTimeToMinute(task.scheduled_time);
           if (minute === null) return null;
           return {
             kind: "task" as const,
@@ -919,7 +832,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     ));
     rows.push(...anytimeItems.map((task) => ({ kind: "task" as const, task })));
     return rows;
-  }, [anytimeItems, flowOrderedScheduledItems, previewScheduledOverrides, timelineMarkerRows]);
+  }, [anytimeItems, flowOrderedScheduledItems, timelineMarkerRows]);
   const hasNowMarkerRow = useMemo(
     () => timelineRows.some((row) => row.kind === "marker" && row.marker.kind === "now"),
     [timelineRows],
@@ -958,48 +871,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     [draggableTimelineItems],
   );
 
-  const timelineConflictMap = useMemo(() => {
-    const activeTaskId = timelineDrag.draggingTaskId;
-    const previewTime = timelineDrag.previewTime;
-    if (!activeTaskId || !previewTime) return baseTimelineConflictMap;
-
-    const activeConflictIds = getTaskConflictSetForTask(activeTaskId, draggableTimelineItems, {
-      [activeTaskId]: previewTime,
-    });
-    const previousActiveConflictIds = baseTimelineConflictMap.get(activeTaskId) ?? new Set<string>();
-    const touchedTaskIds = new Set<string>([
-      ...previousActiveConflictIds,
-      ...activeConflictIds,
-    ]);
-    const nextMap = new Map(baseTimelineConflictMap);
-
-    for (const touchedTaskId of touchedTaskIds) {
-      const updatedConflicts = new Set(nextMap.get(touchedTaskId) ?? []);
-      updatedConflicts.delete(activeTaskId);
-      if (activeConflictIds.has(touchedTaskId)) {
-        updatedConflicts.add(activeTaskId);
-      }
-
-      if (updatedConflicts.size > 0) {
-        nextMap.set(touchedTaskId, updatedConflicts);
-      } else {
-        nextMap.delete(touchedTaskId);
-      }
-    }
-
-    if (activeConflictIds.size > 0) {
-      nextMap.set(activeTaskId, new Set(activeConflictIds));
-    } else {
-      nextMap.delete(activeTaskId);
-    }
-
-    return nextMap;
-  }, [
-    baseTimelineConflictMap,
-    draggableTimelineItems,
-    timelineDrag.draggingTaskId,
-    timelineDrag.previewTime,
-  ]);
+  const timelineConflictMap = baseTimelineConflictMap;
 
   // Group rituals by campaign
   const campaignRitualGroups = useMemo(() => {
@@ -1066,7 +938,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   
 
-  const totalXP = tasks.reduce((sum, t) => (t.completed ? sum + t.xp_reward : sum), 0);
+  const totalXP = tasks.reduce((sum, task) => {
+    if (!task.completed) return sum;
+    const taskXP = task.is_main_quest
+      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
+      : task.xp_reward;
+    return sum + taskXP;
+  }, 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
   const allComplete = totalCount > 0 && completedCount === totalCount;
 
@@ -1118,6 +996,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, overlapCount = 0) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
+    const effectiveTaskXP = task.is_main_quest
+      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
+      : task.xp_reward;
     const isDragging = dragProps?.isDragging ?? false;
     const isPressed = dragProps?.isPressed ?? false;
     const isActivated = dragProps?.isActivated ?? false;
@@ -1152,7 +1033,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         });
         resetCombo();
         triggerHaptic(ImpactStyle.Light);
-        onUndoToggle(task.id, task.xp_reward);
+        onUndoToggle(task.id, effectiveTaskXP);
       } else {
         // Complete: add to optimistic set immediately for instant strikethrough
         setOptimisticCompleted(prev => new Set(prev).add(task.id));
@@ -1169,7 +1050,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           });
         }, 600);
 
-        onToggle(task.id, !isComplete, task.xp_reward);
+        onToggle(task.id, !isComplete, effectiveTaskXP);
       }
     };
 
@@ -1359,7 +1240,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 Main
               </Badge>
             )}
-            <span className="text-sm font-bold text-stardust-gold/80">+{task.xp_reward}</span>
+            <span className="text-sm font-bold text-stardust-gold/80">+{effectiveTaskXP}</span>
             
             {/* Chevron for expandable details - only shown if task has details */}
             {hasDetails && (
@@ -1725,20 +1606,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
                   const isAnytimeTask = !task.scheduled_time;
                   const rowFlow = scheduledFlow.byTaskId.get(task.id);
-                  const rowSnapshot = draggedTimelineRowSnapshotRef.current;
-                  const hasFrozenRowMetrics = isThisDragging && rowSnapshot?.taskId === task.id;
-                  const laneIndex = hasFrozenRowMetrics ? rowSnapshot.laneIndex : rowFlow?.laneIndex;
-                  const laneCount = hasFrozenRowMetrics ? rowSnapshot.laneCount : rowFlow?.laneCount;
-                  const laneOffsetPx = hasFrozenRowMetrics
-                    ? rowSnapshot.laneOffsetPx
-                    : rowFlow
-                      ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
-                      : 0;
-                  const scheduledSpacingPx = hasFrozenRowMetrics
-                    ? rowSnapshot.marginTopPx
-                    : rowFlow
-                      ? getScheduledSpacingPx(rowFlow.gapBeforeMinutes)
-                      : 0;
+                  const laneIndex = rowFlow?.laneIndex;
+                  const laneCount = rowFlow?.laneCount;
+                  const laneOffsetPx = rowFlow
+                    ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
+                    : 0;
+                  const scheduledSpacingPx = rowFlow
+                    ? getScheduledSpacingPx(rowFlow.gapBeforeMinutes)
+                    : 0;
                   const previousRow = index > 0 ? timelineRows[index - 1] : undefined;
                   const previousIsAnytimeTask = previousRow?.kind === "task" && !previousRow.task.scheduled_time;
                   const showAnytimeLabel = isAnytimeTask && !previousIsAnytimeTask;
@@ -1797,7 +1672,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   return (
                     <motion.div
                       key={task.id}
-                      ref={(node) => setTimelineRowRef(task.id, node)}
                       className={cn("relative", isThisDragging && "z-50")}
                       layout={!isThisDragging}
                       animate={bounceAnimation}
@@ -1814,7 +1688,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       style={{
                         ...rowStyle,
                         x: laneOffsetPx,
-                        y: isThisDragging ? composedDragOffsetY : 0,
+                        y: isThisDragging ? timelineDrag.dragOffsetY : 0,
                       }}
                     >
                       {rowContent}

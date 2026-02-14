@@ -55,7 +55,7 @@ const HelpCenter = () => {
         },
         {
           title: "Understanding XP & Evolution",
-          content: "XP (Experience Points) is earned by completing quests, habits, and interacting with your mentor. Your companion needs specific XP thresholds to evolve to each new stage. Streak multipliers boost your XP gains—the longer your daily streak, the more XP you earn. Completing your Main Quest each day gives 3x XP bonus!"
+          content: "XP (Experience Points) is earned by completing quests, habits, and interacting with your mentor. Your companion needs specific XP thresholds to evolve to each new stage. Streak multipliers boost repeatable effort events (quests, habits, focus sessions): 7+ days = 1.25x, 30+ = 1.5x, 60+ = 1.75x. Completing your Main Quest each day gives a 1.5x quest bonus."
         },
         {
           title: "What are Factions?",
@@ -75,7 +75,7 @@ const HelpCenter = () => {
         },
         {
           title: "Earning XP",
-          content: "Gain XP through: completing daily quests (10-50 XP each), maintaining habit streaks (bonus XP per day), completing your Main Quest (3x XP multiplier), and engaging with your mentor. Consistency is key—daily engagement compounds your growth!"
+          content: "Gain XP through: completing daily quests (Easy 12, Medium 16, Hard 22 before modifiers), maintaining habits (Easy 8, Medium 12, Hard 18), focus sessions, milestones, and mentor activities. Completing your Main Quest applies a 1.5x quest multiplier. Consistency is key—daily engagement compounds your growth."
         },
         {
           title: "Companion Skins",
@@ -103,11 +103,11 @@ const HelpCenter = () => {
         },
         {
           title: "Main Quest Bonus",
-          content: "One quest each day is marked as your 'Main Quest' with a special badge. Completing your Main Quest grants 3x the normal XP! This encourages you to prioritize your most important daily goal. Your Main Quest is highlighted at the top of your quest list."
+          content: "One quest each day is marked as your 'Main Quest' with a special badge. Completing your Main Quest grants 1.5x the normal quest XP. This encourages you to prioritize your most important daily goal. Your Main Quest is highlighted in your quest list."
         },
         {
           title: "Streak Multipliers",
-          content: "Build a daily streak by completing at least one quest each day. Your streak multiplier increases your XP earnings: 7 days = 1.5x, 14 days = 2x, 30 days = 2.5x, 60+ days = 3x. Breaking your streak resets the multiplier, so consistency pays off!"
+          content: "Build a daily streak by completing at least one quest each day. Your streak multiplier applies to repeatable effort events (quest, habit, and focus completions): 7 days = 1.25x, 30 days = 1.5x, 60+ days = 1.75x. Breaking your streak resets the multiplier, so consistency pays off."
         },
         {
           title: "Custom Tasks",
@@ -321,7 +321,7 @@ const HelpCenter = () => {
     {
       icon: Zap,
       title: "Complete your Main Quest daily",
-      description: "It gives 3x XP—the biggest daily boost available!"
+      description: "It gives 1.5x quest XP and helps pace steady progression."
     },
     {
       icon: Calendar,

@@ -714,7 +714,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getAllByText(/Overlaps:/).length).toBeGreaterThan(0);
   });
 
-  it("reorders scheduled rows based on drag preview time", () => {
+  it("keeps scheduled row order stable during drag preview updates", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -759,12 +759,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     ).map((element) => element.getAttribute("data-testid"));
 
     expect(orderedRowIds).toEqual([
-      "timeline-row-task-scheduled-2",
       "timeline-row-task-scheduled-1",
+      "timeline-row-task-scheduled-2",
     ]);
   });
 
-  it("keeps dragged row lane metadata anchored while overlap status updates live", () => {
+  it("keeps dragged row lane metadata stable while preview time changes", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -828,15 +828,15 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       container.querySelectorAll('[data-testid^="timeline-row-task-scheduled-"]'),
     ).map((element) => element.getAttribute("data-testid"));
     expect(orderedRowIds).toEqual([
-      "timeline-row-task-scheduled-2",
       "timeline-row-task-scheduled-1",
+      "timeline-row-task-scheduled-2",
     ]);
 
     const draggedRowAfterPreviewShift = screen.getByTestId("timeline-row-task-scheduled-2").parentElement;
     expect(draggedRowAfterPreviewShift).toBeTruthy();
     expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-lane", "1");
     expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-lane-count", "2");
-    expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-overlap", "0");
+    expect(draggedRowAfterPreviewShift).toHaveAttribute("data-timeline-overlap", "1");
   });
 
   it("exposes lane metadata for overlapping scheduled rows", () => {

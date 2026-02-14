@@ -12,9 +12,9 @@
  * Main Quest receives 1.5x multiplier.
  */
 export const QUEST_XP_REWARDS = {
-  EASY: 15,
+  EASY: 12,
   MEDIUM: 16,
-  HARD: 18,
+  HARD: 22,
 } as const;
 
 /**
@@ -24,9 +24,9 @@ export const QUEST_XP_REWARDS = {
  * Done daily, these become the core XP engine.
  */
 export const HABIT_XP_REWARDS = {
-  EASY: 7,
-  MEDIUM: 14,
-  HARD: 24,
+  EASY: 8,
+  MEDIUM: 12,
+  HARD: 18,
 } as const;
 
 /**
@@ -36,9 +36,9 @@ export const HABIT_XP_REWARDS = {
  */
 export const SYSTEM_XP_REWARDS = {
   /** Completing a habit (base - multiplied by difficulty) */
-  HABIT_COMPLETE: 7,
+  HABIT_COMPLETE: 8,
   /** Completing ALL daily habits */
-  ALL_HABITS_COMPLETE: 15,
+  ALL_HABITS_COMPLETE: 12,
   /** Completing a challenge day */
   CHALLENGE_COMPLETE: 25,
   /** Completing a full weekly challenge */
@@ -46,9 +46,9 @@ export const SYSTEM_XP_REWARDS = {
   /** Listening to 80%+ of pep talk (requires real engagement) */
   PEP_TALK_LISTEN: 8,
   /** Morning check-in completion (quick tap, low effort) */
-  CHECK_IN: 3,
+  CHECK_IN: 4,
   /** Evening reflection completion */
-  EVENING_REFLECTION: 3,
+  EVENING_REFLECTION: 4,
   /** Viewing weekly recap */
   WEEKLY_RECAP_VIEWED: 5,
   /** Reaching a streak milestone */
@@ -221,10 +221,14 @@ export const MILESTONE_XP_REWARDS = {
   /** Postcard/celebration milestone completion */
   POSTCARD: 35,
   /** Phase completion bonus (all milestones in phase done) */
-  PHASE_COMPLETE: 50,
+  PHASE_COMPLETE: 45,
   /** Epic completion (all milestones done) */
-  EPIC_COMPLETE: 150,
+  EPIC_COMPLETE: 120,
 } as const;
+
+export const MAIN_QUEST_XP_MULTIPLIER = 1.5;
+export const DAILY_XP_CAP = 220;
+export const POST_CAP_REPEATABLE_MULTIPLIER = 0.2;
 
 /**
  * Type-safe difficulty type
@@ -258,24 +262,19 @@ export function getHabitXP(difficulty: Difficulty): number {
 /**
  * Quest XP Multiplier based on quest position (diminishing returns)
  * 
- * Quests 1-3: 100% XP
- * Quest 4: 75% XP
- * Quest 5: 50% XP
- * Quest 6: 35% XP
- * Quest 7: 25% XP
- * Quest 8: 15% XP
- * Quests 9-10: 10% XP
- * Quests 11+: 5% XP
+ * Quests 1-4: 100% XP
+ * Quest 5: 75% XP
+ * Quest 6: 50% XP
+ * Quests 7-8: 25% XP
+ * Quests 9-10+: 10% XP
  */
 export function getQuestXPMultiplier(questPosition: number): number {
-  if (questPosition <= 3) return 1.0;
-  if (questPosition === 4) return 0.75;
-  if (questPosition === 5) return 0.5;
-  if (questPosition === 6) return 0.35;
-  if (questPosition === 7) return 0.25;
-  if (questPosition === 8) return 0.15;
+  if (questPosition <= 4) return 1.0;
+  if (questPosition === 5) return 0.75;
+  if (questPosition === 6) return 0.5;
+  if (questPosition <= 8) return 0.25;
   if (questPosition <= 10) return 0.1;
-  return 0.05; // 11+
+  return 0.1;
 }
 
 /**
