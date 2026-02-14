@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { isSameDay } from "date-fns";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   unsurfacedEpicHabitsCount: 0,
   pendingRecurringCount: 0,
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
+  lastDatePillSelectedDate: null as Date | null,
 }));
 
 vi.mock("@/components/PageTransition", () => ({
@@ -49,7 +51,31 @@ vi.mock("@/components/BottomNav", () => ({
 }));
 
 vi.mock("@/components/DatePillsScroller", () => ({
-  DatePillsScroller: () => <div data-testid="date-pills" />,
+  DatePillsScroller: ({
+    selectedDate,
+    onDateSelect,
+  }: {
+    selectedDate: Date;
+    onDateSelect: (date: Date) => void;
+  }) => {
+    mocks.lastDatePillSelectedDate = selectedDate;
+    return (
+      <div data-testid="date-pills">
+        <span data-testid="selected-date-iso">{selectedDate.toISOString()}</span>
+        <button
+          type="button"
+          onClick={() => {
+            const nextDate = new Date();
+            const nextHour = nextDate.getHours() === 0 ? 1 : 0;
+            nextDate.setHours(nextHour, 0, 0, 0);
+            onDateSelect(nextDate);
+          }}
+        >
+          set-same-day-non-current
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/components/AddQuestSheet", () => ({
@@ -329,6 +355,7 @@ describe("Journeys row drag integration", () => {
     mocks.unsurfacedEpicHabitsCount = 0;
     mocks.pendingRecurringCount = 0;
     mocks.calendarConnections = [];
+    mocks.lastDatePillSelectedDate = null;
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       writable: true,
@@ -438,6 +465,77 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       expect(mocks.clearPendingTask).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("resets selected date to current day when returning to /journeys", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const RouteHarness = () => {
+      const navigate = useNavigate();
+      const location = useLocation();
+
+      return (
+        <>
+          <div data-testid="route-path">{location.pathname}</div>
+          <button type="button" onClick={() => navigate("/inbox")}>
+            go-inbox
+          </button>
+          <button type="button" onClick={() => navigate("/journeys")}>
+            go-journeys
+          </button>
+          <Journeys />
+        </>
+      );
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <RouteHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    const initialSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    const initialSelectedDate = new Date(initialSelectedDateIso);
+    expect(isSameDay(initialSelectedDate, new Date())).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
+
+    let manuallySelectedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+    await waitFor(() => {
+      manuallySelectedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+      expect(manuallySelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
+      expect(isSameDay(manuallySelectedDate, new Date())).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/inbox");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("route-path").textContent).toBe("/journeys");
+    });
+
+    await waitFor(() => {
+      const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      const reenteredDate = new Date(reenteredDateIso);
+
+      expect(reenteredDate.getTime()).not.toBe(manuallySelectedDate.getTime());
+      expect(isSameDay(reenteredDate, new Date())).toBe(true);
     });
   });
 });

@@ -103,7 +103,7 @@ const Journeys = () => {
   useEffect(() => {
     const previousPath = previousPathRef.current;
     if (shouldResetJourneysDate(previousPath, location.pathname)) {
-      setSelectedDate((currentDate) => getTodayIfDateStale(currentDate));
+      setSelectedDate(() => new Date());
     }
     previousPathRef.current = location.pathname;
   }, [location.pathname]);

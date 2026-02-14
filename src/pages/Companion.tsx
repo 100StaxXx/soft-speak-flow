@@ -8,20 +8,57 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer, Settings } from "lucide-react";
 import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
-
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
-
+import { useAuth } from "@/hooks/useAuth";
+import {
+  fetchCompanionStoriesAll,
+  getCompanionStoriesAllQueryKey,
+} from "@/hooks/useCompanionStory";
+import {
+  fetchCompanionPostcards,
+  getCompanionPostcardsQueryKey,
+} from "@/hooks/useCompanionPostcards";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
 import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
-import { useState, memo, lazy, Suspense } from "react";
+import {
+  useState,
+  memo,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
+
+type CompanionTab = "overview" | "focus" | "stories" | "postcards" | "collection";
+
+const COMPANION_TAB_KEYS: CompanionTab[] = [
+  "overview",
+  "focus",
+  "stories",
+  "postcards",
+  "collection",
+];
+
+const INITIAL_MOUNTED_TABS: Record<CompanionTab, boolean> = {
+  overview: true,
+  focus: false,
+  stories: false,
+  postcards: false,
+  collection: false,
+};
+
+const isCompanionTab = (tab: string): tab is CompanionTab =>
+  COMPANION_TAB_KEYS.includes(tab as CompanionTab);
 
 // Memoized tab content to prevent unnecessary re-renders
 const OverviewTab = memo(({ 
@@ -59,8 +96,17 @@ const OverviewTab = memo(({
 OverviewTab.displayName = 'OverviewTab';
 
 // Lazy load heavy tab content
-const LazyCompanionStoryJournal = lazy(() => import("@/components/CompanionStoryJournal").then(m => ({ default: m.CompanionStoryJournal })));
-const LazyCompanionPostcards = lazy(() => import("@/components/companion/CompanionPostcards").then(m => ({ default: m.CompanionPostcards })));
+const loadCompanionStoryJournal = () =>
+  import("@/components/CompanionStoryJournal").then((module) => ({
+    default: module.CompanionStoryJournal,
+  }));
+const loadCompanionPostcards = () =>
+  import("@/components/companion/CompanionPostcards").then((module) => ({
+    default: module.CompanionPostcards,
+  }));
+
+const LazyCompanionStoryJournal = lazy(loadCompanionStoryJournal);
+const LazyCompanionPostcards = lazy(loadCompanionPostcards);
 
 // Tab content loading fallback
 const TabLoadingFallback = () => (
@@ -86,9 +132,115 @@ const OverviewSkeleton = () => (
 const Companion = () => {
   const prefersReducedMotion = useReducedMotion();
   const { companion, nextEvolutionXP, progressToNext, isLoading, error, refetch } = useCompanion();
-  const [activeTab, setActiveTab] = useState("overview");
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<CompanionTab>("overview");
+  const [mountedTabs, setMountedTabs] = useState<Record<CompanionTab, boolean>>(() => INITIAL_MOUNTED_TABS);
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
+  const prefetchedResourceKeyRef = useRef<string | null>(null);
   const navigate = useNavigate();
+
+  const markTabMounted = useCallback((tab: CompanionTab) => {
+    setMountedTabs((previous) => (previous[tab] ? previous : { ...previous, [tab]: true }));
+  }, []);
+
+  const prefetchStories = useCallback(() => {
+    const tasks: Promise<unknown>[] = [loadCompanionStoryJournal()];
+
+    if (companion?.id) {
+      tasks.push(
+        queryClient.prefetchQuery({
+          queryKey: getCompanionStoriesAllQueryKey(companion.id),
+          queryFn: () => fetchCompanionStoriesAll(companion.id),
+        }),
+      );
+    }
+
+    return Promise.allSettled(tasks);
+  }, [companion?.id, queryClient]);
+
+  const prefetchPostcards = useCallback(() => {
+    const tasks: Promise<unknown>[] = [loadCompanionPostcards()];
+
+    if (user?.id) {
+      tasks.push(
+        queryClient.prefetchQuery({
+          queryKey: getCompanionPostcardsQueryKey(user.id),
+          queryFn: () => fetchCompanionPostcards(user.id),
+        }),
+      );
+    }
+
+    return Promise.allSettled(tasks);
+  }, [queryClient, user?.id]);
+
+  const prefetchJourneyTabs = useCallback(() => {
+    void prefetchStories();
+    void prefetchPostcards();
+  }, [prefetchPostcards, prefetchStories]);
+
+  const handleStoriesTriggerPrefetch = useCallback(() => {
+    void prefetchStories();
+  }, [prefetchStories]);
+
+  const handlePostcardsTriggerPrefetch = useCallback(() => {
+    void prefetchPostcards();
+  }, [prefetchPostcards]);
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      if (!isCompanionTab(value)) {
+        return;
+      }
+
+      setActiveTab(value);
+      markTabMounted(value);
+
+      if (value === "stories") {
+        void prefetchStories();
+      } else if (value === "postcards") {
+        void prefetchPostcards();
+      }
+    },
+    [markTabMounted, prefetchPostcards, prefetchStories],
+  );
+
+  useEffect(() => {
+    if (!companion?.id || !user?.id) return;
+
+    const prefetchKey = `${user.id}:${companion.id}`;
+    if (prefetchedResourceKeyRef.current === prefetchKey) {
+      return;
+    }
+    prefetchedResourceKeyRef.current = prefetchKey;
+
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    let timeoutId: number | null = null;
+    let idleHandle: number | null = null;
+
+    if (idleWindow.requestIdleCallback) {
+      idleHandle = idleWindow.requestIdleCallback(() => {
+        prefetchJourneyTabs();
+      }, { timeout: 1500 });
+    } else {
+      timeoutId = window.setTimeout(() => {
+        prefetchJourneyTabs();
+      }, 500);
+    }
+
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      if (idleHandle !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleHandle);
+      }
+    };
+  }, [companion?.id, prefetchJourneyTabs, user?.id]);
 
   // Render persistent layout - header/nav always visible, content swaps smoothly
   const renderContent = () => {
@@ -140,7 +292,7 @@ const Companion = () => {
 
     // Loading or loaded content with tabs
     return (
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="container pb-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="container pb-6">
         <TabsList className="grid w-full grid-cols-5 bg-card/80 backdrop-blur-md border border-border/60">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -150,11 +302,21 @@ const Companion = () => {
             <Timer className="h-4 w-4" />
             <span className="hidden sm:inline">Focus</span>
           </TabsTrigger>
-          <TabsTrigger value="stories" className="flex items-center gap-2">
+          <TabsTrigger
+            value="stories"
+            className="flex items-center gap-2"
+            onPointerDown={handleStoriesTriggerPrefetch}
+            onFocus={handleStoriesTriggerPrefetch}
+          >
             <BookOpen className="h-4 w-4" />
             <span className="hidden sm:inline">Stories</span>
           </TabsTrigger>
-          <TabsTrigger value="postcards" className="flex items-center gap-2">
+          <TabsTrigger
+            value="postcards"
+            className="flex items-center gap-2"
+            onPointerDown={handlePostcardsTriggerPrefetch}
+            onFocus={handlePostcardsTriggerPrefetch}
+          >
             <MapPin className="h-4 w-4" />
             <span className="hidden sm:inline">Postcards</span>
           </TabsTrigger>
@@ -181,8 +343,12 @@ const Companion = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
             >
-              <TabsContent value="overview">
-                {activeTab === "overview" && (
+              <TabsContent
+                value="overview"
+                forceMount
+                className="data-[state=inactive]:hidden"
+              >
+                {mountedTabs.overview && (
                   <OverviewTab 
                     companion={companion} 
                     nextEvolutionXP={nextEvolutionXP} 
@@ -191,29 +357,28 @@ const Companion = () => {
                 )}
               </TabsContent>
 
-
-              <TabsContent value="focus">
-                {activeTab === "focus" && <FocusTab />}
+              <TabsContent value="focus" forceMount className="data-[state=inactive]:hidden">
+                {mountedTabs.focus && <FocusTab />}
               </TabsContent>
 
-              <TabsContent value="stories">
-                {activeTab === "stories" && (
+              <TabsContent value="stories" forceMount className="data-[state=inactive]:hidden">
+                {mountedTabs.stories && (
                   <Suspense fallback={<TabLoadingFallback />}>
                     <LazyCompanionStoryJournal />
                   </Suspense>
                 )}
               </TabsContent>
 
-              <TabsContent value="postcards">
-                {activeTab === "postcards" && (
+              <TabsContent value="postcards" forceMount className="data-[state=inactive]:hidden">
+                {mountedTabs.postcards && (
                   <Suspense fallback={<TabLoadingFallback />}>
                     <LazyCompanionPostcards />
                   </Suspense>
                 )}
               </TabsContent>
 
-              <TabsContent value="collection">
-                {activeTab === "collection" && <CollectionTab />}
+              <TabsContent value="collection" forceMount className="data-[state=inactive]:hidden">
+                {mountedTabs.collection && <CollectionTab />}
               </TabsContent>
             </motion.div>
           )}

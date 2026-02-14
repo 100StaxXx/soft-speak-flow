@@ -95,4 +95,44 @@ describe("DatePillsScroller", () => {
       expect(onDateSelect).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("re-centers the selected day when time changes within the same date", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { rerender } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      });
+
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T20:30:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalledTimes(2);
+      });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
 });

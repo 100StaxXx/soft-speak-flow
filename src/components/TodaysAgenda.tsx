@@ -229,14 +229,95 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 const normalizeModulo = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor;
 
+const getHourlyPlaceholderCandidatesBetween = (startMinute: number, endMinute: number): number[] => {
+  if (endMinute - startMinute <= 1) return [];
+
+  const firstCandidateMinute = Math.ceil((startMinute + 1) / 60) * 60;
+  const candidates: number[] = [];
+
+  for (let minute = firstCandidateMinute; minute < endMinute; minute += 60) {
+    if (minute >= DAY_START_MINUTE && minute <= DAY_END_MINUTE) {
+      candidates.push(minute);
+    }
+  }
+
+  return candidates;
+};
+
+const getThreeHourPlaceholderCandidatesBetween = (startMinute: number, endMinute: number): number[] => {
+  if (endMinute - startMinute <= 1) return [];
+
+  const firstCandidateMinute = DAY_START_MINUTE + (
+    Math.ceil((startMinute + 1 - DAY_START_MINUTE) / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES
+  );
+  const candidates: number[] = [];
+
+  for (let minute = firstCandidateMinute; minute < endMinute; minute += PLACEHOLDER_INTERVAL_MINUTES) {
+    if (minute >= DAY_START_MINUTE && minute <= DAY_END_MINUTE) {
+      candidates.push(minute);
+    }
+  }
+
+  return candidates;
+};
+
+const pickClosestMinuteToMidpoint = (candidates: number[], midpoint: number): number | null => {
+  if (candidates.length === 0) return null;
+
+  let bestMinute = candidates[0];
+  let bestDistance = Math.abs(bestMinute - midpoint);
+
+  for (let index = 1; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    const candidateDistance = Math.abs(candidate - midpoint);
+    if (candidateDistance < bestDistance) {
+      bestMinute = candidate;
+      bestDistance = candidateDistance;
+      continue;
+    }
+    if (candidateDistance === bestDistance && candidate < bestMinute) {
+      bestMinute = candidate;
+    }
+  }
+
+  return bestMinute;
+};
+
+const selectPairPlaceholderMinute = (startMinute: number, endMinute: number): number | null => {
+  const gapMinutes = endMinute - startMinute;
+  if (gapMinutes < 60) return null;
+
+  const midpoint = (startMinute + endMinute) / 2;
+  const candidates = gapMinutes < PLACEHOLDER_INTERVAL_MINUTES
+    ? getHourlyPlaceholderCandidatesBetween(startMinute, endMinute)
+    : getThreeHourPlaceholderCandidatesBetween(startMinute, endMinute);
+
+  return pickClosestMinuteToMidpoint(candidates, midpoint);
+};
+
+const isStrictlyBetweenConsecutiveQuestTimes = (
+  minute: number,
+  sortedScheduledMinutes: number[],
+): boolean => {
+  for (let index = 1; index < sortedScheduledMinutes.length; index += 1) {
+    const previousMinute = sortedScheduledMinutes[index - 1];
+    const nextMinute = sortedScheduledMinutes[index];
+    if (previousMinute < minute && minute < nextMinute) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
+  const sortedScheduledMinutes = [...scheduledMinutes].sort((a, b) => a - b);
   const markerMinutes = new Set<number>([DAY_START_MINUTE]);
 
-  if (scheduledMinutes.length === 0) {
+  if (sortedScheduledMinutes.length === 0) {
     return Array.from(markerMinutes).sort((a, b) => a - b);
   }
 
-  for (const scheduledMinute of scheduledMinutes) {
+  for (const scheduledMinute of sortedScheduledMinutes) {
     const offsetFromStart = scheduledMinute - DAY_START_MINUTE;
     const remainder = normalizeModulo(offsetFromStart, PLACEHOLDER_INTERVAL_MINUTES);
     const isOnBoundary = remainder === 0;
@@ -253,6 +334,24 @@ const buildPlaceholderMinutes = (scheduledMinutes: number[]): number[] => {
 
     if (lowerAnchor <= DAY_END_MINUTE) markerMinutes.add(lowerAnchor);
     if (upperAnchor <= DAY_END_MINUTE) markerMinutes.add(upperAnchor);
+  }
+
+  if (sortedScheduledMinutes.length > 1) {
+    for (const minute of Array.from(markerMinutes)) {
+      if (minute === DAY_START_MINUTE) continue;
+      if (isStrictlyBetweenConsecutiveQuestTimes(minute, sortedScheduledMinutes)) {
+        markerMinutes.delete(minute);
+      }
+    }
+
+    for (let index = 1; index < sortedScheduledMinutes.length; index += 1) {
+      const previousMinute = sortedScheduledMinutes[index - 1];
+      const nextMinute = sortedScheduledMinutes[index];
+      const selectedMinute = selectPairPlaceholderMinute(previousMinute, nextMinute);
+      if (selectedMinute !== null) {
+        markerMinutes.add(selectedMinute);
+      }
+    }
   }
 
   return Array.from(markerMinutes).sort((a, b) => a - b);
@@ -631,7 +730,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       .filter((minute): minute is number => minute !== null);
     const placeholderMinutes = buildPlaceholderMinutes(scheduledMinutes);
     const nowAnchorMinute = Math.max(DAY_START_MINUTE, Math.min(DAY_END_MINUTE, nowMarkerMinute));
-    if (isToday) {
+    if (isToday && scheduledMinutes.length === 0) {
       const nowOffset = nowAnchorMinute - DAY_START_MINUTE;
       const lowerNowAnchor = DAY_START_MINUTE + (Math.floor(nowOffset / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES);
       const upperNowAnchor = lowerNowAnchor + PLACEHOLDER_INTERVAL_MINUTES;

@@ -19,6 +19,20 @@ export interface CompanionStory {
   generated_at: string;
 }
 
+export const getCompanionStoriesAllQueryKey = (companionId?: string) =>
+  ["companion-stories-all", companionId] as const;
+
+export const fetchCompanionStoriesAll = async (companionId: string): Promise<CompanionStory[]> => {
+  const { data, error } = await supabase
+    .from("companion_stories")
+    .select("*")
+    .eq("companion_id", companionId)
+    .order("stage", { ascending: true });
+
+  if (error) throw error;
+  return data as CompanionStory[];
+};
+
 export const useCompanionStory = (companionId?: string, stage?: number) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -48,18 +62,10 @@ export const useCompanionStory = (companionId?: string, stage?: number) => {
   });
 
   const { data: allStories } = useQuery({
-    queryKey: ["companion-stories-all", companionId],
+    queryKey: getCompanionStoriesAllQueryKey(companionId),
     queryFn: async () => {
       if (!companionId) return [];
-
-      const { data, error } = await supabase
-        .from("companion_stories")
-        .select("*")
-        .eq("companion_id", companionId)
-        .order("stage", { ascending: true });
-
-      if (error) throw error;
-      return data as CompanionStory[];
+      return fetchCompanionStoriesAll(companionId);
     },
     enabled: !!companionId,
   });

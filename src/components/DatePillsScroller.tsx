@@ -153,9 +153,12 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     const containerWidth = container.offsetWidth;
     const selectedLeft = selected.offsetLeft;
     const selectedWidth = selected.offsetWidth;
+    const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
+    const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
+    const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
 
     container.scrollTo({
-      left: selectedLeft - containerWidth / 2 + selectedWidth / 2,
+      left: clampedLeft,
       behavior: "smooth",
     });
     shouldCenterOnSelectedRef.current = false;

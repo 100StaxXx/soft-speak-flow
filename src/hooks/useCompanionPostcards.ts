@@ -34,6 +34,20 @@ export interface PostcardUnlockInfo {
   locationName?: string;
 }
 
+export const getCompanionPostcardsQueryKey = (userId?: string) =>
+  ["companion-postcards", userId] as const;
+
+export const fetchCompanionPostcards = async (userId: string): Promise<CompanionPostcard[]> => {
+  const { data, error } = await supabase
+    .from("companion_postcards")
+    .select("*")
+    .eq("user_id", userId)
+    .order("generated_at", { ascending: false });
+
+  if (error) throw error;
+  return data as CompanionPostcard[];
+};
+
 export const useCompanionPostcards = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -46,18 +60,10 @@ export const useCompanionPostcards = () => {
   }, []);
 
   const { data: postcards, isLoading, error } = useQuery({
-    queryKey: ["companion-postcards", user?.id],
+    queryKey: getCompanionPostcardsQueryKey(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from("companion_postcards")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("generated_at", { ascending: false });
-
-      if (error) throw error;
-      return data as CompanionPostcard[];
+      return fetchCompanionPostcards(user.id);
     },
     enabled: !!user?.id,
   });
@@ -101,7 +107,7 @@ export const useCompanionPostcards = () => {
     },
     onSuccess: async (data) => {
       if (!data?.existing) {
-        queryClient.invalidateQueries({ queryKey: ["companion-postcards"] });
+        queryClient.invalidateQueries({ queryKey: getCompanionPostcardsQueryKey(user?.id) });
         
         // Set unlock info for celebration animation
         setPostcardJustUnlocked({
