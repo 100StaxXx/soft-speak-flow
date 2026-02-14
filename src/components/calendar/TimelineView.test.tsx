@@ -88,7 +88,7 @@ describe("TimelineView drag integration", () => {
     });
   });
 
-  it("shows zoom rail during active drag", async () => {
+  it("does not show zoom rail during active drag", async () => {
     const onTaskReschedule = vi.fn();
 
     render(
@@ -108,7 +108,7 @@ describe("TimelineView drag integration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("drag-time-zoom-rail")).toBeInTheDocument();
+      expect(screen.queryByTestId("drag-time-zoom-rail")).not.toBeInTheDocument();
     });
   });
 });

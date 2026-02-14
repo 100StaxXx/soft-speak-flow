@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  SHARED_TIMELINE_DRAG_PROFILE,
   buildAdaptiveSnapRuntimeScale,
   buildDragZoomRailState,
   clampMinuteToRange,
@@ -58,13 +59,13 @@ describe("dragSnap", () => {
   });
 
   it("derives runtime pixels-per-minute from viewport range", () => {
-    const runtime = buildAdaptiveSnapRuntimeScale(undefined, 720);
-    expect(runtime.coarsePixelsPerMinute).toBeCloseTo(2, 5); // 6 hours per viewport
+    const runtime = buildAdaptiveSnapRuntimeScale(SHARED_TIMELINE_DRAG_PROFILE, 720);
+    expect(runtime.coarsePixelsPerMinute).toBeCloseTo(1, 5); // 12 hours per viewport
     expect(runtime.finePixelsPerMinute).toBeCloseTo(6, 5); // 2 hours per viewport
   });
 
   it("maps full viewport drag to multi-hour coarse movement", () => {
-    const runtime = buildAdaptiveSnapRuntimeScale(undefined, 720);
+    const runtime = buildAdaptiveSnapRuntimeScale(SHARED_TIMELINE_DRAG_PROFILE, 720);
 
     const result = computeAdaptiveMinute({
       startMinute: 9 * 60,
@@ -75,9 +76,10 @@ describe("dragSnap", () => {
       fineAnchorMinute: null,
       fineAnchorClientY: null,
       runtimeScale: runtime,
+      config: SHARED_TIMELINE_DRAG_PROFILE,
     });
 
-    expect(result.snappedMinute).toBe(15 * 60);
+    expect(result.snappedMinute).toBe(21 * 60);
   });
 
   it("clamps minute and time output to day bounds", () => {

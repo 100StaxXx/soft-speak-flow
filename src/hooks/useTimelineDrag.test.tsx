@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTimelineDrag } from "./useTimelineDrag";
+import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
 
 const mocks = vi.hoisted(() => ({
   updatePositionMock: vi.fn(),
@@ -118,7 +119,11 @@ describe("useTimelineDrag", () => {
 
   it("maps a full-screen drag to multi-hour movement", () => {
     const onDrop = vi.fn();
-    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+    const { result } = renderHook(() => useTimelineDrag({
+      containerRef,
+      onDrop,
+      snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+    }));
 
     const handleProps = result.current.getDragHandleProps("task-long", "09:00");
     act(() => {
@@ -127,7 +132,7 @@ describe("useTimelineDrag", () => {
       dispatchPointerUp();
     });
 
-    expect(onDrop).toHaveBeenCalledWith("task-long", "15:00");
+    expect(onDrop).toHaveBeenCalledWith("task-long", "21:00");
   });
 
   it("starts drag from row-level drag props", () => {

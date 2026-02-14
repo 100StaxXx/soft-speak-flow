@@ -83,7 +83,7 @@ export const resolveAdaptiveSnapConfig = (
 export const SHARED_TIMELINE_DRAG_PROFILE: Readonly<Partial<AdaptiveSnapConfig>> = Object.freeze({
   coarseStepMinutes: 15,
   fineStepMinutes: 5,
-  coarseHoursPerViewport: 6,
+  coarseHoursPerViewport: 12,
   fineHoursPerViewport: 2,
   precisionActivationMode: "manual-hold",
 });

@@ -54,6 +54,7 @@ import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
+import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
 import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
 
 // Helper to calculate days remaining
@@ -404,17 +405,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [tasks, sortBy, keepInPlace]);
 
   // Only quests go into the unified timeline (rituals grouped by campaign below)
-  const { scheduledItems, timelineItems } = useMemo(() => {
-    const scheduled = questTasks.filter(t => !!t.scheduled_time).sort((a, b) => 
-      (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
-    );
-    const anytime = questTasks.filter(t => !t.scheduled_time);
-    return { scheduledItems: scheduled, timelineItems: [...scheduled, ...anytime] };
-  }, [questTasks]);
+  const scheduledItems = useMemo(
+    () => questTasks
+      .filter((task) => !!task.scheduled_time)
+      .sort((a, b) => (a.scheduled_time || "").localeCompare(b.scheduled_time || "")),
+    [questTasks],
+  );
+  const anytimeItems = useMemo(
+    () => questTasks.filter((task) => !task.scheduled_time),
+    [questTasks],
+  );
+  const baseTimelineItems = useMemo(
+    () => [...scheduledItems, ...anytimeItems],
+    [scheduledItems, anytimeItems],
+  );
 
   const draggableTimelineItems = useMemo(
-    () => [...timelineItems, ...ritualTasks],
-    [timelineItems, ritualTasks],
+    () => [...baseTimelineItems, ...ritualTasks],
+    [baseTimelineItems, ritualTasks],
   );
 
   const timelineDrag = useTimelineDrag({
@@ -424,10 +432,46 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
       if (overlapCount > 0) {
-        toast(`Overlaps with ${overlapCount} other quest${overlapCount === 1 ? "" : "s"}`);
+        toast(`Overlap: ${overlapCount} quest${overlapCount === 1 ? "" : "s"}`);
       }
     },
   });
+
+  const previewScheduledOverrides = useMemo(() => {
+    const activeTaskId = timelineDrag.draggingTaskId;
+    const previewTime = timelineDrag.previewTime;
+    if (!activeTaskId || !previewTime) return undefined;
+    return { [activeTaskId]: previewTime };
+  }, [timelineDrag.draggingTaskId, timelineDrag.previewTime]);
+
+  const scheduledFlow = useMemo(
+    () => buildTaskTimelineFlow(scheduledItems, previewScheduledOverrides),
+    [scheduledItems, previewScheduledOverrides],
+  );
+
+  const scheduledItemsById = useMemo(
+    () => new Map(scheduledItems.map((task) => [task.id, task])),
+    [scheduledItems],
+  );
+
+  const flowOrderedScheduledItems = useMemo(() => {
+    if (scheduledFlow.orderedTaskIds.length === 0) return scheduledItems;
+
+    const ordered: Task[] = [];
+    for (const taskId of scheduledFlow.orderedTaskIds) {
+      const task = scheduledItemsById.get(taskId);
+      if (task) {
+        ordered.push(task);
+      }
+    }
+
+    return ordered.length > 0 ? ordered : scheduledItems;
+  }, [scheduledFlow.orderedTaskIds, scheduledItems, scheduledItemsById]);
+
+  const timelineItems = useMemo(
+    () => [...flowOrderedScheduledItems, ...anytimeItems],
+    [flowOrderedScheduledItems, anytimeItems],
+  );
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -759,9 +803,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               </span>
             )}
             {overlapCount > 0 && (
-              <p className="text-xs font-semibold text-[#ef8a8a] mt-0.5">
-                Tasks are overlapping
-              </p>
+              <span className="mt-1 inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                Overlaps: {overlapCount}
+              </span>
             )}
           </div>
           
@@ -1147,6 +1191,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   const isAnyDragging = timelineDrag.isDragging;
                   const isJustDropped = timelineDrag.justDroppedId === task.id;
                   const isAnytimeTask = !task.scheduled_time;
+                  const rowFlow = scheduledFlow.byTaskId.get(task.id);
+                  const laneOffsetPx = rowFlow && rowFlow.overlapCount > 0 ? rowFlow.laneIndex * 10 : 0;
+                  const scheduledSpacingPx = rowFlow
+                    ? Math.min(24, Math.max(0, rowFlow.gapBeforeMinutes * 0.12))
+                    : 0;
                   const showAnytimeLabel = isAnytimeTask
                     && (index === 0 || !!timelineItems[index - 1]?.scheduled_time);
                   const timelineRowDragProps = task.scheduled_time && !task.completed
@@ -1169,6 +1218,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     borderRadius: isThisDragging ? 12 : 0,
                     transition: 'none',
                     willChange: isThisDragging ? "transform" : undefined,
+                    marginTop: task.scheduled_time ? scheduledSpacingPx : 0,
                   };
 
                   const rowContent = (
@@ -1179,6 +1229,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       showLine={index > 0}
                       isLast={index === timelineItems.length - 1}
                       isDragTarget={isThisDragging}
+                      durationMinutes={task.estimated_duration}
+                      laneIndex={rowFlow?.laneIndex}
+                      laneCount={rowFlow?.laneCount}
+                      overlapCount={rowFlow?.overlapCount}
                       className={cn(
                         isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
                         isThisDragging && "cursor-grabbing",
@@ -1200,13 +1254,21 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     <motion.div
                       key={task.id}
                       className={cn("relative", isThisDragging && "z-50")}
+                      layout={!isThisDragging}
                       animate={bounceAnimation}
                       transition={bounceAnimation ? {
                         duration: 0.25,
                         ease: [0.25, 0.1, 0.25, 1],
-                      } : undefined}
+                        layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                      } : {
+                        layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                      }}
+                      data-timeline-lane={rowFlow?.laneIndex}
+                      data-timeline-lane-count={rowFlow?.laneCount}
+                      data-timeline-overlap={rowFlow?.overlapCount}
                       style={{
                         ...rowStyle,
+                        x: laneOffsetPx,
                         y: isThisDragging ? timelineDrag.dragOffsetY : 0,
                       }}
                     >

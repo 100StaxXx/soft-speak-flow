@@ -345,7 +345,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.updateTask).toHaveBeenCalledWith({
         taskId: "task-1",
-        updates: { scheduled_time: "14:00" },
+        updates: { scheduled_time: "20:00" },
       });
     });
 

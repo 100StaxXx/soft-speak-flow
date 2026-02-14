@@ -110,8 +110,7 @@ vi.mock("@/components/HourlyViewModal", () => ({
 }));
 
 vi.mock("@/components/calendar/DragTimeZoomRail", () => ({
-  DragTimeZoomRail: ({ rail }: { rail: unknown }) =>
-    rail ? <div data-testid="drag-time-zoom-rail" /> : null,
+  DragTimeZoomRail: () => null,
 }));
 
 vi.mock("@/components/JourneyPathDrawer", () => ({
@@ -122,7 +121,11 @@ vi.mock("@/components/TimelineTaskRow", () => ({
   TimelineTaskRow: ({
     children,
     overrideTime,
-    time: _time,
+    time,
+    durationMinutes,
+    laneIndex,
+    laneCount,
+    overlapCount,
     label: _label,
     showLine: _showLine,
     isLast: _isLast,
@@ -132,13 +135,29 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     children: ReactNode;
     overrideTime?: string | null;
     time?: string | null;
+    durationMinutes?: number | null;
+    laneIndex?: number;
+    laneCount?: number;
+    overlapCount?: number;
     label?: string | null;
     showLine?: boolean;
     isLast?: boolean;
     isDragTarget?: boolean;
   } & Record<string, unknown>) => (
-    <div data-testid="timeline-row" {...props}>
+    <div
+      data-testid="timeline-row"
+      data-timeline-lane={laneIndex}
+      data-timeline-lane-count={laneCount}
+      data-timeline-overlap={overlapCount}
+      {...props}
+    >
       {overrideTime ? <span>{overrideTime}</span> : null}
+      {time ? (
+        <div
+          data-testid="timeline-duration-indicator"
+          data-duration-minutes={durationMinutes ?? 30}
+        />
+      ) : null}
       {children}
     </div>
   ),
@@ -518,7 +537,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("shows overlap warning text for conflicting tasks", () => {
+  it("shows compact overlap copy for conflicting tasks", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -555,7 +574,149 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getAllByText("Tasks are overlapping").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Overlaps:/).length).toBeGreaterThan(0);
+  });
+
+  it("reorders scheduled rows based on drag preview time", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-2";
+    mocks.timelineDragState.isDragging = true;
+    mocks.timelineDragState.previewTime = "08:30";
+
+    const { container } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 60,
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Standup",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "11:00",
+            estimated_duration: 30,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const orderedRowIds = Array.from(
+      container.querySelectorAll('[data-testid^="timeline-row-task-scheduled-"]'),
+    ).map((element) => element.getAttribute("data-testid"));
+
+    expect(orderedRowIds).toEqual([
+      "timeline-row-task-scheduled-2",
+      "timeline-row-task-scheduled-1",
+    ]);
+  });
+
+  it("exposes lane metadata for overlapping scheduled rows", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 60,
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Standup",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "09:30",
+            estimated_duration: 30,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const firstRow = screen.getByTestId("timeline-row-task-scheduled-1");
+    const secondRow = screen.getByTestId("timeline-row-task-scheduled-2");
+
+    expect(firstRow).toHaveAttribute("data-timeline-lane", "0");
+    expect(firstRow).toHaveAttribute("data-timeline-overlap", "1");
+    expect(secondRow).toHaveAttribute("data-timeline-lane", "1");
+    expect(secondRow).toHaveAttribute("data-timeline-overlap", "1");
+  });
+
+  it("shows duration rail with explicit and fallback durations", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 45,
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Inbox zero",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "10:00",
+            estimated_duration: null,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const explicitDuration = within(screen.getByTestId("timeline-row-task-scheduled-1"))
+      .getByTestId("timeline-duration-indicator");
+    const fallbackDuration = within(screen.getByTestId("timeline-row-task-scheduled-2"))
+      .getByTestId("timeline-duration-indicator");
+
+    expect(explicitDuration).toHaveAttribute("data-duration-minutes", "45");
+    expect(fallbackDuration).toHaveAttribute("data-duration-minutes", "30");
   });
 
   it("uses drag preview time in timeline row during active drag", () => {
@@ -592,7 +753,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByText("09:45")).toBeInTheDocument();
   });
 
-  it("renders zoom rail while drag preview is active", () => {
+  it("does not render zoom rail while drag preview is active", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -628,7 +789,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("drag-time-zoom-rail")).toBeInTheDocument();
+    expect(screen.queryByTestId("drag-time-zoom-rail")).not.toBeInTheDocument();
   });
 
   it("keeps swipe enabled when not dragging and disables it for the active dragged row", () => {

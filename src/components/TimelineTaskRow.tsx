@@ -4,6 +4,10 @@ interface TimelineTaskRowProps extends React.HTMLAttributes<HTMLDivElement> {
   time?: string | null;
   overrideTime?: string | null;
   label?: string | null;
+  durationMinutes?: number | null;
+  laneIndex?: number;
+  laneCount?: number;
+  overlapCount?: number;
   showLine?: boolean;
   isLast?: boolean;
   isDragTarget?: boolean;
@@ -19,10 +23,18 @@ const formatTime12h = (time: string) => {
   return `${displayHour}:${minutes}${ampm}`;
 };
 
+const clamp = (value: number, min: number, max: number) => {
+  return Math.min(max, Math.max(min, value));
+};
+
 export function TimelineTaskRow({
   time,
   overrideTime,
   label,
+  durationMinutes,
+  laneIndex = 0,
+  laneCount = 1,
+  overlapCount = 0,
   showLine = true,
   isLast = false,
   isDragTarget = false,
@@ -32,10 +44,20 @@ export function TimelineTaskRow({
 }: TimelineTaskRowProps) {
   const displayTime = overrideTime ?? time;
   const isOverridden = overrideTime != null;
+  const effectiveDurationMinutes = Number.isFinite(durationMinutes) && (durationMinutes ?? 0) > 0
+    ? Number(durationMinutes)
+    : 30;
+  const durationHeightPx = clamp(Math.round((effectiveDurationMinutes / 30) * 12), 12, 56);
+  const laneOffsetPx = clamp(laneIndex, 0, 12) * 2;
+  const hasOverlap = overlapCount > 0;
+  const hasMultipleLanes = laneCount > 1;
 
   return (
     <div
       className={cn("relative flex gap-2", isDragTarget && "rounded-lg", className)}
+      data-timeline-lane={displayTime ? laneIndex : undefined}
+      data-timeline-lane-count={displayTime ? laneCount : undefined}
+      data-timeline-overlap={displayTime ? overlapCount : undefined}
       {...rootProps}
     >
       {/* Time label column - fixed width */}
@@ -71,6 +93,27 @@ export function TimelineTaskRow({
             ? "bg-primary/70 ring-2 ring-primary/20" 
             : "bg-muted-foreground/40 ring-2 ring-muted/30"
         )} />
+
+        {displayTime && (
+          <div
+            className={cn(
+              "relative mt-1 mb-1 w-[3px] rounded-full",
+              hasOverlap
+                ? "bg-primary/55"
+                : hasMultipleLanes
+                  ? "bg-primary/40"
+                  : "bg-primary/30",
+            )}
+            style={{
+              height: `${durationHeightPx}px`,
+              transform: `translateX(${laneOffsetPx}px)`,
+            }}
+            data-testid="timeline-duration-indicator"
+            data-duration-minutes={effectiveDurationMinutes}
+            data-duration-height={durationHeightPx}
+            aria-hidden
+          />
+        )}
         
         {/* Bottom segment of line */}
         {!isLast ? (
