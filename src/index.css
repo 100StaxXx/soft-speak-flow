@@ -557,6 +557,9 @@ All colors MUST be HSL.
     --mentor-gentle: 150 40% 60%;      /* soft green */
     --mentor-bold: 340 80% 50%;        /* magenta */
     --mentor-serene: 200 60% 55%;      /* blue */
+
+    /* Shared layout token for fixed bottom navigation clearance */
+    --bottom-nav-safe-offset: calc(6.5rem + env(safe-area-inset-bottom, 0px));
   }
   
   .dark {
@@ -1664,7 +1667,7 @@ All colors MUST be HSL.
 
   /* Bottom Nav Height + Safe Area for page padding */
   .pb-nav-safe {
-    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--bottom-nav-safe-offset);
   }
 
   .mb-nav-safe {

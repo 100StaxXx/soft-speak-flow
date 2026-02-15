@@ -4,6 +4,14 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const windowScrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+if (!HTMLElement.prototype.scrollTo) {
+  Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+    value: () => undefined,
+    configurable: true,
+    writable: true,
+  });
+}
+const elementScrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
 
 const mocks = vi.hoisted(() => {
   const subtaskEqMock = vi.fn();
@@ -207,6 +215,7 @@ const getRenderedPlaceholderMinutes = (): number[] => {
 
 beforeEach(() => {
   windowScrollToSpy.mockClear();
+  elementScrollToSpy.mockClear();
 });
 
 describe("TodaysAgenda subtasks", () => {
@@ -247,7 +256,7 @@ describe("TodaysAgenda subtasks", () => {
             task_text: "Launch campaign",
             completed: false,
             xp_reward: 50,
-            scheduled_time: null,
+            scheduled_time: "09:00",
             subtasks: [
               {
                 id: "subtask-1",
@@ -310,8 +319,8 @@ describe("TodaysAgenda combo feedback", () => {
     render(
       <TodaysAgenda
         tasks={[
-          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: null },
-          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: null },
+          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: "09:00" },
+          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: "09:30" },
         ]}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onToggle={vi.fn()}
@@ -340,8 +349,8 @@ describe("TodaysAgenda combo feedback", () => {
     render(
       <TodaysAgenda
         tasks={[
-          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: null },
-          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: null },
+          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: "09:00" },
+          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: "09:30" },
         ]}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onToggle={vi.fn()}
@@ -379,8 +388,8 @@ describe("TodaysAgenda combo feedback", () => {
     render(
       <TodaysAgenda
         tasks={[
-          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: null },
-          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: null },
+          { id: "task-1", task_text: "Task One", completed: false, xp_reward: 10, scheduled_time: "09:00" },
+          { id: "task-2", task_text: "Task Two", completed: false, xp_reward: 10, scheduled_time: "09:30" },
         ]}
         selectedDate={new Date("2026-02-13T09:00:00.000Z")}
         onToggle={vi.fn()}
@@ -451,12 +460,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
-    expect(windowScrollToSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        behavior: "smooth",
-        top: expect.any(Number),
-      }),
-    );
+    expect(windowScrollToSpy.mock.calls.length + elementScrollToSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
   it("does not auto-center for non-today dates", () => {
@@ -488,6 +492,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(windowScrollToSpy).not.toHaveBeenCalled();
+    expect(elementScrollToSpy).not.toHaveBeenCalled();
   });
 
   it("re-centers when today remains selected and visibility toggles on", () => {
@@ -520,6 +525,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(windowScrollToSpy).not.toHaveBeenCalled();
+    expect(elementScrollToSpy).not.toHaveBeenCalled();
 
     rerender(
       <TodaysAgenda
@@ -541,7 +547,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       />,
     );
 
-    expect(windowScrollToSpy).toHaveBeenCalled();
+    expect(windowScrollToSpy.mock.calls.length + elementScrollToSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
   it("shows scheduled header without a dedicated drag-handle button", () => {
@@ -573,7 +579,50 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
+    expect(screen.getByTestId("scheduled-timeline-pane")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps quests timeline scheduled-only and excludes unscheduled quests", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+          {
+            id: "task-unscheduled-1",
+            task_text: "Anytime focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: null,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const pane = screen.getByTestId("scheduled-timeline-pane");
+    expect(within(pane).getByTestId("timeline-row-task-scheduled-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-row-task-unscheduled-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Anytime focus")).not.toBeInTheDocument();
+    expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
   });
 
   it("uses row drag wiring for scheduled quests", () => {

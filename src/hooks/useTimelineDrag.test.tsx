@@ -338,6 +338,55 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-scroll", "10:00");
   });
 
+  it("advances preview time while constrained pane scrolls under a held pointer", () => {
+    const onDrop = vi.fn();
+    const scrollPane = document.createElement("div");
+    scrollPane.style.overflowY = "auto";
+    Object.defineProperty(scrollPane, "clientHeight", { configurable: true, value: 300 });
+    Object.defineProperty(scrollPane, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(scrollPane, "scrollTop", { configurable: true, writable: true, value: 0 });
+    scrollPane.getBoundingClientRect = () => ({
+      top: 100,
+      bottom: 400,
+      left: 0,
+      right: 320,
+      width: 320,
+      height: 300,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+    const container = document.createElement("div");
+    scrollPane.appendChild(container);
+    document.body.appendChild(scrollPane);
+
+    const localContainerRef = { current: container } as React.RefObject<HTMLElement>;
+    const { result } = renderHook(() => useTimelineDrag({ containerRef: localContainerRef, onDrop }));
+
+    const handleProps = result.current.getDragHandleProps("task-pane-scroll", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(395));
+      dispatchPointerMove(395);
+    });
+
+    expect(result.current.previewTime).toBe("09:00");
+
+    act(() => {
+      scrollPane.scrollTop = 120;
+      scrollPane.dispatchEvent(new Event("scroll"));
+    });
+
+    expect(result.current.previewTime).toBe("10:00");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-pane-scroll", "10:00");
+    document.body.removeChild(scrollPane);
+  });
+
   it("clamps time range to 00:00 through 23:59", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));

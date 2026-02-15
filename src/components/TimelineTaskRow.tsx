@@ -39,8 +39,8 @@ export function TimelineTaskRow({
   laneIndex = 0,
   laneCount = 1,
   overlapCount = 0,
-  showLine = true,
-  isLast = false,
+  showLine: _showLine = true,
+  isLast: _isLast = false,
   isDragTarget = false,
   className,
   children,
@@ -68,12 +68,6 @@ export function TimelineTaskRow({
   const durationWidthPx = (visualLaneCount * 4) + ((visualLaneCount - 1) * 1) + 4;
   const hasOverlap = overlapCount > 0;
   const hasMultipleLanes = laneCount > 1;
-  const connectorClass = isScheduledTaskRow
-    ? cn(
-        "w-[2px] flex-1 min-h-[8px] rounded-full",
-        isNowTone ? "bg-stardust-gold/45" : "bg-primary/35",
-      )
-    : "w-px flex-1 border-l border-dashed border-border/50 min-h-[8px]";
 
   return (
     <div
@@ -103,13 +97,8 @@ export function TimelineTaskRow({
         ) : null}
       </div>
 
-      {/* Timeline column */}
-      <div className={cn("relative flex flex-col items-center flex-shrink-0", isScheduledTaskRow ? "w-7" : "w-5")}>
-        {/* Top segment of line */}
-        {showLine && <div className={connectorClass} />}
-        {!showLine && <div className="flex-1 min-h-[8px]" />}
-
-        {/* Task duration rail */}
+      {/* Timeline column (dot/line indicators removed) */}
+      <div className="relative flex flex-col items-center flex-shrink-0 w-7">
         {isScheduledTaskRow ? (
           <div
             className={cn(
@@ -156,23 +145,7 @@ export function TimelineTaskRow({
             </div>
           </div>
         ) : (
-          <div
-            className={cn(
-              "w-2 h-2 rounded-full flex-shrink-0 z-10",
-              isNowTone
-                ? "bg-stardust-gold ring-2 ring-stardust-gold/30"
-                : time
-                  ? "bg-primary/70 ring-2 ring-primary/20"
-                  : "bg-muted-foreground/40 ring-2 ring-muted/30",
-            )}
-          />
-        )}
-
-        {/* Bottom segment of line */}
-        {!isLast ? (
-          <div className={connectorClass} />
-        ) : (
-          <div className="flex-1 min-h-[8px]" />
+          <div className="min-h-[18px]" aria-hidden />
         )}
       </div>
 

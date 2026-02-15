@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect, useCallback, memo, type CSSProperties } from "react";
+import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays, isSameDay } from "date-fns";
@@ -198,6 +198,34 @@ const GAP_SCALE = 0.05;
 const GAP_MAX_PX = 10;
 const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
+const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
+
+const getBottomNavSafeOffsetPx = () => {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX;
+  }
+
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.top = "0";
+  probe.style.left = "0";
+  probe.style.height = "var(--bottom-nav-safe-offset)";
+  document.body.appendChild(probe);
+  const measured = probe.getBoundingClientRect().height;
+  probe.remove();
+
+  if (Number.isFinite(measured) && measured > 0) {
+    return measured;
+  }
+
+  const rootFontSize = Number.parseFloat(
+    window.getComputedStyle(document.documentElement).fontSize || "16",
+  );
+  const safeFontSize = Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
+  return safeFontSize * 6.5;
+};
 
 interface TimelineMarkerRow {
   id: string;
@@ -517,6 +545,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
+  const scheduledHeaderRef = useRef<HTMLDivElement | null>(null);
+  const scheduledPaneRef = useRef<HTMLDivElement | null>(null);
+  const [scheduledPaneMaxHeightPx, setScheduledPaneMaxHeightPx] = useState<number | null>(null);
+  const setScheduledPaneNode = useCallback((node: HTMLDivElement | null) => {
+    scheduledPaneRef.current = node;
+    timelineDragContainerRef.current = node;
+  }, []);
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [showMonthView, setShowMonthView] = useState(false);
@@ -826,19 +861,48 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return a.sortKey.localeCompare(b.sortKey);
     });
 
-    const rows: TimelineRow[] = scheduledRows.map((row) => (
+    return scheduledRows.map((row) => (
       row.kind === "marker"
         ? { kind: "marker", marker: row.marker }
         : { kind: "task", task: row.task }
     ));
-    rows.push(...anytimeItems.map((task) => ({ kind: "task" as const, task })));
-    return rows;
-  }, [anytimeItems, flowOrderedScheduledItems, timelineMarkerRows]);
+  }, [flowOrderedScheduledItems, timelineMarkerRows]);
   const hasNowMarkerRow = useMemo(
     () => timelineRows.some((row) => row.kind === "marker" && row.marker.kind === "now"),
     [timelineRows],
   );
   const hasRenderableNowMarker = hasNowMarkerRow && tasks.length > 0;
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateScheduledPaneBounds = () => {
+      const header = scheduledHeaderRef.current;
+      if (!header) {
+        setScheduledPaneMaxHeightPx(null);
+        return;
+      }
+
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const bottomOffset = getBottomNavSafeOffsetPx();
+      const available = Math.floor(viewportHeight - header.getBoundingClientRect().bottom - bottomOffset);
+      if (!Number.isFinite(available)) return;
+      setScheduledPaneMaxHeightPx(Math.max(120, available));
+    };
+
+    const rafId = window.requestAnimationFrame(updateScheduledPaneBounds);
+    updateScheduledPaneBounds();
+    window.addEventListener("resize", updateScheduledPaneBounds);
+    window.visualViewport?.addEventListener("resize", updateScheduledPaneBounds);
+    window.visualViewport?.addEventListener("scroll", updateScheduledPaneBounds);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updateScheduledPaneBounds);
+      window.visualViewport?.removeEventListener("resize", updateScheduledPaneBounds);
+      window.visualViewport?.removeEventListener("scroll", updateScheduledPaneBounds);
+    };
+  }, [comboCount, hasRenderableNowMarker, isTodaySelected, tasks.length, timelineRows.length]);
 
   useEffect(() => {
     const isToday = isTodaySelected;
@@ -853,13 +917,26 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       (becameVisible || becameToday || gainedNowMarker);
 
     if (shouldCenter && nowMarkerRowRef.current && typeof window !== "undefined") {
-      const markerRect = nowMarkerRowRef.current.getBoundingClientRect();
-      const markerMidpoint = markerRect.top + (markerRect.height / 2);
-      const targetScrollTop = Math.max(
-        0,
-        window.scrollY + markerMidpoint - (window.innerHeight * NOW_MARKER_VIEWPORT_TARGET),
-      );
-      window.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+      const pane = scheduledPaneRef.current;
+      if (pane && pane.scrollHeight > pane.clientHeight + 1) {
+        const markerRect = nowMarkerRowRef.current.getBoundingClientRect();
+        const paneRect = pane.getBoundingClientRect();
+        const markerMidpointWithinPane = markerRect.top - paneRect.top + (markerRect.height / 2);
+        const targetPaneScrollTop = pane.scrollTop + markerMidpointWithinPane - (pane.clientHeight * NOW_MARKER_VIEWPORT_TARGET);
+        const maxPaneScrollTop = Math.max(0, pane.scrollHeight - pane.clientHeight);
+        pane.scrollTo({
+          top: Math.max(0, Math.min(maxPaneScrollTop, targetPaneScrollTop)),
+          behavior: "smooth",
+        });
+      } else {
+        const markerRect = nowMarkerRowRef.current.getBoundingClientRect();
+        const markerMidpoint = markerRect.top + (markerRect.height / 2);
+        const targetScrollTop = Math.max(
+          0,
+          window.scrollY + markerMidpoint - (window.innerHeight * NOW_MARKER_VIEWPORT_TARGET),
+        );
+        window.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+      }
     }
 
     wasVisibleRef.current = isVisible;
@@ -1564,158 +1641,155 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
             {/* Scheduled Tasks Timeline */}
             {timelineRows.length > 0 && (
-              <div ref={timelineDragContainerRef}>
-                {timelineRows.some((row) => row.kind === "marker" || !!row.task.scheduled_time) && (
-                  <div className="flex items-center gap-2 pb-2">
-                    <div className="w-9 flex-shrink-0" />
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Scheduled
-                    </span>
-                  </div>
-                )}
-                {timelineRows.map((row, index) => {
-                  if (row.kind === "marker") {
-                    const marker = row.marker;
-                    const markerScale = marker.kind === "placeholder"
-                      ? 0.72 + (marker.emphasis * 0.28)
-                      : 1;
-                    const markerOpacity = marker.kind === "placeholder"
-                      ? 0.25 + (marker.emphasis * 0.65)
-                      : 1;
-                    return (
-                      <div
-                        ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
-                        key={marker.id}
-                        className="pointer-events-none select-none"
-                        style={{
-                          opacity: markerOpacity,
-                          transform: `scale(${markerScale})`,
-                          transformOrigin: "left center",
-                        }}
-                        data-testid={marker.id}
-                      >
-                        <TimelineTaskRow
-                          rowKind="marker"
-                          time={marker.time}
-                          tone={marker.kind === "now" ? "now" : "default"}
-                          showLine={index > 0}
-                          isLast={index === timelineRows.length - 1}
+              <div>
+                <div ref={scheduledHeaderRef} className="flex items-center gap-2 pb-2">
+                  <div className="w-9 flex-shrink-0" />
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Scheduled
+                  </span>
+                </div>
+
+                <div
+                  ref={setScheduledPaneNode}
+                  className="overflow-y-auto overscroll-contain pr-1"
+                  style={scheduledPaneMaxHeightPx ? { maxHeight: `${scheduledPaneMaxHeightPx}px` } : undefined}
+                  data-testid="scheduled-timeline-pane"
+                >
+                  {timelineRows.map((row, index) => {
+                    if (row.kind === "marker") {
+                      const marker = row.marker;
+                      const markerScale = marker.kind === "placeholder"
+                        ? 0.72 + (marker.emphasis * 0.28)
+                        : 1;
+                      const markerOpacity = marker.kind === "placeholder"
+                        ? 0.25 + (marker.emphasis * 0.65)
+                        : 1;
+                      return (
+                        <div
+                          ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
+                          key={marker.id}
+                          className="pointer-events-none select-none"
+                          style={{
+                            opacity: markerOpacity,
+                            transform: `scale(${markerScale})`,
+                            transformOrigin: "left center",
+                          }}
+                          data-testid={marker.id}
                         >
-                          {marker.kind === "now" ? (
-                            <div className="flex items-center gap-2 pt-1">
-                              <span className="h-3.5 w-[3px] rounded-full bg-stardust-gold/80" />
-                              <span className="inline-flex items-center gap-1 rounded-full border border-stardust-gold/35 bg-stardust-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stardust-gold">
-                                <span>Now</span>
-                                <span className="tabular-nums">{formatTime(marker.time)}</span>
-                              </span>
-                              <div className="h-[2px] flex-1 rounded-full bg-stardust-gold/35" />
-                            </div>
-                          ) : (
-                            <div className="pt-1">
-                              <div className="h-px w-full border-t border-dashed border-border/35" />
-                            </div>
-                          )}
-                        </TimelineTaskRow>
-                      </div>
+                          <TimelineTaskRow
+                            rowKind="marker"
+                            time={marker.time}
+                            tone={marker.kind === "now" ? "now" : "default"}
+                            showLine={index > 0}
+                            isLast={index === timelineRows.length - 1}
+                          >
+                            {marker.kind === "now" ? (
+                              <div className="pt-1">
+                                <span className="inline-flex items-center gap-1 rounded-full border border-stardust-gold/35 bg-stardust-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stardust-gold">
+                                  <span>Now</span>
+                                  <span className="tabular-nums">{formatTime(marker.time)}</span>
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="pt-1" />
+                            )}
+                          </TimelineTaskRow>
+                        </div>
+                      );
+                    }
+
+                    const task = row.task;
+                    const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                    const isAnyDragging = timelineDrag.isDragging;
+                    const isJustDropped = timelineDrag.justDroppedId === task.id;
+                    const rowFlow = scheduledFlow.byTaskId.get(task.id);
+                    const laneIndex = rowFlow?.laneIndex;
+                    const laneCount = rowFlow?.laneCount;
+                    const laneOffsetPx = rowFlow
+                      ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
+                      : 0;
+                    const scheduledSpacingPx = rowFlow
+                      ? getScheduledSpacingPx(rowFlow.gapBeforeMinutes)
+                      : 0;
+                    const timelineRowDragProps = task.scheduled_time && !task.completed
+                      ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
+                      : undefined;
+                    const isRowDraggable = !!timelineRowDragProps;
+                    const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+
+                    const rowStyle: CSSProperties = {
+                      WebkitUserSelect: 'none',
+                      userSelect: 'none',
+                      WebkitTouchCallout: 'none',
+                      touchAction: isThisDragging ? 'none' : 'pan-y',
+                      pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+                      opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                      boxShadow: isThisDragging
+                        ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                        : "none",
+                      backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
+                      borderRadius: isThisDragging ? 12 : 0,
+                      transition: 'none',
+                      willChange: isThisDragging ? "transform" : undefined,
+                      marginTop: scheduledSpacingPx,
+                    };
+
+                    const rowContent = (
+                      <TimelineTaskRow
+                        rowKind="task"
+                        time={task.scheduled_time}
+                        overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
+                        showLine={index > 0}
+                        isLast={index === timelineRows.length - 1}
+                        isDragTarget={isThisDragging}
+                        durationMinutes={task.estimated_duration}
+                        laneIndex={laneIndex}
+                        laneCount={laneCount}
+                        overlapCount={rowFlow?.overlapCount}
+                        className={cn(
+                          isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
+                          isThisDragging && "cursor-grabbing",
+                        )}
+                        data-testid={`timeline-row-${task.id}`}
+                        {...timelineRowDragProps}
+                      >
+                        {renderTaskItem(task, undefined, overlapCount)}
+                      </TimelineTaskRow>
                     );
-                  }
 
-                  const task = row.task;
-                  const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                  const isAnyDragging = timelineDrag.isDragging;
-                  const isJustDropped = timelineDrag.justDroppedId === task.id;
-                  const isAnytimeTask = !task.scheduled_time;
-                  const rowFlow = scheduledFlow.byTaskId.get(task.id);
-                  const laneIndex = rowFlow?.laneIndex;
-                  const laneCount = rowFlow?.laneCount;
-                  const laneOffsetPx = rowFlow
-                    ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
-                    : 0;
-                  const scheduledSpacingPx = rowFlow
-                    ? getScheduledSpacingPx(rowFlow.gapBeforeMinutes)
-                    : 0;
-                  const previousRow = index > 0 ? timelineRows[index - 1] : undefined;
-                  const previousIsAnytimeTask = previousRow?.kind === "task" && !previousRow.task.scheduled_time;
-                  const showAnytimeLabel = isAnytimeTask && !previousIsAnytimeTask;
-                  const timelineRowDragProps = task.scheduled_time && !task.completed
-                    ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
-                    : undefined;
-                  const isRowDraggable = !!timelineRowDragProps;
-                  const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
-
-                  const rowStyle: CSSProperties = {
-                    WebkitUserSelect: 'none',
-                    userSelect: 'none',
-                    WebkitTouchCallout: 'none',
-                    touchAction: isThisDragging ? 'none' : 'pan-y',
-                    pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
-                    opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
-                    boxShadow: isThisDragging
-                      ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                      : "none",
-                    backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
-                    borderRadius: isThisDragging ? 12 : 0,
-                    transition: 'none',
-                    willChange: isThisDragging ? "transform" : undefined,
-                    marginTop: task.scheduled_time ? scheduledSpacingPx : 0,
-                  };
-
-                  const rowContent = (
-                    <TimelineTaskRow
-                      rowKind="task"
-                      time={task.scheduled_time}
-                      label={showAnytimeLabel ? "Anytime" : undefined}
-                      overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
-                      showLine={index > 0}
-                      isLast={index === timelineRows.length - 1}
-                      isDragTarget={isThisDragging}
-                      durationMinutes={task.estimated_duration}
-                      laneIndex={laneIndex}
-                      laneCount={laneCount}
-                      overlapCount={rowFlow?.overlapCount}
-                      className={cn(
-                        isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
-                        isThisDragging && "cursor-grabbing",
-                      )}
-                      data-testid={`timeline-row-${task.id}`}
-                      {...timelineRowDragProps}
-                    >
-                      {renderTaskItem(task, undefined, overlapCount)}
-                    </TimelineTaskRow>
-                  );
-
-                  const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
-                    ? {
-                        scale: [1, 1.02, 0.98, 1],
-                        y: [0, -2, 1, 0],
-                      }
-                    : undefined;
-                  return (
-                    <motion.div
-                      key={task.id}
-                      className={cn("relative", isThisDragging && "z-50")}
-                      layout={!isThisDragging}
-                      animate={bounceAnimation}
-                      transition={bounceAnimation ? {
-                        duration: 0.25,
-                        ease: [0.25, 0.1, 0.25, 1],
-                        layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                      } : {
-                        layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                      }}
-                      data-timeline-lane={laneIndex}
-                      data-timeline-lane-count={laneCount}
-                      data-timeline-overlap={rowFlow?.overlapCount}
-                      style={{
-                        ...rowStyle,
-                        x: laneOffsetPx,
-                        y: isThisDragging ? timelineDrag.dragOffsetY : 0,
-                      }}
-                    >
-                      {rowContent}
-                    </motion.div>
-                  );
-                })}
+                    const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
+                      ? {
+                          scale: [1, 1.02, 0.98, 1],
+                          y: [0, -2, 1, 0],
+                        }
+                      : undefined;
+                    return (
+                      <motion.div
+                        key={task.id}
+                        className={cn("relative", isThisDragging && "z-50")}
+                        layout={!isThisDragging}
+                        animate={bounceAnimation}
+                        transition={bounceAnimation ? {
+                          duration: 0.25,
+                          ease: [0.25, 0.1, 0.25, 1],
+                          layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                        } : {
+                          layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                        }}
+                        data-timeline-lane={laneIndex}
+                        data-timeline-lane-count={laneCount}
+                        data-timeline-overlap={rowFlow?.overlapCount}
+                        style={{
+                          ...rowStyle,
+                          x: laneOffsetPx,
+                          y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                        }}
+                      >
+                        {rowContent}
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

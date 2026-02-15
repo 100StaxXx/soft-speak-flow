@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { TimelineTaskRow } from "./TimelineTaskRow";
 
 describe("TimelineTaskRow", () => {
-  it("renders a wide lane-aware duration rail for scheduled tasks", () => {
-    render(
+  it("renders a wide lane-aware duration rail without dot/line indicators", () => {
+    const { container } = render(
       <TimelineTaskRow
         time="09:00"
         durationMinutes={45}
@@ -26,6 +26,8 @@ describe("TimelineTaskRow", () => {
     expect(indicator).toHaveAttribute("data-duration-lane-count", "3");
     expect(indicator).toHaveAttribute("data-duration-lane-index", "1");
     expect(indicator).toHaveClass("border-primary/45");
+    expect(container.querySelector(".border-l")).toBeNull();
+    expect(container.querySelector(".w-2.h-2.rounded-full")).toBeNull();
   });
 
   it("keeps override preview styling unchanged in default tone", () => {
@@ -49,7 +51,7 @@ describe("TimelineTaskRow", () => {
     expect(screen.getByTestId("timeline-duration-indicator")).toHaveClass("border-stardust-gold/45");
   });
 
-  it("keeps marker rows lightweight without the wide duration rail", () => {
+  it("renders marker rows with no left indicator glyphs", () => {
     const { container } = render(
       <TimelineTaskRow rowKind="marker" time="10:15" tone="now">
         <div>Now marker</div>
@@ -57,7 +59,7 @@ describe("TimelineTaskRow", () => {
     );
 
     expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
-    const dot = container.querySelector(".w-2.h-2.rounded-full");
-    expect(dot).not.toBeNull();
+    expect(container.querySelector(".border-l")).toBeNull();
+    expect(container.querySelector(".w-2.h-2.rounded-full")).toBeNull();
   });
 });
