@@ -4,6 +4,7 @@ interface TimelineTaskRowProps extends React.HTMLAttributes<HTMLDivElement> {
   time?: string | null;
   overrideTime?: string | null;
   label?: string | null;
+  rowKind?: "task" | "marker";
   tone?: "default" | "now";
   durationMinutes?: number | null;
   laneIndex?: number;
@@ -32,6 +33,7 @@ export function TimelineTaskRow({
   time,
   overrideTime,
   label,
+  rowKind = "task",
   tone = "default",
   durationMinutes,
   laneIndex = 0,
@@ -47,13 +49,31 @@ export function TimelineTaskRow({
   const displayTime = overrideTime ?? time;
   const isOverridden = overrideTime != null;
   const isNowTone = tone === "now";
+  const isTaskRow = rowKind === "task";
+  const isScheduledTaskRow = isTaskRow && !!displayTime;
   const effectiveDurationMinutes = Number.isFinite(durationMinutes) && (durationMinutes ?? 0) > 0
     ? Number(durationMinutes)
     : 30;
-  const durationHeightPx = clamp(Math.round((effectiveDurationMinutes / 30) * 12), 12, 56);
-  const laneOffsetPx = clamp(laneIndex, 0, 12) * 2;
+  const durationHeightPx = clamp(Math.round((effectiveDurationMinutes / 30) * 18), 16, 72);
+  const visualLaneCount = clamp(
+    Number.isFinite(laneCount) ? Math.round(Number(laneCount)) : 1,
+    1,
+    4,
+  );
+  const visualLaneIndex = clamp(
+    Number.isFinite(laneIndex) ? Math.round(Number(laneIndex)) : 0,
+    0,
+    visualLaneCount - 1,
+  );
+  const durationWidthPx = (visualLaneCount * 4) + ((visualLaneCount - 1) * 1) + 4;
   const hasOverlap = overlapCount > 0;
   const hasMultipleLanes = laneCount > 1;
+  const connectorClass = isScheduledTaskRow
+    ? cn(
+        "w-[2px] flex-1 min-h-[8px] rounded-full",
+        isNowTone ? "bg-stardust-gold/45" : "bg-primary/35",
+      )
+    : "w-px flex-1 border-l border-dashed border-border/50 min-h-[8px]";
 
   return (
     <div
@@ -83,50 +103,74 @@ export function TimelineTaskRow({
         ) : null}
       </div>
 
-      {/* Timeline dot + line */}
-      <div className="relative flex flex-col items-center flex-shrink-0 w-3">
+      {/* Timeline column */}
+      <div className={cn("relative flex flex-col items-center flex-shrink-0", isScheduledTaskRow ? "w-7" : "w-5")}>
         {/* Top segment of line */}
-        {showLine && (
-          <div className="w-px flex-1 border-l border-dashed border-border/50 min-h-[8px]" />
-        )}
+        {showLine && <div className={connectorClass} />}
         {!showLine && <div className="flex-1 min-h-[8px]" />}
-        
-        {/* Dot */}
-        <div className={cn(
-          "w-2 h-2 rounded-full flex-shrink-0 z-10",
-          isNowTone
-            ? "bg-stardust-gold ring-2 ring-stardust-gold/30"
-            : time
-            ? "bg-primary/70 ring-2 ring-primary/20" 
-            : "bg-muted-foreground/40 ring-2 ring-muted/30"
-        )} />
 
-        {displayTime && (
+        {/* Task duration rail */}
+        {isScheduledTaskRow ? (
           <div
             className={cn(
-              "relative mt-1 mb-1 w-[3px] rounded-full",
+              "relative mt-1 mb-1 overflow-hidden rounded-full border",
               isNowTone
-                ? "bg-stardust-gold/45"
+                ? "border-stardust-gold/45 bg-stardust-gold/12 shadow-[0_0_0_1px_rgba(225,177,59,0.14)]"
                 : hasOverlap
-                ? "bg-primary/55"
+                ? "border-primary/45 bg-primary/20"
                 : hasMultipleLanes
-                  ? "bg-primary/40"
-                  : "bg-primary/30",
+                  ? "border-primary/35 bg-primary/15"
+                  : "border-primary/30 bg-primary/10",
             )}
             style={{
               height: `${durationHeightPx}px`,
-              transform: `translateX(${laneOffsetPx}px)`,
+              width: `${durationWidthPx}px`,
             }}
             data-testid="timeline-duration-indicator"
             data-duration-minutes={effectiveDurationMinutes}
             data-duration-height={durationHeightPx}
+            data-duration-width={durationWidthPx}
+            data-duration-lane-count={visualLaneCount}
+            data-duration-lane-index={visualLaneIndex}
             aria-hidden
+          >
+            <div className="absolute inset-[2px] flex gap-px">
+              {Array.from({ length: visualLaneCount }).map((_, lane) => {
+                const isActiveLane = lane === visualLaneIndex;
+                return (
+                  <span
+                    key={lane}
+                    className={cn(
+                      "flex-1 rounded-full",
+                      isActiveLane
+                        ? isNowTone
+                          ? "bg-stardust-gold/95"
+                          : "bg-primary/85"
+                        : isNowTone
+                          ? "bg-stardust-gold/25"
+                          : "bg-primary/25",
+                    )}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "w-2 h-2 rounded-full flex-shrink-0 z-10",
+              isNowTone
+                ? "bg-stardust-gold ring-2 ring-stardust-gold/30"
+                : time
+                  ? "bg-primary/70 ring-2 ring-primary/20"
+                  : "bg-muted-foreground/40 ring-2 ring-muted/30",
+            )}
           />
         )}
-        
+
         {/* Bottom segment of line */}
         {!isLast ? (
-          <div className="w-px flex-1 border-l border-dashed border-border/50 min-h-[8px]" />
+          <div className={connectorClass} />
         ) : (
           <div className="flex-1 min-h-[8px]" />
         )}

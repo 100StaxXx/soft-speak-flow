@@ -688,10 +688,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   });
 
   const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
+  const isTodaySelected = isSameDay(selectedDate, new Date());
   const lastReportedPreviewTimeRef = useRef<string | null>(null);
   const nowMarkerRowRef = useRef<HTMLDivElement | null>(null);
   const wasVisibleRef = useRef(isVisible);
-  const wasTodayRef = useRef(isSameDay(selectedDate, new Date()));
+  const wasTodayRef = useRef(isTodaySelected);
   const hadNowMarkerRef = useRef(false);
 
   useEffect(() => {
@@ -708,7 +709,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [onTimelineDragPreviewTimeChange]);
 
   useEffect(() => {
-    if (!isSameDay(selectedDate, new Date())) return;
+    if (!isTodaySelected) return;
 
     const tick = () => {
       const minute = parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0;
@@ -718,7 +719,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     tick();
     const interval = window.setInterval(tick, 60_000);
     return () => window.clearInterval(interval);
-  }, [selectedDate]);
+  }, [isTodaySelected, selectedDate]);
 
   const scheduledFlow = useMemo(
     () => buildTaskTimelineFlow(scheduledItems),
@@ -745,7 +746,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, [scheduledFlow.orderedTaskIds, scheduledItems, scheduledItemsById]);
 
   const timelineMarkerRows = useMemo(() => {
-    const isToday = isSameDay(selectedDate, new Date());
+    const isToday = isTodaySelected;
     const scheduledMinutes = scheduledItems
       .map((task) => parseTimeToMinute(task.scheduled_time))
       .filter((minute): minute is number => minute !== null);
@@ -798,7 +799,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return Array.from(markers.values());
-  }, [nowMarkerMinute, scheduledItems, selectedDate]);
+  }, [isTodaySelected, nowMarkerMinute, scheduledItems]);
 
   const timelineRows = useMemo<TimelineRow[]>(() => {
     const scheduledRows: Array<TimelineRow & { minute: number; sortKey: string }> = [
@@ -840,7 +841,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const hasRenderableNowMarker = hasNowMarkerRow && tasks.length > 0;
 
   useEffect(() => {
-    const isToday = isSameDay(selectedDate, new Date());
+    const isToday = isTodaySelected;
     const becameVisible = isVisible && !wasVisibleRef.current;
     const becameToday = isToday && !wasTodayRef.current;
     const gainedNowMarker = hasRenderableNowMarker && !hadNowMarkerRef.current;
@@ -864,7 +865,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     wasVisibleRef.current = isVisible;
     wasTodayRef.current = isToday;
     hadNowMarkerRef.current = hasRenderableNowMarker;
-  }, [hasRenderableNowMarker, isVisible, selectedDate, timelineDrag.isDragging]);
+  }, [hasRenderableNowMarker, isTodaySelected, isVisible, timelineDrag.isDragging]);
 
   const baseTimelineConflictMap = useMemo(
     () => buildTaskConflictMap(draggableTimelineItems),
@@ -1483,6 +1484,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )}
         </AnimatePresence>
 
+        {isTodaySelected && (
+          <div className="sticky top-2 z-20 mb-3 pointer-events-none" data-testid="timeline-now-pill">
+            <div className="inline-flex items-center gap-2 rounded-full border border-stardust-gold/35 bg-background/75 px-2.5 py-1 shadow-[0_6px_16px_-10px_rgba(225,177,59,0.7)] backdrop-blur-sm">
+              <span className="h-3.5 w-[3px] rounded-full bg-stardust-gold/80" aria-hidden />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stardust-gold/90">
+                Now
+              </span>
+              <span
+                className="text-xs font-bold tabular-nums text-stardust-gold"
+                data-testid="timeline-now-pill-time"
+              >
+                {formatTime(minuteToTime(nowMarkerMinute))}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Timeline Content */}
         {tasks.length === 0 ? (
           <div className="text-center py-6">
@@ -1577,6 +1595,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         data-testid={marker.id}
                       >
                         <TimelineTaskRow
+                          rowKind="marker"
                           time={marker.time}
                           tone={marker.kind === "now" ? "now" : "default"}
                           showLine={index > 0}
@@ -1584,11 +1603,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         >
                           {marker.kind === "now" ? (
                             <div className="flex items-center gap-2 pt-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-stardust-gold" />
-                              <span className="text-[10px] font-medium uppercase tracking-wide text-stardust-gold">
-                                Now
+                              <span className="h-3.5 w-[3px] rounded-full bg-stardust-gold/80" />
+                              <span className="inline-flex items-center gap-1 rounded-full border border-stardust-gold/35 bg-stardust-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stardust-gold">
+                                <span>Now</span>
+                                <span className="tabular-nums">{formatTime(marker.time)}</span>
                               </span>
-                              <div className="h-px flex-1 bg-stardust-gold/40" />
+                              <div className="h-[2px] flex-1 rounded-full bg-stardust-gold/35" />
                             </div>
                           ) : (
                             <div className="pt-1">
@@ -1642,6 +1662,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
                   const rowContent = (
                     <TimelineTaskRow
+                      rowKind="task"
                       time={task.scheduled_time}
                       label={showAnytimeLabel ? "Anytime" : undefined}
                       overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}

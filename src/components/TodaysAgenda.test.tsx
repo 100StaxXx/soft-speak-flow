@@ -127,6 +127,7 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     laneIndex,
     laneCount,
     overlapCount,
+    rowKind: _rowKind,
     label: _label,
     showLine: _showLine,
     isLast: _isLast,
@@ -141,6 +142,7 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     laneIndex?: number;
     laneCount?: number;
     overlapCount?: number;
+    rowKind?: "task" | "marker";
     label?: string | null;
     showLine?: boolean;
     isLast?: boolean;
@@ -1500,7 +1502,11 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByTestId("timeline-marker-placeholder-1500")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-marker-placeholder-1800")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
-    expect(within(screen.getByTestId("timeline-marker-now")).getByText("16:34")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+    ).toHaveTextContent("16:34");
+    expect(screen.getByTestId("timeline-now-pill")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:34 PM");
 
     vi.useRealTimers();
   });
@@ -1575,13 +1581,88 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
-    expect(within(screen.getByTestId("timeline-marker-now")).getByText("07:12")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+    ).toHaveTextContent("07:12");
     expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("7:12 AM");
 
     vi.useRealTimers();
   });
 
-  it("shows a subtle now marker only on today", () => {
+  it("keeps the now pill visible for today even in the empty state", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T16:34:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={0}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByText("No tasks for this day")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-now-pill")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:34 PM");
+
+    vi.useRealTimers();
+  });
+
+  it("updates now pill timestamp every minute on today", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T16:34:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:34 PM");
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:35 PM");
+
+    vi.useRealTimers();
+  });
+
+  it("shows now marker and now pill only on today", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1610,6 +1691,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-now-pill")).toBeInTheDocument();
 
     rerender(
       <TodaysAgenda
@@ -1631,5 +1713,6 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.queryByTestId("timeline-marker-now")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-now-pill")).not.toBeInTheDocument();
   });
 });
