@@ -202,6 +202,8 @@ const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
 const DRAG_OVERLAY_TOP_PADDING_PX = 8;
 const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
+const EDGE_HOLD_ACTIVATION_MS = 220;
+const EDGE_HOLD_REPEAT_MS = 180;
 
 interface DragOverlaySnapshot {
   taskId: string;
@@ -737,6 +739,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const [dragOverlaySnapshot, setDragOverlaySnapshot] = useState<DragOverlaySnapshot | null>(null);
   const dragOverlayOffsetY = useMotionValue(0);
   const dragOverlayBottomInsetRef = useRef(DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX);
+  const edgeHoldDirectionRef = useRef<-1 | 0 | 1>(0);
+  const edgeHoldActivationTimeoutRef = useRef<number | null>(null);
+  const edgeHoldRepeatIntervalRef = useRef<number | null>(null);
 
   const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
   const isTodaySelected = isSameDay(selectedDate, new Date());
@@ -758,6 +763,54 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       onTimelineDragPreviewTimeChange?.(null);
     };
   }, [onTimelineDragPreviewTimeChange]);
+
+  const clearEdgeHoldActivationTimer = useCallback(() => {
+    if (edgeHoldActivationTimeoutRef.current !== null) {
+      window.clearTimeout(edgeHoldActivationTimeoutRef.current);
+      edgeHoldActivationTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearEdgeHoldRepeatTimer = useCallback(() => {
+    if (edgeHoldRepeatIntervalRef.current !== null) {
+      window.clearInterval(edgeHoldRepeatIntervalRef.current);
+      edgeHoldRepeatIntervalRef.current = null;
+    }
+  }, []);
+
+  const syncEdgeHoldDirection = useCallback(
+    (nextDirection: -1 | 0 | 1) => {
+      if (edgeHoldDirectionRef.current === nextDirection) return;
+
+      edgeHoldDirectionRef.current = nextDirection;
+      clearEdgeHoldActivationTimer();
+      clearEdgeHoldRepeatTimer();
+
+      if (nextDirection === 0 || !timelineDrag.isDragging) {
+        return;
+      }
+
+      edgeHoldActivationTimeoutRef.current = window.setTimeout(() => {
+        edgeHoldActivationTimeoutRef.current = null;
+        if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== nextDirection) {
+          return;
+        }
+
+        edgeHoldRepeatIntervalRef.current = window.setInterval(() => {
+          if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== nextDirection) {
+            clearEdgeHoldRepeatTimer();
+            return;
+          }
+
+          const nudged = timelineDrag.nudgeByFineStep(nextDirection);
+          if (!nudged) {
+            clearEdgeHoldRepeatTimer();
+          }
+        }, EDGE_HOLD_REPEAT_MS);
+      }, EDGE_HOLD_ACTIVATION_MS);
+    },
+    [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer, timelineDrag.isDragging, timelineDrag.nudgeByFineStep],
+  );
 
   useLayoutEffect(() => {
     if (!timelineDrag.draggingTaskId) {
@@ -802,6 +855,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   useEffect(() => {
     if (!timelineDrag.isDragging || !dragOverlaySnapshot) {
       dragOverlayOffsetY.set(0);
+      syncEdgeHoldDirection(0);
       return;
     }
 
@@ -830,6 +884,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const maxOffset = safeMaxTop - dragOverlaySnapshot.top;
       const clampedOffset = Math.max(minOffset, Math.min(maxOffset, rawOffsetY));
       dragOverlayOffsetY.set(clampedOffset);
+
+      const clampDelta = rawOffsetY - clampedOffset;
+      const pinnedDirection: -1 | 0 | 1 = clampDelta > 0.5 ? 1 : clampDelta < -0.5 ? -1 : 0;
+      syncEdgeHoldDirection(pinnedDirection);
     };
 
     clampDragOffset(dragVisualOffsetY.get());
@@ -842,11 +900,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
     return () => {
       unsubscribe();
+      syncEdgeHoldDirection(0);
       window.removeEventListener("resize", handleViewportChange);
       window.visualViewport?.removeEventListener("resize", handleViewportChange);
       window.visualViewport?.removeEventListener("scroll", handleViewportChange);
     };
-  }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, timelineDrag.isDragging]);
+  }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, syncEdgeHoldDirection, timelineDrag.isDragging]);
+
+  useEffect(() => {
+    if (timelineDrag.isDragging) return;
+    edgeHoldDirectionRef.current = 0;
+    clearEdgeHoldActivationTimer();
+    clearEdgeHoldRepeatTimer();
+  }, [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer, timelineDrag.isDragging]);
+
+  useEffect(() => {
+    return () => {
+      edgeHoldDirectionRef.current = 0;
+      clearEdgeHoldActivationTimer();
+      clearEdgeHoldRepeatTimer();
+    };
+  }, [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer]);
 
   useEffect(() => {
     if (!isTodaySelected) return;

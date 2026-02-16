@@ -368,6 +368,32 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     [isInteractiveEventTarget, startDrag],
   );
 
+  const nudgeByFineStep = useCallback(
+    (direction: -1 | 1): boolean => {
+      if (!draggingTaskIdRef.current) return false;
+
+      const currentPreviewMinute = lastPreviewMinuteRef.current;
+      const nextPreviewMinute = clampMinuteToRange(
+        currentPreviewMinute + (direction * resolvedSnapConfig.fineStepMinutes),
+        resolvedSnapConfig,
+      );
+      if (nextPreviewMinute === currentPreviewMinute) {
+        return false;
+      }
+
+      lastPreviewMinuteRef.current = nextPreviewMinute;
+      currentRawMinutesRef.current = nextPreviewMinute;
+      setPreviewTime(minuteToTime24(nextPreviewMinute, resolvedSnapConfig));
+
+      const deltaMinutes = nextPreviewMinute - originalMinutesRef.current;
+      const deltaY = deltaMinutes * runtimeScaleRef.current.coarsePixelsPerMinute;
+      dragOffsetY.set(deltaY);
+      dragMovedRef.current = true;
+      return true;
+    },
+    [dragOffsetY, resolvedSnapConfig],
+  );
+
   const getDragHandleProps = useCallback(
     (taskId: string, scheduledTime: string): DragHandleProps => ({
       onPointerDownCapture: (e) => handlePointerDown(e, taskId, scheduledTime),
@@ -411,6 +437,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     isDragging: draggingTaskId !== null,
     snapMode,
     zoomRail,
+    nudgeByFineStep,
     getDragHandleProps,
     getRowDragProps,
   };

@@ -417,4 +417,128 @@ describe("useTimelineDrag", () => {
     });
     expect(onDrop).not.toHaveBeenCalledWith("task-lower", expect.any(String));
   });
+
+  it("nudges preview and drop time forward by one fine step while dragging", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-nudge-forward", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+    });
+
+    let nudged = false;
+    act(() => {
+      nudged = result.current.nudgeByFineStep(1);
+    });
+
+    expect(nudged).toBe(true);
+    expect(result.current.previewTime).toBe("09:05");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-nudge-forward", "09:05");
+  });
+
+  it("nudges preview and drop time backward by one fine step while dragging", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-nudge-backward", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+    });
+
+    let nudged = false;
+    act(() => {
+      nudged = result.current.nudgeByFineStep(-1);
+    });
+
+    expect(nudged).toBe(true);
+    expect(result.current.previewTime).toBe("08:55");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-nudge-backward", "08:55");
+  });
+
+  it("returns false when nudging beyond either boundary", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const upperClamp = result.current.getDragHandleProps("task-nudge-upper", "23:59");
+    act(() => {
+      upperClamp.onPointerDown(createPointerDownEvent(100));
+    });
+
+    let nudged = true;
+    act(() => {
+      nudged = result.current.nudgeByFineStep(1);
+    });
+
+    expect(nudged).toBe(false);
+    expect(result.current.previewTime).toBe("23:59");
+    expect(result.current.dragOffsetY.get()).toBe(0);
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    const lowerClamp = result.current.getDragHandleProps("task-nudge-lower", "00:00");
+    act(() => {
+      lowerClamp.onPointerDown(createPointerDownEvent(100));
+    });
+
+    act(() => {
+      nudged = result.current.nudgeByFineStep(-1);
+    });
+
+    expect(nudged).toBe(false);
+    expect(result.current.previewTime).toBe("00:00");
+    expect(result.current.dragOffsetY.get()).toBe(0);
+
+    act(() => {
+      dispatchPointerUp();
+    });
+  });
+
+  it("updates drag offsets when nudging changes the minute", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-nudge-offset", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      result.current.nudgeByFineStep(1);
+    });
+
+    expect(result.current.dragOffsetY.get()).not.toBe(0);
+    expect(result.current.dragVisualOffsetY.get()).toBe(result.current.dragOffsetY.get());
+
+    act(() => {
+      dispatchPointerUp();
+    });
+  });
 });

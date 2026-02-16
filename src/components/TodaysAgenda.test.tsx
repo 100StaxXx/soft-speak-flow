@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => {
   const handleTouchStartSpy = vi.fn();
   const rowPointerDownSpy = vi.fn();
   const rowTouchStartSpy = vi.fn();
+  const nudgeByFineStepMock = vi.fn(() => true);
   const getDragHandlePropsMock = vi.fn(() => ({
     onPointerDown: handlePointerDownSpy,
     onTouchStart: handleTouchStartSpy,
@@ -69,6 +70,7 @@ const mocks = vi.hoisted(() => {
     handleTouchStartSpy,
     rowPointerDownSpy,
     rowTouchStartSpy,
+    nudgeByFineStepMock,
     getDragHandlePropsMock,
     getRowDragPropsMock,
     dragOffsetMotionValue,
@@ -98,6 +100,7 @@ vi.mock("@/hooks/useMotionProfile", () => ({
 vi.mock("@/hooks/useTimelineDrag", () => ({
   useTimelineDrag: () => ({
     ...mocks.timelineDragState,
+    nudgeByFineStep: mocks.nudgeByFineStepMock,
     getDragHandleProps: mocks.getDragHandlePropsMock,
     getRowDragProps: mocks.getRowDragPropsMock,
   }),
@@ -244,6 +247,8 @@ describe("TodaysAgenda subtasks", () => {
     mocks.handleTouchStartSpy.mockClear();
     mocks.rowPointerDownSpy.mockClear();
     mocks.rowTouchStartSpy.mockClear();
+    mocks.nudgeByFineStepMock.mockReset();
+    mocks.nudgeByFineStepMock.mockReturnValue(true);
     mocks.getDragHandlePropsMock.mockClear();
     mocks.getRowDragPropsMock.mockClear();
     mocks.subtaskEqMock.mockResolvedValue({ error: null });
@@ -439,6 +444,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.handleTouchStartSpy.mockClear();
     mocks.rowPointerDownSpy.mockClear();
     mocks.rowTouchStartSpy.mockClear();
+    mocks.nudgeByFineStepMock.mockReset();
+    mocks.nudgeByFineStepMock.mockReturnValue(true);
     mocks.getDragHandlePropsMock.mockClear();
     mocks.getRowDragPropsMock.mockClear();
   });
@@ -1111,6 +1118,174 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const draggedRowInList = screen.getByTestId("timeline-row-task-scheduled-1").parentElement;
     expect(draggedRowInList).toBeTruthy();
     expect(draggedRowInList).toHaveStyle({ opacity: "0" });
+  });
+
+  it("nudges earlier repeatedly while pinned at the top drag restraint", () => {
+    vi.useFakeTimers();
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.dragOffsetMotionValue.set(-1000);
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(screen.getByTestId("timeline-drag-overlay")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(220 + (180 * 3));
+    });
+
+    expect(mocks.nudgeByFineStepMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === -1)).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("nudges later repeatedly while pinned at the bottom drag restraint", () => {
+    vi.useFakeTimers();
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.dragOffsetMotionValue.set(1000);
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(screen.getByTestId("timeline-drag-overlay")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(220 + (180 * 3));
+    });
+
+    expect(mocks.nudgeByFineStepMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === 1)).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("stops edge-hold nudging when unpinned or drag ends", () => {
+    vi.useFakeTimers();
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.dragOffsetMotionValue.set(-1000);
+
+    const { rerender } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(220 + (180 * 2));
+    });
+    expect(mocks.nudgeByFineStepMock.mock.calls.length).toBeGreaterThan(0);
+
+    act(() => {
+      mocks.dragOffsetMotionValue.set(120);
+    });
+    const callsAfterUnpin = mocks.nudgeByFineStepMock.mock.calls.length;
+
+    act(() => {
+      vi.advanceTimersByTime(220 + (180 * 3));
+    });
+    expect(mocks.nudgeByFineStepMock.mock.calls.length).toBe(callsAfterUnpin);
+
+    mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.isDragging = false;
+    rerender(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+    );
+
+    const callsAfterDragEnd = mocks.nudgeByFineStepMock.mock.calls.length;
+    act(() => {
+      vi.advanceTimersByTime(220 + (180 * 3));
+    });
+    expect(mocks.nudgeByFineStepMock.mock.calls.length).toBe(callsAfterDragEnd);
+    vi.useRealTimers();
   });
 
   it("does not render zoom rail while drag preview is active", () => {
