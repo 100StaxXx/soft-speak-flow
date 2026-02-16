@@ -1740,6 +1740,46 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByTestId("timeline-marker-placeholder-1500")).not.toBeInTheDocument();
   });
 
+  it("centers between-quest placeholder marker timestamps between neighboring quests", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:30",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Review",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "16:30",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const betweenQuestMarker = screen.getByTestId("timeline-marker-placeholder-1300");
+    const markerInnerWrapper = betweenQuestMarker.firstElementChild as HTMLElement | null;
+    expect(markerInnerWrapper?.style.transform).toContain("translateY(-50%)");
+  });
+
   it("aligns all non-now placeholders to exact-hour timestamps", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -2010,7 +2050,9 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     const nowMarker = screen.getByTestId("timeline-marker-now");
+    const nowMarkerInner = nowMarker.firstElementChild as HTMLElement | null;
     expect(nowMarker).toHaveClass("h-0", "overflow-visible");
+    expect(nowMarkerInner?.style.transform).not.toContain("translateY(-50%)");
     expect(within(nowMarker).getByTestId("timeline-row-time")).toHaveTextContent("16:34");
 
     vi.useRealTimers();
@@ -2054,9 +2096,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    const nowMarker = screen.getByTestId("timeline-marker-now");
+    const nowMarkerInner = nowMarker.firstElementChild as HTMLElement | null;
+    expect(nowMarker).toBeInTheDocument();
+    expect(nowMarkerInner?.style.transform).toContain("translateY(-50%)");
     expect(
-      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+      within(nowMarker).getByTestId("timeline-row-time"),
     ).toHaveTextContent("13:20");
 
     const betweenPlaceholders = getRenderedPlaceholderMinutes().filter((minute) => (
@@ -2098,9 +2143,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    const nowMarker = screen.getByTestId("timeline-marker-now");
+    const nowMarkerInner = nowMarker.firstElementChild as HTMLElement | null;
+    expect(nowMarker).toBeInTheDocument();
+    expect(nowMarkerInner?.style.transform).not.toContain("translateY(-50%)");
     expect(
-      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+      within(nowMarker).getByTestId("timeline-row-time"),
     ).toHaveTextContent("07:12");
     expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-now-pill")).not.toBeInTheDocument();

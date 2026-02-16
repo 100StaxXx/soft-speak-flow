@@ -1922,12 +1922,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   {timelineRows.map((row, index) => {
                     if (row.kind === "marker") {
                       const marker = row.marker;
+                      const previousRow = index > 0 ? timelineRows[index - 1] : null;
+                      const nextRow = index < timelineRows.length - 1 ? timelineRows[index + 1] : null;
+                      const previousTaskMinute = previousRow?.kind === "task"
+                        ? parseTimeToMinute(previousRow.task.scheduled_time)
+                        : null;
+                      const nextTaskMinute = nextRow?.kind === "task"
+                        ? parseTimeToMinute(nextRow.task.scheduled_time)
+                        : null;
+                      const shouldCenterBetweenQuests = previousTaskMinute !== null
+                        && nextTaskMinute !== null
+                        && previousTaskMinute < marker.minute
+                        && marker.minute < nextTaskMinute;
                       const markerScale = marker.kind === "placeholder"
                         ? 0.72 + (marker.emphasis * 0.28)
                         : 1;
                       const markerOpacity = marker.kind === "placeholder"
                         ? 0.25 + (marker.emphasis * 0.65)
                         : 1;
+                      const markerTransform = shouldCenterBetweenQuests
+                        ? `translateY(-50%) scale(${markerScale})`
+                        : `scale(${markerScale})`;
                       return (
                         <div
                           key={marker.id}
@@ -1938,7 +1953,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
                             style={{
                               opacity: markerOpacity,
-                              transform: `scale(${markerScale})`,
+                              transform: markerTransform,
                               transformOrigin: "left center",
                             }}
                           >

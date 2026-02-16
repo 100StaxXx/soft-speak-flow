@@ -18,6 +18,7 @@ describe("TimelineTaskRow", () => {
     );
 
     expect(screen.getByText("9:00a")).toHaveClass("text-muted-foreground");
+    expect(screen.getByText("9:00a")).toHaveClass("text-[10px]");
     const root = container.firstElementChild;
     expect(root).toHaveAttribute("data-timeline-lane", "1");
     expect(root).toHaveAttribute("data-timeline-lane-count", "3");
@@ -69,6 +70,7 @@ describe("TimelineTaskRow", () => {
       </TimelineTaskRow>,
     );
 
+    expect(screen.getByText("10:15a")).toHaveClass("text-[9px]");
     expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
     const root = container.firstElementChild;
     expect(root?.firstElementChild).toHaveClass("pt-[8px]");

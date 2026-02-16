@@ -61,7 +61,8 @@ export function TimelineTaskRow({
       <div className={cn("w-9 flex-shrink-0 text-left", isMarkerRow ? "pt-[8px]" : "pt-[22px]")}>
         {displayTime ? (
           <span className={cn(
-            "text-[10px] font-medium leading-none transition-colors",
+            isMarkerRow ? "text-[9px]" : "text-[10px]",
+            "font-medium leading-none transition-colors",
             isNowTone
               ? "font-semibold text-stardust-gold"
               : isOverridden
