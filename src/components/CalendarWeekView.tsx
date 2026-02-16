@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { QuestDragCard } from "./QuestDragCard";
 import { QuestDropZone } from "./QuestDropZone";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { playSound } from "@/utils/soundEffects";
 import { toast } from "sonner";
 import { CalendarTask } from "@/types/quest";
@@ -22,11 +22,38 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
   const [draggedTask, setDraggedTask] = useState<string | null>(null);
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
+  const extractTaskIdFromDataTransfer = useCallback((dataTransfer: DataTransfer | null | undefined) => {
+    const taskId = dataTransfer?.getData("taskId")?.trim();
+    return taskId ? taskId : null;
+  }, []);
+
+  const isQuestCardGesture = useCallback((target: EventTarget | null) => {
+    return target instanceof Element && !!target.closest('[data-quest-card="true"]');
+  }, []);
+
+  const handleTaskDragStart = useCallback((e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData("taskId", taskId);
+    setDraggedTask(taskId);
+    playSound("pop");
+  }, []);
+
+  const handleTaskDragEnd = useCallback(() => {
+    setDraggedTask(null);
+  }, []);
+
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  const handleLongPressStart = (date: Date, hour: number) => {
+  const handleLongPressStart = (
+    date: Date,
+    hour: number,
+    e?: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>,
+  ) => {
+    if (isQuestCardGesture(e?.target ?? null)) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       playSound('pop');
       const time = format(new Date().setHours(hour, 0), 'HH:mm');
@@ -165,7 +192,12 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                       )}
                       onDrop={(e) => {
                         e.preventDefault();
-                        const taskId = e.dataTransfer.getData('taskId');
+                        const taskId = extractTaskIdFromDataTransfer(e.dataTransfer);
+                        if (!taskId) {
+                          setDraggedTask(null);
+                          return;
+                        }
+
                         const time = format(new Date().setHours(hour, 0), 'HH:mm');
 
                         if (!hasConflict) {
@@ -179,9 +211,9 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                         }
                         setDraggedTask(null);
                       }}
-                      onTouchStart={() => handleLongPressStart(day, hour)}
+                      onTouchStart={(e) => handleLongPressStart(day, hour, e)}
                       onTouchEnd={handleLongPressEnd}
-                      onMouseDown={() => handleLongPressStart(day, hour)}
+                      onMouseDown={(e) => handleLongPressStart(day, hour, e)}
                       onMouseUp={handleLongPressEnd}
                       onMouseLeave={handleLongPressEnd}
                     >
@@ -190,11 +222,8 @@ export const CalendarWeekView = ({ selectedDate, onDateSelect, tasks, onTaskDrop
                           key={task.id}
                           task={task}
                           isDragging={draggedTask === task.id}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('taskId', task.id);
-                            setDraggedTask(task.id);
-                            playSound('pop');
-                          }}
+                          onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                          onDragEnd={handleTaskDragEnd}
                         />
                       ))}
                       {hasConflict && hourTasks.length > 1 && (

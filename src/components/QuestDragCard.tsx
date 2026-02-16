@@ -9,6 +9,8 @@ interface QuestDragCardProps {
   task: DragTask;
   isDragging?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  draggable?: boolean;
   onLongPress?: () => void;
   compact?: boolean;
   showTime?: boolean;
@@ -65,6 +67,8 @@ export const QuestDragCard = React.memo(({
   task, 
   isDragging, 
   onDragStart, 
+  onDragEnd,
+  draggable,
   onLongPress, 
   compact = false, 
   showTime = true 
@@ -133,12 +137,15 @@ export const QuestDragCard = React.memo(({
     const mins = duration % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
+  const isCardDraggable = draggable ?? Boolean(onDragStart);
 
   return (
     <div className="flex items-stretch gap-2">
       <Card
-        draggable
+        data-quest-card="true"
+        draggable={isCardDraggable}
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         className={cn(
           "cursor-grab active:cursor-grabbing overflow-hidden group relative touch-manipulation",
           // Hardware-accelerated transforms for smooth animations

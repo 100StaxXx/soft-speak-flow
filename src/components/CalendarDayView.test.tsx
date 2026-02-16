@@ -10,7 +10,25 @@ vi.mock("./ui/scroll-area", () => ({
 }));
 
 vi.mock("./QuestDragCard", () => ({
-  QuestDragCard: ({ task }: { task: { task_text: string } }) => <div>{task.task_text}</div>,
+  QuestDragCard: ({
+    task,
+    onDragStart,
+    onDragEnd,
+  }: {
+    task: { id: string; task_text: string };
+    onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+    onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  }) => (
+    <div
+      data-testid={`quest-card-${task.id}`}
+      data-quest-card="true"
+      draggable={Boolean(onDragStart)}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    >
+      {task.task_text}
+    </div>
+  ),
 }));
 
 vi.mock("./MilestoneCalendarCard", () => ({
@@ -88,6 +106,20 @@ const createDragOverEvent = (clientY: number) => {
   return event;
 };
 
+const createDataTransfer = (initialTaskId: string = "") => {
+  const payload = new Map<string, string>();
+  if (initialTaskId) {
+    payload.set("taskId", initialTaskId);
+  }
+
+  return {
+    setData: vi.fn((key: string, value: string) => {
+      payload.set(key, value);
+    }),
+    getData: vi.fn((key: string) => payload.get(key) ?? ""),
+  };
+};
+
 describe("CalendarDayView interactions", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -137,6 +169,45 @@ describe("CalendarDayView interactions", () => {
     fireEvent(row!, createDropEvent(152, dataTransfer));
 
     expect(onTaskDrop).toHaveBeenCalledWith("drop-task", selectedDate, "08:50");
+  });
+
+  it("ignores drop when payload does not include a task id", () => {
+    const { onTaskDrop } = setup([baseTask()]);
+
+    const label = screen.getByText("8:30 AM");
+    const row = label.closest("div.flex");
+    expect(row).toBeTruthy();
+    mockRowBounds(row!, 100);
+
+    const dataTransfer = createDataTransfer();
+    fireEvent(row!, createDropEvent(122, dataTransfer));
+
+    expect(dataTransfer.getData).toHaveBeenCalledWith("taskId");
+    expect(onTaskDrop).not.toHaveBeenCalled();
+  });
+
+  it("uses one unscheduled quest id for drag start and performs one drop action", () => {
+    const unscheduledTask = baseTask({
+      id: "task-unscheduled",
+      task_text: "Unscheduled quest",
+      scheduled_time: null,
+    });
+    const { onTaskDrop } = setup([baseTask(), unscheduledTask]);
+
+    const card = screen.getByTestId("quest-card-task-unscheduled");
+    const dataTransfer = createDataTransfer();
+    fireEvent.dragStart(card, { dataTransfer });
+
+    const label = screen.getByText("8:30 AM");
+    const row = label.closest("div.flex");
+    expect(row).toBeTruthy();
+    mockRowBounds(row!, 100);
+    fireEvent(row!, createDropEvent(122, dataTransfer));
+
+    expect(dataTransfer.setData).toHaveBeenCalledTimes(1);
+    expect(dataTransfer.setData).toHaveBeenCalledWith("taskId", "task-unscheduled");
+    expect(onTaskDrop).toHaveBeenCalledTimes(1);
+    expect(onTaskDrop.mock.calls[0]?.[0]).toBe("task-unscheduled");
   });
 
   it("snaps long-press add time to 5-minute increments in standard view", () => {

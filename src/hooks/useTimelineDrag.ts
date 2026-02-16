@@ -329,6 +329,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
+      if (e.defaultPrevented) return;
       if (draggingTaskIdRef.current) return;
       if (isInteractiveEventTarget(e.target)) return;
       const touch = e.touches[0];
@@ -357,6 +358,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
+      if (e.defaultPrevented) return;
       if (draggingTaskIdRef.current) return;
       if (isInteractiveEventTarget(e.target)) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;

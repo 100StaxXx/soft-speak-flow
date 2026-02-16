@@ -10,11 +10,11 @@ interface QuestDropZoneProps {
   children?: React.ReactNode;
   time?: string;
   className?: string;
-  onTouchStart?: () => void;
-  onTouchEnd?: () => void;
-  onMouseDown?: () => void;
-  onMouseUp?: () => void;
-  onMouseLeave?: () => void;
+  onTouchStart?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchEnd?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onMouseUp?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 export const QuestDropZone = ({
@@ -49,9 +49,9 @@ export const QuestDropZone = ({
       onTouchEnd={onTouchEnd}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
-      onMouseLeave={() => {
+      onMouseLeave={(e) => {
         setIsDragOver(false);
-        onMouseLeaveHandler?.();
+        onMouseLeaveHandler?.(e);
       }}
       className={cn(
         "min-h-[80px] p-2 transition-all duration-300 relative overflow-hidden",

@@ -30,27 +30,45 @@ const createPointerDownEvent = (
   clientY: number,
   target?: Element,
   pointerType: "mouse" | "touch" | "pen" = "mouse",
-) =>
-  ({
+) => {
+  let defaultPrevented = false;
+  const preventDefault = vi.fn(() => {
+    defaultPrevented = true;
+  });
+
+  return {
     pointerType,
     button: 0,
     clientY,
     target: target ?? document.createElement("div"),
-    preventDefault: vi.fn(),
+    get defaultPrevented() {
+      return defaultPrevented;
+    },
+    preventDefault,
     stopPropagation: vi.fn(),
-  }) as unknown as React.PointerEvent<HTMLElement>;
+  } as unknown as React.PointerEvent<HTMLElement>;
+};
 
 const createTouchEvent = (
   y: number,
   target?: Element,
-): React.TouchEvent<HTMLElement> =>
-  ({
+) => {
+  let defaultPrevented = false;
+  const preventDefault = vi.fn(() => {
+    defaultPrevented = true;
+  });
+
+  return {
     touches: [{ clientX: 0, clientY: y }],
     changedTouches: [{ clientX: 0, clientY: y }],
     target: target ?? document.createElement("div"),
-    preventDefault: vi.fn(),
+    get defaultPrevented() {
+      return defaultPrevented;
+    },
+    preventDefault,
     stopPropagation: vi.fn(),
-  }) as unknown as React.TouchEvent<HTMLElement>;
+  } as unknown as React.TouchEvent<HTMLElement>;
+};
 
 const dispatchPointerMove = (clientY: number) => {
   const event = new Event("pointermove") as PointerEvent;
@@ -170,6 +188,30 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-row", "09:20");
+  });
+
+  it("does not double-start when capture and bubble handlers receive the same start event", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const rowProps = result.current.getRowDragProps("task-capture-bubble", "09:00");
+    const pointerEvent = createPointerDownEvent(120);
+    act(() => {
+      rowProps.onPointerDownCapture?.(pointerEvent);
+      rowProps.onPointerDown(pointerEvent);
+      dispatchPointerMove(140);
+      dispatchPointerUp();
+    });
+
+    expect(pointerEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(onDrop).toHaveBeenCalledTimes(1);
+    expect(onDrop).toHaveBeenCalledWith("task-capture-bubble", "09:20");
   });
 
   it("starts drag from touch pointerdown events", () => {

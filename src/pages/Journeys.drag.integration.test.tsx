@@ -36,6 +36,16 @@ const mocks = vi.hoisted(() => ({
   pendingRecurringCount: 0,
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
   lastDatePillSelectedDate: null as Date | null,
+  dailyTasks: [] as Array<{
+    id: string;
+    task_text: string;
+    completed: boolean;
+    xp_reward: number;
+    task_date: string;
+    scheduled_time: string;
+    difficulty: string;
+    is_main_quest: boolean;
+  }>,
 }));
 
 vi.mock("@/components/PageTransition", () => ({
@@ -231,18 +241,7 @@ vi.mock("@/hooks/useTaskCompletionWithInteraction", () => ({
 
 vi.mock("@/hooks/useDailyTasks", () => ({
   useDailyTasks: () => ({
-    tasks: [
-      {
-        id: "task-1",
-        task_text: "Morning focus",
-        completed: false,
-        xp_reward: 20,
-        task_date: "2026-02-13",
-        scheduled_time: "08:00",
-        difficulty: "medium",
-        is_main_quest: false,
-      },
-    ],
+    tasks: mocks.dailyTasks,
     isLoading: false,
     addTask: mocks.addTask,
     toggleTask: mocks.toggleTask,
@@ -250,8 +249,8 @@ vi.mock("@/hooks/useDailyTasks", () => ({
     deleteTask: mocks.deleteTask,
     restoreTask: mocks.restoreTask,
     moveTaskToDate: mocks.moveTaskToDate,
-    completedCount: 0,
-    totalCount: 1,
+    completedCount: mocks.dailyTasks.filter((task) => task.completed).length,
+    totalCount: mocks.dailyTasks.length,
     isAdding: false,
     isUpdating: false,
     isDeleting: false,
@@ -356,6 +355,18 @@ describe("Journeys row drag integration", () => {
     mocks.pendingRecurringCount = 0;
     mocks.calendarConnections = [];
     mocks.lastDatePillSelectedDate = null;
+    mocks.dailyTasks = [
+      {
+        id: "task-1",
+        task_text: "Morning focus",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-02-13",
+        scheduled_time: "08:00",
+        difficulty: "medium",
+        is_main_quest: false,
+      },
+    ];
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       writable: true,
@@ -408,6 +419,72 @@ describe("Journeys row drag integration", () => {
 
     expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
     expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+  });
+
+  it("updates only the dragged quest once when multiple quests are present", async () => {
+    mocks.dailyTasks = [
+      {
+        id: "task-1",
+        task_text: "Morning focus",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-02-13",
+        scheduled_time: "08:00",
+        difficulty: "medium",
+        is_main_quest: false,
+      },
+      {
+        id: "task-2",
+        task_text: "Deep work",
+        completed: false,
+        xp_reward: 30,
+        task_date: "2026-02-13",
+        scheduled_time: "10:00",
+        difficulty: "hard",
+        is_main_quest: false,
+      },
+    ];
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const rowTaskOne = await screen.findByTestId("timeline-row-task-1");
+    await screen.findByTestId("timeline-row-task-2");
+
+    act(() => {
+      fireEvent(rowTaskOne, createPointerDownEvent(100));
+      dispatchPointerMove(820);
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.updateTask).toHaveBeenCalledWith({
+      taskId: "task-1",
+      updates: { scheduled_time: "20:00" },
+    });
+    expect(mocks.updateTask).not.toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: "task-2" }),
+    );
+    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
   });
 
   it("skips polling and auto-surface side effects while tab is inactive", async () => {
