@@ -569,7 +569,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(windowScrollToSpy.mock.calls.length + elementScrollToSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
-  it("shows scheduled header without a dedicated drag-handle button", () => {
+  it("renders timeline without scheduled category header text", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -597,7 +597,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByText("Scheduled")).toBeInTheDocument();
+    expect(screen.queryByText("Scheduled")).not.toBeInTheDocument();
     expect(screen.getByTestId("scheduled-timeline-pane")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
   });
@@ -1857,8 +1857,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(
       within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
     ).toHaveTextContent("16:34");
-    expect(screen.getByTestId("timeline-now-pill")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:34 PM");
+    expect(screen.queryByTestId("timeline-now-pill")).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });
@@ -1937,12 +1936,12 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
     ).toHaveTextContent("07:12");
     expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
-    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("7:12 AM");
+    expect(screen.queryByTestId("timeline-now-pill")).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });
 
-  it("keeps the now pill visible for today even in the empty state", () => {
+  it("does not render a separate now chip in the empty state", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-14T16:34:00"));
 
@@ -1966,13 +1965,13 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByText("No tasks for this day")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-now-pill")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:34 PM");
+    expect(screen.queryByTestId("timeline-marker-now")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-now-pill")).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });
 
-  it("updates now pill timestamp every minute on today", () => {
+  it("updates now marker timestamp every minute on today", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-14T16:34:00"));
 
@@ -2003,18 +2002,22 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:34 PM");
+    expect(
+      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+    ).toHaveTextContent("16:34");
 
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
 
-    expect(screen.getByTestId("timeline-now-pill-time")).toHaveTextContent("4:35 PM");
+    expect(
+      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+    ).toHaveTextContent("16:35");
 
     vi.useRealTimers();
   });
 
-  it("shows now marker and now pill only on today", () => {
+  it("shows now marker only on today", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -2043,7 +2046,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
-    expect(screen.getByTestId("timeline-now-pill")).toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-now-pill")).not.toBeInTheDocument();
 
     rerender(
       <TodaysAgenda

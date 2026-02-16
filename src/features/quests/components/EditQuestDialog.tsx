@@ -25,7 +25,13 @@ import { QuestImageThumbnail } from "@/components/QuestImageThumbnail";
 import { QuestImagePicker } from "@/components/QuestImagePicker";
 import { useQuestImagePicker } from "@/hooks/useQuestImagePicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
-import { DIFFICULTY_COLORS, formatTime12, TIME_SLOTS, DURATION_OPTIONS } from "@/components/quest-shared";
+import {
+  DIFFICULTY_COLORS,
+  formatTime12,
+  TIME_SLOTS,
+  DURATION_OPTIONS,
+  getNextHalfHourTime,
+} from "@/components/quest-shared";
 import type { QuestDifficulty } from "../types";
 import {
   normalizeQuestDifficulty,
@@ -389,12 +395,7 @@ export function EditQuestDialog({
               <button
                 onClick={() => {
                   if (!scheduledTime) {
-                    const now = new Date();
-                    const rm = Math.ceil(now.getMinutes() / 5) * 5;
-                    const rounded = new Date(now);
-                    rounded.setMinutes(rm, 0, 0);
-                    if (rm >= 60) rounded.setHours(rounded.getHours() + 1, 0, 0, 0);
-                    setScheduledTime(format(rounded, "HH:mm"));
+                    setScheduledTime(getNextHalfHourTime());
                   }
                   setShowTimePicker(!showTimePicker);
                 }}
@@ -412,41 +413,51 @@ export function EditQuestDialog({
 
             {/* Time Wheel */}
             {showTimePicker && (
-              <div
-                ref={timeWheelRef}
-                className="relative h-[180px] overflow-y-auto rounded-xl bg-card border border-border/50 snap-y snap-mandatory scrollbar-none"
-                style={{ scrollbarWidth: "none" }}
-              >
-                <div className="sticky top-0 h-12 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none" />
-                <div className="flex flex-col items-center py-1">
-                  {TIME_SLOTS.map((slot) => {
-                    const isSelected = scheduledTime === slot;
-                    const selectedIdx = scheduledTime ? TIME_SLOTS.indexOf(scheduledTime) : -1;
-                    const slotIdx = TIME_SLOTS.indexOf(slot);
-                    const distance = selectedIdx >= 0 ? Math.abs(slotIdx - selectedIdx) : 0;
-                    const opacity = isSelected ? 1 : Math.max(0.25, 1 - distance * 0.15);
+              <div className="space-y-2">
+                <Input
+                  aria-label="Custom quest time"
+                  type="time"
+                  step={60}
+                  value={scheduledTime || ""}
+                  onChange={(event) => setScheduledTime(event.target.value || null)}
+                  className="h-10"
+                />
+                <div
+                  ref={timeWheelRef}
+                  className="relative h-[180px] overflow-y-auto rounded-xl bg-card border border-border/50 snap-y snap-mandatory scrollbar-none"
+                  style={{ scrollbarWidth: "none" }}
+                >
+                  <div className="sticky top-0 h-12 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none" />
+                  <div className="flex flex-col items-center py-1">
+                    {TIME_SLOTS.map((slot) => {
+                      const isSelected = scheduledTime === slot;
+                      const selectedIdx = scheduledTime ? TIME_SLOTS.indexOf(scheduledTime) : -1;
+                      const slotIdx = TIME_SLOTS.indexOf(slot);
+                      const distance = selectedIdx >= 0 ? Math.abs(slotIdx - selectedIdx) : 0;
+                      const opacity = isSelected ? 1 : Math.max(0.25, 1 - distance * 0.15);
 
-                    return (
-                      <button
-                        key={slot}
-                        ref={isSelected ? selectedTimeRef : undefined}
-                        onClick={() => setScheduledTime(slot)}
-                        className={cn(
-                          "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",
-                          isSelected
-                            ? cn(colors.pill, "text-white shadow-lg scale-[1.02]")
-                            : "text-foreground hover:bg-muted/50"
-                        )}
-                        style={{ opacity: isSelected ? 1 : opacity }}
-                      >
-                        {isSelected && endTime
-                          ? `${formatTime12(slot)} – ${formatTime12(endTime)}`
-                          : formatTime12(slot)}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={slot}
+                          ref={isSelected ? selectedTimeRef : undefined}
+                          onClick={() => setScheduledTime(slot)}
+                          className={cn(
+                            "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",
+                            isSelected
+                              ? cn(colors.pill, "text-white shadow-lg scale-[1.02]")
+                              : "text-foreground hover:bg-muted/50"
+                          )}
+                          style={{ opacity: isSelected ? 1 : opacity }}
+                        >
+                          {isSelected && endTime
+                            ? `${formatTime12(slot)} – ${formatTime12(endTime)}`
+                            : formatTime12(slot)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
                 </div>
-                <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
               </div>
             )}
 

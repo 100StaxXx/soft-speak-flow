@@ -100,6 +100,54 @@ describe("AddQuestSheet", () => {
     expect(createButton).toBeEnabled();
   });
 
+  it("shows full-day half-hour quick-pick times in the time picker", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+
+    expect(screen.getByText("12:00 AM")).toBeInTheDocument();
+    expect(screen.getByText("12:30 AM")).toBeInTheDocument();
+    expect(screen.getByText("11:30 PM")).toBeInTheDocument();
+  });
+
+  it("submits custom manual time values outside quick-pick increments", async () => {
+    const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
+      .mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Custom time quest" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    fireEvent.change(screen.getByLabelText("Custom quest time"), {
+      target: { value: "11:17" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onAdd.mock.calls[0]?.[0]).toMatchObject({
+      scheduledTime: "11:17",
+    });
+  });
+
   it("sends inbox payload with null date/time when adding to inbox", async () => {
     const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
       .mockResolvedValue(undefined);

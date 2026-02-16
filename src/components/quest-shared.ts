@@ -22,12 +22,26 @@ export function formatTime12(time24: string): string {
 
 export function generateTimeSlots(): string[] {
   const slots: string[] = [];
-  for (let h = 6; h < 24; h++) {
-    for (let m = 0; m < 60; m += 5) {
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
       slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     }
   }
   return slots;
+}
+
+export function getNextHalfHourTime(baseDate: Date = new Date()): string {
+  const rounded = new Date(baseDate);
+  rounded.setSeconds(0, 0);
+
+  const minutes = rounded.getMinutes();
+  const remainder = minutes % 30;
+
+  if (remainder !== 0) {
+    rounded.setMinutes(minutes + (30 - remainder));
+  }
+
+  return `${String(rounded.getHours()).padStart(2, "0")}:${String(rounded.getMinutes()).padStart(2, "0")}`;
 }
 
 export const TIME_SLOTS = generateTimeSlots();

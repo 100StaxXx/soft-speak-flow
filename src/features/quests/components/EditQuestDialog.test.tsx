@@ -117,4 +117,36 @@ describe("EditQuestDialog", () => {
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("saves manual custom time values from the time picker", async () => {
+    const onOpenChange = vi.fn();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={onOpenChange}
+        onSave={onSave}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "9:30 AM" }));
+    fireEvent.change(screen.getByLabelText("Custom quest time"), {
+      target: { value: "11:17" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(
+      "task-1",
+      expect.objectContaining({
+        scheduled_time: "11:17",
+      }),
+    );
+  });
 });

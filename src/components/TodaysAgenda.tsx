@@ -576,7 +576,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
-  const scheduledHeaderRef = useRef<HTMLDivElement | null>(null);
   const scheduledPaneRef = useRef<HTMLDivElement | null>(null);
   const [scheduledPaneMaxHeightPx, setScheduledPaneMaxHeightPx] = useState<number | null>(null);
   const setScheduledPaneNode = useCallback((node: HTMLDivElement | null) => {
@@ -933,12 +932,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const viewportTopInset = viewport?.offsetTop ?? 0;
       const viewportBottom = viewportTopInset + viewportHeight;
       const paneRect = scheduledPaneRef.current?.getBoundingClientRect();
-      const headerRect = scheduledHeaderRef.current?.getBoundingClientRect();
       const navRect = document
         .querySelector('nav[aria-label="Main navigation"]')
         ?.getBoundingClientRect();
 
-      const timelineTopBound = paneRect?.top ?? headerRect?.bottom ?? viewportTopInset;
+      const timelineTopBound = paneRect?.top ?? viewportTopInset;
       const navTopBound = navRect?.top ?? (viewportBottom - dragOverlayBottomInsetRef.current);
 
       const minTop = Math.max(viewportTopInset, timelineTopBound) + DRAG_OVERLAY_TOP_PADDING_PX;
@@ -1125,15 +1123,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     if (typeof window === "undefined") return;
 
     const updateScheduledPaneBounds = () => {
-      const header = scheduledHeaderRef.current;
-      if (!header) {
+      const pane = scheduledPaneRef.current;
+      if (!pane) {
         setScheduledPaneMaxHeightPx(null);
         return;
       }
 
       const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
       const bottomOffset = getBottomNavSafeOffsetPx();
-      const available = Math.floor(viewportHeight - header.getBoundingClientRect().bottom - bottomOffset);
+      const available = Math.floor(viewportHeight - pane.getBoundingClientRect().top - bottomOffset);
       if (!Number.isFinite(available)) return;
       setScheduledPaneMaxHeightPx(Math.max(120, available));
     };
@@ -1829,23 +1827,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           )}
         </AnimatePresence>
 
-        {isTodaySelected && (
-          <div className="sticky top-2 z-20 mb-3 pointer-events-none" data-testid="timeline-now-pill">
-            <div className="inline-flex items-center gap-2 rounded-full border border-stardust-gold/35 bg-background/75 px-2.5 py-1 shadow-[0_6px_16px_-10px_rgba(225,177,59,0.7)] backdrop-blur-sm">
-              <span className="h-3.5 w-[3px] rounded-full bg-stardust-gold/80" aria-hidden />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stardust-gold/90">
-                Now
-              </span>
-              <span
-                className="text-xs font-bold tabular-nums text-stardust-gold"
-                data-testid="timeline-now-pill-time"
-              >
-                {formatTime(minuteToTime(nowMarkerMinute))}
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Timeline Content */}
         {tasks.length === 0 ? (
           <div className="text-center py-6">
@@ -1910,13 +1891,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {/* Scheduled Tasks Timeline */}
             {timelineRows.length > 0 && (
               <div>
-                <div ref={scheduledHeaderRef} className="flex items-center gap-2 pb-2">
-                  <div className="w-9 flex-shrink-0" />
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Scheduled
-                  </span>
-                </div>
-
                 <div
                   ref={setScheduledPaneNode}
                   className="overflow-y-auto overscroll-contain pr-1"
@@ -1951,16 +1925,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             showLine={index > 0}
                             isLast={index === timelineRows.length - 1}
                           >
-                            {marker.kind === "now" ? (
-                              <div className="pt-1">
-                                <span className="inline-flex items-center gap-1 rounded-full border border-stardust-gold/35 bg-stardust-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stardust-gold">
-                                  <span>Now</span>
-                                  <span className="tabular-nums">{formatTime(marker.time)}</span>
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="pt-1" />
-                            )}
+                            <div className="pt-1" />
                           </TimelineTaskRow>
                         </div>
                       );

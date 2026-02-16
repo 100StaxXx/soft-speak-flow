@@ -45,6 +45,7 @@ export function TimelineTaskRow({
   const isOverridden = overrideTime != null;
   const isNowTone = tone === "now";
   const isTaskRow = rowKind === "task";
+  const isMarkerRow = rowKind === "marker";
   const showTimelineMetadata = isTaskRow && !!displayTime;
 
   return (
@@ -56,7 +57,7 @@ export function TimelineTaskRow({
       {...rootProps}
     >
       {/* Time label column - fixed width */}
-      <div className="w-9 flex-shrink-0 pt-[22px] text-left">
+      <div className={cn("w-9 flex-shrink-0 text-left", isMarkerRow ? "pt-[8px]" : "pt-[22px]")}>
         {displayTime ? (
           <span className={cn(
             "text-[10px] font-medium leading-none transition-colors",
@@ -76,7 +77,7 @@ export function TimelineTaskRow({
       </div>
 
       {/* Task card */}
-      <div className="flex-1 min-w-0 py-1">
+      <div className={cn("flex-1 min-w-0", isMarkerRow ? "py-0" : "py-1")}>
         {children}
       </div>
     </div>
