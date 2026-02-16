@@ -8,6 +8,7 @@ describe("TimelineTaskRow", () => {
     const { container } = render(
       <TimelineTaskRow
         time="09:00"
+        durationMinutes={30}
         laneCount={3}
         laneIndex={1}
         overlapCount={2}
@@ -26,6 +27,18 @@ describe("TimelineTaskRow", () => {
     expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
     expect(container.querySelector(".border-l")).toBeNull();
     expect(container.querySelector(".w-2.h-2.rounded-full")).toBeNull();
+  });
+
+  it("does not forward durationMinutes to the DOM", () => {
+    const { container } = render(
+      <TimelineTaskRow time="09:00" durationMinutes={45}>
+        <div>Quest</div>
+      </TimelineTaskRow>,
+    );
+
+    const root = container.firstElementChild;
+    expect(root).not.toHaveAttribute("durationminutes");
+    expect(root).not.toHaveAttribute("durationMinutes");
   });
 
   it("keeps override preview styling unchanged in default tone", () => {

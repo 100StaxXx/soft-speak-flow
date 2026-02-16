@@ -31,6 +31,7 @@ export function TimelineTaskRow({
   label,
   rowKind = "task",
   tone = "default",
+  durationMinutes: _durationMinutes,
   laneIndex = 0,
   laneCount = 1,
   overlapCount = 0,

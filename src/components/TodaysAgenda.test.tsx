@@ -1433,6 +1433,43 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(onDeleteQuest).not.toHaveBeenCalled();
   });
 
+  it("keeps quest actions visible on touch layouts while preserving desktop hover/focus reveal classes", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        onDeleteQuest={vi.fn()}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const actionTrigger = screen.getByLabelText("Quest actions");
+    expect(actionTrigger).toHaveClass("opacity-100");
+    expect(actionTrigger).toHaveClass("md:opacity-0");
+    expect(actionTrigger).toHaveClass("md:group-hover:opacity-100");
+    expect(actionTrigger).toHaveClass("md:group-focus-within:opacity-100");
+    expect(actionTrigger).toHaveClass("md:focus-visible:opacity-100");
+  });
+
   it("shows the row action trigger when move-to-tomorrow is available", () => {
     const queryClient = new QueryClient({
       defaultOptions: {

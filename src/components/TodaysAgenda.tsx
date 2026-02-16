@@ -373,10 +373,10 @@ const buildPlaceholderMinutes = (
     const remainder = normalizeModulo(scheduledMinute, PLACEHOLDER_INTERVAL_MINUTES);
     const isOnBoundary = remainder === 0;
 
-    let lowerAnchor = isOnBoundary
+    const lowerAnchor = isOnBoundary
       ? scheduledMinute - PLACEHOLDER_INTERVAL_MINUTES
       : scheduledMinute - remainder;
-    let upperAnchor = isOnBoundary
+    const upperAnchor = isOnBoundary
       ? scheduledMinute + PLACEHOLDER_INTERVAL_MINUTES
       : lowerAnchor + PLACEHOLDER_INTERVAL_MINUTES;
 
@@ -1546,7 +1546,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     aria-label="Quest actions"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 -m-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
+                    className="h-9 w-9 -m-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 transition-opacity touch-manipulation"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <MoreHorizontal className="w-4 h-4" />
