@@ -88,8 +88,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [sendToCalendar, setSendToCalendar] = useState(false);
 
   const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
-  const effectiveProvider = defaultProvider || connections[0]?.provider || null;
-  const canShowCalendarSendOption = Boolean(integrationVisible && effectiveProvider);
+  const effectiveProvider = useMemo(() => {
+    const connectedDefaultProvider = defaultProvider
+      ? connections.find((connection) => connection.provider === defaultProvider)?.provider ?? null
+      : null;
+    return connectedDefaultProvider || connections[0]?.provider || null;
+  }, [connections, defaultProvider]);
+  const canShowCalendarSendOption = Boolean(integrationVisible && connections.length > 0 && effectiveProvider);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const timeWheelRef = useRef<HTMLDivElement>(null);

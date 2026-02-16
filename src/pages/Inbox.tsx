@@ -12,12 +12,14 @@ import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { DraggableFAB } from "@/components/DraggableFAB";
 import { AddQuestSheet, type AddQuestData } from "@/components/AddQuestSheet";
 import { EditQuestDialog } from "@/features/quests/components/EditQuestDialog";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { haptics } from "@/utils/haptics";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
+import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -25,6 +27,7 @@ const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const InboxPage = memo(function InboxPage() {
   const prefersReducedMotion = useReducedMotion();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { isTabActive } = useMainTabVisibility();
   const queryClient = useQueryClient();
@@ -39,8 +42,19 @@ const InboxPage = memo(function InboxPage() {
   const { sendTaskToCalendar, syncTaskUpdate, syncTaskDelete, hasLinkedEvent } = useQuestCalendarSync({
     enabled: isTabActive,
   });
+  const { connections: calendarConnections } = useCalendarIntegrations({ enabled: isTabActive });
 
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+    const routeToCalendarPreferences = () => {
+      toast.error("No calendar connected. Opening Preferences...");
+      navigate("/profile", { state: { openTab: "preferences" } });
+    };
+
+    if (calendarConnections.length === 0) {
+      routeToCalendarPreferences();
+      return;
+    }
+
     let taskDateOverride: string | undefined;
     let scheduledTimeOverride: string | undefined;
 
@@ -62,8 +76,17 @@ const InboxPage = memo(function InboxPage() {
       return;
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+      if (message.includes("NO_CALENDAR_CONNECTION")) {
+        routeToCalendarPreferences();
+        return;
+      }
 
       for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+        if (message.includes("NO_CALENDAR_CONNECTION")) {
+          routeToCalendarPreferences();
+          return;
+        }
+
         if (message.includes("TASK_DATE_REQUIRED") && !taskDateOverride) {
           const pickedDate = window.prompt(
             "Choose a date to send this quest (YYYY-MM-DD)",
@@ -91,6 +114,10 @@ const InboxPage = memo(function InboxPage() {
           return;
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (message.includes("NO_CALENDAR_CONNECTION")) {
+            routeToCalendarPreferences();
+            return;
+          }
           if (
             !message.includes("TASK_DATE_REQUIRED")
             && !message.includes("SCHEDULED_TIME_REQUIRED")
@@ -114,7 +141,7 @@ const InboxPage = memo(function InboxPage() {
 
       toast.error(message);
     }
-  }, [sendTaskToCalendar]);
+  }, [calendarConnections.length, navigate, sendTaskToCalendar]);
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     await updateTask({ taskId, updates });

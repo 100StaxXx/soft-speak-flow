@@ -105,8 +105,15 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
   };
 
   const resolveProvider = (provider?: CalendarProvider): CalendarProvider => {
-    if (provider) return provider;
-    if (defaultProvider) return defaultProvider;
+    if (provider) {
+      if (!getProviderConnection(provider)) {
+        throw new Error('NO_CALENDAR_CONNECTION');
+      }
+      return provider;
+    }
+    if (defaultProvider && getProviderConnection(defaultProvider)) {
+      return defaultProvider;
+    }
     const first = connections[0]?.provider;
     if (!first) throw new Error('NO_CALENDAR_CONNECTION');
     return first;

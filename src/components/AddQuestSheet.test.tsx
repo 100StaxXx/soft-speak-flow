@@ -167,4 +167,38 @@ describe("AddQuestSheet", () => {
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("hides send-to-calendar option when default provider is stale and no providers are connected", () => {
+    mocks.integrationVisible = true;
+    mocks.defaultProvider = "google";
+    mocks.connections = [];
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    expect(screen.queryByText(/Send to .* Calendar after create/i)).not.toBeInTheDocument();
+  });
+
+  it("shows connected provider label when default provider is stale", () => {
+    mocks.integrationVisible = true;
+    mocks.defaultProvider = "outlook";
+    mocks.connections = [{ provider: "google" }];
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
+  });
 });

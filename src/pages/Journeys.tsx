@@ -5,7 +5,7 @@ import { Compass } from "lucide-react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
@@ -65,6 +65,7 @@ interface CreatedCampaignData {
 const Journeys = () => {
   const prefersReducedMotion = useReducedMotion();
   const location = useLocation();
+  const navigate = useNavigate();
   const { isTabActive } = useMainTabVisibility();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
@@ -364,6 +365,16 @@ const Journeys = () => {
   }, [allCalendarTasks]);
 
   const handleSendTaskToCalendar = useCallback(async (taskId: string) => {
+    const routeToCalendarPreferences = () => {
+      toast.error("No calendar connected. Opening Preferences...");
+      navigate("/profile", { state: { openTab: "preferences" } });
+    };
+
+    if (calendarConnections.length === 0) {
+      routeToCalendarPreferences();
+      return;
+    }
+
     let taskDateOverride: string | undefined;
     let scheduledTimeOverride: string | undefined;
 
@@ -385,8 +396,17 @@ const Journeys = () => {
       return;
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+      if (message.includes("NO_CALENDAR_CONNECTION")) {
+        routeToCalendarPreferences();
+        return;
+      }
 
       for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+        if (message.includes("NO_CALENDAR_CONNECTION")) {
+          routeToCalendarPreferences();
+          return;
+        }
+
         if (message.includes("TASK_DATE_REQUIRED") && !taskDateOverride) {
           const pickedDate = window.prompt(
             "Choose a date to send this quest (YYYY-MM-DD)",
@@ -414,6 +434,10 @@ const Journeys = () => {
           return;
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (message.includes("NO_CALENDAR_CONNECTION")) {
+            routeToCalendarPreferences();
+            return;
+          }
           if (
             !message.includes("TASK_DATE_REQUIRED")
             && !message.includes("SCHEDULED_TIME_REQUIRED")
@@ -437,7 +461,7 @@ const Journeys = () => {
 
       toast.error(message);
     }
-  }, [selectedDate, sendTaskToCalendar]);
+  }, [calendarConnections.length, navigate, selectedDate, sendTaskToCalendar]);
 
   const handleAddQuest = useCallback(async (data: AddQuestData) => {
     const taskDate = data.sendToInbox

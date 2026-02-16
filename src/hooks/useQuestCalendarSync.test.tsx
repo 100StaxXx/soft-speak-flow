@@ -189,4 +189,76 @@ describe("useQuestCalendarSync", () => {
     expect((thrown as Error).message).toContain("SCHEDULED_TIME_REQUIRED");
     expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
   });
+
+  it("falls back to a connected provider when default provider is stale", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [
+        {
+          id: "conn-1",
+          provider: "google",
+          calendar_email: "user@example.com",
+          primary_calendar_id: "primary-calendar",
+          primary_calendar_name: "Primary Calendar",
+          sync_mode: "send_only",
+          sync_enabled: true,
+          platform: "web",
+          last_synced_at: null,
+        },
+      ],
+      defaultProvider: "outlook",
+    });
+    mocks.dailyTaskSingleMock.mockResolvedValueOnce({
+      data: {
+        id: "task-3",
+        task_text: "Fallback provider quest",
+        task_date: "2026-02-12",
+        scheduled_time: "09:00",
+        estimated_duration: 30,
+        location: null,
+        notes: null,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-3" });
+    });
+
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("google-calendar-events", {
+      body: {
+        action: "createLinkedEvent",
+        taskId: "task-3",
+        syncMode: "send_only",
+      },
+    });
+  });
+
+  it("throws NO_CALENDAR_CONNECTION when no providers are connected", async () => {
+    mocks.useCalendarIntegrationsMock.mockReturnValue({
+      connections: [],
+      defaultProvider: "google",
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+    await act(async () => {
+      try {
+        await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-4" });
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain("NO_CALENDAR_CONNECTION");
+    expect(mocks.dailyTaskSingleMock).not.toHaveBeenCalled();
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
+  });
 });
