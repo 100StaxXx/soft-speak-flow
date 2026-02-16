@@ -200,6 +200,8 @@ const GAP_MAX_PX = 10;
 const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
+const DRAG_OVERLAY_TOP_PADDING_PX = 8;
+const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
 
 interface DragOverlaySnapshot {
   taskId: string;
@@ -807,9 +809,25 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const viewport = window.visualViewport;
       const viewportHeight = viewport?.height ?? window.innerHeight;
       const viewportTopInset = viewport?.offsetTop ?? 0;
-      const minOffset = viewportTopInset - dragOverlaySnapshot.top;
-      const maxTop = viewportHeight - dragOverlayBottomInsetRef.current - dragOverlaySnapshot.height;
-      const maxOffset = Math.max(minOffset, maxTop - dragOverlaySnapshot.top);
+      const viewportBottom = viewportTopInset + viewportHeight;
+      const paneRect = scheduledPaneRef.current?.getBoundingClientRect();
+      const headerRect = scheduledHeaderRef.current?.getBoundingClientRect();
+      const navRect = document
+        .querySelector('nav[aria-label="Main navigation"]')
+        ?.getBoundingClientRect();
+
+      const timelineTopBound = paneRect?.top ?? headerRect?.bottom ?? viewportTopInset;
+      const navTopBound = navRect?.top ?? (viewportBottom - dragOverlayBottomInsetRef.current);
+
+      const minTop = Math.max(viewportTopInset, timelineTopBound) + DRAG_OVERLAY_TOP_PADDING_PX;
+      const maxTop = Math.min(
+        navTopBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX,
+        viewportBottom - dragOverlayBottomInsetRef.current - dragOverlaySnapshot.height,
+      );
+      const safeMaxTop = Math.max(minTop, maxTop);
+
+      const minOffset = minTop - dragOverlaySnapshot.top;
+      const maxOffset = safeMaxTop - dragOverlaySnapshot.top;
       const clampedOffset = Math.max(minOffset, Math.min(maxOffset, rawOffsetY));
       dragOverlayOffsetY.set(clampedOffset);
     };
