@@ -203,7 +203,25 @@ const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
 const DRAG_OVERLAY_TOP_PADDING_PX = 8;
 const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
 const EDGE_HOLD_ACTIVATION_MS = 220;
-const EDGE_HOLD_REPEAT_MS = 180;
+const EDGE_HOLD_PIN_THRESHOLD_PX = 0.5;
+const EDGE_HOLD_NEAR_MAX_OVERSHOOT_PX = 24;
+const EDGE_HOLD_MEDIUM_MAX_OVERSHOOT_PX = 72;
+const EDGE_HOLD_NEAR_REPEAT_MS = 180;
+const EDGE_HOLD_MEDIUM_REPEAT_MS = 140;
+const EDGE_HOLD_FAR_REPEAT_MS = 110;
+
+const resolveEdgeHoldRepeatMs = (overshootPx: number): number | null => {
+  if (!Number.isFinite(overshootPx) || overshootPx <= EDGE_HOLD_PIN_THRESHOLD_PX) {
+    return null;
+  }
+  if (overshootPx <= EDGE_HOLD_NEAR_MAX_OVERSHOOT_PX) {
+    return EDGE_HOLD_NEAR_REPEAT_MS;
+  }
+  if (overshootPx <= EDGE_HOLD_MEDIUM_MAX_OVERSHOOT_PX) {
+    return EDGE_HOLD_MEDIUM_REPEAT_MS;
+  }
+  return EDGE_HOLD_FAR_REPEAT_MS;
+};
 
 interface DragOverlaySnapshot {
   taskId: string;
@@ -740,8 +758,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const dragOverlayOffsetY = useMotionValue(0);
   const dragOverlayBottomInsetRef = useRef(DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX);
   const edgeHoldDirectionRef = useRef<-1 | 0 | 1>(0);
+  const edgeHoldRepeatMsRef = useRef<number | null>(null);
   const edgeHoldActivationTimeoutRef = useRef<number | null>(null);
   const edgeHoldRepeatIntervalRef = useRef<number | null>(null);
+  const edgeHoldIsActiveRef = useRef(false);
 
   const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
   const isTodaySelected = isSameDay(selectedDate, new Date());
@@ -778,38 +798,86 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   }, []);
 
-  const syncEdgeHoldDirection = useCallback(
-    (nextDirection: -1 | 0 | 1) => {
-      if (edgeHoldDirectionRef.current === nextDirection) return;
+  const stopEdgeHold = useCallback(() => {
+    edgeHoldDirectionRef.current = 0;
+    edgeHoldRepeatMsRef.current = null;
+    edgeHoldIsActiveRef.current = false;
+    clearEdgeHoldActivationTimer();
+    clearEdgeHoldRepeatTimer();
+  }, [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer]);
 
-      edgeHoldDirectionRef.current = nextDirection;
-      clearEdgeHoldActivationTimer();
+  const startEdgeHoldInterval = useCallback(
+    (direction: -1 | 1, repeatMs: number) => {
       clearEdgeHoldRepeatTimer();
-
-      if (nextDirection === 0 || !timelineDrag.isDragging) {
-        return;
-      }
-
-      edgeHoldActivationTimeoutRef.current = window.setTimeout(() => {
-        edgeHoldActivationTimeoutRef.current = null;
-        if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== nextDirection) {
+      edgeHoldIsActiveRef.current = true;
+      edgeHoldRepeatIntervalRef.current = window.setInterval(() => {
+        if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== direction) {
+          edgeHoldIsActiveRef.current = false;
+          clearEdgeHoldRepeatTimer();
           return;
         }
 
-        edgeHoldRepeatIntervalRef.current = window.setInterval(() => {
+        const nudged = timelineDrag.nudgeByFineStep(direction);
+        if (!nudged) {
+          edgeHoldIsActiveRef.current = false;
+          clearEdgeHoldRepeatTimer();
+        }
+      }, repeatMs);
+    },
+    [clearEdgeHoldRepeatTimer, timelineDrag.isDragging, timelineDrag.nudgeByFineStep],
+  );
+
+  const syncEdgeHoldState = useCallback(
+    (nextDirection: -1 | 0 | 1, nextRepeatMs: number | null) => {
+      if (!timelineDrag.isDragging || nextDirection === 0 || nextRepeatMs === null) {
+        stopEdgeHold();
+        return;
+      }
+
+      const previousDirection = edgeHoldDirectionRef.current;
+      const previousRepeatMs = edgeHoldRepeatMsRef.current;
+      const directionChanged = previousDirection !== nextDirection;
+      const repeatChanged = previousRepeatMs !== nextRepeatMs;
+
+      edgeHoldDirectionRef.current = nextDirection;
+      edgeHoldRepeatMsRef.current = nextRepeatMs;
+
+      if (directionChanged) {
+        edgeHoldIsActiveRef.current = false;
+        clearEdgeHoldActivationTimer();
+        clearEdgeHoldRepeatTimer();
+
+        edgeHoldActivationTimeoutRef.current = window.setTimeout(() => {
+          edgeHoldActivationTimeoutRef.current = null;
           if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== nextDirection) {
-            clearEdgeHoldRepeatTimer();
             return;
           }
 
-          const nudged = timelineDrag.nudgeByFineStep(nextDirection);
-          if (!nudged) {
-            clearEdgeHoldRepeatTimer();
+          const activeRepeatMs = edgeHoldRepeatMsRef.current;
+          if (activeRepeatMs === null) {
+            stopEdgeHold();
+            return;
           }
-        }, EDGE_HOLD_REPEAT_MS);
-      }, EDGE_HOLD_ACTIVATION_MS);
+          startEdgeHoldInterval(nextDirection, activeRepeatMs);
+        }, EDGE_HOLD_ACTIVATION_MS);
+        return;
+      }
+
+      if (!edgeHoldIsActiveRef.current) {
+        return;
+      }
+
+      if (repeatChanged) {
+        startEdgeHoldInterval(nextDirection, nextRepeatMs);
+      }
     },
-    [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer, timelineDrag.isDragging, timelineDrag.nudgeByFineStep],
+    [
+      clearEdgeHoldActivationTimer,
+      clearEdgeHoldRepeatTimer,
+      startEdgeHoldInterval,
+      stopEdgeHold,
+      timelineDrag.isDragging,
+    ],
   );
 
   useLayoutEffect(() => {
@@ -855,7 +923,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   useEffect(() => {
     if (!timelineDrag.isDragging || !dragOverlaySnapshot) {
       dragOverlayOffsetY.set(0);
-      syncEdgeHoldDirection(0);
+      stopEdgeHold();
       return;
     }
 
@@ -886,8 +954,13 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       dragOverlayOffsetY.set(clampedOffset);
 
       const clampDelta = rawOffsetY - clampedOffset;
-      const pinnedDirection: -1 | 0 | 1 = clampDelta > 0.5 ? 1 : clampDelta < -0.5 ? -1 : 0;
-      syncEdgeHoldDirection(pinnedDirection);
+      const pinnedDirection: -1 | 0 | 1 = clampDelta > EDGE_HOLD_PIN_THRESHOLD_PX
+        ? 1
+        : clampDelta < -EDGE_HOLD_PIN_THRESHOLD_PX
+          ? -1
+          : 0;
+      const repeatMs = resolveEdgeHoldRepeatMs(Math.abs(clampDelta));
+      syncEdgeHoldState(pinnedDirection, repeatMs);
     };
 
     clampDragOffset(dragVisualOffsetY.get());
@@ -900,27 +973,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
     return () => {
       unsubscribe();
-      syncEdgeHoldDirection(0);
+      stopEdgeHold();
       window.removeEventListener("resize", handleViewportChange);
       window.visualViewport?.removeEventListener("resize", handleViewportChange);
       window.visualViewport?.removeEventListener("scroll", handleViewportChange);
     };
-  }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, syncEdgeHoldDirection, timelineDrag.isDragging]);
+  }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineDrag.isDragging]);
 
   useEffect(() => {
     if (timelineDrag.isDragging) return;
-    edgeHoldDirectionRef.current = 0;
-    clearEdgeHoldActivationTimer();
-    clearEdgeHoldRepeatTimer();
-  }, [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer, timelineDrag.isDragging]);
+    stopEdgeHold();
+  }, [stopEdgeHold, timelineDrag.isDragging]);
 
   useEffect(() => {
     return () => {
-      edgeHoldDirectionRef.current = 0;
-      clearEdgeHoldActivationTimer();
-      clearEdgeHoldRepeatTimer();
+      stopEdgeHold();
     };
-  }, [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer]);
+  }, [stopEdgeHold]);
 
   useEffect(() => {
     if (!isTodaySelected) return;
