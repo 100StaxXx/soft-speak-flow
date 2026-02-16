@@ -995,7 +995,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
   });
 
-  it("caps large scheduled gaps to compact spacing", () => {
+  it("removes added spacing between scheduled rows", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1033,7 +1033,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const secondRow = screen.getByTestId("timeline-row-task-scheduled-2").parentElement;
     expect(secondRow).toBeTruthy();
     const marginTop = Number.parseFloat(secondRow?.style.marginTop || "0");
-    expect(marginTop).toBeLessThanOrEqual(10);
+    expect(marginTop).toBe(0);
   });
 
   it("uses drag preview time in timeline row during active drag", () => {
@@ -1937,6 +1937,44 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1500")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1800")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("renders marker containers as zero-height while keeping marker timestamps visible", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T16:34:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const nowMarker = screen.getByTestId("timeline-marker-now");
+    expect(nowMarker).toHaveClass("h-0", "overflow-visible");
+    expect(within(nowMarker).getByTestId("timeline-row-time")).toHaveTextContent("16:34");
 
     vi.useRealTimers();
   });

@@ -194,9 +194,6 @@ const DAY_END_MINUTE = (24 * 60) - 1;
 const PLACEHOLDER_INTERVAL_MINUTES = 3 * 60;
 const MIN_PLACEHOLDER_EMPHASIS = 0.2;
 const MAX_PLACEHOLDER_EMPHASIS = 1;
-const GAP_FREE_MINUTES = 60;
-const GAP_SCALE = 0.05;
-const GAP_MAX_PX = 10;
 const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
@@ -292,13 +289,6 @@ const normalizeModulo = (value: number, divisor: number) => ((value % divisor) +
 
 const getLaneOffsetPx = (laneIndex: number, overlapCount: number) => {
   return overlapCount > 0 ? laneIndex * LANE_OFFSET_STEP_PX : 0;
-};
-
-const getScheduledSpacingPx = (gapBeforeMinutes: number) => {
-  return Math.min(
-    GAP_MAX_PX,
-    Math.max(0, (gapBeforeMinutes - GAP_FREE_MINUTES) * GAP_SCALE),
-  );
 };
 
 const getHourlyPlaceholderCandidatesBetween = (
@@ -982,15 +972,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const handleViewportChange = () => clampDragOffset(dragVisualOffsetY.get());
 
     window.addEventListener("resize", handleViewportChange);
-    window.visualViewport?.addEventListener("resize", handleViewportChange);
-    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+    const viewport = window.visualViewport;
+    const canListenToViewport = !!viewport
+      && typeof viewport.addEventListener === "function"
+      && typeof viewport.removeEventListener === "function";
+    if (canListenToViewport) {
+      viewport.addEventListener("resize", handleViewportChange);
+      viewport.addEventListener("scroll", handleViewportChange);
+    }
 
     return () => {
       unsubscribe();
       stopEdgeHold();
       window.removeEventListener("resize", handleViewportChange);
-      window.visualViewport?.removeEventListener("resize", handleViewportChange);
-      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+      if (canListenToViewport) {
+        viewport.removeEventListener("resize", handleViewportChange);
+        viewport.removeEventListener("scroll", handleViewportChange);
+      }
     };
   }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineDrag.isDragging]);
 
@@ -1155,14 +1153,22 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const rafId = window.requestAnimationFrame(updateScheduledPaneBounds);
     updateScheduledPaneBounds();
     window.addEventListener("resize", updateScheduledPaneBounds);
-    window.visualViewport?.addEventListener("resize", updateScheduledPaneBounds);
-    window.visualViewport?.addEventListener("scroll", updateScheduledPaneBounds);
+    const viewport = window.visualViewport;
+    const canListenToViewport = !!viewport
+      && typeof viewport.addEventListener === "function"
+      && typeof viewport.removeEventListener === "function";
+    if (canListenToViewport) {
+      viewport.addEventListener("resize", updateScheduledPaneBounds);
+      viewport.addEventListener("scroll", updateScheduledPaneBounds);
+    }
 
     return () => {
       window.cancelAnimationFrame(rafId);
       window.removeEventListener("resize", updateScheduledPaneBounds);
-      window.visualViewport?.removeEventListener("resize", updateScheduledPaneBounds);
-      window.visualViewport?.removeEventListener("scroll", updateScheduledPaneBounds);
+      if (canListenToViewport) {
+        viewport.removeEventListener("resize", updateScheduledPaneBounds);
+        viewport.removeEventListener("scroll", updateScheduledPaneBounds);
+      }
     };
   }, [comboCount, hasRenderableNowMarker, isTodaySelected, tasks.length, timelineRows.length]);
 
@@ -1924,25 +1930,28 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         : 1;
                       return (
                         <div
-                          ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
                           key={marker.id}
-                          className="pointer-events-none select-none"
-                          style={{
-                            opacity: markerOpacity,
-                            transform: `scale(${markerScale})`,
-                            transformOrigin: "left center",
-                          }}
+                          className="pointer-events-none select-none h-0 overflow-visible"
                           data-testid={marker.id}
                         >
-                          <TimelineTaskRow
-                            rowKind="marker"
-                            time={marker.time}
-                            tone={marker.kind === "now" ? "now" : "default"}
-                            showLine={index > 0}
-                            isLast={index === timelineRows.length - 1}
+                          <div
+                            ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
+                            style={{
+                              opacity: markerOpacity,
+                              transform: `scale(${markerScale})`,
+                              transformOrigin: "left center",
+                            }}
                           >
-                            <div className="h-1" />
-                          </TimelineTaskRow>
+                            <TimelineTaskRow
+                              rowKind="marker"
+                              time={marker.time}
+                              tone={marker.kind === "now" ? "now" : "default"}
+                              showLine={index > 0}
+                              isLast={index === timelineRows.length - 1}
+                            >
+                              <div className="h-px" />
+                            </TimelineTaskRow>
+                          </div>
                         </div>
                       );
                     }
@@ -1957,9 +1966,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     const laneCount = rowFlow?.laneCount;
                     const laneOffsetPx = rowFlow
                       ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
-                      : 0;
-                    const scheduledSpacingPx = rowFlow
-                      ? getScheduledSpacingPx(rowFlow.gapBeforeMinutes)
                       : 0;
                     const timelineRowDragProps = task.scheduled_time && !task.completed
                       ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
@@ -1981,7 +1987,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       borderRadius: isThisDragging && !usesOverlayPlaceholder ? 12 : 0,
                       transition: 'none',
                       willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
-                      marginTop: scheduledSpacingPx,
                     };
 
                     const rowContent = (

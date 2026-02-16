@@ -22,7 +22,7 @@ describe("TimelineTaskRow", () => {
     expect(root).toHaveAttribute("data-timeline-lane-count", "3");
     expect(root).toHaveAttribute("data-timeline-overlap", "2");
     expect(root?.firstElementChild).toHaveClass("pt-[22px]");
-    expect(root?.lastElementChild).toHaveClass("py-1");
+    expect(root?.lastElementChild).toHaveClass("py-0");
     expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
     expect(container.querySelector(".border-l")).toBeNull();
     expect(container.querySelector(".w-2.h-2.rounded-full")).toBeNull();
