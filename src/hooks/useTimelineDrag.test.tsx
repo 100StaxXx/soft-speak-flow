@@ -397,6 +397,8 @@ describe("useTimelineDrag", () => {
       dispatchPointerMove(400);
     });
     expect(result.current.previewTime).toBe("23:59");
+    expect(result.current.dragOffsetY.get()).toBe(0);
+    expect(result.current.dragVisualOffsetY.get()).toBe(0);
     act(() => {
       dispatchPointerUp();
     });
@@ -408,6 +410,8 @@ describe("useTimelineDrag", () => {
       dispatchPointerMove(-300);
     });
     expect(result.current.previewTime).toBe("00:00");
+    expect(result.current.dragOffsetY.get()).toBe(0);
+    expect(result.current.dragVisualOffsetY.get()).toBe(0);
     act(() => {
       dispatchPointerUp();
     });

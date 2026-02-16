@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback, memo, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTimelineDrag } from "@/hooks/useTimelineDrag";
 import { format, differenceInDays, isSameDay } from "date-fns";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { toast } from "sonner";
 import { 
@@ -199,6 +200,14 @@ const GAP_MAX_PX = 10;
 const LANE_OFFSET_STEP_PX = 10;
 const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
+
+interface DragOverlaySnapshot {
+  taskId: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
 
 const getBottomNavSafeOffsetPx = () => {
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -721,6 +730,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       }
     },
   });
+  const dragVisualOffsetY = (timelineDrag.dragVisualOffsetY ?? timelineDrag.dragOffsetY) as MotionValue<number>;
+  const timelineRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [dragOverlaySnapshot, setDragOverlaySnapshot] = useState<DragOverlaySnapshot | null>(null);
+  const dragOverlayOffsetY = useMotionValue(0);
+  const dragOverlayBottomInsetRef = useRef(DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX);
 
   const [nowMarkerMinute, setNowMarkerMinute] = useState(() => parseTimeToMinute(format(new Date(), "HH:mm")) ?? 0);
   const isTodaySelected = isSameDay(selectedDate, new Date());
@@ -742,6 +756,79 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       onTimelineDragPreviewTimeChange?.(null);
     };
   }, [onTimelineDragPreviewTimeChange]);
+
+  useLayoutEffect(() => {
+    if (!timelineDrag.draggingTaskId) {
+      setDragOverlaySnapshot(null);
+      dragOverlayOffsetY.set(0);
+      return;
+    }
+
+    let frameId: number | null = null;
+
+    const captureSnapshot = () => {
+      const rowNode = timelineRowRefs.current.get(timelineDrag.draggingTaskId!);
+      if (!rowNode) return false;
+
+      const rect = rowNode.getBoundingClientRect();
+      const width = rect.width > 0 ? rect.width : rowNode.clientWidth || rowNode.offsetWidth || 1;
+      const height = rect.height > 0 ? rect.height : rowNode.clientHeight || rowNode.offsetHeight || 1;
+      setDragOverlaySnapshot({
+        taskId: timelineDrag.draggingTaskId!,
+        top: rect.top,
+        left: rect.left,
+        width,
+        height,
+      });
+      dragOverlayBottomInsetRef.current = getBottomNavSafeOffsetPx();
+      return true;
+    };
+
+    if (!captureSnapshot() && typeof window !== "undefined") {
+      frameId = window.requestAnimationFrame(() => {
+        captureSnapshot();
+      });
+    }
+
+    return () => {
+      if (frameId !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [dragOverlayOffsetY, timelineDrag.draggingTaskId]);
+
+  useEffect(() => {
+    if (!timelineDrag.isDragging || !dragOverlaySnapshot) {
+      dragOverlayOffsetY.set(0);
+      return;
+    }
+
+    const clampDragOffset = (rawOffsetY: number) => {
+      const viewport = window.visualViewport;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportTopInset = viewport?.offsetTop ?? 0;
+      const minOffset = viewportTopInset - dragOverlaySnapshot.top;
+      const maxTop = viewportHeight - dragOverlayBottomInsetRef.current - dragOverlaySnapshot.height;
+      const maxOffset = Math.max(minOffset, maxTop - dragOverlaySnapshot.top);
+      const clampedOffset = Math.max(minOffset, Math.min(maxOffset, rawOffsetY));
+      dragOverlayOffsetY.set(clampedOffset);
+    };
+
+    clampDragOffset(dragVisualOffsetY.get());
+    const unsubscribe = dragVisualOffsetY.on("change", clampDragOffset);
+    const handleViewportChange = () => clampDragOffset(dragVisualOffsetY.get());
+
+    window.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+    };
+  }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, timelineDrag.isDragging]);
 
   useEffect(() => {
     if (!isTodaySelected) return;
@@ -950,6 +1037,26 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   );
 
   const timelineConflictMap = baseTimelineConflictMap;
+  const draggedScheduledTask = useMemo(() => {
+    if (!timelineDrag.draggingTaskId) return null;
+    return scheduledItemsById.get(timelineDrag.draggingTaskId) ?? null;
+  }, [scheduledItemsById, timelineDrag.draggingTaskId]);
+  const draggedScheduledFlow = useMemo(() => {
+    if (!draggedScheduledTask) return null;
+    return scheduledFlow.byTaskId.get(draggedScheduledTask.id) ?? null;
+  }, [draggedScheduledTask, scheduledFlow.byTaskId]);
+  const shouldRenderDragOverlay = Boolean(
+    timelineDrag.isDragging &&
+      dragOverlaySnapshot &&
+      draggedScheduledTask &&
+      dragOverlaySnapshot.taskId === draggedScheduledTask.id,
+  );
+  const draggedLaneOffsetPx = draggedScheduledFlow
+    ? getLaneOffsetPx(draggedScheduledFlow.laneIndex, draggedScheduledFlow.overlapCount)
+    : 0;
+  const draggedOverlapCount = draggedScheduledTask
+    ? timelineConflictMap.get(draggedScheduledTask.id)?.size ?? 0
+    : 0;
 
   // Group rituals by campaign
   const campaignRitualGroups = useMemo(() => {
@@ -1702,6 +1809,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     const isThisDragging = timelineDrag.draggingTaskId === task.id;
                     const isAnyDragging = timelineDrag.isDragging;
                     const isJustDropped = timelineDrag.justDroppedId === task.id;
+                    const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
                     const rowFlow = scheduledFlow.byTaskId.get(task.id);
                     const laneIndex = rowFlow?.laneIndex;
                     const laneCount = rowFlow?.laneCount;
@@ -1721,16 +1829,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       WebkitUserSelect: 'none',
                       userSelect: 'none',
                       WebkitTouchCallout: 'none',
-                      touchAction: isThisDragging ? 'none' : 'pan-y',
+                      touchAction: isThisDragging && !usesOverlayPlaceholder ? 'none' : 'pan-y',
                       pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
-                      opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
-                      boxShadow: isThisDragging
+                      opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
+                      boxShadow: isThisDragging && !usesOverlayPlaceholder
                         ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
                         : "none",
-                      backgroundColor: isThisDragging ? "hsl(var(--background))" : "transparent",
-                      borderRadius: isThisDragging ? 12 : 0,
+                      backgroundColor: isThisDragging && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
+                      borderRadius: isThisDragging && !usesOverlayPlaceholder ? 12 : 0,
                       transition: 'none',
-                      willChange: isThisDragging ? "transform" : undefined,
+                      willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
                       marginTop: scheduledSpacingPx,
                     };
 
@@ -1765,9 +1873,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       : undefined;
                     return (
                       <motion.div
+                        ref={(node) => {
+                          if (node) {
+                            timelineRowRefs.current.set(task.id, node);
+                          } else {
+                            timelineRowRefs.current.delete(task.id);
+                          }
+                        }}
                         key={task.id}
-                        className={cn("relative", isThisDragging && "z-50")}
-                        layout={!isThisDragging}
+                        className={cn("relative", isThisDragging && !usesOverlayPlaceholder && "z-50")}
+                        layout={!isThisDragging || usesOverlayPlaceholder}
                         animate={bounceAnimation}
                         transition={bounceAnimation ? {
                           duration: 0.25,
@@ -1782,7 +1897,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         style={{
                           ...rowStyle,
                           x: laneOffsetPx,
-                          y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                          y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
                         }}
                       >
                         {rowContent}
@@ -1922,6 +2037,38 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         )}
       </div>
+
+      {shouldRenderDragOverlay && draggedScheduledTask && dragOverlaySnapshot && typeof document !== "undefined"
+        ? createPortal(
+            <motion.div
+              data-testid="timeline-drag-overlay"
+              className="pointer-events-none fixed z-[120] rounded-xl bg-background shadow-[0_18px_32px_-10px_rgba(0,0,0,0.35),0_10px_16px_-8px_rgba(0,0,0,0.2)]"
+              style={{
+                top: dragOverlaySnapshot.top,
+                left: dragOverlaySnapshot.left,
+                width: dragOverlaySnapshot.width,
+                x: draggedLaneOffsetPx,
+                y: dragOverlayOffsetY,
+              }}
+            >
+              <TimelineTaskRow
+                rowKind="task"
+                time={draggedScheduledTask.scheduled_time}
+                overrideTime={timelineDrag.previewTime ?? undefined}
+                isDragTarget
+                durationMinutes={draggedScheduledTask.estimated_duration}
+                laneIndex={draggedScheduledFlow?.laneIndex}
+                laneCount={draggedScheduledFlow?.laneCount}
+                overlapCount={draggedScheduledFlow?.overlapCount}
+                className="cursor-grabbing"
+                data-testid={`timeline-drag-overlay-row-${draggedScheduledTask.id}`}
+              >
+                {renderTaskItem(draggedScheduledTask, undefined, draggedOverlapCount)}
+              </TimelineTaskRow>
+            </motion.div>,
+            document.body,
+          )
+        : null}
 
       <HourlyViewModal
         open={showMonthView}

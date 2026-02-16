@@ -14,6 +14,22 @@ if (!HTMLElement.prototype.scrollTo) {
 const elementScrollToSpy = vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
 
 const mocks = vi.hoisted(() => {
+  const createMotionValueMock = (initial = 0) => {
+    let current = initial;
+    const listeners = new Set<(value: number) => void>();
+    return {
+      get: () => current,
+      set: (value: number) => {
+        current = value;
+        listeners.forEach((listener) => listener(value));
+      },
+      on: (_event: "change", listener: (value: number) => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+  };
+  const dragOffsetMotionValue = createMotionValueMock(0);
   const subtaskEqMock = vi.fn();
   const subtaskUpdateMock = vi.fn();
   const handlePointerDownSpy = vi.fn();
@@ -32,7 +48,8 @@ const mocks = vi.hoisted(() => {
     draggingTaskId: null as string | null,
     isDragging: false,
     justDroppedId: null as string | null,
-    dragOffsetY: 0,
+    dragOffsetY: dragOffsetMotionValue,
+    dragVisualOffsetY: dragOffsetMotionValue,
     previewTime: undefined as string | undefined,
     snapMode: "coarse" as const,
     zoomRail: null as
@@ -54,6 +71,7 @@ const mocks = vi.hoisted(() => {
     rowTouchStartSpy,
     getDragHandlePropsMock,
     getRowDragPropsMock,
+    dragOffsetMotionValue,
     timelineDragState,
   };
 });
@@ -131,7 +149,7 @@ vi.mock("@/components/TimelineTaskRow", () => ({
     overrideTime,
     time,
     tone,
-    durationMinutes,
+    durationMinutes: _durationMinutes,
     laneIndex,
     laneCount,
     overlapCount,
@@ -167,12 +185,6 @@ vi.mock("@/components/TimelineTaskRow", () => ({
         {...props}
       >
         {displayTime ? <span data-testid="timeline-row-time">{displayTime}</span> : null}
-        {time ? (
-          <div
-            data-testid="timeline-duration-indicator"
-            data-duration-minutes={durationMinutes ?? 30}
-          />
-        ) : null}
         {children}
       </div>
     );
@@ -224,7 +236,7 @@ describe("TodaysAgenda subtasks", () => {
     mocks.timelineDragState.draggingTaskId = null;
     mocks.timelineDragState.isDragging = false;
     mocks.timelineDragState.justDroppedId = null;
-    mocks.timelineDragState.dragOffsetY = 0;
+    mocks.dragOffsetMotionValue.set(0);
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
@@ -419,7 +431,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.timelineDragState.draggingTaskId = null;
     mocks.timelineDragState.isDragging = false;
     mocks.timelineDragState.justDroppedId = null;
-    mocks.timelineDragState.dragOffsetY = 0;
+    mocks.dragOffsetMotionValue.set(0);
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
@@ -936,7 +948,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(secondRow).toHaveAttribute("data-timeline-overlap", "1");
   });
 
-  it("shows duration rail with explicit and fallback durations", () => {
+  it("does not render side duration indicators for scheduled rows", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -973,13 +985,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const explicitDuration = within(screen.getByTestId("timeline-row-task-scheduled-1"))
-      .getByTestId("timeline-duration-indicator");
-    const fallbackDuration = within(screen.getByTestId("timeline-row-task-scheduled-2"))
-      .getByTestId("timeline-duration-indicator");
-
-    expect(explicitDuration).toHaveAttribute("data-duration-minutes", "45");
-    expect(fallbackDuration).toHaveAttribute("data-duration-minutes", "30");
+    expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
   });
 
   it("caps large scheduled gaps to compact spacing", () => {
@@ -1054,7 +1060,57 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByText("09:45")).toBeInTheDocument();
+    expect(within(screen.getByTestId("timeline-row-task-scheduled-1")).getByTestId("timeline-row-time")).toHaveTextContent("09:45");
+  });
+
+  it("renders a fixed high-z drag overlay and keeps in-list placeholder during active drag", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.timelineDragState.previewTime = "09:45";
+    mocks.dragOffsetMotionValue.set(32);
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Standup",
+            completed: false,
+            xp_reward: 20,
+            scheduled_time: "09:30",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("timeline-drag-overlay")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("timeline-drag-overlay")).toHaveClass("fixed", "z-[120]");
+    expect(screen.getByTestId("timeline-drag-overlay-row-task-scheduled-1")).toBeInTheDocument();
+
+    const draggedRowInList = screen.getByTestId("timeline-row-task-scheduled-1").parentElement;
+    expect(draggedRowInList).toBeTruthy();
+    expect(draggedRowInList).toHaveStyle({ opacity: "0" });
   });
 
   it("does not render zoom rail while drag preview is active", () => {

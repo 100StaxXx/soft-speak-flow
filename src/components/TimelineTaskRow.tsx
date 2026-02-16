@@ -25,17 +25,12 @@ const formatTime12h = (time: string) => {
   return `${displayHour}:${minutes}${ampm}`;
 };
 
-const clamp = (value: number, min: number, max: number) => {
-  return Math.min(max, Math.max(min, value));
-};
-
 export function TimelineTaskRow({
   time,
   overrideTime,
   label,
   rowKind = "task",
   tone = "default",
-  durationMinutes,
   laneIndex = 0,
   laneCount = 1,
   overlapCount = 0,
@@ -50,31 +45,14 @@ export function TimelineTaskRow({
   const isOverridden = overrideTime != null;
   const isNowTone = tone === "now";
   const isTaskRow = rowKind === "task";
-  const isScheduledTaskRow = isTaskRow && !!displayTime;
-  const effectiveDurationMinutes = Number.isFinite(durationMinutes) && (durationMinutes ?? 0) > 0
-    ? Number(durationMinutes)
-    : 30;
-  const durationHeightPx = clamp(Math.round((effectiveDurationMinutes / 30) * 18), 16, 72);
-  const visualLaneCount = clamp(
-    Number.isFinite(laneCount) ? Math.round(Number(laneCount)) : 1,
-    1,
-    4,
-  );
-  const visualLaneIndex = clamp(
-    Number.isFinite(laneIndex) ? Math.round(Number(laneIndex)) : 0,
-    0,
-    visualLaneCount - 1,
-  );
-  const durationWidthPx = (visualLaneCount * 4) + ((visualLaneCount - 1) * 1) + 4;
-  const hasOverlap = overlapCount > 0;
-  const hasMultipleLanes = laneCount > 1;
+  const showTimelineMetadata = isTaskRow && !!displayTime;
 
   return (
     <div
       className={cn("relative flex gap-2", isDragTarget && "rounded-lg", className)}
-      data-timeline-lane={displayTime ? laneIndex : undefined}
-      data-timeline-lane-count={displayTime ? laneCount : undefined}
-      data-timeline-overlap={displayTime ? overlapCount : undefined}
+      data-timeline-lane={showTimelineMetadata ? laneIndex : undefined}
+      data-timeline-lane-count={showTimelineMetadata ? laneCount : undefined}
+      data-timeline-overlap={showTimelineMetadata ? overlapCount : undefined}
       {...rootProps}
     >
       {/* Time label column - fixed width */}
@@ -95,58 +73,6 @@ export function TimelineTaskRow({
             {label}
           </span>
         ) : null}
-      </div>
-
-      {/* Timeline column (dot/line indicators removed) */}
-      <div className="relative flex flex-col items-center flex-shrink-0 w-7">
-        {isScheduledTaskRow ? (
-          <div
-            className={cn(
-              "relative mt-1 mb-1 overflow-hidden rounded-full border",
-              isNowTone
-                ? "border-stardust-gold/45 bg-stardust-gold/12 shadow-[0_0_0_1px_rgba(225,177,59,0.14)]"
-                : hasOverlap
-                ? "border-primary/45 bg-primary/20"
-                : hasMultipleLanes
-                  ? "border-primary/35 bg-primary/15"
-                  : "border-primary/30 bg-primary/10",
-            )}
-            style={{
-              height: `${durationHeightPx}px`,
-              width: `${durationWidthPx}px`,
-            }}
-            data-testid="timeline-duration-indicator"
-            data-duration-minutes={effectiveDurationMinutes}
-            data-duration-height={durationHeightPx}
-            data-duration-width={durationWidthPx}
-            data-duration-lane-count={visualLaneCount}
-            data-duration-lane-index={visualLaneIndex}
-            aria-hidden
-          >
-            <div className="absolute inset-[2px] flex gap-px">
-              {Array.from({ length: visualLaneCount }).map((_, lane) => {
-                const isActiveLane = lane === visualLaneIndex;
-                return (
-                  <span
-                    key={lane}
-                    className={cn(
-                      "flex-1 rounded-full",
-                      isActiveLane
-                        ? isNowTone
-                          ? "bg-stardust-gold/95"
-                          : "bg-primary/85"
-                        : isNowTone
-                          ? "bg-stardust-gold/25"
-                          : "bg-primary/25",
-                    )}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="min-h-[18px]" aria-hidden />
-        )}
       </div>
 
       {/* Task card */}

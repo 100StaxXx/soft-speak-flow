@@ -8,6 +8,7 @@ import {
   DragSnapMode,
   DragZoomRailState,
   buildAdaptiveSnapRuntimeScale,
+  clampMinuteToRange,
   minuteToTime24,
   resolveAdaptiveSnapConfig,
   snapMinuteByMode,
@@ -176,14 +177,17 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       const scrollDelta = getScrollOffset(scrollContextRef.current) - dragStartScrollOffsetRef.current;
       const effectiveClientY = safeClientY + scrollDelta;
       const deltaY = effectiveClientY - dragStartYRef.current;
-      dragOffsetY.set(deltaY);
-      if (!dragMovedRef.current && Math.abs(deltaY) > 0.5) {
+      const rawMinute = originalMinutesRef.current + (deltaY / runtimeScaleRef.current.coarsePixelsPerMinute);
+      const clampedRawMinute = clampMinuteToRange(rawMinute, resolvedSnapConfig);
+      const clampedDeltaY = (clampedRawMinute - originalMinutesRef.current) * runtimeScaleRef.current.coarsePixelsPerMinute;
+
+      dragOffsetY.set(clampedDeltaY);
+      if (!dragMovedRef.current && Math.abs(clampedDeltaY) > 0.5) {
         dragMovedRef.current = true;
       }
 
-      const rawMinute = originalMinutesRef.current + (deltaY / runtimeScaleRef.current.coarsePixelsPerMinute);
-      currentRawMinutesRef.current = rawMinute;
-      const previewMinute = snapMinuteByMode(rawMinute, "fine", resolvedSnapConfig);
+      currentRawMinutesRef.current = clampedRawMinute;
+      const previewMinute = snapMinuteByMode(clampedRawMinute, "fine", resolvedSnapConfig);
       if (previewMinute !== lastPreviewMinuteRef.current) {
         lastPreviewMinuteRef.current = previewMinute;
         setPreviewTime(minuteToTime24(previewMinute, resolvedSnapConfig));
@@ -402,6 +406,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     draggingTaskId,
     previewTime,
     dragOffsetY: dragOffsetY as MotionValue<number>,
+    dragVisualOffsetY: dragOffsetY as MotionValue<number>,
     justDroppedId,
     isDragging: draggingTaskId !== null,
     snapMode,

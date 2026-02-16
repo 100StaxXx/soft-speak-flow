@@ -4,11 +4,10 @@ import { describe, expect, it } from "vitest";
 import { TimelineTaskRow } from "./TimelineTaskRow";
 
 describe("TimelineTaskRow", () => {
-  it("renders a wide lane-aware duration rail without dot/line indicators", () => {
+  it("renders scheduled rows without side indicator rails", () => {
     const { container } = render(
       <TimelineTaskRow
         time="09:00"
-        durationMinutes={45}
         laneCount={3}
         laneIndex={1}
         overlapCount={2}
@@ -18,14 +17,11 @@ describe("TimelineTaskRow", () => {
     );
 
     expect(screen.getByText("9:00a")).toHaveClass("text-muted-foreground");
-
-    const indicator = screen.getByTestId("timeline-duration-indicator");
-    expect(indicator).toHaveAttribute("data-duration-minutes", "45");
-    expect(indicator).toHaveAttribute("data-duration-height", "27");
-    expect(indicator).toHaveAttribute("data-duration-width", "18");
-    expect(indicator).toHaveAttribute("data-duration-lane-count", "3");
-    expect(indicator).toHaveAttribute("data-duration-lane-index", "1");
-    expect(indicator).toHaveClass("border-primary/45");
+    const root = container.firstElementChild;
+    expect(root).toHaveAttribute("data-timeline-lane", "1");
+    expect(root).toHaveAttribute("data-timeline-lane-count", "3");
+    expect(root).toHaveAttribute("data-timeline-overlap", "2");
+    expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
     expect(container.querySelector(".border-l")).toBeNull();
     expect(container.querySelector(".w-2.h-2.rounded-full")).toBeNull();
   });
@@ -48,7 +44,7 @@ describe("TimelineTaskRow", () => {
     );
 
     expect(screen.getByText("10:15a")).toHaveClass("text-stardust-gold", "font-semibold");
-    expect(screen.getByTestId("timeline-duration-indicator")).toHaveClass("border-stardust-gold/45");
+    expect(screen.queryByTestId("timeline-duration-indicator")).not.toBeInTheDocument();
   });
 
   it("renders marker rows with no left indicator glyphs", () => {
