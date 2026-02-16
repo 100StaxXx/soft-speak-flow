@@ -1578,10 +1578,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(screen.getByTestId("timeline-marker-placeholder-1330")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-marker-placeholder-1200")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-0600")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-0900")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("timeline-marker-placeholder-1200")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-marker-placeholder-1330")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-0000")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1800")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-2359")).not.toBeInTheDocument();
@@ -1698,8 +1698,49 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const betweenPlaceholders = getRenderedPlaceholderMinutes().filter((minute) => (
       minute > minuteFromTime("10:30") && minute < minuteFromTime("16:30")
     ));
-    expect(betweenPlaceholders).toEqual([minuteFromTime("13:30")]);
+    expect(betweenPlaceholders).toEqual([minuteFromTime("13:00")]);
+    expect(screen.queryByTestId("timeline-marker-placeholder-1400")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1500")).not.toBeInTheDocument();
+  });
+
+  it("aligns all non-now placeholders to exact-hour timestamps", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:30",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Review",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "16:30",
+          },
+        ]}
+        selectedDate={new Date("2000-01-01T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const placeholderMinutes = getRenderedPlaceholderMinutes();
+    expect(placeholderMinutes.length).toBeGreaterThan(0);
+    expect(placeholderMinutes.every((minute) => minute % 60 === 0)).toBe(true);
   });
 
   it("uses a single hourly placeholder for medium gaps between consecutive quests", () => {
@@ -1896,6 +1937,57 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1500")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-marker-placeholder-1800")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("uses now as the only marker between quests when now falls in that gap", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-14T13:20:00"));
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Deep work",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:30",
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Review",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "16:30",
+          },
+        ]}
+        selectedDate={new Date()}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-marker-now")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("timeline-marker-now")).getByTestId("timeline-row-time"),
+    ).toHaveTextContent("13:20");
+
+    const betweenPlaceholders = getRenderedPlaceholderMinutes().filter((minute) => (
+      minute > minuteFromTime("10:30") && minute < minuteFromTime("16:30")
+    ));
+    expect(betweenPlaceholders).toHaveLength(0);
 
     vi.useRealTimers();
   });

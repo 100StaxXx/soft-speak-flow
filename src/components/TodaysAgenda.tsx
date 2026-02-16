@@ -304,7 +304,6 @@ const getScheduledSpacingPx = (gapBeforeMinutes: number) => {
 const getHourlyPlaceholderCandidatesBetween = (
   startMinute: number,
   endMinute: number,
-  dayStartMinute: number,
 ): number[] => {
   if (endMinute - startMinute <= 1) return [];
 
@@ -312,28 +311,7 @@ const getHourlyPlaceholderCandidatesBetween = (
   const candidates: number[] = [];
 
   for (let minute = firstCandidateMinute; minute < endMinute; minute += 60) {
-    if (minute >= dayStartMinute && minute <= DAY_END_MINUTE) {
-      candidates.push(minute);
-    }
-  }
-
-  return candidates;
-};
-
-const getThreeHourPlaceholderCandidatesBetween = (
-  startMinute: number,
-  endMinute: number,
-  dayStartMinute: number,
-): number[] => {
-  if (endMinute - startMinute <= 1) return [];
-
-  const firstCandidateMinute = dayStartMinute + (
-    Math.ceil((startMinute + 1 - dayStartMinute) / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES
-  );
-  const candidates: number[] = [];
-
-  for (let minute = firstCandidateMinute; minute < endMinute; minute += PLACEHOLDER_INTERVAL_MINUTES) {
-    if (minute >= dayStartMinute && minute <= DAY_END_MINUTE) {
+    if (minute <= DAY_END_MINUTE) {
       candidates.push(minute);
     }
   }
@@ -366,15 +344,12 @@ const pickClosestMinuteToMidpoint = (candidates: number[], midpoint: number): nu
 const selectPairPlaceholderMinute = (
   startMinute: number,
   endMinute: number,
-  dayStartMinute: number,
 ): number | null => {
   const gapMinutes = endMinute - startMinute;
   if (gapMinutes < 60) return null;
 
   const midpoint = (startMinute + endMinute) / 2;
-  const candidates = gapMinutes < PLACEHOLDER_INTERVAL_MINUTES
-    ? getHourlyPlaceholderCandidatesBetween(startMinute, endMinute, dayStartMinute)
-    : getThreeHourPlaceholderCandidatesBetween(startMinute, endMinute, dayStartMinute);
+  const candidates = getHourlyPlaceholderCandidatesBetween(startMinute, endMinute);
 
   return pickClosestMinuteToMidpoint(candidates, midpoint);
 };
@@ -405,8 +380,7 @@ const buildPlaceholderMinutes = (
   }
 
   for (const scheduledMinute of sortedScheduledMinutes) {
-    const offsetFromStart = scheduledMinute - dayStartMinute;
-    const remainder = normalizeModulo(offsetFromStart, PLACEHOLDER_INTERVAL_MINUTES);
+    const remainder = normalizeModulo(scheduledMinute, PLACEHOLDER_INTERVAL_MINUTES);
     const isOnBoundary = remainder === 0;
 
     let lowerAnchor = isOnBoundary
@@ -416,11 +390,8 @@ const buildPlaceholderMinutes = (
       ? scheduledMinute + PLACEHOLDER_INTERVAL_MINUTES
       : lowerAnchor + PLACEHOLDER_INTERVAL_MINUTES;
 
-    lowerAnchor = Math.max(dayStartMinute, lowerAnchor);
-    upperAnchor = Math.max(dayStartMinute, upperAnchor);
-
-    if (lowerAnchor <= DAY_END_MINUTE) markerMinutes.add(lowerAnchor);
-    if (upperAnchor <= DAY_END_MINUTE) markerMinutes.add(upperAnchor);
+    if (lowerAnchor >= 0 && lowerAnchor <= DAY_END_MINUTE) markerMinutes.add(lowerAnchor);
+    if (upperAnchor >= 0 && upperAnchor <= DAY_END_MINUTE) markerMinutes.add(upperAnchor);
   }
 
   if (sortedScheduledMinutes.length > 1) {
@@ -434,7 +405,7 @@ const buildPlaceholderMinutes = (
     for (let index = 1; index < sortedScheduledMinutes.length; index += 1) {
       const previousMinute = sortedScheduledMinutes[index - 1];
       const nextMinute = sortedScheduledMinutes[index];
-      const selectedMinute = selectPairPlaceholderMinute(previousMinute, nextMinute, dayStartMinute);
+      const selectedMinute = selectPairPlaceholderMinute(previousMinute, nextMinute);
       if (selectedMinute !== null) {
         markerMinutes.add(selectedMinute);
       }
@@ -442,6 +413,51 @@ const buildPlaceholderMinutes = (
   }
 
   return Array.from(markerMinutes).sort((a, b) => a - b);
+};
+
+const pruneMarkersBetweenConsecutiveQuests = (
+  markers: Map<number, TimelineMarkerRow>,
+  sortedScheduledMinutes: number[],
+): Map<number, TimelineMarkerRow> => {
+  if (sortedScheduledMinutes.length < 2) {
+    return markers;
+  }
+
+  for (let index = 1; index < sortedScheduledMinutes.length; index += 1) {
+    const previousMinute = sortedScheduledMinutes[index - 1];
+    const nextMinute = sortedScheduledMinutes[index];
+    const betweenMarkers = Array.from(markers.values())
+      .filter((marker) => previousMinute < marker.minute && marker.minute < nextMinute)
+      .sort((a, b) => a.minute - b.minute);
+
+    if (betweenMarkers.length <= 1) continue;
+
+    const nowMarker = betweenMarkers.find((marker) => marker.kind === "now");
+    if (nowMarker) {
+      for (const marker of betweenMarkers) {
+        if (marker.kind === "placeholder") {
+          markers.delete(marker.minute);
+        }
+      }
+      continue;
+    }
+
+    const keepMinute = pickClosestMinuteToMidpoint(
+      betweenMarkers
+        .filter((marker) => marker.kind === "placeholder")
+        .map((marker) => marker.minute),
+      (previousMinute + nextMinute) / 2,
+    );
+    if (keepMinute === null) continue;
+
+    for (const marker of betweenMarkers) {
+      if (marker.kind === "placeholder" && marker.minute !== keepMinute) {
+        markers.delete(marker.minute);
+      }
+    }
+  }
+
+  return markers;
 };
 
 const buildPlaceholderEmphasis = (
@@ -1031,17 +1047,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const scheduledMinutes = scheduledItems
       .map((task) => parseTimeToMinute(task.scheduled_time))
       .filter((minute): minute is number => minute !== null);
-    const timelineStartMinute = scheduledMinutes.length > 0
-      ? Math.min(...scheduledMinutes)
+    const sortedScheduledMinutes = [...scheduledMinutes].sort((a, b) => a - b);
+    const timelineStartMinute = sortedScheduledMinutes.length > 0
+      ? sortedScheduledMinutes[0]
       : DEFAULT_DAY_START_MINUTE;
-    let placeholderMinutes = buildPlaceholderMinutes(scheduledMinutes, timelineStartMinute);
-    if (scheduledMinutes.length > 0) {
+    let placeholderMinutes = buildPlaceholderMinutes(sortedScheduledMinutes, timelineStartMinute);
+    if (sortedScheduledMinutes.length > 0) {
       placeholderMinutes = placeholderMinutes.filter((minute) => minute > timelineStartMinute);
     }
     const nowAnchorMinute = Math.max(timelineStartMinute, Math.min(DAY_END_MINUTE, nowMarkerMinute));
-    if (isToday && scheduledMinutes.length === 0) {
-      const nowOffset = nowAnchorMinute - timelineStartMinute;
-      const lowerNowAnchor = timelineStartMinute + (Math.floor(nowOffset / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES);
+    if (isToday && sortedScheduledMinutes.length === 0) {
+      const lowerNowAnchor = Math.floor(nowAnchorMinute / PLACEHOLDER_INTERVAL_MINUTES) * PLACEHOLDER_INTERVAL_MINUTES;
       const upperNowAnchor = lowerNowAnchor + PLACEHOLDER_INTERVAL_MINUTES;
       if (lowerNowAnchor >= timelineStartMinute && lowerNowAnchor <= DAY_END_MINUTE) {
         placeholderMinutes.push(lowerNowAnchor);
@@ -1079,7 +1095,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       });
     }
 
-    return Array.from(markers.values());
+    return Array.from(pruneMarkersBetweenConsecutiveQuests(markers, sortedScheduledMinutes).values());
   }, [isTodaySelected, nowMarkerMinute, scheduledItems]);
 
   const timelineRows = useMemo<TimelineRow[]>(() => {
@@ -1925,7 +1941,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                             showLine={index > 0}
                             isLast={index === timelineRows.length - 1}
                           >
-                            <div className="pt-1" />
+                            <div className="h-1" />
                           </TimelineTaskRow>
                         </div>
                       );
