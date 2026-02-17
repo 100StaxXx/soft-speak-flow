@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeCompletedSteps } from "./TutorialOrchestrator";
+import { computeGuidedPanelPlacement, safeCompletedSteps } from "./TutorialOrchestrator";
 
 describe("safeCompletedSteps", () => {
   it("returns only valid guided step ids", () => {
@@ -19,5 +19,50 @@ describe("safeCompletedSteps", () => {
     expect(safeCompletedSteps("create_quest")).toEqual([]);
     expect(safeCompletedSteps({ completedSteps: ["create_quest"] })).toEqual([]);
     expect(safeCompletedSteps(null)).toEqual([]);
+  });
+});
+
+describe("computeGuidedPanelPlacement", () => {
+  const base = {
+    panelWidth: 320,
+    panelHeight: 180,
+    viewportWidth: 390,
+    viewportHeight: 844,
+  };
+
+  it("places the panel below when target is near the top", () => {
+    const result = computeGuidedPanelPlacement({
+      ...base,
+      targetRect: {
+        top: 40,
+        left: 100,
+        right: 200,
+        bottom: 92,
+        width: 100,
+        height: 52,
+      },
+      preferredZones: ["bottom", "top", "right", "left"],
+    });
+
+    expect(result.zone).toBe("bottom");
+    expect(result.lockEnabled).toBe(true);
+  });
+
+  it("places the panel above when target is near the bottom", () => {
+    const result = computeGuidedPanelPlacement({
+      ...base,
+      targetRect: {
+        top: 700,
+        left: 120,
+        right: 230,
+        bottom: 760,
+        width: 110,
+        height: 60,
+      },
+      preferredZones: ["top", "bottom", "left", "right"],
+    });
+
+    expect(result.zone).toBe("top");
+    expect(result.lockEnabled).toBe(true);
   });
 });

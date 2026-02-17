@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { TutorialInteractionGuard } from "@/components/tutorial/TutorialInteractionGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -17,6 +18,9 @@ const STEP_XP_REWARDS: Record<GuidedTutorialStepId, number> = {
   morning_checkin: 3,
 };
 
+type GuidedLockMode = "strict";
+type PanelZone = "top" | "bottom" | "left" | "right";
+
 interface GuidedStep {
   id: GuidedTutorialStepId;
   title: string;
@@ -27,6 +31,9 @@ interface GuidedStep {
   route: string;
   navSelector: string;
   inRouteSelector: string;
+  lockMode: GuidedLockMode;
+  spotlightPadding: number;
+  preferredPanelZones?: PanelZone[];
   completion:
     | {
         type: "route_visit";
@@ -39,6 +46,27 @@ interface GuidedStep {
 }
 
 type GuidedTutorialProgressSnapshot = Partial<GuidedTutorialProgress>;
+
+interface PanelPlacementResult {
+  zone: PanelZone;
+  top: number;
+  left: number;
+  lockEnabled: boolean;
+}
+
+interface PlacementInput {
+  targetRect: Pick<DOMRectReadOnly, "top" | "left" | "right" | "bottom" | "width" | "height">;
+  panelWidth: number;
+  panelHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  preferredZones?: PanelZone[];
+}
+
+const PANEL_GAP = 12;
+const SAFE_HORIZONTAL = 12;
+const SAFE_TOP = 12;
+const SAFE_BOTTOM = 104;
 
 const GUIDED_STEPS: GuidedStep[] = [
   {
@@ -55,6 +83,9 @@ const GUIDED_STEPS: GuidedStep[] = [
     route: "/journeys",
     navSelector: '[data-tour="quests-tab"]',
     inRouteSelector: '[data-tour="add-quest-fab"]',
+    lockMode: "strict",
+    spotlightPadding: 10,
+    preferredPanelZones: ["top", "bottom", "left", "right"],
     completion: { type: "event", eventName: "task-added", requireRoute: true },
   },
   {
@@ -71,6 +102,9 @@ const GUIDED_STEPS: GuidedStep[] = [
     route: "/companion",
     navSelector: '[data-tour="companion-tab"]',
     inRouteSelector: '[data-tour="companion-page"]',
+    lockMode: "strict",
+    spotlightPadding: 12,
+    preferredPanelZones: ["bottom", "top", "right", "left"],
     completion: { type: "route_visit" },
   },
   {
@@ -87,6 +121,9 @@ const GUIDED_STEPS: GuidedStep[] = [
     route: "/mentor",
     navSelector: '[data-tour="mentor-tab"]',
     inRouteSelector: '[data-tour="morning-checkin"]',
+    lockMode: "strict",
+    spotlightPadding: 10,
+    preferredPanelZones: ["top", "bottom", "right", "left"],
     completion: { type: "event", eventName: "morning-checkin-completed", requireRoute: true },
   },
 ];
@@ -98,6 +135,105 @@ const isGuidedStepId = (value: unknown): value is GuidedTutorialStepId =>
 
 const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getDefaultPanelPlacement = (
+  viewportWidth: number,
+  panelWidth: number,
+  fallbackTop = SAFE_TOP
+): PanelPlacementResult => ({
+  zone: "top",
+  top: fallbackTop,
+  left: clamp((viewportWidth - panelWidth) / 2, SAFE_HORIZONTAL, Math.max(SAFE_HORIZONTAL, viewportWidth - panelWidth - SAFE_HORIZONTAL)),
+  lockEnabled: false,
+});
+
+export const computeGuidedPanelPlacement = ({
+  targetRect,
+  panelWidth,
+  panelHeight,
+  viewportWidth,
+  viewportHeight,
+  preferredZones,
+}: PlacementInput): PanelPlacementResult => {
+  const safeBottomEdge = viewportHeight - SAFE_BOTTOM;
+  const centerX = targetRect.left + targetRect.width / 2;
+  const centerY = targetRect.top + targetRect.height / 2;
+
+  const availableSpace: Record<PanelZone, number> = {
+    top: targetRect.top - SAFE_TOP - PANEL_GAP,
+    bottom: safeBottomEdge - targetRect.bottom - PANEL_GAP,
+    left: targetRect.left - SAFE_HORIZONTAL - PANEL_GAP,
+    right: viewportWidth - SAFE_HORIZONTAL - targetRect.right - PANEL_GAP,
+  };
+
+  const zones: PanelZone[] =
+    preferredZones && preferredZones.length > 0
+      ? preferredZones
+      : (Object.entries(availableSpace)
+          .sort((a, b) => b[1] - a[1])
+          .map(([zone]) => zone as PanelZone));
+
+  const chooseTopLeft = (zone: PanelZone) => {
+    if (zone === "top") {
+      return {
+        top: targetRect.top - panelHeight - PANEL_GAP,
+        left: centerX - panelWidth / 2,
+      };
+    }
+
+    if (zone === "bottom") {
+      return {
+        top: targetRect.bottom + PANEL_GAP,
+        left: centerX - panelWidth / 2,
+      };
+    }
+
+    if (zone === "left") {
+      return {
+        top: centerY - panelHeight / 2,
+        left: targetRect.left - panelWidth - PANEL_GAP,
+      };
+    }
+
+    return {
+      top: centerY - panelHeight / 2,
+      left: targetRect.right + PANEL_GAP,
+    };
+  };
+
+  for (const zone of zones) {
+    const { top, left } = chooseTopLeft(zone);
+
+    const clampedTop = clamp(top, SAFE_TOP, Math.max(SAFE_TOP, safeBottomEdge - panelHeight));
+    const clampedLeft = clamp(
+      left,
+      SAFE_HORIZONTAL,
+      Math.max(SAFE_HORIZONTAL, viewportWidth - panelWidth - SAFE_HORIZONTAL)
+    );
+
+    const hasVerticalRoom =
+      zone === "left" || zone === "right" ? availableSpace.top + availableSpace.bottom >= panelHeight : availableSpace[zone] >= panelHeight;
+    const hasHorizontalRoom =
+      zone === "top" || zone === "bottom" ? availableSpace.left + availableSpace.right >= panelWidth : availableSpace[zone] >= panelWidth;
+
+    if (hasVerticalRoom || hasHorizontalRoom) {
+      return {
+        zone,
+        top: clampedTop,
+        left: clampedLeft,
+        lockEnabled: true,
+      };
+    }
+  }
+
+  const fallback = getDefaultPanelPlacement(viewportWidth, panelWidth);
+  return {
+    ...fallback,
+    top: clamp(fallback.top, SAFE_TOP, Math.max(SAFE_TOP, safeBottomEdge - panelHeight)),
+  };
+};
 
 export const safeCompletedSteps = (value: unknown): GuidedTutorialStepId[] => {
   if (!Array.isArray(value)) return [];
@@ -150,13 +286,17 @@ export const TutorialOrchestrator = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const spotlightRef = useRef<HTMLElement | null>(null);
   const completionPersistRef = useRef(false);
   const stepPersistThrottleRef = useRef<Set<GuidedTutorialStepId>>(new Set());
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
   const [dismissedOverride, setDismissedOverride] = useState<boolean | null>(null);
+  const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
+  const [panelPlacement, setPanelPlacement] = useState<PanelPlacementResult>(() =>
+    getDefaultPanelPlacement(typeof window !== "undefined" ? window.innerWidth : 390, 360)
+  );
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const walkthroughCompleted = onboardingData?.walkthrough_completed === true;
@@ -208,10 +348,7 @@ export const TutorialOrchestrator = () => {
   );
 
   const tutorialReady =
-    Boolean(user?.id) &&
-    !profileLoading &&
-    walkthroughCompleted &&
-    tutorialEligible;
+    Boolean(user?.id) && !profileLoading && walkthroughCompleted && tutorialEligible;
 
   const tutorialMarkedComplete = Boolean(
     remoteProgress?.completed ?? localProgress?.completed ?? false
@@ -366,40 +503,76 @@ export const TutorialOrchestrator = () => {
   }, [currentStep, location.pathname]);
 
   useEffect(() => {
-    if (spotlightRef.current) {
-      spotlightRef.current.classList.remove("tutorial-guide-spotlight");
-      spotlightRef.current.classList.remove("tutorial-guide-fab-spotlight");
-      spotlightRef.current = null;
-    }
-
-    if (!tutorialReady || !currentStep || effectiveDismissed || pathIsHidden(location.pathname)) {
+    if (!tutorialReady || tutorialComplete || !currentStep || effectiveDismissed || !activeSelector) {
+      setTargetElement(null);
       return;
     }
-    if (!activeSelector) return;
 
-    const target = document.querySelector(activeSelector) as HTMLElement | null;
-    if (!target) return;
+    const updatePlacement = () => {
+      const target = document.querySelector(activeSelector) as HTMLElement | null;
+      const panelElement = panelRef.current;
 
-    target.classList.add("tutorial-guide-spotlight");
-    if (activeSelector === '[data-tour="add-quest-fab"]') {
-      target.classList.add("tutorial-guide-fab-spotlight");
-    }
-    spotlightRef.current = target;
+      setTargetElement(target);
 
-    if (location.pathname === currentStep.route) {
-      window.requestAnimationFrame(() => {
-        target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      if (!target || !panelElement) {
+        const fallback = getDefaultPanelPlacement(window.innerWidth, Math.min(window.innerWidth - 24, 560));
+        setPanelPlacement(fallback);
+        return;
+      }
+
+      const panelRect = panelElement.getBoundingClientRect();
+      const panelWidth = Math.min(window.innerWidth - 24, panelRect.width || 360);
+      const placement = computeGuidedPanelPlacement({
+        targetRect: target.getBoundingClientRect(),
+        panelWidth,
+        panelHeight: panelRect.height || 220,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        preferredZones: currentStep.preferredPanelZones,
       });
-    }
 
-    return () => {
-      target.classList.remove("tutorial-guide-spotlight");
-      target.classList.remove("tutorial-guide-fab-spotlight");
-      if (spotlightRef.current === target) {
-        spotlightRef.current = null;
+      setPanelPlacement(placement);
+
+      if (location.pathname === currentStep.route) {
+        window.requestAnimationFrame(() => {
+          target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+        });
       }
     };
-  }, [activeSelector, currentStep, effectiveDismissed, location.pathname, tutorialReady]);
+
+    updatePlacement();
+
+    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updatePlacement) : null;
+    const targetForObserver = document.querySelector(activeSelector) as HTMLElement | null;
+
+    if (targetForObserver) {
+      resizeObserver?.observe(targetForObserver);
+    }
+    if (panelRef.current) {
+      resizeObserver?.observe(panelRef.current);
+    }
+
+    window.addEventListener("scroll", updatePlacement, true);
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("orientationchange", updatePlacement);
+
+    const pollTimer = window.setInterval(updatePlacement, 350);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("scroll", updatePlacement, true);
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("orientationchange", updatePlacement);
+      window.clearInterval(pollTimer);
+    };
+  }, [
+    activeSelector,
+    currentStep,
+    effectiveDismissed,
+    location.pathname,
+    tutorialComplete,
+    tutorialReady,
+  ]);
 
   const handlePrimaryAction = useCallback(() => {
     if (!currentStep) return;
@@ -430,12 +603,16 @@ export const TutorialOrchestrator = () => {
 
   const currentIndex = GUIDED_STEPS.findIndex((step) => step.id === currentStep.id);
   const progressText = `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
-  const needsFabAccess = location.pathname === "/journeys" && currentStep.id === "create_quest";
+  const strictLockActive =
+    !effectiveDismissed &&
+    currentStep.lockMode === "strict" &&
+    panelPlacement.lockEnabled &&
+    Boolean(targetElement);
 
   if (effectiveDismissed) {
     return (
       <div
-        className="fixed right-4 z-[80]"
+        className="fixed right-4 z-[90]"
         style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <Button
@@ -451,62 +628,75 @@ export const TutorialOrchestrator = () => {
   }
 
   return (
-    <div
-      className="fixed left-0 right-0 z-[80] px-3"
-      style={
-        needsFabAccess
-          ? { top: "calc(1rem + env(safe-area-inset-top, 0px))" }
-          : { bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }
-      }
-    >
-      <div
-        className={cn(
-          "mx-auto rounded-2xl border border-primary/30 bg-card/92 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] p-3",
-          needsFabAccess ? "max-w-md" : "max-w-lg"
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-primary/90 font-semibold">
-              {progressText}
-            </p>
-            <h3 className="mt-1 text-sm font-semibold text-foreground">{currentStep.title}</h3>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              {currentStep.description}
-            </p>
-            <div className="mt-2 rounded-lg border border-border/60 bg-background/35 px-2.5 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
-                Do this now
+    <>
+      <TutorialInteractionGuard
+        active={strictLockActive}
+        targetElement={targetElement}
+        panelElement={panelRef.current}
+        spotlightPadding={currentStep.spotlightPadding}
+        maskStyle="dim"
+      />
+
+      <div className="fixed inset-0 z-[90] pointer-events-none" data-tutorial="guided-layer">
+        <div
+          ref={panelRef}
+          data-tutorial="guided-panel"
+          className={cn(
+            "pointer-events-auto rounded-2xl border border-primary/30 bg-card/92 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] p-3",
+            "w-[calc(100vw-24px)] max-w-lg"
+          )}
+          style={{
+            position: "fixed",
+            top: `${panelPlacement.top}px`,
+            left: `${panelPlacement.left}px`,
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p
+                className="text-[10px] uppercase tracking-[0.18em] text-primary/90 font-semibold"
+                aria-live="polite"
+              >
+                {progressText}
               </p>
-              <ol className="mt-1.5 space-y-1">
-                {currentStep.checklist.map((item, index) => (
-                  <li key={item} className="text-[11px] text-foreground/90 leading-relaxed">
-                    <span className="mr-1 text-primary/90 font-semibold">{index + 1}.</span>
-                    {item}
-                  </li>
-                ))}
-              </ol>
+              <h3 className="mt-1 text-sm font-semibold text-foreground">{currentStep.title}</h3>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                {currentStep.description}
+              </p>
+              <div className="mt-2 rounded-lg border border-border/60 bg-background/35 px-2.5 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+                  Do this now
+                </p>
+                <ol className="mt-1.5 space-y-1">
+                  {currentStep.checklist.map((item, index) => (
+                    <li key={item} className="text-[11px] text-foreground/90 leading-relaxed">
+                      <span className="mr-1 text-primary/90 font-semibold">{index + 1}.</span>
+                      {item}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <p className="mt-2 text-[11px] text-primary/90 leading-relaxed">
+                {currentStep.successHint}
+              </p>
             </div>
-            <p className="mt-2 text-[11px] text-primary/90 leading-relaxed">
-              {currentStep.successHint}
-            </p>
+            <button
+              className={cn(
+                "text-[11px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md",
+                "hover:bg-muted/50"
+              )}
+              onClick={handleDismiss}
+            >
+              Hide
+            </button>
           </div>
-          <button
-            className={cn(
-              "text-[11px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md",
-              "hover:bg-muted/50"
-            )}
-            onClick={handleDismiss}
-          >
-            Hide
-          </button>
-        </div>
-        <div className="mt-3">
-          <Button size="sm" className="w-full" onClick={handlePrimaryAction}>
-            {currentStep.actionLabel}
-          </Button>
+          <div className="mt-3">
+            <Button size="sm" className="w-full" onClick={handlePrimaryAction}>
+              {currentStep.actionLabel}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
