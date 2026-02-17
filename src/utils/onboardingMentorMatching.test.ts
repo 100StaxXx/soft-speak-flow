@@ -90,6 +90,21 @@ describe("filterMentorsByEnergyPreference", () => {
     expect(result.usedFallback).toBe(true);
     expect(result.candidates.map((mentor) => mentor.id)).toEqual(["f1", "f2"]);
   });
+
+  it("filters using slug inference when gender_energy is missing", () => {
+    const inferredMentors = [
+      { id: "s1", slug: "atlas", tags: [] as string[] },
+      { id: "s2", slug: "sienna", tags: [] as string[] },
+    ];
+
+    const masculineResult = filterMentorsByEnergyPreference(inferredMentors, "masculine");
+    const feminineResult = filterMentorsByEnergyPreference(inferredMentors, "feminine");
+
+    expect(masculineResult.usedFallback).toBe(false);
+    expect(masculineResult.candidates.map((mentor) => mentor.id)).toEqual(["s1"]);
+    expect(feminineResult.usedFallback).toBe(false);
+    expect(feminineResult.candidates.map((mentor) => mentor.id)).toEqual(["s2"]);
+  });
 });
 
 describe("getDesiredIntensityFromGuidanceTone", () => {

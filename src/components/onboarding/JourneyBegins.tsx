@@ -17,6 +17,10 @@ const narrativeLines = [
   "...will shape both your destinies.",
 ];
 
+const LINE_DISPLAY_MS = 3400;
+const FINAL_LINE_HOLD_MS = LINE_DISPLAY_MS;
+const FINAL_BUTTON_DELAY_MS = 3200;
+
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
   const [currentLine, setCurrentLine] = useState(0);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
@@ -34,12 +38,12 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
     if (currentLine < narrativeLines.length) {
       const timer = setTimeout(() => {
         setCurrentLine(prev => prev + 1);
-      }, 3400);
+      }, LINE_DISPLAY_MS);
       return () => clearTimeout(timer);
     } else {
       const finalTimer = setTimeout(() => {
         setShowFinalMessage(true);
-      }, 1200);
+      }, FINAL_LINE_HOLD_MS);
       return () => clearTimeout(finalTimer);
     }
   }, [currentLine]);
@@ -48,7 +52,7 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
     if (showFinalMessage) {
       const buttonTimer = setTimeout(() => {
         setShowButton(true);
-      }, 3200);
+      }, FINAL_BUTTON_DELAY_MS);
       return () => clearTimeout(buttonTimer);
     }
   }, [showFinalMessage]);

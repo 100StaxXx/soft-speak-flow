@@ -1,6 +1,5 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Mail, Star, BookOpen, Sparkles } from "lucide-react";
+import { Mail, Star, BookOpen, Sparkles, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
 
@@ -39,11 +38,20 @@ const storyPoints: StoryPoint[] = [
 ];
 
 export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModalProps) {
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent 
-        className="max-w-sm rounded-3xl bg-gradient-to-br from-amber-950/90 via-background/95 to-orange-950/80 backdrop-blur-2xl border-amber-500/20 shadow-2xl shadow-amber-900/30 p-0 overflow-hidden"
-        hideCloseButton
+    <div
+      className="fixed left-0 right-0 z-[75] px-3 pointer-events-none"
+      style={{ top: "calc(1rem + env(safe-area-inset-top, 0px))" }}
+      data-testid="postcards-tutorial-floating-wrapper"
+    >
+      <motion.div
+        role="dialog"
+        aria-label="Your Companion's Journey"
+        aria-modal="false"
+        aria-live="polite"
+        className="pointer-events-auto mx-auto max-w-sm rounded-3xl bg-gradient-to-br from-amber-950/90 via-background/95 to-orange-950/80 backdrop-blur-2xl border border-amber-500/20 shadow-2xl shadow-amber-900/30 p-0 overflow-hidden"
       >
         <motion.div
           initial={{ opacity: 0, y: 40, scale: 0.95 }}
@@ -54,6 +62,15 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
             stiffness: 300 
           }}
         >
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Hide tutorial"
+            className="absolute right-3 top-3 z-10 rounded-full p-1.5 text-amber-200/80 hover:text-amber-100 hover:bg-amber-500/20 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
           {/* Floating sparkles decoration */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {[
@@ -160,7 +177,7 @@ export function PostcardsTutorialModal({ open, onClose }: PostcardsTutorialModal
             </motion.div>
           </div>
         </motion.div>
-      </DialogContent>
-    </Dialog>
+      </motion.div>
+    </div>
   );
 }

@@ -23,6 +23,7 @@ interface MentorResultProps {
   onConfirm: () => void;
   onSeeAll: () => void;
   isConfirming?: boolean;
+  seeAllLabel?: string;
 }
 
 export const MentorResult = ({
@@ -31,7 +32,8 @@ export const MentorResult = ({
   compatibilityScore: _compatibilityScore,
   onConfirm,
   onSeeAll,
-  isConfirming = false
+  isConfirming = false,
+  seeAllLabel = "See All Mentors",
 }: MentorResultProps) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 pt-safe-top safe-area-bottom relative z-10">
@@ -119,7 +121,7 @@ export const MentorResult = ({
               onClick={onSeeAll}
               className="md:w-56 h-16 border-steel/50 text-pure-white hover:bg-charcoal/50"
             >
-              See All Mentors
+              {seeAllLabel}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>

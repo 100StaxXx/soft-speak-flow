@@ -435,7 +435,7 @@ export const TutorialOrchestrator = () => {
   if (effectiveDismissed) {
     return (
       <div
-        className="fixed right-4 z-[70]"
+        className="fixed right-4 z-[80]"
         style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <Button
@@ -452,7 +452,7 @@ export const TutorialOrchestrator = () => {
 
   return (
     <div
-      className="fixed left-0 right-0 z-[70] px-3"
+      className="fixed left-0 right-0 z-[80] px-3"
       style={
         needsFabAccess
           ? { top: "calc(1rem + env(safe-area-inset-top, 0px))" }

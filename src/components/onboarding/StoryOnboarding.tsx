@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -24,6 +24,7 @@ import { TimeoutError, pollWithDeadline, withTimeout } from "@/utils/asyncTimeou
 import { logger } from "@/utils/logger";
 import {
   filterMentorsByEnergyPreference,
+  type EnergyPreference,
   getDesiredIntensityFromGuidanceTone,
   getEnergyPreferenceFromAnswers,
 } from "@/utils/onboardingMentorMatching";
@@ -71,6 +72,35 @@ export const mapGuidanceToneToIntensity = (answer: string): "high" | "medium" | 
   return getDesiredIntensityFromGuidanceTone(answer.trim());
 };
 
+type MentorEnergyCandidate = {
+  gender_energy?: string | null;
+  tags?: string[] | null;
+  slug?: string | null;
+};
+
+type AnswerEnergyInput = {
+  questionId: string;
+  tags?: string[] | null;
+};
+
+export const deriveOnboardingMentorCandidates = <T extends MentorEnergyCandidate>(
+  mentors: T[],
+  questionAnswers: AnswerEnergyInput[],
+): {
+  energyPreference: EnergyPreference;
+  mentorsForSelection: T[];
+  usedEnergyFallback: boolean;
+} => {
+  const energyPreference = getEnergyPreferenceFromAnswers(questionAnswers);
+  const { candidates, usedFallback } = filterMentorsByEnergyPreference(mentors, energyPreference);
+
+  return {
+    energyPreference,
+    mentorsForSelection: candidates,
+    usedEnergyFallback: usedFallback,
+  };
+};
+
 const COMPANION_CREATION_TIMEOUT_MS = 90_000;
 const COMPANION_RECOVERY_DEADLINE_MS = 30_000;
 const COMPANION_RECOVERY_INTERVAL_MS = 3_000;
@@ -101,6 +131,17 @@ export const StoryOnboarding = () => {
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
+
+  const {
+    energyPreference: onboardingEnergyPreference,
+    mentorsForSelection: mentorsForOnboardingSelection,
+    usedEnergyFallback: usedOnboardingEnergyFallback,
+  } = useMemo(() => deriveOnboardingMentorCandidates(mentors, answers), [mentors, answers]);
+
+  const mentorResultSeeAllLabel =
+    onboardingEnergyPreference !== "no_preference" && !usedOnboardingEnergyFallback
+      ? "See Matching Mentors"
+      : "See All Mentors";
 
   const waitForCompanionDisplayName = async (companionId: string) => {
     await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
@@ -243,9 +284,11 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     const desiredIntensity = mapGuidanceToneToIntensity(toneAnswer?.answer ?? "");
 
     // Apply hard energy preference filtering with fallback to avoid blocking onboarding
-    const energyPreference = getEnergyPreferenceFromAnswers(questionAnswers);
-    const { candidates: mentorsForScoring, usedFallback: usedEnergyFallback } =
-      filterMentorsByEnergyPreference(mentors, energyPreference);
+    const {
+      energyPreference,
+      mentorsForSelection: mentorsForScoring,
+      usedEnergyFallback,
+    } = deriveOnboardingMentorCandidates(mentors, questionAnswers);
 
     if (usedEnergyFallback && energyPreference !== "no_preference") {
       console.warn(
@@ -784,6 +827,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               compatibilityScore={compatibilityScore}
               onConfirm={() => handleMentorConfirm(recommendedMentor)}
               onSeeAll={handleSeeAllMentors}
+              seeAllLabel={mentorResultSeeAllLabel}
             />
           </motion.div>
         )}
@@ -801,7 +845,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
             <MentorGrid
-              mentors={mentors.map(m => ({
+              mentors={mentorsForOnboardingSelection.map(m => ({
                 ...m,
                 archetype: m.mentor_type,
                 style_description: m.tone_description,

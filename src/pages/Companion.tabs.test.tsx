@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   focusMountCount: 0,
   navigate: vi.fn(),
+  showTutorial: false,
+  dismissTutorial: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -116,8 +118,8 @@ vi.mock("@/hooks/useCompanion", () => ({
 
 vi.mock("@/hooks/useFirstTimeModal", () => ({
   useFirstTimeModal: () => ({
-    showModal: false,
-    dismissModal: vi.fn(),
+    showModal: mocks.showTutorial,
+    dismissModal: mocks.dismissTutorial,
   }),
 }));
 
@@ -175,7 +177,14 @@ vi.mock("@/components/StarfieldBackground", () => ({
 }));
 
 vi.mock("@/components/CompanionTutorialModal", () => ({
-  CompanionTutorialModal: () => null,
+  CompanionTutorialModal: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="companion-tutorial">
+        <button type="button" onClick={onClose}>
+          Hide tutorial
+        </button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/components/ui/parallax-card", () => ({
@@ -243,6 +252,8 @@ describe("Companion tabs performance behavior", () => {
     mocks.prefetchQuery.mockClear();
     mocks.focusMountCount = 0;
     mocks.navigate.mockClear();
+    mocks.showTutorial = false;
+    mocks.dismissTutorial.mockClear();
   });
 
   afterEach(() => {
@@ -347,5 +358,14 @@ describe("Companion tabs performance behavior", () => {
     expect(screen.getByRole("tab", { name: /overview/i })).toBeInTheDocument();
     expect(screen.queryByText("No Companion Found")).not.toBeInTheDocument();
     expect(screen.queryByText("Error Loading Companion")).not.toBeInTheDocument();
+  });
+
+  it("keeps companion actions clickable while tutorial is visible", () => {
+    mocks.showTutorial = true;
+    render(<Companion />);
+
+    expect(screen.getByTestId("companion-tutorial")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Settings"));
+    expect(mocks.navigate).toHaveBeenCalledWith("/profile");
   });
 });

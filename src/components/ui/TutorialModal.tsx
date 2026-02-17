@@ -1,7 +1,6 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TutorialFeature {
@@ -75,15 +74,24 @@ export function TutorialModal({
   buttonText = "Continue",
   accentColor = "primary",
 }: TutorialModalProps) {
+  if (!open) return null;
+
   const accent =
     ACCENT_STYLE_MAP[accentColor as keyof typeof ACCENT_STYLE_MAP] ??
     ACCENT_STYLE_MAP.primary;
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent 
-        className="max-w-sm rounded-3xl border-border/70 bg-card/90 p-0 shadow-[0_24px_46px_rgba(0,0,0,0.34)] backdrop-blur-2xl overflow-hidden"
-        hideCloseButton
+    <div
+      className="fixed left-0 right-0 z-[75] px-3 pointer-events-none"
+      style={{ top: "calc(1rem + env(safe-area-inset-top, 0px))" }}
+      data-testid="tutorial-floating-wrapper"
+    >
+      <motion.div
+        role="dialog"
+        aria-label={title}
+        aria-modal="false"
+        aria-live="polite"
+        className="pointer-events-auto mx-auto max-w-sm rounded-3xl border border-border/70 bg-card/90 p-0 shadow-[0_24px_46px_rgba(0,0,0,0.34)] backdrop-blur-2xl overflow-hidden"
       >
         <motion.div
           initial={{ opacity: 0, y: 40, scale: 0.95 }}
@@ -94,6 +102,15 @@ export function TutorialModal({
             stiffness: 300 
           }}
         >
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Hide tutorial"
+            className="absolute right-3 top-3 z-10 rounded-full p-1.5 text-muted-foreground/80 hover:text-foreground hover:bg-muted/60 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
           {/* Hero section with centered icon */}
           <div className="pt-8 pb-4 flex flex-col items-center">
             {/* Soft glow behind icon */}
@@ -184,7 +201,7 @@ export function TutorialModal({
             </motion.div>
           </div>
         </motion.div>
-      </DialogContent>
-    </Dialog>
+      </motion.div>
+    </div>
   );
 }
