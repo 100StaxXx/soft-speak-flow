@@ -199,25 +199,52 @@ const NOW_MARKER_VIEWPORT_TARGET = 0.45;
 const DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX = 104;
 const DRAG_OVERLAY_TOP_PADDING_PX = 8;
 const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
-const EDGE_HOLD_ACTIVATION_MS = 220;
+const DRAG_OVERLAY_NAV_GAP_PX = 4;
+const EDGE_HOLD_ACTIVATION_MS = 160;
 const EDGE_HOLD_PIN_THRESHOLD_PX = 0.5;
 const EDGE_HOLD_NEAR_MAX_OVERSHOOT_PX = 24;
 const EDGE_HOLD_MEDIUM_MAX_OVERSHOOT_PX = 72;
-const EDGE_HOLD_NEAR_REPEAT_MS = 180;
-const EDGE_HOLD_MEDIUM_REPEAT_MS = 140;
-const EDGE_HOLD_FAR_REPEAT_MS = 110;
+const EDGE_HOLD_HIGH_MAX_OVERSHOOT_PX = 140;
+const EDGE_HOLD_NEAR_REPEAT_MS = 120;
+const EDGE_HOLD_MEDIUM_REPEAT_MS = 85;
+const EDGE_HOLD_HIGH_REPEAT_MS = 60;
+const EDGE_HOLD_EXTREME_REPEAT_MS = 45;
+const EDGE_HOLD_NEAR_STEP_MULTIPLIER = 1;
+const EDGE_HOLD_MEDIUM_STEP_MULTIPLIER = 2;
+const EDGE_HOLD_HIGH_STEP_MULTIPLIER = 3;
+const EDGE_HOLD_EXTREME_STEP_MULTIPLIER = 4;
 
-const resolveEdgeHoldRepeatMs = (overshootPx: number): number | null => {
+interface EdgeHoldProfile {
+  repeatMs: number;
+  stepMultiplier: number;
+}
+
+const resolveEdgeHoldProfile = (overshootPx: number): EdgeHoldProfile | null => {
   if (!Number.isFinite(overshootPx) || overshootPx <= EDGE_HOLD_PIN_THRESHOLD_PX) {
     return null;
   }
   if (overshootPx <= EDGE_HOLD_NEAR_MAX_OVERSHOOT_PX) {
-    return EDGE_HOLD_NEAR_REPEAT_MS;
+    return {
+      repeatMs: EDGE_HOLD_NEAR_REPEAT_MS,
+      stepMultiplier: EDGE_HOLD_NEAR_STEP_MULTIPLIER,
+    };
   }
   if (overshootPx <= EDGE_HOLD_MEDIUM_MAX_OVERSHOOT_PX) {
-    return EDGE_HOLD_MEDIUM_REPEAT_MS;
+    return {
+      repeatMs: EDGE_HOLD_MEDIUM_REPEAT_MS,
+      stepMultiplier: EDGE_HOLD_MEDIUM_STEP_MULTIPLIER,
+    };
   }
-  return EDGE_HOLD_FAR_REPEAT_MS;
+  if (overshootPx <= EDGE_HOLD_HIGH_MAX_OVERSHOOT_PX) {
+    return {
+      repeatMs: EDGE_HOLD_HIGH_REPEAT_MS,
+      stepMultiplier: EDGE_HOLD_HIGH_STEP_MULTIPLIER,
+    };
+  }
+  return {
+    repeatMs: EDGE_HOLD_EXTREME_REPEAT_MS,
+    stepMultiplier: EDGE_HOLD_EXTREME_STEP_MULTIPLIER,
+  };
 };
 
 interface DragOverlaySnapshot {
@@ -764,6 +791,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const dragOverlayBottomInsetRef = useRef(DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX);
   const edgeHoldDirectionRef = useRef<-1 | 0 | 1>(0);
   const edgeHoldRepeatMsRef = useRef<number | null>(null);
+  const edgeHoldStepMultiplierRef = useRef(EDGE_HOLD_NEAR_STEP_MULTIPLIER);
   const edgeHoldActivationTimeoutRef = useRef<number | null>(null);
   const edgeHoldRepeatIntervalRef = useRef<number | null>(null);
   const edgeHoldIsActiveRef = useRef(false);
@@ -806,14 +834,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const stopEdgeHold = useCallback(() => {
     edgeHoldDirectionRef.current = 0;
     edgeHoldRepeatMsRef.current = null;
+    edgeHoldStepMultiplierRef.current = EDGE_HOLD_NEAR_STEP_MULTIPLIER;
     edgeHoldIsActiveRef.current = false;
     clearEdgeHoldActivationTimer();
     clearEdgeHoldRepeatTimer();
   }, [clearEdgeHoldActivationTimer, clearEdgeHoldRepeatTimer]);
 
   const startEdgeHoldInterval = useCallback(
-    (direction: -1 | 1, repeatMs: number) => {
+    (direction: -1 | 1, repeatMs: number, stepMultiplier: number) => {
       clearEdgeHoldRepeatTimer();
+      edgeHoldStepMultiplierRef.current = Math.max(1, stepMultiplier);
       edgeHoldIsActiveRef.current = true;
       edgeHoldRepeatIntervalRef.current = window.setInterval(() => {
         if (!timelineDrag.isDragging || edgeHoldDirectionRef.current !== direction) {
@@ -822,10 +852,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           return;
         }
 
-        const nudged = timelineDrag.nudgeByFineStep(direction);
-        if (!nudged) {
-          edgeHoldIsActiveRef.current = false;
-          clearEdgeHoldRepeatTimer();
+        const activeStepMultiplier = Math.max(1, edgeHoldStepMultiplierRef.current);
+        for (let step = 0; step < activeStepMultiplier; step += 1) {
+          const nudged = timelineDrag.nudgeByFineStep(direction);
+          if (!nudged) {
+            edgeHoldIsActiveRef.current = false;
+            clearEdgeHoldRepeatTimer();
+            return;
+          }
         }
       }, repeatMs);
     },
@@ -833,19 +867,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   );
 
   const syncEdgeHoldState = useCallback(
-    (nextDirection: -1 | 0 | 1, nextRepeatMs: number | null) => {
-      if (!timelineDrag.isDragging || nextDirection === 0 || nextRepeatMs === null) {
+    (nextDirection: -1 | 0 | 1, nextProfile: EdgeHoldProfile | null) => {
+      if (!timelineDrag.isDragging || nextDirection === 0 || nextProfile === null) {
         stopEdgeHold();
         return;
       }
 
+      const nextRepeatMs = nextProfile.repeatMs;
+      const nextStepMultiplier = nextProfile.stepMultiplier;
       const previousDirection = edgeHoldDirectionRef.current;
       const previousRepeatMs = edgeHoldRepeatMsRef.current;
+      const previousStepMultiplier = edgeHoldStepMultiplierRef.current;
       const directionChanged = previousDirection !== nextDirection;
       const repeatChanged = previousRepeatMs !== nextRepeatMs;
+      const stepMultiplierChanged = previousStepMultiplier !== nextStepMultiplier;
 
       edgeHoldDirectionRef.current = nextDirection;
       edgeHoldRepeatMsRef.current = nextRepeatMs;
+      edgeHoldStepMultiplierRef.current = nextStepMultiplier;
 
       if (directionChanged) {
         edgeHoldIsActiveRef.current = false;
@@ -863,7 +902,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             stopEdgeHold();
             return;
           }
-          startEdgeHoldInterval(nextDirection, activeRepeatMs);
+          const activeStepMultiplier = Math.max(1, edgeHoldStepMultiplierRef.current);
+          startEdgeHoldInterval(nextDirection, activeRepeatMs, activeStepMultiplier);
         }, EDGE_HOLD_ACTIVATION_MS);
         return;
       }
@@ -872,8 +912,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         return;
       }
 
-      if (repeatChanged) {
-        startEdgeHoldInterval(nextDirection, nextRepeatMs);
+      if (repeatChanged || stepMultiplierChanged) {
+        startEdgeHoldInterval(nextDirection, nextRepeatMs, nextStepMultiplier);
       }
     },
     [
@@ -946,17 +986,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         && Number.isFinite(paneRect.top)
         && Number.isFinite(paneRect.bottom)
         && paneRect.bottom > (paneRect.top + 1);
+      const hasMeasurableNavBounds = !!navRect
+        && Number.isFinite(navRect.top)
+        && Number.isFinite(navRect.bottom)
+        && navRect.bottom > navRect.top;
       const timelineTopBound = hasMeasurablePaneBounds ? paneRect.top : viewportTopInset;
       const timelineBottomBound = hasMeasurablePaneBounds ? paneRect.bottom : viewportBottom;
-      const navTopBound = navRect?.top ?? (viewportBottom - dragOverlayBottomInsetRef.current);
-      const viewportSafeBottomBound = viewportBottom - dragOverlayBottomInsetRef.current;
+      const viewportSafeMaxTop = viewportBottom - dragOverlayBottomInsetRef.current - dragOverlaySnapshot.height;
+      const paneBoundMaxTop = timelineBottomBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX;
+      const navBoundMaxTop = hasMeasurableNavBounds
+        ? navRect.top - dragOverlaySnapshot.height - DRAG_OVERLAY_NAV_GAP_PX
+        : null;
 
       const minTop = Math.max(viewportTopInset, timelineTopBound) + DRAG_OVERLAY_TOP_PADDING_PX;
-      const maxTop = Math.min(
-        timelineBottomBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX,
-        navTopBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX,
-        viewportSafeBottomBound - dragOverlaySnapshot.height,
-      );
+      const maxTop = navBoundMaxTop !== null
+        ? Math.min(navBoundMaxTop, viewportSafeMaxTop)
+        : hasMeasurablePaneBounds
+          ? paneBoundMaxTop
+          : viewportSafeMaxTop;
       const safeMaxTop = Math.max(minTop, maxTop);
 
       const minOffset = minTop - dragOverlaySnapshot.top;
@@ -970,8 +1017,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         : clampDelta < -EDGE_HOLD_PIN_THRESHOLD_PX
           ? -1
           : 0;
-      const repeatMs = resolveEdgeHoldRepeatMs(Math.abs(clampDelta));
-      syncEdgeHoldState(pinnedDirection, repeatMs);
+      const edgeHoldProfile = resolveEdgeHoldProfile(Math.abs(clampDelta));
+      syncEdgeHoldState(pinnedDirection, edgeHoldProfile);
     };
 
     clampDragOffset(dragVisualOffsetY.get());
