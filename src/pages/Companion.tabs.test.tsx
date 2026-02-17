@@ -148,6 +148,7 @@ vi.mock("@/hooks/useCompanionPostcards", () => ({
 
 vi.mock("react-router-dom", () => ({
   useNavigate: () => mocks.navigate,
+  useLocation: () => ({ pathname: "/companion" }),
 }));
 
 vi.mock("framer-motion", () => {
@@ -174,6 +175,10 @@ vi.mock("@/components/CompanionErrorBoundary", () => ({
 
 vi.mock("@/components/StarfieldBackground", () => ({
   StarfieldBackground: () => null,
+}));
+
+vi.mock("@/components/MentorGuidanceCard", () => ({
+  MentorGuidanceCard: () => null,
 }));
 
 vi.mock("@/components/CompanionTutorialModal", () => ({

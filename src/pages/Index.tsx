@@ -25,6 +25,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { useMentorConnectionHealth } from "@/hooks/useMentorConnectionHealth";
+import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -230,6 +231,8 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       {/* Scrollable Content */}
       <div className="relative z-10 min-h-screen pb-nav-safe pt-safe">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 pt-28 sm:pt-24 md:pt-20 space-y-4 sm:space-y-6 md:space-y-8">
+          <MentorGuidanceCard route="/mentor" />
+
           {mentorConnectionIssue && (
             <div className="mx-4 sm:mx-6 rounded-2xl border border-destructive/45 bg-card/40 backdrop-blur-2xl p-4 sm:p-5 shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

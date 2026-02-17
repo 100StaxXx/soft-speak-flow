@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
+import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 
 type CompanionTab = "overview" | "focus" | "stories" | "postcards" | "collection";
 
@@ -410,6 +411,10 @@ const Companion = () => {
           
           {/* Spacer for fixed header */}
           <div className="pt-safe" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 72px)' }} />
+
+          <div className="container">
+            <MentorGuidanceCard route="/companion" />
+          </div>
 
           {renderContent()}
         </div>

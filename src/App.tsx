@@ -36,10 +36,10 @@ import { useAuthSync } from "@/hooks/useAuthSync";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { safeSessionStorage } from "@/utils/storage";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
-import { TutorialOrchestrator } from "@/components/TutorialOrchestrator";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
 import { BottomNav } from "@/components/BottomNav";
 import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
+import { PostOnboardingMentorGuidanceProvider } from "@/hooks/usePostOnboardingMentorGuidance";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -260,20 +260,21 @@ const AppContent = memo(() => {
     <ThemeProvider mentorId={resolvedMentorId}>
       <ViewModeProvider>
         <XPProvider>
-          <WeeklyRecapProvider>
-            <CompanionPresenceProvider>
-               <TalkPopupProvider>
-                <RealtimeSyncProvider>
-                <AstralEncounterProvider>
-                <Suspense fallback={<LoadingFallback />}>
-                <EvolutionAwareContent />
-                {activeMainTabPath ? (
-                  <ProtectedRoute>
-                    <MainTabsKeepAlive activePath={activeMainTabPath} />
-                  </ProtectedRoute>
-                ) : (
-                <AnimatePresence mode="sync" initial={false}>
-                  <Routes location={location} key={location.pathname}>
+          <PostOnboardingMentorGuidanceProvider>
+            <WeeklyRecapProvider>
+              <CompanionPresenceProvider>
+                 <TalkPopupProvider>
+                  <RealtimeSyncProvider>
+                  <AstralEncounterProvider>
+                  <Suspense fallback={<LoadingFallback />}>
+                  <EvolutionAwareContent />
+                  {activeMainTabPath ? (
+                    <ProtectedRoute>
+                      <MainTabsKeepAlive activePath={activeMainTabPath} />
+                    </ProtectedRoute>
+                  ) : (
+                  <AnimatePresence mode="sync" initial={false}>
+                    <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />
                   <Route path="/auth" element={<Auth />} />
@@ -315,17 +316,17 @@ const AppContent = memo(() => {
                   <Route path="/test-scroll" element={<TestScroll />} />
                   <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </AnimatePresence>
-                )}
-                {showBottomNav && <BottomNav />}
-                <TutorialOrchestrator />
-                </Suspense>
-                </AstralEncounterProvider>
-                </RealtimeSyncProvider>
-               </TalkPopupProvider>
-            </CompanionPresenceProvider>
-          </WeeklyRecapProvider>
+                    </Routes>
+                  </AnimatePresence>
+                  )}
+                  {showBottomNav && <BottomNav />}
+                  </Suspense>
+                  </AstralEncounterProvider>
+                  </RealtimeSyncProvider>
+                 </TalkPopupProvider>
+              </CompanionPresenceProvider>
+            </WeeklyRecapProvider>
+          </PostOnboardingMentorGuidanceProvider>
         </XPProvider>
       </ViewModeProvider>
     </ThemeProvider>

@@ -53,6 +53,7 @@ import { getTodayIfDateStale, JOURNEYS_ROUTE, shouldResetJourneysDate } from "@/
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { formatTime12 } from "@/components/quest-shared";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -70,7 +71,6 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
-  const [preventQuestSheetClose, setPreventQuestSheetClose] = useState(false);
   
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
@@ -101,20 +101,6 @@ const Journeys = () => {
   useEffect(() => {
     activePathRef.current = location.pathname;
   }, [location.pathname]);
-
-  useEffect(() => {
-    const listener = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{ active?: boolean }>
-      ).detail;
-      setPreventQuestSheetClose(detail?.active === true);
-    };
-
-    window.addEventListener("guided-create-quest-lock", listener as EventListener);
-    return () => {
-      window.removeEventListener("guided-create-quest-lock", listener as EventListener);
-    };
-  }, []);
 
   useEffect(() => {
     const previousPath = previousPathRef.current;
@@ -769,6 +755,7 @@ const Journeys = () => {
             {headerDragTime ? `Dragging to ${formatTime12(headerDragTime)}` : "Daily quests. Your path to progress."}
           </p>
         </motion.div>
+        <MentorGuidanceCard route="/journeys" />
 
         <QuestsErrorBoundary>
           {/* Date Selector */}
@@ -837,7 +824,6 @@ const Journeys = () => {
           isAdding={isAdding}
           prefilledTime={prefilledTime}
           onCreateCampaign={() => setShowPathfinder(true)}
-          preventClose={preventQuestSheetClose}
         />
         
         {/* Edit Quest Dialog (for regular quests) */}
