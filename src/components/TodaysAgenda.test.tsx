@@ -1173,17 +1173,17 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const edgeHoldDelaysAfterActivation = setIntervalSpy.mock.calls
       .map(([, delay]) => delay)
       .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
-    expect(edgeHoldDelaysAfterActivation).toContain(120);
+    expect(edgeHoldDelaysAfterActivation).toContain(150);
 
     const callsBeforeMediumTier = mocks.nudgeByFineStepMock.mock.calls.length;
     act(() => {
       mocks.dragOffsetMotionValue.set(-40);
-      vi.advanceTimersByTime(90);
+      vi.advanceTimersByTime(110);
     });
     const edgeHoldDelaysAfterMediumTier = setIntervalSpy.mock.calls
       .map(([, delay]) => delay)
       .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
-    expect(edgeHoldDelaysAfterMediumTier).toContain(85);
+    expect(edgeHoldDelaysAfterMediumTier).toContain(105);
     const callsAfterMediumTier = mocks.nudgeByFineStepMock.mock.calls.length;
     expect(callsAfterMediumTier - callsBeforeMediumTier).toBeGreaterThanOrEqual(2);
 
