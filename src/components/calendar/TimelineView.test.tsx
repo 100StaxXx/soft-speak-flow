@@ -111,4 +111,25 @@ describe("TimelineView drag integration", () => {
       expect(screen.queryByTestId("drag-time-zoom-rail")).not.toBeInTheDocument();
     });
   });
+
+  it("does not reschedule when drag handle is clicked without movement", async () => {
+    const onTaskReschedule = vi.fn();
+
+    render(
+      <TimelineView
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={vi.fn()}
+        tasks={[baseTask()]}
+        onTaskReschedule={onTaskReschedule}
+      />,
+    );
+
+    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    act(() => {
+      fireEvent(dragHandle, createPointerDownEvent(100));
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    expect(onTaskReschedule).not.toHaveBeenCalled();
+  });
 });

@@ -17,6 +17,7 @@ import {
 
 const DROP_BOUNCE_MS = 300;
 const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
+const DEFAULT_ACTIVATION_THRESHOLD_PX = 8;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -30,6 +31,7 @@ interface UseTimelineDragOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   onDrop: (taskId: string, newTime: string) => void;
   snapConfig?: Partial<AdaptiveSnapConfig>;
+  activationThresholdPx?: number;
 }
 
 interface DragHandleProps {
@@ -56,6 +58,12 @@ interface WindowListeners {
 type ScrollContext =
   | { kind: "window" }
   | { kind: "element"; element: HTMLElement };
+
+interface PendingDragCandidate {
+  taskId: string;
+  scheduledTime: string;
+  startY: number;
+}
 
 const getViewportHeight = () => {
   if (typeof window === "undefined") return 720;
@@ -93,8 +101,14 @@ const getScrollOffset = (context: ScrollContext): number => {
   return context.element.scrollTop;
 };
 
-export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelineDragOptions) {
+export function useTimelineDrag({
+  containerRef,
+  onDrop,
+  snapConfig,
+  activationThresholdPx = DEFAULT_ACTIVATION_THRESHOLD_PX,
+}: UseTimelineDragOptions) {
   const resolvedSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(snapConfig), [snapConfig]);
+  const resolvedActivationThresholdPx = Math.max(0, activationThresholdPx);
 
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [previewTime, setPreviewTime] = useState<string | null>(null);
@@ -117,9 +131,12 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   );
   const dropResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowListenersRef = useRef<WindowListeners>({});
+  const pendingDragRef = useRef<PendingDragCandidate | null>(null);
   const scrollContextRef = useRef<ScrollContext>({ kind: "window" });
   const dragStartScrollOffsetRef = useRef(0);
   const lastPointerClientYRef = useRef(0);
+  const queuedMoveClientYRef = useRef<number | null>(null);
+  const queuedMoveFrameRef = useRef<number | null>(null);
 
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -198,8 +215,126 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     [dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig, updateAutoscroll],
   );
 
+  const clearQueuedMove = useCallback(() => {
+    if (queuedMoveFrameRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(queuedMoveFrameRef.current);
+      queuedMoveFrameRef.current = null;
+    }
+    queuedMoveClientYRef.current = null;
+  }, []);
+
+  const flushQueuedMove = useCallback(
+    (options?: { skipAutoscrollUpdate?: boolean }) => {
+      const queuedClientY = queuedMoveClientYRef.current;
+      if (queuedMoveFrameRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(queuedMoveFrameRef.current);
+        queuedMoveFrameRef.current = null;
+      }
+      if (queuedClientY === null) return;
+      queuedMoveClientYRef.current = null;
+      handleMove(queuedClientY, options);
+    },
+    [handleMove],
+  );
+
+  const queueMove = useCallback(
+    (clientY: number) => {
+      if (!draggingTaskIdRef.current) return;
+      const safeClientY = Number.isFinite(clientY) ? clientY : dragStartYRef.current;
+      queuedMoveClientYRef.current = safeClientY;
+
+      if (typeof window === "undefined") {
+        flushQueuedMove();
+        return;
+      }
+      if (queuedMoveFrameRef.current !== null) return;
+
+      queuedMoveFrameRef.current = window.requestAnimationFrame(() => {
+        queuedMoveFrameRef.current = null;
+        const nextClientY = queuedMoveClientYRef.current;
+        if (nextClientY === null) return;
+        queuedMoveClientYRef.current = null;
+        handleMove(nextClientY);
+      });
+    },
+    [flushQueuedMove, handleMove],
+  );
+
+  const attachActiveScrollListener = useCallback(() => {
+    const scrollContext = findNearestScrollContext(containerRef.current);
+    scrollContextRef.current = scrollContext;
+    dragStartScrollOffsetRef.current = getScrollOffset(scrollContext);
+
+    const scrollListener = () => {
+      if (!draggingTaskIdRef.current) return;
+      handleMove(lastPointerClientYRef.current, { skipAutoscrollUpdate: true });
+    };
+
+    windowListenersRef.current.scroll = scrollListener;
+    windowListenersRef.current.scrollContext = scrollContext;
+    if (scrollContext.kind === "element") {
+      scrollContext.element.addEventListener("scroll", scrollListener, { passive: true });
+    } else {
+      window.addEventListener("scroll", scrollListener, { passive: true });
+    }
+  }, [containerRef, handleMove]);
+
+  const activateDrag = useCallback(
+    (pendingDrag: PendingDragCandidate) => {
+      if (draggingTaskIdRef.current) return;
+
+      const safeStartY = Number.isFinite(pendingDrag.startY) ? pendingDrag.startY : 0;
+      const startMinute = time24ToMinute(pendingDrag.scheduledTime, resolvedSnapConfig);
+      const normalizedStartTime = minuteToTime24(startMinute, resolvedSnapConfig);
+
+      pendingDragRef.current = null;
+      draggingTaskIdRef.current = pendingDrag.taskId;
+      originalTimeRef.current = normalizedStartTime;
+      originalMinutesRef.current = startMinute;
+      currentRawMinutesRef.current = startMinute;
+      lastPreviewMinuteRef.current = startMinute;
+      dragStartYRef.current = safeStartY;
+      lastPointerClientYRef.current = safeStartY;
+      dragMovedRef.current = false;
+      runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(
+        resolvedSnapConfig,
+        getViewportHeight(),
+      );
+
+      setDraggingTaskId(pendingDrag.taskId);
+      setPreviewTime(normalizedStartTime);
+      dragOffsetY.set(0);
+      dragEdgeOffsetY.set(0);
+      setSnapMode("coarse");
+      setZoomRail(null);
+      attachActiveScrollListener();
+    },
+    [attachActiveScrollListener, dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig],
+  );
+
+  const maybeActivateDrag = useCallback(
+    (clientY: number): boolean => {
+      if (draggingTaskIdRef.current) return true;
+      const pendingDrag = pendingDragRef.current;
+      if (!pendingDrag) return false;
+
+      const safeClientY = Number.isFinite(clientY) ? clientY : pendingDrag.startY;
+      lastPointerClientYRef.current = safeClientY;
+      const movementY = Math.abs(safeClientY - pendingDrag.startY);
+      if (movementY < resolvedActivationThresholdPx) {
+        return false;
+      }
+
+      activateDrag(pendingDrag);
+      return true;
+    },
+    [activateDrag, resolvedActivationThresholdPx],
+  );
+
   const finishDrag = useCallback(() => {
+    flushQueuedMove({ skipAutoscrollUpdate: true });
     removeWindowListeners();
+    pendingDragRef.current = null;
 
     const taskId = draggingTaskIdRef.current;
     const finalMinute = snapMinuteByMode(currentRawMinutesRef.current, "fine", resolvedSnapConfig);
@@ -223,6 +358,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     setPreviewTime(null);
     dragOffsetY.set(0);
     dragEdgeOffsetY.set(0);
+    clearQueuedMove();
     stopScroll();
     scrollContextRef.current = { kind: "window" };
     dragStartScrollOffsetRef.current = 0;
@@ -231,8 +367,10 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     resetSnapState();
   }, [
     clearDropResetTimer,
+    clearQueuedMove,
     dragEdgeOffsetY,
     dragOffsetY,
+    flushQueuedMove,
     onDrop,
     removeWindowListeners,
     resetSnapState,
@@ -240,66 +378,54 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     stopScroll,
   ]);
 
-  const startDrag = useCallback(
+  const startPendingDrag = useCallback(
     (taskId: string, scheduledTime: string, startY: number, inputSource: "pointer" | "touch") => {
-      if (draggingTaskIdRef.current) return;
+      if (draggingTaskIdRef.current || pendingDragRef.current) return;
 
       removeWindowListeners();
-
+      clearQueuedMove();
       const safeStartY = Number.isFinite(startY) ? startY : 0;
-      const startMinute = time24ToMinute(scheduledTime, resolvedSnapConfig);
-      const normalizedStartTime = minuteToTime24(startMinute, resolvedSnapConfig);
-      const scrollContext = findNearestScrollContext(containerRef.current);
-      const dragStartScrollOffset = getScrollOffset(scrollContext);
-
-      draggingTaskIdRef.current = taskId;
-      originalTimeRef.current = normalizedStartTime;
-      originalMinutesRef.current = startMinute;
-      currentRawMinutesRef.current = startMinute;
-      lastPreviewMinuteRef.current = startMinute;
-      dragStartYRef.current = safeStartY;
-      scrollContextRef.current = scrollContext;
-      dragStartScrollOffsetRef.current = dragStartScrollOffset;
+      pendingDragRef.current = {
+        taskId,
+        scheduledTime,
+        startY: safeStartY,
+      };
       lastPointerClientYRef.current = safeStartY;
       dragMovedRef.current = false;
-      runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(
-        resolvedSnapConfig,
-        getViewportHeight(),
-      );
-
-      setDraggingTaskId(taskId);
-      setPreviewTime(normalizedStartTime);
-      dragOffsetY.set(0);
-      dragEdgeOffsetY.set(0);
-      setSnapMode("coarse");
-      setZoomRail(null);
 
       const pointerMove = (e: PointerEvent) => {
-        handleMove(e.clientY);
+        const isActive = maybeActivateDrag(e.clientY);
+        if (!isActive) return;
+        queueMove(e.clientY);
       };
       const pointerEnd = () => {
-        finishDrag();
+        if (draggingTaskIdRef.current) {
+          finishDrag();
+          return;
+        }
+        pendingDragRef.current = null;
+        clearQueuedMove();
+        removeWindowListeners();
       };
       const touchMove = (e: TouchEvent) => {
-        if (!draggingTaskIdRef.current) return;
-        e.preventDefault();
         const touch = e.touches[0];
-        if (touch) {
-          handleMove(touch.clientY);
-        }
+        if (!touch) return;
+        const isActive = maybeActivateDrag(touch.clientY);
+        if (!isActive) return;
+        e.preventDefault();
+        queueMove(touch.clientY);
       };
       const touchEnd = () => {
-        finishDrag();
-      };
-      const scrollListener = () => {
-        if (!draggingTaskIdRef.current) return;
-        handleMove(lastPointerClientYRef.current, { skipAutoscrollUpdate: true });
+        if (draggingTaskIdRef.current) {
+          finishDrag();
+          return;
+        }
+        pendingDragRef.current = null;
+        clearQueuedMove();
+        removeWindowListeners();
       };
 
-      windowListenersRef.current = {
-        scroll: scrollListener,
-        scrollContext,
-      };
+      windowListenersRef.current = {};
 
       if (inputSource === "touch") {
         windowListenersRef.current.touchmove = touchMove;
@@ -316,36 +442,27 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
         window.addEventListener("pointerup", pointerEnd);
         window.addEventListener("pointercancel", pointerEnd);
       }
-      if (scrollContext.kind === "element") {
-        scrollContext.element.addEventListener("scroll", scrollListener, { passive: true });
-      } else {
-        window.addEventListener("scroll", scrollListener, { passive: true });
-      }
     },
     [
-      containerRef,
-      dragEdgeOffsetY,
-      dragOffsetY,
+      clearQueuedMove,
       finishDrag,
-      handleMove,
+      maybeActivateDrag,
+      queueMove,
       removeWindowListeners,
-      resolvedSnapConfig,
     ],
   );
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (e.defaultPrevented) return;
-      if (draggingTaskIdRef.current) return;
+      if (draggingTaskIdRef.current || pendingDragRef.current) return;
       if (isInteractiveEventTarget(e.target)) return;
       const touch = e.touches[0];
       if (!touch) return;
 
-      e.preventDefault();
-      e.stopPropagation();
-      startDrag(taskId, scheduledTime, touch.clientY, "touch");
+      startPendingDrag(taskId, scheduledTime, touch.clientY, "touch");
     },
-    [isInteractiveEventTarget, startDrag],
+    [isInteractiveEventTarget, startPendingDrag],
   );
 
   const noopTouchMove = useCallback(
@@ -365,19 +482,18 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (e.defaultPrevented) return;
-      if (draggingTaskIdRef.current) return;
+      if (draggingTaskIdRef.current || pendingDragRef.current) return;
       if (isInteractiveEventTarget(e.target)) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
-      e.preventDefault();
-      e.stopPropagation();
-      startDrag(taskId, scheduledTime, e.clientY, "pointer");
+      startPendingDrag(taskId, scheduledTime, e.clientY, "pointer");
     },
-    [isInteractiveEventTarget, startDrag],
+    [isInteractiveEventTarget, startPendingDrag],
   );
 
   const nudgeByFineStep = useCallback(
     (direction: -1 | 1): boolean => {
+      flushQueuedMove({ skipAutoscrollUpdate: true });
       if (!draggingTaskIdRef.current) return false;
 
       const currentPreviewMinute = lastPreviewMinuteRef.current;
@@ -399,7 +515,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       dragMovedRef.current = true;
       return true;
     },
-    [dragOffsetY, resolvedSnapConfig],
+    [dragOffsetY, flushQueuedMove, resolvedSnapConfig],
   );
 
   const getDragHandleProps = useCallback(
@@ -432,9 +548,11 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     return () => {
       removeWindowListeners();
       clearDropResetTimer();
+      clearQueuedMove();
+      pendingDragRef.current = null;
       stopScroll();
     };
-  }, [clearDropResetTimer, removeWindowListeners, stopScroll]);
+  }, [clearDropResetTimer, clearQueuedMove, removeWindowListeners, stopScroll]);
 
   return {
     draggingTaskId,

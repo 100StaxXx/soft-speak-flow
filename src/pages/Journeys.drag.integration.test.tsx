@@ -421,6 +421,33 @@ describe("Journeys row drag integration", () => {
     expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
   });
 
+  it("does not reschedule when row is clicked without drag movement", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const row = await screen.findByTestId("timeline-row-task-1");
+
+    act(() => {
+      fireEvent(row, createPointerDownEvent(100));
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutate).not.toHaveBeenCalled();
+  });
+
   it("updates only the dragged quest once when multiple quests are present", async () => {
     mocks.dailyTasks = [
       {
