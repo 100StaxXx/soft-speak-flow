@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeGuidedPanelPlacement, safeCompletedSteps } from "./TutorialOrchestrator";
+import {
+  CREATE_QUEST_SUBSTEP_ORDER,
+  computeGuidedPanelPlacement,
+  safeCompletedSteps,
+} from "./TutorialOrchestrator";
 
 describe("safeCompletedSteps", () => {
   it("returns only valid guided step ids", () => {
@@ -64,5 +68,16 @@ describe("computeGuidedPanelPlacement", () => {
 
     expect(result.zone).toBe("top");
     expect(result.lockEnabled).toBe(true);
+  });
+});
+
+describe("create quest substep order", () => {
+  it("defines deterministic substeps in strict order", () => {
+    expect(CREATE_QUEST_SUBSTEP_ORDER).toEqual([
+      "stay_on_quests",
+      "open_add_quest",
+      "select_time",
+      "submit_create_quest",
+    ]);
   });
 });

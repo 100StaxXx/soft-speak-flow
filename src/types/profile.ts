@@ -3,12 +3,27 @@
  */
 
 export type GuidedTutorialStepId = "create_quest" | "meet_companion" | "morning_checkin";
+export type CreateQuestSubstepId =
+  | "stay_on_quests"
+  | "open_add_quest"
+  | "select_time"
+  | "submit_create_quest";
+
+export interface GuidedSubstepProgress {
+  create_quest?: {
+    current: CreateQuestSubstepId;
+    completed: CreateQuestSubstepId[];
+    startedAt?: string;
+    completedAt?: string;
+  };
+}
 
 export interface GuidedTutorialProgress {
   version: number;
   eligible: boolean;
   completedSteps: GuidedTutorialStepId[];
   xpAwardedSteps: GuidedTutorialStepId[];
+  substeps?: GuidedSubstepProgress;
   dismissed: boolean;
   completed: boolean;
   completedAt?: string;

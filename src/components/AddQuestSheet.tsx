@@ -49,6 +49,8 @@ interface AddQuestSheetProps {
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
   onCreateCampaign?: () => void;
+  preventClose?: boolean;
+  onPreventedCloseAttempt?: () => void;
 }
 
 import {
@@ -73,6 +75,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onAdd,
   isAdding = false,
   onCreateCampaign,
+  preventClose = false,
+  onPreventedCloseAttempt,
 }: AddQuestSheetProps) {
   const [taskText, setTaskText] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -221,8 +225,27 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setTimeout(() => subtaskInputRefs.current[subtasks.length]?.focus(), 50);
   }, [subtasks.length]);
 
+  const requestOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        onOpenChange(true);
+        return;
+      }
+
+      if (preventClose) {
+        window.dispatchEvent(new CustomEvent("add-quest-sheet-close-attempted"));
+        onPreventedCloseAttempt?.();
+        return;
+      }
+
+      onOpenChange(false);
+    },
+    [onOpenChange, onPreventedCloseAttempt, preventClose]
+  );
+
   const handleSubmit = useCallback(async () => {
     if (!taskText.trim()) return;
+    window.dispatchEvent(new CustomEvent("add-quest-create-attempted"));
     await onAdd({
       text: taskText,
       taskDate,
@@ -267,16 +290,30 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     onOpenChange(false);
   }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, onAdd, onOpenChange]);
 
+  useEffect(() => {
+    if (!open) return;
+    window.dispatchEvent(new CustomEvent("add-quest-sheet-opened"));
+  }, [open]);
+
+  useEffect(() => {
+    if (!scheduledTime) return;
+    window.dispatchEvent(
+      new CustomEvent("add-quest-time-selected", {
+        detail: { scheduledTime },
+      })
+    );
+  }, [scheduledTime]);
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden">
+    <Sheet open={open} onOpenChange={requestOpenChange}>
+      <SheetContent side="bottom" data-tour="add-quest-sheet" className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden">
         <SheetTitle className="sr-only">Add Quest</SheetTitle>
         <SheetDescription className="sr-only">
           Create a new quest with schedule, subtasks, and optional details.
         </SheetDescription>
         <div className={cn("relative px-5 pt-4 pb-5 flex-shrink-0", colors.bg)}>
           <button
-            onClick={() => onOpenChange(false)}
+            onClick={() => requestOpenChange(false)}
             className="absolute top-3 right-3 p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white z-10"
             aria-label="Close"
           >
@@ -426,6 +463,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   }
                   setShowTimePicker(!showTimePicker);
                 }}
+                data-tour="add-quest-time-chip"
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
                   scheduledTime
@@ -443,6 +481,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <div className="space-y-2">
                 <Input
                   aria-label="Custom quest time"
+                  data-tour="add-quest-time-input"
                   type="time"
                   step={60}
                   value={scheduledTime || ""}
@@ -466,6 +505,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                       return (
                         <button
                           key={slot}
+                          data-tour="add-quest-time-slot"
                           ref={isSelected ? selectedTimeRef : undefined}
                           onClick={() => setScheduledTime(slot)}
                           className={cn(
@@ -620,6 +660,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           )}
           <Button
             onClick={handleSubmit}
+            data-tour="add-quest-create-button"
             disabled={isAdding || !canCreateTask}
             className={cn(
               "w-full text-white",

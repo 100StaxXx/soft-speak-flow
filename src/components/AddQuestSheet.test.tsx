@@ -249,4 +249,61 @@ describe("AddQuestSheet", () => {
 
     expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
   });
+
+  it("blocks close requests when preventClose is enabled", () => {
+    const onOpenChange = vi.fn();
+    const onPreventedCloseAttempt = vi.fn();
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+        preventClose
+        onPreventedCloseAttempt={onPreventedCloseAttempt}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(onPreventedCloseAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it("emits tutorial events for open, time selection, and create attempt", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+      />
+    );
+
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-sheet-opened" }));
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Evented quest" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    fireEvent.change(screen.getByLabelText("Custom quest time"), {
+      target: { value: "10:15" },
+    });
+
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-create-attempted" }));
+    dispatchSpy.mockRestore();
+  });
 });

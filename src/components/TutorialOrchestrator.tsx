@@ -9,7 +9,12 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { supabase } from "@/integrations/supabase/client";
 import { safeLocalStorage } from "@/utils/storage";
 import { cn } from "@/lib/utils";
-import type { GuidedTutorialProgress, GuidedTutorialStepId } from "@/types/profile";
+import type {
+  CreateQuestSubstepId,
+  GuidedSubstepProgress,
+  GuidedTutorialProgress,
+  GuidedTutorialStepId,
+} from "@/types/profile";
 
 const GUIDED_TUTORIAL_VERSION = 2;
 const STEP_XP_REWARDS: Record<GuidedTutorialStepId, number> = {
@@ -63,6 +68,23 @@ interface PlacementInput {
   preferredZones?: PanelZone[];
 }
 
+interface CreateQuestSubstepView {
+  id: CreateQuestSubstepId;
+  title: string;
+  description: string;
+  checklist: string[];
+  successHint: string;
+  actionLabel: string;
+  selectors: string[];
+}
+
+interface CreateQuestProgressState {
+  current: CreateQuestSubstepId;
+  completed: CreateQuestSubstepId[];
+  startedAt?: string;
+  completedAt?: string;
+}
+
 const PANEL_GAP = 12;
 const SAFE_HORIZONTAL = 12;
 const SAFE_TOP = 12;
@@ -72,13 +94,13 @@ const GUIDED_STEPS: GuidedStep[] = [
   {
     id: "create_quest",
     title: "Create your first quest",
-    description: "Schedule one quest with a time so it appears in Quests.",
+    description: "Finish each action in order to create your first scheduled quest.",
     checklist: [
       "Stay on the QUESTS tab.",
       "Tap + in the lower-right corner.",
       "Set a time, enter a title, then tap Create Quest.",
     ],
-    successHint: "If time is missing, it becomes an Inbox item.",
+    successHint: "You'll move one substep at a time.",
     actionLabel: "Go to Quests",
     route: "/journeys",
     navSelector: '[data-tour="quests-tab"]',
@@ -128,10 +150,60 @@ const GUIDED_STEPS: GuidedStep[] = [
   },
 ];
 
+export const CREATE_QUEST_SUBSTEP_ORDER: CreateQuestSubstepId[] = [
+  "stay_on_quests",
+  "open_add_quest",
+  "select_time",
+  "submit_create_quest",
+];
+
+const CREATE_QUEST_SUBSTEP_VIEW: Record<CreateQuestSubstepId, CreateQuestSubstepView> = {
+  stay_on_quests: {
+    id: "stay_on_quests",
+    title: "Stay on Quests",
+    description: "You must remain on the Quests tab for this tutorial sequence.",
+    checklist: ["Stay on the QUESTS tab."],
+    successHint: "Once you're on Quests, we'll move to the next action.",
+    actionLabel: "Go to Quests",
+    selectors: ['[data-tour="quests-tab"]'],
+  },
+  open_add_quest: {
+    id: "open_add_quest",
+    title: "Open Add Quest",
+    description: "Tap the + button to open the Add Quest sheet.",
+    checklist: ["Tap + in the lower-right corner."],
+    successHint: "The next step starts as soon as the Add Quest sheet opens.",
+    actionLabel: "Highlight +",
+    selectors: ['[data-tour="add-quest-fab"]'],
+  },
+  select_time: {
+    id: "select_time",
+    title: "Select a Time",
+    description: "Pick a time for your quest before creating it.",
+    checklist: ["Tap Time.", "Choose a time in the picker."],
+    successHint: "Selecting any valid time moves you to the final substep.",
+    actionLabel: "Select Time",
+    selectors: ['[data-tour="add-quest-time-input"]', '[data-tour="add-quest-time-chip"]'],
+  },
+  submit_create_quest: {
+    id: "submit_create_quest",
+    title: "Tap Create Quest",
+    description: "Now submit your scheduled quest.",
+    checklist: ["Enter a title.", "Tap Create Quest."],
+    successHint: "This completes the create-quest tutorial step.",
+    actionLabel: "Create Quest",
+    selectors: ['[data-tour="add-quest-create-button"]'],
+  },
+};
+
 const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
+const CREATE_QUEST_SUBSTEP_SET = new Set<CreateQuestSubstepId>(CREATE_QUEST_SUBSTEP_ORDER);
 
 const isGuidedStepId = (value: unknown): value is GuidedTutorialStepId =>
   typeof value === "string" && GUIDED_STEP_ID_SET.has(value as GuidedTutorialStepId);
+
+const isCreateQuestSubstepId = (value: unknown): value is CreateQuestSubstepId =>
+  typeof value === "string" && CREATE_QUEST_SUBSTEP_SET.has(value as CreateQuestSubstepId);
 
 const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -145,9 +217,68 @@ const getDefaultPanelPlacement = (
 ): PanelPlacementResult => ({
   zone: "top",
   top: fallbackTop,
-  left: clamp((viewportWidth - panelWidth) / 2, SAFE_HORIZONTAL, Math.max(SAFE_HORIZONTAL, viewportWidth - panelWidth - SAFE_HORIZONTAL)),
+  left: clamp(
+    (viewportWidth - panelWidth) / 2,
+    SAFE_HORIZONTAL,
+    Math.max(SAFE_HORIZONTAL, viewportWidth - panelWidth - SAFE_HORIZONTAL)
+  ),
   lockEnabled: false,
 });
+
+const getNextCreateQuestSubstep = (
+  completed: CreateQuestSubstepId[]
+): CreateQuestSubstepId => {
+  const completedSet = new Set(completed);
+  return (
+    CREATE_QUEST_SUBSTEP_ORDER.find((substep) => !completedSet.has(substep)) ??
+    "submit_create_quest"
+  );
+};
+
+const sanitizeCreateQuestProgress = (value: unknown): CreateQuestProgressState | null => {
+  if (!isProgressRecord(value)) return null;
+
+  const completed = Array.isArray(value.completed)
+    ? value.completed.filter(isCreateQuestSubstepId)
+    : [];
+
+  const current = isCreateQuestSubstepId(value.current)
+    ? value.current
+    : getNextCreateQuestSubstep(completed);
+
+  return {
+    current,
+    completed,
+    startedAt: typeof value.startedAt === "string" ? value.startedAt : undefined,
+    completedAt: typeof value.completedAt === "string" ? value.completedAt : undefined,
+  };
+};
+
+const mergeCreateQuestProgress = (
+  remote: CreateQuestProgressState | null,
+  local: CreateQuestProgressState | null
+): CreateQuestProgressState => {
+  const remoteCompleted = remote?.completed ?? [];
+  const localCompleted = local?.completed ?? [];
+  const completed = Array.from(new Set([...remoteCompleted, ...localCompleted]));
+
+  const current = getNextCreateQuestSubstep(completed);
+  const completedAll = completed.length >= CREATE_QUEST_SUBSTEP_ORDER.length;
+
+  return {
+    current,
+    completed,
+    startedAt: remote?.startedAt ?? local?.startedAt ?? new Date().toISOString(),
+    completedAt: completedAll ? remote?.completedAt ?? local?.completedAt ?? new Date().toISOString() : undefined,
+  };
+};
+
+const resolveSelectorFromCandidates = (candidates: string[]): string | null => {
+  for (const candidate of candidates) {
+    if (document.querySelector(candidate)) return candidate;
+  }
+  return candidates[0] ?? null;
+};
 
 export const computeGuidedPanelPlacement = ({
   targetRect,
@@ -171,9 +302,9 @@ export const computeGuidedPanelPlacement = ({
   const zones: PanelZone[] =
     preferredZones && preferredZones.length > 0
       ? preferredZones
-      : (Object.entries(availableSpace)
+      : Object.entries(availableSpace)
           .sort((a, b) => b[1] - a[1])
-          .map(([zone]) => zone as PanelZone));
+          .map(([zone]) => zone as PanelZone);
 
   const chooseTopLeft = (zone: PanelZone) => {
     if (zone === "top") {
@@ -214,9 +345,13 @@ export const computeGuidedPanelPlacement = ({
     );
 
     const hasVerticalRoom =
-      zone === "left" || zone === "right" ? availableSpace.top + availableSpace.bottom >= panelHeight : availableSpace[zone] >= panelHeight;
+      zone === "left" || zone === "right"
+        ? availableSpace.top + availableSpace.bottom >= panelHeight
+        : availableSpace[zone] >= panelHeight;
     const hasHorizontalRoom =
-      zone === "top" || zone === "bottom" ? availableSpace.left + availableSpace.right >= panelWidth : availableSpace[zone] >= panelWidth;
+      zone === "top" || zone === "bottom"
+        ? availableSpace.left + availableSpace.right >= panelWidth
+        : availableSpace[zone] >= panelWidth;
 
     if (hasVerticalRoom || hasHorizontalRoom) {
       return {
@@ -292,6 +427,7 @@ export const TutorialOrchestrator = () => {
 
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
+  const [sessionCreateQuestCompleted, setSessionCreateQuestCompleted] = useState<CreateQuestSubstepId[]>([]);
   const [dismissedOverride, setDismissedOverride] = useState<boolean | null>(null);
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
   const [panelPlacement, setPanelPlacement] = useState<PanelPlacementResult>(() =>
@@ -310,6 +446,7 @@ export const TutorialOrchestrator = () => {
   useEffect(() => {
     setSessionCompleted([]);
     setSessionAwarded([]);
+    setSessionCreateQuestCompleted([]);
     setDismissedOverride(null);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
@@ -326,6 +463,26 @@ export const TutorialOrchestrator = () => {
     const local = safeAwardedSteps(localProgress?.xpAwardedSteps);
     return Array.from(new Set([...remote, ...local]));
   }, [localProgress?.xpAwardedSteps, remoteProgress?.xpAwardedSteps]);
+
+  const remoteCreateQuestProgress = useMemo(
+    () => sanitizeCreateQuestProgress((remoteProgress?.substeps as GuidedSubstepProgress | undefined)?.create_quest),
+    [remoteProgress?.substeps]
+  );
+
+  const localCreateQuestProgress = useMemo(
+    () => sanitizeCreateQuestProgress((localProgress?.substeps as GuidedSubstepProgress | undefined)?.create_quest),
+    [localProgress?.substeps]
+  );
+
+  const createQuestProgress = useMemo(() => {
+    const merged = mergeCreateQuestProgress(remoteCreateQuestProgress, localCreateQuestProgress);
+    const completed = Array.from(new Set([...merged.completed, ...sessionCreateQuestCompleted]));
+    return {
+      ...merged,
+      completed,
+      current: getNextCreateQuestSubstep(completed),
+    };
+  }, [localCreateQuestProgress, remoteCreateQuestProgress, sessionCreateQuestCompleted]);
 
   const effectiveDismissed = useMemo(() => {
     if (dismissedOverride !== null) return dismissedOverride;
@@ -400,6 +557,35 @@ export const TutorialOrchestrator = () => {
     [profile?.onboarding_data, queryClient, user?.id]
   );
 
+  const markCreateQuestSubstepComplete = useCallback(
+    (substepId: CreateQuestSubstepId) => {
+      if (!tutorialReady || currentStep?.id !== "create_quest") return;
+      if (createQuestProgress.current !== substepId) return;
+      if (createQuestProgress.completed.includes(substepId)) return;
+
+      const completed = [...createQuestProgress.completed, substepId];
+      const completedUnique = Array.from(new Set(completed));
+      const nextCurrent = getNextCreateQuestSubstep(completedUnique);
+      const completedAll = completedUnique.length >= CREATE_QUEST_SUBSTEP_ORDER.length;
+
+      setSessionCreateQuestCompleted((prev) =>
+        prev.includes(substepId) ? prev : [...prev, substepId]
+      );
+
+      void persistProgress({
+        substeps: {
+          create_quest: {
+            current: nextCurrent,
+            completed: completedUnique,
+            startedAt: createQuestProgress.startedAt ?? new Date().toISOString(),
+            completedAt: completedAll ? new Date().toISOString() : undefined,
+          },
+        },
+      });
+    },
+    [createQuestProgress, currentStep?.id, persistProgress, tutorialReady]
+  );
+
   const markStepComplete = useCallback(
     (stepId: GuidedTutorialStepId) => {
       if (!tutorialReady || completedSet.has(stepId)) return;
@@ -456,6 +642,7 @@ export const TutorialOrchestrator = () => {
 
   useEffect(() => {
     if (!currentStep) return;
+    if (currentStep.id === "create_quest") return;
     if (currentStep.completion.type !== "route_visit") return;
     if (location.pathname !== currentStep.route) return;
 
@@ -469,38 +656,107 @@ export const TutorialOrchestrator = () => {
   }, [currentStep, location.pathname, markStepComplete]);
 
   useEffect(() => {
+    if (!tutorialReady || effectiveDismissed || currentStep?.id !== "create_quest") return;
+
+    if (location.pathname !== "/journeys" && !pathIsHidden(location.pathname)) {
+      navigate("/journeys", { replace: true });
+    }
+  }, [currentStep?.id, effectiveDismissed, location.pathname, navigate, tutorialReady]);
+
+  useEffect(() => {
+    if (currentStep?.id !== "create_quest") return;
+    if (location.pathname !== "/journeys") return;
+    if (createQuestProgress.current !== "stay_on_quests") return;
+
+    markCreateQuestSubstepComplete("stay_on_quests");
+  }, [
+    createQuestProgress.current,
+    currentStep?.id,
+    location.pathname,
+    markCreateQuestSubstepComplete,
+  ]);
+
+  useEffect(() => {
     if (!currentStep) return;
+
     const completion = currentStep.completion;
-    if (completion.type !== "event") return;
+    const listeners: Array<{ eventName: string; handler: (event: Event) => void }> = [];
 
-    const listener = (event: Event) => {
-      if (completion.requireRoute && location.pathname !== currentStep.route) {
-        return;
-      }
+    if (currentStep.id === "create_quest") {
+      listeners.push({
+        eventName: "add-quest-sheet-opened",
+        handler: () => {
+          if (location.pathname !== "/journeys") return;
+          markCreateQuestSubstepComplete("open_add_quest");
+        },
+      });
 
-      if (currentStep.id === "create_quest") {
-        const detail = (
-          event as CustomEvent<{ taskDate?: string | null; scheduledTime?: string | null }>
-        ).detail;
-        if (!detail?.taskDate || !detail?.scheduledTime) {
-          return;
-        }
-      }
+      listeners.push({
+        eventName: "add-quest-time-selected",
+        handler: (event) => {
+          if (location.pathname !== "/journeys") return;
+          const detail = (event as CustomEvent<{ scheduledTime?: string | null }>).detail;
+          if (!detail?.scheduledTime) return;
+          markCreateQuestSubstepComplete("select_time");
+        },
+      });
 
-      markStepComplete(currentStep.id);
-    };
+      listeners.push({
+        eventName: completion.eventName,
+        handler: (event) => {
+          if (location.pathname !== "/journeys") return;
+          const detail = (event as CustomEvent<{ taskDate?: string | null; scheduledTime?: string | null }>).detail;
+          if (!detail?.taskDate || !detail?.scheduledTime) return;
+          if (createQuestProgress.current !== "submit_create_quest") return;
 
-    window.addEventListener(completion.eventName, listener as EventListener);
+          markCreateQuestSubstepComplete("submit_create_quest");
+          markStepComplete("create_quest");
+        },
+      });
+    } else if (completion.type === "event") {
+      listeners.push({
+        eventName: completion.eventName,
+        handler: () => {
+          if (completion.requireRoute && location.pathname !== currentStep.route) {
+            return;
+          }
+          markStepComplete(currentStep.id);
+        },
+      });
+    }
+
+    listeners.forEach(({ eventName, handler }) => {
+      window.addEventListener(eventName, handler as EventListener);
+    });
+
     return () => {
-      window.removeEventListener(completion.eventName, listener as EventListener);
+      listeners.forEach(({ eventName, handler }) => {
+        window.removeEventListener(eventName, handler as EventListener);
+      });
     };
-  }, [currentStep, location.pathname, markStepComplete]);
+  }, [
+    createQuestProgress.current,
+    currentStep,
+    location.pathname,
+    markCreateQuestSubstepComplete,
+    markStepComplete,
+  ]);
+
+  const createQuestView = useMemo(() => {
+    if (currentStep?.id !== "create_quest") return null;
+    return CREATE_QUEST_SUBSTEP_VIEW[createQuestProgress.current];
+  }, [createQuestProgress.current, currentStep?.id]);
 
   const activeSelector = useMemo(() => {
     if (!currentStep) return null;
+
+    if (currentStep.id === "create_quest" && createQuestView) {
+      return resolveSelectorFromCandidates(createQuestView.selectors);
+    }
+
     if (location.pathname === currentStep.route) return currentStep.inRouteSelector;
     return currentStep.navSelector;
-  }, [currentStep, location.pathname]);
+  }, [createQuestView, currentStep, location.pathname]);
 
   useEffect(() => {
     if (!tutorialReady || tutorialComplete || !currentStep || effectiveDismissed || !activeSelector) {
@@ -515,7 +771,10 @@ export const TutorialOrchestrator = () => {
       setTargetElement(target);
 
       if (!target || !panelElement) {
-        const fallback = getDefaultPanelPlacement(window.innerWidth, Math.min(window.innerWidth - 24, 560));
+        const fallback = getDefaultPanelPlacement(
+          window.innerWidth,
+          Math.min(window.innerWidth - 24, 560)
+        );
         setPanelPlacement(fallback);
         return;
       }
@@ -542,7 +801,8 @@ export const TutorialOrchestrator = () => {
 
     updatePlacement();
 
-    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updatePlacement) : null;
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updatePlacement) : null;
     const targetForObserver = document.querySelector(activeSelector) as HTMLElement | null;
 
     if (targetForObserver) {
@@ -576,6 +836,24 @@ export const TutorialOrchestrator = () => {
 
   const handlePrimaryAction = useCallback(() => {
     if (!currentStep) return;
+
+    if (currentStep.id === "create_quest") {
+      const view = CREATE_QUEST_SUBSTEP_VIEW[createQuestProgress.current];
+
+      if (location.pathname !== "/journeys") {
+        navigate("/journeys", { replace: true });
+        return;
+      }
+
+      const selector = resolveSelectorFromCandidates(view.selectors);
+      const target = selector ? (document.querySelector(selector) as HTMLElement | null) : null;
+      if (target) {
+        target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+        target.click();
+      }
+      return;
+    }
+
     if (location.pathname !== currentStep.route) {
       navigate(currentStep.route);
       return;
@@ -585,7 +863,7 @@ export const TutorialOrchestrator = () => {
     if (target) {
       target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
     }
-  }, [currentStep, location.pathname, navigate]);
+  }, [createQuestProgress.current, currentStep, location.pathname, navigate]);
 
   const handleDismiss = useCallback(() => {
     setDismissedOverride(true);
@@ -597,12 +875,46 @@ export const TutorialOrchestrator = () => {
     void persistProgress({ dismissed: false });
   }, [persistProgress]);
 
+  const shouldBlockAddQuestClose =
+    !effectiveDismissed &&
+    currentStep?.id === "create_quest" &&
+    !completedSet.has("create_quest") &&
+    createQuestProgress.current !== "stay_on_quests";
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("guided-create-quest-lock", {
+        detail: {
+          active: shouldBlockAddQuestClose,
+        },
+      })
+    );
+
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("guided-create-quest-lock", {
+          detail: {
+            active: false,
+          },
+        })
+      );
+    };
+  }, [shouldBlockAddQuestClose]);
+
   if (!tutorialReady || tutorialComplete || pathIsHidden(location.pathname) || !currentStep) {
     return null;
   }
 
   const currentIndex = GUIDED_STEPS.findIndex((step) => step.id === currentStep.id);
-  const progressText = `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
+  const createQuestSubstepIndex = createQuestProgress.completed.length + 1;
+  const progressText =
+    currentStep.id === "create_quest"
+      ? `Step ${currentIndex + 1} of ${GUIDED_STEPS.length} • Create Quest ${Math.min(
+          createQuestSubstepIndex,
+          CREATE_QUEST_SUBSTEP_ORDER.length
+        )}/${CREATE_QUEST_SUBSTEP_ORDER.length}`
+      : `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`;
+
   const strictLockActive =
     !effectiveDismissed &&
     currentStep.lockMode === "strict" &&
@@ -626,6 +938,20 @@ export const TutorialOrchestrator = () => {
       </div>
     );
   }
+
+  const displayTitle = currentStep.id === "create_quest" && createQuestView ? createQuestView.title : currentStep.title;
+  const displayDescription = currentStep.id === "create_quest" && createQuestView
+    ? createQuestView.description
+    : currentStep.description;
+  const displayChecklist = currentStep.id === "create_quest" && createQuestView
+    ? createQuestView.checklist
+    : currentStep.checklist;
+  const displaySuccessHint = currentStep.id === "create_quest" && createQuestView
+    ? createQuestView.successHint
+    : currentStep.successHint;
+  const displayActionLabel = currentStep.id === "create_quest" && createQuestView
+    ? createQuestView.actionLabel
+    : currentStep.actionLabel;
 
   return (
     <>
@@ -659,16 +985,16 @@ export const TutorialOrchestrator = () => {
               >
                 {progressText}
               </p>
-              <h3 className="mt-1 text-sm font-semibold text-foreground">{currentStep.title}</h3>
+              <h3 className="mt-1 text-sm font-semibold text-foreground">{displayTitle}</h3>
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                {currentStep.description}
+                {displayDescription}
               </p>
               <div className="mt-2 rounded-lg border border-border/60 bg-background/35 px-2.5 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
                   Do this now
                 </p>
                 <ol className="mt-1.5 space-y-1">
-                  {currentStep.checklist.map((item, index) => (
+                  {displayChecklist.map((item, index) => (
                     <li key={item} className="text-[11px] text-foreground/90 leading-relaxed">
                       <span className="mr-1 text-primary/90 font-semibold">{index + 1}.</span>
                       {item}
@@ -677,7 +1003,7 @@ export const TutorialOrchestrator = () => {
                 </ol>
               </div>
               <p className="mt-2 text-[11px] text-primary/90 leading-relaxed">
-                {currentStep.successHint}
+                {displaySuccessHint}
               </p>
             </div>
             <button
@@ -692,7 +1018,7 @@ export const TutorialOrchestrator = () => {
           </div>
           <div className="mt-3">
             <Button size="sm" className="w-full" onClick={handlePrimaryAction}>
-              {currentStep.actionLabel}
+              {displayActionLabel}
             </Button>
           </div>
         </div>
