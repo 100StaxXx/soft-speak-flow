@@ -38,7 +38,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
-import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 
 type CompanionTab = "overview" | "focus" | "stories" | "postcards" | "collection";
 
@@ -79,12 +78,14 @@ const OverviewTab = memo(({
       <CompanionDisplay />
     </ParallaxCard>
     <ParallaxCard offset={22}>
-      <NextEvolutionPreview 
-        currentXP={companion?.current_xp || 0}
-        nextEvolutionXP={nextEvolutionXP || 0}
-        currentStage={companion?.current_stage || 0}
-        progressPercent={progressToNext}
-      />
+      <div data-tour="companion-progress-area">
+        <NextEvolutionPreview 
+          currentXP={companion?.current_xp || 0}
+          nextEvolutionXP={nextEvolutionXP || 0}
+          currentStage={companion?.current_stage || 0}
+          progressPercent={progressToNext}
+        />
+      </div>
     </ParallaxCard>
     <ParallaxCard offset={16}>
       <DailyMissions />
@@ -411,10 +412,6 @@ const Companion = () => {
           
           {/* Spacer for fixed header */}
           <div className="pt-safe" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 72px)' }} />
-
-          <div className="container">
-            <MentorGuidanceCard route="/companion" />
-          </div>
 
           {renderContent()}
         </div>

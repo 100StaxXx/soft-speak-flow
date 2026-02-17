@@ -32,6 +32,7 @@ describe("create quest substep order", () => {
     expect(CREATE_QUEST_SUBSTEP_ORDER).toEqual([
       "stay_on_quests",
       "open_add_quest",
+      "enter_title",
       "select_time",
       "submit_create_quest",
     ]);
@@ -46,7 +47,7 @@ describe("sanitizeCreateQuestProgress", () => {
     });
 
     expect(result).toEqual({
-      current: "select_time",
+      current: "enter_title",
       completed: ["stay_on_quests", "open_add_quest"],
       startedAt: undefined,
       completedAt: undefined,
@@ -57,12 +58,12 @@ describe("sanitizeCreateQuestProgress", () => {
 describe("getMentorInstructionLines", () => {
   it("returns mentor-led instructions for each step", () => {
     expect(getMentorInstructionLines("create_quest", "open_add_quest")[0]).toContain(
-      "Tap the + button"
+      "Tap the + in the bottom right"
+    );
+    expect(getMentorInstructionLines("create_quest", "enter_title")[0]).toContain(
+      "Type your quest title"
     );
     expect(getMentorInstructionLines("meet_companion", null)[0]).toContain("Open Companion");
-    expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain(
-      "Open Mentor and complete one Morning Check-in"
-    );
+    expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Head to Mentor");
   });
 });
-

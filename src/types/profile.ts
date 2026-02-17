@@ -6,6 +6,7 @@ export type GuidedTutorialStepId = "create_quest" | "meet_companion" | "morning_
 export type CreateQuestSubstepId =
   | "stay_on_quests"
   | "open_add_quest"
+  | "enter_title"
   | "select_time"
   | "submit_create_quest";
 

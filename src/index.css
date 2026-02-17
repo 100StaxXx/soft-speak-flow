@@ -1596,6 +1596,35 @@ All colors MUST be HSL.
     background-color: hsl(0 0% 0% / 0.75) !important;
   }
 
+  .mentor-spotlight-root {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .mentor-spotlight-mask {
+    position: fixed;
+    pointer-events: auto;
+    background: hsl(0 0% 0% / 0.65);
+  }
+
+  .mentor-spotlight-ring {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 12px;
+    border: 2px solid hsl(var(--primary) / 0.92);
+    box-shadow:
+      0 0 0 8px hsl(var(--primary) / 0.2),
+      0 16px 35px rgba(0, 0, 0, 0.35);
+    z-index: 101;
+  }
+
+  .mentor-spotlight-target-elevated {
+    position: relative;
+    z-index: 110 !important;
+  }
+
   /* Safe Area Support for Mobile Devices (iOS notches, home indicators) */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);

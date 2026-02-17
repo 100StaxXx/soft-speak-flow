@@ -40,6 +40,9 @@ import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive
 import { BottomNav } from "@/components/BottomNav";
 import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
 import { PostOnboardingMentorGuidanceProvider } from "@/hooks/usePostOnboardingMentorGuidance";
+import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
+import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -156,6 +159,22 @@ const EvolutionAwareContent = memo(() => {
 });
 
 EvolutionAwareContent.displayName = 'EvolutionAwareContent';
+
+const MentorTutorialLayer = memo(() => {
+  const { isActive, activeTargetSelector, isStrictLockActive } = usePostOnboardingMentorGuidance();
+
+  return (
+    <>
+      <MentorSpotlightGuard
+        active={isActive && isStrictLockActive}
+        targetSelector={activeTargetSelector}
+      />
+      <MentorGuidanceCard />
+    </>
+  );
+});
+
+MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
@@ -320,6 +339,7 @@ const AppContent = memo(() => {
                   </AnimatePresence>
                   )}
                   {showBottomNav && <BottomNav />}
+                  <MentorTutorialLayer />
                   </Suspense>
                   </AstralEncounterProvider>
                   </RealtimeSyncProvider>

@@ -53,7 +53,6 @@ import { getTodayIfDateStale, JOURNEYS_ROUTE, shouldResetJourneysDate } from "@/
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { formatTime12 } from "@/components/quest-shared";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
-import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -755,7 +754,6 @@ const Journeys = () => {
             {headerDragTime ? `Dragging to ${formatTime12(headerDragTime)}` : "Daily quests. Your path to progress."}
           </p>
         </motion.div>
-        <MentorGuidanceCard route="/journeys" />
 
         <QuestsErrorBoundary>
           {/* Date Selector */}

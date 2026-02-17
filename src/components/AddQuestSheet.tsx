@@ -111,6 +111,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const timeWheelRef = useRef<HTMLDivElement>(null);
   const selectedTimeRef = useRef<HTMLButtonElement>(null);
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const hasEmittedTitleEnteredRef = useRef(false);
 
   useEffect(() => {
     if (prefilledTime) setScheduledTime(prefilledTime);
@@ -136,6 +137,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setShowTimePicker(false);
       setSubtasks([]);
       setSendToCalendar(false);
+      hasEmittedTitleEnteredRef.current = false;
     } else {
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
@@ -296,6 +298,15 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }, [open]);
 
   useEffect(() => {
+    if (!open) return;
+    if (hasEmittedTitleEnteredRef.current) return;
+    if (!taskText.trim()) return;
+
+    hasEmittedTitleEnteredRef.current = true;
+    window.dispatchEvent(new CustomEvent("add-quest-title-entered"));
+  }, [open, taskText]);
+
+  useEffect(() => {
     if (!scheduledTime) return;
     window.dispatchEvent(
       new CustomEvent("add-quest-time-selected", {
@@ -325,6 +336,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <p className="text-sm opacity-80 mt-1.5">New Quest</p>
             <Input
               ref={inputRef}
+              data-tour="add-quest-title-input"
               placeholder="Quest Title"
               value={taskText}
               onChange={(e) => setTaskText(e.target.value)}

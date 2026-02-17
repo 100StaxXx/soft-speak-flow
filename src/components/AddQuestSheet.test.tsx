@@ -271,7 +271,7 @@ describe("AddQuestSheet", () => {
     expect(onPreventedCloseAttempt).toHaveBeenCalledTimes(1);
   });
 
-  it("emits tutorial events for open, time selection, and create attempt", async () => {
+  it("emits tutorial events for open, title entry, time selection, and create attempt", async () => {
     const onAdd = vi.fn().mockResolvedValue(undefined);
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
 
@@ -289,6 +289,7 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Evented quest" },
     });
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-title-entered" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
     fireEvent.change(screen.getByLabelText("Custom quest time"), {

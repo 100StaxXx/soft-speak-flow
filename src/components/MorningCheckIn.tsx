@@ -266,6 +266,7 @@ const MorningCheckInContent = () => {
 
         <Button 
           onClick={submitCheckIn} 
+          data-tour="checkin-submit"
           disabled={isSubmitting || !mood || !intention.trim() || !!existingCheckIn}
           variant="cta"
           className="w-full h-13 text-base"

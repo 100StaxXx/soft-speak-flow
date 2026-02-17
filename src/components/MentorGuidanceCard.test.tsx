@@ -1,22 +1,28 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MentorGuidanceCard } from "./MentorGuidanceCard";
-import { MemoryRouter } from "react-router-dom";
 
 const mocks = vi.hoisted(() => ({
-  personality: { name: "Atlas" } as { name: string } | null,
   guidance: {
     isActive: true,
     currentStep: "create_quest",
     currentSubstep: "open_add_quest",
     stepRoute: "/journeys",
-    mentorInstructionLines: ["Step 1: Tap the + button to open Add Quest."],
-    progressText: "Step 1 of 3 - Create Quest 2/4",
+    mentorInstructionLines: ["Tap the + in the bottom right."],
+    progressText: "Step 1 of 3 - Create Quest 2/5",
+    activeTargetSelectors: ['[data-tour="add-quest-fab"]'],
+    activeTargetSelector: '[data-tour="add-quest-fab"]',
+    isStrictLockActive: true,
+    dialogueText: "Tap the + in the bottom right.",
+    dialogueSupportText: "I'll highlight it for you.",
+    speakerName: "Atlas",
+    speakerSlug: "atlas",
+    speakerAvatarUrl: "",
   },
 }));
 
-vi.mock("@/hooks/useMentorPersonality", () => ({
-  useMentorPersonality: () => mocks.personality,
+vi.mock("@/components/MentorAvatar", () => ({
+  MentorAvatar: ({ mentorName }: { mentorName: string }) => <div>{mentorName} portrait</div>,
 }));
 
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
@@ -24,25 +30,21 @@ vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
 }));
 
 describe("MentorGuidanceCard", () => {
-  it("renders mentor guidance text without tutorial control buttons", () => {
-    render(
-      <MemoryRouter initialEntries={["/journeys"]}>
-        <MentorGuidanceCard route="/journeys" />
-      </MemoryRouter>
-    );
+  it("renders VN-style dialogue without tutorial control buttons", () => {
+    render(<MentorGuidanceCard />);
 
+    expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
     expect(screen.getByText("Atlas")).toBeInTheDocument();
-    expect(screen.getByText("Step 1 of 3 - Create Quest 2/4")).toBeInTheDocument();
-    expect(screen.getByText("Step 1: Tap the + button to open Add Quest.")).toBeInTheDocument();
+    expect(screen.getByText("Step 1 of 3 - Create Quest 2/5")).toBeInTheDocument();
+    expect(screen.getByText("Tap the + in the bottom right.")).toBeInTheDocument();
+    expect(screen.getByText("I'll highlight it for you.")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("does not render when route does not match active guidance step", () => {
-    render(
-      <MemoryRouter initialEntries={["/mentor"]}>
-        <MentorGuidanceCard route="/mentor" />
-      </MemoryRouter>
-    );
+  it("does not render when guidance is inactive", () => {
+    mocks.guidance.isActive = false;
+    render(<MentorGuidanceCard />);
     expect(screen.queryByText("Atlas")).not.toBeInTheDocument();
+    mocks.guidance.isActive = true;
   });
 });

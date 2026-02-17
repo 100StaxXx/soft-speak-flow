@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { safeLocalStorage } from "@/utils/storage";
 import type {
   CreateQuestSubstepId,
@@ -23,6 +24,8 @@ import type {
 } from "@/types/profile";
 
 const GUIDED_TUTORIAL_VERSION = 2;
+const TARGET_RESOLVE_POLL_MS = 250;
+const TARGET_MISSING_FALLBACK_MS = 1400;
 
 const STEP_XP_REWARDS: Record<GuidedTutorialStepId, number> = {
   create_quest: 4,
@@ -30,41 +33,41 @@ const STEP_XP_REWARDS: Record<GuidedTutorialStepId, number> = {
   morning_checkin: 3,
 };
 
+type GuidedMilestoneId =
+  | "stay_on_quests"
+  | "open_add_quest"
+  | "enter_title"
+  | "select_time"
+  | "submit_create_quest"
+  | "open_companion_tab"
+  | "confirm_companion_progress"
+  | "open_mentor_tab"
+  | "submit_morning_checkin";
+
 interface GuidedStep {
   id: GuidedTutorialStepId;
   route: string;
-  completion:
-    | {
-        type: "route_visit";
-      }
-    | {
-        type: "event";
-        eventName: string;
-        requireRoute?: boolean;
-      };
 }
 
 const GUIDED_STEPS: GuidedStep[] = [
   {
     id: "create_quest",
     route: "/journeys",
-    completion: { type: "event", eventName: "task-added", requireRoute: true },
   },
   {
     id: "meet_companion",
     route: "/companion",
-    completion: { type: "route_visit" },
   },
   {
     id: "morning_checkin",
     route: "/mentor",
-    completion: { type: "event", eventName: "morning-checkin-completed", requireRoute: true },
   },
 ];
 
 export const CREATE_QUEST_SUBSTEP_ORDER: CreateQuestSubstepId[] = [
   "stay_on_quests",
   "open_add_quest",
+  "enter_title",
   "select_time",
   "submit_create_quest",
 ];
@@ -81,6 +84,69 @@ const isCreateQuestSubstepId = (value: unknown): value is CreateQuestSubstepId =
 const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
+const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
+  "stay_on_quests",
+  "open_add_quest",
+  "enter_title",
+  "select_time",
+  "submit_create_quest",
+  "open_companion_tab",
+  "confirm_companion_progress",
+  "open_mentor_tab",
+  "submit_morning_checkin",
+]);
+
+const isGuidedMilestoneId = (value: unknown): value is GuidedMilestoneId =>
+  typeof value === "string" && MILESTONE_ID_SET.has(value as GuidedMilestoneId);
+
+const getSafeMilestoneArray = (value: unknown): GuidedMilestoneId[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isGuidedMilestoneId);
+};
+
+const emitTutorialEvent = (eventName: string, detail: Record<string, unknown>) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(eventName, { detail }));
+
+  if (import.meta.env.DEV) {
+    // Keep diagnostics local to development.
+    // eslint-disable-next-line no-console
+    console.debug(`[Tutorial] ${eventName}`, detail);
+  }
+};
+
+const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[] => {
+  switch (milestoneId) {
+    case "stay_on_quests":
+      return ['[data-tour="quests-tab"]'];
+    case "open_add_quest":
+      return ['[data-tour="add-quest-fab"]'];
+    case "enter_title":
+      return ['[data-tour="add-quest-title-input"]'];
+    case "select_time":
+      return ['[data-tour="add-quest-time-chip"]', '[data-tour="add-quest-time-input"]'];
+    case "submit_create_quest":
+      return ['[data-tour="add-quest-create-button"]'];
+    case "open_companion_tab":
+      return ['[data-tour="companion-tab"]'];
+    case "confirm_companion_progress":
+      return ['[data-tour="companion-progress-area"]', '[data-tour="companion-page"]'];
+    case "open_mentor_tab":
+      return ['[data-tour="mentor-tab"]'];
+    case "submit_morning_checkin":
+      return ['[data-tour="checkin-submit"]', '[data-tour="morning-checkin"]'];
+    default:
+      return [];
+  }
+};
+
+const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
+  for (const selector of selectors) {
+    if (document.querySelector(selector)) return selector;
+  }
+  return null;
+};
+
 export interface CreateQuestProgressState {
   current: CreateQuestSubstepId;
   completed: CreateQuestSubstepId[];
@@ -88,7 +154,9 @@ export interface CreateQuestProgressState {
   completedAt?: string;
 }
 
-type GuidedTutorialProgressSnapshot = Partial<GuidedTutorialProgress>;
+type GuidedTutorialProgressSnapshot = Partial<GuidedTutorialProgress> & {
+  milestonesCompleted?: GuidedMilestoneId[];
+};
 
 export const getNextCreateQuestSubstep = (
   completed: CreateQuestSubstepId[]
@@ -184,6 +252,15 @@ export interface PostOnboardingMentorGuidanceState {
   stepRoute: string | null;
   mentorInstructionLines: string[];
   progressText: string;
+  activeTargetSelectors: string[];
+  activeTargetSelector: string | null;
+  isStrictLockActive: boolean;
+  dialogueText: string;
+  dialogueSupportText?: string;
+  speakerName: string;
+  speakerPrimaryColor?: string;
+  speakerSlug?: string;
+  speakerAvatarUrl?: string;
 }
 
 const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
@@ -193,6 +270,15 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   stepRoute: null,
   mentorInstructionLines: [],
   progressText: "",
+  activeTargetSelectors: [],
+  activeTargetSelector: null,
+  isStrictLockActive: false,
+  dialogueText: "",
+  dialogueSupportText: undefined,
+  speakerName: "Your mentor",
+  speakerPrimaryColor: "#f59e0b",
+  speakerSlug: undefined,
+  speakerAvatarUrl: undefined,
 };
 
 const PostOnboardingMentorGuidanceContext = createContext<PostOnboardingMentorGuidanceState>(
@@ -205,61 +291,120 @@ export const getMentorInstructionLines = (
 ): string[] => {
   if (currentStep === "create_quest") {
     if (currentSubstep === "stay_on_quests") {
-      return [
-        "Step 1: Stay on Quests.",
-        "Once you are here, we will move to opening your first quest.",
-      ];
+      return ["Start on Quests. We'll build your first quest together."];
     }
 
     if (currentSubstep === "open_add_quest") {
-      return [
-        "Step 1: Tap the + button to open Add Quest.",
-        "Use the same button you would normally use. No extra tutorial controls needed.",
-      ];
+      return ["Tap the + in the bottom right."];
+    }
+
+    if (currentSubstep === "enter_title") {
+      return ["Type your quest title here."];
     }
 
     if (currentSubstep === "select_time") {
-      return [
-        "Step 1: Choose a time for your quest.",
-        "Pick any valid time that fits your day.",
-      ];
+      return ["Set a time so this is scheduled."];
     }
 
-    return [
-      "Step 1: Enter a quest title, then tap Create Quest.",
-      "As soon as it is created, we continue to your next step.",
-    ];
+    return ["Now tap Create Quest."];
   }
 
   if (currentStep === "meet_companion") {
-    return [
-      "Step 2: Open Companion and check your bond/progress area.",
-      "Just entering Companion completes this step.",
-    ];
+    return ["Open Companion."];
   }
 
   if (currentStep === "morning_checkin") {
-    return [
-      "Step 3: Open Mentor and complete one Morning Check-in.",
-      "Answer and submit once to finish your guided start.",
-    ];
+    return ["Head to Mentor."];
   }
 
   return [];
+};
+
+const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; support?: string } => {
+  switch (milestoneId) {
+    case "stay_on_quests":
+      return {
+        text: "Start on Quests. We'll build your first quest together.",
+        support: "You and I are setting the tone for your whole adventure.",
+      };
+    case "open_add_quest":
+      return {
+        text: "Tap the + in the bottom right.",
+        support: "This opens your quest forge.",
+      };
+    case "enter_title":
+      return {
+        text: "Type your quest title here.",
+        support: "Name it clearly so future-you knows exactly what to do.",
+      };
+    case "select_time":
+      return {
+        text: "Set a time so this is scheduled.",
+        support: "A quest with a time gets done.",
+      };
+    case "submit_create_quest":
+      return {
+        text: "Now tap Create Quest.",
+        support: "Once you submit, your first mission goes live.",
+      };
+    case "open_companion_tab":
+      return {
+        text: "Open Companion.",
+        support: "Let's check in with your ally.",
+      };
+    case "confirm_companion_progress":
+      return {
+        text: "This is your companion progress area.",
+        support: "Every completed quest strengthens your bond.",
+      };
+    case "open_mentor_tab":
+      return {
+        text: "Head to Mentor.",
+        support: "We're about to lock in your focus for the day.",
+      };
+    case "submit_morning_checkin":
+      return {
+        text: "Complete your check-in and submit.",
+        support: "Keep it honest and simple.",
+      };
+    default:
+      return {
+        text: "Let's keep going.",
+      };
+  }
+};
+
+const milestoneUsesStrictLock = (
+  milestoneId: GuidedMilestoneId | null,
+  resolvedSelector: string | null
+): boolean => {
+  if (!milestoneId) return false;
+  if (milestoneId === "confirm_companion_progress") return false;
+  if (milestoneId === "submit_morning_checkin" && resolvedSelector === '[data-tour="morning-checkin"]') {
+    return false;
+  }
+  return true;
 };
 
 const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidanceState => {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
   const { awardCustomXP } = useXPRewards();
+  const personality = useMentorPersonality();
   const queryClient = useQueryClient();
   const location = useLocation();
 
   const completionPersistRef = useRef(false);
   const stepPersistThrottleRef = useRef<Set<GuidedTutorialStepId>>(new Set());
+  const missingTargetSinceRef = useRef<number | null>(null);
+  const currentMilestoneStartedAtRef = useRef<number | null>(null);
+  const lastTargetResolutionSignatureRef = useRef<string | null>(null);
+
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
   const [sessionCreateQuestCompleted, setSessionCreateQuestCompleted] = useState<CreateQuestSubstepId[]>([]);
+  const [sessionMilestonesCompleted, setSessionMilestonesCompleted] = useState<GuidedMilestoneId[]>([]);
+  const [activeTargetSelector, setActiveTargetSelector] = useState<string | null>(null);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
   const walkthroughCompleted = onboardingData?.walkthrough_completed === true;
@@ -274,8 +419,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionCompleted([]);
     setSessionAwarded([]);
     setSessionCreateQuestCompleted([]);
+    setSessionMilestonesCompleted([]);
+    setActiveTargetSelector(null);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
+    missingTargetSinceRef.current = null;
   }, [user?.id]);
 
   const persistedCompleted = useMemo(() => {
@@ -289,6 +437,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     const local = safeAwardedSteps(localProgress?.xpAwardedSteps);
     return Array.from(new Set([...remote, ...local]));
   }, [localProgress?.xpAwardedSteps, remoteProgress?.xpAwardedSteps]);
+
+  const persistedMilestones = useMemo(() => {
+    const remote = getSafeMilestoneArray(remoteProgress?.milestonesCompleted);
+    const local = getSafeMilestoneArray(localProgress?.milestonesCompleted);
+    return Array.from(new Set([...remote, ...local]));
+  }, [localProgress?.milestonesCompleted, remoteProgress?.milestonesCompleted]);
 
   const remoteCreateQuestProgress = useMemo(
     () => sanitizeCreateQuestProgress((remoteProgress?.substeps as GuidedSubstepProgress | undefined)?.create_quest),
@@ -318,6 +472,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const awardedSet = useMemo(
     () => new Set<GuidedTutorialStepId>([...persistedAwarded, ...sessionAwarded]),
     [persistedAwarded, sessionAwarded]
+  );
+
+  const milestoneSet = useMemo(
+    () => new Set<GuidedMilestoneId>([...persistedMilestones, ...sessionMilestonesCompleted]),
+    [persistedMilestones, sessionMilestonesCompleted]
   );
 
   const currentStep = useMemo(
@@ -377,6 +536,28 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     [profile?.onboarding_data, queryClient, user?.id]
   );
 
+  const markMilestoneComplete = useCallback(
+    (milestoneId: GuidedMilestoneId) => {
+      if (milestoneSet.has(milestoneId)) return;
+
+      emitTutorialEvent("tutorial_step_transition", {
+        userId: user?.id,
+        milestoneId,
+        route: location.pathname,
+      });
+
+      setSessionMilestonesCompleted((prev) =>
+        prev.includes(milestoneId) ? prev : [...prev, milestoneId]
+      );
+
+      const nextMilestones = Array.from(new Set([...Array.from(milestoneSet), milestoneId]));
+      void persistProgress({
+        milestonesCompleted: nextMilestones,
+      });
+    },
+    [location.pathname, milestoneSet, persistProgress, user?.id]
+  );
+
   const markCreateQuestSubstepComplete = useCallback(
     (substepId: CreateQuestSubstepId) => {
       if (!tutorialReady || currentStep?.id !== "create_quest") return;
@@ -392,6 +573,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         prev.includes(substepId) ? prev : [...prev, substepId]
       );
 
+      markMilestoneComplete(substepId);
+
       void persistProgress({
         substeps: {
           create_quest: {
@@ -403,7 +586,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         },
       });
     },
-    [createQuestProgress, currentStep?.id, persistProgress, tutorialReady]
+    [createQuestProgress, currentStep?.id, markMilestoneComplete, persistProgress, tutorialReady]
   );
 
   const markStepComplete = useCallback(
@@ -456,37 +639,96 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [awardedSet, persistProgress, tutorialComplete]);
 
   useEffect(() => {
-    if (!currentStep) return;
-    if (currentStep.id === "create_quest") return;
-    if (currentStep.completion.type !== "route_visit") return;
-    if (location.pathname !== currentStep.route) return;
+    if (!tutorialReady || tutorialComplete || !currentStep) return;
 
-    const timer = window.setTimeout(() => {
-      markStepComplete(currentStep.id);
-    }, 700);
+    if (currentStep.id === "create_quest") {
+      if (location.pathname === "/journeys" && createQuestProgress.current === "stay_on_quests") {
+        markCreateQuestSubstepComplete("stay_on_quests");
+      }
+      return;
+    }
 
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [currentStep, location.pathname, markStepComplete]);
+    if (currentStep.id === "meet_companion") {
+      if (!milestoneSet.has("open_companion_tab") && location.pathname === "/companion") {
+        markMilestoneComplete("open_companion_tab");
+      }
 
-  useEffect(() => {
-    if (currentStep?.id !== "create_quest") return;
-    if (location.pathname !== "/journeys") return;
-    if (createQuestProgress.current !== "stay_on_quests") return;
+      if (milestoneSet.has("open_companion_tab") && !milestoneSet.has("confirm_companion_progress")) {
+        const tryCompleteCompanion = () => {
+          if (typeof document === "undefined") return false;
+          if (location.pathname !== "/companion") return false;
+          const hasProgressTarget = Boolean(
+            document.querySelector('[data-tour="companion-progress-area"], [data-tour="companion-page"]')
+          );
+          if (!hasProgressTarget) return false;
+          markMilestoneComplete("confirm_companion_progress");
+          markStepComplete("meet_companion");
+          return true;
+        };
 
-    markCreateQuestSubstepComplete("stay_on_quests");
+        if (tryCompleteCompanion()) return;
+
+        const interval = window.setInterval(() => {
+          if (tryCompleteCompanion()) {
+            window.clearInterval(interval);
+          }
+        }, TARGET_RESOLVE_POLL_MS);
+
+        return () => {
+          window.clearInterval(interval);
+        };
+      }
+      return;
+    }
+
+    if (currentStep.id === "morning_checkin") {
+      if (!milestoneSet.has("open_mentor_tab") && location.pathname === "/mentor") {
+        markMilestoneComplete("open_mentor_tab");
+      }
+
+      if (milestoneSet.has("open_mentor_tab") && !milestoneSet.has("submit_morning_checkin")) {
+        const tryCompleteExistingCheckIn = () => {
+          if (typeof document === "undefined") return false;
+          if (location.pathname !== "/mentor") return false;
+
+          const hasSubmitButton = Boolean(document.querySelector('[data-tour="checkin-submit"]'));
+          const hasMorningCheckInCard = Boolean(document.querySelector('[data-tour="morning-checkin"]'));
+
+          if (!hasMorningCheckInCard || hasSubmitButton) return false;
+
+          markMilestoneComplete("submit_morning_checkin");
+          markStepComplete("morning_checkin");
+          return true;
+        };
+
+        if (tryCompleteExistingCheckIn()) return;
+
+        const interval = window.setInterval(() => {
+          if (tryCompleteExistingCheckIn()) {
+            window.clearInterval(interval);
+          }
+        }, TARGET_RESOLVE_POLL_MS);
+
+        return () => {
+          window.clearInterval(interval);
+        };
+      }
+    }
   }, [
     createQuestProgress.current,
-    currentStep?.id,
+    currentStep,
     location.pathname,
     markCreateQuestSubstepComplete,
+    markMilestoneComplete,
+    markStepComplete,
+    milestoneSet,
+    tutorialComplete,
+    tutorialReady,
   ]);
 
   useEffect(() => {
     if (!currentStep || !tutorialReady || tutorialComplete) return;
 
-    const completion = currentStep.completion;
     const listeners: Array<{ eventName: string; handler: (event: Event) => void }> = [];
 
     if (currentStep.id === "create_quest") {
@@ -495,6 +737,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         handler: () => {
           if (location.pathname !== "/journeys") return;
           markCreateQuestSubstepComplete("open_add_quest");
+        },
+      });
+
+      listeners.push({
+        eventName: "add-quest-title-entered",
+        handler: () => {
+          if (location.pathname !== "/journeys") return;
+          markCreateQuestSubstepComplete("enter_title");
         },
       });
 
@@ -509,7 +759,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       });
 
       listeners.push({
-        eventName: completion.eventName,
+        eventName: "task-added",
         handler: (event) => {
           if (location.pathname !== "/journeys") return;
           const detail = (event as CustomEvent<{ taskDate?: string | null; scheduledTime?: string | null }>).detail;
@@ -520,12 +770,18 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
           markStepComplete("create_quest");
         },
       });
-    } else if (completion.type === "event") {
+    }
+
+    if (currentStep.id === "morning_checkin") {
       listeners.push({
-        eventName: completion.eventName,
+        eventName: "morning-checkin-completed",
         handler: () => {
-          if (completion.requireRoute && location.pathname !== currentStep.route) return;
-          markStepComplete(currentStep.id);
+          if (location.pathname !== "/mentor") return;
+          if (!milestoneSet.has("open_mentor_tab")) {
+            markMilestoneComplete("open_mentor_tab");
+          }
+          markMilestoneComplete("submit_morning_checkin");
+          markStepComplete("morning_checkin");
         },
       });
     }
@@ -544,9 +800,111 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentStep,
     location.pathname,
     markCreateQuestSubstepComplete,
+    markMilestoneComplete,
     markStepComplete,
+    milestoneSet,
     tutorialComplete,
     tutorialReady,
+  ]);
+
+  const currentMilestone = useMemo<GuidedMilestoneId | null>(() => {
+    if (!currentStep) return null;
+
+    if (currentStep.id === "create_quest") {
+      return createQuestProgress.current;
+    }
+
+    if (currentStep.id === "meet_companion") {
+      return milestoneSet.has("open_companion_tab")
+        ? "confirm_companion_progress"
+        : "open_companion_tab";
+    }
+
+    if (currentStep.id === "morning_checkin") {
+      return milestoneSet.has("open_mentor_tab")
+        ? "submit_morning_checkin"
+        : "open_mentor_tab";
+    }
+
+    return null;
+  }, [createQuestProgress.current, currentStep, milestoneSet]);
+
+  const activeTargetSelectors = useMemo(
+    () => (currentMilestone ? getTargetSelectorsForMilestone(currentMilestone) : []),
+    [currentMilestone]
+  );
+
+  useEffect(() => {
+    if (!currentMilestone) {
+      currentMilestoneStartedAtRef.current = null;
+      lastTargetResolutionSignatureRef.current = null;
+      return;
+    }
+
+    currentMilestoneStartedAtRef.current = Date.now();
+    lastTargetResolutionSignatureRef.current = null;
+    emitTutorialEvent("tutorial_step_enter", {
+      userId: user?.id,
+      stepId: currentStep?.id,
+      milestoneId: currentMilestone,
+      route: location.pathname,
+    });
+  }, [currentMilestone, currentStep?.id, location.pathname, user?.id]);
+
+  useEffect(() => {
+    if (!tutorialReady || tutorialComplete || !currentMilestone || pathIsHidden(location.pathname)) {
+      setActiveTargetSelector(null);
+      missingTargetSinceRef.current = null;
+      return;
+    }
+
+    let stopped = false;
+
+    const resolveTarget = () => {
+      if (stopped) return;
+      const resolved = resolveSelectorFromCandidates(activeTargetSelectors);
+      setActiveTargetSelector(resolved);
+
+      const signature = `${currentMilestone}|${location.pathname}|${resolved ?? "none"}`;
+      if (lastTargetResolutionSignatureRef.current !== signature) {
+        lastTargetResolutionSignatureRef.current = signature;
+        emitTutorialEvent("tutorial_target_resolution", {
+          userId: user?.id,
+          stepId: currentStep?.id,
+          milestoneId: currentMilestone,
+          selectorsTried: activeTargetSelectors,
+          resolvedSelector: resolved,
+          route: location.pathname,
+          latencyMs:
+            currentMilestoneStartedAtRef.current === null
+              ? null
+              : Date.now() - currentMilestoneStartedAtRef.current,
+        });
+      }
+    };
+
+    resolveTarget();
+
+    const poll = window.setInterval(resolveTarget, TARGET_RESOLVE_POLL_MS);
+    window.addEventListener("resize", resolveTarget);
+    window.addEventListener("orientationchange", resolveTarget);
+    window.addEventListener("scroll", resolveTarget, true);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(poll);
+      window.removeEventListener("resize", resolveTarget);
+      window.removeEventListener("orientationchange", resolveTarget);
+      window.removeEventListener("scroll", resolveTarget, true);
+    };
+  }, [
+    activeTargetSelectors,
+    currentMilestone,
+    currentStep?.id,
+    location.pathname,
+    tutorialComplete,
+    tutorialReady,
+    user?.id,
   ]);
 
   const isActive = tutorialReady && !tutorialComplete && !pathIsHidden(location.pathname) && Boolean(currentStep);
@@ -568,13 +926,63 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         ? `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`
         : "";
 
+  const dialogue = currentMilestone ? getMilestoneDialogue(currentMilestone) : { text: "", support: undefined };
+  const mentorInstructionLines = dialogue.support ? [dialogue.text, dialogue.support] : [dialogue.text];
+
+  const isMissingTarget = isActive && activeTargetSelectors.length > 0 && !activeTargetSelector;
+  if (isMissingTarget && missingTargetSinceRef.current === null) {
+    missingTargetSinceRef.current = Date.now();
+  }
+  if (!isMissingTarget) {
+    missingTargetSinceRef.current = null;
+  }
+
+  const targetMissingTooLong =
+    isMissingTarget &&
+    missingTargetSinceRef.current !== null &&
+    Date.now() - missingTargetSinceRef.current > TARGET_MISSING_FALLBACK_MS;
+
+  useEffect(() => {
+    if (!targetMissingTooLong || !currentMilestone) return;
+
+    emitTutorialEvent("tutorial_target_missing", {
+      userId: user?.id,
+      stepId: currentStepId,
+      milestoneId: currentMilestone,
+      selectorsTried: activeTargetSelectors,
+      route: location.pathname,
+      elapsedMs: Date.now() - (missingTargetSinceRef.current ?? Date.now()),
+    });
+  }, [
+    activeTargetSelectors,
+    currentMilestone,
+    currentStepId,
+    location.pathname,
+    targetMissingTooLong,
+    user?.id,
+  ]);
+
+  const dialogueSupportText = targetMissingTooLong
+    ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
+    : dialogue.support;
+  const strictLockEnabled = milestoneUsesStrictLock(currentMilestone, activeTargetSelector);
+
   return {
     isActive,
     currentStep: currentStepId,
     currentSubstep,
     stepRoute: currentStep?.route ?? null,
-    mentorInstructionLines: getMentorInstructionLines(currentStepId, currentSubstep),
+    mentorInstructionLines,
     progressText,
+    activeTargetSelectors,
+    activeTargetSelector,
+    isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
+    dialogueText: dialogue.text,
+    dialogueSupportText,
+    speakerName: personality?.name ?? "Your mentor",
+    speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
+    speakerSlug: personality?.slug,
+    speakerAvatarUrl: personality?.avatar_url,
   };
 };
 
@@ -589,4 +997,3 @@ export const PostOnboardingMentorGuidanceProvider = ({ children }: PropsWithChil
 
 export const usePostOnboardingMentorGuidance = () =>
   useContext(PostOnboardingMentorGuidanceContext);
-
