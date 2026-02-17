@@ -785,6 +785,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     },
   });
   const dragVisualOffsetY = (timelineDrag.dragVisualOffsetY ?? timelineDrag.dragOffsetY) as MotionValue<number>;
+  const dragEdgeOffsetY = (timelineDrag.dragEdgeOffsetY ?? dragVisualOffsetY) as MotionValue<number>;
   const timelineRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [dragOverlaySnapshot, setDragOverlaySnapshot] = useState<DragOverlaySnapshot | null>(null);
   const dragOverlayOffsetY = useMotionValue(0);
@@ -972,7 +973,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return;
     }
 
-    const clampDragOffset = (rawOffsetY: number) => {
+    const clampDragOffset = (rawVisualOffsetY: number, rawEdgeOffsetY: number) => {
       const viewport = window.visualViewport;
       const viewportHeight = viewport?.height ?? window.innerHeight;
       const viewportTopInset = viewport?.offsetTop ?? 0;
@@ -1008,22 +1009,30 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       const minOffset = minTop - dragOverlaySnapshot.top;
       const maxOffset = safeMaxTop - dragOverlaySnapshot.top;
-      const clampedOffset = Math.max(minOffset, Math.min(maxOffset, rawOffsetY));
-      dragOverlayOffsetY.set(clampedOffset);
+      const clampedVisualOffset = Math.max(minOffset, Math.min(maxOffset, rawVisualOffsetY));
+      dragOverlayOffsetY.set(clampedVisualOffset);
 
-      const clampDelta = rawOffsetY - clampedOffset;
-      const pinnedDirection: -1 | 0 | 1 = clampDelta > EDGE_HOLD_PIN_THRESHOLD_PX
+      const clampedEdgeOffset = Math.max(minOffset, Math.min(maxOffset, rawEdgeOffsetY));
+      const clampDeltaEdge = rawEdgeOffsetY - clampedEdgeOffset;
+      const pinnedDirection: -1 | 0 | 1 = clampDeltaEdge > EDGE_HOLD_PIN_THRESHOLD_PX
         ? 1
-        : clampDelta < -EDGE_HOLD_PIN_THRESHOLD_PX
+        : clampDeltaEdge < -EDGE_HOLD_PIN_THRESHOLD_PX
           ? -1
           : 0;
-      const edgeHoldProfile = resolveEdgeHoldProfile(Math.abs(clampDelta));
+      const edgeHoldProfile = resolveEdgeHoldProfile(Math.abs(clampDeltaEdge));
       syncEdgeHoldState(pinnedDirection, edgeHoldProfile);
     };
 
-    clampDragOffset(dragVisualOffsetY.get());
-    const unsubscribe = dragVisualOffsetY.on("change", clampDragOffset);
-    const handleViewportChange = () => clampDragOffset(dragVisualOffsetY.get());
+    clampDragOffset(dragVisualOffsetY.get(), dragEdgeOffsetY.get());
+    const unsubscribeVisualOffset = dragVisualOffsetY.on("change", (nextVisualOffset) => {
+      clampDragOffset(nextVisualOffset, dragEdgeOffsetY.get());
+    });
+    const unsubscribeEdgeOffset = dragEdgeOffsetY === dragVisualOffsetY
+      ? null
+      : dragEdgeOffsetY.on("change", (nextEdgeOffset) => {
+          clampDragOffset(dragVisualOffsetY.get(), nextEdgeOffset);
+        });
+    const handleViewportChange = () => clampDragOffset(dragVisualOffsetY.get(), dragEdgeOffsetY.get());
 
     window.addEventListener("resize", handleViewportChange);
     const viewport = window.visualViewport;
@@ -1036,7 +1045,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
 
     return () => {
-      unsubscribe();
+      unsubscribeVisualOffset();
+      unsubscribeEdgeOffset?.();
       stopEdgeHold();
       window.removeEventListener("resize", handleViewportChange);
       if (canListenToViewport) {
@@ -1044,7 +1054,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         viewport.removeEventListener("scroll", handleViewportChange);
       }
     };
-  }, [dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineDrag.isDragging]);
+  }, [dragEdgeOffsetY, dragOverlayOffsetY, dragOverlaySnapshot, dragVisualOffsetY, stopEdgeHold, syncEdgeHoldState, timelineDrag.isDragging]);
 
   useEffect(() => {
     if (timelineDrag.isDragging) return;

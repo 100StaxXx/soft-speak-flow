@@ -102,6 +102,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
   const [snapMode, setSnapMode] = useState<DragSnapMode>("coarse");
   const [zoomRail, setZoomRail] = useState<DragZoomRailState | null>(null);
   const dragOffsetY = useMotionValue(0);
+  const dragEdgeOffsetY = useMotionValue(0);
 
   // Refs (no drag-frame re-renders)
   const draggingTaskIdRef = useRef<string | null>(null);
@@ -182,6 +183,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       const clampedDeltaY = (clampedRawMinute - originalMinutesRef.current) * runtimeScaleRef.current.coarsePixelsPerMinute;
 
       dragOffsetY.set(clampedDeltaY);
+      dragEdgeOffsetY.set(clampedDeltaY);
       if (!dragMovedRef.current && Math.abs(clampedDeltaY) > 0.5) {
         dragMovedRef.current = true;
       }
@@ -193,7 +195,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
         setPreviewTime(minuteToTime24(previewMinute, resolvedSnapConfig));
       }
     },
-    [dragOffsetY, resolvedSnapConfig, updateAutoscroll],
+    [dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig, updateAutoscroll],
   );
 
   const finishDrag = useCallback(() => {
@@ -220,6 +222,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     setDraggingTaskId(null);
     setPreviewTime(null);
     dragOffsetY.set(0);
+    dragEdgeOffsetY.set(0);
     stopScroll();
     scrollContextRef.current = { kind: "window" };
     dragStartScrollOffsetRef.current = 0;
@@ -228,6 +231,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     resetSnapState();
   }, [
     clearDropResetTimer,
+    dragEdgeOffsetY,
     dragOffsetY,
     onDrop,
     removeWindowListeners,
@@ -266,6 +270,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
       setDraggingTaskId(taskId);
       setPreviewTime(normalizedStartTime);
       dragOffsetY.set(0);
+      dragEdgeOffsetY.set(0);
       setSnapMode("coarse");
       setZoomRail(null);
 
@@ -319,6 +324,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     },
     [
       containerRef,
+      dragEdgeOffsetY,
       dragOffsetY,
       finishDrag,
       handleMove,
@@ -435,6 +441,7 @@ export function useTimelineDrag({ containerRef, onDrop, snapConfig }: UseTimelin
     previewTime,
     dragOffsetY: dragOffsetY as MotionValue<number>,
     dragVisualOffsetY: dragOffsetY as MotionValue<number>,
+    dragEdgeOffsetY: dragEdgeOffsetY as MotionValue<number>,
     justDroppedId,
     isDragging: draggingTaskId !== null,
     snapMode,

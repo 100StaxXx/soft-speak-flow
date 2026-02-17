@@ -441,6 +441,7 @@ describe("useTimelineDrag", () => {
     expect(result.current.previewTime).toBe("23:59");
     expect(result.current.dragOffsetY.get()).toBe(0);
     expect(result.current.dragVisualOffsetY.get()).toBe(0);
+    expect(result.current.dragEdgeOffsetY.get()).toBe(0);
     act(() => {
       dispatchPointerUp();
     });
@@ -454,6 +455,7 @@ describe("useTimelineDrag", () => {
     expect(result.current.previewTime).toBe("00:00");
     expect(result.current.dragOffsetY.get()).toBe(0);
     expect(result.current.dragVisualOffsetY.get()).toBe(0);
+    expect(result.current.dragEdgeOffsetY.get()).toBe(0);
     act(() => {
       dispatchPointerUp();
     });
@@ -578,6 +580,37 @@ describe("useTimelineDrag", () => {
 
     expect(result.current.dragOffsetY.get()).not.toBe(0);
     expect(result.current.dragVisualOffsetY.get()).toBe(result.current.dragOffsetY.get());
+
+    act(() => {
+      dispatchPointerUp();
+    });
+  });
+
+  it("does not update pointer-anchored edge offset when nudging without additional pointer movement", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-edge-stable", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(130);
+    });
+
+    const edgeOffsetBeforeNudge = result.current.dragEdgeOffsetY.get();
+    const dragOffsetBeforeNudge = result.current.dragOffsetY.get();
+    act(() => {
+      result.current.nudgeByFineStep(1);
+    });
+
+    expect(result.current.dragOffsetY.get()).not.toBe(dragOffsetBeforeNudge);
+    expect(result.current.dragVisualOffsetY.get()).toBe(result.current.dragOffsetY.get());
+    expect(result.current.dragEdgeOffsetY.get()).toBe(edgeOffsetBeforeNudge);
 
     act(() => {
       dispatchPointerUp();
