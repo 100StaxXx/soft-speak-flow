@@ -79,7 +79,7 @@ export function TimelineTaskRow({
       </div>
 
       {/* Task card */}
-      <div className="flex-1 min-w-0 py-0">
+      <div className={cn("flex-1 min-w-0", isMarkerRow ? "py-0" : "py-1")}>
         {children}
       </div>
     </div>

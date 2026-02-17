@@ -942,13 +942,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         .querySelector('nav[aria-label="Main navigation"]')
         ?.getBoundingClientRect();
 
-      const timelineTopBound = paneRect?.top ?? viewportTopInset;
+      const hasMeasurablePaneBounds = !!paneRect
+        && Number.isFinite(paneRect.top)
+        && Number.isFinite(paneRect.bottom)
+        && paneRect.bottom > (paneRect.top + 1);
+      const timelineTopBound = hasMeasurablePaneBounds ? paneRect.top : viewportTopInset;
+      const timelineBottomBound = hasMeasurablePaneBounds ? paneRect.bottom : viewportBottom;
       const navTopBound = navRect?.top ?? (viewportBottom - dragOverlayBottomInsetRef.current);
+      const viewportSafeBottomBound = viewportBottom - dragOverlayBottomInsetRef.current;
 
       const minTop = Math.max(viewportTopInset, timelineTopBound) + DRAG_OVERLAY_TOP_PADDING_PX;
       const maxTop = Math.min(
+        timelineBottomBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX,
         navTopBound - dragOverlaySnapshot.height - DRAG_OVERLAY_BOTTOM_PADDING_PX,
-        viewportBottom - dragOverlayBottomInsetRef.current - dragOverlaySnapshot.height,
+        viewportSafeBottomBound - dragOverlaySnapshot.height,
       );
       const safeMaxTop = Math.max(minTop, maxTop);
 
@@ -1930,7 +1937,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       const nextTaskMinute = nextRow?.kind === "task"
                         ? parseTimeToMinute(nextRow.task.scheduled_time)
                         : null;
-                      const shouldCenterBetweenQuests = previousTaskMinute !== null
+                      const isBetweenQuestMarker = previousTaskMinute !== null
                         && nextTaskMinute !== null
                         && previousTaskMinute < marker.minute
                         && marker.minute < nextTaskMinute;
@@ -1940,13 +1947,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       const markerOpacity = marker.kind === "placeholder"
                         ? 0.25 + (marker.emphasis * 0.65)
                         : 1;
-                      const markerTransform = shouldCenterBetweenQuests
+                      const markerTransform = isBetweenQuestMarker
                         ? `translateY(-50%) scale(${markerScale})`
                         : `scale(${markerScale})`;
                       return (
                         <div
                           key={marker.id}
-                          className="pointer-events-none select-none h-0 overflow-visible"
+                          className={cn(
+                            "pointer-events-none select-none",
+                            isBetweenQuestMarker && "h-0 overflow-visible",
+                          )}
                           data-testid={marker.id}
                         >
                           <div

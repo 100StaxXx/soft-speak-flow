@@ -487,6 +487,72 @@ describe("Journeys row drag integration", () => {
     expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
   });
 
+  it("clamps far-below drag movement to end-of-day and still updates only the dragged quest", async () => {
+    mocks.dailyTasks = [
+      {
+        id: "task-1",
+        task_text: "Morning focus",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-02-13",
+        scheduled_time: "08:00",
+        difficulty: "medium",
+        is_main_quest: false,
+      },
+      {
+        id: "task-2",
+        task_text: "Deep work",
+        completed: false,
+        xp_reward: 30,
+        task_date: "2026-02-13",
+        scheduled_time: "10:00",
+        difficulty: "hard",
+        is_main_quest: false,
+      },
+    ];
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const rowTaskOne = await screen.findByTestId("timeline-row-task-1");
+    await screen.findByTestId("timeline-row-task-2");
+
+    act(() => {
+      fireEvent(rowTaskOne, createPointerDownEvent(100));
+      dispatchPointerMove(6000);
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.updateTask).toHaveBeenCalledWith({
+      taskId: "task-1",
+      updates: { scheduled_time: "23:59" },
+    });
+    expect(mocks.updateTask).not.toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: "task-2" }),
+    );
+    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
+  });
+
   it("skips polling and auto-surface side effects while tab is inactive", async () => {
     mocks.isTabActive = false;
     mocks.unsurfacedEpicHabitsCount = 2;

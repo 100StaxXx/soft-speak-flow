@@ -213,6 +213,19 @@ const minuteFromTime = (time: string) => {
   return (hour * 60) + minute;
 };
 
+const createDomRect = (overrides: Partial<DOMRect> = {}): DOMRect => ({
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  toJSON: () => ({}),
+  ...overrides,
+}) as DOMRect;
+
 const getRenderedPlaceholderMinutes = (): number[] => {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="timeline-marker-placeholder-"]'))
     .map((element) => element.getAttribute("data-testid"))
@@ -1243,6 +1256,78 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     vi.useRealTimers();
   });
 
+  it("pins bottom edge-hold using scheduled pane bounds before nav/viewport bounds", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    mocks.timelineDragState.draggingTaskId = "task-scheduled-1";
+    mocks.timelineDragState.isDragging = true;
+    mocks.dragOffsetMotionValue.set(0);
+
+    const nav = document.createElement("nav");
+    nav.setAttribute("aria-label", "Main navigation");
+    document.body.appendChild(nav);
+    const navRectSpy = vi
+      .spyOn(nav, "getBoundingClientRect")
+      .mockReturnValue(createDomRect({ top: 1200, bottom: 1300, left: 0, right: 320, width: 320, height: 100 }));
+
+    let setIntervalSpy: ReturnType<typeof vi.spyOn> | null = null;
+    let paneRectSpy: ReturnType<typeof vi.spyOn> | null = null;
+    try {
+      render(
+        <TodaysAgenda
+          tasks={[
+            {
+              id: "task-scheduled-1",
+              task_text: "Morning focus",
+              completed: false,
+              xp_reward: 25,
+              scheduled_time: "08:00",
+            },
+          ]}
+          selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+          onToggle={vi.fn()}
+          onAddQuest={vi.fn()}
+          completedCount={0}
+          totalCount={1}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      expect(await screen.findByTestId("timeline-drag-overlay")).toBeInTheDocument();
+
+      const pane = screen.getByTestId("scheduled-timeline-pane");
+      paneRectSpy = vi
+        .spyOn(pane, "getBoundingClientRect")
+        .mockReturnValue(createDomRect({ top: 100, bottom: 260, left: 0, right: 320, width: 320, height: 160 }));
+
+      vi.useFakeTimers();
+      setIntervalSpy = vi.spyOn(window, "setInterval");
+      const callsBeforePin = mocks.nudgeByFineStepMock.mock.calls.length;
+      act(() => {
+        mocks.dragOffsetMotionValue.set(500);
+        vi.advanceTimersByTime(340);
+      });
+
+      const edgeHoldDelays = setIntervalSpy.mock.calls
+        .map(([, delay]) => delay)
+        .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
+
+      expect(edgeHoldDelays).toContain(110);
+      expect(mocks.nudgeByFineStepMock.mock.calls.length).toBeGreaterThan(callsBeforePin);
+      expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === 1)).toBe(true);
+    } finally {
+      paneRectSpy?.mockRestore();
+      navRectSpy.mockRestore();
+      nav.remove();
+      setIntervalSpy?.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("stops edge-hold nudging when unpinned or drag ends", () => {
     vi.useFakeTimers();
     const queryClient = new QueryClient({
@@ -1777,6 +1862,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const betweenQuestMarker = screen.getByTestId("timeline-marker-placeholder-1300");
     const markerInnerWrapper = betweenQuestMarker.firstElementChild as HTMLElement | null;
+    expect(betweenQuestMarker).toHaveClass("h-0", "overflow-visible");
     expect(markerInnerWrapper?.style.transform).toContain("translateY(-50%)");
   });
 
@@ -2018,7 +2104,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     vi.useRealTimers();
   });
 
-  it("renders marker containers as zero-height while keeping marker timestamps visible", () => {
+  it("keeps boundary now markers in normal flow while preserving timestamp visibility", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-14T16:34:00"));
 
@@ -2051,7 +2137,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const nowMarker = screen.getByTestId("timeline-marker-now");
     const nowMarkerInner = nowMarker.firstElementChild as HTMLElement | null;
-    expect(nowMarker).toHaveClass("h-0", "overflow-visible");
+    expect(nowMarker).not.toHaveClass("h-0");
+    expect(nowMarker).not.toHaveClass("overflow-visible");
     expect(nowMarkerInner?.style.transform).not.toContain("translateY(-50%)");
     expect(within(nowMarker).getByTestId("timeline-row-time")).toHaveTextContent("16:34");
 
@@ -2099,6 +2186,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const nowMarker = screen.getByTestId("timeline-marker-now");
     const nowMarkerInner = nowMarker.firstElementChild as HTMLElement | null;
     expect(nowMarker).toBeInTheDocument();
+    expect(nowMarker).toHaveClass("h-0", "overflow-visible");
     expect(nowMarkerInner?.style.transform).toContain("translateY(-50%)");
     expect(
       within(nowMarker).getByTestId("timeline-row-time"),
@@ -2146,6 +2234,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const nowMarker = screen.getByTestId("timeline-marker-now");
     const nowMarkerInner = nowMarker.firstElementChild as HTMLElement | null;
     expect(nowMarker).toBeInTheDocument();
+    expect(nowMarker).not.toHaveClass("h-0");
     expect(nowMarkerInner?.style.transform).not.toContain("translateY(-50%)");
     expect(
       within(nowMarker).getByTestId("timeline-row-time"),
