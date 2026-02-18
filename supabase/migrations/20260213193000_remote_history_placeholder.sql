@@ -1,0 +1,6 @@
+-- Placeholder for remote migration version 20260213193000.
+--
+-- This file exists to keep local migration history aligned with the linked remote project.
+-- Replace this placeholder with the real migration via:
+--   supabase migration fetch
+-- once SUPABASE_ACCESS_TOKEN is available in this environment.
