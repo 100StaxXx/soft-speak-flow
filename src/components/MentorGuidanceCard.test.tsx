@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MentorGuidanceCard } from "./MentorGuidanceCard";
+import { MentorGuidanceCard, resolveMentorGuidancePlacement } from "./MentorGuidanceCard";
 
 const mocks = vi.hoisted(() => ({
   guidance: {
@@ -46,5 +46,95 @@ describe("MentorGuidanceCard", () => {
     render(<MentorGuidanceCard />);
     expect(screen.queryByText("Atlas")).not.toBeInTheDocument();
     mocks.guidance.isActive = true;
+  });
+});
+
+describe("resolveMentorGuidancePlacement", () => {
+  const viewportHeight = 844;
+  const panelRect = {
+    top: 620,
+    right: 390,
+    bottom: 844,
+    left: 0,
+    width: 390,
+    height: 224,
+  };
+
+  const placedRect = (
+    placement: ReturnType<typeof resolveMentorGuidancePlacement>,
+    baseRect = panelRect
+  ) => {
+    if (placement.anchor === "top") {
+      return {
+        top: placement.topPx,
+        bottom: placement.topPx + baseRect.height,
+      };
+    }
+
+    const top = viewportHeight - placement.bottomPx - baseRect.height;
+    return {
+      top,
+      bottom: top + baseRect.height,
+    };
+  };
+
+  it("repositions to avoid bottom-nav mentor tab overlap", () => {
+    const mentorTabRect = {
+      top: 758,
+      right: 88,
+      bottom: 834,
+      left: 8,
+      width: 80,
+      height: 76,
+    };
+
+    const placement = resolveMentorGuidancePlacement({
+      panelRect,
+      targetRect: mentorTabRect,
+      viewportHeight,
+    });
+
+    const rect = placedRect(placement);
+    expect(rect.bottom).toBeLessThanOrEqual(mentorTabRect.top - 12);
+  });
+
+  it("repositions to avoid morning check-in submit button overlap", () => {
+    const submitRect = {
+      top: 690,
+      right: 360,
+      bottom: 748,
+      left: 30,
+      width: 330,
+      height: 58,
+    };
+
+    const placement = resolveMentorGuidancePlacement({
+      panelRect,
+      targetRect: submitRect,
+      viewportHeight,
+    });
+
+    const rect = placedRect(placement);
+    expect(rect.bottom).toBeLessThanOrEqual(submitRect.top - 12);
+  });
+
+  it("repositions to avoid morning check-in card overlap", () => {
+    const checkInCardRect = {
+      top: 530,
+      right: 372,
+      bottom: 760,
+      left: 18,
+      width: 354,
+      height: 230,
+    };
+
+    const placement = resolveMentorGuidancePlacement({
+      panelRect,
+      targetRect: checkInCardRect,
+      viewportHeight,
+    });
+
+    const rect = placedRect(placement);
+    expect(rect.bottom).toBeLessThanOrEqual(checkInCardRect.top - 12);
   });
 });
