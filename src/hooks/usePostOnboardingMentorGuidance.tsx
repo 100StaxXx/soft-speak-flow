@@ -8,7 +8,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -245,6 +245,24 @@ const pathIsHidden = (pathname: string) =>
   pathname.startsWith("/auth") ||
   pathname.startsWith("/onboarding");
 
+const ROUTE_RESTORE_PATH_SET = new Set(["/", "/mentor", "/inbox", "/journeys", "/companion"]);
+
+export const shouldRestoreTutorialRoute = ({
+  pathname,
+  stepRoute,
+  tutorialReady,
+  tutorialComplete,
+}: {
+  pathname: string;
+  stepRoute: string | null;
+  tutorialReady: boolean;
+  tutorialComplete: boolean;
+}): boolean => {
+  if (!tutorialReady || tutorialComplete || !stepRoute) return false;
+  if (!ROUTE_RESTORE_PATH_SET.has(pathname)) return false;
+  return pathname !== stepRoute;
+};
+
 export interface PostOnboardingMentorGuidanceState {
   isActive: boolean;
   currentStep: GuidedTutorialStepId | null;
@@ -393,12 +411,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const personality = useMentorPersonality();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const completionPersistRef = useRef(false);
   const stepPersistThrottleRef = useRef<Set<GuidedTutorialStepId>>(new Set());
   const missingTargetSinceRef = useRef<number | null>(null);
   const currentMilestoneStartedAtRef = useRef<number | null>(null);
   const lastTargetResolutionSignatureRef = useRef<string | null>(null);
+  const lastRouteRestoreSignatureRef = useRef<string | null>(null);
 
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
@@ -492,6 +512,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   );
 
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
+  const stepRoute = currentStep?.route ?? null;
+  const shouldRestoreRoute = shouldRestoreTutorialRoute({
+    pathname: location.pathname,
+    stepRoute,
+    tutorialReady,
+    tutorialComplete,
+  });
 
   const persistProgress = useCallback(
     async (progress: GuidedTutorialProgressSnapshot) => {
@@ -835,6 +862,36 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   );
 
   useEffect(() => {
+    if (!shouldRestoreRoute || !stepRoute) {
+      lastRouteRestoreSignatureRef.current = null;
+      return;
+    }
+
+    const signature = `${location.pathname}->${stepRoute}`;
+    if (lastRouteRestoreSignatureRef.current === signature) {
+      return;
+    }
+    lastRouteRestoreSignatureRef.current = signature;
+
+    emitTutorialEvent("tutorial_route_restored", {
+      userId: user?.id,
+      from: location.pathname,
+      to: stepRoute,
+      stepId: currentStep?.id ?? null,
+      milestoneId: currentMilestone,
+    });
+    navigate(stepRoute, { replace: true });
+  }, [
+    currentMilestone,
+    currentStep?.id,
+    location.pathname,
+    navigate,
+    shouldRestoreRoute,
+    stepRoute,
+    user?.id,
+  ]);
+
+  useEffect(() => {
     if (!currentMilestone) {
       currentMilestoneStartedAtRef.current = null;
       lastTargetResolutionSignatureRef.current = null;
@@ -852,7 +909,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [currentMilestone, currentStep?.id, location.pathname, user?.id]);
 
   useEffect(() => {
-    if (!tutorialReady || tutorialComplete || !currentMilestone || pathIsHidden(location.pathname)) {
+    if (
+      !tutorialReady ||
+      tutorialComplete ||
+      !currentMilestone ||
+      shouldRestoreRoute ||
+      pathIsHidden(location.pathname)
+    ) {
       setActiveTargetSelector(null);
       missingTargetSinceRef.current = null;
       return;
@@ -902,12 +965,18 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     currentMilestone,
     currentStep?.id,
     location.pathname,
+    shouldRestoreRoute,
     tutorialComplete,
     tutorialReady,
     user?.id,
   ]);
 
-  const isActive = tutorialReady && !tutorialComplete && !pathIsHidden(location.pathname) && Boolean(currentStep);
+  const isActive =
+    tutorialReady &&
+    !tutorialComplete &&
+    !shouldRestoreRoute &&
+    !pathIsHidden(location.pathname) &&
+    Boolean(currentStep);
   const currentStepId = currentStep?.id ?? null;
   const currentSubstep = currentStepId === "create_quest" ? createQuestProgress.current : null;
 
@@ -971,7 +1040,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     isActive,
     currentStep: currentStepId,
     currentSubstep,
-    stepRoute: currentStep?.route ?? null,
+    stepRoute,
     mentorInstructionLines,
     progressText,
     activeTargetSelectors,

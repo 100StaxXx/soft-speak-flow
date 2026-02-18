@@ -4,6 +4,7 @@ import {
   getMentorInstructionLines,
   safeCompletedSteps,
   sanitizeCreateQuestProgress,
+  shouldRestoreTutorialRoute,
 } from "./usePostOnboardingMentorGuidance";
 
 describe("safeCompletedSteps", () => {
@@ -65,5 +66,71 @@ describe("getMentorInstructionLines", () => {
     );
     expect(getMentorInstructionLines("meet_companion", null)[0]).toContain("Open Companion");
     expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Head to Mentor");
+  });
+});
+
+describe("shouldRestoreTutorialRoute", () => {
+  it("returns true when current path is a main tab and differs from the active step route", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/journeys",
+        stepRoute: "/mentor",
+        tutorialReady: true,
+        tutorialComplete: false,
+      })
+    ).toBe(true);
+  });
+
+  it("returns true for root path mismatch", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/",
+        stepRoute: "/companion",
+        tutorialReady: true,
+        tutorialComplete: false,
+      })
+    ).toBe(true);
+  });
+
+  it("returns false when already on the correct step route", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/mentor",
+        stepRoute: "/mentor",
+        tutorialReady: true,
+        tutorialComplete: false,
+      })
+    ).toBe(false);
+  });
+
+  it("returns false for non-main-tab routes", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/profile",
+        stepRoute: "/mentor",
+        tutorialReady: true,
+        tutorialComplete: false,
+      })
+    ).toBe(false);
+  });
+
+  it("returns false when tutorial is not ready or already complete", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/journeys",
+        stepRoute: "/mentor",
+        tutorialReady: false,
+        tutorialComplete: false,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/journeys",
+        stepRoute: "/mentor",
+        tutorialReady: true,
+        tutorialComplete: true,
+      })
+    ).toBe(false);
   });
 });
