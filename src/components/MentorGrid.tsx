@@ -31,6 +31,7 @@ const MENTOR_ORDER = ['atlas', 'eli', 'sienna', 'stryker', 'carmen', 'reign', 's
 
 export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommendedMentorId, isSelecting = false }: MentorGridProps) => {
   const [selectedMentor, setSelectedMentor] = useState<string | null>(null);
+  const topControlOffset = 'calc(env(safe-area-inset-top, 0px) + 1rem)';
 
   // Order mentors: first by MENTOR_ORDER, then any unlisted mentors alphabetically
   const orderedMentors = (() => {
@@ -60,7 +61,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
     <div className="relative w-full max-w-6xl mx-auto">
       {/* Full Screen Mentor View */}
       {activeMentor && (
-        <div className="fixed inset-0 z-50 bg-obsidian animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-obsidian animate-fade-in overflow-y-auto ios-scroll-container">
           {/* Full Size Mentor Image */}
           <div className="absolute inset-0">
             <MentorAvatar
@@ -80,7 +81,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
           <button
             onClick={handleBack}
             className="absolute left-8 z-50 flex items-center justify-center w-12 h-12 text-pure-white hover:text-royal-gold transition-colors group cursor-pointer"
-            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+            style={{ top: topControlOffset }}
             aria-label="Back to mentor grid"
           >
             <ArrowLeft className="h-6 w-6 group-hover:-translate-x-1 transition-transform" />
@@ -90,7 +91,7 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
           {currentMentorId === activeMentor.id && (
             <div 
               className="absolute right-8 z-10 flex items-center gap-2 px-4 py-2 bg-royal-gold/20 border border-royal-gold rounded-full"
-              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 2rem)' }}
+              style={{ top: topControlOffset }}
             >
               <Check className="h-4 w-4 text-royal-gold" />
               <span className="text-royal-gold font-bold text-sm">Current Mentor</span>
@@ -98,12 +99,18 @@ export const MentorGrid = ({ mentors, onSelectMentor, currentMentorId, recommend
           )}
 
           {/* Overlayed Content */}
-          <div className="relative z-10 h-full flex flex-col justify-end p-8 md:p-16 max-w-5xl mx-auto">
+          <div
+            className="relative z-10 min-h-[100svh] w-full flex flex-col justify-end px-6 py-8 md:px-16 md:py-12 max-w-5xl mx-auto"
+            style={{
+              paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4rem)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)',
+            }}
+          >
             <div className="space-y-8 animate-velocity-fade-in">
               {/* Name & Title */}
               <div className="space-y-4">
                 <div className="h-1 w-32 bg-royal-gold animate-scale-in" />
-                <h1 className="text-7xl md:text-9xl font-black text-pure-white uppercase tracking-tighter leading-none">
+                <h1 className="text-[clamp(2.75rem,12vw,5rem)] md:text-9xl font-black text-pure-white uppercase tracking-tighter leading-none">
                   {activeMentor.name}
                 </h1>
                 <p 
