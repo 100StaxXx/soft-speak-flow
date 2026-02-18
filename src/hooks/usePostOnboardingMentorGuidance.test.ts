@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CREATE_QUEST_SUBSTEP_ORDER,
   getMentorInstructionLines,
+  milestoneUsesStrictLock,
   safeCompletedSteps,
   sanitizeCreateQuestProgress,
   shouldRestoreTutorialRoute,
@@ -66,6 +67,20 @@ describe("getMentorInstructionLines", () => {
     );
     expect(getMentorInstructionLines("meet_companion", null)[0]).toContain("Open Companion");
     expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Head to Mentor");
+  });
+});
+
+describe("milestoneUsesStrictLock", () => {
+  it("does not strict-lock submit morning check-in", () => {
+    expect(milestoneUsesStrictLock("submit_morning_checkin")).toBe(false);
+  });
+
+  it("does not strict-lock companion progress confirmation", () => {
+    expect(milestoneUsesStrictLock("confirm_companion_progress")).toBe(false);
+  });
+
+  it("keeps strict lock enabled for actionable tutorial targets", () => {
+    expect(milestoneUsesStrictLock("open_add_quest")).toBe(true);
   });
 });
 

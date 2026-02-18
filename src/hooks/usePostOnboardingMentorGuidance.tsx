@@ -392,15 +392,10 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
   }
 };
 
-const milestoneUsesStrictLock = (
-  milestoneId: GuidedMilestoneId | null,
-  resolvedSelector: string | null
-): boolean => {
+export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
   if (!milestoneId) return false;
   if (milestoneId === "confirm_companion_progress") return false;
-  if (milestoneId === "submit_morning_checkin" && resolvedSelector === '[data-tour="morning-checkin"]') {
-    return false;
-  }
+  if (milestoneId === "submit_morning_checkin") return false;
   return true;
 };
 
@@ -1034,7 +1029,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const dialogueSupportText = targetMissingTooLong
     ? "I'm waiting for this area to load. Stay on this screen and it'll highlight as soon as it's ready."
     : dialogue.support;
-  const strictLockEnabled = milestoneUsesStrictLock(currentMilestone, activeTargetSelector);
+  const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
 
   return {
     isActive,
