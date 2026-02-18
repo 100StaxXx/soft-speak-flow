@@ -252,7 +252,7 @@ const IAPTest = () => {
   return (
     <div className="min-h-screen pb-nav-safe bg-background pb-8">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border safe-area-top">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />

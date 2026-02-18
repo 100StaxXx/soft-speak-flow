@@ -63,7 +63,7 @@ export const CompanionCreationLoader = () => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="min-h-screen bg-background flex items-center justify-center p-4 pt-safe-top safe-area-bottom"
+      className="min-h-screen bg-background flex items-center justify-center px-4 pt-safe pb-safe"
     >
       <div className="max-w-md w-full text-center space-y-8">
         {/* Cosmic pulse animation */}

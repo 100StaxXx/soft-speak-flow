@@ -118,7 +118,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
 
             {/* Scrollable Content */}
             <div className="relative flex-1 overflow-y-auto pt-safe-top">
-              <div className="min-h-full flex flex-col justify-end p-6 pb-safe-bottom pt-20">
+              <div className="min-h-full flex flex-col justify-end px-6 pb-safe-lg pt-20">
                 <motion.div
                   initial={{ y: 40, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}

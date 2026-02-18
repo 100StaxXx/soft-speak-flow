@@ -59,17 +59,13 @@ export const resolveMentorEnergy = (mentor: MentorLike): MentorEnergy => {
 export const filterMentorsByEnergyPreference = <T extends MentorLike>(
   mentors: T[],
   preference: EnergyPreference,
-): { candidates: T[]; usedFallback: boolean } => {
+): { candidates: T[] } => {
   if (preference === "no_preference") {
-    return { candidates: mentors, usedFallback: false };
+    return { candidates: mentors };
   }
 
   const filtered = mentors.filter((mentor) => resolveMentorEnergy(mentor) === preference);
-  if (filtered.length > 0) {
-    return { candidates: filtered, usedFallback: false };
-  }
-
-  return { candidates: mentors, usedFallback: true };
+  return { candidates: filtered };
 };
 
 export const getDesiredIntensityFromGuidanceTone = (

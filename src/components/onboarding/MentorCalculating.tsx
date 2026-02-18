@@ -21,7 +21,7 @@ export const MentorCalculating = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 pt-safe-top safe-area-bottom relative">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe pb-safe-lg relative">
       {/* Animated constellation */}
       <div className="relative w-48 h-48 mb-8">
         {/* Orbiting particles */}

@@ -29,7 +29,7 @@ const PRACTICE_TIMER = 12; // 12 seconds for all practice rounds
 
 const PracticeBanner = memo(() => (
   <motion.div
-    className="absolute top-0 left-0 right-0 z-50 flex justify-center"
+    className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-safe-top"
     initial={{ y: -50, opacity: 0 }}
     animate={{ y: 0, opacity: 1 }}
     transition={{ type: 'spring', stiffness: 300, damping: 25 }}

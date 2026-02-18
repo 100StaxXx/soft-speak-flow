@@ -61,7 +61,7 @@ const Preview = () => {
       <StarfieldBackground />
       <div className="min-h-screen bg-background pb-24 pt-safe relative z-10">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/55 px-4 py-3 safe-area-top">
+      <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/55 px-4 pb-3 pt-safe-top">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
@@ -223,7 +223,7 @@ const Preview = () => {
       </div>
 
       {/* Fixed CTA at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe-bottom bg-background/90 backdrop-blur-xl border-t border-border/55">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pt-4 pb-safe bg-background/90 backdrop-blur-xl border-t border-border/55">
         <div className="max-w-lg mx-auto">
           <Button
             size="lg"

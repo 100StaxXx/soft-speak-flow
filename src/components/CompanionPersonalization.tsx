@@ -71,7 +71,7 @@ export const CompanionPersonalization = ({ onComplete, isLoading }: CompanionPer
   }
 
   return (
-    <div className="min-h-screen p-4 pt-safe-top safe-area-bottom flex items-center justify-center relative z-10">
+    <div className="min-h-screen px-4 pt-safe pb-safe flex items-center justify-center relative z-10">
       <div className="max-w-2xl w-full p-8 space-y-8 animate-scale-in cosmic-glass rounded-2xl border border-white/10">
         <div className="text-center space-y-4">
           <h1 className="text-3xl md:text-4xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">

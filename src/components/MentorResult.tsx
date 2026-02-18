@@ -36,7 +36,7 @@ export const MentorResult = ({
   seeAllLabel = "See All Mentors",
 }: MentorResultProps) => {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 pt-safe-top safe-area-bottom relative z-10">
+    <div className="min-h-screen flex items-center justify-center px-6 pt-safe pb-safe-lg relative z-10">
       <div className="max-w-3xl w-full space-y-12 animate-fade-in">
         {/* Header */}
         <div className="text-center space-y-4">

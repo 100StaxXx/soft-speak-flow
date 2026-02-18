@@ -30,7 +30,7 @@ export const OfflineBanner = () => {
   if (!isOnline) {
     return (
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-50 px-4 py-2",
+        "fixed top-0 left-0 right-0 z-50 px-4 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]",
         "bg-gradient-to-r from-amber-600 to-orange-600",
         "text-white flex items-center justify-center gap-2 text-sm",
         "animate-fade-in"
@@ -50,7 +50,7 @@ export const OfflineBanner = () => {
   if (wasOffline && pendingCount > 0) {
     return (
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-50 px-4 py-2",
+        "fixed top-0 left-0 right-0 z-50 px-4 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]",
         "bg-gradient-to-r from-sky-600 to-blue-600",
         "text-white flex items-center justify-center gap-2 text-sm",
         "animate-fade-in"
@@ -81,7 +81,7 @@ export const OfflineBanner = () => {
   if (showSyncSuccess) {
     return (
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-50 px-4 py-2",
+        "fixed top-0 left-0 right-0 z-50 px-4 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]",
         "bg-gradient-to-r from-green-600 to-emerald-600",
         "text-white flex items-center justify-center gap-2 text-sm",
         "animate-fade-in"
@@ -96,7 +96,7 @@ export const OfflineBanner = () => {
   if (syncStatus === "error" && pendingCount > 0) {
     return (
       <div className={cn(
-        "fixed top-0 left-0 right-0 z-50 px-4 py-2",
+        "fixed top-0 left-0 right-0 z-50 px-4 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]",
         "bg-gradient-to-r from-red-600 to-rose-600",
         "text-white flex items-center justify-center gap-2 text-sm",
         "animate-fade-in"

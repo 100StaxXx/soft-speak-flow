@@ -31,7 +31,6 @@ describe("deriveOnboardingMentorCandidates", () => {
     ]);
 
     expect(result.energyPreference).toBe("masculine");
-    expect(result.usedEnergyFallback).toBe(false);
     expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1"]);
   });
 
@@ -41,7 +40,6 @@ describe("deriveOnboardingMentorCandidates", () => {
     ]);
 
     expect(result.energyPreference).toBe("feminine");
-    expect(result.usedEnergyFallback).toBe(false);
     expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m2", "m3"]);
   });
 
@@ -51,7 +49,19 @@ describe("deriveOnboardingMentorCandidates", () => {
     ]);
 
     expect(result.energyPreference).toBe("no_preference");
-    expect(result.usedEnergyFallback).toBe(false);
     expect(result.mentorsForSelection.map((mentor) => mentor.id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("returns no mentors when a strict preference has no matches", () => {
+    const feminineOnlyMentors = [
+      { id: "f1", slug: "sienna", gender_energy: "feminine", tags: ["supportive"] },
+      { id: "f2", slug: "reign", gender_energy: "feminine", tags: ["momentum"] },
+    ];
+    const result = deriveOnboardingMentorCandidates(feminineOnlyMentors, [
+      { questionId: "mentor_energy", tags: ["masculine_preference"] },
+    ]);
+
+    expect(result.energyPreference).toBe("masculine");
+    expect(result.mentorsForSelection).toEqual([]);
   });
 });

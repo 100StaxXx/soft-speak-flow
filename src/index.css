@@ -560,6 +560,18 @@ All colors MUST be HSL.
 
     /* Shared layout token for fixed bottom navigation clearance */
     --bottom-nav-safe-offset: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+
+    /* Canonical safe area inset tokens */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+
+    /* Short aliases used by some JS/native bridge code */
+    --sat: var(--safe-area-inset-top);
+    --sar: var(--safe-area-inset-right);
+    --sab: var(--safe-area-inset-bottom);
+    --sal: var(--safe-area-inset-left);
   }
   
   .dark {
@@ -728,27 +740,35 @@ All colors MUST be HSL.
 
   /* iOS Safe Area padding utilities */
   .pt-safe {
-    padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+    padding-top: calc(1.5rem + var(--safe-area-inset-top)) !important;
   }
   
   .pt-safe-lg {
-    padding-top: calc(2.5rem + env(safe-area-inset-top, 0px));
+    padding-top: calc(2.5rem + var(--safe-area-inset-top)) !important;
   }
 
   .pt-safe-top {
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: var(--safe-area-inset-top) !important;
+  }
+
+  .pb-safe {
+    padding-bottom: calc(1rem + var(--safe-area-inset-bottom)) !important;
+  }
+
+  .pb-safe-lg {
+    padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom)) !important;
   }
 
   .pb-safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--safe-area-inset-bottom) !important;
   }
 
   .pl-safe-left {
-    padding-left: env(safe-area-inset-left, 0px);
+    padding-left: var(--safe-area-inset-left) !important;
   }
 
   .pr-safe-right {
-    padding-right: env(safe-area-inset-right, 0px);
+    padding-right: var(--safe-area-inset-right) !important;
   }
 
   /* Better touch targets for iOS inputs */
@@ -1627,19 +1647,27 @@ All colors MUST be HSL.
 
   /* Safe Area Support for Mobile Devices (iOS notches, home indicators) */
   .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--safe-area-inset-bottom) !important;
   }
 
   .safe-area-top {
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--safe-area-inset-top) !important;
   }
 
   .safe-area-left {
-    padding-left: env(safe-area-inset-left);
+    padding-left: var(--safe-area-inset-left) !important;
   }
 
   .safe-area-right {
-    padding-right: env(safe-area-inset-right);
+    padding-right: var(--safe-area-inset-right) !important;
+  }
+
+  .safe-area-inset-top {
+    padding-top: var(--safe-area-inset-top) !important;
+  }
+
+  .safe-area-inset-bottom {
+    padding-bottom: var(--safe-area-inset-bottom) !important;
   }
 
   /* Bottom Nav Height + Safe Area for page padding */

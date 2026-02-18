@@ -64,31 +64,27 @@ describe("filterMentorsByEnergyPreference", () => {
 
   it("keeps only masculine mentors when masculine is selected", () => {
     const result = filterMentorsByEnergyPreference(mentors, "masculine");
-    expect(result.usedFallback).toBe(false);
     expect(result.candidates.map((mentor) => mentor.id)).toEqual(["m1"]);
   });
 
   it("keeps only feminine mentors when feminine is selected", () => {
     const result = filterMentorsByEnergyPreference(mentors, "feminine");
-    expect(result.usedFallback).toBe(false);
     expect(result.candidates.map((mentor) => mentor.id)).toEqual(["m2", "m3"]);
   });
 
   it("does not filter mentors when no preference is selected", () => {
     const result = filterMentorsByEnergyPreference(mentors, "no_preference");
-    expect(result.usedFallback).toBe(false);
     expect(result.candidates.map((mentor) => mentor.id)).toEqual(["m1", "m2", "m3"]);
   });
 
-  it("falls back to all mentors when preferred energy has no matches", () => {
+  it("returns no candidates when preferred energy has no matches", () => {
     const feminineOnlyMentors = [
       { id: "f1", slug: "sienna", gender_energy: "feminine" },
       { id: "f2", slug: "solace", gender_energy: "feminine" },
     ];
     const result = filterMentorsByEnergyPreference(feminineOnlyMentors, "masculine");
 
-    expect(result.usedFallback).toBe(true);
-    expect(result.candidates.map((mentor) => mentor.id)).toEqual(["f1", "f2"]);
+    expect(result.candidates).toEqual([]);
   });
 
   it("filters using slug inference when gender_energy is missing", () => {
@@ -100,9 +96,7 @@ describe("filterMentorsByEnergyPreference", () => {
     const masculineResult = filterMentorsByEnergyPreference(inferredMentors, "masculine");
     const feminineResult = filterMentorsByEnergyPreference(inferredMentors, "feminine");
 
-    expect(masculineResult.usedFallback).toBe(false);
     expect(masculineResult.candidates.map((mentor) => mentor.id)).toEqual(["s1"]);
-    expect(feminineResult.usedFallback).toBe(false);
     expect(feminineResult.candidates.map((mentor) => mentor.id)).toEqual(["s2"]);
   });
 });

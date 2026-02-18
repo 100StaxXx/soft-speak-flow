@@ -149,7 +149,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col px-6 pb-6 pt-safe-top safe-area-bottom">
+    <div className="min-h-screen relative overflow-hidden flex flex-col px-6 pb-safe-lg pt-safe-top">
       {/* Background Stars */}
       <div className="absolute inset-0 overflow-hidden">
         {starPositions.map((star, i) => (

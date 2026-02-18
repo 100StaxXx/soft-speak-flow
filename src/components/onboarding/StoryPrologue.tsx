@@ -35,7 +35,7 @@ export const StoryPrologue = ({ onComplete }: StoryPrologueProps) => {
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6 pt-safe-top safe-area-bottom">
+    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center px-6 pt-safe pb-safe-lg">
       {/* Animated Stars Background */}
       <div className="absolute inset-0 overflow-hidden">
         {starPositions.map((star, i) => (

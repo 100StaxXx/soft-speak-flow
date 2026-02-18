@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -89,15 +89,13 @@ export const deriveOnboardingMentorCandidates = <T extends MentorEnergyCandidate
 ): {
   energyPreference: EnergyPreference;
   mentorsForSelection: T[];
-  usedEnergyFallback: boolean;
 } => {
   const energyPreference = getEnergyPreferenceFromAnswers(questionAnswers);
-  const { candidates, usedFallback } = filterMentorsByEnergyPreference(mentors, energyPreference);
+  const { candidates } = filterMentorsByEnergyPreference(mentors, energyPreference);
 
   return {
     energyPreference,
     mentorsForSelection: candidates,
-    usedEnergyFallback: usedFallback,
   };
 };
 
@@ -131,17 +129,6 @@ export const StoryOnboarding = () => {
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
-
-  const {
-    energyPreference: onboardingEnergyPreference,
-    mentorsForSelection: mentorsForOnboardingSelection,
-    usedEnergyFallback: usedOnboardingEnergyFallback,
-  } = useMemo(() => deriveOnboardingMentorCandidates(mentors, answers), [mentors, answers]);
-
-  const mentorResultSeeAllLabel =
-    onboardingEnergyPreference !== "no_preference" && !usedOnboardingEnergyFallback
-      ? "See Matching Mentors"
-      : "See All Mentors";
 
   const waitForCompanionDisplayName = async (companionId: string) => {
     await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
@@ -283,17 +270,19 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     const toneAnswer = questionAnswers.find(a => a.questionId === "guidance_tone");
     const desiredIntensity = mapGuidanceToneToIntensity(toneAnswer?.answer ?? "");
 
-    // Apply hard energy preference filtering with fallback to avoid blocking onboarding
+    // Apply strict energy preference filtering for recommendation lock
     const {
       energyPreference,
       mentorsForSelection: mentorsForScoring,
-      usedEnergyFallback,
     } = deriveOnboardingMentorCandidates(mentors, questionAnswers);
 
-    if (usedEnergyFallback && energyPreference !== "no_preference") {
-      console.warn(
-        `[Onboarding] No mentors matched energy preference "${energyPreference}". Falling back to all mentors.`,
+    if (energyPreference !== "no_preference" && mentorsForScoring.length === 0) {
+      console.error(
+        `[Onboarding] No mentors matched strict energy preference "${energyPreference}".`,
       );
+      toast.error("No mentors matched your selected preference. Please review mentor setup.");
+      setStage("mentor-grid");
+      return;
     }
 
     // Calculate scores for each mentor
@@ -827,7 +816,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               compatibilityScore={compatibilityScore}
               onConfirm={() => handleMentorConfirm(recommendedMentor)}
               onSeeAll={handleSeeAllMentors}
-              seeAllLabel={mentorResultSeeAllLabel}
+              seeAllLabel="See All Mentors"
             />
           </motion.div>
         )}
@@ -845,7 +834,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               <p className="text-muted-foreground text-sm">Select the guide who resonates with you</p>
             </div>
             <MentorGrid
-              mentors={mentorsForOnboardingSelection.map(m => ({
+              mentors={mentors.map(m => ({
                 ...m,
                 archetype: m.mentor_type,
                 style_description: m.tone_description,

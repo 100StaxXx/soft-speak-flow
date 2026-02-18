@@ -1225,7 +1225,13 @@ export function EnergyBeamGame({
       <StarfieldBackground />
       
       {/* HUD - No timer, show wave without max - compact mode support */}
-      <div className={`absolute top-0 left-0 right-0 z-30 ${compact ? 'p-2' : 'p-3'}`}>
+      <div
+        className={`absolute top-0 left-0 right-0 z-30 ${
+          compact
+            ? 'px-2 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]'
+            : 'px-3 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]'
+        }`}
+      >
         <div className="flex justify-between items-start">
           <div>
             <div className={`font-black text-white ${compact ? 'text-lg' : 'text-2xl'}`} style={{ textShadow: '0 0 10px rgba(59,130,246,0.5)' }}>
