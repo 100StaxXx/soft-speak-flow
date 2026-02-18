@@ -14,8 +14,6 @@ const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   focusMountCount: 0,
   navigate: vi.fn(),
-  showTutorial: false,
-  dismissTutorial: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -116,13 +114,6 @@ vi.mock("@/hooks/useCompanion", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useFirstTimeModal", () => ({
-  useFirstTimeModal: () => ({
-    showModal: mocks.showTutorial,
-    dismissModal: mocks.dismissTutorial,
-  }),
-}));
-
 vi.mock("@/hooks/useCompanionStory", () => ({
   getCompanionStoriesAllQueryKey: (companionId?: string) => ["companion-stories-all", companionId],
   fetchCompanionStoriesAll: vi.fn().mockResolvedValue([]),
@@ -179,17 +170,6 @@ vi.mock("@/components/StarfieldBackground", () => ({
 
 vi.mock("@/components/MentorGuidanceCard", () => ({
   MentorGuidanceCard: () => null,
-}));
-
-vi.mock("@/components/CompanionTutorialModal", () => ({
-  CompanionTutorialModal: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
-    open ? (
-      <div data-testid="companion-tutorial">
-        <button type="button" onClick={onClose}>
-          Hide tutorial
-        </button>
-      </div>
-    ) : null,
 }));
 
 vi.mock("@/components/ui/parallax-card", () => ({
@@ -257,8 +237,6 @@ describe("Companion tabs performance behavior", () => {
     mocks.prefetchQuery.mockClear();
     mocks.focusMountCount = 0;
     mocks.navigate.mockClear();
-    mocks.showTutorial = false;
-    mocks.dismissTutorial.mockClear();
   });
 
   afterEach(() => {
@@ -365,11 +343,9 @@ describe("Companion tabs performance behavior", () => {
     expect(screen.queryByText("Error Loading Companion")).not.toBeInTheDocument();
   });
 
-  it("keeps companion actions clickable while tutorial is visible", () => {
-    mocks.showTutorial = true;
+  it("keeps companion settings action clickable", () => {
     render(<Companion />);
 
-    expect(screen.getByTestId("companion-tutorial")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Settings"));
     expect(mocks.navigate).toHaveBeenCalledWith("/profile");
   });

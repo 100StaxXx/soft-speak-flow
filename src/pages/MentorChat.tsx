@@ -8,11 +8,9 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
-import { MentorTutorialModal } from "@/components/MentorTutorialModal";
 import { MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
-import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { PageTransition } from "@/components/PageTransition";
 import { useMentorConnectionHealth } from "@/hooks/useMentorConnectionHealth";
 
@@ -26,7 +24,6 @@ export default function MentorChat() {
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const haptics = useHapticFeedback();
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('mentor');
   const {
     effectiveMentorId: resolvedMentorId,
     status: mentorConnectionStatus,
@@ -240,8 +237,6 @@ export default function MentorChat() {
         ]}
         tip="Your mentor's tone and style match your preferences from onboarding."
       />
-      
-      <MentorTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </PageTransition>
   );
 }

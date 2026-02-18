@@ -94,10 +94,6 @@ vi.mock("@/components/skeletons", () => ({
   IndexPageSkeleton: () => <div>Loading...</div>,
 }));
 
-vi.mock("@/components/MentorTutorialModal", () => ({
-  MentorTutorialModal: () => null,
-}));
-
 vi.mock("@/components/MorningCheckIn", () => ({
   MorningCheckIn: () => <div>MorningCheckIn</div>,
 }));

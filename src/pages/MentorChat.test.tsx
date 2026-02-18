@@ -21,8 +21,6 @@ const mocks = vi.hoisted(() => ({
   queryClient: {
     invalidateQueries: vi.fn().mockResolvedValue(undefined),
   },
-  showTutorial: false,
-  dismissTutorial: vi.fn(),
   askMentorAction: vi.fn(),
 }));
 
@@ -64,13 +62,6 @@ vi.mock("@/hooks/useHapticFeedback", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useFirstTimeModal", () => ({
-  useFirstTimeModal: () => ({
-    showModal: mocks.showTutorial,
-    dismissModal: mocks.dismissTutorial,
-  }),
-}));
-
 vi.mock("@/components/AskMentorChat", () => ({
   AskMentorChat: () => (
     <button onClick={mocks.askMentorAction} type="button">
@@ -93,17 +84,6 @@ vi.mock("@/components/PageInfoButton", () => ({
 
 vi.mock("@/components/PageInfoModal", () => ({
   PageInfoModal: () => null,
-}));
-
-vi.mock("@/components/MentorTutorialModal", () => ({
-  MentorTutorialModal: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
-    open ? (
-      <div data-testid="mentor-tutorial">
-        <button type="button" onClick={onClose}>
-          Hide tutorial
-        </button>
-      </div>
-    ) : null,
 }));
 
 import MentorChat from "./MentorChat";
@@ -133,8 +113,6 @@ describe("MentorChat mentor connection state", () => {
       refetch: vi.fn().mockResolvedValue(undefined),
     };
     mocks.queryClient.invalidateQueries.mockClear();
-    mocks.showTutorial = false;
-    mocks.dismissTutorial.mockClear();
     mocks.askMentorAction.mockClear();
   });
 
@@ -156,7 +134,7 @@ describe("MentorChat mentor connection state", () => {
     expect(screen.queryByText("Loading your motivator...")).not.toBeInTheDocument();
   });
 
-  it("keeps mentor actions clickable while tutorial is visible", () => {
+  it("keeps mentor actions clickable when mentor is ready", () => {
     mocks.mentorStatus = "ready";
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery.data = {
@@ -165,11 +143,9 @@ describe("MentorChat mentor connection state", () => {
       tone_description: "Steady guidance",
       avatar_url: "https://example.com/avatar.png",
     };
-    mocks.showTutorial = true;
 
     renderMentorChat();
 
-    expect(screen.getByTestId("mentor-tutorial")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "AskMentorChat Action" }));
     expect(mocks.askMentorAction).toHaveBeenCalledTimes(1);
   });

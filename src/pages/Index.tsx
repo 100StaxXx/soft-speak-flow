@@ -16,8 +16,6 @@ import { EveningReflectionBanner } from "@/components/EveningReflectionBanner";
 import { WeeklyRecapCard } from "@/components/WeeklyRecapCard";
 import { DailyCoachPanel } from "@/components/DailyCoachPanel";
 import { IndexPageSkeleton } from "@/components/skeletons";
-import { MentorTutorialModal } from "@/components/MentorTutorialModal";
-import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Button } from "@/components/ui/button";
 import { loadMentorImage } from "@/utils/mentorImageLoader";
@@ -38,7 +36,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   const { isTransitioning } = useTheme();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { showModal, dismissModal } = useFirstTimeModal("mentor");
 
   // Scroll to top on mount
   useEffect(() => {
@@ -343,7 +340,6 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
       
       <ErrorBoundary>
       </ErrorBoundary>
-      <MentorTutorialModal open={showModal} onClose={dismissModal} />
     </PageTransition>
   );
 };

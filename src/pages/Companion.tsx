@@ -21,7 +21,6 @@ import {
 } from "@/hooks/useCompanionPostcards";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { Button } from "@/components/ui/button";
-import { CompanionTutorialModal } from "@/components/CompanionTutorialModal";
 import {
   useState,
   memo,
@@ -33,7 +32,6 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
-import { useFirstTimeModal } from "@/hooks/useFirstTimeModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -138,7 +136,6 @@ const Companion = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<CompanionTab>("overview");
   const [mountedTabs, setMountedTabs] = useState<Record<CompanionTab, boolean>>(() => INITIAL_MOUNTED_TABS);
-  const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal('companion');
   const prefetchedResourceKeyRef = useRef<string | null>(null);
   const navigate = useNavigate();
 
@@ -416,8 +413,6 @@ const Companion = () => {
           {renderContent()}
         </div>
       </CompanionErrorBoundary>
-      
-      <CompanionTutorialModal open={showTutorial} onClose={dismissTutorial} />
     </PageTransition>
   );
 };
