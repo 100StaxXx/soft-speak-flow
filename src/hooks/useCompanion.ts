@@ -4,19 +4,15 @@ import { useAuth } from "./useAuth";
 import { useAchievements } from "./useAchievements";
 import { toast } from "sonner";
 import { retryWithBackoff } from "@/utils/retry";
-import { useRef, useMemo, useCallback } from "react";
-import { Capacitor } from "@capacitor/core";
+import { useRef, useMemo, useCallback, useEffect, useState } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
-import type { CompleteReferralStage3Result, CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
+import type { CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
 import { generateWithValidation } from "@/utils/validateCompanionImage";
-import {
-  isRetriableFunctionInvokeError,
-  parseFunctionInvokeError,
-  toUserFacingFunctionError,
-} from "@/utils/supabaseFunctionErrors";
+import { isRetriableFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import { safeLocalStorage } from "@/utils/storage";
 
 export interface Companion {
   id: string;
@@ -67,6 +63,121 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
   return data as Companion | null;
 };
 
+type EvolutionJobStatus = "queued" | "processing" | "succeeded" | "failed";
+
+interface CompanionEvolutionJob {
+  id: string;
+  status: EvolutionJobStatus;
+  requested_stage: number;
+  requested_at: string;
+  started_at: string | null;
+  next_retry_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+}
+
+interface RequestCompanionEvolutionJobResult {
+  job_id: string;
+  status: EvolutionJobStatus;
+  requested_stage: number;
+}
+
+const ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX = "companion:evolution:active-job";
+const EVOLUTION_READY_STORAGE_PREFIX = "companion:evolution:ready";
+const EVOLUTION_ETA_DELAY_MS = 75_000;
+
+const seenFailedJobToasts = new Set<string>();
+const seenSucceededJobToasts = new Set<string>();
+const lastEvolutionWorkerKickoffAt = new Map<string, number>();
+
+const getEvolutionJobQueryKey = (userId: string | undefined) =>
+  ["companion-evolution-job", userId] as const;
+
+const getEvolutionReadyQueryKey = (userId: string | undefined) =>
+  ["companion-evolution-ready", userId] as const;
+
+const getActiveEvolutionJobStorageKey = (userId: string) =>
+  `${ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX}:${userId}`;
+
+const getEvolutionReadyStorageKey = (userId: string) =>
+  `${EVOLUTION_READY_STORAGE_PREFIX}:${userId}`;
+
+const readStoredActiveEvolutionJobId = (userId: string) =>
+  safeLocalStorage.getItem(getActiveEvolutionJobStorageKey(userId));
+
+const writeStoredActiveEvolutionJobId = (userId: string, jobId: string) => {
+  safeLocalStorage.setItem(getActiveEvolutionJobStorageKey(userId), jobId);
+};
+
+const clearStoredActiveEvolutionJobId = (userId: string) => {
+  safeLocalStorage.removeItem(getActiveEvolutionJobStorageKey(userId));
+};
+
+const readEvolutionReadyFlag = (userId: string) =>
+  safeLocalStorage.getItem(getEvolutionReadyStorageKey(userId)) === "true";
+
+const writeEvolutionReadyFlag = (userId: string, value: boolean) => {
+  if (value) {
+    safeLocalStorage.setItem(getEvolutionReadyStorageKey(userId), "true");
+    return;
+  }
+  safeLocalStorage.removeItem(getEvolutionReadyStorageKey(userId));
+};
+
+const fetchTrackedEvolutionJob = async (userId: string): Promise<CompanionEvolutionJob | null> => {
+  const trackedJobId = readStoredActiveEvolutionJobId(userId);
+
+  if (trackedJobId) {
+    const { data, error } = await supabase
+      .from("companion_evolution_jobs")
+      .select("id, status, requested_stage, requested_at, started_at, next_retry_at, error_code, error_message")
+      .eq("id", trackedJobId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      clearStoredActiveEvolutionJobId(userId);
+      return null;
+    }
+    return data as CompanionEvolutionJob;
+  }
+
+  const { data, error } = await supabase
+    .from("companion_evolution_jobs")
+    .select("id, status, requested_stage, requested_at, started_at, next_retry_at, error_code, error_message")
+    .eq("user_id", userId)
+    .in("status", ["queued", "processing"])
+    .order("requested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  writeStoredActiveEvolutionJobId(userId, data.id);
+  return data as CompanionEvolutionJob;
+};
+
+const evolutionRequestErrorMessage = (errorMessage: string) => {
+  const normalized = errorMessage.toLowerCase();
+  if (normalized.includes("not_enough_xp")) return "Your companion is not ready to evolve yet.";
+  if (normalized.includes("max_stage_reached")) return "Your companion has already reached the maximum stage.";
+  if (normalized.includes("already_evolved")) return "Your companion already evolved to this stage.";
+  if (normalized.includes("companion_not_found")) return "No companion found to evolve.";
+  return "Unable to start evolution right now. Please try again.";
+};
+
+const evolutionJobErrorMessage = (job: CompanionEvolutionJob) => {
+  const code = (job.error_code ?? "").toLowerCase();
+  if (code.includes("rate_limited")) return "Evolution is on cooldown. Please try again in a little while.";
+  if (code.includes("not_enough_xp")) return "Your companion is not ready to evolve yet.";
+  if (code.includes("max_stage_reached")) return "Your companion has already reached the maximum stage.";
+  if (code.includes("companion_not_found")) return "We couldn't find your companion. Refresh and try again.";
+  if (job.error_message) return "Evolution failed. Please try again.";
+  return "Unable to evolve your companion right now. Please try again.";
+};
+
 export const useCompanion = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -93,6 +204,167 @@ export const useCompanion = () => {
     retry: 3, // Increased from 2 to 3 for better reliability after onboarding
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
+
+  const [etaNow, setEtaNow] = useState(() => Date.now());
+
+  const setEvolutionReady = useCallback(
+    (value: boolean) => {
+      if (!user?.id) return;
+      writeEvolutionReadyFlag(user.id, value);
+      queryClient.setQueryData(getEvolutionReadyQueryKey(user.id), value);
+    },
+    [queryClient, user?.id],
+  );
+
+  const { data: hasEvolutionReady = false } = useQuery({
+    queryKey: getEvolutionReadyQueryKey(user?.id),
+    enabled: !!user?.id,
+    queryFn: async () => {
+      if (!user?.id) return false;
+      return readEvolutionReadyFlag(user.id);
+    },
+    initialData: user?.id ? readEvolutionReadyFlag(user.id) : false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+
+  const { data: trackedEvolutionJob = null } = useQuery({
+    queryKey: getEvolutionJobQueryKey(user?.id),
+    enabled: !!user?.id,
+    queryFn: async () => {
+      if (!user?.id) return null;
+      return fetchTrackedEvolutionJob(user.id);
+    },
+    staleTime: 1000,
+    refetchInterval: (query) => {
+      const job = query.state.data as CompanionEvolutionJob | null;
+      if (!job) return false;
+      return job.status === "queued" || job.status === "processing" ? 3000 : false;
+    },
+  });
+
+  const hasActiveEvolutionJob = Boolean(
+    trackedEvolutionJob &&
+      (trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing"),
+  );
+
+  useEffect(() => {
+    if (!hasActiveEvolutionJob) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setEtaNow(Date.now());
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [hasActiveEvolutionJob]);
+
+  useEffect(() => {
+    if (!user?.id || !trackedEvolutionJob) return;
+
+    if (trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing") {
+      writeStoredActiveEvolutionJobId(user.id, trackedEvolutionJob.id);
+      setIsEvolvingLoading(true);
+      return;
+    }
+
+    clearStoredActiveEvolutionJobId(user.id);
+    lastEvolutionWorkerKickoffAt.delete(trackedEvolutionJob.id);
+
+    if (trackedEvolutionJob.status === "succeeded") {
+      setEvolutionReady(true);
+      setIsEvolvingLoading(false);
+
+      if (!seenSucceededJobToasts.has(trackedEvolutionJob.id)) {
+        toast.success("Your companion evolved. Tap Companion to see the new form.");
+        seenSucceededJobToasts.add(trackedEvolutionJob.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["companion"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+      queryClient.setQueryData(getEvolutionJobQueryKey(user.id), null);
+      return;
+    }
+
+    setIsEvolvingLoading(false);
+
+    if (!seenFailedJobToasts.has(trackedEvolutionJob.id)) {
+      toast.error(evolutionJobErrorMessage(trackedEvolutionJob));
+      seenFailedJobToasts.add(trackedEvolutionJob.id);
+    }
+    queryClient.setQueryData(getEvolutionJobQueryKey(user.id), null);
+  }, [queryClient, setEvolutionReady, setIsEvolvingLoading, trackedEvolutionJob, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !trackedEvolutionJob) return undefined;
+    if (!(trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing")) {
+      return undefined;
+    }
+
+    let disposed = false;
+
+    const maybeInvokeWorker = async () => {
+      if (disposed) return;
+
+      if (trackedEvolutionJob.status === "queued" && trackedEvolutionJob.next_retry_at) {
+        const nextRetryMs = Date.parse(trackedEvolutionJob.next_retry_at);
+        if (Number.isFinite(nextRetryMs) && Date.now() < nextRetryMs) {
+          return;
+        }
+      }
+
+      const nowMs = Date.now();
+      const lastKickoffMs = lastEvolutionWorkerKickoffAt.get(trackedEvolutionJob.id) ?? 0;
+      if (nowMs - lastKickoffMs < 8000) {
+        return;
+      }
+
+      lastEvolutionWorkerKickoffAt.set(trackedEvolutionJob.id, nowMs);
+
+      try {
+        await supabase.functions.invoke("process-companion-evolution-job", {
+          body: {
+            jobId: trackedEvolutionJob.id,
+          },
+        });
+      } catch (workerError) {
+        logger.warn("Background evolution worker kick failed; will retry", {
+          jobId: trackedEvolutionJob.id,
+          error: workerError instanceof Error ? workerError.message : String(workerError),
+        });
+      }
+    };
+
+    void maybeInvokeWorker();
+
+    const intervalId = window.setInterval(() => {
+      void maybeInvokeWorker();
+    }, 15000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+    };
+  }, [trackedEvolutionJob, user?.id]);
+
+  const evolutionEtaMessage = useMemo(() => {
+    if (!hasActiveEvolutionJob || !trackedEvolutionJob) return null;
+
+    const baselineTimestamp = trackedEvolutionJob.started_at ?? trackedEvolutionJob.requested_at;
+    const baselineMs = Date.parse(baselineTimestamp);
+    const elapsedMs = Number.isFinite(baselineMs) ? Math.max(0, etaNow - baselineMs) : 0;
+
+    if (elapsedMs >= EVOLUTION_ETA_DELAY_MS) {
+      return "Taking longer than usual, can take up to ~2 minutes";
+    }
+
+    return "About 1 minute";
+  }, [etaNow, hasActiveEvolutionJob, trackedEvolutionJob]);
+
+  const clearEvolutionReadyIndicator = useCallback(() => {
+    setEvolutionReady(false);
+  }, [setEvolutionReady]);
 
   const createCompanion = useMutation({
     mutationFn: async (data: {
@@ -440,87 +712,6 @@ export const useCompanion = () => {
     };
   };
 
-
-  // Helper function to validate referral when user reaches Stage 3
-  const validateReferralAtStage3 = async () => {
-    if (!user) return;
-
-    try {
-      // Check if user was referred by someone
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("referred_by")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error("Error fetching profile for referral validation:", profileError);
-        return;
-      }
-      if (!profile?.referred_by) return;
-
-      // FIX Bugs #14, #16, #17, #21, #24: Use atomic function with retry logic and type safety
-      const result = await retryWithBackoff<CompleteReferralStage3Result>(
-        async () => {
-          const response = await (supabase.rpc as unknown as (name: string, params: any) => Promise<{ data: any; error: any }>)(
-            'complete_referral_stage3',
-            { 
-              p_referee_id: user.id,
-              p_referrer_id: profile.referred_by
-            }
-          );
-          
-          const { data, error } = response as { data: CompleteReferralStage3Result | null; error: Error | null };
-
-          if (error) throw error;
-          if (!data) throw new Error("No data returned from referral completion");
-          
-          // Data from this RPC should match CompleteReferralStage3Result
-          return data as unknown as CompleteReferralStage3Result;
-        },
-        {
-          maxAttempts: 3,
-          initialDelay: 1000,
-          shouldRetry: (error: unknown) => {
-            const msg = error instanceof Error ? error.message : String(error);
-            
-            // Don't retry business logic errors
-            if (msg.includes('already_completed') ||
-                msg.includes('concurrent_completion') ||
-                msg.includes('not found')) {
-              return false;
-            }
-            
-            // Retry network/transient errors
-            return msg.includes('network') ||
-                   msg.includes('timeout') ||
-                   msg.includes('temporarily unavailable') ||
-                   msg.includes('connection') ||
-                   msg.includes('ECONNRESET') ||
-                   msg.includes('fetch');
-          }
-        }
-      );
-
-      if (!result || !result.success) {
-        // Referral already completed or concurrent request (not an error)
-        logger.log('Referral not completed:', result?.reason ?? 'unknown', result?.message ?? '');
-        return;
-      }
-
-      // Success! Log the result with safe access
-      logger.log('Referral completed successfully:', {
-        newCount: result.new_count ?? 0,
-        milestoneReached: result.milestone_reached ?? false,
-        skinUnlocked: result.skin_unlocked ?? false
-      });
-
-    } catch (error) {
-      console.error("Failed to validate referral after retries:", error);
-      // Don't throw - this shouldn't block evolution
-    }
-  };
-
   const evolveCompanion = useMutation({
     mutationFn: async ({ newStage: _newStage, currentXP: _currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
@@ -544,187 +735,74 @@ export const useCompanion = () => {
           throw new Error("No companion found");
         }
 
+        if (trackedEvolutionJob && (trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing")) {
+          writeStoredActiveEvolutionJobId(user.id, trackedEvolutionJob.id);
+          setEvolutionReady(false);
+          setIsEvolvingLoading(true);
+          return trackedEvolutionJob.id;
+        }
+
         setIsEvolvingLoading(true);
 
         try {
-        // Call the new evolution edge function with strict continuity.
-        // Retry transient transport/backend failures before surfacing a user-facing error.
-        const functionName = "generate-companion-evolution";
-        let evolutionData: Record<string, any> | null = null;
-        try {
-          evolutionData = await retryWithBackoff(
-            async () => {
-              const { data, error: evolutionError } = await supabase.functions.invoke(functionName, {
-                body: {
-                  userId: user.id,
-                },
-              });
-
-              if (evolutionError) throw evolutionError;
-              return data as Record<string, any> | null;
-            },
-            {
-              maxAttempts: 3,
-              initialDelay: 750,
-              maxDelay: 2500,
-              shouldRetry: isRetriableFunctionInvokeError,
-            },
+          const { data, error: requestError } = await (supabase.rpc as unknown as (
+            name: string,
+            params?: Record<string, never>,
+          ) => Promise<{ data: RequestCompanionEvolutionJobResult[] | RequestCompanionEvolutionJobResult | null; error: Error | null }>)(
+            "request_companion_evolution_job",
+            {},
           );
-        } catch (invokeError) {
-          const parsedInvokeError = await parseFunctionInvokeError(invokeError);
-          logger.error("Companion evolution invoke failed", {
-            functionName,
-            platform: Capacitor.getPlatform(),
-            isNative: Capacitor.isNativePlatform(),
-            isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
-            status: parsedInvokeError.status,
-            errorName: parsedInvokeError.name,
-            category: parsedInvokeError.category,
-            backendMessage: parsedInvokeError.backendMessage,
-            backendCode: parsedInvokeError.responsePayload?.code ?? parsedInvokeError.code,
-          });
-          throw new Error(
-            toUserFacingFunctionError(parsedInvokeError, { action: "evolve your companion" }),
-          );
-        }
-        
-        if (!evolutionData?.evolved) {
-          evolutionInProgress.current = false;
-          setIsEvolvingLoading(false);
-          logger.log('Evolution not triggered:', evolutionData?.message);
-          return null; // Return null instead of throwing when evolution isn't needed
-        }
 
-        const newStage = evolutionData.new_stage;
-        const oldStage = companion.current_stage;
-
-      // FIX Bug #9: Check if we CROSSED Stage 3 (not just landed on it)
-      // This handles cases where user skips from Stage 2 to Stage 4+
-      if (oldStage < 3 && newStage >= 3) {
-        await validateReferralAtStage3();
-      }
-
-      // Generate evolution cards for all stages up to current stage
-      try {
-        // Check which cards already exist
-        const { data: existingCards } = await supabase
-          .from("companion_evolution_cards")
-          .select("evolution_stage")
-          .eq("companion_id", companion.id);
-
-        const existingStages = new Set(existingCards?.map(c => c.evolution_stage) || []);
-
-        // Generate cards for missing stages (stage 0 through current stage)
-        for (let stage = 0; stage <= newStage; stage++) {
-          if (!existingStages.has(stage)) {
-            logger.log(`Generating card for stage ${stage}`);
-            
-            // Get the evolution record for this stage
-            const { data: evolutionRecord } = await supabase
-              .from("companion_evolutions")
-              .select("id")
-              .eq("companion_id", companion.id)
-              .eq("stage", stage)
-              .maybeSingle();
-            
-            // Special handling for stage 0 - ensure evolution record exists
-            let stageEvolutionId = evolutionRecord?.id;
-            
-            if (stage === 0 && !evolutionRecord) {
-              logger.log("Stage 0 evolution record not found, creating one...");
-              
-              // Get the companion's initial image
-              const { data: companionData } = await supabase
-                .from("user_companion")
-                .select("initial_image_url, created_at")
-                .eq("id", companion.id)
-                .maybeSingle();
-              
-              // Create stage 0 evolution record
-              const { data: newStage0Evolution, error: stage0Error } = await supabase
-                .from("companion_evolutions")
-                .insert({
-                  companion_id: companion.id,
-                  stage: 0,
-                  image_url: companionData?.initial_image_url || null,
-                  xp_at_evolution: 0,
-                  evolved_at: companionData?.created_at || new Date().toISOString(),
-                })
-                .select()
-                .maybeSingle();
-              
-              if (!stage0Error && newStage0Evolution) {
-                stageEvolutionId = newStage0Evolution.id;
-                logger.log("Created stage 0 evolution record:", stageEvolutionId);
-              } else {
-                console.error("Failed to create stage 0 evolution record:", stage0Error);
-              }
-            }
-            
-            // Only generate card if we have a valid evolution ID for this stage
-            if (stageEvolutionId) {
-              await supabase.functions.invoke("generate-evolution-card", {
-                body: {
-                  companionId: companion.id,
-                  evolutionId: stageEvolutionId,
-                  stage: stage,
-                  species: companion.spirit_animal,
-                  element: companion.core_element,
-                  color: companion.favorite_color,
-                  userAttributes: {
-                    vitality: companion.vitality || 300,
-                    wisdom: companion.wisdom || 300,
-                    discipline: companion.discipline || 300,
-                    resolve: companion.resolve || 300,
-                    creativity: companion.creativity || 300,
-                    alignment: companion.alignment || 300,
-                  },
-                },
-              });
-            } else {
-              logger.warn(`Skipping card generation for stage ${stage} - no evolution record found`);
-            }
+          if (requestError) {
+            throw new Error(evolutionRequestErrorMessage(requestError.message));
           }
-        }
-      } catch (cardError) {
-        console.error("Failed to generate evolution card:", cardError);
-        // Don't fail the evolution if card generation fails
-      }
 
-      // Auto-generate story chapter for this evolution stage
-      const { data: existingStory } = await supabase
-        .from("companion_stories")
-        .select("id")
-        .eq("companion_id", companion.id)
-        .eq("stage", newStage)
-        .maybeSingle();
+          const requestResult = Array.isArray(data) ? data[0] : data;
+          if (!requestResult?.job_id) {
+            throw new Error("Unable to start evolution right now. Please try again.");
+          }
 
-      if (!existingStory) {
-        // Generate story chapter in the background - properly handled promise
-        (async () => {
+          const createdJob: CompanionEvolutionJob = {
+            id: requestResult.job_id,
+            status: requestResult.status,
+            requested_stage: requestResult.requested_stage,
+            requested_at: new Date().toISOString(),
+            started_at: null,
+            next_retry_at: null,
+            error_code: null,
+            error_message: null,
+          };
+
+          writeStoredActiveEvolutionJobId(user.id, createdJob.id);
+          setEvolutionReady(false);
+          queryClient.setQueryData(getEvolutionJobQueryKey(user.id), createdJob);
+
           try {
-            await supabase.functions.invoke("generate-companion-story", {
-              body: {
-                companionId: companion.id,
-                stage: newStage,
-                tonePreference: "heroic",
-                themeIntensity: "moderate",
-              },
-            });
-            logger.log(`Stage ${newStage} story generation started`);
-            queryClient.invalidateQueries({ queryKey: ["companion-story"] });
-            queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.warn(`Failed to auto-generate story for stage ${newStage} (non-critical):`, errorMessage);
-            // Don't throw - story generation is not critical to evolution
-          }
-        })().catch((error) => {
-          console.warn('Story generation promise rejected:', error?.message || error);
-        });
-      }
+            await retryWithBackoff(
+              async () => {
+                const { error: processError } = await supabase.functions.invoke("process-companion-evolution-job", {
+                  body: {
+                    jobId: createdJob.id,
+                  },
+                });
 
-          return evolutionData.image_url;
+                if (processError) throw processError;
+              },
+              {
+                maxAttempts: 2,
+                initialDelay: 500,
+                maxDelay: 1500,
+                shouldRetry: isRetriableFunctionInvokeError,
+              },
+            );
+          } catch (workerInvokeError) {
+            logger.warn("Async evolution worker invoke failed; polling will continue", {
+              jobId: createdJob.id,
+              error: workerInvokeError instanceof Error ? workerInvokeError.message : String(workerInvokeError),
+            });
+          }
+
+          return createdJob.id;
         } catch (error) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);
@@ -741,28 +819,19 @@ export const useCompanion = () => {
         evolutionPromise.current = null;
       }
     },
-    onSuccess: (imageUrl) => {
+    onSuccess: () => {
       evolutionInProgress.current = false;
-      // Only invalidate queries if evolution actually happened
-      if (imageUrl) {
-        // Don't hide overlay here - let CompanionEvolution handle it
-        // The overlay will remain visible until the animation completes
-        queryClient.invalidateQueries({ queryKey: ["companion"] });
-        queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-        queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-        queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
-      }
+      queryClient.invalidateQueries({ queryKey: getEvolutionJobQueryKey(user?.id) });
     },
     onError: (error) => {
       evolutionInProgress.current = false;
       setIsEvolvingLoading(false);
       console.error("Evolution failed:", error);
-      const fallbackMessage = "Unable to evolve your companion right now. Please try again.";
-      const message = error instanceof Error && error.message ? error.message : fallbackMessage;
-      const hasSdkInternals = /failed to send a request to the edge function|functionsfetcherror|edge function returned a non-2xx status code/i.test(
-        message,
-      );
-      toast.error(hasSdkInternals ? fallbackMessage : message);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Unable to evolve your companion right now. Please try again.";
+      toast.error(message);
     },
   });
 
@@ -787,9 +856,11 @@ export const useCompanion = () => {
     return shouldEvolve(companion.current_stage, companion.current_xp);
   }, [companion, shouldEvolve]);
 
+  const isEvolutionBusy = evolveCompanion.isPending || hasActiveEvolutionJob;
+
   // Manual evolution trigger function
   const triggerManualEvolution = useCallback(() => {
-    if (!companion || !canEvolve) return;
+    if (!companion || isEvolutionBusy || !canEvolve) return;
     
     const nextStage = companion.current_stage + 1;
     
@@ -801,7 +872,7 @@ export const useCompanion = () => {
       newStage: nextStage, 
       currentXP: companion.current_xp 
     });
-  }, [companion, canEvolve, setIsEvolvingLoading, evolveCompanion]);
+  }, [companion, canEvolve, evolveCompanion, isEvolutionBusy, setIsEvolvingLoading]);
 
   return {
     companion,
@@ -815,6 +886,12 @@ export const useCompanion = () => {
     progressToNext,
     isEvolvingLoading,
     canEvolve,
+    isEvolutionBusy,
+    evolutionEtaMessage,
+    hasActiveEvolutionJob,
+    trackedEvolutionJob,
+    hasEvolutionReady,
+    clearEvolutionReadyIndicator,
     triggerManualEvolution,
   };
 };

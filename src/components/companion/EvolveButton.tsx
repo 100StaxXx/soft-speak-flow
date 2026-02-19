@@ -5,13 +5,15 @@ import { useEvolution } from "@/contexts/EvolutionContext";
 interface EvolveButtonProps {
   onEvolve: () => void;
   isEvolving: boolean;
+  etaMessage?: string | null;
 }
 
-export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) => {
+export const EvolveButton = memo(({ onEvolve, isEvolving, etaMessage }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
+  const isProcessing = isEvolving || isEvolvingLoading;
 
   const handleClick = () => {
-    if (!isEvolving && !isEvolvingLoading) {
+    if (!isProcessing) {
       onEvolve();
     }
   };
@@ -26,7 +28,7 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
     >
       <button
         onClick={handleClick}
-        disabled={isEvolving || isEvolvingLoading}
+        disabled={isProcessing}
         className="
           relative w-full py-5 rounded-xl
           font-heading font-black text-3xl sm:text-4xl tracking-[0.35em]
@@ -104,7 +106,7 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
         
         {/* Content */}
         <div className="relative z-10 h-[1.2em]">
-          {isEvolvingLoading ? (
+          {isProcessing ? (
             <motion.span 
               className="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
               style={{
@@ -127,6 +129,14 @@ export const EvolveButton = memo(({ onEvolve, isEvolving }: EvolveButtonProps) =
           )}
         </div>
       </button>
+      {isProcessing && (
+        <div className="mt-2 space-y-1 text-center">
+          <p className="text-sm text-muted-foreground">{etaMessage ?? "About 1 minute"}</p>
+          <p className="text-xs text-muted-foreground/80">
+            You can leave this screen and come back when it is ready.
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 });

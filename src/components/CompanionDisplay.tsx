@@ -91,7 +91,17 @@ const getColorName = (hexColor: string): string => {
 };
 
 export const CompanionDisplay = memo(() => {
-  const { companion, nextEvolutionXP, progressToNext, evolveCompanion, isLoading, canEvolve, triggerManualEvolution } = useCompanion();
+  const {
+    companion,
+    nextEvolutionXP,
+    progressToNext,
+    isLoading,
+    canEvolve,
+    triggerManualEvolution,
+    isEvolutionBusy,
+    evolutionEtaMessage,
+    hasActiveEvolutionJob,
+  } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
   const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
@@ -549,10 +559,11 @@ export const CompanionDisplay = memo(() => {
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
-            {canEvolve && (
+            {(canEvolve || hasActiveEvolutionJob) && (
               <EvolveButton 
                 onEvolve={triggerManualEvolution}
-                isEvolving={evolveCompanion.isPending}
+                isEvolving={isEvolutionBusy}
+                etaMessage={evolutionEtaMessage}
               />
             )}
           </AnimatePresence>

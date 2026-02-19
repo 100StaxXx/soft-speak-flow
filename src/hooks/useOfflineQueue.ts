@@ -34,17 +34,25 @@ export function useOfflineQueue() {
 
   // Initialize DB and get pending count
   useEffect(() => {
+    let isDisposed = false;
+
     const init = async () => {
       try {
         await initOfflineDB();
-        const count = await getPendingActionCount();
-        setState(prev => ({ ...prev, pendingCount: count }));
+        const count = user?.id ? await getPendingActionCount(user.id) : 0;
+        if (!isDisposed) {
+          setState(prev => ({ ...prev, pendingCount: count }));
+        }
       } catch (error) {
         console.error("Failed to initialize offline queue:", error);
       }
     };
-    init();
-  }, []);
+
+    void init();
+    return () => {
+      isDisposed = true;
+    };
+  }, [user?.id]);
 
   // Listen for online status and auto-sync
   useEffect(() => {
@@ -65,11 +73,12 @@ export function useOfflineQueue() {
     type: "COMPLETE_TASK" | "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK",
     payload: Record<string, unknown>
   ): Promise<string> => {
-    const id = await addPendingAction(type, payload);
-    const count = await getPendingActionCount();
+    if (!user?.id) throw new Error("User not authenticated");
+    const id = await addPendingAction(type, payload, user.id);
+    const count = await getPendingActionCount(user.id);
     setState(prev => ({ ...prev, pendingCount: count }));
     return id;
-  }, []);
+  }, [user?.id]);
 
   /**
    * Execute a single pending action
@@ -166,7 +175,7 @@ export function useOfflineQueue() {
     success: number;
     failed: number;
   }> => {
-    if (isSyncingRef.current || !navigator.onLine) {
+    if (isSyncingRef.current || !navigator.onLine || !user?.id) {
       return { success: 0, failed: 0 };
     }
 
@@ -177,7 +186,7 @@ export function useOfflineQueue() {
     let failedCount = 0;
 
     try {
-      const actions = await getPendingActions();
+      const actions = await getPendingActions(user.id);
       
       for (const action of actions) {
         if (action.retries >= MAX_RETRIES) {
@@ -198,7 +207,7 @@ export function useOfflineQueue() {
         }
       }
 
-      const finalCount = await getPendingActionCount();
+      const finalCount = await getPendingActionCount(user.id);
       
       setState(prev => ({
         ...prev,
@@ -237,6 +246,7 @@ export function useOfflineQueue() {
    * Force a sync attempt
    */
   const triggerSync = useCallback(async () => {
+    if (!user?.id) return;
     if (!navigator.onLine) {
       toast({
         title: "You're offline",
@@ -247,7 +257,7 @@ export function useOfflineQueue() {
     }
     
     return syncPendingActions();
-  }, [syncPendingActions, toast]);
+  }, [syncPendingActions, toast, user?.id]);
 
   return {
     pendingCount: state.pendingCount,

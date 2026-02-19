@@ -4,10 +4,11 @@
  */
 
 const DB_NAME = "cosmiq-offline-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface PendingAction {
   id: string;
+  user_id: string;
   type: "COMPLETE_TASK" | "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK";
   payload: Record<string, unknown>;
   timestamp: number;
@@ -43,15 +44,36 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
     
     request.onupgradeneeded = (event) => {
       const database = (event.target as IDBOpenDBRequest).result;
+      const oldVersion = event.oldVersion;
       
       // Create object stores
       if (!database.objectStoreNames.contains("tasks")) {
         database.createObjectStore("tasks", { keyPath: "id" });
       }
       
-      if (!database.objectStoreNames.contains("pendingActions")) {
-        const actionStore = database.createObjectStore("pendingActions", { keyPath: "id" });
+      const actionStore = database.objectStoreNames.contains("pendingActions")
+        ? (event.target as IDBOpenDBRequest).transaction!.objectStore("pendingActions")
+        : database.createObjectStore("pendingActions", { keyPath: "id" });
+
+      if (!actionStore.indexNames.contains("timestamp")) {
         actionStore.createIndex("timestamp", "timestamp");
+      }
+      if (!actionStore.indexNames.contains("user_id")) {
+        actionStore.createIndex("user_id", "user_id");
+      }
+
+      // Safety migration: remove legacy unscoped actions to prevent cross-account replay.
+      if (oldVersion < 2) {
+        const cursorRequest = actionStore.openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          const value = cursor.value as Partial<PendingAction>;
+          if (!value.user_id || typeof value.user_id !== "string") {
+            cursor.delete();
+          }
+          cursor.continue();
+        };
       }
       
       if (!database.objectStoreNames.contains("cache")) {
@@ -145,15 +167,18 @@ export async function getCacheTimestamp(key: string): Promise<number | null> {
  */
 export async function addPendingAction(
   type: PendingAction["type"],
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  userId: string
 ): Promise<string> {
   try {
+    if (!userId) throw new Error("User ID is required for pending actions");
     const database = await getDB();
     const transaction = database.transaction("pendingActions", "readwrite");
     const store = transaction.objectStore("pendingActions");
     
     const action: PendingAction = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      user_id: userId,
       type,
       payload,
       timestamp: Date.now(),
@@ -176,16 +201,21 @@ export async function addPendingAction(
 /**
  * Get all pending actions
  */
-export async function getPendingActions(): Promise<PendingAction[]> {
+export async function getPendingActions(userId: string): Promise<PendingAction[]> {
   try {
+    if (!userId) return [];
     const database = await getDB();
     const transaction = database.transaction("pendingActions", "readonly");
     const store = transaction.objectStore("pendingActions");
-    const index = store.index("timestamp");
+    const index = store.index("user_id");
     
     return new Promise((resolve, reject) => {
-      const request = index.getAll();
-      request.onsuccess = () => resolve(request.result || []);
+      const request = index.getAll(userId);
+      request.onsuccess = () => {
+        const actions = (request.result || []) as PendingAction[];
+        actions.sort((a, b) => a.timestamp - b.timestamp);
+        resolve(actions);
+      };
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
@@ -197,14 +227,23 @@ export async function getPendingActions(): Promise<PendingAction[]> {
 /**
  * Get count of pending actions
  */
-export async function getPendingActionCount(): Promise<number> {
+export async function getPendingActionCount(userId?: string): Promise<number> {
   try {
     const database = await getDB();
     const transaction = database.transaction("pendingActions", "readonly");
     const store = transaction.objectStore("pendingActions");
-    
+
+    if (!userId) {
+      return new Promise((resolve, reject) => {
+        const request = store.count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    const index = store.index("user_id");
     return new Promise((resolve, reject) => {
-      const request = store.count();
+      const request = index.count(userId);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -264,15 +303,35 @@ export async function incrementRetryCount(id: string): Promise<void> {
 /**
  * Clear all pending actions
  */
-export async function clearAllPendingActions(): Promise<void> {
+export async function clearAllPendingActions(userId?: string): Promise<void> {
   try {
     const database = await getDB();
     const transaction = database.transaction("pendingActions", "readwrite");
     const store = transaction.objectStore("pendingActions");
-    
+
+    if (!userId) {
+      await new Promise<void>((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+      return;
+    }
+
+    const index = store.index("user_id");
     await new Promise<void>((resolve, reject) => {
-      const request = store.clear();
-      request.onsuccess = () => resolve();
+      const request = index.openCursor(IDBKeyRange.only(userId));
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+
+        const deleteRequest = cursor.delete();
+        deleteRequest.onsuccess = () => cursor.continue();
+        deleteRequest.onerror = () => reject(deleteRequest.error);
+      };
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
@@ -289,4 +348,11 @@ export function isIndexedDBAvailable(): boolean {
   } catch {
     return false;
   }
+}
+
+export function __resetOfflineDBForTests(): void {
+  if (db) {
+    db.close();
+  }
+  db = null;
 }

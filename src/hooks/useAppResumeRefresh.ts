@@ -6,6 +6,10 @@ import { logger } from '@/utils/logger';
 
 const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
 
+interface UseAppResumeRefreshOptions {
+  enabled?: boolean;
+}
+
 /**
  * Refreshes critical data when the app resumes from background.
  * 
@@ -16,11 +20,12 @@ const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
  * becomes stale while the app is backgrounded, causing the mentor
  * section to appear empty on resume.
  */
-export const useAppResumeRefresh = () => {
+export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptions = {}) => {
   const queryClient = useQueryClient();
   const lastResumeRef = useRef<number>(0);
 
   const refreshCriticalData = useCallback(async (source: string) => {
+    if (!enabled) return;
     logger.debug(`${source} - refreshing critical data`);
 
     // Refetch profile first (mentor ID depends on it)
@@ -41,10 +46,11 @@ export const useAppResumeRefresh = () => {
       queryClient.invalidateQueries({ queryKey: ['epics'] }),
       queryClient.invalidateQueries({ queryKey: ['epic-progress'] }),
     ]);
-  }, [queryClient]);
+  }, [enabled, queryClient]);
 
   // Native iOS/Android: Listen for app state changes
   useEffect(() => {
+    if (!enabled) return;
     if (!Capacitor.isNativePlatform()) return;
 
     let isDisposed = false;
@@ -87,10 +93,11 @@ export const useAppResumeRefresh = () => {
         void listenerHandle.remove();
       }
     };
-  }, [refreshCriticalData]);
+  }, [enabled, refreshCriticalData]);
 
   // Web/PWA: Listen for visibility changes
   useEffect(() => {
+    if (!enabled) return;
     if (Capacitor.isNativePlatform()) return; // Skip on native
 
     const handleVisibilityChange = async () => {
@@ -111,5 +118,5 @@ export const useAppResumeRefresh = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [refreshCriticalData]);
+  }, [enabled, refreshCriticalData]);
 };

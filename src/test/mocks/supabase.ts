@@ -27,6 +27,7 @@ export const mockSupabaseClient = {
   functions: {
     invoke: vi.fn(),
   },
+  removeAllChannels: vi.fn(() => Promise.resolve([])),
 };
 
 vi.mock("@/integrations/supabase/client", () => ({

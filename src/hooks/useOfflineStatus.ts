@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getPendingActionCount } from "@/utils/offlineStorage";
+import { useAuth } from "@/hooks/useAuth";
 
 interface OfflineStatusState {
   isOnline: boolean;
@@ -8,6 +9,7 @@ interface OfflineStatusState {
 }
 
 export function useOfflineStatus() {
+  const { user } = useAuth();
   const [state, setState] = useState<OfflineStatusState>({
     isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
     pendingCount: 0,
@@ -17,12 +19,16 @@ export function useOfflineStatus() {
   // Update pending count periodically
   const refreshPendingCount = useCallback(async () => {
     try {
-      const count = await getPendingActionCount();
+      if (!user?.id) {
+        setState(prev => ({ ...prev, pendingCount: 0 }));
+        return;
+      }
+      const count = await getPendingActionCount(user.id);
       setState(prev => ({ ...prev, pendingCount: count }));
     } catch {
       // Ignore errors
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -56,7 +62,7 @@ export function useOfflineStatus() {
       window.removeEventListener("offline", handleOffline);
       clearInterval(interval);
     };
-  }, [refreshPendingCount]);
+  }, [refreshPendingCount, user?.id]);
 
   const clearWasOffline = useCallback(() => {
     setState(prev => ({ ...prev, wasOffline: false }));

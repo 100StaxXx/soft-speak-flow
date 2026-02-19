@@ -11,23 +11,25 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true }: ProtectedRouteProps) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, status } = useAuth();
   const { hasAccess, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
+  const authStatus = status ?? (authLoading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
+  const isAuthPending = authLoading || authStatus === 'recovering' || authStatus === 'loading';
 
   useEffect(() => {
     // Redirect to welcome page if not logged in (for App Store compliance)
-    if (!authLoading && !user) {
-      navigate("/welcome");
+    if (!isAuthPending && authStatus === 'unauthenticated') {
+      navigate("/welcome", { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [authStatus, isAuthPending, navigate]);
 
   // Animate progress bar while loading
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (authLoading || accessLoading) {
+    if (isAuthPending || accessLoading) {
       timer = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -43,10 +45,10 @@ export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true 
         clearInterval(timer);
       }
     };
-  }, [authLoading, accessLoading]);
+  }, [accessLoading, isAuthPending]);
 
   // Show loading while checking auth
-  if (authLoading || accessLoading) {
+  if (isAuthPending || accessLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-full max-w-md px-8 space-y-4">
@@ -61,7 +63,7 @@ export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true 
   }
 
   // Don't render children until auth is confirmed
-  if (!user) return null;
+  if (authStatus === 'unauthenticated' || !user) return null;
 
   // Show hard paywall if no access (trial expired and not subscribed)
   if (!hasAccess) {

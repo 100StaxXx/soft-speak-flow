@@ -1219,6 +1219,85 @@ export type Database = {
           },
         ]
       }
+      companion_evolution_jobs: {
+        Row: {
+          companion_id: string
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          next_retry_at: string | null
+          requested_at: string
+          requested_stage: number
+          result_evolution_id: string | null
+          result_image_url: string | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          companion_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          next_retry_at?: string | null
+          requested_at?: string
+          requested_stage: number
+          result_evolution_id?: string | null
+          result_image_url?: string | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          companion_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          next_retry_at?: string | null
+          requested_at?: string
+          requested_stage?: number
+          result_evolution_id?: string | null
+          result_image_url?: string | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_evolution_jobs_companion_id_fkey"
+            columns: ["companion_id"]
+            isOneToOne: false
+            referencedRelation: "user_companion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_evolution_jobs_result_evolution_id_fkey"
+            columns: ["result_evolution_id"]
+            isOneToOne: false
+            referencedRelation: "companion_evolutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companion_evolution_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companion_memorials: {
         Row: {
           companion_name: string
@@ -7787,6 +7866,14 @@ export type Database = {
       }
       is_service_role: { Args: never; Returns: boolean }
       join_community_by_id: { Args: { p_community_id: string }; Returns: Json }
+      request_companion_evolution_job: {
+        Args: Record<string, never>
+        Returns: {
+          job_id: string
+          requested_stage: number
+          status: string
+        }[]
+      }
       should_evolve: {
         Args: { current_stage: number; current_xp: number }
         Returns: boolean

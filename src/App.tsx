@@ -17,7 +17,7 @@ import { DeepLinkProvider } from "@/contexts/DeepLinkContext";
 
 import { useProfile } from "@/hooks/useProfile";
 import { getResolvedMentorId } from "@/utils/mentor";
-import { useAuth } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
@@ -32,7 +32,6 @@ import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
-import { useAuthSync } from "@/hooks/useAuthSync";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
 import { safeSessionStorage } from "@/utils/storage";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
@@ -178,17 +177,14 @@ MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
-  const { session } = useAuth();
+  const { session, status } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
   const [recoveryChecked, setRecoveryChecked] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Sync auth state changes with query cache to prevent stale profile data
-  useAuthSync();
-  
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
-  useAppResumeRefresh();
+  useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
@@ -364,23 +360,25 @@ const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <TimeProvider>
-          <EvolutionProvider>
-            <CelebrationProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <InstallPWA />
-                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                  <DeepLinkProvider>
-                    <ScrollToTop />
-                    <AppContent />
-                  </DeepLinkProvider>
-                </BrowserRouter>
-              </TooltipProvider>
-            </CelebrationProvider>
-          </EvolutionProvider>
-        </TimeProvider>
+        <AuthProvider>
+          <TimeProvider>
+            <EvolutionProvider>
+              <CelebrationProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <InstallPWA />
+                  <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                    <DeepLinkProvider>
+                      <ScrollToTop />
+                      <AppContent />
+                    </DeepLinkProvider>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </CelebrationProvider>
+            </EvolutionProvider>
+          </TimeProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

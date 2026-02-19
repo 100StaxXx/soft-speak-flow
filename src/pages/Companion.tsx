@@ -131,7 +131,15 @@ const OverviewSkeleton = () => (
 
 const Companion = () => {
   const prefersReducedMotion = useReducedMotion();
-  const { companion, nextEvolutionXP, progressToNext, isLoading, error, refetch } = useCompanion();
+  const {
+    companion,
+    nextEvolutionXP,
+    progressToNext,
+    isLoading,
+    error,
+    refetch,
+    clearEvolutionReadyIndicator,
+  } = useCompanion();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<CompanionTab>("overview");
@@ -185,6 +193,10 @@ const Companion = () => {
   const handlePostcardsTriggerPrefetch = useCallback(() => {
     void prefetchPostcards();
   }, [prefetchPostcards]);
+
+  useEffect(() => {
+    clearEvolutionReadyIndicator();
+  }, [clearEvolutionReadyIndicator]);
 
   const handleTabChange = useCallback(
     (value: string) => {

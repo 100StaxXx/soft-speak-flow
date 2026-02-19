@@ -7,7 +7,7 @@ import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
 // Evolution thresholds are now loaded from database (single source of truth)
@@ -143,46 +143,68 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing Authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+    const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+    const providedInternalSecret = req.headers.get("x-internal-key");
+    const isInternalCall = Boolean(internalSecret) && providedInternalSecret === internalSecret;
+    const authHeader = req.headers.get("Authorization");
+    const requestBody = await req.json().catch(() => ({}));
+    const requestedUserId = typeof requestBody?.userId === "string" ? requestBody.userId : null;
 
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
+    let resolvedUserId: string | null = null;
+
+    if (isInternalCall) {
+      if (!requestedUserId) {
+        return new Response(
+          JSON.stringify({ error: "userId is required for internal evolution calls" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      resolvedUserId = requestedUserId;
+    } else {
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: "Missing Authorization header" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
         },
-      },
-    });
+      });
 
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser();
+      const {
+        data: { user },
+        error: authError,
+      } = await authClient.auth.getUser();
 
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      resolvedUserId = requestedUserId ?? user.id;
+      if (resolvedUserId !== user.id) {
+        return new Response(
+          JSON.stringify({ error: "User mismatch" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    const { userId } = await req.json();
-    const resolvedUserId = userId ?? user.id;
-
-    if (resolvedUserId !== user.id) {
+    if (!resolvedUserId) {
       return new Response(
-        JSON.stringify({ error: "User mismatch" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Unable to resolve user for evolution request" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
