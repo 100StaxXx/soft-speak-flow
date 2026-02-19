@@ -82,6 +82,62 @@ interface RequestCompanionEvolutionJobResult {
   requested_stage: number;
 }
 
+const isEvolutionJobStatus = (value: unknown): value is EvolutionJobStatus =>
+  value === "queued" || value === "processing" || value === "succeeded" || value === "failed";
+
+const parseCompositeJobTuple = (value: unknown) => {
+  if (typeof value !== "string") return null;
+  const match = value.match(/^\(([^,]+),([^,]+),([^,]+)\)$/);
+  if (!match) return null;
+
+  const parsedStatus = match[2]?.trim();
+  const parsedStage = Number.parseInt(match[3]?.trim() ?? "", 10);
+  if (!isEvolutionJobStatus(parsedStatus) || Number.isNaN(parsedStage)) {
+    return null;
+  }
+
+  return {
+    jobId: match[1]?.trim(),
+    status: parsedStatus,
+    requestedStage: parsedStage,
+  };
+};
+
+const extractRequestedEvolutionJob = (
+  data: RequestCompanionEvolutionJobResult[] | RequestCompanionEvolutionJobResult | null,
+) => {
+  const requestResult = Array.isArray(data) ? data[0] : data;
+  if (!requestResult) return null;
+
+  if (typeof requestResult !== "object") return null;
+
+  const resultRecord = requestResult as Record<string, unknown>;
+  const parsedComposite = parseCompositeJobTuple(resultRecord.request_companion_evolution_job);
+  const rawJobId = typeof resultRecord.job_id === "string"
+    ? resultRecord.job_id
+    : typeof resultRecord.id === "string"
+      ? resultRecord.id
+      : parsedComposite?.jobId;
+  const rawStatus = resultRecord.status ?? parsedComposite?.status;
+  const rawRequestedStage = resultRecord.requested_stage ?? resultRecord.requestedStage ?? parsedComposite?.requestedStage;
+  const parsedStage =
+    typeof rawRequestedStage === "number"
+      ? rawRequestedStage
+      : typeof rawRequestedStage === "string"
+        ? Number.parseInt(rawRequestedStage, 10)
+        : NaN;
+
+  if (!rawJobId || !isEvolutionJobStatus(rawStatus) || Number.isNaN(parsedStage)) {
+    return null;
+  }
+
+  return {
+    job_id: rawJobId,
+    status: rawStatus,
+    requested_stage: parsedStage,
+  } satisfies RequestCompanionEvolutionJobResult;
+};
+
 const ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX = "companion:evolution:active-job";
 const EVOLUTION_READY_STORAGE_PREFIX = "companion:evolution:ready";
 const EVOLUTION_ETA_DELAY_MS = 75_000;
@@ -165,6 +221,18 @@ const evolutionRequestErrorMessage = (errorMessage: string) => {
   if (normalized.includes("max_stage_reached")) return "Your companion has already reached the maximum stage.";
   if (normalized.includes("already_evolved")) return "Your companion already evolved to this stage.";
   if (normalized.includes("companion_not_found")) return "No companion found to evolve.";
+  if (
+    normalized.includes("request_companion_evolution_job")
+    && (normalized.includes("could not find") || normalized.includes("schema cache"))
+  ) {
+    return "Evolution service is temporarily unavailable. Please try again in a minute.";
+  }
+  if (normalized.includes("companion_evolution_jobs") && normalized.includes("does not exist")) {
+    return "Evolution service is temporarily unavailable. Please try again in a minute.";
+  }
+  if (normalized.includes("failed to fetch") || normalized.includes("network")) {
+    return "Unable to reach evolution service. Check your connection and try again.";
+  }
   return "Unable to start evolution right now. Please try again.";
 };
 
@@ -757,15 +825,33 @@ export const useCompanion = () => {
             throw new Error(evolutionRequestErrorMessage(requestError.message));
           }
 
-          const requestResult = Array.isArray(data) ? data[0] : data;
-          if (!requestResult?.job_id) {
+          const requestResult = extractRequestedEvolutionJob(data);
+          let resolvedJob = requestResult;
+
+          if (!resolvedJob) {
+            logger.warn("Evolution request returned unexpected payload; attempting active-job recovery", {
+              payloadType: Array.isArray(data) ? "array" : typeof data,
+              hasPayload: Boolean(data),
+            });
+
+            const fallbackActiveJob = await fetchTrackedEvolutionJob(user.id);
+            if (fallbackActiveJob && (fallbackActiveJob.status === "queued" || fallbackActiveJob.status === "processing")) {
+              resolvedJob = {
+                job_id: fallbackActiveJob.id,
+                status: fallbackActiveJob.status,
+                requested_stage: fallbackActiveJob.requested_stage,
+              };
+            }
+          }
+
+          if (!resolvedJob?.job_id) {
             throw new Error("Unable to start evolution right now. Please try again.");
           }
 
           const createdJob: CompanionEvolutionJob = {
-            id: requestResult.job_id,
-            status: requestResult.status,
-            requested_stage: requestResult.requested_stage,
+            id: resolvedJob.job_id,
+            status: resolvedJob.status,
+            requested_stage: resolvedJob.requested_stage,
             requested_at: new Date().toISOString(),
             started_at: null,
             next_retry_at: null,
