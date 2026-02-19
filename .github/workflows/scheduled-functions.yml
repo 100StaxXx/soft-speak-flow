@@ -5,6 +5,7 @@ on:
     - cron: "1 0 * * *"
     - cron: "5 0 * * *"
     - cron: "*/5 * * * *"
+    - cron: "*/2 * * * *"
   workflow_dispatch:
     inputs:
       function_name:
@@ -18,6 +19,7 @@ jobs:
     env:
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
 
     steps:
       - name: Select function for this run
@@ -38,6 +40,9 @@ jobs:
               "*/5 * * * *")
                 fn="dispatch-daily-pushes"
                 ;;
+              "*/2 * * * *")
+                fn="process-companion-evolution-job"
+                ;;
               *)
                 echo "Unsupported schedule: ${{ github.event.schedule }}" >&2
                 exit 1
@@ -53,14 +58,34 @@ jobs:
           fn="${{ steps.select.outputs.function_name }}"
           url="https://${PROJECT_REF}.supabase.co/functions/v1/${fn}"
 
-          status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
-            -X POST "$url" \
-            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{}')
+          if [ "$fn" = "process-companion-evolution-job" ]; then
+            if [ -z "${INTERNAL_FUNCTION_SECRET:-}" ]; then
+              echo "INTERNAL_FUNCTION_SECRET is required to invoke ${fn}" >&2
+              exit 1
+            fi
+
+            status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
+              -X POST "$url" \
+              -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+              -H "apikey: ${SERVICE_ROLE_KEY}" \
+              -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+          else
+            status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
+              -X POST "$url" \
+              -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+          fi
 
           echo "HTTP $status"
           cat /tmp/function-response.json || true
+
+          if [ "$fn" = "process-companion-evolution-job" ] && [ "$status" = "404" ]; then
+            echo "No due evolution jobs available."
+            exit 0
+          fi
 
           if [ "$status" -ge 300 ]; then
             exit 1

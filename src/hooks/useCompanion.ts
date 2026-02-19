@@ -447,6 +447,8 @@ const normalizeEvolutionError = async (error: unknown): Promise<Error> => {
 const ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX = "companion:evolution:active-job";
 const EVOLUTION_READY_STORAGE_PREFIX = "companion:evolution:ready";
 const EVOLUTION_ETA_DELAY_MS = 75_000;
+const EVOLUTION_STALLED_NOTICE_DELAY_MS = 120_000;
+const EVOLUTION_STALLED_NOTICE = "Evolution is taking longer than usual. We'll keep trying in the background.";
 const EVOLUTION_DEGRADED_COOLDOWN_MS = 60_000;
 const EVOLUTION_DEGRADED_RETRY_AFTER_MS = 60_000;
 const EVOLUTION_DEGRADED_NOTICE = "Evolution is busy right now. Try again in about a minute.";
@@ -764,6 +766,19 @@ export const useCompanion = () => {
     }
 
     return "About 1 minute";
+  }, [etaNow, hasActiveEvolutionJob, trackedEvolutionJob]);
+
+  const stalledEvolutionNotice = useMemo(() => {
+    if (!hasActiveEvolutionJob || !trackedEvolutionJob) return null;
+
+    const baselineTimestamp = trackedEvolutionJob.started_at ?? trackedEvolutionJob.requested_at;
+    const baselineMs = Date.parse(baselineTimestamp);
+    if (!Number.isFinite(baselineMs)) return null;
+
+    const elapsedMs = Math.max(0, etaNow - baselineMs);
+    if (elapsedMs < EVOLUTION_STALLED_NOTICE_DELAY_MS) return null;
+
+    return EVOLUTION_STALLED_NOTICE;
   }, [etaNow, hasActiveEvolutionJob, trackedEvolutionJob]);
 
   const publishEvolutionDegradedNotice = useCallback((notice: string | null) => {
@@ -1576,11 +1591,12 @@ export const useCompanion = () => {
   }, [companion, shouldEvolve]);
 
   const isEvolutionBusy = evolveCompanion.isPending || hasActiveEvolutionJob;
+  const effectiveEvolutionServiceNotice = evolutionServiceNotice ?? stalledEvolutionNotice;
   const evolutionServiceState: EvolutionServiceState = useMemo(() => {
+    if (effectiveEvolutionServiceNotice) return "degraded";
     if (isEvolutionBusy) return "processing";
-    if (evolutionServiceNotice) return "degraded";
     return "ready";
-  }, [evolutionServiceNotice, isEvolutionBusy]);
+  }, [effectiveEvolutionServiceNotice, isEvolutionBusy]);
 
   // Manual evolution trigger function
   const triggerManualEvolution = useCallback(() => {
@@ -1612,7 +1628,7 @@ export const useCompanion = () => {
     canEvolve,
     isEvolutionBusy,
     evolutionServiceState,
-    evolutionServiceNotice,
+    evolutionServiceNotice: effectiveEvolutionServiceNotice,
     evolutionEtaMessage,
     hasActiveEvolutionJob,
     trackedEvolutionJob,

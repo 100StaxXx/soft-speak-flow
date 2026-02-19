@@ -330,6 +330,33 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.toastErrorMock).not.toHaveBeenCalled();
   });
 
+  it("marks long-running active jobs as degraded with a stalled notice", async () => {
+    const stalledAtIso = new Date(Date.now() - 130_000).toISOString();
+    mocks.evolutionJobResponses.length = 0;
+    mocks.evolutionJobResponses.push({
+      data: {
+        id: "job-stalled",
+        status: "processing",
+        requested_stage: 1,
+        requested_at: stalledAtIso,
+        started_at: stalledAtIso,
+        next_retry_at: null,
+        error_code: null,
+        error_message: null,
+      },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await waitFor(() => {
+      expect(result.current.hasActiveEvolutionJob).toBe(true);
+    });
+
+    expect(result.current.evolutionServiceState).toBe("degraded");
+    expect(result.current.evolutionServiceNotice).toMatch(/taking longer than usual/i);
+  });
+
   it("retries direct fallback invoke once and succeeds after a transient relay failure", async () => {
     mocks.rpcMock.mockResolvedValue({ data: null, error: null });
     mocks.evolutionJobResponses.push({ data: null, error: null });

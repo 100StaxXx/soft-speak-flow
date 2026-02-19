@@ -54,4 +54,21 @@ describe("EvolveButton", () => {
     expect(screen.getByText("About 90 seconds")).toBeInTheDocument();
     expect(screen.getByText(/You can leave this screen/i)).toBeInTheDocument();
   });
+
+  it("shows stalled degraded notice while remaining in processing mode", () => {
+    render(
+      <EvolveButton
+        onEvolve={vi.fn()}
+        isEvolving={true}
+        etaMessage="Taking longer than usual"
+        serviceState="degraded"
+        serviceNotice="Evolution is taking longer than usual. We'll keep trying in the background."
+      />,
+    );
+
+    const button = screen.getByRole("button");
+    expect(button).toBeDisabled();
+    expect(screen.getAllByText(/taking longer than usual/i)).toHaveLength(2);
+    expect(screen.getByText(/keep trying in the background/i)).toBeInTheDocument();
+  });
 });

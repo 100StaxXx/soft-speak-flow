@@ -88,11 +88,17 @@ const parseJsonSafe = async <T>(response: Response): Promise<T | null> => {
   }
 };
 
+interface FetchJobOptions {
+  allowGlobalQueue?: boolean;
+}
+
 const fetchJob = async (
   supabase: ReturnType<typeof createClient>,
   userId: string | null,
   jobId?: string,
+  options?: FetchJobOptions,
 ): Promise<CompanionEvolutionJob | null> => {
+  const allowGlobalQueue = options?.allowGlobalQueue === true;
   const nowIso = new Date().toISOString();
 
   if (jobId) {
@@ -108,19 +114,23 @@ const fetchJob = async (
     return data as CompanionEvolutionJob;
   }
 
-  if (!userId) {
+  if (!userId && !allowGlobalQueue) {
     return null;
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("companion_evolution_jobs")
     .select("id, user_id, companion_id, requested_stage, status, retry_count, next_retry_at, error_code, error_message, started_at, requested_at, updated_at")
-    .eq("user_id", userId)
     .in("status", ["queued", "processing"])
     .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
     .order("requested_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
   return (data ?? null) as CompanionEvolutionJob | null;
@@ -172,18 +182,37 @@ const claimJob = async (
   return (data ?? null) as CompanionEvolutionJob | null;
 };
 
+type EvolutionPipelineAuthContext =
+  | {
+      mode: "internal";
+      internalSecret: string;
+      userId: string;
+    }
+  | {
+      mode: "user";
+      authHeader: string;
+    };
+
 const runEvolutionPipeline = async (
   supabaseUrl: string,
-  internalSecret: string,
-  userId: string,
+  authContext: EvolutionPipelineAuthContext,
 ) => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const body: Record<string, unknown> = {};
+
+  if (authContext.mode === "internal") {
+    headers["x-internal-key"] = authContext.internalSecret;
+    body.userId = authContext.userId;
+  } else {
+    headers.Authorization = authContext.authHeader;
+  }
+
   const response = await fetch(`${supabaseUrl}/functions/v1/generate-companion-evolution`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-internal-key": internalSecret,
-    },
-    body: JSON.stringify({ userId }),
+    headers,
+    body: JSON.stringify(body),
   });
 
   const payload = await parseJsonSafe<Record<string, unknown>>(response);
@@ -350,9 +379,16 @@ const validateReferralStage3 = async (
 
 const sendCompletionPush = async (
   supabase: ReturnType<typeof createClient>,
-  internalSecret: string,
+  internalSecret: string | null,
   userId: string,
 ) => {
+  if (!internalSecret) {
+    console.warn("Skipping evolution completion push because INTERNAL_FUNCTION_SECRET is missing", {
+      userId,
+    });
+    return;
+  }
+
   const { data: deviceTokens } = await supabase
     .from("push_device_tokens")
     .select("device_token")
@@ -387,7 +423,7 @@ const sendCompletionPush = async (
 
 const runNonCriticalSideEffects = async (
   supabase: ReturnType<typeof createClient>,
-  internalSecret: string,
+  internalSecret: string | null,
   job: CompanionEvolutionJob,
   previousStage: number,
   newStage: number,
@@ -430,7 +466,7 @@ serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
 
-    if (!supabaseUrl || !serviceRoleKey || !anonKey || !internalSecret) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
       return new Response(
         JSON.stringify({
           error: "server_configuration_error",
@@ -441,9 +477,21 @@ serve(async (req) => {
     }
 
     const providedInternalSecret = req.headers.get("x-internal-key");
-    const isInternal = providedInternalSecret === internalSecret;
+    const hasInternalSecret = typeof internalSecret === "string" && internalSecret.length > 0;
+    const isInternal = hasInternalSecret && providedInternalSecret === internalSecret;
+
+    if (providedInternalSecret !== null && !hasInternalSecret) {
+      return new Response(
+        JSON.stringify({
+          error: "server_configuration_error",
+          code: "internal_function_secret_missing",
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     let callerUserId: string | null = null;
+    let callerAuthHeader: string | null = null;
     if (!isInternal) {
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) {
@@ -474,15 +522,29 @@ serve(async (req) => {
       }
 
       callerUserId = user.id;
+      callerAuthHeader = authHeader;
     }
 
     const requestBody = await req.json().catch(() => ({}));
     requestedJobId = typeof requestBody?.jobId === "string" ? requestBody.jobId : undefined;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const allowGlobalQueue = isInternal && !requestedJobId && !callerUserId;
 
-    const job = await fetchJob(supabase, callerUserId, requestedJobId);
+    const job = await fetchJob(supabase, callerUserId, requestedJobId, {
+      allowGlobalQueue,
+    });
     if (!job) {
+      if (allowGlobalQueue) {
+        return new Response(
+          JSON.stringify({
+            status: "idle",
+            message: "no_job_available",
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: "job_not_found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -526,7 +588,37 @@ serve(async (req) => {
       );
     }
 
-    const evolutionPayload = await runEvolutionPipeline(supabaseUrl, internalSecret, claimedJob.user_id);
+    let pipelineAuthContext: EvolutionPipelineAuthContext;
+    if (isInternal) {
+      if (!internalSecret) {
+        throw new JobProcessingError(
+          "INTERNAL_FUNCTION_SECRET is not configured for internal evolution processing",
+          "internal_function_secret_missing",
+          false,
+        );
+      }
+
+      pipelineAuthContext = {
+        mode: "internal",
+        internalSecret,
+        userId: claimedJob.user_id,
+      };
+    } else {
+      if (!callerAuthHeader) {
+        throw new JobProcessingError(
+          "Missing caller authorization for user evolution processing",
+          "unauthorized",
+          false,
+        );
+      }
+
+      pipelineAuthContext = {
+        mode: "user",
+        authHeader: callerAuthHeader,
+      };
+    }
+
+    const evolutionPayload = await runEvolutionPipeline(supabaseUrl, pipelineAuthContext);
 
     const nowIso = new Date().toISOString();
     const { error: successUpdateError } = await supabase
@@ -550,7 +642,7 @@ serve(async (req) => {
     const previousStage = typeof evolutionPayload.previous_stage === "number" ? evolutionPayload.previous_stage : claimedJob.requested_stage - 1;
     const newStage = typeof evolutionPayload.new_stage === "number" ? evolutionPayload.new_stage : claimedJob.requested_stage;
 
-    await runNonCriticalSideEffects(supabase, internalSecret, claimedJob, previousStage, newStage);
+    await runNonCriticalSideEffects(supabase, internalSecret ?? null, claimedJob, previousStage, newStage);
 
     return new Response(
       JSON.stringify({
