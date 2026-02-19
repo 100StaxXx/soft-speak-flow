@@ -99,6 +99,8 @@ export const CompanionDisplay = memo(() => {
     canEvolve,
     triggerManualEvolution,
     isEvolutionBusy,
+    evolutionServiceState,
+    evolutionServiceNotice,
     evolutionEtaMessage,
     hasActiveEvolutionJob,
   } = useCompanion();
@@ -564,6 +566,8 @@ export const CompanionDisplay = memo(() => {
                 onEvolve={triggerManualEvolution}
                 isEvolving={isEvolutionBusy}
                 etaMessage={evolutionEtaMessage}
+                serviceState={evolutionServiceState}
+                serviceNotice={evolutionServiceNotice}
               />
             )}
           </AnimatePresence>

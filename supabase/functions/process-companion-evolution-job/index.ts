@@ -432,7 +432,10 @@ serve(async (req) => {
 
     if (!supabaseUrl || !serviceRoleKey || !anonKey || !internalSecret) {
       return new Response(
-        JSON.stringify({ error: "server_configuration_error" }),
+        JSON.stringify({
+          error: "server_configuration_error",
+          code: "server_configuration_error",
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -632,6 +635,8 @@ serve(async (req) => {
           JSON.stringify({
             jobId: requestedJobId,
             status: "failed",
+            error: message,
+            code: errorCode,
             retryCount,
             errorCode,
             errorMessage: message,
@@ -644,9 +649,11 @@ serve(async (req) => {
       }
     }
 
+    const fallbackMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: fallbackMessage,
+        code: normalizeErrorCode(fallbackMessage),
       }),
       {
         status: 500,

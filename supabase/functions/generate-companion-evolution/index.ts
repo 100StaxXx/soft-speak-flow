@@ -10,6 +10,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key",
 };
 
+const normalizeErrorCode = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64) || "evolution_service_unavailable";
+
+const resolveServerErrorCode = (message: string) => {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("not enough xp")) return "not_enough_xp";
+  if (normalized.includes("max stage")) return "max_stage_reached";
+  if (normalized.includes("already evolved")) return "already_evolved";
+  if (normalized.includes("companion not found")) return "companion_not_found";
+  if (normalized.includes("image generation failed")) return "image_generation_failed";
+  if (normalized.includes("no image returned")) return "image_generation_empty";
+  if (normalized.includes("failed to upload image")) return "image_upload_failed";
+  if (normalized.includes("failed to save evolution record")) return "evolution_record_failed";
+  if (normalized.includes("failed to update companion")) return "companion_update_failed";
+  if (normalized.includes("evolution thresholds not available")) return "evolution_thresholds_unavailable";
+  if (normalized.includes("openai_api_key")) return "openai_api_key_missing";
+  return normalizeErrorCode(message);
+};
+
 // Evolution thresholds are now loaded from database (single source of truth)
 // No more hardcoded values!
 
@@ -209,7 +232,10 @@ serve(async (req) => {
     }
 
     if (!openAIApiKey) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
+      return new Response(JSON.stringify({
+        error: "OPENAI_API_KEY not configured",
+        code: "openai_api_key_missing",
+      }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -859,8 +885,12 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
   } catch (error) {
     console.error("Error in generate-companion-evolution:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorCode = resolveServerErrorCode(errorMessage);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({
+        error: errorMessage,
+        code: errorCode,
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
