@@ -36,6 +36,35 @@ interface DailyPepTalk {
   mentor_name?: string;
 }
 
+function getFunctionInvokeStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object" || !("context" in error)) {
+    return null;
+  }
+
+  const context = (error as { context?: unknown }).context;
+  return context instanceof Response ? context.status : null;
+}
+
+function logTranscriptSyncError(error: unknown) {
+  const name = error && typeof error === "object" && "name" in error
+    ? String((error as { name?: unknown }).name ?? "")
+    : "";
+  const status = getFunctionInvokeStatus(error);
+
+  if (name === "FunctionsHttpError") {
+    if (typeof status === "number" && status >= 500) {
+      console.warn("Transcript sync returned server error:", { status });
+      return;
+    }
+
+    console.info("Transcript sync returned non-blocking HTTP error:", { status });
+    return;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn("Transcript sync returned non-blocking error:", { name, message });
+}
+
 export const TodaysPepTalk = memo(() => {
   const { profile } = useProfile();
   const personality = useMentorPersonality();
@@ -281,7 +310,7 @@ export const TodaysPepTalk = memo(() => {
         
         // Handle edge function error
         if (error) {
-          console.warn('Transcript sync returned error:', error);
+          logTranscriptSyncError(error);
           return; // Silent fail - transcript sync is optional enhancement
         }
         
@@ -311,7 +340,8 @@ export const TodaysPepTalk = memo(() => {
           });
         }
       } catch (error) {
-        console.error('Transcript sync failed:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn('Transcript sync failed (non-blocking):', message);
         // silent fail; avoid blocking UI if sync fails
       }
     };

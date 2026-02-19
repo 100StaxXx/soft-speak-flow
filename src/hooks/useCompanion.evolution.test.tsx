@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => {
   const toastErrorMock = vi.fn();
   const toastSuccessMock = vi.fn();
   const checkCompanionAchievementsMock = vi.fn();
+  const loggerWarnMock = vi.fn();
+  const loggerLogMock = vi.fn();
+  const loggerErrorMock = vi.fn();
+  const loggerInfoMock = vi.fn();
   const userCompanionResponses: Array<{ data: unknown; error: unknown }> = [];
   const evolutionJobResponses: Array<{ data: unknown; error: unknown }> = [];
 
@@ -23,6 +27,10 @@ const mocks = vi.hoisted(() => {
     toastErrorMock,
     toastSuccessMock,
     checkCompanionAchievementsMock,
+    loggerWarnMock,
+    loggerLogMock,
+    loggerErrorMock,
+    loggerInfoMock,
     userCompanionResponses,
     evolutionJobResponses,
   };
@@ -75,6 +83,15 @@ vi.mock("sonner", () => ({
   toast: {
     error: mocks.toastErrorMock,
     success: mocks.toastSuccessMock,
+  },
+}));
+
+vi.mock("@/utils/logger", () => ({
+  logger: {
+    warn: mocks.loggerWarnMock,
+    log: mocks.loggerLogMock,
+    error: mocks.loggerErrorMock,
+    info: mocks.loggerInfoMock,
   },
 }));
 
@@ -268,5 +285,62 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
       "Your session has expired. Please sign in again and try evolving.",
     );
+  });
+
+  it("normalizes non-Error throws into a user-facing evolution error", async () => {
+    mocks.rpcMock.mockRejectedValue({});
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.evolveCompanion.mutateAsync({
+          newStage: 1,
+          currentXP: 14,
+        }),
+      ).rejects.toThrow("Unable to start evolution. Please try again.");
+    });
+
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Unable to start evolution. Please try again.");
+  });
+
+  it("logs explicit RPC errors and skips unexpected payload warnings when request RPC fails", async () => {
+    mocks.rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        message: "request_companion_evolution_job schema cache stale",
+        code: "PGRST",
+        details: "Could not find function public.request_companion_evolution_job",
+        hint: "Try again",
+      },
+    });
+    mocks.evolutionJobResponses.push({ data: null, error: null });
+    mocks.invokeMock.mockResolvedValue({
+      data: { evolved: true, new_stage: 1 },
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.evolveCompanion.mutateAsync({
+          newStage: 1,
+          currentXP: 14,
+        }),
+      ).resolves.toEqual({ path: "direct", newStage: 1 });
+    });
+
+    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
+
+    const hasRpcFailureWarn = mocks.loggerWarnMock.mock.calls.some(([message]) =>
+      message === "Evolution job request RPC returned error; attempting fallback",
+    );
+    const hasUnexpectedPayloadWarn = mocks.loggerWarnMock.mock.calls.some(([message]) =>
+      message === "Evolution request returned unexpected payload; attempting active-job recovery",
+    );
+
+    expect(hasRpcFailureWarn).toBe(true);
+    expect(hasUnexpectedPayloadWarn).toBe(false);
   });
 });

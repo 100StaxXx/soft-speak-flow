@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const platformState = {
     isNative: true,
     platform: "ios",
+    widgetPluginAvailable: true,
   };
 
   return {
@@ -24,6 +25,8 @@ vi.mock("@capacitor/core", () => ({
   Capacitor: {
     isNativePlatform: () => mocks.platformState.isNative,
     getPlatform: () => mocks.platformState.platform,
+    isPluginAvailable: (name: string) =>
+      name === "WidgetData" ? mocks.platformState.widgetPluginAvailable : true,
   },
 }));
 
@@ -106,6 +109,7 @@ describe("useWidgetSync", () => {
 
     mocks.platformState.isNative = true;
     mocks.platformState.platform = "ios";
+    mocks.platformState.widgetPluginAvailable = true;
     mocks.updateWidgetDataMock.mockResolvedValue(undefined);
     mocks.addListenerMock.mockResolvedValue({ remove: mocks.removeListenerMock });
   });
@@ -247,5 +251,49 @@ describe("useWidgetSync", () => {
         ],
       }),
     );
+  });
+
+  it("skips sync and listeners when the WidgetData plugin is unavailable", async () => {
+    const today = localDateString();
+    mocks.platformState.widgetPluginAvailable = false;
+
+    renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).not.toHaveBeenCalled();
+    expect(mocks.addListenerMock).not.toHaveBeenCalled();
+  });
+
+  it("disables further sync attempts after an unimplemented plugin error", async () => {
+    const today = localDateString();
+    const consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mocks.updateWidgetDataMock.mockRejectedValueOnce({
+      code: "UNIMPLEMENTED",
+      message: "WidgetData plugin not implemented",
+    });
+
+    const { result } = renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.syncToWidget(true);
+    });
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith("[WidgetSync] Failed to sync:", expect.anything());
+
+    const appStateCallback = mocks.addListenerMock.mock.calls[0]?.[1];
+    await act(async () => {
+      appStateCallback?.({ isActive: true });
+      await Promise.resolve();
+    });
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
+    consoleInfoSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 });

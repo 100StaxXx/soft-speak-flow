@@ -65,6 +65,7 @@ export interface DailyTask {
 
 export const DAILY_TASKS_STALE_TIME = 2 * 60 * 1000;
 export const DAILY_TASKS_GC_TIME = 30 * 60 * 1000;
+const NETWORK_TASK_FETCH_ERROR_MESSAGE = 'Network error. Please check your connection and try again.';
 
 export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: string) =>
   ['daily-tasks', userId, taskDate] as const;
@@ -84,6 +85,13 @@ export const fetchDailyTasks = async (userId: string, taskDate: string): Promise
     .order('created_at', { ascending: false });
 
   if (error) {
+    if (isNetworkFetchFailure(error)) {
+      console.warn('Failed to fetch daily tasks (network):', {
+        message: error.message,
+      });
+      throw new Error(NETWORK_TASK_FETCH_ERROR_MESSAGE);
+    }
+
     console.error('Failed to fetch daily tasks:', error);
     throw error;
   }
@@ -140,3 +148,11 @@ export const useTasksQuery = (selectedDate?: Date, options: TasksQueryOptions = 
     totalCount,
   };
 };
+
+function isNetworkFetchFailure(error: { message?: string } | null): boolean {
+  const message = error?.message?.toLowerCase() ?? '';
+  return message.includes('load failed')
+    || message.includes('failed to fetch')
+    || message.includes('network request failed')
+    || message.includes('typeerror: failed to fetch');
+}

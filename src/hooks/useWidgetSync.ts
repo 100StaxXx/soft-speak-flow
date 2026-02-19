@@ -25,15 +25,21 @@ export const useWidgetSync = (
   const { enabled = true } = options;
   const lastSyncRef = useRef<string>('');
   const syncRef = useRef<(force?: boolean) => void>(() => {});
+  const sessionSyncDisabledRef = useRef(false);
   const isIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  const isWidgetPluginAvailable = isIOS && isPluginAvailable('WidgetData');
   
   const syncToWidget = useCallback(async (force = false) => {
     if (!enabled) {
       return;
     }
 
+    if (sessionSyncDisabledRef.current) {
+      return;
+    }
+
     // Only run on iOS native platform
-    if (!isIOS) {
+    if (!isWidgetPluginAvailable) {
       return;
     }
 
@@ -85,9 +91,14 @@ export const useWidgetSync = (
       });
       lastSyncRef.current = fingerprint;
     } catch (error) {
+      if (isUnimplementedPluginError(error)) {
+        sessionSyncDisabledRef.current = true;
+        console.info('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
+        return;
+      }
       console.error('[WidgetSync] Failed to sync:', error);
     }
-  }, [enabled, tasks, taskDate, isIOS]);
+  }, [enabled, isWidgetPluginAvailable, taskDate, tasks]);
 
   useEffect(() => {
     syncRef.current = syncToWidget;
@@ -103,7 +114,7 @@ export const useWidgetSync = (
   
   // Force sync shortly after mount
   useEffect(() => {
-    if (!enabled || !isIOS) {
+    if (!enabled || !isWidgetPluginAvailable) {
       return;
     }
 
@@ -111,11 +122,11 @@ export const useWidgetSync = (
       syncRef.current(true);
     }, 500);
     return () => clearTimeout(timer);
-  }, [enabled, isIOS]);
+  }, [enabled, isWidgetPluginAvailable]);
   
   // Sync when app resumes from background (single listener, latest callback via ref)
   useEffect(() => {
-    if (!enabled || !isIOS) return;
+    if (!enabled || !isWidgetPluginAvailable) return;
     
     const listener = App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
@@ -126,7 +137,7 @@ export const useWidgetSync = (
     return () => {
       listener.then(l => l.remove());
     };
-  }, [enabled, isIOS]);
+  }, [enabled, isWidgetPluginAvailable]);
   
   return { syncToWidget };
 };
@@ -147,4 +158,25 @@ function getLocalDateString(date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function isPluginAvailable(pluginName: string): boolean {
+  const maybeChecker = (Capacitor as { isPluginAvailable?: (name: string) => boolean }).isPluginAvailable;
+  return typeof maybeChecker === 'function' ? maybeChecker(pluginName) : false;
+}
+
+function isUnimplementedPluginError(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code ?? '')
+    : '';
+
+  const message = typeof error === 'string'
+    ? error
+    : error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : '';
+
+  return code.toUpperCase() === 'UNIMPLEMENTED' || message.toUpperCase().includes('UNIMPLEMENTED');
 }

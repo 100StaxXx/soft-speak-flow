@@ -243,6 +243,16 @@ const directEvolutionInvokeErrorMessage = async (invokeError: unknown) => {
   return toUserFacingFunctionError(parsed, { action: "start evolution" });
 };
 
+const normalizeEvolutionError = async (error: unknown): Promise<Error> => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error;
+  }
+
+  const parsed = await parseFunctionInvokeError(error);
+  const message = toUserFacingFunctionError(parsed, { action: "start evolution" });
+  return new Error(message);
+};
+
 const ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX = "companion:evolution:active-job";
 const EVOLUTION_READY_STORAGE_PREFIX = "companion:evolution:ready";
 const EVOLUTION_ETA_DELAY_MS = 75_000;
@@ -927,6 +937,15 @@ export const useCompanion = () => {
           let requestFailure: { message: string; allowDirectFallback: boolean } | null = null;
           if (requestError) {
             requestFailure = resolveEvolutionRequestError(requestError);
+            logger.warn("Evolution job request RPC returned error; attempting fallback", {
+              userId: user.id,
+              code: requestError.code ?? null,
+              message: requestError.message ?? null,
+              details: requestError.details ?? null,
+              hint: requestError.hint ?? null,
+              fallbackAllowed: requestFailure.allowDirectFallback,
+              fallbackReason: requestFailure.message,
+            });
             if (!requestFailure.allowDirectFallback) {
               throw new Error(requestFailure.message);
             }
@@ -935,7 +954,7 @@ export const useCompanion = () => {
           const requestResult = requestError ? null : extractRequestedEvolutionJob(data);
           let resolvedJob = requestResult;
 
-          if (!resolvedJob) {
+          if (!resolvedJob && !requestError) {
             logger.warn("Evolution request returned unexpected payload; attempting active-job recovery", {
               payloadType: Array.isArray(data) ? "array" : typeof data,
               hasPayload: Boolean(data),
@@ -1021,7 +1040,7 @@ export const useCompanion = () => {
         } catch (error) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);
-          throw error;
+          throw await normalizeEvolutionError(error);
         }
       })();
 
@@ -1058,7 +1077,10 @@ export const useCompanion = () => {
     onError: (error) => {
       evolutionInProgress.current = false;
       setIsEvolvingLoading(false);
-      console.error("Evolution failed:", error);
+      console.error("Evolution failed:", {
+        name: error.name,
+        message: error.message,
+      });
       const message =
         error instanceof Error && error.message
           ? error.message
