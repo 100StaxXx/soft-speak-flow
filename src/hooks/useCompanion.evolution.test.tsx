@@ -2,7 +2,19 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { safeLocalStorage } from "@/utils/storage";
+
+const companionFixture = {
+  id: "companion-1",
+  user_id: "user-1",
+  favorite_color: "#00ff88",
+  spirit_animal: "Wolf",
+  core_element: "Fire",
+  current_stage: 0,
+  current_xp: 14,
+  current_image_url: "https://example.com/stage0.png",
+  created_at: "2026-02-19T00:00:00.000Z",
+  updated_at: "2026-02-19T00:00:00.000Z",
+};
 
 const mocks = vi.hoisted(() => {
   const rpcMock = vi.fn();
@@ -17,7 +29,6 @@ const mocks = vi.hoisted(() => {
   const loggerErrorMock = vi.fn();
   const loggerInfoMock = vi.fn();
   const userCompanionResponses: Array<{ data: unknown; error: unknown }> = [];
-  const evolutionJobResponses: Array<{ data: unknown; error: unknown }> = [];
 
   return {
     rpcMock,
@@ -32,7 +43,6 @@ const mocks = vi.hoisted(() => {
     loggerErrorMock,
     loggerInfoMock,
     userCompanionResponses,
-    evolutionJobResponses,
   };
 });
 
@@ -97,19 +107,6 @@ vi.mock("@/utils/logger", () => ({
 
 import { useCompanion } from "./useCompanion";
 
-const companionFixture = {
-  id: "companion-1",
-  user_id: "user-1",
-  favorite_color: "#00ff88",
-  spirit_animal: "Wolf",
-  core_element: "Fire",
-  current_stage: 0,
-  current_xp: 14,
-  current_image_url: "https://example.com/stage0.png",
-  created_at: "2026-02-19T00:00:00.000Z",
-  updated_at: "2026-02-19T00:00:00.000Z",
-};
-
 const createRelayInvokeError = () => ({
   name: "FunctionsRelayError",
   message: "Relay error invoking the edge function",
@@ -136,11 +133,7 @@ const createQueryBuilder = (table: string) => {
     limit: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => {
       if (table === "user_companion") {
-        return mocks.userCompanionResponses.shift() ?? { data: null, error: null };
-      }
-
-      if (table === "companion_evolution_jobs") {
-        return mocks.evolutionJobResponses.shift() ?? { data: null, error: null };
+        return mocks.userCompanionResponses.shift() ?? { data: companionFixture, error: null };
       }
 
       return { data: null, error: null };
@@ -180,83 +173,14 @@ const renderUseCompanion = async (queryClient?: QueryClient) => {
 describe("useCompanion evolveCompanion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    safeLocalStorage.removeItem("companion:evolution:active-job:user-1");
-    safeLocalStorage.removeItem("companion:evolution:ready:user-1");
-
     mocks.userCompanionResponses.length = 0;
-    mocks.evolutionJobResponses.length = 0;
-
     mocks.userCompanionResponses.push({ data: companionFixture, error: null });
-    mocks.evolutionJobResponses.push({ data: null, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => createQueryBuilder(table));
     mocks.invokeMock.mockResolvedValue({ data: null, error: null });
   });
 
-  it("requests an async evolution job with a true no-arg RPC call", async () => {
-    mocks.rpcMock.mockResolvedValue({
-      data: [{ job_id: "job-1", status: "queued", requested_stage: 1 }],
-      error: null,
-    });
-
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
-    const { result } = await renderUseCompanion(queryClient);
-
-    let mutationResult: Awaited<ReturnType<typeof result.current.evolveCompanion.mutateAsync>>;
-    await act(async () => {
-      mutationResult = await result.current.evolveCompanion.mutateAsync({
-        newStage: 1,
-        currentXP: 14,
-      });
-    });
-
-    expect(mutationResult!).toEqual({ path: "job", jobId: "job-1" });
-    expect(mocks.rpcMock).toHaveBeenCalledWith("request_companion_evolution_job");
-    expect(mocks.rpcMock.mock.calls[0]).toHaveLength(1);
-    expect(mocks.invokeMock).toHaveBeenCalledWith("process-companion-evolution-job", {
-      body: { jobId: "job-1" },
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["companion-evolution-job", "user-1"] });
-  });
-
-  it("retries RPC request failures and recovers to async job flow", async () => {
-    mocks.rpcMock
-      .mockResolvedValueOnce({
-        data: null,
-        error: { message: "failed to fetch", code: "PGRST" },
-      })
-      .mockResolvedValueOnce({
-        data: [{ job_id: "job-retry", status: "queued", requested_stage: 1 }],
-        error: null,
-      });
-
-    const { result } = await renderUseCompanion();
-
-    await act(async () => {
-      await expect(
-        result.current.evolveCompanion.mutateAsync({
-          newStage: 1,
-          currentXP: 14,
-        }),
-      ).resolves.toEqual({ path: "job", jobId: "job-retry" });
-    });
-
-    expect(mocks.rpcMock).toHaveBeenCalledTimes(2);
-    expect(mocks.invokeMock).toHaveBeenCalledWith("process-companion-evolution-job", {
-      body: { jobId: "job-retry" },
-    });
-    expect(mocks.toastErrorMock).not.toHaveBeenCalled();
-  });
-
-  it("falls back to direct evolution when no async job can be established", async () => {
-    mocks.rpcMock.mockResolvedValue({ data: null, error: null });
-    mocks.evolutionJobResponses.push({ data: null, error: null });
+  it("calls generate-companion-evolution directly and invalidates companion queries", async () => {
     mocks.invokeMock.mockResolvedValue({
       data: { evolved: true, new_stage: 1 },
       error: null,
@@ -279,26 +203,18 @@ describe("useCompanion evolveCompanion", () => {
       });
     });
 
-    expect(mutationResult!).toEqual({ path: "direct", newStage: 1 });
+    expect(mutationResult!).toEqual({ newStage: 1 });
     expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
-    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(false);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["companion"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["companion-stories-all"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["current-evolution-card"] });
   });
 
-  it("returns degraded path when retryable infra failures persist across RPC and direct fallback", async () => {
-    mocks.rpcMock.mockResolvedValue({
-      data: null,
-      error: {
-        message: "failed to fetch request_companion_evolution_job",
-        code: "PGRST",
-      },
-    });
+  it("surfaces evolved:false payloads with a clear user message", async () => {
     mocks.invokeMock.mockResolvedValue({
-      data: null,
-      error: createRelayInvokeError(),
+      data: { evolved: false, message: "Not enough XP" },
+      error: null,
     });
 
     const { result } = await renderUseCompanion();
@@ -309,57 +225,14 @@ describe("useCompanion evolveCompanion", () => {
           newStage: 1,
           currentXP: 14,
         }),
-      ).resolves.toEqual({
-        path: "degraded",
-        retryAfterMs: 60000,
-        reason: "Evolution is busy right now. Try again in about a minute.",
-      });
+      ).rejects.toThrow("Your companion is not ready to evolve yet.");
     });
 
-    await waitFor(() => {
-      expect(result.current.evolutionServiceState).toBe("degraded");
-      expect(result.current.evolutionServiceNotice).toMatch(/Evolution is busy right now/i);
-    });
-
-    const generateInvokeCalls = mocks.invokeMock.mock.calls.filter(
-      ([fnName]) => fnName === "generate-companion-evolution",
-    );
-
-    expect(mocks.rpcMock).toHaveBeenCalledTimes(3);
-    expect(generateInvokeCalls).toHaveLength(2);
-    expect(mocks.toastErrorMock).not.toHaveBeenCalled();
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Your companion is not ready to evolve yet.");
+    expect(mocks.setIsEvolvingLoadingMock).toHaveBeenCalledWith(false);
   });
 
-  it("marks long-running active jobs as degraded with a stalled notice", async () => {
-    const stalledAtIso = new Date(Date.now() - 130_000).toISOString();
-    mocks.evolutionJobResponses.length = 0;
-    mocks.evolutionJobResponses.push({
-      data: {
-        id: "job-stalled",
-        status: "processing",
-        requested_stage: 1,
-        requested_at: stalledAtIso,
-        started_at: stalledAtIso,
-        next_retry_at: null,
-        error_code: null,
-        error_message: null,
-      },
-      error: null,
-    });
-
-    const { result } = await renderUseCompanion();
-
-    await waitFor(() => {
-      expect(result.current.hasActiveEvolutionJob).toBe(true);
-    });
-
-    expect(result.current.evolutionServiceState).toBe("degraded");
-    expect(result.current.evolutionServiceNotice).toMatch(/taking longer than usual/i);
-  });
-
-  it("retries direct fallback invoke once and succeeds after a transient relay failure", async () => {
-    mocks.rpcMock.mockResolvedValue({ data: null, error: null });
-    mocks.evolutionJobResponses.push({ data: null, error: null });
+  it("retries a transient invoke failure once and then succeeds", async () => {
     mocks.invokeMock
       .mockResolvedValueOnce({
         data: null,
@@ -378,7 +251,7 @@ describe("useCompanion evolveCompanion", () => {
           newStage: 1,
           currentXP: 14,
         }),
-      ).resolves.toEqual({ path: "direct", newStage: 1 });
+      ).resolves.toEqual({ newStage: 1 });
     });
 
     const generateInvokeCalls = mocks.invokeMock.mock.calls.filter(
@@ -388,32 +261,10 @@ describe("useCompanion evolveCompanion", () => {
     expect(mocks.toastErrorMock).not.toHaveBeenCalled();
   });
 
-  it("shows a specific message when direct fallback reports not enough XP", async () => {
-    mocks.rpcMock.mockResolvedValue({ data: null, error: null });
-    mocks.evolutionJobResponses.push({ data: null, error: null });
+  it("surfaces a clean error after retryable infrastructure failures are exhausted", async () => {
     mocks.invokeMock.mockResolvedValue({
-      data: { evolved: false, message: "Not enough XP" },
-      error: null,
-    });
-
-    const { result } = await renderUseCompanion();
-
-    await act(async () => {
-      await expect(
-        result.current.evolveCompanion.mutateAsync({
-          newStage: 1,
-          currentXP: 14,
-        }),
-      ).rejects.toThrow("Your companion is not ready to evolve yet.");
-    });
-
-    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Your companion is not ready to evolve yet.");
-  });
-
-  it("maps auth request errors without attempting direct fallback", async () => {
-    mocks.rpcMock.mockResolvedValue({
       data: null,
-      error: { message: "not_authenticated" },
+      error: createRelayInvokeError(),
     });
 
     const { result } = await renderUseCompanion();
@@ -424,69 +275,52 @@ describe("useCompanion evolveCompanion", () => {
           newStage: 1,
           currentXP: 14,
         }),
-      ).rejects.toThrow("Your session has expired. Please sign in again and try evolving.");
+      ).rejects.toThrow("Evolution service is temporarily unavailable. Please try again in a minute.");
     });
 
-    expect(mocks.invokeMock).not.toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
+    const generateInvokeCalls = mocks.invokeMock.mock.calls.filter(
+      ([fnName]) => fnName === "generate-companion-evolution",
+    );
+    expect(generateInvokeCalls).toHaveLength(2);
     expect(mocks.toastErrorMock).toHaveBeenCalledWith(
-      "Your session has expired. Please sign in again and try evolving.",
+      "Evolution service is temporarily unavailable. Please try again in a minute.",
     );
   });
 
-  it("normalizes non-Error throws into a user-facing evolution error", async () => {
-    mocks.rpcMock.mockRejectedValue({});
+  it("suppresses duplicate-click evolution requests while one is in flight", async () => {
+    let resolveInvoke: ((value: unknown) => void) | null = null;
+    mocks.invokeMock.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveInvoke = resolve;
+      }),
+    );
 
     const { result } = await renderUseCompanion();
 
-    await act(async () => {
-      await expect(
-        result.current.evolveCompanion.mutateAsync({
-          newStage: 1,
-          currentXP: 14,
-        }),
-      ).rejects.toThrow("Unable to start evolution. Please try again.");
+    const firstMutation = result.current.evolveCompanion.mutateAsync({
+      newStage: 1,
+      currentXP: 14,
     });
 
-    expect(mocks.toastErrorMock).toHaveBeenCalledWith("Unable to start evolution. Please try again.");
-  });
-
-  it("logs explicit RPC errors and skips unexpected payload warnings when request RPC fails", async () => {
-    mocks.rpcMock.mockResolvedValue({
-      data: null,
-      error: {
-        message: "request_companion_evolution_job schema cache stale",
-        code: "PGRST",
-        details: "Could not find function public.request_companion_evolution_job",
-        hint: "Try again",
-      },
+    const secondMutation = result.current.evolveCompanion.mutateAsync({
+      newStage: 1,
+      currentXP: 14,
     });
-    mocks.evolutionJobResponses.push({ data: null, error: null });
-    mocks.invokeMock.mockResolvedValue({
+
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+    });
+
+    resolveInvoke?.({
       data: { evolved: true, new_stage: 1 },
       error: null,
     });
 
-    const { result } = await renderUseCompanion();
-
     await act(async () => {
-      await expect(
-        result.current.evolveCompanion.mutateAsync({
-          newStage: 1,
-          currentXP: 14,
-        }),
-      ).resolves.toEqual({ path: "direct", newStage: 1 });
+      await expect(firstMutation).resolves.toEqual({ newStage: 1 });
+      await expect(secondMutation).resolves.toBeNull();
     });
 
-    expect(mocks.invokeMock).toHaveBeenCalledWith("generate-companion-evolution", { body: {} });
-
-    const hasRpcFailureWarn = mocks.loggerWarnMock.mock.calls.some(([message]) =>
-      message === "Evolution job request RPC returned error; attempting fallback",
-    );
-    const hasUnexpectedPayloadWarn = mocks.loggerWarnMock.mock.calls.some(([message]) =>
-      message === "Evolution request returned unexpected payload; attempting active-job recovery",
-    );
-
-    expect(hasRpcFailureWarn).toBe(true);
-    expect(hasUnexpectedPayloadWarn).toBe(false);
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
   });
 });

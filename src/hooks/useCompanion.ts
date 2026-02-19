@@ -3,8 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useAchievements } from "./useAchievements";
 import { toast } from "sonner";
-import { retryWithBackoff } from "@/utils/retry";
-import { useRef, useMemo, useCallback, useEffect, useState } from "react";
+import { useRef, useMemo, useCallback } from "react";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useEvolutionThresholds } from "./useEvolutionThresholds";
 import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
@@ -12,11 +11,9 @@ import type { CreateCompanionIfNotExistsResult } from "@/types/referral-function
 import { logger } from "@/utils/logger";
 import { generateWithValidation } from "@/utils/validateCompanionImage";
 import {
-  isRetriableFunctionInvokeError,
   parseFunctionInvokeError,
   toUserFacingFunctionError,
 } from "@/utils/supabaseFunctionErrors";
-import { safeLocalStorage } from "@/utils/storage";
 
 export interface Companion {
   id: string;
@@ -67,32 +64,6 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
   return data as Companion | null;
 };
 
-type EvolutionJobStatus = "queued" | "processing" | "succeeded" | "failed";
-
-interface CompanionEvolutionJob {
-  id: string;
-  status: EvolutionJobStatus;
-  requested_stage: number;
-  requested_at: string;
-  started_at: string | null;
-  next_retry_at: string | null;
-  error_code: string | null;
-  error_message: string | null;
-}
-
-interface RequestCompanionEvolutionJobResult {
-  job_id: string;
-  status: EvolutionJobStatus;
-  requested_stage: number;
-}
-
-interface EvolutionRequestRpcError {
-  message?: string;
-  code?: string;
-  details?: string;
-  hint?: string;
-}
-
 interface DirectEvolutionResponse {
   evolved?: boolean;
   message?: string;
@@ -104,95 +75,14 @@ interface DirectEvolutionResponse {
   evolution_id?: string;
 }
 
-export type EvolutionServiceState = "ready" | "processing" | "degraded";
-
 type EvolutionFailureClass = "terminal" | "retryable_infrastructure" | "non_retryable";
 
 interface EvolutionResolvedFailure {
   message: string;
-  allowDirectFallback: boolean;
   failureClass: EvolutionFailureClass;
   reason: string;
   code: string | null;
 }
-
-interface EvolutionAttemptContext {
-  attempt_id: string;
-  user_id: string;
-  target_stage: number;
-  evolution_phase: "rpc_request" | "direct_fallback" | "job_polling" | "complete";
-  fallback_path: "none" | "job" | "direct" | "degraded";
-  error_class: EvolutionFailureClass | null;
-  error_category: string | null;
-  error_status: number | null;
-  error_code: string | null;
-  rpc_error_code: string | null;
-  invoke_status: number | null;
-  invoke_category: string | null;
-  job_id: string | null;
-}
-
-type EvolutionMutationResult =
-  | { path: "job"; jobId: string }
-  | { path: "direct"; newStage: number | null }
-  | { path: "degraded"; retryAfterMs: number; reason: string }
-  | null;
-
-const isEvolutionJobStatus = (value: unknown): value is EvolutionJobStatus =>
-  value === "queued" || value === "processing" || value === "succeeded" || value === "failed";
-
-const parseCompositeJobTuple = (value: unknown) => {
-  if (typeof value !== "string") return null;
-  const match = value.match(/^\(([^,]+),([^,]+),([^,]+)\)$/);
-  if (!match) return null;
-
-  const parsedStatus = match[2]?.trim();
-  const parsedStage = Number.parseInt(match[3]?.trim() ?? "", 10);
-  if (!isEvolutionJobStatus(parsedStatus) || Number.isNaN(parsedStage)) {
-    return null;
-  }
-
-  return {
-    jobId: match[1]?.trim(),
-    status: parsedStatus,
-    requestedStage: parsedStage,
-  };
-};
-
-const extractRequestedEvolutionJob = (
-  data: RequestCompanionEvolutionJobResult[] | RequestCompanionEvolutionJobResult | null,
-) => {
-  const requestResult = Array.isArray(data) ? data[0] : data;
-  if (!requestResult) return null;
-
-  if (typeof requestResult !== "object") return null;
-
-  const resultRecord = requestResult as Record<string, unknown>;
-  const parsedComposite = parseCompositeJobTuple(resultRecord.request_companion_evolution_job);
-  const rawJobId = typeof resultRecord.job_id === "string"
-    ? resultRecord.job_id
-    : typeof resultRecord.id === "string"
-      ? resultRecord.id
-      : parsedComposite?.jobId;
-  const rawStatus = resultRecord.status ?? parsedComposite?.status;
-  const rawRequestedStage = resultRecord.requested_stage ?? resultRecord.requestedStage ?? parsedComposite?.requestedStage;
-  const parsedStage =
-    typeof rawRequestedStage === "number"
-      ? rawRequestedStage
-      : typeof rawRequestedStage === "string"
-        ? Number.parseInt(rawRequestedStage, 10)
-        : NaN;
-
-  if (!rawJobId || !isEvolutionJobStatus(rawStatus) || Number.isNaN(parsedStage)) {
-    return null;
-  }
-
-  return {
-    job_id: rawJobId,
-    status: rawStatus,
-    requested_stage: parsedStage,
-  } satisfies RequestCompanionEvolutionJobResult;
-};
 
 const normalizeEvolutionErrorCode = (value: string | null | undefined): string | null => {
   if (!value) return null;
@@ -275,50 +165,6 @@ const isRetryableEvolutionInfrastructureSource = (normalizedSource: string) => (
   || normalizedSource.includes("service_unavailable")
 );
 
-const resolveEvolutionRequestError = (error: EvolutionRequestRpcError | null): EvolutionResolvedFailure => {
-  const message = [
-    error?.message,
-    error?.code,
-    error?.details,
-    error?.hint,
-  ]
-    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
-    .join(" ");
-  const normalized = message.toLowerCase();
-  const terminalFailure = resolveKnownTerminalEvolutionFailure(normalized);
-
-  if (terminalFailure) {
-    return {
-      message: terminalFailure.message,
-      allowDirectFallback: false,
-      failureClass: "terminal",
-      reason: terminalFailure.category,
-      code: terminalFailure.code,
-    };
-  }
-
-  if (isRetryableEvolutionInfrastructureSource(normalized)) {
-    return {
-      message: "Evolution service is temporarily unavailable. Please try again in a minute.",
-      allowDirectFallback: true,
-      failureClass: "retryable_infrastructure",
-      reason: "rpc_infrastructure",
-      code: normalizeEvolutionErrorCode(error?.code) ?? "evolution_service_unavailable",
-    };
-  }
-
-  const fallbackMessage = message.length > 0
-    ? evolutionRequestErrorMessage(message)
-    : "Unable to start evolution right now. Please try again.";
-  return {
-    message: fallbackMessage,
-    allowDirectFallback: true,
-    failureClass: "non_retryable",
-    reason: "rpc_unknown",
-    code: normalizeEvolutionErrorCode(error?.code),
-  };
-};
-
 const directEvolutionFailureMessage = (data: DirectEvolutionResponse | null) => {
   const source = [data?.code, data?.message, data?.error].filter(Boolean).join(" ").toLowerCase();
   if (source.includes("not enough xp")) return "Your companion is not ready to evolve yet.";
@@ -334,7 +180,6 @@ const resolveDirectEvolutionPayloadFailure = (data: DirectEvolutionResponse | nu
   if (terminalFailure) {
     return {
       message: terminalFailure.message,
-      allowDirectFallback: false,
       failureClass: "terminal",
       reason: terminalFailure.category,
       code: terminalFailure.code,
@@ -344,7 +189,6 @@ const resolveDirectEvolutionPayloadFailure = (data: DirectEvolutionResponse | nu
   if (isRetryableEvolutionInfrastructureSource(source)) {
     return {
       message: "Evolution service is temporarily unavailable. Please try again in a minute.",
-      allowDirectFallback: false,
       failureClass: "retryable_infrastructure",
       reason: "direct_payload_infrastructure",
       code: normalizeEvolutionErrorCode(data?.code) ?? "evolution_service_unavailable",
@@ -353,7 +197,6 @@ const resolveDirectEvolutionPayloadFailure = (data: DirectEvolutionResponse | nu
 
   return {
     message: directEvolutionFailureMessage(data),
-    allowDirectFallback: false,
     failureClass: "non_retryable",
     reason: "direct_payload_terminal",
     code: normalizeEvolutionErrorCode(data?.code),
@@ -373,7 +216,6 @@ const resolveDirectEvolutionInvokeFailure = async (invokeError: unknown): Promis
   if (terminalFailure) {
     return {
       message: terminalFailure.message,
-      allowDirectFallback: false,
       failureClass: "terminal",
       reason: terminalFailure.category,
       code: terminalFailure.code,
@@ -385,7 +227,6 @@ const resolveDirectEvolutionInvokeFailure = async (invokeError: unknown): Promis
   if (parsed.category === "auth") {
     return {
       message: "Your session has expired. Please sign in again and try evolving.",
-      allowDirectFallback: false,
       failureClass: "terminal",
       reason: "auth",
       code: "unauthorized",
@@ -397,7 +238,6 @@ const resolveDirectEvolutionInvokeFailure = async (invokeError: unknown): Promis
   if (parsed.category === "rate_limit") {
     return {
       message: "Evolution is on cooldown. Please try again in a little while.",
-      allowDirectFallback: false,
       failureClass: "terminal",
       reason: "rate_limit",
       code: "rate_limited",
@@ -414,7 +254,6 @@ const resolveDirectEvolutionInvokeFailure = async (invokeError: unknown): Promis
   ) {
     return {
       message: "Evolution service is temporarily unavailable. Please try again in a minute.",
-      allowDirectFallback: false,
       failureClass: "retryable_infrastructure",
       reason: "invoke_infrastructure",
       code: normalizeEvolutionErrorCode(parsed.responsePayload?.code ?? parsed.code) ?? "evolution_service_unavailable",
@@ -425,7 +264,6 @@ const resolveDirectEvolutionInvokeFailure = async (invokeError: unknown): Promis
 
   return {
     message: toUserFacingFunctionError(parsed, { action: "start evolution" }),
-    allowDirectFallback: false,
     failureClass: "non_retryable",
     reason: "invoke_unknown",
     code: normalizeEvolutionErrorCode(parsed.responsePayload?.code ?? parsed.code),
@@ -444,15 +282,8 @@ const normalizeEvolutionError = async (error: unknown): Promise<Error> => {
   return new Error(message);
 };
 
-const ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX = "companion:evolution:active-job";
-const EVOLUTION_READY_STORAGE_PREFIX = "companion:evolution:ready";
-const EVOLUTION_ETA_DELAY_MS = 75_000;
-const EVOLUTION_STALLED_NOTICE_DELAY_MS = 120_000;
-const EVOLUTION_STALLED_NOTICE = "Evolution is taking longer than usual. We'll keep trying in the background.";
-const EVOLUTION_DEGRADED_COOLDOWN_MS = 60_000;
-const EVOLUTION_DEGRADED_RETRY_AFTER_MS = 60_000;
-const EVOLUTION_DEGRADED_NOTICE = "Evolution is busy right now. Try again in about a minute.";
-const EVOLUTION_RPC_MAX_ATTEMPTS = 3;
+type EvolutionMutationResult = { newStage: number | null } | null;
+
 const EVOLUTION_DIRECT_MAX_ATTEMPTS = 2;
 const EVOLUTION_RETRY_DELAYS_MS = [400, 900];
 
@@ -466,116 +297,6 @@ const getEvolutionRetryDelayMs = (attempt: number) => {
   return EVOLUTION_RETRY_DELAYS_MS[index] ?? EVOLUTION_RETRY_DELAYS_MS[EVOLUTION_RETRY_DELAYS_MS.length - 1];
 };
 
-const createEvolutionAttemptId = () => (
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `evolution-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-);
-
-const seenFailedJobToasts = new Set<string>();
-const seenSucceededJobToasts = new Set<string>();
-const lastEvolutionWorkerKickoffAt = new Map<string, number>();
-
-const getEvolutionJobQueryKey = (userId: string | undefined) =>
-  ["companion-evolution-job", userId] as const;
-
-const getEvolutionReadyQueryKey = (userId: string | undefined) =>
-  ["companion-evolution-ready", userId] as const;
-
-const getActiveEvolutionJobStorageKey = (userId: string) =>
-  `${ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX}:${userId}`;
-
-const getEvolutionReadyStorageKey = (userId: string) =>
-  `${EVOLUTION_READY_STORAGE_PREFIX}:${userId}`;
-
-const readStoredActiveEvolutionJobId = (userId: string) =>
-  safeLocalStorage.getItem(getActiveEvolutionJobStorageKey(userId));
-
-const writeStoredActiveEvolutionJobId = (userId: string, jobId: string) => {
-  safeLocalStorage.setItem(getActiveEvolutionJobStorageKey(userId), jobId);
-};
-
-const clearStoredActiveEvolutionJobId = (userId: string) => {
-  safeLocalStorage.removeItem(getActiveEvolutionJobStorageKey(userId));
-};
-
-const readEvolutionReadyFlag = (userId: string) =>
-  safeLocalStorage.getItem(getEvolutionReadyStorageKey(userId)) === "true";
-
-const writeEvolutionReadyFlag = (userId: string, value: boolean) => {
-  if (value) {
-    safeLocalStorage.setItem(getEvolutionReadyStorageKey(userId), "true");
-    return;
-  }
-  safeLocalStorage.removeItem(getEvolutionReadyStorageKey(userId));
-};
-
-const fetchTrackedEvolutionJob = async (userId: string): Promise<CompanionEvolutionJob | null> => {
-  const trackedJobId = readStoredActiveEvolutionJobId(userId);
-
-  if (trackedJobId) {
-    const { data, error } = await supabase
-      .from("companion_evolution_jobs")
-      .select("id, status, requested_stage, requested_at, started_at, next_retry_at, error_code, error_message")
-      .eq("id", trackedJobId)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) {
-      clearStoredActiveEvolutionJobId(userId);
-      return null;
-    }
-    return data as CompanionEvolutionJob;
-  }
-
-  const { data, error } = await supabase
-    .from("companion_evolution_jobs")
-    .select("id, status, requested_stage, requested_at, started_at, next_retry_at, error_code, error_message")
-    .eq("user_id", userId)
-    .in("status", ["queued", "processing"])
-    .order("requested_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) return null;
-
-  writeStoredActiveEvolutionJobId(userId, data.id);
-  return data as CompanionEvolutionJob;
-};
-
-const evolutionRequestErrorMessage = (errorMessage: string) => {
-  const normalized = errorMessage.toLowerCase();
-  if (normalized.includes("not_enough_xp")) return "Your companion is not ready to evolve yet.";
-  if (normalized.includes("max_stage_reached")) return "Your companion has already reached the maximum stage.";
-  if (normalized.includes("already_evolved")) return "Your companion already evolved to this stage.";
-  if (normalized.includes("companion_not_found")) return "No companion found to evolve.";
-  if (
-    normalized.includes("request_companion_evolution_job")
-    && (normalized.includes("could not find") || normalized.includes("schema cache"))
-  ) {
-    return "Evolution service is temporarily unavailable. Please try again in a minute.";
-  }
-  if (normalized.includes("companion_evolution_jobs") && normalized.includes("does not exist")) {
-    return "Evolution service is temporarily unavailable. Please try again in a minute.";
-  }
-  if (normalized.includes("failed to fetch") || normalized.includes("network")) {
-    return "Unable to reach evolution service. Check your connection and try again.";
-  }
-  return "Unable to start evolution right now. Please try again.";
-};
-
-const evolutionJobErrorMessage = (job: CompanionEvolutionJob) => {
-  const code = (job.error_code ?? "").toLowerCase();
-  if (code.includes("rate_limited")) return "Evolution is on cooldown. Please try again in a little while.";
-  if (code.includes("not_enough_xp")) return "Your companion is not ready to evolve yet.";
-  if (code.includes("max_stage_reached")) return "Your companion has already reached the maximum stage.";
-  if (code.includes("companion_not_found")) return "We couldn't find your companion. Refresh and try again.";
-  if (job.error_message) return "Evolution failed. Please try again.";
-  return "Unable to evolve your companion right now. Please try again.";
-};
-
 export const useCompanion = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -587,8 +308,6 @@ export const useCompanion = () => {
   const evolutionInProgress = useRef(false);
   const evolutionPromise = useRef<Promise<unknown> | null>(null);
   const companionCreationInProgress = useRef(false);
-  const lastEvolutionDegradedNoticeAt = useRef(0);
-  const [evolutionServiceNotice, setEvolutionServiceNotice] = useState<string | null>(null);
 
   const { data: companion, isLoading, error, refetch } = useQuery({
     queryKey: getCompanionQueryKey(user?.id),
@@ -604,217 +323,6 @@ export const useCompanion = () => {
     retry: 3, // Increased from 2 to 3 for better reliability after onboarding
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
-
-  const [etaNow, setEtaNow] = useState(() => Date.now());
-
-  const setEvolutionReady = useCallback(
-    (value: boolean) => {
-      if (!user?.id) return;
-      writeEvolutionReadyFlag(user.id, value);
-      queryClient.setQueryData(getEvolutionReadyQueryKey(user.id), value);
-    },
-    [queryClient, user?.id],
-  );
-
-  const { data: hasEvolutionReady = false } = useQuery({
-    queryKey: getEvolutionReadyQueryKey(user?.id),
-    enabled: !!user?.id,
-    queryFn: async () => {
-      if (!user?.id) return false;
-      return readEvolutionReadyFlag(user.id);
-    },
-    initialData: user?.id ? readEvolutionReadyFlag(user.id) : false,
-    staleTime: Infinity,
-    gcTime: Infinity,
-  });
-
-  const { data: trackedEvolutionJob = null } = useQuery({
-    queryKey: getEvolutionJobQueryKey(user?.id),
-    enabled: !!user?.id,
-    queryFn: async () => {
-      if (!user?.id) return null;
-      return fetchTrackedEvolutionJob(user.id);
-    },
-    staleTime: 1000,
-    refetchInterval: (query) => {
-      const job = query.state.data as CompanionEvolutionJob | null;
-      if (!job) return false;
-      return job.status === "queued" || job.status === "processing" ? 3000 : false;
-    },
-  });
-
-  const hasActiveEvolutionJob = Boolean(
-    trackedEvolutionJob &&
-      (trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing"),
-  );
-
-  useEffect(() => {
-    if (!hasActiveEvolutionJob) return undefined;
-
-    const intervalId = window.setInterval(() => {
-      setEtaNow(Date.now());
-    }, 5000);
-
-    return () => window.clearInterval(intervalId);
-  }, [hasActiveEvolutionJob]);
-
-  useEffect(() => {
-    if (!user?.id || !trackedEvolutionJob) return;
-
-    if (trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing") {
-      writeStoredActiveEvolutionJobId(user.id, trackedEvolutionJob.id);
-      setIsEvolvingLoading(true);
-      return;
-    }
-
-    clearStoredActiveEvolutionJobId(user.id);
-    lastEvolutionWorkerKickoffAt.delete(trackedEvolutionJob.id);
-
-    if (trackedEvolutionJob.status === "succeeded") {
-      setEvolutionReady(true);
-      setIsEvolvingLoading(false);
-
-      if (!seenSucceededJobToasts.has(trackedEvolutionJob.id)) {
-        toast.success("Your companion evolved. Tap Companion to see the new form.");
-        seenSucceededJobToasts.add(trackedEvolutionJob.id);
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["companion"] });
-      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
-      queryClient.setQueryData(getEvolutionJobQueryKey(user.id), null);
-      return;
-    }
-
-    setIsEvolvingLoading(false);
-
-    if (!seenFailedJobToasts.has(trackedEvolutionJob.id)) {
-      toast.error(evolutionJobErrorMessage(trackedEvolutionJob));
-      seenFailedJobToasts.add(trackedEvolutionJob.id);
-    }
-    queryClient.setQueryData(getEvolutionJobQueryKey(user.id), null);
-  }, [queryClient, setEvolutionReady, setIsEvolvingLoading, trackedEvolutionJob, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !trackedEvolutionJob) return undefined;
-    if (!(trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing")) {
-      return undefined;
-    }
-
-    let disposed = false;
-
-    const maybeInvokeWorker = async () => {
-      if (disposed) return;
-
-      if (trackedEvolutionJob.status === "queued" && trackedEvolutionJob.next_retry_at) {
-        const nextRetryMs = Date.parse(trackedEvolutionJob.next_retry_at);
-        if (Number.isFinite(nextRetryMs) && Date.now() < nextRetryMs) {
-          return;
-        }
-      }
-
-      const nowMs = Date.now();
-      const lastKickoffMs = lastEvolutionWorkerKickoffAt.get(trackedEvolutionJob.id) ?? 0;
-      if (nowMs - lastKickoffMs < 8000) {
-        return;
-      }
-
-      lastEvolutionWorkerKickoffAt.set(trackedEvolutionJob.id, nowMs);
-
-      try {
-        await supabase.functions.invoke("process-companion-evolution-job", {
-          body: {
-            jobId: trackedEvolutionJob.id,
-          },
-        });
-      } catch (workerError) {
-        logger.warn("Background evolution worker kick failed; will retry", {
-          jobId: trackedEvolutionJob.id,
-          evolution_phase: "job_polling",
-          rpc_error_code: null,
-          invoke_status: null,
-          invoke_category: "worker_kickoff",
-          fallback_path: "job",
-          job_id: trackedEvolutionJob.id,
-          error: workerError instanceof Error ? workerError.message : String(workerError),
-        });
-      }
-    };
-
-    void maybeInvokeWorker();
-
-    const intervalId = window.setInterval(() => {
-      void maybeInvokeWorker();
-    }, 15000);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(intervalId);
-    };
-  }, [trackedEvolutionJob, user?.id]);
-
-  const evolutionEtaMessage = useMemo(() => {
-    if (!hasActiveEvolutionJob || !trackedEvolutionJob) return null;
-
-    const baselineTimestamp = trackedEvolutionJob.started_at ?? trackedEvolutionJob.requested_at;
-    const baselineMs = Date.parse(baselineTimestamp);
-    const elapsedMs = Number.isFinite(baselineMs) ? Math.max(0, etaNow - baselineMs) : 0;
-
-    if (elapsedMs >= EVOLUTION_ETA_DELAY_MS) {
-      return "Taking longer than usual, can take up to ~2 minutes";
-    }
-
-    return "About 1 minute";
-  }, [etaNow, hasActiveEvolutionJob, trackedEvolutionJob]);
-
-  const stalledEvolutionNotice = useMemo(() => {
-    if (!hasActiveEvolutionJob || !trackedEvolutionJob) return null;
-
-    const baselineTimestamp = trackedEvolutionJob.started_at ?? trackedEvolutionJob.requested_at;
-    const baselineMs = Date.parse(baselineTimestamp);
-    if (!Number.isFinite(baselineMs)) return null;
-
-    const elapsedMs = Math.max(0, etaNow - baselineMs);
-    if (elapsedMs < EVOLUTION_STALLED_NOTICE_DELAY_MS) return null;
-
-    return EVOLUTION_STALLED_NOTICE;
-  }, [etaNow, hasActiveEvolutionJob, trackedEvolutionJob]);
-
-  const publishEvolutionDegradedNotice = useCallback((notice: string | null) => {
-    const safeNotice = typeof notice === "string" && notice.trim().length > 0
-      ? notice.trim()
-      : EVOLUTION_DEGRADED_NOTICE;
-    const nowMs = Date.now();
-
-    setEvolutionServiceNotice((currentNotice) => {
-      const withinCooldown = nowMs - lastEvolutionDegradedNoticeAt.current < EVOLUTION_DEGRADED_COOLDOWN_MS;
-      if (withinCooldown && currentNotice) {
-        return currentNotice;
-      }
-
-      lastEvolutionDegradedNoticeAt.current = nowMs;
-      return safeNotice;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!evolutionServiceNotice) return undefined;
-
-    const elapsedMs = Date.now() - lastEvolutionDegradedNoticeAt.current;
-    const remainingMs = Math.max(0, EVOLUTION_DEGRADED_COOLDOWN_MS - elapsedMs);
-    const timeoutId = window.setTimeout(() => {
-      setEvolutionServiceNotice(null);
-    }, remainingMs);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [evolutionServiceNotice]);
-
-  const clearEvolutionReadyIndicator = useCallback(() => {
-    setEvolutionReady(false);
-  }, [setEvolutionReady]);
 
   const createCompanion = useMutation({
     mutationFn: async (data: {
@@ -1163,7 +671,7 @@ export const useCompanion = () => {
   };
 
   const evolveCompanion = useMutation<EvolutionMutationResult, Error, { newStage: number; currentXP: number }>({
-    mutationFn: async ({ newStage, currentXP: _currentXP }: { newStage: number; currentXP: number }) => {
+    mutationFn: async ({ newStage: _newStage, currentXP: _currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
       if (evolutionInProgress.current) {
         logger.log("Evolution already in progress, rejecting duplicate request");
@@ -1185,183 +693,9 @@ export const useCompanion = () => {
           throw new Error("No companion found");
         }
 
-        const attemptContext: EvolutionAttemptContext = {
-          attempt_id: createEvolutionAttemptId(),
-          user_id: user.id,
-          target_stage: newStage,
-          evolution_phase: "rpc_request",
-          fallback_path: "none",
-          error_class: null,
-          error_category: null,
-          error_status: null,
-          error_code: null,
-          rpc_error_code: null,
-          invoke_status: null,
-          invoke_category: null,
-          job_id: null,
-        };
-
-        const updateAttemptContext = (updates: Partial<EvolutionAttemptContext>) => {
-          Object.assign(attemptContext, updates);
-        };
-
-        const currentAttemptContext = () => ({ ...attemptContext });
-
-        if (trackedEvolutionJob && (trackedEvolutionJob.status === "queued" || trackedEvolutionJob.status === "processing")) {
-          updateAttemptContext({
-            evolution_phase: "job_polling",
-            fallback_path: "job",
-            job_id: trackedEvolutionJob.id,
-          });
-          writeStoredActiveEvolutionJobId(user.id, trackedEvolutionJob.id);
-          setEvolutionReady(false);
-          setIsEvolvingLoading(true);
-          return { path: "job", jobId: trackedEvolutionJob.id } satisfies EvolutionMutationResult;
-        }
-
         setIsEvolvingLoading(true);
 
         try {
-          let requestFailure: EvolutionResolvedFailure | null = null;
-          let resolvedJob: RequestCompanionEvolutionJobResult | null = null;
-
-          for (let attempt = 1; attempt <= EVOLUTION_RPC_MAX_ATTEMPTS; attempt += 1) {
-            const { data, error: requestError } = await (supabase.rpc as unknown as (
-              name: string,
-            ) => Promise<{ data: RequestCompanionEvolutionJobResult[] | RequestCompanionEvolutionJobResult | null; error: EvolutionRequestRpcError | null }>)(
-              "request_companion_evolution_job",
-            );
-
-            if (!requestError) {
-              const requestResult = extractRequestedEvolutionJob(data);
-              resolvedJob = requestResult;
-
-              if (!resolvedJob) {
-                logger.warn("Evolution request returned unexpected payload; attempting active-job recovery", {
-                  ...currentAttemptContext(),
-                  payloadType: Array.isArray(data) ? "array" : typeof data,
-                  hasPayload: Boolean(data),
-                });
-
-                const fallbackActiveJob = await fetchTrackedEvolutionJob(user.id);
-                if (fallbackActiveJob && (fallbackActiveJob.status === "queued" || fallbackActiveJob.status === "processing")) {
-                  resolvedJob = {
-                    job_id: fallbackActiveJob.id,
-                    status: fallbackActiveJob.status,
-                    requested_stage: fallbackActiveJob.requested_stage,
-                  };
-                }
-              }
-
-              break;
-            }
-
-            const resolvedFailure = resolveEvolutionRequestError(requestError);
-            requestFailure = resolvedFailure;
-
-            updateAttemptContext({
-              error_class: resolvedFailure.failureClass,
-              error_category: "rpc",
-              error_code: resolvedFailure.code ?? normalizeEvolutionErrorCode(requestError.code),
-              rpc_error_code: normalizeEvolutionErrorCode(requestError.code),
-            });
-
-            const shouldRetryRpc =
-              resolvedFailure.failureClass === "retryable_infrastructure"
-              && attempt < EVOLUTION_RPC_MAX_ATTEMPTS;
-
-            logger.warn("Evolution job request RPC returned error; attempting fallback", {
-              ...currentAttemptContext(),
-              attempt,
-              max_attempts: EVOLUTION_RPC_MAX_ATTEMPTS,
-              retrying: shouldRetryRpc,
-              code: requestError.code ?? null,
-              message: requestError.message ?? null,
-              details: requestError.details ?? null,
-              hint: requestError.hint ?? null,
-              fallbackAllowed: resolvedFailure.allowDirectFallback,
-              fallbackReason: resolvedFailure.message,
-            });
-
-            if (resolvedFailure.failureClass === "terminal" || !resolvedFailure.allowDirectFallback) {
-              throw new Error(resolvedFailure.message);
-            }
-
-            if (shouldRetryRpc) {
-              await waitForEvolutionRetry(getEvolutionRetryDelayMs(attempt));
-              continue;
-            }
-
-            break;
-          }
-
-          if (resolvedJob?.job_id) {
-            const createdJob: CompanionEvolutionJob = {
-              id: resolvedJob.job_id,
-              status: resolvedJob.status,
-              requested_stage: resolvedJob.requested_stage,
-              requested_at: new Date().toISOString(),
-              started_at: null,
-              next_retry_at: null,
-              error_code: null,
-              error_message: null,
-            };
-
-            updateAttemptContext({
-              evolution_phase: "job_polling",
-              fallback_path: "job",
-              job_id: createdJob.id,
-              error_class: null,
-              error_category: null,
-              error_status: null,
-              error_code: null,
-            });
-
-            writeStoredActiveEvolutionJobId(user.id, createdJob.id);
-            setEvolutionReady(false);
-            queryClient.setQueryData(getEvolutionJobQueryKey(user.id), createdJob);
-
-            try {
-              await retryWithBackoff(
-                async () => {
-                  const { error: processError } = await supabase.functions.invoke("process-companion-evolution-job", {
-                    body: {
-                      jobId: createdJob.id,
-                    },
-                  });
-
-                  if (processError) throw processError;
-                },
-                {
-                  maxAttempts: 2,
-                  initialDelay: 500,
-                  maxDelay: 1500,
-                  shouldRetry: isRetriableFunctionInvokeError,
-                },
-              );
-            } catch (workerInvokeError) {
-              logger.warn("Async evolution worker invoke failed; polling will continue", {
-                ...currentAttemptContext(),
-                evolution_phase: "job_polling",
-                fallback_path: "job",
-                job_id: createdJob.id,
-                error: workerInvokeError instanceof Error ? workerInvokeError.message : String(workerInvokeError),
-              });
-            }
-
-            return { path: "job", jobId: createdJob.id };
-          }
-
-          updateAttemptContext({
-            evolution_phase: "direct_fallback",
-            fallback_path: "direct",
-          });
-
-          logger.warn("Evolution job request unavailable; attempting direct evolution fallback", {
-            ...currentAttemptContext(),
-            reason: requestFailure?.reason ?? "no_job_id",
-          });
-
           for (let attempt = 1; attempt <= EVOLUTION_DIRECT_MAX_ATTEMPTS; attempt += 1) {
             const { data: directEvolutionData, error: directEvolutionError } = await supabase.functions.invoke(
               "generate-companion-evolution",
@@ -1374,47 +708,16 @@ export const useCompanion = () => {
                 invokeFailure.failureClass === "retryable_infrastructure"
                 && attempt < EVOLUTION_DIRECT_MAX_ATTEMPTS;
 
-              updateAttemptContext({
-                error_class: invokeFailure.failureClass,
-                error_category: "invoke",
-                error_status: invokeFailure.invokeStatus,
-                error_code: invokeFailure.code,
-                invoke_status: invokeFailure.invokeStatus,
-                invoke_category: invokeFailure.invokeCategory,
-              });
-
-              logger.warn("Direct evolution fallback invoke failed", {
-                ...currentAttemptContext(),
-                attempt,
-                max_attempts: EVOLUTION_DIRECT_MAX_ATTEMPTS,
-                retrying: shouldRetryInvoke,
-                reason: invokeFailure.reason,
-              });
-
-              if (invokeFailure.failureClass === "terminal") {
-                throw new Error(invokeFailure.message);
-              }
-
               if (shouldRetryInvoke) {
+                logger.warn("Direct evolution invoke failed; retrying", {
+                  attempt,
+                  max_attempts: EVOLUTION_DIRECT_MAX_ATTEMPTS,
+                  reason: invokeFailure.reason,
+                  status: invokeFailure.invokeStatus,
+                  category: invokeFailure.invokeCategory,
+                });
                 await waitForEvolutionRetry(getEvolutionRetryDelayMs(attempt));
                 continue;
-              }
-
-              if (invokeFailure.failureClass === "retryable_infrastructure") {
-                updateAttemptContext({
-                  evolution_phase: "complete",
-                  fallback_path: "degraded",
-                });
-                logger.warn("Evolution request moved to degraded mode", {
-                  ...currentAttemptContext(),
-                  retry_after_ms: EVOLUTION_DEGRADED_RETRY_AFTER_MS,
-                  reason: invokeFailure.reason,
-                });
-                return {
-                  path: "degraded",
-                  retryAfterMs: EVOLUTION_DEGRADED_RETRY_AFTER_MS,
-                  reason: EVOLUTION_DEGRADED_NOTICE,
-                };
               }
 
               throw new Error(invokeFailure.message);
@@ -1427,86 +730,26 @@ export const useCompanion = () => {
                 directFailure.failureClass === "retryable_infrastructure"
                 && attempt < EVOLUTION_DIRECT_MAX_ATTEMPTS;
 
-              updateAttemptContext({
-                error_class: directFailure.failureClass,
-                error_category: "direct_payload",
-                error_status: 200,
-                error_code: directFailure.code,
-                invoke_status: 200,
-                invoke_category: "http",
-              });
-
-              logger.warn("Direct evolution fallback returned unsuccessful response", {
-                ...currentAttemptContext(),
-                attempt,
-                max_attempts: EVOLUTION_DIRECT_MAX_ATTEMPTS,
-                retrying: shouldRetryPayload,
-                reason: directFailure.reason,
-              });
-
-              if (directFailure.failureClass === "terminal") {
-                throw new Error(directFailure.message);
-              }
-
               if (shouldRetryPayload) {
+                logger.warn("Direct evolution returned unsuccessful payload; retrying", {
+                  attempt,
+                  max_attempts: EVOLUTION_DIRECT_MAX_ATTEMPTS,
+                  reason: directFailure.reason,
+                  code: directFailure.code,
+                });
                 await waitForEvolutionRetry(getEvolutionRetryDelayMs(attempt));
                 continue;
-              }
-
-              if (directFailure.failureClass === "retryable_infrastructure") {
-                updateAttemptContext({
-                  evolution_phase: "complete",
-                  fallback_path: "degraded",
-                });
-                logger.warn("Evolution request moved to degraded mode", {
-                  ...currentAttemptContext(),
-                  retry_after_ms: EVOLUTION_DEGRADED_RETRY_AFTER_MS,
-                  reason: directFailure.reason,
-                });
-                return {
-                  path: "degraded",
-                  retryAfterMs: EVOLUTION_DEGRADED_RETRY_AFTER_MS,
-                  reason: EVOLUTION_DEGRADED_NOTICE,
-                };
               }
 
               throw new Error(directFailure.message);
             }
 
-            updateAttemptContext({
-              evolution_phase: "complete",
-              fallback_path: "direct",
-              error_class: null,
-              error_category: null,
-              error_status: null,
-              error_code: null,
-              invoke_status: null,
-              invoke_category: null,
-            });
-
-            return {
-              path: "direct",
-              newStage: typeof directResult.new_stage === "number" ? directResult.new_stage : null,
-            };
+            return { newStage: typeof directResult.new_stage === "number" ? directResult.new_stage : null };
           }
 
-          updateAttemptContext({
-            evolution_phase: "complete",
-            fallback_path: "degraded",
-          });
-          logger.warn("Evolution request moved to degraded mode", {
-            ...currentAttemptContext(),
-            retry_after_ms: EVOLUTION_DEGRADED_RETRY_AFTER_MS,
-            reason: "direct_retry_exhausted",
-          });
-          return {
-            path: "degraded",
-            retryAfterMs: EVOLUTION_DEGRADED_RETRY_AFTER_MS,
-            reason: EVOLUTION_DEGRADED_NOTICE,
-          };
+          throw new Error("Evolution service is temporarily unavailable. Please try again in a minute.");
         } catch (error) {
           logger.error("Evolution mutation failed", {
-            ...currentAttemptContext(),
             error: error instanceof Error ? error.message : String(error),
           });
           evolutionInProgress.current = false;
@@ -1526,36 +769,16 @@ export const useCompanion = () => {
     },
     onSuccess: (result) => {
       evolutionInProgress.current = false;
+      setIsEvolvingLoading(false);
 
       if (!result) return;
-
-      if (result.path === "degraded") {
-        setIsEvolvingLoading(false);
-        publishEvolutionDegradedNotice(result.reason);
-        return;
-      }
-
-      setEvolutionServiceNotice(null);
-
-      if (result.path === "direct") {
-        if (user?.id) {
-          clearStoredActiveEvolutionJobId(user.id);
-          queryClient.setQueryData(getEvolutionJobQueryKey(user.id), null);
-        }
-
-        setIsEvolvingLoading(false);
-        queryClient.invalidateQueries({ queryKey: ["companion"] });
-        queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
-        queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
-        queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
-        return;
-      }
-
-      queryClient.invalidateQueries({ queryKey: getEvolutionJobQueryKey(user?.id) });
+      queryClient.invalidateQueries({ queryKey: ["companion"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+      queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
     },
     onError: (error) => {
       evolutionInProgress.current = false;
-      setEvolutionServiceNotice(null);
       setIsEvolvingLoading(false);
       console.error("Evolution failed:", {
         name: error.name,
@@ -1590,13 +813,7 @@ export const useCompanion = () => {
     return shouldEvolve(companion.current_stage, companion.current_xp);
   }, [companion, shouldEvolve]);
 
-  const isEvolutionBusy = evolveCompanion.isPending || hasActiveEvolutionJob;
-  const effectiveEvolutionServiceNotice = evolutionServiceNotice ?? stalledEvolutionNotice;
-  const evolutionServiceState: EvolutionServiceState = useMemo(() => {
-    if (effectiveEvolutionServiceNotice) return "degraded";
-    if (isEvolutionBusy) return "processing";
-    return "ready";
-  }, [effectiveEvolutionServiceNotice, isEvolutionBusy]);
+  const isEvolutionBusy = evolveCompanion.isPending;
 
   // Manual evolution trigger function
   const triggerManualEvolution = useCallback(() => {
@@ -1627,13 +844,6 @@ export const useCompanion = () => {
     isEvolvingLoading,
     canEvolve,
     isEvolutionBusy,
-    evolutionServiceState,
-    evolutionServiceNotice: effectiveEvolutionServiceNotice,
-    evolutionEtaMessage,
-    hasActiveEvolutionJob,
-    trackedEvolutionJob,
-    hasEvolutionReady,
-    clearEvolutionReadyIndicator,
     triggerManualEvolution,
   };
 };

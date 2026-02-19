@@ -18,19 +18,10 @@ describe("EvolveButton", () => {
     mocks.isEvolvingLoading = false;
   });
 
-  it("renders degraded notice while keeping the evolve CTA actionable", () => {
+  it("calls onEvolve when the button is actionable", () => {
     const onEvolve = vi.fn();
 
-    render(
-      <EvolveButton
-        onEvolve={onEvolve}
-        isEvolving={false}
-        serviceState="degraded"
-        serviceNotice="Evolution is busy right now. Try again in about a minute."
-      />,
-    );
-
-    expect(screen.getByText(/Evolution is busy right now/i)).toBeInTheDocument();
+    render(<EvolveButton onEvolve={onEvolve} isEvolving={false} />);
 
     const button = screen.getByRole("button");
     expect(button).not.toBeDisabled();
@@ -39,36 +30,23 @@ describe("EvolveButton", () => {
     expect(onEvolve).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps processing state behavior unchanged", () => {
-    render(
-      <EvolveButton
-        onEvolve={vi.fn()}
-        isEvolving={true}
-        etaMessage="About 90 seconds"
-        serviceState="processing"
-      />,
-    );
+  it("disables the button while evolving", () => {
+    render(<EvolveButton onEvolve={vi.fn()} isEvolving={true} />);
 
     const button = screen.getByRole("button");
     expect(button).toBeDisabled();
-    expect(screen.getByText("About 90 seconds")).toBeInTheDocument();
-    expect(screen.getByText(/You can leave this screen/i)).toBeInTheDocument();
+    expect(screen.getByText("EVOLVING...")).toBeInTheDocument();
   });
 
-  it("shows stalled degraded notice while remaining in processing mode", () => {
-    render(
-      <EvolveButton
-        onEvolve={vi.fn()}
-        isEvolving={true}
-        etaMessage="Taking longer than usual"
-        serviceState="degraded"
-        serviceNotice="Evolution is taking longer than usual. We'll keep trying in the background."
-      />,
-    );
+  it("disables the button when global evolution loading is active", () => {
+    mocks.isEvolvingLoading = true;
+    const onEvolve = vi.fn();
+    render(<EvolveButton onEvolve={onEvolve} isEvolving={false} />);
 
     const button = screen.getByRole("button");
     expect(button).toBeDisabled();
-    expect(screen.getAllByText(/taking longer than usual/i)).toHaveLength(2);
-    expect(screen.getByText(/keep trying in the background/i)).toBeInTheDocument();
+
+    fireEvent.click(button);
+    expect(onEvolve).not.toHaveBeenCalled();
   });
 });

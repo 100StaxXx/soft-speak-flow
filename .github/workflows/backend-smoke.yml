@@ -15,7 +15,6 @@ jobs:
     env:
       PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      INTERNAL_FUNCTION_SECRET: ${{ secrets.INTERNAL_FUNCTION_SECRET }}
 
     steps:
       - name: Basic auth health check
@@ -71,45 +70,5 @@ jobs:
           cat /tmp/scheduled.json || true
 
           if [ "$status" -ge 300 ]; then
-            exit 1
-          fi
-
-      - name: Verify evolution job worker internal endpoint health
-        run: |
-          set -euo pipefail
-
-          if [ -z "${INTERNAL_FUNCTION_SECRET:-}" ]; then
-            echo "Missing INTERNAL_FUNCTION_SECRET for backend smoke checks" >&2
-            exit 1
-          fi
-
-          status=$(curl -sS -o /tmp/evolution-worker.json -w "%{http_code}" \
-            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/process-companion-evolution-job" \
-            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-            -H "apikey: ${SERVICE_ROLE_KEY}" \
-            -H "x-internal-key: ${INTERNAL_FUNCTION_SECRET}" \
-            -H "Content-Type: application/json" \
-            -d '{}')
-
-          echo "process-companion-evolution-job (internal) => HTTP $status"
-          cat /tmp/evolution-worker.json || true
-
-          if [ "$status" -ge 500 ]; then
-            echo "Evolution worker returned server/config error" >&2
-            exit 1
-          fi
-
-          if [ "$status" = "401" ] || [ "$status" = "403" ]; then
-            echo "Evolution worker rejected internal auth" >&2
-            exit 1
-          fi
-
-          if [ "$status" = "404" ]; then
-            echo "No due evolution job found; endpoint health is acceptable."
-            exit 0
-          fi
-
-          if [ "$status" -ge 300 ]; then
-            echo "Unexpected non-success status from evolution worker" >&2
             exit 1
           fi

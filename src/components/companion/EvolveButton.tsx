@@ -1,25 +1,18 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { useEvolution } from "@/contexts/EvolutionContext";
-import type { EvolutionServiceState } from "@/hooks/useCompanion";
 
 interface EvolveButtonProps {
   onEvolve: () => void;
   isEvolving: boolean;
-  etaMessage?: string | null;
-  serviceState?: EvolutionServiceState;
-  serviceNotice?: string | null;
 }
 
 export const EvolveButton = memo(({
   onEvolve,
   isEvolving,
-  etaMessage,
-  serviceState = "ready",
-  serviceNotice = null,
 }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
-  const isProcessing = isEvolving || isEvolvingLoading || serviceState === "processing";
+  const isProcessing = isEvolving || isEvolvingLoading;
 
   const handleClick = () => {
     if (!isProcessing) {
@@ -138,19 +131,6 @@ export const EvolveButton = memo(({
           )}
         </div>
       </button>
-      {isProcessing && (
-        <div className="mt-2 space-y-1 text-center">
-          <p className="text-sm text-muted-foreground">{etaMessage ?? "About 1 minute"}</p>
-          <p className="text-xs text-muted-foreground/80">
-            You can leave this screen and come back when it is ready.
-          </p>
-        </div>
-      )}
-      {serviceState === "degraded" && (
-        <p className="mt-2 text-center text-sm text-amber-300/90">
-          {serviceNotice ?? "Evolution is busy right now. Try again in about a minute."}
-        </p>
-      )}
     </motion.div>
   );
 });

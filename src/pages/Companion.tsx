@@ -138,7 +138,6 @@ const Companion = () => {
     isLoading,
     error,
     refetch,
-    clearEvolutionReadyIndicator,
   } = useCompanion();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -193,10 +192,6 @@ const Companion = () => {
   const handlePostcardsTriggerPrefetch = useCallback(() => {
     void prefetchPostcards();
   }, [prefetchPostcards]);
-
-  useEffect(() => {
-    clearEvolutionReadyIndicator();
-  }, [clearEvolutionReadyIndicator]);
 
   const handleTabChange = useCallback(
     (value: string) => {

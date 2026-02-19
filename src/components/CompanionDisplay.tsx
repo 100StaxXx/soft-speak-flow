@@ -99,10 +99,6 @@ export const CompanionDisplay = memo(() => {
     canEvolve,
     triggerManualEvolution,
     isEvolutionBusy,
-    evolutionServiceState,
-    evolutionServiceNotice,
-    evolutionEtaMessage,
-    hasActiveEvolutionJob,
   } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
@@ -561,13 +557,10 @@ export const CompanionDisplay = memo(() => {
 
           {/* Evolve Button - shows when ready */}
           <AnimatePresence>
-            {(canEvolve || hasActiveEvolutionJob) && (
-              <EvolveButton 
+            {canEvolve && (
+              <EvolveButton
                 onEvolve={triggerManualEvolution}
                 isEvolving={isEvolutionBusy}
-                etaMessage={evolutionEtaMessage}
-                serviceState={evolutionServiceState}
-                serviceNotice={evolutionServiceNotice}
               />
             )}
           </AnimatePresence>

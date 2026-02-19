@@ -38,7 +38,6 @@ jobs:
             SUPABASE_URL
             SUPABASE_ANON_KEY
             SUPABASE_SERVICE_ROLE_KEY
-            INTERNAL_FUNCTION_SECRET
             OPENAI_API_KEY
             ELEVENLABS_API_KEY
           )
