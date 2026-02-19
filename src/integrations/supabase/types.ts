@@ -1219,85 +1219,6 @@ export type Database = {
           },
         ]
       }
-      companion_evolution_jobs: {
-        Row: {
-          companion_id: string
-          completed_at: string | null
-          created_at: string
-          error_code: string | null
-          error_message: string | null
-          id: string
-          next_retry_at: string | null
-          requested_at: string
-          requested_stage: number
-          result_evolution_id: string | null
-          result_image_url: string | null
-          retry_count: number
-          started_at: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          companion_id: string
-          completed_at?: string | null
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          id?: string
-          next_retry_at?: string | null
-          requested_at?: string
-          requested_stage: number
-          result_evolution_id?: string | null
-          result_image_url?: string | null
-          retry_count?: number
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          companion_id?: string
-          completed_at?: string | null
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          id?: string
-          next_retry_at?: string | null
-          requested_at?: string
-          requested_stage?: number
-          result_evolution_id?: string | null
-          result_image_url?: string | null
-          retry_count?: number
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "companion_evolution_jobs_companion_id_fkey"
-            columns: ["companion_id"]
-            isOneToOne: false
-            referencedRelation: "user_companion"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "companion_evolution_jobs_result_evolution_id_fkey"
-            columns: ["result_evolution_id"]
-            isOneToOne: false
-            referencedRelation: "companion_evolutions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "companion_evolution_jobs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       companion_memorials: {
         Row: {
           companion_name: string
@@ -3053,33 +2974,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      calendar_user_settings: {
-        Row: {
-          created_at: string
-          default_provider: string | null
-          integration_visible: boolean
-          nudge_dismissed_at: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          default_provider?: string | null
-          integration_visible?: boolean
-          nudge_dismissed_at?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          default_provider?: string | null
-          integration_visible?: boolean
-          nudge_dismissed_at?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       favorites: {
         Row: {
@@ -6549,13 +6443,9 @@ export type Database = {
           created_at: string | null
           id: string
           last_synced_at: string | null
-          platform: string
-          primary_calendar_id: string | null
-          primary_calendar_name: string | null
           provider: string
           refresh_token: string | null
           sync_enabled: boolean | null
-          sync_mode: string
           sync_token: string | null
           token_expires_at: string | null
           updated_at: string | null
@@ -6568,13 +6458,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_synced_at?: string | null
-          platform?: string
-          primary_calendar_id?: string | null
-          primary_calendar_name?: string | null
           provider: string
           refresh_token?: string | null
           sync_enabled?: boolean | null
-          sync_mode?: string
           sync_token?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
@@ -6587,82 +6473,15 @@ export type Database = {
           created_at?: string | null
           id?: string
           last_synced_at?: string | null
-          platform?: string
-          primary_calendar_id?: string | null
-          primary_calendar_name?: string | null
           provider?: string
           refresh_token?: string | null
           sync_enabled?: boolean | null
-          sync_mode?: string
           sync_token?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
         Relationships: []
-      }
-      quest_calendar_links: {
-        Row: {
-          connection_id: string
-          created_at: string
-          external_calendar_id: string | null
-          external_event_id: string
-          id: string
-          last_app_sync_at: string | null
-          last_conflict_at: string | null
-          last_provider_sync_at: string | null
-          provider: string
-          sync_mode: string
-          task_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          connection_id: string
-          created_at?: string
-          external_calendar_id?: string | null
-          external_event_id: string
-          id?: string
-          last_app_sync_at?: string | null
-          last_conflict_at?: string | null
-          last_provider_sync_at?: string | null
-          provider: string
-          sync_mode?: string
-          task_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          connection_id?: string
-          created_at?: string
-          external_calendar_id?: string | null
-          external_event_id?: string
-          id?: string
-          last_app_sync_at?: string | null
-          last_conflict_at?: string | null
-          last_provider_sync_at?: string | null
-          provider?: string
-          sync_mode?: string
-          task_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quest_calendar_links_connection_id_fkey"
-            columns: ["connection_id"]
-            isOneToOne: false
-            referencedRelation: "user_calendar_connections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "quest_calendar_links_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "daily_tasks"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       user_challenges: {
         Row: {
@@ -7623,7 +7442,6 @@ export type Database = {
           event_metadata: Json | null
           event_type: string
           id: string
-          idempotency_key: string | null
           user_id: string
           xp_earned: number
         }
@@ -7633,7 +7451,6 @@ export type Database = {
           event_metadata?: Json | null
           event_type: string
           id?: string
-          idempotency_key?: string | null
           user_id: string
           xp_earned: number
         }
@@ -7643,7 +7460,6 @@ export type Database = {
           event_metadata?: Json | null
           event_type?: string
           id?: string
-          idempotency_key?: string | null
           user_id?: string
           xp_earned?: number
         }
@@ -7749,22 +7565,6 @@ export type Database = {
       }
     }
     Functions: {
-      award_xp_v2: {
-        Args: {
-          p_event_metadata?: Json
-          p_event_type: string
-          p_idempotency_key?: string
-          p_xp_amount: number
-        }
-        Returns: {
-          cap_applied: boolean
-          next_threshold: number | null
-          should_evolve: boolean
-          xp_after: number
-          xp_awarded: number
-          xp_before: number
-        }[]
-      }
       apply_referral_code_secure: {
         Args: { p_referral_code: string; p_user_id: string }
         Returns: {
@@ -7866,14 +7666,6 @@ export type Database = {
       }
       is_service_role: { Args: never; Returns: boolean }
       join_community_by_id: { Args: { p_community_id: string }; Returns: Json }
-      request_companion_evolution_job: {
-        Args: Record<string, never>
-        Returns: {
-          job_id: string
-          requested_stage: number
-          status: string
-        }[]
-      }
       should_evolve: {
         Args: { current_stage: number; current_xp: number }
         Returns: boolean
