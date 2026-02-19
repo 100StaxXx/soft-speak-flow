@@ -177,6 +177,7 @@ describe("useCompanion evolveCompanion", () => {
     mocks.userCompanionResponses.push({ data: companionFixture, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => createQueryBuilder(table));
+    mocks.rpcMock.mockResolvedValue({ data: null, error: null });
     mocks.invokeMock.mockResolvedValue({ data: null, error: null });
   });
 
@@ -322,5 +323,38 @@ describe("useCompanion evolveCompanion", () => {
     });
 
     expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a clear error when award_xp_v2 is unavailable", async () => {
+    mocks.rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        code: "42883",
+        message: 'function public.award_xp_v2(text, integer, jsonb, text) does not exist',
+        details: null,
+        hint: null,
+      },
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await expect(
+        result.current.awardXP.mutateAsync({
+          eventType: "focus_session",
+          xpAmount: 5,
+        }),
+      ).rejects.toThrow("XP service is temporarily unavailable. Please try again shortly.");
+    });
+
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith("XP service is temporarily unavailable. Please try again shortly.");
+    expect(mocks.loggerErrorMock).toHaveBeenCalledWith(
+      "award_xp_v2 unavailable during XP award",
+      expect.objectContaining({
+        userId: "user-1",
+        eventType: "focus_session",
+        error_code: "42883",
+      }),
+    );
   });
 });

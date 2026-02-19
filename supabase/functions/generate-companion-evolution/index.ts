@@ -822,7 +822,11 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
-      throw new Error("Failed to upload image");
+      const uploadMessage =
+        typeof uploadError.message === "string" && uploadError.message.trim().length > 0
+          ? uploadError.message
+          : "unknown_storage_error";
+      throw new Error(`Failed to upload image: ${uploadMessage}`);
     }
 
     const { data: urlData } = supabase.storage

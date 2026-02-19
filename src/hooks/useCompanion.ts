@@ -84,6 +84,24 @@ interface EvolutionResolvedFailure {
   code: string | null;
 }
 
+type AwardXpResult = {
+  should_evolve: boolean;
+  xp_before: number;
+  xp_after: number;
+  xp_awarded: number;
+  cap_applied: boolean;
+  next_threshold: number | null;
+};
+
+type SupabaseRpcError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+const AWARD_XP_UNAVAILABLE_MESSAGE = "XP service is temporarily unavailable. Please try again shortly.";
+
 const normalizeEvolutionErrorCode = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const normalized = value
@@ -91,6 +109,29 @@ const normalizeEvolutionErrorCode = (value: string | null | undefined): string |
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   return normalized.length > 0 ? normalized : null;
+};
+
+const isAwardXpFunctionMissingError = (error: SupabaseRpcError | null | undefined) => {
+  if (!error) return false;
+
+  const normalizedCode = normalizeEvolutionErrorCode(error.code);
+  if (normalizedCode === "42883") return true;
+
+  const normalizedSource = [error.message, error.details, error.hint]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    normalizedSource.includes("award_xp_v2")
+    && (
+      normalizedSource.includes("could not find function")
+      || normalizedSource.includes("does not exist")
+      || normalizedSource.includes("schema cache")
+      || normalizedSource.includes("undefined function")
+      || normalizedSource.includes("function not found")
+    )
+  );
 };
 
 const resolveKnownTerminalEvolutionFailure = (
@@ -603,7 +644,11 @@ export const useCompanion = () => {
     },
     onError: (error) => {
       console.error('XP award failed:', error);
-      toast.error("Failed to award XP. Please try again.");
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to award XP. Please try again.";
+      toast.error(message);
     },
   });
 
@@ -636,9 +681,23 @@ export const useCompanion = () => {
       p_idempotency_key: requestIdempotencyKey,
     });
 
-    if (error) throw error;
+    if (error) {
+      if (isAwardXpFunctionMissingError(error)) {
+        logger.error("award_xp_v2 unavailable during XP award", {
+          userId: currentUser.id,
+          eventType,
+          idempotencyKey: requestIdempotencyKey,
+          error_code: error.code ?? null,
+          error_message: error.message ?? null,
+          error_details: error.details ?? null,
+          error_hint: error.hint ?? null,
+        });
+        throw new Error(AWARD_XP_UNAVAILABLE_MESSAGE);
+      }
+      throw error;
+    }
 
-    const awardResult = Array.isArray(data) ? data[0] : data;
+    const awardResult = (Array.isArray(data) ? data[0] : data) as AwardXpResult | null;
     if (!awardResult) {
       throw new Error("XP award returned no data");
     }
