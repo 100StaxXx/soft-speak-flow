@@ -18,6 +18,7 @@ import {
 const DROP_BOUNCE_MS = 300;
 const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
 const DEFAULT_ACTIVATION_THRESHOLD_PX = 8;
+const POINTER_NUDGE_RELEASE_DEADZONE_PX = 2;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -63,6 +64,13 @@ interface PendingDragCandidate {
   taskId: string;
   scheduledTime: string;
   startY: number;
+}
+
+type MoveSource = "pointer" | "scroll";
+
+interface HandleMoveOptions {
+  skipAutoscrollUpdate?: boolean;
+  source?: MoveSource;
 }
 
 const getViewportHeight = () => {
@@ -122,6 +130,8 @@ export function useTimelineDrag({
   const draggingTaskIdRef = useRef<string | null>(null);
   const originalTimeRef = useRef<string>("09:00");
   const originalMinutesRef = useRef(540);
+  const pointerMinutesRef = useRef(540);
+  const nudgeOffsetMinutesRef = useRef(0);
   const currentRawMinutesRef = useRef(540);
   const lastPreviewMinuteRef = useRef(540);
   const dragStartYRef = useRef(0);
@@ -181,12 +191,42 @@ export function useTimelineDrag({
     runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight());
   }, [resolvedSnapConfig]);
 
+  const applyComposedDragMinute = useCallback(
+    (pointerMinute: number, nudgeOffsetMinutes: number) => {
+      const safePointerMinute = clampMinuteToRange(pointerMinute, resolvedSnapConfig);
+      const composedMinute = clampMinuteToRange(safePointerMinute + nudgeOffsetMinutes, resolvedSnapConfig);
+      const resolvedNudgeOffsetMinutes = composedMinute - safePointerMinute;
+
+      pointerMinutesRef.current = safePointerMinute;
+      nudgeOffsetMinutesRef.current = resolvedNudgeOffsetMinutes;
+      currentRawMinutesRef.current = composedMinute;
+
+      const edgeDeltaY = (safePointerMinute - originalMinutesRef.current) * runtimeScaleRef.current.coarsePixelsPerMinute;
+      const visualDeltaY = (composedMinute - originalMinutesRef.current) * runtimeScaleRef.current.coarsePixelsPerMinute;
+
+      dragEdgeOffsetY.set(edgeDeltaY);
+      dragOffsetY.set(visualDeltaY);
+      if (!dragMovedRef.current && Math.abs(visualDeltaY) > 0.5) {
+        dragMovedRef.current = true;
+      }
+
+      const previewMinute = snapMinuteByMode(composedMinute, "fine", resolvedSnapConfig);
+      if (previewMinute !== lastPreviewMinuteRef.current) {
+        lastPreviewMinuteRef.current = previewMinute;
+        setPreviewTime(minuteToTime24(previewMinute, resolvedSnapConfig));
+      }
+    },
+    [dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig],
+  );
+
   const handleMove = useCallback(
-    (clientY: number, options?: { skipAutoscrollUpdate?: boolean }) => {
+    (clientY: number, options?: HandleMoveOptions) => {
       if (!draggingTaskIdRef.current) return;
 
       const safeClientY = Number.isFinite(clientY) ? clientY : dragStartYRef.current;
+      const previousPointerClientY = lastPointerClientYRef.current;
       lastPointerClientYRef.current = safeClientY;
+      const moveSource = options?.source ?? "pointer";
 
       if (!options?.skipAutoscrollUpdate) {
         updateAutoscroll(safeClientY);
@@ -196,23 +236,27 @@ export function useTimelineDrag({
       const effectiveClientY = safeClientY + scrollDelta;
       const deltaY = effectiveClientY - dragStartYRef.current;
       const rawMinute = originalMinutesRef.current + (deltaY / runtimeScaleRef.current.coarsePixelsPerMinute);
-      const clampedRawMinute = clampMinuteToRange(rawMinute, resolvedSnapConfig);
-      const clampedDeltaY = (clampedRawMinute - originalMinutesRef.current) * runtimeScaleRef.current.coarsePixelsPerMinute;
+      const pointerMinute = clampMinuteToRange(rawMinute, resolvedSnapConfig);
 
-      dragOffsetY.set(clampedDeltaY);
-      dragEdgeOffsetY.set(clampedDeltaY);
-      if (!dragMovedRef.current && Math.abs(clampedDeltaY) > 0.5) {
-        dragMovedRef.current = true;
+      let nextNudgeOffsetMinutes = nudgeOffsetMinutesRef.current;
+      if (
+        moveSource === "pointer" &&
+        Math.abs(previousPointerClientY - safeClientY) > POINTER_NUDGE_RELEASE_DEADZONE_PX &&
+        Math.abs(nextNudgeOffsetMinutes) > 0
+      ) {
+        const pointerDirection = Math.sign(safeClientY - previousPointerClientY);
+        const nudgeDirection = Math.sign(nextNudgeOffsetMinutes);
+        if (pointerDirection !== 0 && pointerDirection === -nudgeDirection) {
+          nextNudgeOffsetMinutes -= nudgeDirection * resolvedSnapConfig.fineStepMinutes;
+          if (Math.sign(nextNudgeOffsetMinutes) !== nudgeDirection) {
+            nextNudgeOffsetMinutes = 0;
+          }
+        }
       }
 
-      currentRawMinutesRef.current = clampedRawMinute;
-      const previewMinute = snapMinuteByMode(clampedRawMinute, "fine", resolvedSnapConfig);
-      if (previewMinute !== lastPreviewMinuteRef.current) {
-        lastPreviewMinuteRef.current = previewMinute;
-        setPreviewTime(minuteToTime24(previewMinute, resolvedSnapConfig));
-      }
+      applyComposedDragMinute(pointerMinute, nextNudgeOffsetMinutes);
     },
-    [dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig, updateAutoscroll],
+    [applyComposedDragMinute, resolvedSnapConfig, updateAutoscroll],
   );
 
   const clearQueuedMove = useCallback(() => {
@@ -224,7 +268,7 @@ export function useTimelineDrag({
   }, []);
 
   const flushQueuedMove = useCallback(
-    (options?: { skipAutoscrollUpdate?: boolean }) => {
+    (options?: HandleMoveOptions) => {
       const queuedClientY = queuedMoveClientYRef.current;
       if (queuedMoveFrameRef.current !== null && typeof window !== "undefined") {
         window.cancelAnimationFrame(queuedMoveFrameRef.current);
@@ -232,7 +276,7 @@ export function useTimelineDrag({
       }
       if (queuedClientY === null) return;
       queuedMoveClientYRef.current = null;
-      handleMove(queuedClientY, options);
+      handleMove(queuedClientY, { source: "pointer", ...options });
     },
     [handleMove],
   );
@@ -254,7 +298,7 @@ export function useTimelineDrag({
         const nextClientY = queuedMoveClientYRef.current;
         if (nextClientY === null) return;
         queuedMoveClientYRef.current = null;
-        handleMove(nextClientY);
+        handleMove(nextClientY, { source: "pointer" });
       });
     },
     [flushQueuedMove, handleMove],
@@ -267,7 +311,7 @@ export function useTimelineDrag({
 
     const scrollListener = () => {
       if (!draggingTaskIdRef.current) return;
-      handleMove(lastPointerClientYRef.current, { skipAutoscrollUpdate: true });
+      handleMove(lastPointerClientYRef.current, { skipAutoscrollUpdate: true, source: "scroll" });
     };
 
     windowListenersRef.current.scroll = scrollListener;
@@ -291,6 +335,8 @@ export function useTimelineDrag({
       draggingTaskIdRef.current = pendingDrag.taskId;
       originalTimeRef.current = normalizedStartTime;
       originalMinutesRef.current = startMinute;
+      pointerMinutesRef.current = startMinute;
+      nudgeOffsetMinutesRef.current = 0;
       currentRawMinutesRef.current = startMinute;
       lastPreviewMinuteRef.current = startMinute;
       dragStartYRef.current = safeStartY;
@@ -363,6 +409,8 @@ export function useTimelineDrag({
     scrollContextRef.current = { kind: "window" };
     dragStartScrollOffsetRef.current = 0;
     lastPointerClientYRef.current = 0;
+    pointerMinutesRef.current = originalMinutesRef.current;
+    nudgeOffsetMinutesRef.current = 0;
     dragMovedRef.current = false;
     resetSnapState();
   }, [
@@ -391,6 +439,7 @@ export function useTimelineDrag({
         startY: safeStartY,
       };
       lastPointerClientYRef.current = safeStartY;
+      nudgeOffsetMinutesRef.current = 0;
       dragMovedRef.current = false;
 
       const pointerMove = (e: PointerEvent) => {
@@ -404,6 +453,8 @@ export function useTimelineDrag({
           return;
         }
         pendingDragRef.current = null;
+        pointerMinutesRef.current = originalMinutesRef.current;
+        nudgeOffsetMinutesRef.current = 0;
         clearQueuedMove();
         removeWindowListeners();
       };
@@ -421,6 +472,8 @@ export function useTimelineDrag({
           return;
         }
         pendingDragRef.current = null;
+        pointerMinutesRef.current = originalMinutesRef.current;
+        nudgeOffsetMinutesRef.current = 0;
         clearQueuedMove();
         removeWindowListeners();
       };
@@ -496,26 +549,19 @@ export function useTimelineDrag({
       flushQueuedMove({ skipAutoscrollUpdate: true });
       if (!draggingTaskIdRef.current) return false;
 
-      const currentPreviewMinute = lastPreviewMinuteRef.current;
-      const nextPreviewMinute = clampMinuteToRange(
-        currentPreviewMinute + (direction * resolvedSnapConfig.fineStepMinutes),
-        resolvedSnapConfig,
-      );
-      if (nextPreviewMinute === currentPreviewMinute) {
+      const previousComposedMinute = currentRawMinutesRef.current;
+      const pointerMinute = pointerMinutesRef.current;
+      const nextNudgeOffsetMinutes =
+        nudgeOffsetMinutesRef.current + (direction * resolvedSnapConfig.fineStepMinutes);
+      applyComposedDragMinute(pointerMinute, nextNudgeOffsetMinutes);
+      if (currentRawMinutesRef.current === previousComposedMinute) {
         return false;
       }
 
-      lastPreviewMinuteRef.current = nextPreviewMinute;
-      currentRawMinutesRef.current = nextPreviewMinute;
-      setPreviewTime(minuteToTime24(nextPreviewMinute, resolvedSnapConfig));
-
-      const deltaMinutes = nextPreviewMinute - originalMinutesRef.current;
-      const deltaY = deltaMinutes * runtimeScaleRef.current.coarsePixelsPerMinute;
-      dragOffsetY.set(deltaY);
       dragMovedRef.current = true;
       return true;
     },
-    [dragOffsetY, flushQueuedMove, resolvedSnapConfig],
+    [applyComposedDragMinute, flushQueuedMove, resolvedSnapConfig],
   );
 
   const getDragHandleProps = useCallback(
@@ -550,6 +596,8 @@ export function useTimelineDrag({
       clearDropResetTimer();
       clearQueuedMove();
       pendingDragRef.current = null;
+      pointerMinutesRef.current = originalMinutesRef.current;
+      nudgeOffsetMinutesRef.current = 0;
       stopScroll();
     };
   }, [clearDropResetTimer, clearQueuedMove, removeWindowListeners, stopScroll]);

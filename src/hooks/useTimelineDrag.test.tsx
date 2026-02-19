@@ -536,6 +536,39 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-nudge-forward", "09:05");
   });
 
+  it("keeps nudged preview time when pointermove repeats at the same clientY", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-nudge-stable", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(130);
+    });
+    expect(result.current.previewTime).toBe("09:30");
+
+    act(() => {
+      result.current.nudgeByFineStep(1);
+    });
+    expect(result.current.previewTime).toBe("09:35");
+
+    act(() => {
+      dispatchPointerMove(130);
+    });
+    expect(result.current.previewTime).toBe("09:35");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+    expect(onDrop).toHaveBeenCalledWith("task-nudge-stable", "09:35");
+  });
+
   it("nudges preview and drop time backward by one fine step while dragging", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
@@ -566,6 +599,36 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-nudge-backward", "08:55");
+  });
+
+  it("blends nudged preview back toward pointer time on opposite-direction pointer movement", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-nudge-blend", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(130);
+      result.current.nudgeByFineStep(1);
+      result.current.nudgeByFineStep(1);
+    });
+    expect(result.current.previewTime).toBe("09:40");
+
+    act(() => {
+      dispatchPointerMove(120);
+    });
+    expect(result.current.previewTime).toBe("09:25");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+    expect(onDrop).toHaveBeenCalledWith("task-nudge-blend", "09:25");
   });
 
   it("returns false when nudging beyond either boundary", () => {
