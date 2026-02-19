@@ -110,7 +110,6 @@ const emitTutorialEvent = (eventName: string, detail: Record<string, unknown>) =
 
   if (import.meta.env.DEV) {
     // Keep diagnostics local to development.
-    // eslint-disable-next-line no-console
     console.debug(`[Tutorial] ${eventName}`, detail);
   }
 };
