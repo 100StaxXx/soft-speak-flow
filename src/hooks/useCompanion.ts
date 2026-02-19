@@ -11,7 +11,11 @@ import { SYSTEM_XP_REWARDS } from "@/config/xpRewards";
 import type { CreateCompanionIfNotExistsResult } from "@/types/referral-functions";
 import { logger } from "@/utils/logger";
 import { generateWithValidation } from "@/utils/validateCompanionImage";
-import { isRetriableFunctionInvokeError } from "@/utils/supabaseFunctionErrors";
+import {
+  isRetriableFunctionInvokeError,
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
 import { safeLocalStorage } from "@/utils/storage";
 
 export interface Companion {
@@ -82,6 +86,28 @@ interface RequestCompanionEvolutionJobResult {
   requested_stage: number;
 }
 
+interface EvolutionRequestRpcError {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+}
+
+interface DirectEvolutionResponse {
+  evolved?: boolean;
+  message?: string;
+  error?: string;
+  previous_stage?: number;
+  new_stage?: number;
+  image_url?: string;
+  evolution_id?: string;
+}
+
+type EvolutionMutationResult =
+  | { path: "job"; jobId: string }
+  | { path: "direct"; newStage: number | null }
+  | null;
+
 const isEvolutionJobStatus = (value: unknown): value is EvolutionJobStatus =>
   value === "queued" || value === "processing" || value === "succeeded" || value === "failed";
 
@@ -136,6 +162,85 @@ const extractRequestedEvolutionJob = (
     status: rawStatus,
     requested_stage: parsedStage,
   } satisfies RequestCompanionEvolutionJobResult;
+};
+
+const resolveEvolutionRequestError = (error: EvolutionRequestRpcError | null) => {
+  const message = [
+    error?.message,
+    error?.code,
+    error?.details,
+    error?.hint,
+  ]
+    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .join(" ");
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("not_enough_xp")) {
+    return { message: "Your companion is not ready to evolve yet.", allowDirectFallback: false };
+  }
+  if (normalized.includes("max_stage_reached")) {
+    return { message: "Your companion has already reached the maximum stage.", allowDirectFallback: false };
+  }
+  if (normalized.includes("already_evolved")) {
+    return { message: "Your companion already evolved to this stage.", allowDirectFallback: false };
+  }
+  if (normalized.includes("companion_not_found")) {
+    return { message: "No companion found to evolve.", allowDirectFallback: false };
+  }
+  if (
+    normalized.includes("not_authenticated")
+    || normalized.includes("permission denied")
+    || normalized.includes("jwt")
+    || normalized.includes("unauthorized")
+  ) {
+    return { message: "Your session has expired. Please sign in again and try evolving.", allowDirectFallback: false };
+  }
+  if (normalized.includes("rate limit") || normalized.includes("too many requests") || normalized.includes("429")) {
+    return { message: "Evolution is on cooldown. Please try again in a little while.", allowDirectFallback: false };
+  }
+  if (
+    normalized.includes("request_companion_evolution_job")
+    && (normalized.includes("could not find") || normalized.includes("schema cache"))
+  ) {
+    return { message: "Evolution service is temporarily unavailable. Please try again in a minute.", allowDirectFallback: true };
+  }
+  if (normalized.includes("companion_evolution_jobs") && normalized.includes("does not exist")) {
+    return { message: "Evolution service is temporarily unavailable. Please try again in a minute.", allowDirectFallback: true };
+  }
+  if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("timeout")) {
+    return { message: "Unable to reach evolution service. Check your connection and try again.", allowDirectFallback: false };
+  }
+
+  return {
+    message: message.length > 0 ? evolutionRequestErrorMessage(message) : "Unable to start evolution right now. Please try again.",
+    allowDirectFallback: true,
+  };
+};
+
+const directEvolutionFailureMessage = (data: DirectEvolutionResponse | null) => {
+  const source = [data?.message, data?.error].filter(Boolean).join(" ").toLowerCase();
+  if (source.includes("not enough xp")) return "Your companion is not ready to evolve yet.";
+  if (source.includes("max stage")) return "Your companion has already reached the maximum stage.";
+  if (source.includes("companion not found")) return "No companion found to evolve.";
+  if (source.includes("rate limit")) return "Evolution is on cooldown. Please try again in a little while.";
+  return "Unable to start evolution right now. Please try again.";
+};
+
+const directEvolutionInvokeErrorMessage = async (invokeError: unknown) => {
+  const parsed = await parseFunctionInvokeError(invokeError);
+  const backend = `${parsed.backendMessage ?? ""} ${parsed.responsePayload?.code ?? ""}`.toLowerCase();
+
+  if (backend.includes("not enough xp")) return "Your companion is not ready to evolve yet.";
+  if (backend.includes("max stage")) return "Your companion has already reached the maximum stage.";
+  if (backend.includes("companion not found")) return "No companion found to evolve.";
+  if (parsed.category === "auth") return "Your session has expired. Please sign in again and try evolving.";
+  if (parsed.category === "rate_limit") return "Evolution is on cooldown. Please try again in a little while.";
+  if (parsed.category === "network") return "Unable to reach evolution service. Check your connection and try again.";
+  if (parsed.category === "relay" || (typeof parsed.status === "number" && parsed.status >= 500)) {
+    return "Evolution service is temporarily unavailable. Please try again in a minute.";
+  }
+
+  return toUserFacingFunctionError(parsed, { action: "start evolution" });
 };
 
 const ACTIVE_EVOLUTION_JOB_STORAGE_PREFIX = "companion:evolution:active-job";
@@ -780,7 +885,7 @@ export const useCompanion = () => {
     };
   };
 
-  const evolveCompanion = useMutation({
+  const evolveCompanion = useMutation<EvolutionMutationResult, Error, { newStage: number; currentXP: number }>({
     mutationFn: async ({ newStage: _newStage, currentXP: _currentXP }: { newStage: number; currentXP: number }) => {
       // Prevent duplicate evolution requests - wait for any ongoing evolution
       if (evolutionInProgress.current) {
@@ -807,7 +912,7 @@ export const useCompanion = () => {
           writeStoredActiveEvolutionJobId(user.id, trackedEvolutionJob.id);
           setEvolutionReady(false);
           setIsEvolvingLoading(true);
-          return trackedEvolutionJob.id;
+          return { path: "job", jobId: trackedEvolutionJob.id } satisfies EvolutionMutationResult;
         }
 
         setIsEvolvingLoading(true);
@@ -815,17 +920,19 @@ export const useCompanion = () => {
         try {
           const { data, error: requestError } = await (supabase.rpc as unknown as (
             name: string,
-            params?: Record<string, never>,
-          ) => Promise<{ data: RequestCompanionEvolutionJobResult[] | RequestCompanionEvolutionJobResult | null; error: Error | null }>)(
+          ) => Promise<{ data: RequestCompanionEvolutionJobResult[] | RequestCompanionEvolutionJobResult | null; error: EvolutionRequestRpcError | null }>)(
             "request_companion_evolution_job",
-            {},
           );
 
+          let requestFailure: { message: string; allowDirectFallback: boolean } | null = null;
           if (requestError) {
-            throw new Error(evolutionRequestErrorMessage(requestError.message));
+            requestFailure = resolveEvolutionRequestError(requestError);
+            if (!requestFailure.allowDirectFallback) {
+              throw new Error(requestFailure.message);
+            }
           }
 
-          const requestResult = extractRequestedEvolutionJob(data);
+          const requestResult = requestError ? null : extractRequestedEvolutionJob(data);
           let resolvedJob = requestResult;
 
           if (!resolvedJob) {
@@ -844,51 +951,73 @@ export const useCompanion = () => {
             }
           }
 
-          if (!resolvedJob?.job_id) {
-            throw new Error("Unable to start evolution right now. Please try again.");
+          if (resolvedJob?.job_id) {
+            const createdJob: CompanionEvolutionJob = {
+              id: resolvedJob.job_id,
+              status: resolvedJob.status,
+              requested_stage: resolvedJob.requested_stage,
+              requested_at: new Date().toISOString(),
+              started_at: null,
+              next_retry_at: null,
+              error_code: null,
+              error_message: null,
+            };
+
+            writeStoredActiveEvolutionJobId(user.id, createdJob.id);
+            setEvolutionReady(false);
+            queryClient.setQueryData(getEvolutionJobQueryKey(user.id), createdJob);
+
+            try {
+              await retryWithBackoff(
+                async () => {
+                  const { error: processError } = await supabase.functions.invoke("process-companion-evolution-job", {
+                    body: {
+                      jobId: createdJob.id,
+                    },
+                  });
+
+                  if (processError) throw processError;
+                },
+                {
+                  maxAttempts: 2,
+                  initialDelay: 500,
+                  maxDelay: 1500,
+                  shouldRetry: isRetriableFunctionInvokeError,
+                },
+              );
+            } catch (workerInvokeError) {
+              logger.warn("Async evolution worker invoke failed; polling will continue", {
+                jobId: createdJob.id,
+                error: workerInvokeError instanceof Error ? workerInvokeError.message : String(workerInvokeError),
+              });
+            }
+
+            return { path: "job", jobId: createdJob.id };
           }
 
-          const createdJob: CompanionEvolutionJob = {
-            id: resolvedJob.job_id,
-            status: resolvedJob.status,
-            requested_stage: resolvedJob.requested_stage,
-            requested_at: new Date().toISOString(),
-            started_at: null,
-            next_retry_at: null,
-            error_code: null,
-            error_message: null,
+          logger.warn("Evolution job request unavailable; attempting direct evolution fallback", {
+            userId: user.id,
+            reason: requestFailure?.message ?? "no_job_id",
+          });
+
+          const { data: directEvolutionData, error: directEvolutionError } = await supabase.functions.invoke(
+            "generate-companion-evolution",
+            { body: {} },
+          );
+
+          if (directEvolutionError) {
+            throw new Error(await directEvolutionInvokeErrorMessage(directEvolutionError));
+          }
+
+          const directResult = (directEvolutionData ?? null) as DirectEvolutionResponse | null;
+          if (!directResult || directResult.evolved !== true) {
+            throw new Error(directEvolutionFailureMessage(directResult));
+          }
+
+          return {
+            path: "direct",
+            newStage: typeof directResult.new_stage === "number" ? directResult.new_stage : null,
           };
-
-          writeStoredActiveEvolutionJobId(user.id, createdJob.id);
-          setEvolutionReady(false);
-          queryClient.setQueryData(getEvolutionJobQueryKey(user.id), createdJob);
-
-          try {
-            await retryWithBackoff(
-              async () => {
-                const { error: processError } = await supabase.functions.invoke("process-companion-evolution-job", {
-                  body: {
-                    jobId: createdJob.id,
-                  },
-                });
-
-                if (processError) throw processError;
-              },
-              {
-                maxAttempts: 2,
-                initialDelay: 500,
-                maxDelay: 1500,
-                shouldRetry: isRetriableFunctionInvokeError,
-              },
-            );
-          } catch (workerInvokeError) {
-            logger.warn("Async evolution worker invoke failed; polling will continue", {
-              jobId: createdJob.id,
-              error: workerInvokeError instanceof Error ? workerInvokeError.message : String(workerInvokeError),
-            });
-          }
-
-          return createdJob.id;
         } catch (error) {
           evolutionInProgress.current = false;
           setIsEvolvingLoading(false);
@@ -905,8 +1034,25 @@ export const useCompanion = () => {
         evolutionPromise.current = null;
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       evolutionInProgress.current = false;
+
+      if (!result) return;
+
+      if (result.path === "direct") {
+        if (user?.id) {
+          clearStoredActiveEvolutionJobId(user.id);
+          queryClient.setQueryData(getEvolutionJobQueryKey(user.id), null);
+        }
+
+        setIsEvolvingLoading(false);
+        queryClient.invalidateQueries({ queryKey: ["companion"] });
+        queryClient.invalidateQueries({ queryKey: ["companion-stories-all"] });
+        queryClient.invalidateQueries({ queryKey: ["evolution-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["current-evolution-card"] });
+        return;
+      }
+
       queryClient.invalidateQueries({ queryKey: getEvolutionJobQueryKey(user?.id) });
     },
     onError: (error) => {
