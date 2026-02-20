@@ -20,10 +20,10 @@ const mocks = vi.hoisted(() => ({
       version: 2,
       eligible: true,
       completed: false,
-      completedSteps: ["create_quest", "meet_companion"] as const,
+      completedSteps: ["create_quest", "meet_companion"],
       xpAwardedSteps: [] as string[],
-      milestonesCompleted: ["open_mentor_tab"] as const,
-    },
+      milestonesCompleted: ["open_mentor_tab"],
+    } as Record<string, unknown>,
     profileUpdatePayloads: [] as Array<Record<string, unknown>>,
     queryClient: {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
@@ -128,7 +128,6 @@ describe("safeCompletedSteps", () => {
 describe("create quest substep order", () => {
   it("defines deterministic substeps in strict order", () => {
     expect(CREATE_QUEST_SUBSTEP_ORDER).toEqual([
-      "stay_on_quests",
       "open_add_quest",
       "enter_title",
       "select_time",
@@ -138,15 +137,15 @@ describe("create quest substep order", () => {
 });
 
 describe("sanitizeCreateQuestProgress", () => {
-  it("drops invalid substep ids and defaults current to first incomplete", () => {
+  it("drops invalid and legacy substep ids and defaults current to first incomplete", () => {
     const result = sanitizeCreateQuestProgress({
-      current: "invalid",
-      completed: ["stay_on_quests", "invalid", "open_add_quest"],
+      current: "stay_on_quests",
+      completed: ["stay_on_quests", "invalid", "open_add_quest", "quests_campaigns_intro"],
     });
 
     expect(result).toEqual({
       current: "enter_title",
-      completed: ["stay_on_quests", "open_add_quest"],
+      completed: ["open_add_quest"],
       startedAt: undefined,
       completedAt: undefined,
     });
@@ -155,15 +154,18 @@ describe("sanitizeCreateQuestProgress", () => {
 
 describe("getMentorInstructionLines", () => {
   it("returns mentor-led instructions for each step", () => {
+    expect(getMentorInstructionLines("quests_campaigns_intro", null)[0]).toContain(
+      "quests and longer campaigns"
+    );
     expect(getMentorInstructionLines("create_quest", "open_add_quest")[0]).toContain(
       "Tap the + in the bottom right"
     );
     expect(getMentorInstructionLines("create_quest", "enter_title")[0]).toContain(
       "Type your quest title"
     );
-    expect(getMentorInstructionLines("meet_companion", null)[0]).toContain("Open Companion");
     expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Head to Mentor");
     expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve");
+    expect(getMentorInstructionLines("post_evolution_companion_intro", null)[0]).toContain("track growth");
     expect(getMentorInstructionLines("mentor_closeout", null)[0]).toContain("tutorial is complete");
   });
 });
@@ -173,12 +175,12 @@ describe("milestoneUsesStrictLock", () => {
     expect(milestoneUsesStrictLock("submit_morning_checkin")).toBe(false);
   });
 
-  it("does not strict-lock companion progress confirmation", () => {
-    expect(milestoneUsesStrictLock("confirm_companion_progress")).toBe(false);
+  it("does not strict-lock quests explainer", () => {
+    expect(milestoneUsesStrictLock("quests_campaigns_intro")).toBe(false);
   });
 
-  it("does not strict-lock mentor closeout messaging", () => {
-    expect(milestoneUsesStrictLock("mentor_closeout_message")).toBe(false);
+  it("does not strict-lock post-evolution companion explainer", () => {
+    expect(milestoneUsesStrictLock("post_evolution_companion_intro")).toBe(false);
   });
 
   it("keeps strict lock enabled for actionable tutorial targets", () => {
@@ -311,6 +313,15 @@ describe("guided tutorial intro dialogue sequence", () => {
       );
 
   it("shows one intro dialogue milestone before resuming normal tutorial", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: [],
+    };
+
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper("/mentor"),
     });
@@ -329,8 +340,9 @@ describe("guided tutorial intro dialogue sequence", () => {
     await waitFor(() => {
       expect(result.current.isIntroDialogueActive).toBe(false);
       expect(result.current.isActive).toBe(true);
-      expect(result.current.dialogueActionLabel).toBeUndefined();
-      expect(result.current.onDialogueAction).toBeUndefined();
+      expect(result.current.currentStep).toBe("quests_campaigns_intro");
+      expect(result.current.dialogueActionLabel).toBe("Continue");
+      expect(result.current.onDialogueAction).toBeDefined();
     });
   });
 
@@ -385,6 +397,73 @@ describe("guided tutorial intro dialogue sequence", () => {
 
     await waitFor(() => {
       expect(result.current.dialogueText).toContain("I'm Nova");
+    });
+  });
+
+  it("migrates legacy meet_companion progress without blocking", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["create_quest", "meet_companion"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["open_mentor_tab"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("morning_checkin");
+      expect(result.current.stepRoute).toBe("/mentor");
+    });
+  });
+
+  it("marks quests intro complete when legacy create quest substeps already exist", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["enter_title"],
+      substeps: {
+        create_quest: {
+          current: "submit_create_quest",
+          completed: ["open_add_quest", "enter_title"],
+        },
+      },
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/journeys"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("create_quest");
+      expect(result.current.currentSubstep).toBe("select_time");
+    });
+  });
+
+  it("keeps completed old tutorial completed after migration", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: true,
+      completedSteps: ["create_quest", "meet_companion", "morning_checkin", "evolve_companion", "mentor_closeout"],
+      xpAwardedSteps: ["create_quest", "morning_checkin"],
+      milestonesCompleted: ["mentor_closeout_message"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isActive).toBe(false);
+      expect(result.current.currentStep).toBe(null);
+      expect(result.current.dialogueText).toBe("");
     });
   });
 });

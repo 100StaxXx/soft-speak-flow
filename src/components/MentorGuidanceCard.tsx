@@ -120,7 +120,6 @@ export const MentorGuidanceCard = () => {
     speakerPrimaryColor,
     speakerSlug,
     speakerAvatarUrl,
-    isIntroDialogueActive,
     dialogueActionLabel,
     onDialogueAction,
   } = usePostOnboardingMentorGuidance();
@@ -227,7 +226,7 @@ export const MentorGuidanceCard = () => {
             {dialogueSupportText ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
             ) : null}
-            {isIntroDialogueActive && onDialogueAction ? (
+            {onDialogueAction ? (
               <div className="mt-3">
                 <Button
                   type="button"

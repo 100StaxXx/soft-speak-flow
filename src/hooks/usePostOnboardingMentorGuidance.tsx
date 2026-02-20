@@ -19,36 +19,24 @@ import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { safeLocalStorage } from "@/utils/storage";
 import type {
   CreateQuestSubstepId,
+  GuidedMilestoneId,
   GuidedSubstepProgress,
   GuidedTutorialProgress,
   GuidedTutorialStepId,
 } from "@/types/profile";
 
 const GUIDED_TUTORIAL_VERSION = 2;
+const GUIDED_TUTORIAL_FLOW_VERSION = 2;
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
+const EVOLVE_AUTOSCROLL_SELECTOR = '[data-tour="evolve-companion-button"]';
+const EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX = 72;
 
 const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
   create_quest: 4,
-  meet_companion: 3,
   morning_checkin: 3,
 };
-
-type GuidedMilestoneId =
-  | "mentor_intro_hello"
-  | "stay_on_quests"
-  | "open_add_quest"
-  | "enter_title"
-  | "select_time"
-  | "submit_create_quest"
-  | "open_companion_tab"
-  | "confirm_companion_progress"
-  | "open_mentor_tab"
-  | "submit_morning_checkin"
-  | "tap_evolve_companion"
-  | "complete_companion_evolution"
-  | "mentor_closeout_message";
 
 interface GuidedStep {
   id: GuidedTutorialStepId;
@@ -57,12 +45,12 @@ interface GuidedStep {
 
 const GUIDED_STEPS: GuidedStep[] = [
   {
-    id: "create_quest",
+    id: "quests_campaigns_intro",
     route: "/journeys",
   },
   {
-    id: "meet_companion",
-    route: "/companion",
+    id: "create_quest",
+    route: "/journeys",
   },
   {
     id: "morning_checkin",
@@ -73,21 +61,32 @@ const GUIDED_STEPS: GuidedStep[] = [
     route: "/companion",
   },
   {
+    id: "post_evolution_companion_intro",
+    route: "/companion",
+  },
+  {
     id: "mentor_closeout",
     route: "/companion",
   },
 ];
 
 export const CREATE_QUEST_SUBSTEP_ORDER: CreateQuestSubstepId[] = [
-  "stay_on_quests",
   "open_add_quest",
   "enter_title",
   "select_time",
   "submit_create_quest",
 ];
 
-const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
-const CREATE_QUEST_SUBSTEP_SET = new Set<CreateQuestSubstepId>(CREATE_QUEST_SUBSTEP_ORDER);
+const ACTIVE_GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>(GUIDED_STEPS.map((step) => step.id));
+const GUIDED_STEP_ID_SET = new Set<GuidedTutorialStepId>([
+  ...GUIDED_STEPS.map((step) => step.id),
+  "meet_companion",
+]);
+const CREATE_QUEST_SUBSTEP_SET = new Set<CreateQuestSubstepId>([
+  ...CREATE_QUEST_SUBSTEP_ORDER,
+  "stay_on_quests",
+  "quests_campaigns_intro",
+]);
 
 const isGuidedStepId = (value: unknown): value is GuidedTutorialStepId =>
   typeof value === "string" && GUIDED_STEP_ID_SET.has(value as GuidedTutorialStepId);
@@ -101,6 +100,7 @@ const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
 const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "mentor_intro_hello",
   "stay_on_quests",
+  "quests_campaigns_intro",
   "open_add_quest",
   "enter_title",
   "select_time",
@@ -111,6 +111,7 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "submit_morning_checkin",
   "tap_evolve_companion",
   "complete_companion_evolution",
+  "post_evolution_companion_intro",
   "mentor_closeout_message",
 ]);
 
@@ -136,8 +137,11 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
   switch (milestoneId) {
     case "mentor_intro_hello":
       return [];
+    case "quests_campaigns_intro":
+    case "post_evolution_companion_intro":
+      return [];
     case "stay_on_quests":
-      return ['[data-tour="quests-tab"]'];
+      return ['[data-tour="quests-tab"]']; // legacy fallback
     case "open_add_quest":
       return ['[data-tour="add-quest-fab"]'];
     case "enter_title":
@@ -221,6 +225,14 @@ const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
   return null;
 };
 
+const isElementComfortablyInView = (element: HTMLElement, viewportHeight: number): boolean => {
+  const rect = element.getBoundingClientRect();
+  return (
+    rect.top >= EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX &&
+    rect.bottom <= viewportHeight - EVOLVE_AUTOSCROLL_VIEWPORT_MARGIN_PX
+  );
+};
+
 export interface CreateQuestProgressState {
   current: CreateQuestSubstepId;
   completed: CreateQuestSubstepId[];
@@ -230,6 +242,37 @@ export interface CreateQuestProgressState {
 
 type GuidedTutorialProgressSnapshot = Partial<GuidedTutorialProgress> & {
   milestonesCompleted?: GuidedMilestoneId[];
+};
+
+interface MigratedGuidedProgress {
+  completedSteps: GuidedTutorialStepId[];
+  xpAwardedSteps: GuidedTutorialStepId[];
+  milestonesCompleted: GuidedMilestoneId[];
+  createQuestProgress: CreateQuestProgressState;
+  completed: boolean;
+  completedAt?: string;
+  evolutionInFlight: boolean;
+  evolutionStartedAt?: string;
+  evolutionCompletedAt?: string;
+  needsMigration: boolean;
+}
+
+const setEquals = <T,>(a: Set<T>, b: Set<T>) => {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
+};
+
+const toActiveStepOrder = (steps: Iterable<GuidedTutorialStepId>): GuidedTutorialStepId[] => {
+  const stepSet = new Set(steps);
+  return GUIDED_STEPS.map((step) => step.id).filter((stepId) => stepSet.has(stepId));
+};
+
+const toCreateQuestSubstepOrder = (substeps: Iterable<CreateQuestSubstepId>): CreateQuestSubstepId[] => {
+  const substepSet = new Set(substeps);
+  return CREATE_QUEST_SUBSTEP_ORDER.filter((substepId) => substepSet.has(substepId));
 };
 
 export const getNextCreateQuestSubstep = (
@@ -245,12 +288,18 @@ export const getNextCreateQuestSubstep = (
 export const sanitizeCreateQuestProgress = (value: unknown): CreateQuestProgressState | null => {
   if (!isProgressRecord(value)) return null;
 
-  const completed = Array.isArray(value.completed)
+  const legacyCompleted = Array.isArray(value.completed)
     ? value.completed.filter(isCreateQuestSubstepId)
     : [];
+  const completed = toCreateQuestSubstepOrder(
+    legacyCompleted.filter(
+      (substep) => substep !== "stay_on_quests" && substep !== "quests_campaigns_intro"
+    )
+  );
 
-  const current = isCreateQuestSubstepId(value.current)
-    ? value.current
+  const currentCandidate = isCreateQuestSubstepId(value.current) ? value.current : null;
+  const current = currentCandidate && CREATE_QUEST_SUBSTEP_ORDER.includes(currentCandidate)
+    ? currentCandidate
     : getNextCreateQuestSubstep(completed);
 
   return {
@@ -267,7 +316,7 @@ const mergeCreateQuestProgress = (
 ): CreateQuestProgressState => {
   const remoteCompleted = remote?.completed ?? [];
   const localCompleted = local?.completed ?? [];
-  const completed = Array.from(new Set([...remoteCompleted, ...localCompleted]));
+  const completed = toCreateQuestSubstepOrder(new Set([...remoteCompleted, ...localCompleted]));
   const current = getNextCreateQuestSubstep(completed);
   const completedAll = completed.length >= CREATE_QUEST_SUBSTEP_ORDER.length;
 
@@ -276,6 +325,109 @@ const mergeCreateQuestProgress = (
     completed,
     startedAt: remote?.startedAt ?? local?.startedAt ?? new Date().toISOString(),
     completedAt: completedAll ? remote?.completedAt ?? local?.completedAt ?? new Date().toISOString() : undefined,
+  };
+};
+
+const hasCreateQuestProgressSignal = ({
+  completedSteps,
+  milestones,
+  createQuestProgress,
+}: {
+  completedSteps: Set<GuidedTutorialStepId>;
+  milestones: Set<GuidedMilestoneId>;
+  createQuestProgress: CreateQuestProgressState;
+}) =>
+  createQuestProgress.completed.length > 0 ||
+  completedSteps.has("create_quest") ||
+  completedSteps.has("meet_companion") ||
+  completedSteps.has("morning_checkin") ||
+  completedSteps.has("evolve_companion") ||
+  completedSteps.has("post_evolution_companion_intro") ||
+  completedSteps.has("mentor_closeout") ||
+  milestones.has("stay_on_quests") ||
+  milestones.has("open_add_quest") ||
+  milestones.has("enter_title") ||
+  milestones.has("select_time") ||
+  milestones.has("submit_create_quest");
+
+const migrateGuidedTutorialProgress = ({
+  completedSteps,
+  awardedSteps,
+  milestonesCompleted,
+  createQuestProgress,
+  completed,
+  completedAt,
+  flowVersion,
+  evolutionInFlight,
+  evolutionStartedAt,
+  evolutionCompletedAt,
+}: {
+  completedSteps: GuidedTutorialStepId[];
+  awardedSteps: GuidedTutorialStepId[];
+  milestonesCompleted: GuidedMilestoneId[];
+  createQuestProgress: CreateQuestProgressState;
+  completed: boolean;
+  completedAt?: string;
+  flowVersion?: number;
+  evolutionInFlight: boolean;
+  evolutionStartedAt?: string;
+  evolutionCompletedAt?: string;
+}): MigratedGuidedProgress => {
+  const rawCompletedSet = new Set(completedSteps);
+  const rawAwardedSet = new Set(awardedSteps);
+  const rawMilestoneSet = new Set(milestonesCompleted);
+
+  const shouldMarkQuestsIntroComplete = hasCreateQuestProgressSignal({
+    completedSteps: rawCompletedSet,
+    milestones: rawMilestoneSet,
+    createQuestProgress,
+  });
+
+  const migratedCompletedSet = new Set<GuidedTutorialStepId>(
+    completedSteps.filter((stepId) => ACTIVE_GUIDED_STEP_ID_SET.has(stepId))
+  );
+  if (shouldMarkQuestsIntroComplete) {
+    migratedCompletedSet.add("quests_campaigns_intro");
+  }
+
+  const isLegacyTutorialComplete = completed || rawCompletedSet.has("mentor_closeout");
+  if (isLegacyTutorialComplete) {
+    GUIDED_STEPS.forEach((step) => migratedCompletedSet.add(step.id));
+  }
+
+  const migratedMilestoneSet = new Set<GuidedMilestoneId>(milestonesCompleted);
+  if (shouldMarkQuestsIntroComplete) {
+    migratedMilestoneSet.add("quests_campaigns_intro");
+  }
+  if (isLegacyTutorialComplete) {
+    migratedMilestoneSet.add("post_evolution_companion_intro");
+  }
+
+  const migratedAwardedSet = new Set<GuidedTutorialStepId>(
+    awardedSteps.filter((stepId) => ACTIVE_GUIDED_STEP_ID_SET.has(stepId))
+  );
+
+  const migratedCompleted = toActiveStepOrder(migratedCompletedSet);
+  const migratedAwarded = toActiveStepOrder(migratedAwardedSet);
+  const migratedMilestones = Array.from(migratedMilestoneSet);
+
+  const needsMigration =
+    flowVersion !== GUIDED_TUTORIAL_FLOW_VERSION ||
+    !setEquals(new Set(migratedCompleted), rawCompletedSet) ||
+    !setEquals(new Set(migratedAwarded), rawAwardedSet) ||
+    !setEquals(new Set(migratedMilestones), rawMilestoneSet);
+
+  return {
+    completedSteps: migratedCompleted,
+    xpAwardedSteps: migratedAwarded,
+    milestonesCompleted: migratedMilestones,
+    createQuestProgress,
+    completed: isLegacyTutorialComplete || GUIDED_STEPS.every((step) => migratedCompletedSet.has(step.id)),
+    completedAt,
+    evolutionInFlight,
+    evolutionStartedAt,
+    evolutionCompletedAt,
+    needsMigration,
   };
 };
 
@@ -392,11 +544,11 @@ export const getMentorInstructionLines = (
   currentStep: GuidedTutorialStepId | null,
   currentSubstep: CreateQuestSubstepId | null
 ): string[] => {
-  if (currentStep === "create_quest") {
-    if (currentSubstep === "stay_on_quests") {
-      return ["Start on Quests. We'll build your first quest together."];
-    }
+  if (currentStep === "quests_campaigns_intro") {
+    return ["This is Quests, where you run daily quests and longer campaigns."];
+  }
 
+  if (currentStep === "create_quest") {
     if (currentSubstep === "open_add_quest") {
       return ["Tap the + in the bottom right."];
     }
@@ -412,16 +564,16 @@ export const getMentorInstructionLines = (
     return ["Now tap Create Quest."];
   }
 
-  if (currentStep === "meet_companion") {
-    return ["Open Companion."];
-  }
-
   if (currentStep === "morning_checkin") {
     return ["Head to Mentor."];
   }
 
   if (currentStep === "evolve_companion") {
     return ["Your companion is ready. Tap Evolve."];
+  }
+
+  if (currentStep === "post_evolution_companion_intro") {
+    return ["You're on Companion. This is where you track growth after evolution."];
   }
 
   if (currentStep === "mentor_closeout") {
@@ -433,6 +585,11 @@ export const getMentorInstructionLines = (
 
 const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; support?: string } => {
   switch (milestoneId) {
+    case "quests_campaigns_intro":
+      return {
+        text: "This is Quests. Daily quests keep momentum, and campaigns guide your long-term path.",
+        support: "We'll build your first quest now.",
+      };
     case "stay_on_quests":
       return {
         text: "Start on Quests. We'll build your first quest together.",
@@ -488,6 +645,11 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
         text: "Evolution is in progress. This may take a little while.",
         support: "You can leave this screen and use the app like usual. I'll bring you back to complete your tutorial when it's ready.",
       };
+    case "post_evolution_companion_intro":
+      return {
+        text: "Great evolution. This Companion page is where you follow your bond and growth.",
+        support: "Take a look here before we close out.",
+      };
     case "mentor_closeout_message":
       return {
         text: "Outstanding. You completed your tutorial.",
@@ -503,9 +665,11 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
 export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
   if (!milestoneId) return false;
   if (milestoneId === "mentor_intro_hello") return false;
+  if (milestoneId === "quests_campaigns_intro") return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
   if (milestoneId === "complete_companion_evolution") return false;
+  if (milestoneId === "post_evolution_companion_intro") return false;
   if (milestoneId === "mentor_closeout_message") return false;
   return true;
 };
@@ -525,6 +689,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const currentMilestoneStartedAtRef = useRef<number | null>(null);
   const lastTargetResolutionSignatureRef = useRef<string | null>(null);
   const lastRouteRestoreSignatureRef = useRef<string | null>(null);
+  const lastEvolveAutoscrollEntryRef = useRef<string | null>(null);
+  const migrationPersistSignatureRef = useRef<string | null>(null);
 
   const [sessionCompleted, setSessionCompleted] = useState<GuidedTutorialStepId[]>([]);
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
@@ -552,21 +718,22 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
     missingTargetSinceRef.current = null;
+    migrationPersistSignatureRef.current = null;
   }, [user?.id]);
 
-  const persistedCompleted = useMemo(() => {
+  const persistedCompletedBeforeMigration = useMemo(() => {
     const remote = safeCompletedSteps(remoteProgress?.completedSteps);
     const local = safeCompletedSteps(localProgress?.completedSteps);
     return Array.from(new Set([...remote, ...local]));
   }, [localProgress?.completedSteps, remoteProgress?.completedSteps]);
 
-  const persistedAwarded = useMemo(() => {
+  const persistedAwardedBeforeMigration = useMemo(() => {
     const remote = safeAwardedSteps(remoteProgress?.xpAwardedSteps);
     const local = safeAwardedSteps(localProgress?.xpAwardedSteps);
     return Array.from(new Set([...remote, ...local]));
   }, [localProgress?.xpAwardedSteps, remoteProgress?.xpAwardedSteps]);
 
-  const persistedMilestones = useMemo(() => {
+  const persistedMilestonesBeforeMigration = useMemo(() => {
     const remote = getSafeMilestoneArray(remoteProgress?.milestonesCompleted);
     const local = getSafeMilestoneArray(localProgress?.milestonesCompleted);
     return Array.from(new Set([...remote, ...local]));
@@ -582,15 +749,82 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     [localProgress?.substeps]
   );
 
+  const mergedCreateQuestProgress = useMemo(
+    () => mergeCreateQuestProgress(remoteCreateQuestProgress, localCreateQuestProgress),
+    [localCreateQuestProgress, remoteCreateQuestProgress]
+  );
+
+  const migratedProgress = useMemo(
+    () =>
+      migrateGuidedTutorialProgress({
+        completedSteps: persistedCompletedBeforeMigration,
+        awardedSteps: persistedAwardedBeforeMigration,
+        milestonesCompleted: persistedMilestonesBeforeMigration,
+        createQuestProgress: mergedCreateQuestProgress,
+        completed: Boolean(remoteProgress?.completed ?? localProgress?.completed ?? false),
+        completedAt:
+          typeof remoteProgress?.completedAt === "string"
+            ? remoteProgress.completedAt
+            : typeof localProgress?.completedAt === "string"
+              ? localProgress.completedAt
+              : undefined,
+        flowVersion:
+          typeof remoteProgress?.flowVersion === "number"
+            ? remoteProgress.flowVersion
+            : typeof localProgress?.flowVersion === "number"
+              ? localProgress.flowVersion
+              : undefined,
+        evolutionInFlight: Boolean(
+          remoteProgress?.evolutionInFlight ?? localProgress?.evolutionInFlight ?? false
+        ),
+        evolutionStartedAt:
+          typeof remoteProgress?.evolutionStartedAt === "string"
+            ? remoteProgress.evolutionStartedAt
+            : typeof localProgress?.evolutionStartedAt === "string"
+              ? localProgress.evolutionStartedAt
+              : undefined,
+        evolutionCompletedAt:
+          typeof remoteProgress?.evolutionCompletedAt === "string"
+            ? remoteProgress.evolutionCompletedAt
+            : typeof localProgress?.evolutionCompletedAt === "string"
+              ? localProgress.evolutionCompletedAt
+              : undefined,
+      }),
+    [
+      localProgress?.completed,
+      localProgress?.completedAt,
+      localProgress?.evolutionCompletedAt,
+      localProgress?.evolutionInFlight,
+      localProgress?.evolutionStartedAt,
+      localProgress?.flowVersion,
+      mergedCreateQuestProgress,
+      persistedAwardedBeforeMigration,
+      persistedCompletedBeforeMigration,
+      persistedMilestonesBeforeMigration,
+      remoteProgress?.completed,
+      remoteProgress?.completedAt,
+      remoteProgress?.evolutionCompletedAt,
+      remoteProgress?.evolutionInFlight,
+      remoteProgress?.evolutionStartedAt,
+      remoteProgress?.flowVersion,
+    ]
+  );
+
+  const persistedCompleted = migratedProgress.completedSteps;
+  const persistedAwarded = migratedProgress.xpAwardedSteps;
+  const persistedMilestones = migratedProgress.milestonesCompleted;
+
   const createQuestProgress = useMemo(() => {
-    const merged = mergeCreateQuestProgress(remoteCreateQuestProgress, localCreateQuestProgress);
-    const completed = Array.from(new Set([...merged.completed, ...sessionCreateQuestCompleted]));
+    const completed = toCreateQuestSubstepOrder([
+      ...migratedProgress.createQuestProgress.completed,
+      ...sessionCreateQuestCompleted,
+    ]);
     return {
-      ...merged,
+      ...migratedProgress.createQuestProgress,
       completed,
       current: getNextCreateQuestSubstep(completed),
     };
-  }, [localCreateQuestProgress, remoteCreateQuestProgress, sessionCreateQuestCompleted]);
+  }, [migratedProgress.createQuestProgress, sessionCreateQuestCompleted]);
 
   const completedSet = useMemo(
     () => new Set<GuidedTutorialStepId>([...persistedCompleted, ...sessionCompleted]),
@@ -613,18 +847,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   );
   const currentStepId = currentStep?.id ?? null;
   const persistedEvolutionInFlight = useMemo(() => {
-    const remoteValue = remoteProgress?.evolutionInFlight;
-    const localValue = localProgress?.evolutionInFlight;
-    return Boolean(remoteValue ?? localValue ?? false);
-  }, [localProgress?.evolutionInFlight, remoteProgress?.evolutionInFlight]);
+    return migratedProgress.evolutionInFlight;
+  }, [migratedProgress.evolutionInFlight]);
   const evolutionInFlight = sessionEvolutionInFlight ?? persistedEvolutionInFlight;
 
   const tutorialReady =
     Boolean(user?.id) && !profileLoading && walkthroughCompleted && tutorialEligible;
 
-  const tutorialMarkedComplete = Boolean(
-    remoteProgress?.completed ?? localProgress?.completed ?? false
-  );
+  const tutorialMarkedComplete = migratedProgress.completed;
 
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
   const hasPendingIntroDialogue = Boolean(currentStep) && !milestoneSet.has("mentor_intro_hello");
@@ -648,6 +878,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         ...localCurrent,
         ...progress,
         version: GUIDED_TUTORIAL_VERSION,
+        flowVersion: GUIDED_TUTORIAL_FLOW_VERSION,
         eligible: true,
         lastUpdatedAt: nowIso,
       };
@@ -660,6 +891,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         ...currentGuided,
         ...progress,
         version: GUIDED_TUTORIAL_VERSION,
+        flowVersion: GUIDED_TUTORIAL_FLOW_VERSION,
         eligible: true,
         lastUpdatedAt: nowIso,
       };
@@ -680,6 +912,38 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     },
     [profile?.onboarding_data, queryClient, user?.id]
   );
+
+  useEffect(() => {
+    if (!tutorialReady || !migratedProgress.needsMigration) return;
+
+    const migrationPayload: GuidedTutorialProgressSnapshot = {
+      flowVersion: GUIDED_TUTORIAL_FLOW_VERSION,
+      completedSteps: migratedProgress.completedSteps,
+      xpAwardedSteps: migratedProgress.xpAwardedSteps,
+      milestonesCompleted: migratedProgress.milestonesCompleted,
+      substeps: {
+        create_quest: {
+          current: migratedProgress.createQuestProgress.current,
+          completed: migratedProgress.createQuestProgress.completed,
+          startedAt: migratedProgress.createQuestProgress.startedAt,
+          completedAt: migratedProgress.createQuestProgress.completedAt,
+        },
+      },
+      completed: migratedProgress.completed,
+      completedAt:
+        migratedProgress.completedAt ??
+        (migratedProgress.completed ? new Date().toISOString() : undefined),
+      evolutionInFlight: migratedProgress.evolutionInFlight,
+      evolutionStartedAt: migratedProgress.evolutionStartedAt,
+      evolutionCompletedAt: migratedProgress.evolutionCompletedAt,
+    };
+
+    const signature = JSON.stringify(migrationPayload);
+    if (migrationPersistSignatureRef.current === signature) return;
+    migrationPersistSignatureRef.current = signature;
+
+    void persistProgress(migrationPayload);
+  }, [migratedProgress, persistProgress, tutorialReady]);
 
   const markMilestoneComplete = useCallback(
     (milestoneId: GuidedMilestoneId) => {
@@ -711,7 +975,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       if (createQuestProgress.completed.includes(substepId)) return;
 
       const completed = [...createQuestProgress.completed, substepId];
-      const completedUnique = Array.from(new Set(completed));
+      const completedUnique = toCreateQuestSubstepOrder(completed);
       const nextCurrent = getNextCreateQuestSubstep(completedUnique);
       const completedAll = completedUnique.length >= CREATE_QUEST_SUBSTEP_ORDER.length;
 
@@ -754,7 +1018,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       }, 1000);
 
       const nextCompletedSet = new Set<GuidedTutorialStepId>([...completedSet, stepId]);
-      const nextCompleted = Array.from(nextCompletedSet);
+      const nextCompleted = toActiveStepOrder(nextCompletedSet);
       const complete = GUIDED_STEPS.every((step) => nextCompletedSet.has(step.id));
 
       setSessionCompleted((prev) => (prev.includes(stepId) ? prev : [...prev, stepId]));
@@ -773,7 +1037,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
       void persistProgress({
         completedSteps: nextCompleted,
-        xpAwardedSteps: Array.from(nextAwardedSet),
+        xpAwardedSteps: toActiveStepOrder(nextAwardedSet),
         completed: complete,
         completedAt: complete ? new Date().toISOString() : undefined,
       });
@@ -796,43 +1060,15 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   useEffect(() => {
     if (!tutorialReady || tutorialComplete || hasPendingIntroDialogue || !currentStep) return;
 
-    if (currentStep.id === "create_quest") {
-      if (location.pathname === "/journeys" && createQuestProgress.current === "stay_on_quests") {
-        markCreateQuestSubstepComplete("stay_on_quests");
+    if (currentStep.id === "quests_campaigns_intro") {
+      if (location.pathname !== "/journeys") return;
+      if (milestoneSet.has("quests_campaigns_intro")) {
+        markStepComplete("quests_campaigns_intro");
       }
       return;
     }
 
-    if (currentStep.id === "meet_companion") {
-      if (!milestoneSet.has("open_companion_tab") && location.pathname === "/companion") {
-        markMilestoneComplete("open_companion_tab");
-      }
-
-      if (milestoneSet.has("open_companion_tab") && !milestoneSet.has("confirm_companion_progress")) {
-        const tryCompleteCompanion = () => {
-          if (typeof document === "undefined") return false;
-          if (location.pathname !== "/companion") return false;
-          const hasProgressTarget = Boolean(
-            document.querySelector('[data-tour="companion-progress-area"], [data-tour="companion-page"]')
-          );
-          if (!hasProgressTarget) return false;
-          markMilestoneComplete("confirm_companion_progress");
-          markStepComplete("meet_companion");
-          return true;
-        };
-
-        if (tryCompleteCompanion()) return;
-
-        const interval = window.setInterval(() => {
-          if (tryCompleteCompanion()) {
-            window.clearInterval(interval);
-          }
-        }, TARGET_RESOLVE_POLL_MS);
-
-        return () => {
-          window.clearInterval(interval);
-        };
-      }
+    if (currentStep.id === "create_quest") {
       return;
     }
 
@@ -883,6 +1119,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       ) {
         markMilestoneComplete("complete_companion_evolution");
         markStepComplete("evolve_companion");
+      }
+      return;
+    }
+
+    if (currentStep.id === "post_evolution_companion_intro") {
+      if (location.pathname !== "/companion") return;
+      if (milestoneSet.has("post_evolution_companion_intro")) {
+        markStepComplete("post_evolution_companion_intro");
       }
       return;
     }
@@ -1035,14 +1279,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     if (!currentStep) return null;
     if (!milestoneSet.has("mentor_intro_hello")) return "mentor_intro_hello";
 
-    if (currentStep.id === "create_quest") {
-      return createQuestProgress.current;
+    if (currentStep.id === "quests_campaigns_intro") {
+      return "quests_campaigns_intro";
     }
 
-    if (currentStep.id === "meet_companion") {
-      return milestoneSet.has("open_companion_tab")
-        ? "confirm_companion_progress"
-        : "open_companion_tab";
+    if (currentStep.id === "create_quest") {
+      return createQuestProgress.current;
     }
 
     if (currentStep.id === "morning_checkin") {
@@ -1055,6 +1297,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       return evolutionInFlight ? "complete_companion_evolution" : "tap_evolve_companion";
     }
 
+    if (currentStep.id === "post_evolution_companion_intro") {
+      return "post_evolution_companion_intro";
+    }
+
     if (currentStep.id === "mentor_closeout") {
       return "mentor_closeout_message";
     }
@@ -1063,11 +1309,19 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
 
   const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
-  const dialogueActionLabel = "Start Tutorial";
+  const supportsDialogueAction =
+    currentMilestone === "mentor_intro_hello" ||
+    currentMilestone === "quests_campaigns_intro" ||
+    currentMilestone === "post_evolution_companion_intro";
+  const dialogueActionLabel = supportsDialogueAction
+    ? currentMilestone === "mentor_intro_hello"
+      ? "Start Tutorial"
+      : "Continue"
+    : undefined;
   const onDialogueAction = useCallback(() => {
-    if (!currentMilestone || !isIntroDialogueActive) return;
+    if (!currentMilestone || !supportsDialogueAction) return;
     markMilestoneComplete(currentMilestone);
-  }, [currentMilestone, isIntroDialogueActive, markMilestoneComplete]);
+  }, [currentMilestone, markMilestoneComplete, supportsDialogueAction]);
 
   const activeTargetSelectors = useMemo(
     () => (currentMilestone ? getTargetSelectorsForMilestone(currentMilestone) : []),
@@ -1192,6 +1446,67 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     !shouldRestoreRoute &&
     !pathIsHidden(location.pathname) &&
     Boolean(currentStep);
+
+  useEffect(() => {
+    const isEvolveEntry =
+      isActive &&
+      currentStepId === "evolve_companion" &&
+      currentMilestone === "tap_evolve_companion" &&
+      location.pathname === "/companion";
+
+    if (!isEvolveEntry) {
+      lastEvolveAutoscrollEntryRef.current = null;
+      return;
+    }
+
+    const entryKey = `${currentStepId}|${currentMilestone}|${location.pathname}`;
+    if (lastEvolveAutoscrollEntryRef.current === entryKey) {
+      return;
+    }
+
+    if (activeTargetSelector !== EVOLVE_AUTOSCROLL_SELECTOR) {
+      return;
+    }
+
+    const targetElement = document.querySelector(EVOLVE_AUTOSCROLL_SELECTOR) as HTMLElement | null;
+    if (!targetElement) {
+      return;
+    }
+
+    lastEvolveAutoscrollEntryRef.current = entryKey;
+
+    if (isElementComfortablyInView(targetElement, window.innerHeight)) {
+      return;
+    }
+
+    const prefersReducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const behavior: ScrollBehavior = prefersReducedMotion ? "auto" : "smooth";
+
+    targetElement.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior,
+    });
+
+    emitTutorialEvent("tutorial_target_autoscroll", {
+      userId: user?.id,
+      stepId: currentStepId,
+      milestoneId: currentMilestone,
+      route: location.pathname,
+      selector: EVOLVE_AUTOSCROLL_SELECTOR,
+      behavior,
+    });
+  }, [
+    activeTargetSelector,
+    currentMilestone,
+    currentStepId,
+    isActive,
+    location.pathname,
+    user?.id,
+  ]);
+
   const currentSubstep = currentStepId === "create_quest" ? createQuestProgress.current : null;
 
   const currentIndex = currentStepId
@@ -1271,8 +1586,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
     speakerSlug: personality?.slug,
     speakerAvatarUrl: personality?.avatar_url,
-    dialogueActionLabel: isIntroDialogueActive ? dialogueActionLabel : undefined,
-    onDialogueAction: isIntroDialogueActive ? onDialogueAction : undefined,
+    dialogueActionLabel,
+    onDialogueAction: supportsDialogueAction ? onDialogueAction : undefined,
   };
 };
 

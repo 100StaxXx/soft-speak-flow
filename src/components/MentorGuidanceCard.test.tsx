@@ -67,6 +67,21 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.onDialogueAction = undefined;
     mocks.onDialogueAction.mockClear();
   });
+
+  it("renders continue action for non-intro explainer milestones", () => {
+    mocks.guidance.isIntroDialogueActive = false;
+    mocks.guidance.dialogueActionLabel = "Continue";
+    mocks.guidance.onDialogueAction = mocks.onDialogueAction;
+
+    render(<MentorGuidanceCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
+
+    mocks.guidance.dialogueActionLabel = undefined;
+    mocks.guidance.onDialogueAction = undefined;
+    mocks.onDialogueAction.mockClear();
+  });
 });
 
 describe("resolveMentorGuidancePlacement", () => {
