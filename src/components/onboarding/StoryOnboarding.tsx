@@ -541,6 +541,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               eligible: true,
               completedSteps: [],
               xpAwardedSteps: [],
+              introEnabled: true,
+              introSeen: false,
               dismissed: false,
               completed: false,
               lastUpdatedAt: nowIso,

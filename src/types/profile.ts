@@ -24,6 +24,9 @@ export interface GuidedTutorialProgress {
   eligible: boolean;
   completedSteps: GuidedTutorialStepId[];
   xpAwardedSteps: GuidedTutorialStepId[];
+  introEnabled?: boolean;
+  introSeen?: boolean;
+  introSeenAt?: string;
   substeps?: GuidedSubstepProgress;
   dismissed: boolean;
   completed: boolean;
