@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useEvolution } from "@/contexts/EvolutionContext";
 
@@ -7,12 +7,31 @@ interface EvolveButtonProps {
   isEvolving: boolean;
 }
 
+const LONG_RUNNING_MESSAGE_DELAY_MS = 75_000;
+
 export const EvolveButton = memo(({
   onEvolve,
   isEvolving,
 }: EvolveButtonProps) => {
   const { isEvolvingLoading } = useEvolution();
   const isProcessing = isEvolving || isEvolvingLoading;
+  const [showLongRunningMessage, setShowLongRunningMessage] = useState(false);
+
+  useEffect(() => {
+    if (!isProcessing) {
+      setShowLongRunningMessage(false);
+      return;
+    }
+
+    setShowLongRunningMessage(false);
+    const timeoutId = window.setTimeout(() => {
+      setShowLongRunningMessage(true);
+    }, LONG_RUNNING_MESSAGE_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isProcessing]);
 
   const handleClick = () => {
     if (!isProcessing) {
@@ -131,6 +150,18 @@ export const EvolveButton = memo(({
           )}
         </div>
       </button>
+      {isProcessing && (
+        <div className="mt-2 space-y-1 text-center">
+          <p className="text-sm text-muted-foreground">
+            {showLongRunningMessage
+              ? "Taking longer than usual, can take up to ~2 minutes"
+              : "About 1 minute"}
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            You can leave this screen and come back when it is ready.
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 });
