@@ -505,6 +505,7 @@ export interface PostOnboardingMentorGuidanceState {
   activeTargetSelectors: string[];
   activeTargetSelector: string | null;
   isStrictLockActive: boolean;
+  canTemporarilyHide: boolean;
   dialogueText: string;
   dialogueSupportText?: string;
   speakerName: string;
@@ -526,6 +527,7 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   activeTargetSelectors: [],
   activeTargetSelector: null,
   isStrictLockActive: false,
+  canTemporarilyHide: false,
   dialogueText: "",
   dialogueSupportText: undefined,
   speakerName: "Your mentor",
@@ -1580,6 +1582,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     activeTargetSelectors,
     activeTargetSelector,
     isStrictLockActive: Boolean(isActive && activeTargetSelector && strictLockEnabled),
+    canTemporarilyHide: currentMilestone === "complete_companion_evolution",
     dialogueText: dialogue.text,
     dialogueSupportText,
     speakerName: personality?.name ?? "Your mentor",

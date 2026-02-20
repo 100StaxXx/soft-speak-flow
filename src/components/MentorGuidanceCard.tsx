@@ -113,6 +113,7 @@ export const MentorGuidanceCard = () => {
   const {
     isActive,
     activeTargetSelector,
+    canTemporarilyHide,
     progressText,
     dialogueText,
     dialogueSupportText,
@@ -129,6 +130,7 @@ export const MentorGuidanceCard = () => {
     anchor: "bottom",
     bottomPx: PANEL_BASE_BOTTOM_PX,
   });
+  const [isTemporarilyHidden, setIsTemporarilyHidden] = useState(false);
 
   const updatePlacement = useCallback(() => {
     if (!isActive) return;
@@ -182,6 +184,11 @@ export const MentorGuidanceCard = () => {
     };
   }, [isActive, updatePlacement]);
 
+  useEffect(() => {
+    if (canTemporarilyHide) return;
+    setIsTemporarilyHidden(false);
+  }, [canTemporarilyHide]);
+
   const placementStyle = useMemo(
     () =>
       placement.anchor === "bottom"
@@ -190,7 +197,7 @@ export const MentorGuidanceCard = () => {
     [placement]
   );
 
-  if (!isActive || !dialogueText) {
+  if (!isActive || !dialogueText || (canTemporarilyHide && isTemporarilyHidden)) {
     return null;
   }
 
@@ -202,7 +209,7 @@ export const MentorGuidanceCard = () => {
       style={placementStyle}
       aria-live="polite"
     >
-      <div className="mx-auto max-w-4xl rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
+      <div className="pointer-events-none mx-auto max-w-4xl rounded-2xl border border-white/20 bg-black/65 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
         <div className="flex items-end gap-3 p-3 sm:p-4">
           <div className="shrink-0">
             <MentorAvatar
@@ -225,6 +232,19 @@ export const MentorGuidanceCard = () => {
             <p className="mt-2 text-base leading-relaxed text-white sm:text-lg">{dialogueText}</p>
             {dialogueSupportText ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
+            ) : null}
+            {canTemporarilyHide ? (
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label="Hide tutorial"
+                  onClick={() => setIsTemporarilyHidden(true)}
+                  className="pointer-events-auto h-9 rounded-xl border border-white/25 bg-black/45 text-white hover:bg-black/60"
+                >
+                  Hide tutorial
+                </Button>
+              </div>
             ) : null}
             {onDialogueAction ? (
               <div className="mt-3">

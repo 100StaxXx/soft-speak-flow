@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     activeTargetSelectors: ['[data-tour="add-quest-fab"]'],
     activeTargetSelector: '[data-tour="add-quest-fab"]',
     isStrictLockActive: true,
+    canTemporarilyHide: false,
     dialogueText: "Tap the + in the bottom right.",
     dialogueSupportText: "I'll highlight it for you.",
     dialogueActionLabel: undefined,
@@ -81,6 +82,44 @@ describe("MentorGuidanceCard", () => {
     mocks.guidance.dialogueActionLabel = undefined;
     mocks.guidance.onDialogueAction = undefined;
     mocks.onDialogueAction.mockClear();
+  });
+
+  it("renders hide tutorial control only when temporary hiding is allowed", () => {
+    const { rerender } = render(<MentorGuidanceCard />);
+
+    expect(screen.queryByRole("button", { name: "Hide tutorial" })).not.toBeInTheDocument();
+
+    mocks.guidance.canTemporarilyHide = true;
+    rerender(<MentorGuidanceCard />);
+
+    expect(screen.getByRole("button", { name: "Hide tutorial" })).toBeInTheDocument();
+
+    mocks.guidance.canTemporarilyHide = false;
+  });
+
+  it("hides the panel after tapping hide tutorial", () => {
+    mocks.guidance.canTemporarilyHide = true;
+
+    render(<MentorGuidanceCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
+
+    expect(screen.queryByText("Atlas portrait")).not.toBeInTheDocument();
+
+    mocks.guidance.canTemporarilyHide = false;
+  });
+
+  it("restores the panel after temporary hiding is no longer allowed", () => {
+    mocks.guidance.canTemporarilyHide = true;
+    const { rerender } = render(<MentorGuidanceCard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide tutorial" }));
+    expect(screen.queryByText("Atlas portrait")).not.toBeInTheDocument();
+
+    mocks.guidance.canTemporarilyHide = false;
+    rerender(<MentorGuidanceCard />);
+
+    expect(screen.getByText("Atlas portrait")).toBeInTheDocument();
+    expect(screen.getByText("Tap the + in the bottom right.")).toBeInTheDocument();
   });
 });
 

@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     profileUpdatePayloads: [] as Array<Record<string, unknown>>,
     queryClient: {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      getQueryData: vi.fn().mockReturnValue(null),
     },
     awardCustomXP: vi.fn().mockResolvedValue(undefined),
     personality: null as
@@ -343,6 +344,43 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.currentStep).toBe("quests_campaigns_intro");
       expect(result.current.dialogueActionLabel).toBe("Continue");
       expect(result.current.onDialogueAction).toBeDefined();
+    });
+  });
+
+  it("enables temporary hiding only during in-flight evolution milestone", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["create_quest", "meet_companion", "morning_checkin"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/companion"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("evolve_companion");
+      expect(result.current.canTemporarilyHide).toBe(false);
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.canTemporarilyHide).toBe(true);
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-evolved"));
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("post_evolution_companion_intro");
+      expect(result.current.canTemporarilyHide).toBe(false);
     });
   });
 
