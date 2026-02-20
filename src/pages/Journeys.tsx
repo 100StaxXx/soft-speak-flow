@@ -771,6 +771,7 @@ const Journeys = () => {
               selectedDate={selectedDate}
               onDateSelect={handleDatePillClick}
               tasksPerDay={tasksPerDay}
+              isActive={isTabActive}
             />
           </motion.div>
 

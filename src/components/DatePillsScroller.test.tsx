@@ -334,4 +334,138 @@ describe("DatePillsScroller", () => {
       });
     }
   });
+
+  it("re-centers when the tab becomes active again without changing selected date", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const selectedDate = new Date("2026-02-13T12:00:00.000Z");
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          isActive={false}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalledTimes(0);
+      });
+
+      rerender(
+        <DatePillsScroller
+          selectedDate={selectedDate}
+          onDateSelect={onDateSelect}
+          isActive
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
+  it("computes symmetric edge spacer widths from container and pill size", async () => {
+    const onDateSelect = vi.fn();
+    const { rerender, container } = render(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+        onDateSelect={onDateSelect}
+      />,
+    );
+
+    const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+    const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+    setCenteringMetrics(scroller, selectedButton, {
+      scrollLeft: 0,
+      scrollWidth: 1000,
+      containerWidth: 240,
+      selectedLeft: 340,
+      selectedWidth: 60,
+    });
+
+    rerender(
+      <DatePillsScroller
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={onDateSelect}
+      />,
+    );
+
+    await waitFor(() => {
+      const startSpacer = container.querySelector("[data-testid='date-pill-edge-spacer-start']") as HTMLDivElement;
+      const endSpacer = container.querySelector("[data-testid='date-pill-edge-spacer-end']") as HTMLDivElement;
+      expect(startSpacer.style.width).toBe("90px");
+      expect(endSpacer.style.width).toBe("90px");
+    });
+  });
+
+  it("keeps edge-date selection centerable without permanent clamp", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 610,
+        containerWidth: 220,
+        selectedLeft: 380,
+        selectedWidth: 60,
+      });
+
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T20:30:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalled();
+        expect(scroller.scrollLeft).toBe(300);
+      });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
 });

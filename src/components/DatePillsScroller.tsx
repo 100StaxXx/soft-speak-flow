@@ -17,6 +17,7 @@ interface DatePillsScrollerProps {
   onDateSelect: (date: Date) => void;
   tasksPerDay?: Record<string, number>;
   daysToShow?: number;
+  isActive?: boolean;
 }
 
 const EDGE_THRESHOLD_PX = 80;
@@ -45,10 +46,12 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   onDateSelect,
   tasksPerDay = {},
   daysToShow = 14,
+  isActive = true,
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const shouldCenterOnSelectedRef = useRef(true);
+  const previousIsActiveRef = useRef(isActive);
   const pendingLeftCompensationRef = useRef<{
     previousScrollWidth: number;
     previousScrollLeft: number;
@@ -57,6 +60,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
+  const [edgeSpacerWidth, setEdgeSpacerWidth] = useState(0);
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
 
@@ -89,6 +93,31 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     },
     [tasksPerDay],
   );
+
+  const calculateEdgeSpacerWidth = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container) return null;
+
+    const selected = selectedRef.current;
+    const measuredPill =
+      selected ??
+      container.querySelector<HTMLButtonElement>("button[data-date-pill='true']");
+
+    if (!measuredPill) return null;
+
+    const containerWidth = container.offsetWidth;
+    const pillWidth = measuredPill.offsetWidth;
+    if (containerWidth === 0 || pillWidth === 0) return null;
+
+    return Math.max(0, containerWidth / 2 - pillWidth / 2);
+  }, []);
+
+  const recalculateEdgeSpacers = useCallback(() => {
+    const nextWidth = calculateEdgeSpacerWidth();
+    if (nextWidth === null) return;
+
+    setEdgeSpacerWidth((currentWidth) => (Math.abs(currentWidth - nextWidth) < 0.5 ? currentWidth : nextWidth));
+  }, [calculateEdgeSpacerWidth]);
 
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
@@ -144,8 +173,35 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     shouldCenterOnSelectedRef.current = true;
   }, [selectedDate]);
 
+  useLayoutEffect(() => {
+    if (isActive && !previousIsActiveRef.current) {
+      shouldCenterOnSelectedRef.current = true;
+    }
+    previousIsActiveRef.current = isActive;
+  }, [isActive]);
+
+  useLayoutEffect(() => {
+    recalculateEdgeSpacers();
+  }, [dates, selectedDate, isActive, recalculateEdgeSpacers]);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      recalculateEdgeSpacers();
+    });
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [recalculateEdgeSpacers]);
+
   // Scroll selected date to center only after explicit selected-date changes.
   useLayoutEffect(() => {
+    if (!isActive) return;
     if (!shouldCenterOnSelectedRef.current) return;
 
     let frameId: number | null = null;
@@ -178,6 +234,20 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
       if (containerWidth === 0 || selectedWidth === 0) return;
 
+      const nextSpacerWidth = calculateEdgeSpacerWidth();
+      if (
+        nextSpacerWidth !== null &&
+        Math.abs(nextSpacerWidth - edgeSpacerWidth) >= 0.5
+      ) {
+        setEdgeSpacerWidth(nextSpacerWidth);
+        if (remainingAttempts > 0 && typeof window !== "undefined") {
+          frameId = window.requestAnimationFrame(() => {
+            centerSelectedDate(remainingAttempts - 1);
+          });
+        }
+        return;
+      }
+
       const selectedLeft = selected.offsetLeft;
       const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
       const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
@@ -204,7 +274,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [dates, selectedDate]);
+  }, [calculateEdgeSpacerWidth, dates, edgeSpacerWidth, isActive, selectedDate]);
 
   return (
     <div
@@ -213,6 +283,12 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       className={cn("flex gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1 transition-all duration-200")}
       style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
     >
+      <div
+        aria-hidden="true"
+        data-testid="date-pill-edge-spacer-start"
+        className="shrink-0"
+        style={{ width: `${edgeSpacerWidth}px` }}
+      />
       {dates.map((date) => {
         const isSelected = isSameDay(date, selectedDate);
         const isDayToday = isToday(date);
@@ -223,6 +299,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
           <motion.button
             key={dateKey}
             ref={isSelected ? selectedRef : undefined}
+            data-date-pill="true"
             onClick={async () => {
               await triggerHaptic(ImpactStyle.Light);
               onDateSelect(date);
@@ -287,6 +364,12 @@ export const DatePillsScroller = memo(function DatePillsScroller({
           </motion.button>
         );
       })}
+      <div
+        aria-hidden="true"
+        data-testid="date-pill-edge-spacer-end"
+        className="shrink-0"
+        style={{ width: `${edgeSpacerWidth}px` }}
+      />
     </div>
   );
 });
