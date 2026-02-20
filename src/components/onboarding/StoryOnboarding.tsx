@@ -20,7 +20,7 @@ import { MentorResult } from "@/components/MentorResult";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
 import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";
-import { TimeoutError, pollWithDeadline, withTimeout } from "@/utils/asyncTimeout";
+import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
 import {
   filterMentorsByEnergyPreference,
@@ -99,7 +99,6 @@ export const deriveOnboardingMentorCandidates = <T extends MentorEnergyCandidate
   };
 };
 
-const COMPANION_CREATION_TIMEOUT_MS = 90_000;
 const COMPANION_RECOVERY_DEADLINE_MS = 30_000;
 const COMPANION_RECOVERY_INTERVAL_MS = 3_000;
 const DISPLAY_NAME_INITIAL_DELAY_MS = 2_000;
@@ -630,20 +629,12 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         spiritAnimal: preferences.spiritAnimal,
       });
 
-      const companionData = await withTimeout(
-        () =>
-          createCompanion.mutateAsync({
-            favoriteColor: preferences.favoriteColor,
-            spiritAnimal: preferences.spiritAnimal,
-            coreElement: preferences.coreElement,
-            storyTone: preferences.storyTone,
-          }),
-        {
-          timeoutMs: COMPANION_CREATION_TIMEOUT_MS,
-          operation: "Companion onboarding creation",
-          timeoutCode: "GENERATION_TIMEOUT",
-        },
-      );
+      const companionData = await createCompanion.mutateAsync({
+        favoriteColor: preferences.favoriteColor,
+        spiritAnimal: preferences.spiritAnimal,
+        coreElement: preferences.coreElement,
+        storyTone: preferences.storyTone,
+      });
 
       if (!companionData?.id) {
         throw new Error("Companion record missing ID after creation.");
@@ -651,14 +642,17 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
       await finalizeCompanionOnboarding(companionData.id, preferences.spiritAnimal, false);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const normalizedErrorMessage = errorMessage.toUpperCase();
       const isTimeout =
-        error instanceof TimeoutError ||
-        (error instanceof Error && error.message.includes("GENERATION_TIMEOUT"));
+        normalizedErrorMessage.includes("GENERATION_TIMEOUT") ||
+        normalizedErrorMessage.includes("AI_TIMEOUT") ||
+        normalizedErrorMessage.includes("TIMED OUT");
 
       if (isTimeout) {
         logger.warn("Companion creation timed out; starting recovery poll", {
           userId: user.id,
-          timeoutMs: COMPANION_CREATION_TIMEOUT_MS,
+          reason: errorMessage,
           elapsedMs: Date.now() - startedAt,
         });
 

@@ -1,13 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
-import { TimeoutError, withTimeout } from "@/utils/asyncTimeout";
 
 interface GenerateWithValidationResult {
   imageUrl: string;
   validationPassed: boolean;
   retryCount: number;
 }
-
-const GENERATION_TIMEOUT_MS = 90_000;
 
 /**
  * Generates a companion image with built-in quality scoring and automatic retry.
@@ -36,43 +33,15 @@ export async function generateWithValidation(
   onValidating?.();
 
   // Generate the image - the edge function handles quality scoring and retries internally
-  let imageResult:
-    | {
-        imageUrl?: string;
-        qualityScore?: {
-          overallScore?: number;
-          shouldRetry?: boolean;
-          retryCount?: number;
-        };
-      }
-    | null = null;
-  let imageError: Error | null = null;
-
-  try {
-    const invokeResult = await withTimeout(
-      () =>
-        supabase.functions.invoke("generate-companion-image", {
-          body: {
-            ...params,
-            ...(typeof options.maxRetries === "number" ? { maxInternalRetries: options.maxRetries } : {}),
-          },
-        }),
-      {
-        timeoutMs: GENERATION_TIMEOUT_MS,
-        operation: "Companion image generation",
-        timeoutCode: "GENERATION_TIMEOUT",
+  const { data: imageResult, error: imageError } = await supabase.functions.invoke(
+    "generate-companion-image",
+    {
+      body: {
+        ...params,
+        ...(typeof options.maxRetries === "number" ? { maxInternalRetries: options.maxRetries } : {}),
       },
-    );
-    imageResult = (invokeResult?.data ?? null) as typeof imageResult;
-    imageError = (invokeResult?.error as Error | null) ?? null;
-  } catch (error) {
-    if (error instanceof TimeoutError) {
-      throw new Error(
-        "GENERATION_TIMEOUT: Companion creation is taking longer than expected. Please try again.",
-      );
-    }
-    throw error;
-  }
+    },
+  );
 
   if (imageError) {
     const errorMsg = imageError.message || String(imageError);
