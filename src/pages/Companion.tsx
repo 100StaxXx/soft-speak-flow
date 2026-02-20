@@ -30,7 +30,7 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ParallaxCard } from "@/components/ui/parallax-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -144,6 +144,8 @@ const Companion = () => {
   const [activeTab, setActiveTab] = useState<CompanionTab>("overview");
   const [mountedTabs, setMountedTabs] = useState<Record<CompanionTab, boolean>>(() => INITIAL_MOUNTED_TABS);
   const prefetchedResourceKeyRef = useRef<string | null>(null);
+  const location = useLocation();
+  const previousPathRef = useRef(location.pathname);
   const navigate = useNavigate();
 
   const markTabMounted = useCallback((tab: CompanionTab) => {
@@ -210,6 +212,13 @@ const Companion = () => {
     },
     [markTabMounted, prefetchPostcards, prefetchStories],
   );
+
+  useEffect(() => {
+    if (location.pathname === "/companion" && previousPathRef.current !== "/companion") {
+      setActiveTab("overview");
+    }
+    previousPathRef.current = location.pathname;
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!companion?.id || !user?.id) return;
