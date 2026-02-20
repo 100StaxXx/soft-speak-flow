@@ -36,6 +36,8 @@ const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
 };
 
 type GuidedMilestoneId =
+  | "mentor_intro_hello"
+  | "mentor_intro_ready"
   | "stay_on_quests"
   | "open_add_quest"
   | "enter_title"
@@ -98,6 +100,8 @@ const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
+  "mentor_intro_hello",
+  "mentor_intro_ready",
   "stay_on_quests",
   "open_add_quest",
   "enter_title",
@@ -132,6 +136,9 @@ const emitTutorialEvent = (eventName: string, detail: Record<string, unknown>) =
 
 const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[] => {
   switch (milestoneId) {
+    case "mentor_intro_hello":
+    case "mentor_intro_ready":
+      return [];
     case "stay_on_quests":
       return ['[data-tour="quests-tab"]'];
     case "open_add_quest":
@@ -272,19 +279,24 @@ export const shouldRestoreTutorialRoute = ({
   stepRoute,
   tutorialReady,
   tutorialComplete,
+  currentStepId,
+  evolutionInFlight,
 }: {
   pathname: string;
   stepRoute: string | null;
   tutorialReady: boolean;
   tutorialComplete: boolean;
+  currentStepId: GuidedTutorialStepId | null;
+  evolutionInFlight: boolean;
 }): boolean => {
   if (!tutorialReady || tutorialComplete || !stepRoute) return false;
+  if (currentStepId === "evolve_companion" && evolutionInFlight) return false;
   if (!ROUTE_RESTORE_PATH_SET.has(pathname)) return false;
   return pathname !== stepRoute;
 };
 
 export interface PostOnboardingMentorGuidanceState {
-  isIntroActive: boolean;
+  isIntroDialogueActive: boolean;
   isActive: boolean;
   currentStep: GuidedTutorialStepId | null;
   currentSubstep: CreateQuestSubstepId | null;
@@ -300,11 +312,12 @@ export interface PostOnboardingMentorGuidanceState {
   speakerPrimaryColor?: string;
   speakerSlug?: string;
   speakerAvatarUrl?: string;
-  completeIntro: () => void;
+  dialogueActionLabel?: string;
+  onDialogueAction?: () => void;
 }
 
 const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
-  isIntroActive: false,
+  isIntroDialogueActive: false,
   isActive: false,
   currentStep: null,
   currentSubstep: null,
@@ -320,7 +333,8 @@ const DEFAULT_GUIDANCE_STATE: PostOnboardingMentorGuidanceState = {
   speakerPrimaryColor: "#f59e0b",
   speakerSlug: undefined,
   speakerAvatarUrl: undefined,
-  completeIntro: () => {},
+  dialogueActionLabel: undefined,
+  onDialogueAction: undefined,
 };
 
 const PostOnboardingMentorGuidanceContext = createContext<PostOnboardingMentorGuidanceState>(
@@ -372,6 +386,16 @@ export const getMentorInstructionLines = (
 
 const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; support?: string } => {
   switch (milestoneId) {
+    case "mentor_intro_hello":
+      return {
+        text: "Hey, I'm here with you. We'll move fast and keep this simple.",
+        support: "Two quick notes, then we jump into your full guided walkthrough.",
+      };
+    case "mentor_intro_ready":
+      return {
+        text: "Follow my prompts and tap the highlighted targets.",
+        support: "You only need a few actions to finish this tutorial.",
+      };
     case "stay_on_quests":
       return {
         text: "Start on Quests. We'll build your first quest together.",
@@ -424,8 +448,8 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
       };
     case "complete_companion_evolution":
       return {
-        text: "Stay with your companion through the evolution.",
-        support: "I'll close out your tutorial right after this transformation.",
+        text: "Evolution is in progress. This may take a little while.",
+        support: "You can leave this screen and use the app like usual. I'll bring you back to complete your tutorial when it's ready.",
       };
     case "mentor_closeout_message":
       return {
@@ -441,6 +465,8 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
 
 export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
   if (!milestoneId) return false;
+  if (milestoneId === "mentor_intro_hello") return false;
+  if (milestoneId === "mentor_intro_ready") return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
   if (milestoneId === "complete_companion_evolution") return false;
@@ -468,7 +494,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const [sessionAwarded, setSessionAwarded] = useState<GuidedTutorialStepId[]>([]);
   const [sessionCreateQuestCompleted, setSessionCreateQuestCompleted] = useState<CreateQuestSubstepId[]>([]);
   const [sessionMilestonesCompleted, setSessionMilestonesCompleted] = useState<GuidedMilestoneId[]>([]);
-  const [sessionIntroSeen, setSessionIntroSeen] = useState(false);
+  const [sessionEvolutionInFlight, setSessionEvolutionInFlight] = useState<boolean | null>(null);
   const [activeTargetSelector, setActiveTargetSelector] = useState<string | null>(null);
 
   const onboardingData = (profile?.onboarding_data as Record<string, unknown> | null) ?? null;
@@ -485,7 +511,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     setSessionAwarded([]);
     setSessionCreateQuestCompleted([]);
     setSessionMilestonesCompleted([]);
-    setSessionIntroSeen(false);
+    setSessionEvolutionInFlight(null);
     setActiveTargetSelector(null);
     completionPersistRef.current = false;
     stepPersistThrottleRef.current.clear();
@@ -549,6 +575,13 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     () => GUIDED_STEPS.find((step) => !completedSet.has(step.id)),
     [completedSet]
   );
+  const currentStepId = currentStep?.id ?? null;
+  const persistedEvolutionInFlight = useMemo(() => {
+    const remoteValue = remoteProgress?.evolutionInFlight;
+    const localValue = localProgress?.evolutionInFlight;
+    return Boolean(remoteValue ?? localValue ?? false);
+  }, [localProgress?.evolutionInFlight, remoteProgress?.evolutionInFlight]);
+  const evolutionInFlight = sessionEvolutionInFlight ?? persistedEvolutionInFlight;
 
   const tutorialReady =
     Boolean(user?.id) && !profileLoading && walkthroughCompleted && tutorialEligible;
@@ -556,17 +589,19 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const tutorialMarkedComplete = Boolean(
     remoteProgress?.completed ?? localProgress?.completed ?? false
   );
-  const introEnabled = Boolean(remoteProgress?.introEnabled || localProgress?.introEnabled);
-  const introSeen = Boolean(remoteProgress?.introSeen || localProgress?.introSeen || sessionIntroSeen);
 
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
-  const isIntroActive = tutorialReady && !tutorialComplete && introEnabled && !introSeen;
+  const hasIntroHello = milestoneSet.has("mentor_intro_hello");
+  const hasIntroReady = milestoneSet.has("mentor_intro_ready");
+  const hasPendingIntroDialogue = Boolean(currentStep) && (!hasIntroHello || !hasIntroReady);
   const stepRoute = currentStep?.route ?? null;
   const shouldRestoreRoute = shouldRestoreTutorialRoute({
     pathname: location.pathname,
     stepRoute,
-    tutorialReady: tutorialReady && !isIntroActive,
+    tutorialReady,
     tutorialComplete,
+    currentStepId,
+    evolutionInFlight,
   });
 
   const persistProgress = useCallback(
@@ -634,19 +669,9 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     [location.pathname, milestoneSet, persistProgress, user?.id]
   );
 
-  const completeIntro = useCallback(() => {
-    if (!tutorialReady || !introEnabled || introSeen) return;
-
-    setSessionIntroSeen(true);
-    void persistProgress({
-      introSeen: true,
-      introSeenAt: new Date().toISOString(),
-    });
-  }, [introEnabled, introSeen, persistProgress, tutorialReady]);
-
   const markCreateQuestSubstepComplete = useCallback(
     (substepId: CreateQuestSubstepId) => {
-      if (isIntroActive) return;
+      if (hasPendingIntroDialogue) return;
       if (!tutorialReady || currentStep?.id !== "create_quest") return;
       if (createQuestProgress.current !== substepId) return;
       if (createQuestProgress.completed.includes(substepId)) return;
@@ -676,7 +701,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     [
       createQuestProgress,
       currentStep?.id,
-      isIntroActive,
+      hasPendingIntroDialogue,
       markMilestoneComplete,
       persistProgress,
       tutorialReady,
@@ -685,7 +710,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
   const markStepComplete = useCallback(
     (stepId: GuidedTutorialStepId) => {
-      if (isIntroActive) return;
+      if (hasPendingIntroDialogue) return;
       if (!tutorialReady || completedSet.has(stepId)) return;
       if (stepPersistThrottleRef.current.has(stepId)) return;
 
@@ -719,7 +744,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         completedAt: complete ? new Date().toISOString() : undefined,
       });
     },
-    [awardCustomXP, awardedSet, completedSet, isIntroActive, persistProgress, tutorialReady]
+    [awardCustomXP, awardedSet, completedSet, hasPendingIntroDialogue, persistProgress, tutorialReady]
   );
 
   useEffect(() => {
@@ -735,7 +760,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   }, [awardedSet, persistProgress, tutorialComplete]);
 
   useEffect(() => {
-    if (!tutorialReady || tutorialComplete || isIntroActive || !currentStep) return;
+    if (!tutorialReady || tutorialComplete || hasPendingIntroDialogue || !currentStep) return;
 
     if (currentStep.id === "create_quest") {
       if (location.pathname === "/journeys" && createQuestProgress.current === "stay_on_quests") {
@@ -813,16 +838,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "evolve_companion") {
-      if (location.pathname !== "/companion") return;
-
-      const hasEvolveButton = Boolean(
-        document.querySelector('[data-tour="evolve-companion-button"]')
-      );
-
-      if (hasEvolveButton && !milestoneSet.has("tap_evolve_companion")) {
-        markMilestoneComplete("tap_evolve_companion");
-      }
-
       const cachedCompanion = user?.id
         ? queryClient.getQueryData<Companion | null>(getCompanionQueryKey(user.id))
         : null;
@@ -862,14 +877,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markStepComplete,
     queryClient,
     milestoneSet,
-    isIntroActive,
+    hasPendingIntroDialogue,
     tutorialComplete,
     tutorialReady,
     user?.id,
   ]);
 
   useEffect(() => {
-    if (!currentStep || !tutorialReady || tutorialComplete || isIntroActive) return;
+    if (!currentStep || !tutorialReady || tutorialComplete || hasPendingIntroDialogue) return;
 
     const listeners: Array<{ eventName: string; handler: (event: Event) => void }> = [];
 
@@ -930,8 +945,27 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
 
     if (currentStep.id === "evolve_companion") {
       listeners.push({
+        eventName: "evolution-loading-start",
+        handler: () => {
+          if (!milestoneSet.has("tap_evolve_companion")) {
+            markMilestoneComplete("tap_evolve_companion");
+          }
+          setSessionEvolutionInFlight(true);
+          void persistProgress({
+            evolutionInFlight: true,
+            evolutionStartedAt: new Date().toISOString(),
+          });
+        },
+      });
+
+      listeners.push({
         eventName: "companion-evolved",
         handler: () => {
+          setSessionEvolutionInFlight(false);
+          void persistProgress({
+            evolutionInFlight: false,
+            evolutionCompletedAt: new Date().toISOString(),
+          });
           if (!milestoneSet.has("complete_companion_evolution")) {
             markMilestoneComplete("complete_companion_evolution");
           }
@@ -957,14 +991,16 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markMilestoneComplete,
     markStepComplete,
     milestoneSet,
-    isIntroActive,
+    persistProgress,
+    hasPendingIntroDialogue,
     tutorialComplete,
     tutorialReady,
   ]);
 
   const currentMilestone = useMemo<GuidedMilestoneId | null>(() => {
-    if (isIntroActive) return null;
     if (!currentStep) return null;
+    if (!milestoneSet.has("mentor_intro_hello")) return "mentor_intro_hello";
+    if (!milestoneSet.has("mentor_intro_ready")) return "mentor_intro_ready";
 
     if (currentStep.id === "create_quest") {
       return createQuestProgress.current;
@@ -983,7 +1019,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     if (currentStep.id === "evolve_companion") {
-      return "tap_evolve_companion";
+      return evolutionInFlight ? "complete_companion_evolution" : "tap_evolve_companion";
     }
 
     if (currentStep.id === "mentor_closeout") {
@@ -991,7 +1027,15 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     }
 
     return null;
-  }, [createQuestProgress.current, currentStep, isIntroActive, milestoneSet]);
+  }, [createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
+
+  const isIntroDialogueActive =
+    currentMilestone === "mentor_intro_hello" || currentMilestone === "mentor_intro_ready";
+  const dialogueActionLabel = currentMilestone === "mentor_intro_ready" ? "Start Tutorial" : "Continue";
+  const onDialogueAction = useCallback(() => {
+    if (!currentMilestone || !isIntroDialogueActive) return;
+    markMilestoneComplete(currentMilestone);
+  }, [currentMilestone, isIntroDialogueActive, markMilestoneComplete]);
 
   const activeTargetSelectors = useMemo(
     () => (currentMilestone ? getTargetSelectorsForMilestone(currentMilestone) : []),
@@ -1050,6 +1094,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       !tutorialReady ||
       tutorialComplete ||
       !currentMilestone ||
+      isIntroDialogueActive ||
       shouldRestoreRoute ||
       pathIsHidden(location.pathname)
     ) {
@@ -1101,6 +1146,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     activeTargetSelectors,
     currentMilestone,
     currentStep?.id,
+    isIntroDialogueActive,
     location.pathname,
     shouldRestoreRoute,
     tutorialComplete,
@@ -1111,11 +1157,9 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const isActive =
     tutorialReady &&
     !tutorialComplete &&
-    !isIntroActive &&
     !shouldRestoreRoute &&
     !pathIsHidden(location.pathname) &&
     Boolean(currentStep);
-  const currentStepId = currentStep?.id ?? null;
   const currentSubstep = currentStepId === "create_quest" ? createQuestProgress.current : null;
 
   const currentIndex = currentStepId
@@ -1175,7 +1219,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const strictLockEnabled = milestoneUsesStrictLock(currentMilestone);
 
   return {
-    isIntroActive,
+    isIntroDialogueActive,
     isActive,
     currentStep: currentStepId,
     currentSubstep,
@@ -1191,7 +1235,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     speakerPrimaryColor: personality?.primary_color ?? "#f59e0b",
     speakerSlug: personality?.slug,
     speakerAvatarUrl: personality?.avatar_url,
-    completeIntro,
+    dialogueActionLabel: isIntroDialogueActive ? dialogueActionLabel : undefined,
+    onDialogueAction: isIntroDialogueActive ? onDialogueAction : undefined,
   };
 };
 

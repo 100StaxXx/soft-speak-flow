@@ -29,6 +29,9 @@ export interface GuidedTutorialProgress {
   eligible: boolean;
   completedSteps: GuidedTutorialStepId[];
   xpAwardedSteps: GuidedTutorialStepId[];
+  evolutionInFlight?: boolean;
+  evolutionStartedAt?: string;
+  evolutionCompletedAt?: string;
   introEnabled?: boolean;
   introSeen?: boolean;
   introSeenAt?: string;

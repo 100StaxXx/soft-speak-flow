@@ -41,7 +41,6 @@ import { shouldShowBottomNav } from "@/utils/bottomNavVisibility";
 import { PostOnboardingMentorGuidanceProvider } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
-import { MentorTutorialIntro } from "@/components/tutorial/MentorTutorialIntro";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 
 // Lazy load pages for code splitting
@@ -165,7 +164,6 @@ const MentorTutorialLayer = memo(() => {
 
   return (
     <>
-      <MentorTutorialIntro />
       <MentorSpotlightGuard
         active={isActive && isStrictLockActive}
         targetSelector={activeTargetSelector}

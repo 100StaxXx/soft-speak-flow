@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,15 @@ const createGuidedTutorial = () => ({
   milestonesCompleted: ["open_mentor_tab"] as const,
 });
 
+const createEvolveStepTutorial = () => ({
+  version: 2,
+  eligible: true,
+  completed: false,
+  completedSteps: ["create_quest", "meet_companion", "morning_checkin"] as const,
+  xpAwardedSteps: [] as string[],
+  milestonesCompleted: ["mentor_intro_hello", "mentor_intro_ready"] as const,
+});
+
 const mocks = vi.hoisted(() => ({
   guidedTutorial: {
     version: 2,
@@ -25,7 +34,6 @@ const mocks = vi.hoisted(() => ({
     xpAwardedSteps: [] as string[],
     milestonesCompleted: ["open_mentor_tab"] as const,
   },
-  profileUpdatePayloads: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -59,11 +67,8 @@ vi.mock("@/hooks/useMentorPersonality", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({
-      update: vi.fn((payload: Record<string, unknown>) => ({
-        eq: vi.fn(async () => {
-          mocks.profileUpdatePayloads.push(payload);
-          return { error: null };
-        }),
+      update: vi.fn(() => ({
+        eq: vi.fn(async () => ({ error: null })),
       })),
     })),
   },
@@ -72,17 +77,22 @@ vi.mock("@/integrations/supabase/client", () => ({
 const RouteProbe = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isIntroActive, completeIntro } = usePostOnboardingMentorGuidance();
+  const { isIntroDialogueActive, dialogueActionLabel, onDialogueAction } =
+    usePostOnboardingMentorGuidance();
 
   return (
     <div>
       <div data-testid="path">{location.pathname}</div>
-      <div data-testid="intro-active">{String(isIntroActive)}</div>
-      <button type="button" onClick={() => completeIntro()}>
-        complete-intro
+      <div data-testid="intro-active">{String(isIntroDialogueActive)}</div>
+      <div data-testid="intro-action">{dialogueActionLabel || ""}</div>
+      <button type="button" onClick={() => onDialogueAction?.()}>
+        intro-action
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         back
+      </button>
+      <button type="button" onClick={() => navigate("/journeys")}>
+        go-journeys
       </button>
     </div>
   );
@@ -91,11 +101,10 @@ const RouteProbe = () => {
 describe("guided tutorial route restoration", () => {
   beforeEach(() => {
     mocks.guidedTutorial = createGuidedTutorial();
-    mocks.profileUpdatePayloads = [];
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
   });
 
-  const renderWithProviders = () => {
+  const renderWithProviders = (initialPath = "/journeys") => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -106,7 +115,7 @@ describe("guided tutorial route restoration", () => {
 
     return render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/journeys"]}>
+        <MemoryRouter initialEntries={[initialPath]}>
           <PostOnboardingMentorGuidanceProvider>
             <Routes>
               <Route path="*" element={<RouteProbe />} />
@@ -131,40 +140,64 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("does not restore route while intro is active", async () => {
-    mocks.guidedTutorial.introEnabled = true;
-    mocks.guidedTutorial.introSeen = false;
-
+  it("keeps route restoration active while intro dialogue is pending", async () => {
     renderWithProviders();
 
     await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
       expect(screen.getByTestId("intro-active")).toHaveTextContent("true");
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
     });
   });
 
-  it("restores route after intro is completed", async () => {
-    mocks.guidedTutorial.introEnabled = true;
-    mocks.guidedTutorial.introSeen = false;
-
+  it("advances intro dialogue on route and then exits intro mode", async () => {
     renderWithProviders();
 
     await waitFor(() => {
-      expect(screen.getByTestId("intro-active")).toHaveTextContent("true");
-      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "complete-intro" }));
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("intro-active")).toHaveTextContent("true");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Start Tutorial");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("intro-active")).toHaveTextContent("false");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("");
       expect(screen.getByTestId("path")).toHaveTextContent("/mentor");
     });
+  });
 
-    expect(
-      mocks.profileUpdatePayloads.some((payload) =>
-        JSON.stringify(payload).includes('"introSeen":true')
-      )
-    ).toBe(true);
+  it("allows leaving during in-flight evolution, then returns to companion after completion", async () => {
+    mocks.guidedTutorial = createEvolveStepTutorial();
+    renderWithProviders("/companion");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("intro-active")).toHaveTextContent("false");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("evolution-loading-start"));
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "go-journeys" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/journeys");
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("companion-evolved"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+    });
   });
 });

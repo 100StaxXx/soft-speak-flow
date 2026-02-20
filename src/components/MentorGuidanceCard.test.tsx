@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MentorGuidanceCard, resolveMentorGuidancePlacement } from "./MentorGuidanceCard";
 
 const mocks = vi.hoisted(() => ({
+  onDialogueAction: vi.fn(),
   guidance: {
     isActive: true,
+    isIntroDialogueActive: false,
     currentStep: "create_quest",
     currentSubstep: "open_add_quest",
     stepRoute: "/journeys",
@@ -15,6 +17,8 @@ const mocks = vi.hoisted(() => ({
     isStrictLockActive: true,
     dialogueText: "Tap the + in the bottom right.",
     dialogueSupportText: "I'll highlight it for you.",
+    dialogueActionLabel: undefined,
+    onDialogueAction: undefined,
     speakerName: "Atlas",
     speakerSlug: "atlas",
     speakerAvatarUrl: "",
@@ -46,6 +50,22 @@ describe("MentorGuidanceCard", () => {
     render(<MentorGuidanceCard />);
     expect(screen.queryByText("Atlas")).not.toBeInTheDocument();
     mocks.guidance.isActive = true;
+  });
+
+  it("renders intro action button and triggers callback", () => {
+    mocks.guidance.isIntroDialogueActive = true;
+    mocks.guidance.dialogueActionLabel = "Continue";
+    mocks.guidance.onDialogueAction = mocks.onDialogueAction;
+
+    render(<MentorGuidanceCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
+
+    mocks.guidance.isIntroDialogueActive = false;
+    mocks.guidance.dialogueActionLabel = undefined;
+    mocks.guidance.onDialogueAction = undefined;
+    mocks.onDialogueAction.mockClear();
   });
 });
 

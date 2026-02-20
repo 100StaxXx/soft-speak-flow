@@ -184,6 +184,8 @@ describe("shouldRestoreTutorialRoute", () => {
         stepRoute: "/mentor",
         tutorialReady: true,
         tutorialComplete: false,
+        currentStepId: "morning_checkin",
+        evolutionInFlight: false,
       })
     ).toBe(true);
   });
@@ -195,6 +197,8 @@ describe("shouldRestoreTutorialRoute", () => {
         stepRoute: "/companion",
         tutorialReady: true,
         tutorialComplete: false,
+        currentStepId: "evolve_companion",
+        evolutionInFlight: false,
       })
     ).toBe(true);
   });
@@ -206,6 +210,8 @@ describe("shouldRestoreTutorialRoute", () => {
         stepRoute: "/mentor",
         tutorialReady: true,
         tutorialComplete: false,
+        currentStepId: "morning_checkin",
+        evolutionInFlight: false,
       })
     ).toBe(false);
   });
@@ -217,6 +223,8 @@ describe("shouldRestoreTutorialRoute", () => {
         stepRoute: "/mentor",
         tutorialReady: true,
         tutorialComplete: false,
+        currentStepId: "morning_checkin",
+        evolutionInFlight: false,
       })
     ).toBe(false);
   });
@@ -228,6 +236,8 @@ describe("shouldRestoreTutorialRoute", () => {
         stepRoute: "/mentor",
         tutorialReady: false,
         tutorialComplete: false,
+        currentStepId: "morning_checkin",
+        evolutionInFlight: false,
       })
     ).toBe(false);
 
@@ -237,12 +247,40 @@ describe("shouldRestoreTutorialRoute", () => {
         stepRoute: "/mentor",
         tutorialReady: true,
         tutorialComplete: true,
+        currentStepId: "morning_checkin",
+        evolutionInFlight: false,
       })
     ).toBe(false);
   });
+
+  it("does not restore route during in-flight evolution step", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/journeys",
+        stepRoute: "/companion",
+        tutorialReady: true,
+        tutorialComplete: false,
+        currentStepId: "evolve_companion",
+        evolutionInFlight: true,
+      })
+    ).toBe(false);
+  });
+
+  it("restores route for evolve step once evolution is no longer in-flight", () => {
+    expect(
+      shouldRestoreTutorialRoute({
+        pathname: "/journeys",
+        stepRoute: "/companion",
+        tutorialReady: true,
+        tutorialComplete: false,
+        currentStepId: "evolve_companion",
+        evolutionInFlight: false,
+      })
+    ).toBe(true);
+  });
 });
 
-describe("guided tutorial intro state", () => {
+describe("guided tutorial intro dialogue sequence", () => {
   beforeEach(() => {
     mocks.state.user = { id: "user-1" };
     mocks.state.profileLoading = false;
@@ -261,46 +299,38 @@ describe("guided tutorial intro state", () => {
         React.createElement(PostOnboardingMentorGuidanceProvider, null, children)
       );
 
-  it("keeps tutorial inactive while intro is active", async () => {
-    mocks.state.guidedTutorial.introEnabled = true;
-    mocks.state.guidedTutorial.introSeen = false;
-
-    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isIntroActive).toBe(true);
-    });
-    expect(result.current.isActive).toBe(false);
-  });
-
-  it("completes intro and enables tutorial flow", async () => {
-    mocks.state.guidedTutorial.introEnabled = true;
-    mocks.state.guidedTutorial.introSeen = false;
-
+  it("shows two intro dialogue milestones before resuming normal tutorial", async () => {
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper("/mentor"),
     });
 
     await waitFor(() => {
-      expect(result.current.isIntroActive).toBe(true);
-      expect(result.current.isActive).toBe(false);
+      expect(result.current.isIntroDialogueActive).toBe(true);
+      expect(result.current.dialogueActionLabel).toBe("Continue");
+      expect(result.current.activeTargetSelectors).toEqual([]);
+      expect(result.current.isStrictLockActive).toBe(false);
     });
 
     await act(async () => {
-      result.current.completeIntro();
+      result.current.onDialogueAction?.();
     });
 
     await waitFor(() => {
-      expect(result.current.isIntroActive).toBe(false);
-      expect(result.current.isActive).toBe(true);
+      expect(result.current.isIntroDialogueActive).toBe(true);
+      expect(result.current.dialogueActionLabel).toBe("Start Tutorial");
+      expect(result.current.activeTargetSelectors).toEqual([]);
+      expect(result.current.isStrictLockActive).toBe(false);
     });
 
-    expect(
-      mocks.state.profileUpdatePayloads.some((payload) =>
-        JSON.stringify(payload).includes('"introSeen":true')
-      )
-    ).toBe(true);
+    await act(async () => {
+      result.current.onDialogueAction?.();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isIntroDialogueActive).toBe(false);
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.dialogueActionLabel).toBeUndefined();
+      expect(result.current.onDialogueAction).toBeUndefined();
+    });
   });
 });

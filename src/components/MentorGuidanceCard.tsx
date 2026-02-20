@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { MentorAvatar } from "@/components/MentorAvatar";
+import { Button } from "@/components/ui/button";
 
 const PANEL_GAP_PX = 12;
 const PANEL_TOP_MARGIN_PX = 12;
@@ -119,6 +120,9 @@ export const MentorGuidanceCard = () => {
     speakerPrimaryColor,
     speakerSlug,
     speakerAvatarUrl,
+    isIntroDialogueActive,
+    dialogueActionLabel,
+    onDialogueAction,
   } = usePostOnboardingMentorGuidance();
 
   const wrapperRef = useRef<HTMLElement | null>(null);
@@ -222,6 +226,17 @@ export const MentorGuidanceCard = () => {
             <p className="mt-2 text-base leading-relaxed text-white sm:text-lg">{dialogueText}</p>
             {dialogueSupportText ? (
               <p className="mt-1 text-sm leading-relaxed text-white/80">{dialogueSupportText}</p>
+            ) : null}
+            {isIntroDialogueActive && onDialogueAction ? (
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  onClick={onDialogueAction}
+                  className="pointer-events-auto h-9 rounded-xl bg-amber-500 text-black hover:bg-amber-400"
+                >
+                  {dialogueActionLabel || "Continue"}
+                </Button>
+              </div>
             ) : null}
           </div>
         </div>
