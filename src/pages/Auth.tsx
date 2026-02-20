@@ -17,6 +17,9 @@ import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { signinBackground } from "@/assets/backgrounds";
 import { StaticBackgroundImage } from "@/components/StaticBackgroundImage";
 
+const POST_AUTH_NAVIGATION_TIMEOUT_MS = 5000;
+const POST_AUTH_DEFAULT_PATH = '/onboarding';
+
 const authSchema = z.object({
   email: z.string()
     .trim()
@@ -41,6 +44,39 @@ const authSchema = z.object({
   path: ["confirmPassword"]
 });
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+};
+
+const getAppleErrorDescription = (error: unknown): string => {
+  const message = getErrorMessage(error);
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("apple_email_missing")) {
+    return "Apple did not share an email for this account. Remove Cosmiq from Sign in with Apple settings, then try again.";
+  }
+
+  if (normalized.includes("nonce") || normalized.includes("security check")) {
+    return "Apple Sign-In security verification failed. Please try again.";
+  }
+
+  if (normalized.includes("session")) {
+    return "Apple Sign-In completed, but we couldn't start your session. Please try again.";
+  }
+
+  if (
+    normalized.includes("network") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("timeout")
+  ) {
+    return "Network issue while signing in with Apple. Check your connection and try again.";
+  }
+
+  return message || "Apple Sign-In failed. Please try again.";
+};
+
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -58,10 +94,10 @@ const Auth = () => {
 
   const handlePostAuthNavigation = useCallback(async (session: Session | null, source: string) => {
     const startTime = Date.now();
-    logger.info(`[Auth ${source}] handlePostAuthNavigation START`, { 
-      hasSession: !!session, 
+    logger.info(`[Auth ${source}] handlePostAuthNavigation START`, {
+      hasSession: !!session,
       hasRedirected: hasRedirected.current,
-      userId: session?.user?.id?.substring(0, 8) 
+      userId: session?.user?.id?.substring(0, 8)
     });
 
     // Synchronous guard - check and set IMMEDIATELY before any async work
@@ -71,59 +107,96 @@ const Auth = () => {
     }
     hasRedirected.current = true;
 
-    // Timeout protection - force navigation after 5 seconds to prevent hanging
-    const NAVIGATION_TIMEOUT = 5000;
-    let navigationCompleted = false;
-    
-    const timeoutId = setTimeout(async () => {
-      if (!navigationCompleted) {
-        logger.warn(`[Auth ${source}] TIMEOUT after ${NAVIGATION_TIMEOUT}ms - checking if returning user`);
+    let navigationFinalized = false;
+    const finalizeNavigation = (path: string, reason: string): boolean => {
+      if (navigationFinalized) {
+        logger.debug(`[Auth ${source}] Navigation already finalized, skipping ${reason}`);
+        return false;
+      }
+
+      navigationFinalized = true;
+      logger.info(
+        `[Auth ${source}] Finalizing navigation to ${path} via ${reason} (total time: ${Date.now() - startTime}ms)`,
+      );
+      safeNavigate(navigate, path);
+
+      // Safety valve: if routing fails and we are still on /auth, allow retry.
+      setTimeout(() => {
+        if (window.location.pathname === '/auth') {
+          logger.warn(`[Auth ${source}] Navigation did not leave /auth, resetting redirect guard`);
+          hasRedirected.current = false;
+        }
+      }, 1500);
+
+      return true;
+    };
+
+    const emitTimeoutTelemetry = () => {
+      void Promise.resolve((async () => {
+        const telemetryStart = Date.now();
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("onboarding_completed")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (error) {
+          logger.warn(`[Auth ${source}] Timeout telemetry profile check failed`, { error: error.message });
+          return;
+        }
+
+        logger.info(`[Auth ${source}] Timeout telemetry profile check completed`, {
+          onboardingCompleted: data?.onboarding_completed,
+          durationMs: Date.now() - telemetryStart,
+        });
+      })()).catch((error: unknown) => {
+        logger.warn(`[Auth ${source}] Timeout telemetry failed`, { error });
+      });
+    };
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const deadlineTask = new Promise<"deadline">((resolve) => {
+      timeoutId = setTimeout(() => {
+        logger.warn(`[Auth ${source}] TIMEOUT after ${POST_AUTH_NAVIGATION_TIMEOUT_MS}ms - hard fallback`);
         toast({
           title: "Taking longer than expected",
           description: "Redirecting you now...",
         });
-        
-        // Check if user has completed onboarding before defaulting
-        try {
-          const { data } = await supabase
-            .from("profiles")
-            .select("onboarding_completed")
-            .eq("id", session.user.id)
-            .maybeSingle();
-          
-          const path = data?.onboarding_completed ? '/tasks' : '/onboarding';
-          safeNavigate(navigate, path);
-        } catch {
-          safeNavigate(navigate, '/onboarding');
-        }
-      }
-    }, NAVIGATION_TIMEOUT);
 
-    try {
-      logger.info(`[Auth ${source}] Calling ensureProfile...`);
-      const profileStartTime = Date.now();
-      await ensureProfile(session.user.id, session.user.email);
-      logger.info(`[Auth ${source}] ensureProfile completed in ${Date.now() - profileStartTime}ms`);
-      
-      logger.info(`[Auth ${source}] Calling getAuthRedirectPath...`);
-      const redirectStartTime = Date.now();
-      const path = await getAuthRedirectPath(session.user.id);
-      logger.info(`[Auth ${source}] getAuthRedirectPath returned "${path}" in ${Date.now() - redirectStartTime}ms`);
-      
-      navigationCompleted = true;
+        finalizeNavigation(POST_AUTH_DEFAULT_PATH, "deadline");
+        emitTimeoutTelemetry();
+        resolve("deadline");
+      }, POST_AUTH_NAVIGATION_TIMEOUT_MS);
+    });
+
+    const coreTask = (async (): Promise<"core"> => {
+      try {
+        logger.info(`[Auth ${source}] Calling ensureProfile...`);
+        const profileStartTime = Date.now();
+        await ensureProfile(session.user.id, session.user.email);
+        logger.info(`[Auth ${source}] ensureProfile completed in ${Date.now() - profileStartTime}ms`);
+
+        logger.info(`[Auth ${source}] Calling getAuthRedirectPath...`);
+        const redirectStartTime = Date.now();
+        const path = await getAuthRedirectPath(session.user.id);
+        logger.info(`[Auth ${source}] getAuthRedirectPath returned "${path}" in ${Date.now() - redirectStartTime}ms`);
+
+        finalizeNavigation(path, "resolved-path");
+      } catch (error) {
+        logger.error(`[Auth ${source}] Navigation error after ${Date.now() - startTime}ms`, { error });
+        finalizeNavigation(POST_AUTH_DEFAULT_PATH, "error");
+      }
+
+      return "core";
+    })();
+
+    const winner = await Promise.race([coreTask, deadlineTask]);
+    if (timeoutId) {
       clearTimeout(timeoutId);
-      
-      logger.info(`[Auth ${source}] Navigating to ${path} (total time: ${Date.now() - startTime}ms)`);
-      safeNavigate(navigate, path);
-      logger.info(`[Auth ${source}] safeNavigate called successfully`);
-    } catch (error) {
-      navigationCompleted = true;
-      clearTimeout(timeoutId);
-      
-      // Reset on error so user can retry
-      hasRedirected.current = false;
-      logger.error(`[Auth ${source}] Navigation error after ${Date.now() - startTime}ms`, { error });
-      safeNavigate(navigate, '/onboarding');
+    }
+
+    if (winner === "deadline") {
+      logger.warn(`[Auth ${source}] Navigation deadline won race; continuing in background if needed`);
     }
   }, [navigate, toast]);
   
@@ -538,6 +611,7 @@ const Auth = () => {
 
       // Native Apple Sign-In for iOS
       if (provider === 'apple' && providerSupportsNative && appleNativeReady) {
+        const appleFlowStart = Date.now();
         console.log('[Apple OAuth] Initiating native Apple sign-in');
         
         // Generate secure random nonce (Supabase provides this method)
@@ -555,6 +629,7 @@ const Auth = () => {
 
         console.log('[Apple OAuth] Calling SignInWithApple.authorize with clientId: com.darrylgraham.revolution');
         
+        const authorizeStart = Date.now();
         const result: SignInWithAppleResponse = await SignInWithApple.authorize({
           clientId: 'com.darrylgraham.revolution', // Use bundle ID for native iOS
           redirectURI: 'com.darrylgraham.revolution://',
@@ -562,6 +637,7 @@ const Auth = () => {
           state: crypto.randomUUID(), // Random state for security
           nonce: hashedNonce, // Hashed nonce for Apple
         });
+        console.log(`[Apple OAuth] authorize() completed in ${Date.now() - authorizeStart}ms`);
 
         console.log('[Apple OAuth] SignInWithApple result:', {
           hasIdentityToken: !!result.response.identityToken,
@@ -578,9 +654,14 @@ const Auth = () => {
         console.log('[Apple OAuth] Calling apple-native-auth edge function');
 
         // Call our edge function to handle native Apple auth
+        const edgeInvokeStart = Date.now();
         const { data: sessionData, error: functionError } = await supabase.functions.invoke('apple-native-auth', {
-          body: { identityToken: result.response.identityToken }
+          body: {
+            identityToken: result.response.identityToken,
+            rawNonce,
+          }
         });
+        console.log(`[Apple OAuth] apple-native-auth completed in ${Date.now() - edgeInvokeStart}ms`);
 
         console.log('[Apple OAuth] Edge function response:', { 
           hasAccessToken: !!sessionData?.access_token,
@@ -601,6 +682,10 @@ const Auth = () => {
             return;
           }
 
+          if (sessionData?.code === 'APPLE_NONCE_MISSING' || sessionData?.code === 'APPLE_NONCE_MISMATCH') {
+            throw new Error('Apple Sign-In security check failed. Please try again.');
+          }
+
           throw new Error(sessionData?.error || functionError.message || 'Apple Sign-In failed');
         }
         if (!sessionData?.access_token || !sessionData?.refresh_token) {
@@ -608,10 +693,12 @@ const Auth = () => {
         }
 
         // Set the session with tokens from edge function
+        const setSessionStart = Date.now();
         const { error: sessionError, data: { session: newSession } } = await supabase.auth.setSession({
           access_token: sessionData.access_token,
           refresh_token: sessionData.refresh_token,
         });
+        console.log(`[Apple OAuth] setSession completed in ${Date.now() - setSessionStart}ms`);
 
         if (sessionError) throw sessionError;
 
@@ -625,7 +712,9 @@ const Auth = () => {
 
         const sessionSetTime = Date.now();
         console.log(`[Apple OAuth] Session set successfully at ${sessionSetTime}, proceeding to navigation`);
-        await handlePostAuthNavigation(sessionToUse, 'appleNative');
+        console.log('[Apple OAuth] Triggering post-auth navigation');
+        void handlePostAuthNavigation(sessionToUse, 'appleNative');
+        console.log(`[Apple OAuth] Total native flow completed in ${Date.now() - appleFlowStart}ms`);
 
         // Fallback: manually redirect if onAuthStateChange doesn't fire (increased to 800ms to avoid race conditions)
         if (sessionToUse.user) {
@@ -675,22 +764,32 @@ const Auth = () => {
 
       if (error) throw error;
     } catch (error) {
+      const message = getErrorMessage(error);
       console.error(`[${provider} OAuth] Error caught:`, {
-        message: error.message,
-        code: error.code,
-        status: error.status,
+        message,
+        code: (error as { code?: string })?.code,
+        status: (error as { status?: number })?.status,
         fullError: error
       });
       
       // Handle user cancellation gracefully (don't show error toast)
-      if (error.message?.includes('1001') || error.message?.includes('cancel')) {
+      if (message.includes('1001') || message.toLowerCase().includes('cancel')) {
         console.log(`[${provider} OAuth] User cancelled sign-in`);
         return; // User cancelled, just return silently
+      }
+
+      if (provider === 'apple') {
+        toast({
+          title: "Apple Sign-In Error",
+          description: getAppleErrorDescription(error),
+          variant: "destructive",
+        });
+        return;
       }
       
       toast({
         title: "Error",
-        description: error.message || 'Failed to sign in. Please try again.',
+        description: message || 'Failed to sign in. Please try again.',
         variant: "destructive",
       });
     } finally {

@@ -338,7 +338,12 @@ const getEvolutionRetryDelayMs = (attempt: number) => {
   return EVOLUTION_RETRY_DELAYS_MS[index] ?? EVOLUTION_RETRY_DELAYS_MS[EVOLUTION_RETRY_DELAYS_MS.length - 1];
 };
 
-export const useCompanion = () => {
+interface UseCompanionOptions {
+  enabled?: boolean;
+}
+
+export const useCompanion = (options: UseCompanionOptions = {}) => {
+  const { enabled = true } = options;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { checkCompanionAchievements } = useAchievements();
@@ -357,7 +362,7 @@ export const useCompanion = () => {
 
       return fetchCompanion(user.id);
     },
-    enabled: !!user,
+    enabled: enabled && !!user,
     staleTime: 60000, // 1 minute - prevents unnecessary refetches and tab flash
     gcTime: 30 * 60 * 1000, // Keep companion cache warm across tab switches
     placeholderData: (previousData) => previousData,
@@ -405,10 +410,11 @@ export const useCompanion = () => {
             eyeColor,
             furColor,
             storyTone: data.storyTone,
+            flowType: "onboarding",
           },
           {
             // Adaptive retry policy: onboarding (stage 0) prioritizes reliability/latency.
-            maxRetries: 1,
+            maxRetries: 0,
             onRetry: (attempt) => {
               logger.log(`Validation failed, retrying image generation (attempt ${attempt})...`);
             },

@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+MANUAL_ALLOWLIST="scripts/function-manifest-manual-allowlist.txt"
+
 collect_frontend() {
   grep -RhoE "functions\\.invoke\\([[:space:]]*['\"][^'\"]+['\"]" \
     --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' src \
@@ -28,6 +30,17 @@ collect_scheduled() {
   } | sed '/^$/d' | sort -u
 }
 
+collect_manual_allowlist() {
+  if [ ! -f "$MANUAL_ALLOWLIST" ]; then
+    return
+  fi
+
+  sed -e 's/#.*$//' "$MANUAL_ALLOWLIST" \
+    | sed -e 's/[[:space:]]*$//' \
+    | sed '/^$/d' \
+    | sort -u
+}
+
 to_json_array() {
   if [ -s "$1" ]; then
     jq -R . < "$1" | jq -s .
@@ -39,13 +52,15 @@ to_json_array() {
 tmp_frontend="$(mktemp)"
 tmp_internal="$(mktemp)"
 tmp_scheduled="$(mktemp)"
+tmp_manual="$(mktemp)"
 tmp_allow="$(mktemp)"
-trap 'rm -f "$tmp_frontend" "$tmp_internal" "$tmp_scheduled" "$tmp_allow"' EXIT
+trap 'rm -f "$tmp_frontend" "$tmp_internal" "$tmp_scheduled" "$tmp_manual" "$tmp_allow"' EXIT
 
 collect_frontend > "$tmp_frontend"
 collect_internal > "$tmp_internal"
 collect_scheduled > "$tmp_scheduled"
-cat "$tmp_frontend" "$tmp_internal" "$tmp_scheduled" | sed '/^$/d' | sort -u > "$tmp_allow"
+collect_manual_allowlist > "$tmp_manual"
+cat "$tmp_frontend" "$tmp_internal" "$tmp_scheduled" "$tmp_manual" | sed '/^$/d' | sort -u > "$tmp_allow"
 
 frontend_json="$(to_json_array "$tmp_frontend")"
 internal_json="$(to_json_array "$tmp_internal")"

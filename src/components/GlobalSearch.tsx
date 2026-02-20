@@ -12,6 +12,7 @@ import { Badge } from "./ui/badge";
 import { BookOpen, MessageSquare, Sparkles, Trophy, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
+import { formatDisplayLabel } from "@/lib/utils";
 
 interface GlobalSearchProps {
   initialQuery?: string;
@@ -273,7 +274,7 @@ export const GlobalSearch = ({
                           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                             <Badge variant="outline">{epic.target_days} days</Badge>
                             {epic.status && (
-                              <Badge variant="secondary" className="text-xs capitalize">{epic.status}</Badge>
+                              <Badge variant="secondary" className="text-xs">{formatDisplayLabel(epic.status)}</Badge>
                             )}
                           </div>
                         </Card>
@@ -422,7 +423,7 @@ export const GlobalSearch = ({
                   <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <Badge variant="outline">{epic.target_days} days</Badge>
                     {epic.status && (
-                      <Badge variant="secondary" className="text-xs capitalize">{epic.status}</Badge>
+                      <Badge variant="secondary" className="text-xs">{formatDisplayLabel(epic.status)}</Badge>
                     )}
                   </div>
                 </Card>

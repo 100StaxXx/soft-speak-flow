@@ -20,7 +20,7 @@ import {
   ChevronUp,
   Sparkles,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 import { BossEncounter, DamageLogEntry } from "@/hooks/useGuildBoss";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
@@ -132,7 +132,7 @@ export const GuildBossCard = ({
               <CardTitle className="text-lg flex items-center gap-2">
                 {boss.boss_name}
                 <Badge variant="outline" className={cn("text-xs capitalize", tierConfig.color)}>
-                  {boss.boss_tier}
+                  {formatDisplayLabel(boss.boss_tier)}
                 </Badge>
               </CardTitle>
               {boss.boss_title && (

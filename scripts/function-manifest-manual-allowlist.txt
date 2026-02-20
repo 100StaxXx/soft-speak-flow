@@ -1,0 +1,9 @@
+# Functions that are invoked dynamically and cannot be discovered by static grep.
+ai-orchestrator
+generate-weekly-plan
+google-calendar-auth
+google-calendar-events
+optimize-weekly-plan
+outlook-calendar-auth
+outlook-calendar-events
+process-companion-evolution-job

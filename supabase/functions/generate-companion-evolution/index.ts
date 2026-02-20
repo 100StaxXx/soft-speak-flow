@@ -4,6 +4,7 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rateLimiter.ts";
+import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -165,6 +166,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestStartedAt = Date.now();
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -240,6 +243,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const imageSize = resolveCompanionImageSizeForUser(resolvedUserId);
+    console.log(`[CompanionEvolutionPolicy] user=${resolvedUserId} image_size=${imageSize}`);
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -789,7 +795,8 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
             content: userPrompt
           }
         ],
-        modalities: ["image", "text"]
+        modalities: ["image", "text"],
+        image_size: imageSize,
       })
     });
 
@@ -900,6 +907,8 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
+  } finally {
+    console.log(`[CompanionEvolutionTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
 });
 

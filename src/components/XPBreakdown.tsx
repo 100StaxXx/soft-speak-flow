@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, TrendingUp, Flame } from "lucide-react";
 import { useStreakMultiplier } from "@/hooks/useStreakMultiplier";
+import { formatDisplayLabel } from "@/lib/utils";
 
 export const XPBreakdown = memo(() => {
   const { user } = useAuth();
@@ -93,7 +94,7 @@ export const XPBreakdown = memo(() => {
             <p className="text-xs font-bold text-muted-foreground">XP Sources</p>
             {Object.entries(todayXP.byType).map(([type, xp]) => (
               <div key={type} className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">{typeLabels[type] || type}</span>
+                <span className="text-muted-foreground">{typeLabels[type] || formatDisplayLabel(type)}</span>
                 <span className="font-bold text-primary">+{xp} XP</span>
               </div>
             ))}

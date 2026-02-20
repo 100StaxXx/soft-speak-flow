@@ -1,5 +1,6 @@
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ReactNode, memo } from "react";
+import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -10,18 +11,25 @@ interface PageTransitionProps {
 const iosEasing = [0.25, 0.1, 0.25, 1] as const;
 
 export const PageTransition = memo(({ children, mode = "animated" }: PageTransitionProps) => {
-  const prefersReducedMotion = useReducedMotion();
+  const { capabilities, profile, signals } = useMotionProfile();
+  const shouldSkipTransition =
+    mode === "instant"
+    || signals.prefersReducedMotion
+    || signals.isBackgrounded
+    || !capabilities.enableTabTransitions;
 
-  if (prefersReducedMotion || mode === "instant") {
+  if (shouldSkipTransition) {
     return <div style={{ width: "100%", height: "100%" }}>{children}</div>;
   }
+
+  const duration = profile === "enhanced" ? 0.18 : 0.14;
 
   return (
     <motion.div
       initial={false}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.18, ease: iosEasing }}
+      transition={{ duration, ease: iosEasing }}
       style={{ width: '100%', height: '100%' }}
     >
       {children}

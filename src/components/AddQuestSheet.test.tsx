@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
@@ -65,6 +65,34 @@ describe("AddQuestSheet", () => {
     expect(screen.getByText("30 min")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
+  });
+
+  it("does not auto-focus the title on open and still allows manual focus", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <AddQuestSheet
+          open
+          onOpenChange={vi.fn()}
+          selectedDate={selectedDate}
+          onAdd={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
+
+      const titleInput = screen.getByPlaceholderText("Quest Title");
+      expect(titleInput).not.toHaveFocus();
+
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+      expect(titleInput).not.toHaveFocus();
+
+      fireEvent.click(titleInput);
+      titleInput.focus();
+      expect(titleInput).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows campaign creation CTA with inline max cap hint", () => {

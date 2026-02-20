@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 
 const mocks = vi.hoisted(() => ({
   companion: {
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   focusMountCount: 0,
   navigate: vi.fn(),
+  isTabActive: true,
+  useCompanionCalls: [] as Array<Record<string, unknown> | undefined>,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -104,14 +107,17 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 vi.mock("@/hooks/useCompanion", () => ({
-  useCompanion: () => ({
-    companion: mocks.companion,
-    nextEvolutionXP: 200,
-    progressToNext: 60,
-    isLoading: mocks.isLoading,
-    error: mocks.error,
-    refetch: mocks.refetch,
-  }),
+  useCompanion: (options?: Record<string, unknown>) => {
+    mocks.useCompanionCalls.push(options);
+    return {
+      companion: mocks.companion,
+      nextEvolutionXP: 200,
+      progressToNext: 60,
+      isLoading: mocks.isLoading,
+      error: mocks.error,
+      refetch: mocks.refetch,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useCompanionStory", () => ({
@@ -224,6 +230,13 @@ vi.mock("@/components/companion/FocusTab", async () => {
 
 import Companion from "@/pages/Companion";
 
+const renderCompanion = (isTabActive = true) =>
+  render(
+    <MainTabVisibilityProvider isTabActive={isTabActive}>
+      <Companion />
+    </MainTabVisibilityProvider>,
+  );
+
 describe("Companion tabs performance behavior", () => {
   beforeEach(() => {
     mocks.companion = {
@@ -237,6 +250,8 @@ describe("Companion tabs performance behavior", () => {
     mocks.prefetchQuery.mockClear();
     mocks.focusMountCount = 0;
     mocks.navigate.mockClear();
+    mocks.isTabActive = true;
+    mocks.useCompanionCalls = [];
   });
 
   afterEach(() => {
@@ -244,7 +259,7 @@ describe("Companion tabs performance behavior", () => {
   });
 
   it("keeps focus tab content mounted after first visit", async () => {
-    render(<Companion />);
+    renderCompanion();
 
     fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
     await waitFor(() => {
@@ -262,7 +277,7 @@ describe("Companion tabs performance behavior", () => {
   });
 
   it("preserves focus tab local state across tab switches", async () => {
-    render(<Companion />);
+    renderCompanion();
 
     fireEvent.click(screen.getByRole("tab", { name: /focus/i }));
     expect(screen.getByTestId("focus-mode")).toHaveTextContent("focus");
@@ -284,8 +299,7 @@ describe("Companion tabs performance behavior", () => {
     (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback = undefined;
     (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback = undefined;
     try {
-      render(<Companion />);
-
+      renderCompanion();
       expect(mocks.prefetchQuery).not.toHaveBeenCalled();
 
       await waitFor(() => {
@@ -320,14 +334,18 @@ describe("Companion tabs performance behavior", () => {
 
   it("renders error and no-companion states as expected", () => {
     mocks.error = new Error("Broken load");
-    const { rerender } = render(<Companion />);
+    const { rerender } = renderCompanion();
 
     expect(screen.getByText("Error Loading Companion")).toBeInTheDocument();
     expect(screen.getByText("Broken load")).toBeInTheDocument();
 
     mocks.error = null;
     mocks.companion = null;
-    rerender(<Companion />);
+    rerender(
+      <MainTabVisibilityProvider isTabActive>
+        <Companion />
+      </MainTabVisibilityProvider>,
+    );
 
     expect(screen.getByText("No Companion Found")).toBeInTheDocument();
   });
@@ -336,7 +354,7 @@ describe("Companion tabs performance behavior", () => {
     mocks.isLoading = true;
     mocks.companion = null;
 
-    render(<Companion />);
+    renderCompanion();
 
     expect(screen.getByRole("tab", { name: /overview/i })).toBeInTheDocument();
     expect(screen.queryByText("No Companion Found")).not.toBeInTheDocument();
@@ -344,9 +362,22 @@ describe("Companion tabs performance behavior", () => {
   });
 
   it("keeps companion settings action clickable", () => {
-    render(<Companion />);
+    renderCompanion();
 
     fireEvent.click(screen.getByLabelText("Settings"));
     expect(mocks.navigate).toHaveBeenCalledWith("/profile");
+  });
+
+  it("disables companion query and idle prefetch while tab is inactive", async () => {
+    vi.useFakeTimers();
+
+    renderCompanion(false);
+
+    expect(
+      mocks.useCompanionCalls.some((value) => value?.enabled === false),
+    ).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(mocks.prefetchQuery).not.toHaveBeenCalled();
   });
 });

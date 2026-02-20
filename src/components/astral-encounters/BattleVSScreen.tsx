@@ -4,6 +4,7 @@ import { Skull, Sparkles, Zap, Loader2, SkipForward } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { Button } from "@/components/ui/button";
 import { getStageName } from "@/config/companionStages";
+import { formatDisplayLabel } from "@/lib/utils";
 
 interface BattleVSScreenProps {
   companionImageUrl?: string;
@@ -290,7 +291,7 @@ export const BattleVSScreen = ({
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.6, type: "spring" }}
               >
-                {adversary.tier}
+                {formatDisplayLabel(adversary.tier)}
               </motion.div>
             </motion.div>
 
@@ -311,7 +312,7 @@ export const BattleVSScreen = ({
                 className="text-[10px] font-medium uppercase tracking-wider"
                 style={{ color: tierColors.primary + 'cc' }}
               >
-                {adversary.theme} Adversary
+                {formatDisplayLabel(adversary.theme)} Adversary
               </p>
             </motion.div>
           </motion.div>
@@ -333,7 +334,9 @@ export const BattleVSScreen = ({
             ].map((stat) => (
               <div key={stat.label} className="text-center px-3 py-1.5 rounded-lg bg-muted/30 backdrop-blur-sm">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{stat.label}</p>
-                <p className="text-sm font-bold text-primary capitalize">{stat.value}</p>
+                <p className="text-sm font-bold text-primary">
+                  {typeof stat.value === "string" ? formatDisplayLabel(stat.value) : stat.value}
+                </p>
               </div>
             ))}
           </div>

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { useJourneySchedule, JourneyMilestone, JourneyPhase, JourneyRitual } from "@/hooks/useJourneySchedule";
 import { useMilestones } from "@/hooks/useMilestones";
@@ -371,7 +371,7 @@ export const RescheduleDrawer = ({
                   <div className="flex items-center gap-2 mb-1">
                     <Sparkles className="w-4 h-4" />
                     <span className="font-medium text-sm capitalize">
-                      {schedule.feasibilityAssessment.feasibility.replace("_", " ")} timeline
+                      {formatDisplayLabel(schedule.feasibilityAssessment.feasibility)} timeline
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">

@@ -30,6 +30,14 @@ class AppleAuthError extends Error {
 // Cache Apple's JWKS. jose handles caching + kid selection internally.
 const appleJWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
 
+const sha256Hex = async (value: string): Promise<string> => {
+  const encoded = new TextEncoder().encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -37,11 +45,15 @@ serve(async (req) => {
   }
 
   try {
-    const { identityToken } = await req.json();
+    const { identityToken, rawNonce } = await req.json();
     console.log('Received Apple identity token');
 
     if (!identityToken) {
       throw new Error('Identity token is required');
+    }
+
+    if (!rawNonce) {
+      throw new AppleAuthError('Nonce is required for Apple native auth', 'APPLE_NONCE_MISSING');
     }
 
     const appleServiceId = Deno.env.get('APPLE_SERVICE_ID');
@@ -57,6 +69,20 @@ serve(async (req) => {
       issuer: 'https://appleid.apple.com',
       audience: [appleServiceId, iosBundleId],
     });
+
+    const tokenNonce = typeof payload.nonce === "string" ? payload.nonce : null;
+    if (!tokenNonce) {
+      throw new AppleAuthError('Apple token missing nonce claim', 'APPLE_NONCE_MISSING');
+    }
+
+    const expectedNonce = await sha256Hex(rawNonce);
+    if (tokenNonce !== expectedNonce) {
+      console.error('Apple token nonce mismatch', {
+        tokenNoncePrefix: tokenNonce.substring(0, 12),
+        expectedNoncePrefix: expectedNonce.substring(0, 12),
+      });
+      throw new AppleAuthError('Apple token nonce validation failed', 'APPLE_NONCE_MISMATCH');
+    }
 
     if (!payload.email) {
       console.warn('Apple token missing email claim; falling back to Apple ID lookup');

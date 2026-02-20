@@ -160,6 +160,41 @@ describe("useAuth provider", () => {
     expect(result.current.user).toBeNull();
   });
 
+  it("exits recovering state once session absence is confirmed", async () => {
+    const session = { user: { id: "user-3", email: "test3@example.com" } } as Session;
+    mocks.getSessionMock.mockResolvedValueOnce({ data: { session }, error: null });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("authenticated"));
+
+    mocks.getSessionMock.mockResolvedValue({
+      data: { session: null },
+      error: new Error("network timeout"),
+    });
+
+    await act(async () => {
+      await result.current.refreshSession();
+    });
+
+    expect(result.current.status).toBe("recovering");
+    expect(result.current.user?.id).toBe("user-3");
+
+    mocks.getSessionMock.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    await act(async () => {
+      await result.current.refreshSession();
+    });
+
+    expect(result.current.status).toBe("unauthenticated");
+    expect(result.current.user).toBeNull();
+  }, 10000);
+
   it("signOut is idempotent and performs cleanup once", async () => {
     mocks.getSessionMock.mockResolvedValue({ data: { session: null }, error: null });
 

@@ -63,10 +63,44 @@ export interface AddTaskParams {
   subtasks?: string[];
 }
 
+interface TaskAttachmentPersistResult {
+  attachmentsSkippedDueToSchema: boolean;
+}
+
+type SupabaseLikeError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
 const firstImageFromAttachments = (attachments?: QuestAttachmentInput[]): string | null => {
   if (!attachments || attachments.length === 0) return null;
   return attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null;
 };
+
+export function isTaskAttachmentsTableMissingError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? '').toUpperCase();
+  const haystack = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  const mentionsTaskAttachments = haystack.includes('task_attachments');
+
+  if (code === '42P01' && mentionsTaskAttachments) return true;
+
+  return mentionsTaskAttachments
+    && (
+      code.startsWith('PGRST')
+      || haystack.includes('schema cache')
+      || haystack.includes('does not exist')
+      || haystack.includes('could not find the table')
+      || haystack.includes('relation')
+    );
+}
+
+const emptyAttachmentPersistResult = (): TaskAttachmentPersistResult => ({
+  attachmentsSkippedDueToSchema: false,
+});
 
 export const useTaskMutations = (taskDate: string) => {
   const { user } = useAuth();
@@ -79,6 +113,12 @@ export const useTaskMutations = (taskDate: string) => {
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
 
   const addInProgress = useRef(false);
+  const showAttachmentsUnavailableToast = () => {
+    toast({
+      title: "Attachments unavailable",
+      description: "Quest saved, but attachments could not be stored. Please try again after the backend migration finishes.",
+    });
+  };
 
   const fetchTaskSchedulingState = async (taskId: string) => {
     if (!user?.id) throw new Error('User not authenticated');
@@ -96,16 +136,26 @@ export const useTaskMutations = (taskDate: string) => {
     return task;
   };
 
-  const persistTaskAttachments = async (taskId: string, attachments: QuestAttachmentInput[]) => {
+  const persistTaskAttachments = async (
+    taskId: string,
+    attachments: QuestAttachmentInput[],
+  ): Promise<TaskAttachmentPersistResult> => {
     if (!user?.id) throw new Error('User not authenticated');
 
-    await supabase
+    const { error: deleteError } = await supabase
       .from('task_attachments' as any)
       .delete()
       .eq('task_id', taskId)
       .eq('user_id', user.id);
 
-    if (attachments.length === 0) return;
+    if (deleteError) {
+      if (isTaskAttachmentsTableMissingError(deleteError)) {
+        return { attachmentsSkippedDueToSchema: true };
+      }
+      throw deleteError;
+    }
+
+    if (attachments.length === 0) return emptyAttachmentPersistResult();
 
     const rows = attachments.map((attachment, index) => ({
       task_id: taskId,
@@ -123,7 +173,14 @@ export const useTaskMutations = (taskDate: string) => {
       .from('task_attachments' as any)
       .insert(rows);
 
-    if (error) throw error;
+    if (error) {
+      if (isTaskAttachmentsTableMissingError(error)) {
+        return { attachmentsSkippedDueToSchema: true };
+      }
+      throw error;
+    }
+
+    return emptyAttachmentPersistResult();
   };
 
   const addTask = useMutation({
@@ -198,9 +255,10 @@ export const useTaskMutations = (taskDate: string) => {
           throw error;
         }
 
+        let attachmentPersistResult = emptyAttachmentPersistResult();
         if (data?.id) {
           try {
-            await persistTaskAttachments(data.id, normalizedAttachments);
+            attachmentPersistResult = await persistTaskAttachments(data.id, normalizedAttachments);
           } catch (attachmentsError) {
             await supabase
               .from('daily_tasks')
@@ -238,7 +296,10 @@ export const useTaskMutations = (taskDate: string) => {
           }
         }
 
-        return data;
+        return {
+          ...(data ?? {}),
+          attachmentsSkippedDueToSchema: attachmentPersistResult.attachmentsSkippedDueToSchema,
+        };
       } finally {
         addInProgress.current = false;
       }
@@ -322,6 +383,9 @@ export const useTaskMutations = (taskDate: string) => {
     },
     onSuccess: (data) => {
       toast({ title: "Quest added!" });
+      if (data?.attachmentsSkippedDueToSchema) {
+        showAttachmentsUnavailableToast();
+      }
       window.dispatchEvent(
         new CustomEvent('task-added', {
           detail: {
@@ -750,6 +814,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (!user?.id) throw new Error('User not authenticated');
       let normalizedToInbox = false;
       let strippedScheduledTime = false;
+      let attachmentsSkippedDueToSchema = false;
 
       // Build update object with only provided fields
       const updateData: Record<string, unknown> = {};
@@ -829,7 +894,7 @@ export const useTaskMutations = (taskDate: string) => {
       }
 
       if (Object.keys(updateData).length === 0) {
-        return { normalizedToInbox, strippedScheduledTime };
+        return { normalizedToInbox, strippedScheduledTime, attachmentsSkippedDueToSchema };
       }
 
       const { error } = await supabase
@@ -841,14 +906,19 @@ export const useTaskMutations = (taskDate: string) => {
       if (error) throw error;
 
       if (hasAttachmentUpdates) {
-        await persistTaskAttachments(taskId, updates.attachments ?? []);
+        const attachmentPersistResult = await persistTaskAttachments(taskId, updates.attachments ?? []);
+        attachmentsSkippedDueToSchema = attachmentPersistResult.attachmentsSkippedDueToSchema;
       }
 
-      return { normalizedToInbox, strippedScheduledTime };
+      return { normalizedToInbox, strippedScheduledTime, attachmentsSkippedDueToSchema };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      if (data?.attachmentsSkippedDueToSchema) {
+        showAttachmentsUnavailableToast();
+      }
 
       const definedFields = Object.entries(variables.updates)
         .filter(([, value]) => value !== undefined)

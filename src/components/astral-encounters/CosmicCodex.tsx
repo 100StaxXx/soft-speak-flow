@@ -3,6 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion } from 'framer-motion';
 import { BookOpen, Skull, Sparkles, Trophy } from 'lucide-react';
 import { CosmicCodexEntry, AdversaryEssence } from '@/types/astralEncounters';
+import { formatDisplayLabel } from '@/lib/utils';
 
 interface CosmicCodexProps {
   codexEntries: CosmicCodexEntry[];
@@ -102,8 +103,8 @@ export const CosmicCodex = ({ codexEntries, essences, totalStatBoosts, isLoading
                             <span>×{entry.times_defeated}</span>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {entry.adversary_theme} type
+                        <p className="text-xs text-muted-foreground">
+                          {formatDisplayLabel(entry.adversary_theme)} type
                         </p>
                         {entry.adversary_lore && (
                           <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
@@ -153,8 +154,8 @@ export const CosmicCodex = ({ codexEntries, essences, totalStatBoosts, isLoading
                   }`}>
                     <p className="font-medium text-sm truncate">{essence.essence_name}</p>
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {essence.stat_type}
+                      <span className="text-xs text-muted-foreground">
+                        {formatDisplayLabel(essence.stat_type)}
                       </span>
                       <span className={`text-xs font-bold ${
                         essence.stat_type === 'mind' 

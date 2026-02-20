@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 MANIFEST="supabase/function-manifest.json"
+MANUAL_ALLOWLIST="scripts/function-manifest-manual-allowlist.txt"
 
 if [ ! -f "$MANIFEST" ]; then
   echo "Manifest missing: $MANIFEST" >&2
@@ -35,6 +36,17 @@ collect_scheduled() {
   } | sed '/^$/d' | sort -u
 }
 
+collect_manual_allowlist() {
+  if [ ! -f "$MANUAL_ALLOWLIST" ]; then
+    return
+  fi
+
+  sed -e 's/#.*$//' "$MANUAL_ALLOWLIST" \
+    | sed -e 's/[[:space:]]*$//' \
+    | sed '/^$/d' \
+    | sort -u
+}
+
 tmp_declared="$(mktemp)"
 tmp_discovered="$(mktemp)"
 tmp_missing="$(mktemp)"
@@ -42,7 +54,7 @@ tmp_stale="$(mktemp)"
 trap 'rm -f "$tmp_declared" "$tmp_discovered" "$tmp_missing" "$tmp_stale"' EXIT
 
 jq -r '.allowList[]' "$MANIFEST" | sed '/^$/d' | sort -u > "$tmp_declared"
-cat <(collect_frontend) <(collect_internal) <(collect_scheduled) | sed '/^$/d' | sort -u > "$tmp_discovered"
+cat <(collect_frontend) <(collect_internal) <(collect_scheduled) <(collect_manual_allowlist) | sed '/^$/d' | sort -u > "$tmp_discovered"
 
 comm -23 "$tmp_discovered" "$tmp_declared" > "$tmp_missing"
 comm -13 "$tmp_discovered" "$tmp_declared" > "$tmp_stale"

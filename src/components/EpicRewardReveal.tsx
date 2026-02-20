@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Gift, Star, Trophy } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 import type { RewardRevealData, RewardRarity } from "@/types/epicRewards";
 import { RARITY_CONFIG } from "@/types/epicRewards";
 import confetti from "canvas-confetti";
@@ -260,7 +260,7 @@ export const EpicRewardReveal = ({
                         className="text-sm font-medium uppercase tracking-wider"
                         style={{ color: getRarityConfig(rewardData.loot.rarity).color }}
                       >
-                        {getRarityConfig(rewardData.loot.rarity).label} {rewardData.loot.reward_type}
+                        {getRarityConfig(rewardData.loot.rarity).label} {formatDisplayLabel(rewardData.loot.reward_type)}
                       </p>
                       <h3 className="text-2xl font-bold text-foreground mt-1">{rewardData.loot.name}</h3>
                       <p className="text-sm text-muted-foreground mt-1 max-w-xs">{rewardData.loot.description}</p>
@@ -328,7 +328,7 @@ export const EpicRewardReveal = ({
                           className="text-xs"
                           style={{ color: getRarityConfig(rewardData.loot.rarity).color }}
                         >
-                          {getRarityConfig(rewardData.loot.rarity).label} {rewardData.loot.reward_type}
+                          {getRarityConfig(rewardData.loot.rarity).label} {formatDisplayLabel(rewardData.loot.reward_type)}
                         </p>
                       </div>
                     </div>

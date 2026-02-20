@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { insertTomorrowDailyPepTalkAndSync, type SupabaseLikeClient } from "./workflow.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -178,10 +179,39 @@ serve(async (req) => {
         const title = generateTitle(mentorSlug, theme.topic_category);
         const summary = generateSummary(theme.topic_category);
 
-        // Insert into daily_pep_talks for tomorrow
-        const { error: insertError } = await supabase
-          .from('daily_pep_talks')
-          .insert({
+        // Insert into daily_pep_talks for tomorrow and attempt transcript sync (non-blocking).
+        const { dailyPepTalkId } = await insertTomorrowDailyPepTalkAndSync({
+          supabase: supabase as unknown as SupabaseLikeClient,
+          mentorSlug,
+          logger: console,
+          beforeSync: async () => {
+            // Also insert into main pep_talks library before transcript sync runs.
+            const { error: libraryInsertError } = await supabase
+              .from('pep_talks')
+              .insert({
+                title,
+                description: summary,
+                quote: script.substring(0, 200) + '...',
+                audio_url: audioUrl,
+                category: theme.topic_category,
+                topic_category: [theme.topic_category],
+                emotional_triggers: theme.triggers,
+                intensity: theme.intensity,
+                mentor_slug: mentorSlug,
+                mentor_id: mentor.id,
+                source: 'auto_generated',
+                for_date: tomorrowDate,
+                is_featured: false,
+                is_premium: false,
+                transcript: []
+              });
+
+            if (libraryInsertError) {
+              console.error(`Error inserting library pep talk for ${mentorSlug}:`, libraryInsertError);
+              // Non-blocking: still continue transcript sync for daily row.
+            }
+          },
+          insertPayload: {
             mentor_slug: mentorSlug,
             topic_category: theme.topic_category,
             emotional_triggers: theme.triggers,
@@ -190,37 +220,11 @@ serve(async (req) => {
             summary,
             script,
             audio_url: audioUrl,
-            for_date: tomorrowDate
-          });
-
-        if (insertError) {
-          console.error(`Error inserting for ${mentorSlug}:`, insertError);
-          results.push({ mentor: mentorSlug, status: 'error', error: insertError.message });
-          continue;
-        }
-
-        // Also insert into main pep_talks library
-        await supabase
-          .from('pep_talks')
-          .insert({
-            title,
-            description: summary,
-            quote: script.substring(0, 200) + '...',
-            audio_url: audioUrl,
-            category: theme.topic_category,
-            topic_category: [theme.topic_category],
-            emotional_triggers: theme.triggers,
-            intensity: theme.intensity,
-            mentor_slug: mentorSlug,
-            mentor_id: mentor.id,
-            source: 'auto_generated',
             for_date: tomorrowDate,
-            is_featured: false,
-            is_premium: false,
-            transcript: []
-          });
+          },
+        });
 
-        console.log(`✓ Generated pep talk for ${mentorSlug}`);
+        console.log(`✓ Generated pep talk for ${mentorSlug} (daily id=${dailyPepTalkId})`);
         results.push({ mentor: mentorSlug, status: 'generated' });
 
         // Small delay between mentors to avoid rate limits

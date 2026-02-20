@@ -11,7 +11,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MentorAvatar } from "@/components/MentorAvatar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
@@ -177,53 +176,48 @@ const MorningCheckInContent = () => {
 
   if (existingCheckIn?.completed_at) {
     return (
-      <Card data-tour="morning-checkin" className="p-6 bg-card/25 backdrop-blur-2xl border-celestial-blue/20">
-        <div className="flex items-start gap-4">
-          <div className="h-12 w-12 rounded-full bg-stardust-gold/20 flex items-center justify-center flex-shrink-0 ring-2 ring-stardust-gold/30">
-            <Sunrise className="h-6 w-6 text-stardust-gold" />
-          </div>
-          <div className="flex-1 space-y-3">
-            <div>
+      <Card data-tour="morning-checkin" className="p-5 sm:p-6 bg-card/25 backdrop-blur-2xl border-celestial-blue/20">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-stardust-gold/20 flex items-center justify-center flex-shrink-0 ring-1 ring-stardust-gold/30">
+              <Sunrise className="h-5 w-5 text-stardust-gold" />
+            </div>
+            <div className="min-w-0">
               <h3 className="font-bold text-lg">Check-in Complete</h3>
               <p className="text-sm text-muted-foreground">Focus: {existingCheckIn.intention}</p>
             </div>
-            
-            {/* Mentor Response Section */}
-            {personality && (
-              <div className="bg-white/[0.03] backdrop-blur-xl rounded-2xl p-4 border border-white/[0.08]">
-                <div className="flex items-start gap-3">
-                  <MentorAvatar
-                    mentorSlug={(personality.slug || '').toLowerCase()}
-                    mentorName={personality.name}
-                    primaryColor={personality.primary_color || '#000'}
-                    avatarUrl={personality.avatar_url || undefined}
-                    size="sm"
-                    className="flex-shrink-0"
-                    showBorder={true}
-                  />
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{personality.name}</p>
-                      <Sparkles className="h-3 w-3 text-stardust-gold" />
-                    </div>
-                    {existingCheckIn.mentor_response ? (
-                      <p className="text-sm italic text-foreground/90 leading-relaxed">
-                        "{existingCheckIn.mentor_response}"
-                      </p>
-                    ) : pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION ? (
-                      <p className="text-sm text-foreground/80 italic leading-relaxed">
-                        "Great work on setting your intention today. Stay focused and crush it."
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        Preparing your personalized message...
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
+
+          {/* Mentor Response Section */}
+          {personality && (
+            <div className="relative overflow-hidden bg-white/[0.03] backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08]">
+              <span
+                aria-hidden="true"
+                className="absolute -left-1 -top-7 text-7xl leading-none font-serif text-white/[0.08] select-none"
+              >
+                "
+              </span>
+              <div className="relative space-y-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 border border-white/10">
+                  <p className="text-xs sm:text-sm font-semibold text-foreground">{personality.name}</p>
+                  <Sparkles className="h-3.5 w-3.5 text-stardust-gold" />
+                </div>
+                {existingCheckIn.mentor_response ? (
+                  <p className="text-base italic text-foreground/90 leading-relaxed">
+                    "{existingCheckIn.mentor_response}"
+                  </p>
+                ) : pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION ? (
+                  <p className="text-base text-foreground/80 italic leading-relaxed">
+                    "Great work on setting your intention today. Stay focused and crush it."
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Preparing your personalized message...
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     );

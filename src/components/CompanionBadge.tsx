@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Flame, Zap, Droplet, Wind, Leaf, Mountain, Star } from "lucide-react";
 import { getStageName } from "@/config/companionStages";
+import { formatDisplayLabel } from "@/lib/utils";
 
 interface CompanionBadgeProps {
   element: string;
@@ -50,7 +51,7 @@ export const CompanionBadge = ({ element, stage = 1, showStage = true, className
       className={`px-3 py-1 ${colorClass} ${getStageOverlay()} ${className} flex items-center gap-2`}
     >
       <Icon className="h-3 w-3" />
-      <span className="text-xs font-semibold capitalize">{element}</span>
+      <span className="text-xs font-semibold">{formatDisplayLabel(element)}</span>
       {showStage && stage !== undefined && (
         <>
           <span className="text-xs opacity-50">•</span>

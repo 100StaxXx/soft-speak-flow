@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getResolvedMentorId } from "@/utils/mentor";
-import { MAIN_TAB_REFRESH_EVENT, type MainTabRefreshEventDetail } from "@/utils/mainTabRefresh";
 import { safeLocalStorage } from "@/utils/storage";
 
 import { logger } from "@/utils/logger";
@@ -257,19 +256,6 @@ export const TodaysPepTalk = memo(() => {
 
   useEffect(() => {
     void fetchDailyPepTalk();
-  }, [fetchDailyPepTalk]);
-
-  useEffect(() => {
-    const handleMainTabRefresh = (event: CustomEvent<MainTabRefreshEventDetail>) => {
-      if (event.detail.path !== "/mentor") return;
-      if (event.detail.source !== "pull-to-refresh") return;
-      void fetchDailyPepTalk();
-    };
-
-    window.addEventListener(MAIN_TAB_REFRESH_EVENT, handleMainTabRefresh as EventListener);
-    return () => {
-      window.removeEventListener(MAIN_TAB_REFRESH_EVENT, handleMainTabRefresh as EventListener);
-    };
   }, [fetchDailyPepTalk]);
 
   // Handle user-triggered pep talk generation
@@ -621,7 +607,7 @@ export const TodaysPepTalk = memo(() => {
   };
 
   const renderFullTranscript = () => {
-    if (!pepTalk?.transcript || !Array.isArray(pepTalk.transcript)) {
+    if (!Array.isArray(pepTalk?.transcript) || pepTalk.transcript.length === 0) {
       // Fallback to plain text if no word timestamps
       if (!pepTalk?.script) return null;
       return (
@@ -677,7 +663,7 @@ export const TodaysPepTalk = memo(() => {
           <div className="flex items-center justify-center gap-2">
             <Sparkles className="h-5 w-5 text-muted-foreground" />
             <h2 className="text-lg font-semibold text-muted-foreground">
-              {personality?.name ? `${personality.name}'s Daily Message` : "Today's Pep Talk"}
+              Daily Message
             </h2>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -744,7 +730,7 @@ export const TodaysPepTalk = memo(() => {
             <div className="absolute inset-0 bg-primary/30 blur-md rounded-full" />
           </div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent animate-gradient-text">
-            {personality?.name ? `${personality.name}'s Daily Message` : "Today's Pep Talk"}
+            Daily Message
           </h2>
         </div>
 
@@ -878,7 +864,7 @@ export const TodaysPepTalk = memo(() => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowFullTranscript(!showFullTranscript)}
+                  onClick={() => setShowFullTranscript((previous) => !previous)}
                   className="w-full justify-between mt-2 rounded-full hover:bg-primary/10 transition-all"
                 >
                   <span className="text-xs font-medium">

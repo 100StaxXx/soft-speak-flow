@@ -59,6 +59,19 @@ describe("getAuthRedirectPath", () => {
     await expect(getAuthRedirectPath("12345678-user")).resolves.toBe("/tasks");
   });
 
+  it("routes existing users to /tasks even without mentor when onboarding is complete", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        selected_mentor_id: null,
+        onboarding_completed: true,
+        onboarding_data: {},
+      },
+      error: null,
+    });
+
+    await expect(getAuthRedirectPath("existing-user-no-mentor")).resolves.toBe("/tasks");
+  });
+
   it("routes to /onboarding when onboarding is explicitly incomplete, even with mentor", async () => {
     mocks.maybeSingleMock.mockResolvedValueOnce({
       data: {
@@ -108,5 +121,45 @@ describe("getAuthRedirectPath", () => {
     await vi.advanceTimersByTimeAsync(5001);
 
     await expect(pathPromise).resolves.toBe("/onboarding");
+  });
+
+  it("falls back to /tasks on timeout when returning-user check confirms completion", async () => {
+    vi.useFakeTimers();
+
+    mocks.maybeSingleMock
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValueOnce({
+        data: { onboarding_completed: true },
+        error: null,
+      });
+
+    const pathPromise = getAuthRedirectPath("timeout-returning-user");
+    await vi.advanceTimersByTimeAsync(5001);
+
+    await expect(pathPromise).resolves.toBe("/tasks");
+  });
+
+  it("returns /onboarding when profile and returning-user checks both timeout", async () => {
+    vi.useFakeTimers();
+
+    mocks.maybeSingleMock.mockImplementation(() => new Promise(() => {}));
+
+    const pathPromise = getAuthRedirectPath("12345678-double-timeout");
+    await vi.advanceTimersByTimeAsync(7005);
+
+    await expect(pathPromise).resolves.toBe("/onboarding");
+  });
+
+  it("keeps fallback deterministic when all lookups hang", async () => {
+    vi.useFakeTimers();
+
+    mocks.maybeSingleMock.mockImplementation(() => new Promise(() => {}));
+
+    const firstPathPromise = getAuthRedirectPath("12345678-stuck-1");
+    const secondPathPromise = getAuthRedirectPath("12345678-stuck-2");
+    await vi.advanceTimersByTimeAsync(7005);
+
+    await expect(firstPathPromise).resolves.toBe("/onboarding");
+    await expect(secondPathPromise).resolves.toBe("/onboarding");
   });
 });

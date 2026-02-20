@@ -211,10 +211,28 @@ serve(async (req) => {
         // Sync transcript for the daily pep talk to enable word-by-word highlighting
         try {
           console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
-          await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
+          const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
             body: { id: dailyPepTalk.id }
           });
-          console.log(`✓ Transcript synced for ${mentorSlug}`);
+
+          if (syncError) {
+            console.error(`Transcript sync returned error for ${mentorSlug}:`, syncError);
+          } else {
+            const syncPayload = (syncData && typeof syncData === "object")
+              ? syncData as Record<string, unknown>
+              : {};
+            const libraryRowsUpdated =
+              typeof syncPayload.libraryRowsUpdated === "number" ? syncPayload.libraryRowsUpdated : 0;
+            const warning = typeof syncPayload.warning === "string" ? syncPayload.warning : null;
+
+            console.log(`✓ Transcript synced for ${mentorSlug}`, {
+              updated: syncPayload.updated === true,
+              transcriptChanged: syncPayload.transcriptChanged === true,
+              libraryUpdated: syncPayload.libraryUpdated === true,
+              libraryRowsUpdated,
+              warning,
+            });
+          }
         } catch (syncError) {
           console.error(`Failed to sync transcript for ${mentorSlug}:`, syncError);
           // Non-blocking - continue even if transcript sync fails

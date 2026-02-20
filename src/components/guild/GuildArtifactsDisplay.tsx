@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Gem, Lock, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 import { getUserDisplayName } from "@/utils/getUserDisplayName";
 
 interface GuildArtifact {
@@ -166,7 +166,7 @@ export const GuildArtifactsDisplay = ({
                           </p>
                         ) : (
                           <p className="text-xs text-muted-foreground">
-                            Requires: {artifact.unlock_requirement_value} {artifact.unlock_requirement_type.replace('_', ' ')}
+                            Requires: {artifact.unlock_requirement_value} {formatDisplayLabel(artifact.unlock_requirement_type)}
                           </p>
                         )}
                       </div>

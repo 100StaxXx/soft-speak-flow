@@ -2,51 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
-
-interface TranscriptWord {
-  word: string;
-  start: number;
-  end: number;
-}
-
-function normalizeTranscript(input: unknown): TranscriptWord[] {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
-  return input
-    .filter((word): word is TranscriptWord => {
-      if (!word || typeof word !== "object") {
-        return false;
-      }
-
-      const candidate = word as { word?: unknown; start?: unknown; end?: unknown };
-      return (
-        typeof candidate.word === "string" &&
-        typeof candidate.start === "number" &&
-        Number.isFinite(candidate.start) &&
-        typeof candidate.end === "number" &&
-        Number.isFinite(candidate.end)
-      );
-    })
-    .map((word) => ({
-      word: word.word,
-      start: word.start,
-      end: word.end,
-    }));
-}
-
-function transcriptsEqual(a: TranscriptWord[], b: TranscriptWord[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((word, index) => {
-    const other = b[index];
-    return (
-      word.word === other.word &&
-      word.start === other.start &&
-      word.end === other.end
-    );
-  });
-}
+import {
+  buildTranscriptionFailurePayload,
+  buildTranscriptSyncPlan,
+  type LibraryTranscriptRow,
+} from "./syncLogic.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -126,21 +86,13 @@ serve(async (req) => {
       const t = await transcribeResp.text();
       console.error("transcribe-audio error:", transcribeResp.status, t);
       return new Response(
-        JSON.stringify({
-          error: "Transcription failed",
-          details: t,
-          updated: false,
-          scriptChanged: false,
-          transcriptChanged: false,
-          upstreamStatus: transcribeResp.status,
-        }),
+        JSON.stringify(buildTranscriptionFailurePayload(t, transcribeResp.status)),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const transcribed = await transcribeResp.json();
     const transcribedText: string | undefined = transcribed?.text;
-    const wordTimestamps = normalizeTranscript(transcribed?.transcript);
 
     if (!transcribedText) {
       return new Response(
@@ -149,24 +101,53 @@ serve(async (req) => {
           updated: false,
           scriptChanged: false,
           transcriptChanged: false,
+          libraryUpdated: false,
+          libraryRowsUpdated: 0,
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Track text and transcript changes independently so we persist transcript-only deltas.
-    const currentText: string = pepTalk.script || "";
-    const currentTranscript = normalizeTranscript(pepTalk.transcript);
-    const scriptChanged = currentText.trim() !== transcribedText.trim();
-    const transcriptChanged = !transcriptsEqual(currentTranscript, wordTimestamps);
-    const updated = scriptChanged || transcriptChanged;
+    let libraryRows: LibraryTranscriptRow[] = [];
+    if (pepTalk.mentor_slug && pepTalk.for_date) {
+      const { data: candidateRows, error: libraryLookupError } = await supabase
+        .from("pep_talks")
+        .select("id, transcript")
+        .eq("mentor_slug", pepTalk.mentor_slug)
+        .eq("for_date", pepTalk.for_date)
+        .eq("audio_url", pepTalk.audio_url);
 
-    if (updated) {
+      if (libraryLookupError) {
+        console.error("Failed loading matching pep_talks rows:", libraryLookupError);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to load matching library pep talks",
+            updated: false,
+            scriptChanged: false,
+            transcriptChanged: false,
+            libraryUpdated: false,
+            libraryRowsUpdated: 0,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      libraryRows = (candidateRows ?? []) as LibraryTranscriptRow[];
+    }
+
+    const syncPlan = buildTranscriptSyncPlan({
+      currentScript: pepTalk.script,
+      currentTranscript: pepTalk.transcript,
+      transcribedText,
+      transcribedTranscript: transcribed?.transcript,
+      libraryRows,
+    });
+
+    if (syncPlan.updated) {
       const { error: updateErr } = await supabase
         .from("daily_pep_talks")
-        .update({ 
-          script: transcribedText,
-          transcript: wordTimestamps
+        .update({
+          script: syncPlan.nextScript,
+          transcript: syncPlan.nextTranscript,
         })
         .eq("id", pepTalk.id);
 
@@ -175,10 +156,13 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             error: "Failed to update script/transcript",
-            script: transcribedText,
+            script: syncPlan.nextScript,
             updated: false,
-            scriptChanged,
-            transcriptChanged,
+            scriptChanged: syncPlan.scriptChanged,
+            transcriptChanged: syncPlan.transcriptChanged,
+            libraryUpdated: false,
+            libraryRowsUpdated: 0,
+            warning: syncPlan.warning,
           }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -186,14 +170,51 @@ serve(async (req) => {
       console.log(`Updated daily_pep_talks.script and transcript (id=${pepTalk.id})`);
     }
 
+    let libraryRowsUpdated = 0;
+    if (syncPlan.libraryIdsToUpdate.length > 0) {
+      const { data: updatedLibraryRows, error: libraryUpdateError } = await supabase
+        .from("pep_talks")
+        .update({ transcript: syncPlan.nextTranscript })
+        .in("id", syncPlan.libraryIdsToUpdate)
+        .select("id");
+
+      if (libraryUpdateError) {
+        console.error("Failed updating pep_talks.transcript:", libraryUpdateError);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to update library transcript",
+            id: pepTalk.id,
+            script: syncPlan.nextScript,
+            transcript: syncPlan.nextTranscript,
+            updated: syncPlan.updated,
+            scriptChanged: syncPlan.scriptChanged,
+            transcriptChanged: syncPlan.transcriptChanged,
+            libraryUpdated: false,
+            libraryRowsUpdated: 0,
+            warning: syncPlan.warning,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      libraryRowsUpdated = updatedLibraryRows?.length ?? 0;
+      if (libraryRowsUpdated > 0) {
+        console.log(`Updated pep_talks transcript rows: ${libraryRowsUpdated} (daily id=${pepTalk.id})`);
+      }
+    }
+
+    const libraryUpdated = libraryRowsUpdated > 0;
     return new Response(
-      JSON.stringify({ 
-        id: pepTalk.id, 
-        script: transcribedText, 
-        transcript: wordTimestamps,
-        updated,
-        scriptChanged,
-        transcriptChanged,
+      JSON.stringify({
+        id: pepTalk.id,
+        script: syncPlan.nextScript,
+        transcript: syncPlan.nextTranscript,
+        updated: syncPlan.updated,
+        scriptChanged: syncPlan.scriptChanged,
+        transcriptChanged: syncPlan.transcriptChanged,
+        libraryUpdated,
+        libraryRowsUpdated,
+        warning: syncPlan.warning,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

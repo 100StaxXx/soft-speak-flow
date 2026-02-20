@@ -43,7 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { cn, stripMarkdown } from "@/lib/utils";
+import { cn, formatDisplayLabel, stripMarkdown } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 
@@ -1796,7 +1796,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               {task.energy_level && (
                 <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
                   <Zap className="w-3 h-3" />
-                  {task.energy_level}
+                  {formatDisplayLabel(task.energy_level)}
                 </Badge>
               )}
               
@@ -1812,7 +1812,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               {task.is_recurring && task.recurrence_pattern && (
                 <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 bg-accent/10 text-accent border-accent/30">
                   <Repeat className="w-3 h-3" />
-                  {task.recurrence_pattern}
+                  {formatDisplayLabel(task.recurrence_pattern)}
                 </Badge>
               )}
               </div>

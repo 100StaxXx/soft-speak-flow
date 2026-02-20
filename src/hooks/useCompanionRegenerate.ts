@@ -60,9 +60,10 @@ export const useCompanionRegenerate = () => {
           stage: companion.current_stage,
           eyeColor: companion.eye_color,
           furColor: companion.fur_color,
+          flowType: "regenerate",
         },
         {
-          maxRetries: 2,
+          maxRetries: 1,
           onRetry: (attempt) => {
             setGenerationPhase('retrying');
             setRetryCount(attempt);

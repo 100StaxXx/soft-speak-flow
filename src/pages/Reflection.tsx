@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MoodSelector } from "@/components/MoodSelector";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { formatDisplayLabel } from "@/lib/utils";
 
 
 export default function Reflection() {
@@ -156,7 +157,7 @@ export default function Reflection() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">What brought you joy?</p>
                   <div className="p-4 rounded-xl bg-muted/50">
-                    <p className="text-lg font-medium capitalize">{todayReflection.mood.replace('_', ' ')}</p>
+                    <p className="text-lg font-medium">{formatDisplayLabel(todayReflection.mood)}</p>
                   </div>
                 </div>
 

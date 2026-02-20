@@ -10,10 +10,6 @@
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
-		NC1000001000000000000001 /* NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000001 /* NativeCalendarPlugin.swift */; };
-		NC1000001000000000000002 /* NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* NativeCalendarPlugin.m */; };
-		WD1000001000000000000001 /* WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* WidgetDataPlugin.swift */; };
-		WD1000001000000000000002 /* WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* WidgetDataPlugin.m */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -23,6 +19,10 @@
 		CW1000001000000000000002 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000002 /* WidgetData.swift */; };
 		CW1000001000000000000003 /* WidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CW2000001000000000000003 /* WidgetViews.swift */; };
 		CW1000001000000000000004 /* CosmiqWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CW3000001000000000000001 /* CosmiqWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */; };
+		NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */; };
+		WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */; };
+		WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,10 +54,6 @@
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		NC2000001000000000000001 /* NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeCalendar/NativeCalendarPlugin.swift; sourceTree = "<group>"; };
-		NC2000001000000000000002 /* NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
-		WD2000001000000000000001 /* WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
-		WD2000001000000000000002 /* WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -73,6 +69,10 @@
 		CW2000001000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CW3000001000000000000001 /* CosmiqWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CosmiqWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
+		NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/NativeCalendar/NativeCalendarPlugin.swift; sourceTree = "<group>"; };
+		NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/NativeCalendar/NativeCalendarPlugin.m; sourceTree = "<group>"; };
+		WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugins/WidgetData/WidgetDataPlugin.swift; sourceTree = "<group>"; };
+		WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Plugins/WidgetData/WidgetDataPlugin.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,16 +125,16 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
-					9DA2C7842ED96C570052831B /* App.entitlements */,
-					50379B222058CBB4000EE86E /* capacitor.config.json */,
-					504EC3071FED79650016851F /* AppDelegate.swift */,
-					NC2000001000000000000001 /* NativeCalendarPlugin.swift */,
-					NC2000001000000000000002 /* NativeCalendarPlugin.m */,
-					WD2000001000000000000001 /* WidgetDataPlugin.swift */,
-					WD2000001000000000000002 /* WidgetDataPlugin.m */,
-					504EC30B1FED79650016851F /* Main.storyboard */,
-					504EC30E1FED79650016851F /* Assets.xcassets */,
-					504EC3101FED79650016851F /* LaunchScreen.storyboard */,
+				9DA2C7842ED96C570052831B /* App.entitlements */,
+				50379B222058CBB4000EE86E /* capacitor.config.json */,
+				504EC3071FED79650016851F /* AppDelegate.swift */,
+				NC2000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift */,
+				NC2000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m */,
+				WD2000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift */,
+				WD2000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m */,
+				504EC30B1FED79650016851F /* Main.storyboard */,
+				504EC30E1FED79650016851F /* Assets.xcassets */,
+				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
@@ -216,7 +216,6 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
-						ProvisioningStyle = Automatic;
 					};
 					CW5000001000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
@@ -351,18 +350,18 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-			504EC3001FED79650016851F /* Sources */ = {
-				isa = PBXSourcesBuildPhase;
-				buildActionMask = 2147483647;
-				files = (
-					504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
-					NC1000001000000000000001 /* NativeCalendarPlugin.swift in Sources */,
-					NC1000001000000000000002 /* NativeCalendarPlugin.m in Sources */,
-					WD1000001000000000000001 /* WidgetDataPlugin.swift in Sources */,
-					WD1000001000000000000002 /* WidgetDataPlugin.m in Sources */,
-				);
-				runOnlyForDeploymentPostprocessing = 0;
-			};
+		504EC3001FED79650016851F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				NC1000001000000000000001 /* Plugins/NativeCalendar/NativeCalendarPlugin.swift in Sources */,
+				NC1000001000000000000002 /* Plugins/NativeCalendar/NativeCalendarPlugin.m in Sources */,
+				WD1000001000000000000001 /* Plugins/WidgetData/WidgetDataPlugin.swift in Sources */,
+				WD1000001000000000000002 /* Plugins/WidgetData/WidgetDataPlugin.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CWB000001000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -517,11 +516,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 187;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = B6VW78ABTR;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -531,6 +532,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -543,11 +545,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 187;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = B6VW78ABTR;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Cosmiq;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -556,6 +560,7 @@
 				MARKETING_VERSION = 3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.darrylgraham.revolution;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -570,7 +575,7 @@
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 187;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;
@@ -599,7 +604,7 @@
 				CODE_SIGN_ENTITLEMENTS = ../CosmiqWidget/CosmiqWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 187;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = B6VW78ABTR;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../CosmiqWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CosmiqWidget;

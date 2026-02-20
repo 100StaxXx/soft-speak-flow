@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-import { cn } from '@/lib/utils';
+import { cn, formatDisplayLabel } from '@/lib/utils';
 import type { JourneyPhase, JourneyMilestone, JourneyRitual, FeasibilityAssessment } from '@/hooks/useJourneySchedule';
 import { PhaseCard } from './PhaseCard';
 
@@ -76,7 +76,7 @@ export function TimelineView({
                 {feasibilityAssessment.daysAvailable} days available
               </span>
               <Badge variant="outline" className={cn('text-xs', colors.text, colors.border)}>
-                {feasibilityAssessment.feasibility.replace('_', ' ')}
+                {formatDisplayLabel(feasibilityAssessment.feasibility)}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">

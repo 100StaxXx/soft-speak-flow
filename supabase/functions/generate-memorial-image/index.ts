@@ -3,6 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,12 +15,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestStartedAt = Date.now();
+
   try {
     const { memorialId, companionData } = await req.json();
 
     if (!memorialId || !companionData) {
       throw new Error("Missing memorialId or companionData");
     }
+
+    const rolloutKey =
+      typeof companionData?.user_id === "string" && companionData.user_id.length > 0
+        ? companionData.user_id
+        : memorialId;
+    const imageSize = resolveCompanionImageSizeForUser(rolloutKey);
+    console.log(`[MemorialImagePolicy] rollout_key=${rolloutKey} image_size=${imageSize}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -85,6 +95,7 @@ serve(async (req) => {
             },
           ],
           modalities: ["image", "text"],
+          image_size: imageSize,
         }),
       });
 
@@ -151,5 +162,7 @@ serve(async (req) => {
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+  } finally {
+    console.log(`[MemorialImageTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
 });

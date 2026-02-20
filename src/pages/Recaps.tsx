@@ -7,6 +7,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageTransition } from "@/components/PageTransition";
 import { useWeeklyRecap, WeeklyRecap } from "@/hooks/useWeeklyRecap";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
+import { formatDisplayLabel } from "@/lib/utils";
 
 const TrendIcon = ({ trend }: { trend: string }) => {
   switch (trend) {
@@ -38,8 +39,8 @@ const RecapCard = ({ recap, onClick }: { recap: WeeklyRecap; onClick: () => void
         </div>
         <div className="flex items-center gap-1">
           <TrendIcon trend={recap.mood_data.trend} />
-          <span className="text-xs text-muted-foreground capitalize">
-            {recap.mood_data.trend}
+          <span className="text-xs text-muted-foreground">
+            {formatDisplayLabel(recap.mood_data.trend)}
           </span>
         </div>
       </div>

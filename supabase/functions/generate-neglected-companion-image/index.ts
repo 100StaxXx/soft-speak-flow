@@ -3,6 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveCompanionImageSizeForUser } from "../_shared/companionImagePolicy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,12 +15,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestStartedAt = Date.now();
+
   try {
     const { companionId, userId } = await req.json();
 
     if (!companionId || !userId) {
       throw new Error("Missing companionId or userId");
     }
+
+    const imageSize = resolveCompanionImageSizeForUser(userId);
+    console.log(`[NeglectedImagePolicy] user=${userId} image_size=${imageSize}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -103,6 +109,7 @@ OUTPUT: Same composition and framing as the original image`;
           },
         ],
         modalities: ["image", "text"],
+        image_size: imageSize,
       }),
     });
 
@@ -166,5 +173,7 @@ OUTPUT: Same composition and framing as the original image`;
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
+  } finally {
+    console.log(`[NeglectedImageTiming] total_ms=${Date.now() - requestStartedAt}`);
   }
 });

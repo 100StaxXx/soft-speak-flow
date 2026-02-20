@@ -229,14 +229,26 @@ serve(async (req) => {
     // Non-blocking transcript sync to reduce client-side sync retries.
     try {
       console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
-      const { error: syncError } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
+      const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
         body: { id: dailyPepTalk.id },
       });
 
       if (syncError) {
         console.error(`Transcript sync failed for ${dailyPepTalk.id}:`, syncError);
       } else {
-        console.log(`✓ Transcript synced for ${dailyPepTalk.id}`);
+        const syncPayload = (syncData && typeof syncData === "object")
+          ? syncData as Record<string, unknown>
+          : {};
+        const libraryRowsUpdated =
+          typeof syncPayload.libraryRowsUpdated === "number" ? syncPayload.libraryRowsUpdated : 0;
+        const warning = typeof syncPayload.warning === "string" ? syncPayload.warning : null;
+        console.log(`✓ Transcript synced for ${dailyPepTalk.id}`, {
+          updated: syncPayload.updated === true,
+          transcriptChanged: syncPayload.transcriptChanged === true,
+          libraryUpdated: syncPayload.libraryUpdated === true,
+          libraryRowsUpdated,
+          warning,
+        });
       }
     } catch (syncError) {
       console.error(`Transcript sync threw for ${dailyPepTalk.id}:`, syncError);

@@ -6,6 +6,8 @@ interface GenerateWithValidationResult {
   retryCount: number;
 }
 
+type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin";
+
 /**
  * Generates a companion image with built-in quality scoring and automatic retry.
  * The generate-companion-image edge function now handles validation internally,
@@ -20,6 +22,9 @@ export async function generateWithValidation(
     eyeColor?: string;
     furColor?: string;
     storyTone?: string;
+    flowType?: CompanionImageFlowType;
+    debug?: boolean;
+    image_size?: "1024x1024" | "1536x1024";
   },
   options: {
     maxRetries?: number;

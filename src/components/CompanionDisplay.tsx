@@ -23,6 +23,7 @@ import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDisplayLabel } from "@/lib/utils";
 import {
   useState,
   useEffect,
@@ -530,11 +531,11 @@ export const CompanionDisplay = memo(() => {
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-accent/5 to-primary/5 border border-accent/10 hover:border-accent/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Spirit</p>
-                <p className="font-medium text-sm capitalize">{companion.spirit_animal}</p>
+                <p className="font-medium text-sm">{formatDisplayLabel(companion.spirit_animal)}</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/30 transition-all">
                 <p className="text-xs text-muted-foreground mb-1">Element</p>
-                <p className="font-medium text-sm capitalize">{companion.core_element}</p>
+                <p className="font-medium text-sm">{formatDisplayLabel(companion.core_element)}</p>
               </div>
             </div>
 

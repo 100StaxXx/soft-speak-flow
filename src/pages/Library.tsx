@@ -11,6 +11,7 @@ import { PepTalkCard } from "@/components/PepTalkCard";
 import { QuoteCard } from "@/components/QuoteCard";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { formatDisplayLabel } from "@/lib/utils";
 
 type LibraryTab = "favorites" | "downloads" | "history";
 
@@ -229,7 +230,7 @@ export default function Library() {
                   <Card key={download.id} className="p-4 bg-card/50 backdrop-blur-sm border-border/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium capitalize">{download.content_type}</p>
+                        <p className="font-medium">{formatDisplayLabel(download.content_type)}</p>
                         <p className="text-sm text-muted-foreground">
                           {new Date(download.created_at).toLocaleDateString()}
                         </p>

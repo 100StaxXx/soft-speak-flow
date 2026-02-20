@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
+import { formatDisplayLabel } from "@/lib/utils";
 
 type ChallengeTab = "active" | "available";
 
@@ -190,7 +191,7 @@ export default function Challenges() {
                           <Badge
                             variant={userChallenge.status === "active" ? "default" : "secondary"}
                           >
-                            {userChallenge.status}
+                            {formatDisplayLabel(userChallenge.status)}
                           </Badge>
                         </div>
                       </div>

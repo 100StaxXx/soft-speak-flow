@@ -112,7 +112,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }, [connections, defaultProvider]);
   const canShowCalendarSendOption = Boolean(integrationVisible && connections.length > 0 && effectiveProvider);
 
-  const inputRef = useRef<HTMLInputElement>(null);
   const timeWheelRef = useRef<HTMLDivElement>(null);
   const selectedTimeRef = useRef<HTMLButtonElement>(null);
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -148,13 +147,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
     }
   }, [open, selectedDate]);
-
-  // Auto-focus title input
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 300);
-    }
-  }, [open]);
 
   // Auto-scroll time wheel
   useEffect(() => {
@@ -327,7 +319,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   return (
     <Sheet open={open} onOpenChange={requestOpenChange}>
-      <SheetContent side="bottom" data-tour="add-quest-sheet" className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden">
+      <SheetContent
+        side="bottom"
+        data-tour="add-quest-sheet"
+        className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <SheetTitle className="sr-only">Add Quest</SheetTitle>
         <SheetDescription className="sr-only">
           Create a new quest with schedule, subtasks, and optional details.
@@ -345,7 +342,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <DifficultyIcon difficulty={difficulty} />
             <p className="text-sm opacity-80 mt-1.5">New Quest</p>
             <Input
-              ref={inputRef}
               data-tour="add-quest-title-input"
               placeholder="Quest Title"
               value={taskText}

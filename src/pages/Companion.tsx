@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
+import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
 type CompanionTab = "overview" | "focus" | "stories" | "postcards" | "collection";
 
@@ -131,6 +132,7 @@ const OverviewSkeleton = () => (
 
 const Companion = () => {
   const prefersReducedMotion = useReducedMotion();
+  const { isTabActive } = useMainTabVisibility();
   const {
     companion,
     nextEvolutionXP,
@@ -138,7 +140,7 @@ const Companion = () => {
     isLoading,
     error,
     refetch,
-  } = useCompanion();
+  } = useCompanion({ enabled: isTabActive });
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<CompanionTab>("overview");
@@ -153,6 +155,9 @@ const Companion = () => {
   }, []);
 
   const prefetchStories = useCallback(() => {
+    if (!isTabActive) {
+      return Promise.resolve([]);
+    }
     const tasks: Promise<unknown>[] = [loadCompanionStoryJournal()];
 
     if (companion?.id) {
@@ -165,9 +170,12 @@ const Companion = () => {
     }
 
     return Promise.allSettled(tasks);
-  }, [companion?.id, queryClient]);
+  }, [companion?.id, isTabActive, queryClient]);
 
   const prefetchPostcards = useCallback(() => {
+    if (!isTabActive) {
+      return Promise.resolve([]);
+    }
     const tasks: Promise<unknown>[] = [loadCompanionPostcards()];
 
     if (user?.id) {
@@ -180,7 +188,7 @@ const Companion = () => {
     }
 
     return Promise.allSettled(tasks);
-  }, [queryClient, user?.id]);
+  }, [isTabActive, queryClient, user?.id]);
 
   const prefetchJourneyTabs = useCallback(() => {
     void prefetchStories();
@@ -188,12 +196,14 @@ const Companion = () => {
   }, [prefetchPostcards, prefetchStories]);
 
   const handleStoriesTriggerPrefetch = useCallback(() => {
+    if (!isTabActive) return;
     void prefetchStories();
-  }, [prefetchStories]);
+  }, [isTabActive, prefetchStories]);
 
   const handlePostcardsTriggerPrefetch = useCallback(() => {
+    if (!isTabActive) return;
     void prefetchPostcards();
-  }, [prefetchPostcards]);
+  }, [isTabActive, prefetchPostcards]);
 
   const handleTabChange = useCallback(
     (value: string) => {
@@ -204,13 +214,17 @@ const Companion = () => {
       setActiveTab(value);
       markTabMounted(value);
 
+      if (!isTabActive) {
+        return;
+      }
+
       if (value === "stories") {
         void prefetchStories();
       } else if (value === "postcards") {
         void prefetchPostcards();
       }
     },
-    [markTabMounted, prefetchPostcards, prefetchStories],
+    [isTabActive, markTabMounted, prefetchPostcards, prefetchStories],
   );
 
   useEffect(() => {
@@ -221,6 +235,7 @@ const Companion = () => {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (!isTabActive) return;
     if (!companion?.id || !user?.id) return;
 
     const prefetchKey = `${user.id}:${companion.id}`;
@@ -255,7 +270,7 @@ const Companion = () => {
         idleWindow.cancelIdleCallback(idleHandle);
       }
     };
-  }, [companion?.id, prefetchJourneyTabs, user?.id]);
+  }, [companion?.id, isTabActive, prefetchJourneyTabs, user?.id]);
 
   // Render persistent layout - header/nav always visible, content swaps smoothly
   const renderContent = () => {

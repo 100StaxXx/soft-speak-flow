@@ -5,6 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function formatDisplayLabel(value: string | null | undefined): string {
+  if (!value) return "";
+
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (char) => char.toUpperCase());
+}
+
 /**
  * Remove markdown formatting from text (asterisks, underscores, etc.)
  * Used as a safety net for AI-generated content that may contain markdown

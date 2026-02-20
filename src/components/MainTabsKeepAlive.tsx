@@ -6,18 +6,16 @@ import Companion from "@/pages/Companion";
 import Inbox from "@/pages/Inbox";
 import Journeys from "@/pages/Journeys";
 import { useAuth } from "@/hooks/useAuth";
-import { PullToRefreshContainer } from "@/components/PullToRefreshContainer";
+import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
+import { logger } from "@/utils/logger";
 import {
   DAILY_TASKS_GC_TIME,
   DAILY_TASKS_STALE_TIME,
   fetchDailyTasks,
   getDailyTasksQueryKey,
 } from "@/hooks/useTasksQuery";
-import {
-  buildRefreshPredicate,
-  dispatchMainTabRefreshEvent,
-  type MainTabPath,
-} from "@/utils/mainTabRefresh";
+
+type MainTabPath = "/mentor" | "/inbox" | "/journeys" | "/companion";
 
 const TAB_ORDER: MainTabPath[] = ["/mentor", "/inbox", "/journeys", "/companion"];
 
@@ -38,6 +36,8 @@ const initialScrollPositions: Record<MainTabPath, number> = {
   "/companion": 0,
 };
 
+const SCROLL_RESTORE_EPSILON_PX = 1;
+
 export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -45,6 +45,8 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
   const activePathRef = useRef<MainTabPath>(activePath);
   const visitedTabsRef = useRef<Set<MainTabPath>>(new Set([activePath]));
   const scrollPositionsRef = useRef<Record<MainTabPath, number>>(initialScrollPositions);
+  const hasInitializedScrollRestoreRef = useRef(false);
+  const rafHandlesRef = useRef<number[]>([]);
 
   const prefetchJourneysTasks = useCallback(() => {
     if (!user?.id) return;
@@ -76,32 +78,42 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
 
     const wasVisited = visitedTabsRef.current.has(activePath);
     const targetY = wasVisited ? scrollPositionsRef.current[activePath] ?? 0 : 0;
-
-    const frame = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
-    });
-
     visitedTabsRef.current.add(activePath);
     activePathRef.current = activePath;
+    if (!hasInitializedScrollRestoreRef.current) {
+      hasInitializedScrollRestoreRef.current = true;
+      return;
+    }
 
-    return () => window.cancelAnimationFrame(frame);
+    if (Math.abs(window.scrollY - targetY) <= SCROLL_RESTORE_EPSILON_PX) {
+      return;
+    }
+
+    const frameA = window.requestAnimationFrame(() => {
+      const frameB = window.requestAnimationFrame(() => {
+        if (Math.abs(window.scrollY - targetY) <= SCROLL_RESTORE_EPSILON_PX) {
+          return;
+        }
+        window.scrollTo({ top: targetY, left: 0, behavior: "auto" });
+
+        if (import.meta.env.DEV) {
+          logger.debug("MainTabsKeepAlive restored tab scroll", {
+            activePath,
+            targetY,
+          });
+        }
+      });
+      rafHandlesRef.current.push(frameB);
+    });
+    rafHandlesRef.current.push(frameA);
+
+    return () => {
+      for (const handle of rafHandlesRef.current) {
+        window.cancelAnimationFrame(handle);
+      }
+      rafHandlesRef.current = [];
+    };
   }, [activePath]);
-
-  const handlePullRefresh = useCallback(
-    async (path: MainTabPath) => {
-      await queryClient.invalidateQueries({
-        predicate: buildRefreshPredicate(path),
-        refetchType: "active",
-      });
-
-      dispatchMainTabRefreshEvent({
-        path,
-        source: "pull-to-refresh",
-        triggeredAt: Date.now(),
-      });
-    },
-    [queryClient],
-  );
 
   return (
     <div className="relative">
@@ -113,11 +125,11 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
 
         return (
           <div key={path} style={{ display: isActive ? "block" : "none" }} aria-hidden={!isActive}>
-            <PullToRefreshContainer enabled={isActive} onRefresh={() => handlePullRefresh(path)}>
+            <MainTabVisibilityProvider isTabActive={isActive}>
               <section>
                 <TabPage />
               </section>
-            </PullToRefreshContainer>
+            </MainTabVisibilityProvider>
           </div>
         );
       })}

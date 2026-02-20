@@ -1,8 +1,17 @@
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations";
 
-const DEFAULT_TEXT_MODEL = Deno.env.get("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
-const DEFAULT_IMAGE_MODEL = Deno.env.get("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
+const DEFAULT_IMAGE_SIZE = "1536x1024";
+export const ALLOWED_IMAGE_SIZES = ["1024x1024", "1536x1024"] as const;
+export type SupportedImageSize = (typeof ALLOWED_IMAGE_SIZES)[number];
+
+function getEnv(name: string): string | undefined {
+  const maybeDeno = (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno;
+  return maybeDeno?.env?.get?.(name);
+}
+
+const DEFAULT_TEXT_MODEL = getEnv("OPENAI_TEXT_MODEL") ?? "gpt-4o-mini";
+const DEFAULT_IMAGE_MODEL = getEnv("OPENAI_IMAGE_MODEL") ?? "gpt-image-1";
 
 let shimInstalled = false;
 
@@ -139,6 +148,21 @@ function shouldGenerateImage(body: Record<string, unknown>): boolean {
   return model.includes("image");
 }
 
+export function resolveImageSize(candidate: unknown, fallback: SupportedImageSize): SupportedImageSize;
+export function resolveImageSize(candidate: unknown, fallback: null): SupportedImageSize | null;
+export function resolveImageSize(
+  candidate: unknown,
+  fallback: SupportedImageSize | null = DEFAULT_IMAGE_SIZE,
+): SupportedImageSize | null {
+  if (typeof candidate === "string") {
+    const normalized = candidate.trim();
+    if ((ALLOWED_IMAGE_SIZES as readonly string[]).includes(normalized)) {
+      return normalized as SupportedImageSize;
+    }
+  }
+  return fallback;
+}
+
 async function handleImageRequest(
   originalFetch: typeof fetch,
   headers: Headers,
@@ -157,7 +181,7 @@ async function handleImageRequest(
   const imageRequest = {
     model: mapModel(body.model, true),
     prompt: `${prompt}${referenceHint}`,
-    size: "1536x1024",
+    size: resolveImageSize(body.image_size, DEFAULT_IMAGE_SIZE),
   };
 
   const response = await originalFetch(OPENAI_IMAGE_GENERATIONS_URL, {

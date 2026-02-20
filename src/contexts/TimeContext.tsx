@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { logger } from "@/utils/logger";
 
 export type TimePeriod = 'dawn' | 'morning' | 'afternoon' | 'sunset' | 'night';
 
@@ -121,6 +122,11 @@ const getPeriodProgress = (hour: number, minute: number, period: TimePeriod): nu
   return Math.max(0, Math.min(1, elapsed / duration));
 };
 
+const getRotationHueForTime = (hour: number, minute: number): number => {
+  const totalMinutes = (hour * 60) + minute;
+  return (totalMinutes * 0.5) % 360;
+};
+
 const defaultColors: TimeColors = TIME_PERIODS.night.colors;
 
 const TimeContext = createContext<TimeContextType>({
@@ -150,24 +156,19 @@ export const TimeProvider = ({ children }: TimeProviderProps) => {
       
       const newPeriod = getTimePeriod(hour);
       const newProgress = getPeriodProgress(hour, minute, newPeriod);
+      const newRotationHue = getRotationHueForTime(hour, minute);
       
       setPeriod(newPeriod);
       setProgress(newProgress);
+      setRotationHue(newRotationHue);
     };
 
     updateTime();
     const interval = setInterval(updateTime, 60000); // Update every minute
-    
-    return () => clearInterval(interval);
-  }, []);
 
-  // Slow hue rotation for accent colors (completes cycle every ~3 minutes)
-  useEffect(() => {
-    const rotateHue = () => {
-      setRotationHue((prev) => (prev + 0.5) % 360);
-    };
-
-    const interval = setInterval(rotateHue, 500); // Update every 500ms
+    if (import.meta.env.DEV) {
+      logger.debug("TimeContext running on minute cadence", { updateIntervalMs: 60000 });
+    }
     
     return () => clearInterval(interval);
   }, []);

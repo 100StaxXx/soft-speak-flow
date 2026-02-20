@@ -16,7 +16,7 @@ import {
   Check,
   Calendar,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 
 interface GuildRitual {
   id: string;
@@ -126,8 +126,8 @@ export const GuildRitualCard = ({
               </div>
               <div>
                 <CardTitle className="text-base">{ritual.name}</CardTitle>
-                <Badge variant="outline" className={cn("text-xs capitalize mt-1", colors.color)}>
-                  {ritual.ritual_type} ritual
+                <Badge variant="outline" className={cn("text-xs mt-1", colors.color)}>
+                  {formatDisplayLabel(ritual.ritual_type)} Ritual
                 </Badge>
               </div>
             </div>

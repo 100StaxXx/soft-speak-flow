@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Clock, Trophy, XCircle, Star, Sparkles } from 'lucide-react';
 import { AstralEncounter } from '@/types/astralEncounters';
 import { format } from 'date-fns';
+import { formatDisplayLabel } from '@/lib/utils';
 
 interface EncounterHistoryProps {
   encounters: AstralEncounter[];
@@ -59,7 +60,7 @@ export const EncounterHistory = ({ encounters }: EncounterHistoryProps) => {
                           </span>
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span className="capitalize">{encounter.adversary_tier}</span>
+                          <span>{formatDisplayLabel(encounter.adversary_tier)}</span>
                           <span>•</span>
                           <span>{encounter.accuracy_score || 0}% accuracy</span>
                           {encounter.xp_earned > 0 && (

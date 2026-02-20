@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Skull, Zap, Wind, Brain } from 'lucide-react';
 import { Adversary, AdversaryTier } from '@/types/astralEncounters';
 import { Button } from '@/components/ui/button';
+import { formatDisplayLabel } from '@/lib/utils';
 
 interface AdversaryRevealProps {
   adversary: Adversary;
@@ -59,7 +60,7 @@ export const AdversaryReveal = ({ adversary, onBeginBattle }: AdversaryRevealPro
 
         {/* Tier badge */}
         <div className={`absolute -bottom-2 px-3 py-1 rounded-full text-xs font-bold uppercase bg-background border border-border`}>
-          {adversary.tier}
+          {formatDisplayLabel(adversary.tier)}
         </div>
       </motion.div>
 
@@ -96,7 +97,7 @@ export const AdversaryReveal = ({ adversary, onBeginBattle }: AdversaryRevealPro
         </div>
         <div className="text-center">
           <p className="text-muted-foreground">Essence</p>
-          <p className="font-bold text-primary capitalize">{adversary.statType}</p>
+          <p className="font-bold text-primary">{formatDisplayLabel(adversary.statType)}</p>
         </div>
         <div className="text-center">
           <p className="text-muted-foreground">Boost</p>

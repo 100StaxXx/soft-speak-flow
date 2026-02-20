@@ -126,6 +126,8 @@ export const AdminCompanionImageTester = () => {
             storyTone: testData.storyTone || undefined,
             previousStageImageUrl: previousStageImage,
             retryAttempt: testData.retryAttempt || undefined,
+            flowType: "admin",
+            debug: true,
           },
         });
 
@@ -188,6 +190,8 @@ export const AdminCompanionImageTester = () => {
             furColor: testData.furColor || undefined,
             storyTone: testData.storyTone || undefined,
             previousStageImageUrl: previousImageUrl,
+            flowType: "admin",
+            debug: true,
           },
         });
 

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
   const rpcMock = vi.fn();
   const invokeMock = vi.fn();
   const fromMock = vi.fn();
+  const generateWithValidationMock = vi.fn();
   const setIsEvolvingLoadingMock = vi.fn();
   const toastErrorMock = vi.fn();
   const toastSuccessMock = vi.fn();
@@ -29,11 +30,13 @@ const mocks = vi.hoisted(() => {
   const loggerErrorMock = vi.fn();
   const loggerInfoMock = vi.fn();
   const userCompanionResponses: Array<{ data: unknown; error: unknown }> = [];
+  const companionEvolutionResponses: Array<{ data: unknown; error: unknown }> = [];
 
   return {
     rpcMock,
     invokeMock,
     fromMock,
+    generateWithValidationMock,
     setIsEvolvingLoadingMock,
     toastErrorMock,
     toastSuccessMock,
@@ -43,6 +46,7 @@ const mocks = vi.hoisted(() => {
     loggerErrorMock,
     loggerInfoMock,
     userCompanionResponses,
+    companionEvolutionResponses,
   };
 });
 
@@ -105,6 +109,10 @@ vi.mock("@/utils/logger", () => ({
   },
 }));
 
+vi.mock("@/utils/validateCompanionImage", () => ({
+  generateWithValidation: mocks.generateWithValidationMock,
+}));
+
 import { useCompanion } from "./useCompanion";
 
 const createRelayInvokeError = () => ({
@@ -134,6 +142,9 @@ const createQueryBuilder = (table: string) => {
     maybeSingle: vi.fn(async () => {
       if (table === "user_companion") {
         return mocks.userCompanionResponses.shift() ?? { data: companionFixture, error: null };
+      }
+      if (table === "companion_evolutions") {
+        return mocks.companionEvolutionResponses.shift() ?? { data: { id: "evo-0" }, error: null };
       }
 
       return { data: null, error: null };
@@ -174,11 +185,17 @@ describe("useCompanion evolveCompanion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.userCompanionResponses.length = 0;
+    mocks.companionEvolutionResponses.length = 0;
     mocks.userCompanionResponses.push({ data: companionFixture, error: null });
 
     mocks.fromMock.mockImplementation((table: string) => createQueryBuilder(table));
     mocks.rpcMock.mockResolvedValue({ data: null, error: null });
     mocks.invokeMock.mockResolvedValue({ data: null, error: null });
+    mocks.generateWithValidationMock.mockResolvedValue({
+      imageUrl: "https://example.com/generated-companion.png",
+      validationPassed: true,
+      retryCount: 0,
+    });
   });
 
   it("calls generate-companion-evolution directly and invalidates companion queries", async () => {
@@ -354,6 +371,39 @@ describe("useCompanion evolveCompanion", () => {
         userId: "user-1",
         eventType: "focus_session",
         error_code: "42883",
+      }),
+    );
+  });
+
+  it("uses onboarding fast retry defaults for companion creation", async () => {
+    mocks.rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          ...companionFixture,
+          is_new: true,
+        },
+      ],
+      error: null,
+    });
+
+    const { result } = await renderUseCompanion();
+
+    await act(async () => {
+      await result.current.createCompanion.mutateAsync({
+        favoriteColor: "#FF6B35",
+        spiritAnimal: "Wolf",
+        coreElement: "Fire",
+        storyTone: "epic",
+      });
+    });
+
+    expect(mocks.generateWithValidationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flowType: "onboarding",
+        stage: 0,
+      }),
+      expect.objectContaining({
+        maxRetries: 0,
       }),
     );
   });

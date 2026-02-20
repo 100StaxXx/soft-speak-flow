@@ -4,6 +4,11 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  getCompanionFastRetryLimits,
+  isCompanionFastPathEligible,
+  resolveCompanionImageSizeForUser,
+} from "../_shared/companionImagePolicy.ts";
 
 // ============================================================================
 // CATEGORY DEFAULTS - Shared anatomy for creature categories
@@ -346,6 +351,8 @@ const MAX_ALLOWED_RETRIES = 3;
 const GENERATION_FETCH_TIMEOUT_MS = 75_000;
 const AUXILIARY_FETCH_TIMEOUT_MS = 25_000;
 
+type CompanionImageFlowType = "onboarding" | "regenerate" | "evolution" | "background" | "admin";
+
 type TimeoutCode = "AI_TIMEOUT" | "GENERATION_TIMEOUT";
 
 interface TimedRequestError extends Error {
@@ -411,6 +418,16 @@ async function fetchWithTimeout(
   }
 }
 
+function normalizeFlowType(value: unknown): CompanionImageFlowType {
+  if (typeof value !== "string") return "background";
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "onboarding") return "onboarding";
+  if (normalized === "regenerate") return "regenerate";
+  if (normalized === "evolution") return "evolution";
+  if (normalized === "admin") return "admin";
+  return "background";
+}
+
 function generateCharacterDNA(spiritAnimal: string, element: string, favoriteColor: string, eyeColor: string | undefined, furColor: string | undefined, stage: number): string {
   const anatomy = getCreatureAnatomy(spiritAnimal);
   const isBabyStage = stage >= 2 && stage <= 7;
@@ -464,6 +481,21 @@ serve(async (req) => {
   }
 
   const corsHeaders = getCorsHeaders(req);
+  const requestStartedAt = Date.now();
+  let promptBuildDurationMs = 0;
+  let generationCallDurationMs = 0;
+  let qualityCallDurationMs = 0;
+  let storageUploadDurationMs = 0;
+
+  const timedResponse = (response: Response, reason: string): Response => {
+    const totalDurationMs = Date.now() - requestStartedAt;
+    console.log(
+      `[CompanionImageTiming] reason=${reason} total_ms=${totalDurationMs} auth_ms=${authDurationMs} prompt_build_ms=${promptBuildDurationMs} generation_ms=${generationCallDurationMs} quality_ms=${qualityCallDurationMs} storage_ms=${storageUploadDurationMs}`,
+    );
+    return response;
+  };
+
+  let authDurationMs = 0;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -472,15 +504,24 @@ serve(async (req) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization header", code: "NO_AUTH_HEADER" }), 
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 });
+      return timedResponse(
+        new Response(JSON.stringify({ error: "No authorization header", code: "NO_AUTH_HEADER" }), 
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }),
+        "auth_missing_header",
+      );
     }
 
+    const authStartedAt = Date.now();
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    authDurationMs = Date.now() - authStartedAt;
+    console.log(`[CompanionImageTiming] auth_ms=${authDurationMs}`);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid authentication", code: "INVALID_AUTH" }), 
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 });
+      return timedResponse(
+        new Response(JSON.stringify({ error: "Invalid authentication", code: "INVALID_AUTH" }), 
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }),
+        "auth_invalid",
+      );
     }
 
     console.log(`User authenticated: ${user.id}`);
@@ -497,6 +538,9 @@ serve(async (req) => {
       storyTone,
       previousStageImageUrl,
       companionId,
+      flowType,
+      debug = false,
+      image_size,
     } = await req.json();
 
     console.log(`Request - Animal: ${spiritAnimal}, Element: ${element}, Stage: ${stage}, Color: ${favoriteColor}`);
@@ -509,6 +553,13 @@ serve(async (req) => {
     const anatomy = getCreatureAnatomy(spiritAnimal);
     const stageName = STAGE_NAMES[stage as number];
     if (!stageName) throw new Error(`Invalid stage: ${stage}`);
+    const normalizedFlowType = normalizeFlowType(flowType);
+    const fastPathEligible = isCompanionFastPathEligible(user.id);
+    const imageSize = resolveCompanionImageSizeForUser(user.id, image_size);
+    const fastRetryLimits = getCompanionFastRetryLimits();
+    console.log(
+      `[CompanionImagePolicy] user=${user.id} flow=${normalizedFlowType} fast_path=${fastPathEligible} image_size=${imageSize} stage0_fast_retries=${fastRetryLimits.stage0} non_stage0_fast_retries=${fastRetryLimits.nonStage0}`,
+    );
 
     // ========================================================================
     // VISUAL METADATA EXTRACTION FOR CONSISTENCY (Stages 2-14)
@@ -535,8 +586,11 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       console.error("OPENAI_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }), 
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+      return timedResponse(
+        new Response(JSON.stringify({ error: "AI service not configured.", code: "AI_SERVICE_NOT_CONFIGURED" }), 
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }),
+        "ai_key_missing",
+      );
     }
 
     if (stage >= 2 && stage <= 14) {
@@ -688,6 +742,7 @@ serve(async (req) => {
     // BUILD THE PROMPT
     // ========================================================================
 
+    const promptBuildStartedAt = Date.now();
     const characterDNA = generateCharacterDNA(spiritAnimal, element, favoriteColor, eyeColor, furColor, stage);
     const negativePrompts = getNegativePrompts(stage, spiritAnimal);
     const storyToneStyle = getStoryToneModifiers(normalizeStoryTone(storyTone));
@@ -801,13 +856,17 @@ Stylized digital fantasy art, appealing and charming, expressive features.
 NOT photorealistic, NOT hyper-cartoonish.
 Painterly digital art with rich saturated colors, soft but defined edges.`;
     }
+    promptBuildDurationMs = Date.now() - promptBuildStartedAt;
+    console.log(`[CompanionImageTiming] prompt_build_ms=${promptBuildDurationMs}`);
 
     // ========================================================================
     // CALL AI FOR IMAGE GENERATION WITH AUTO-RETRY ON LOW QUALITY
     // ========================================================================
 
     const stageNumber = Number(stage);
-    const adaptiveRetryDefault = stageNumber === 0 ? STAGE_ZERO_INTERNAL_RETRIES : DEFAULT_INTERNAL_RETRIES;
+    const adaptiveRetryDefault = fastPathEligible
+      ? (stageNumber === 0 ? fastRetryLimits.stage0 : fastRetryLimits.nonStage0)
+      : (stageNumber === 0 ? STAGE_ZERO_INTERNAL_RETRIES : DEFAULT_INTERNAL_RETRIES);
     const requestedRetries =
       typeof maxInternalRetries === "number" && Number.isFinite(maxInternalRetries)
         ? Math.max(0, Math.min(MAX_ALLOWED_RETRIES, Math.floor(maxInternalRetries)))
@@ -832,6 +891,7 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
         : fullPrompt;
 
       let aiResponse;
+      const generationAttemptStartedAt = Date.now();
       try {
         aiResponse = await fetchWithTimeout(
           "https://api.openai.com/v1/chat/completions",
@@ -841,34 +901,50 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
             body: JSON.stringify({
               model: "google/gemini-2.5-flash-image-preview",
               messages: [{ role: "user", content: messageContent }],
-              modalities: ["image", "text"]
+              modalities: ["image", "text"],
+              image_size: imageSize,
             })
           },
           GENERATION_FETCH_TIMEOUT_MS,
           "GENERATION_TIMEOUT",
         );
+        generationCallDurationMs += Date.now() - generationAttemptStartedAt;
       } catch (fetchError) {
+        generationCallDurationMs += Date.now() - generationAttemptStartedAt;
         if (isTimedRequestError(fetchError)) {
           console.error("AI generation timed out:", fetchError);
-          return new Response(JSON.stringify({ error: "AI generation timed out. Try again.", code: fetchError.code }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 });
+          return timedResponse(
+            new Response(JSON.stringify({ error: "AI generation timed out. Try again.", code: fetchError.code }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 }),
+            "generation_timeout",
+          );
         }
         console.error("Network error:", fetchError);
-        return new Response(JSON.stringify({ error: "Network error. Try again.", code: "NETWORK_ERROR" }), 
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 });
+        return timedResponse(
+          new Response(JSON.stringify({ error: "Network error. Try again.", code: "NETWORK_ERROR" }), 
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 503 }),
+          "generation_network_error",
+        );
       }
+      console.log(`[CompanionImageTiming] generation_attempt_ms=${Date.now() - generationAttemptStartedAt} attempt=${currentAttempt + 1}`);
 
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
         console.error("AI error:", errorText);
 
         if (aiResponse.status === 402) {
-          return new Response(JSON.stringify({ error: "Insufficient AI credits.", code: "INSUFFICIENT_CREDITS" }), 
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 });
+          return timedResponse(
+            new Response(JSON.stringify({ error: "Insufficient AI credits.", code: "INSUFFICIENT_CREDITS" }), 
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 402 }),
+            "generation_insufficient_credits",
+          );
         }
         if (aiResponse.status === 429) {
-          return new Response(JSON.stringify({ error: "AI service busy. Try again.", code: "RATE_LIMITED" }), 
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 });
+          return timedResponse(
+            new Response(JSON.stringify({ error: "AI service busy. Try again.", code: "RATE_LIMITED" }), 
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }),
+            "generation_rate_limited",
+          );
         }
         throw new Error(`AI request failed: ${aiResponse.status}`);
       }
@@ -887,6 +963,7 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
       // QUALITY SCORING - Analyze generated image for anatomical correctness
       // ========================================================================
       qualityScore = null;
+      const qualityStartedAt = Date.now();
 
       try {
         const qualityTool = {
@@ -943,6 +1020,8 @@ Score each aspect from 0-100 and list any issues.`;
           AUXILIARY_FETCH_TIMEOUT_MS,
           "AI_TIMEOUT",
         );
+        qualityCallDurationMs += Date.now() - qualityStartedAt;
+        console.log(`[CompanionImageTiming] quality_attempt_ms=${Date.now() - qualityStartedAt} attempt=${currentAttempt + 1}`);
 
         if (qualityResponse.ok) {
           const qualityData = await qualityResponse.json();
@@ -962,6 +1041,8 @@ Score each aspect from 0-100 and list any issues.`;
           }
         }
       } catch (qualityError) {
+        qualityCallDurationMs += Date.now() - qualityStartedAt;
+        console.log(`[CompanionImageTiming] quality_attempt_ms=${Date.now() - qualityStartedAt} attempt=${currentAttempt + 1} status=error`);
         if (isTimedRequestError(qualityError)) {
           console.warn("Quality analysis timed out (non-blocking)");
         } else {
@@ -991,6 +1072,7 @@ Score each aspect from 0-100 and list any issues.`;
     }
     
     console.log("Uploading to storage...");
+    const storageStartedAt = Date.now();
 
     const base64Data = imageUrl.split(",")[1];
     const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
@@ -1006,14 +1088,18 @@ Score each aspect from 0-100 and list any issues.`;
     }
 
     const { data: { publicUrl } } = supabase.storage.from("mentors-avatars").getPublicUrl(filePath);
+    storageUploadDurationMs = Date.now() - storageStartedAt;
+    console.log(`[CompanionImageTiming] storage_ms=${storageUploadDurationMs}`);
 
     console.log(`Uploaded: ${publicUrl}`);
 
     // Return response with quality score
-    const responseData: Record<string, unknown> = { 
-      imageUrl: publicUrl, 
-      prompt: fullPrompt 
+    const responseData: Record<string, unknown> = {
+      imageUrl: publicUrl,
     };
+    if (debug === true) {
+      responseData.prompt = fullPrompt;
+    }
     
     if (qualityScore) {
       responseData.qualityScore = {
@@ -1027,18 +1113,27 @@ Score each aspect from 0-100 and list any issues.`;
       responseData.extractedMetadata = extractedMetadata;
     }
 
-    return new Response(JSON.stringify(responseData), 
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    return timedResponse(
+      new Response(JSON.stringify(responseData), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }),
+      "success",
+    );
 
   } catch (error) {
     if (isTimedRequestError(error)) {
-      return new Response(
-        JSON.stringify({ error: "AI request timed out. Please try again.", code: error.code }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 },
+      return timedResponse(
+        new Response(
+          JSON.stringify({ error: "AI request timed out. Please try again.", code: error.code }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 504 },
+        ),
+        "timed_request_error",
       );
     }
     console.error("Error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }), 
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    return timedResponse(
+      new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }),
+      "unhandled_error",
+    );
   }
 });
