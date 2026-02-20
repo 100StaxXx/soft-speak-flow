@@ -99,11 +99,12 @@ describe("safeCompletedSteps", () => {
       "create_quest",
       "invalid-step",
       "morning_checkin",
+      "evolve_companion",
       42,
       null,
     ]);
 
-    expect(result).toEqual(["create_quest", "morning_checkin"]);
+    expect(result).toEqual(["create_quest", "morning_checkin", "evolve_companion"]);
   });
 
   it("returns an empty array for malformed values", () => {
@@ -152,6 +153,8 @@ describe("getMentorInstructionLines", () => {
     );
     expect(getMentorInstructionLines("meet_companion", null)[0]).toContain("Open Companion");
     expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Head to Mentor");
+    expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve");
+    expect(getMentorInstructionLines("mentor_closeout", null)[0]).toContain("tutorial is complete");
   });
 });
 
@@ -162,6 +165,10 @@ describe("milestoneUsesStrictLock", () => {
 
   it("does not strict-lock companion progress confirmation", () => {
     expect(milestoneUsesStrictLock("confirm_companion_progress")).toBe(false);
+  });
+
+  it("does not strict-lock mentor closeout messaging", () => {
+    expect(milestoneUsesStrictLock("mentor_closeout_message")).toBe(false);
   });
 
   it("keeps strict lock enabled for actionable tutorial targets", () => {

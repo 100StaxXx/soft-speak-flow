@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useXPRewards } from "@/hooks/useXPRewards";
+import { getCompanionQueryKey, type Companion } from "@/hooks/useCompanion";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { safeLocalStorage } from "@/utils/storage";
 import type {
@@ -26,8 +27,9 @@ import type {
 const GUIDED_TUTORIAL_VERSION = 2;
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
+const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
 
-const STEP_XP_REWARDS: Record<GuidedTutorialStepId, number> = {
+const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
   create_quest: 4,
   meet_companion: 3,
   morning_checkin: 3,
@@ -42,7 +44,10 @@ type GuidedMilestoneId =
   | "open_companion_tab"
   | "confirm_companion_progress"
   | "open_mentor_tab"
-  | "submit_morning_checkin";
+  | "submit_morning_checkin"
+  | "tap_evolve_companion"
+  | "complete_companion_evolution"
+  | "mentor_closeout_message";
 
 interface GuidedStep {
   id: GuidedTutorialStepId;
@@ -61,6 +66,14 @@ const GUIDED_STEPS: GuidedStep[] = [
   {
     id: "morning_checkin",
     route: "/mentor",
+  },
+  {
+    id: "evolve_companion",
+    route: "/companion",
+  },
+  {
+    id: "mentor_closeout",
+    route: "/companion",
   },
 ];
 
@@ -94,6 +107,9 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "confirm_companion_progress",
   "open_mentor_tab",
   "submit_morning_checkin",
+  "tap_evolve_companion",
+  "complete_companion_evolution",
+  "mentor_closeout_message",
 ]);
 
 const isGuidedMilestoneId = (value: unknown): value is GuidedMilestoneId =>
@@ -134,6 +150,11 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
       return ['[data-tour="mentor-tab"]'];
     case "submit_morning_checkin":
       return ['[data-tour="checkin-submit"]', '[data-tour="morning-checkin"]'];
+    case "tap_evolve_companion":
+      return ['[data-tour="evolve-companion-button"]'];
+    case "complete_companion_evolution":
+    case "mentor_closeout_message":
+      return [];
     default:
       return [];
   }
@@ -338,6 +359,14 @@ export const getMentorInstructionLines = (
     return ["Head to Mentor."];
   }
 
+  if (currentStep === "evolve_companion") {
+    return ["Your companion is ready. Tap Evolve."];
+  }
+
+  if (currentStep === "mentor_closeout") {
+    return ["Beautiful work. Your tutorial is complete."];
+  }
+
   return [];
 };
 
@@ -388,6 +417,21 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
         text: "Complete your check-in and submit.",
         support: "Keep it honest and simple.",
       };
+    case "tap_evolve_companion":
+      return {
+        text: "Your companion is ready. Tap Evolve.",
+        support: "This is the moment your effort transforms into growth.",
+      };
+    case "complete_companion_evolution":
+      return {
+        text: "Stay with your companion through the evolution.",
+        support: "I'll close out your tutorial right after this transformation.",
+      };
+    case "mentor_closeout_message":
+      return {
+        text: "Outstanding. You completed your tutorial.",
+        support: "Now keep the momentum going with your daily quests and check-ins.",
+      };
     default:
       return {
         text: "Let's keep going.",
@@ -399,6 +443,8 @@ export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): 
   if (!milestoneId) return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
+  if (milestoneId === "complete_companion_evolution") return false;
+  if (milestoneId === "mentor_closeout_message") return false;
   return true;
 };
 
@@ -655,11 +701,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       setSessionCompleted((prev) => (prev.includes(stepId) ? prev : [...prev, stepId]));
 
       const nextAwardedSet = new Set<GuidedTutorialStepId>(awardedSet);
-      if (!nextAwardedSet.has(stepId)) {
+      const stepXPReward = STEP_XP_REWARDS[stepId] ?? 0;
+      if (!nextAwardedSet.has(stepId) && stepXPReward > 0) {
         nextAwardedSet.add(stepId);
         setSessionAwarded((prev) => (prev.includes(stepId) ? prev : [...prev, stepId]));
 
-        void awardCustomXP(STEP_XP_REWARDS[stepId], "guided_tutorial_step_complete", undefined, {
+        void awardCustomXP(stepXPReward, "guided_tutorial_step_complete", undefined, {
           guided_step: stepId,
           source: "guided_tutorial",
         });
@@ -762,6 +809,49 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
           window.clearInterval(interval);
         };
       }
+      return;
+    }
+
+    if (currentStep.id === "evolve_companion") {
+      if (location.pathname !== "/companion") return;
+
+      const hasEvolveButton = Boolean(
+        document.querySelector('[data-tour="evolve-companion-button"]')
+      );
+
+      if (hasEvolveButton && !milestoneSet.has("tap_evolve_companion")) {
+        markMilestoneComplete("tap_evolve_companion");
+      }
+
+      const cachedCompanion = user?.id
+        ? queryClient.getQueryData<Companion | null>(getCompanionQueryKey(user.id))
+        : null;
+
+      if (
+        cachedCompanion &&
+        cachedCompanion.current_stage > 0 &&
+        !milestoneSet.has("complete_companion_evolution")
+      ) {
+        markMilestoneComplete("complete_companion_evolution");
+        markStepComplete("evolve_companion");
+      }
+      return;
+    }
+
+    if (currentStep.id === "mentor_closeout") {
+      if (location.pathname !== "/companion") return;
+
+      if (!milestoneSet.has("mentor_closeout_message")) {
+        markMilestoneComplete("mentor_closeout_message");
+      }
+
+      const timeout = window.setTimeout(() => {
+        markStepComplete("mentor_closeout");
+      }, CLOSEOUT_AUTO_COMPLETE_MS);
+
+      return () => {
+        window.clearTimeout(timeout);
+      };
     }
   }, [
     createQuestProgress.current,
@@ -770,10 +860,12 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     markCreateQuestSubstepComplete,
     markMilestoneComplete,
     markStepComplete,
+    queryClient,
     milestoneSet,
     isIntroActive,
     tutorialComplete,
     tutorialReady,
+    user?.id,
   ]);
 
   useEffect(() => {
@@ -836,6 +928,18 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       });
     }
 
+    if (currentStep.id === "evolve_companion") {
+      listeners.push({
+        eventName: "companion-evolved",
+        handler: () => {
+          if (!milestoneSet.has("complete_companion_evolution")) {
+            markMilestoneComplete("complete_companion_evolution");
+          }
+          markStepComplete("evolve_companion");
+        },
+      });
+    }
+
     listeners.forEach(({ eventName, handler }) => {
       window.addEventListener(eventName, handler as EventListener);
     });
@@ -876,6 +980,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       return milestoneSet.has("open_mentor_tab")
         ? "submit_morning_checkin"
         : "open_mentor_tab";
+    }
+
+    if (currentStep.id === "evolve_companion") {
+      return "tap_evolve_companion";
+    }
+
+    if (currentStep.id === "mentor_closeout") {
+      return "mentor_closeout_message";
     }
 
     return null;

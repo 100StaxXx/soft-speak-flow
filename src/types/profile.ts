@@ -2,7 +2,12 @@
  * Type definitions for profile onboarding data
  */
 
-export type GuidedTutorialStepId = "create_quest" | "meet_companion" | "morning_checkin";
+export type GuidedTutorialStepId =
+  | "create_quest"
+  | "meet_companion"
+  | "morning_checkin"
+  | "evolve_companion"
+  | "mentor_closeout";
 export type CreateQuestSubstepId =
   | "stay_on_quests"
   | "open_add_quest"
