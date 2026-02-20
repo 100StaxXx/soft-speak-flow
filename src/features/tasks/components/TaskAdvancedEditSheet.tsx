@@ -11,14 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users, Camera, CalendarOff } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users, CalendarOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format, parseISO } from 'date-fns';
 import { ContactPicker } from '@/components/tasks/ContactPicker';
-import { QuestImagePicker } from '@/components/QuestImagePicker';
-import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
-import { useQuestImagePicker } from '@/hooks/useQuestImagePicker';
+import { QuestAttachmentPicker } from '@/components/QuestAttachmentPicker';
 import {
   Select,
   SelectContent,
@@ -32,6 +30,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import type { QuestAttachmentInput } from '@/types/questAttachments';
 
 interface TaskAdvancedEditSheetProps {
   open: boolean;
@@ -107,13 +106,25 @@ export function TaskAdvancedEditSheet({
   );
   const [contactId, setContactId] = useState<string | null>(parsed.contactId || null);
   const [autoLogInteraction, setAutoLogInteraction] = useState(parsed.autoLogInteraction ?? true);
-  const [imageUrl, setImageUrl] = useState<string | null>(parsed.imageUrl || null);
+  const [attachments, setAttachments] = useState<QuestAttachmentInput[]>(
+    parsed.attachments?.length
+      ? parsed.attachments
+      : parsed.imageUrl
+        ? [{
+          fileUrl: parsed.imageUrl,
+          filePath: '',
+          fileName: 'image',
+          mimeType: 'image/jpeg',
+          fileSizeBytes: 0,
+          isImage: true,
+          sortOrder: 0,
+        }]
+        : [],
+  );
   
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   
-  const { deleteImage } = useQuestImagePicker();
-
   // Reset end date when recurrence is cleared
   const handleRecurrenceChange = (pattern: string) => {
     setRecurrencePattern(pattern);
@@ -129,13 +140,6 @@ export function TaskAdvancedEditSheet({
     setRecurrenceEndType(endType);
     if (endType === 'never') {
       setRecurrenceEndDate(undefined);
-    }
-  };
-
-  const handleRemoveImage = async () => {
-    if (imageUrl) {
-      await deleteImage(imageUrl);
-      setImageUrl(null);
     }
   };
 
@@ -158,7 +162,8 @@ export function TaskAdvancedEditSheet({
         : null,
       contactId,
       autoLogInteraction,
-      imageUrl,
+      imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
+      attachments,
     };
     onSave(updated);
   };
@@ -454,26 +459,15 @@ export function TaskAdvancedEditSheet({
             />
           </div>
 
-          {/* Photo */}
+          {/* Photo / Files */}
           <div className="space-y-2">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-pink-500" />
-              Photo
+              Photo / Files
             </Label>
-            <div className="flex items-center gap-2">
-              {imageUrl && (
-                <QuestImageThumbnail
-                  imageUrl={imageUrl}
-                  onRemove={handleRemoveImage}
-                  size="md"
-                />
-              )}
-              <QuestImagePicker
-                onImageSelected={setImageUrl}
-                variant="button"
-                disabled={!!imageUrl}
-              />
-            </div>
+            <QuestAttachmentPicker
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+            />
           </div>
 
           {/* Contact Link */}

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import type { TaskAttachment } from "@/types/questAttachments";
 
 export interface DailySubtask {
   id: string;
@@ -57,6 +58,7 @@ export interface DailyTask {
   } | null;
   // Photo attachment
   image_url: string | null;
+  attachments?: TaskAttachment[];
   // Additional metadata
   notes: string | null;
   location: string | null;
@@ -77,7 +79,8 @@ export const fetchDailyTasks = async (userId: string, taskDate: string): Promise
       *,
       epics(title),
       contact:contacts!contact_id(id, name, avatar_url),
-      subtasks(id, title, completed, sort_order)
+      subtasks(id, title, completed, sort_order),
+      task_attachments(id, task_id, file_url, file_path, file_name, mime_type, file_size_bytes, is_image, sort_order, created_at)
     `)
     .eq('user_id', userId)
     .eq('task_date', taskDate)
@@ -104,6 +107,32 @@ export const fetchDailyTasks = async (userId: string, taskDate: string): Promise
     subtasks: ((task.subtasks as DailySubtask[] | null) ?? [])
       .slice()
       .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER)),
+    attachments: (((task.task_attachments as Array<{
+      id: string;
+      task_id: string;
+      file_url: string;
+      file_path: string;
+      file_name: string;
+      mime_type: string;
+      file_size_bytes: number;
+      is_image: boolean;
+      sort_order: number | null;
+      created_at: string;
+    }> | null) ?? [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER))
+      .map((attachment) => ({
+        id: attachment.id,
+        taskId: attachment.task_id,
+        fileUrl: attachment.file_url,
+        filePath: attachment.file_path,
+        fileName: attachment.file_name,
+        mimeType: attachment.mime_type,
+        fileSizeBytes: attachment.file_size_bytes,
+        isImage: attachment.is_image,
+        sortOrder: attachment.sort_order ?? undefined,
+        createdAt: attachment.created_at,
+      }))),
   })) as DailyTask[];
 };
 

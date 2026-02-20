@@ -12,6 +12,7 @@ import { TodaysAgenda } from "@/components/TodaysAgenda";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
+import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { StreakFreezePromptModal } from "@/components/StreakFreezePromptModal";
@@ -484,6 +485,8 @@ const Journeys = () => {
       contactId: data.contactId,
       autoLogInteraction: data.autoLogInteraction,
       subtasks: data.subtasks,
+      imageUrl: data.imageUrl,
+      attachments: data.attachments,
     });
 
     if (data.sendToCalendar && createdTask?.id) {
@@ -537,6 +540,7 @@ const Journeys = () => {
     category: string | null;
     image_url: string | null;
     location: string | null;
+    attachments?: QuestAttachmentInput[];
   }) => {
     await updateTask({ taskId, updates });
     await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {

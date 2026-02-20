@@ -16,6 +16,7 @@ import {
   normalizeTaskSchedulingState,
   normalizeTaskSchedulingUpdate,
 } from "@/utils/taskSchedulingRules";
+import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 type TaskCategory = 'mind' | 'body' | 'soul';
 const validCategories: TaskCategory[] = ['mind', 'body', 'soul'];
@@ -57,9 +58,15 @@ export interface AddTaskParams {
   contactId?: string | null;
   autoLogInteraction?: boolean;
   imageUrl?: string | null;
+  attachments?: QuestAttachmentInput[];
   location?: string | null;
   subtasks?: string[];
 }
+
+const firstImageFromAttachments = (attachments?: QuestAttachmentInput[]): string | null => {
+  if (!attachments || attachments.length === 0) return null;
+  return attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null;
+};
 
 export const useTaskMutations = (taskDate: string) => {
   const { user } = useAuth();
@@ -87,6 +94,36 @@ export const useTaskMutations = (taskDate: string) => {
     if (!task) throw new Error('Task not found');
 
     return task;
+  };
+
+  const persistTaskAttachments = async (taskId: string, attachments: QuestAttachmentInput[]) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    await supabase
+      .from('task_attachments' as any)
+      .delete()
+      .eq('task_id', taskId)
+      .eq('user_id', user.id);
+
+    if (attachments.length === 0) return;
+
+    const rows = attachments.map((attachment, index) => ({
+      task_id: taskId,
+      user_id: user.id,
+      file_url: attachment.fileUrl,
+      file_path: attachment.filePath,
+      file_name: attachment.fileName,
+      mime_type: attachment.mimeType,
+      file_size_bytes: attachment.fileSizeBytes,
+      is_image: attachment.isImage,
+      sort_order: attachment.sortOrder ?? index,
+    }));
+
+    const { error } = await supabase
+      .from('task_attachments' as any)
+      .insert(rows);
+
+    if (error) throw error;
   };
 
   const addTask = useMutation({
@@ -122,6 +159,8 @@ export const useTaskMutations = (taskDate: string) => {
         const questPosition = (existingTasks?.length || 0) + 1;
         const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
         const detectedCategory = detectCategory(params.taskText, params.category);
+        const normalizedAttachments = (params.attachments ?? []).slice(0, 10);
+        const primaryImageUrl = firstImageFromAttachments(normalizedAttachments) ?? params.imageUrl ?? null;
 
         const { data, error } = await supabase
           .from('daily_tasks')
@@ -145,7 +184,7 @@ export const useTaskMutations = (taskDate: string) => {
             notes: params.notes || null,
             contact_id: params.contactId || null,
             auto_log_interaction: params.autoLogInteraction ?? true,
-            image_url: params.imageUrl || null,
+            image_url: primaryImageUrl,
             location: params.location || null,
             source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
           })
@@ -157,6 +196,19 @@ export const useTaskMutations = (taskDate: string) => {
             throw new Error('Maximum quest limit reached for today');
           }
           throw error;
+        }
+
+        if (data?.id) {
+          try {
+            await persistTaskAttachments(data.id, normalizedAttachments);
+          } catch (attachmentsError) {
+            await supabase
+              .from('daily_tasks')
+              .delete()
+              .eq('id', data.id)
+              .eq('user_id', user.id);
+            throw attachmentsError;
+          }
         }
 
         const cleanedSubtasks = (params.subtasks || [])
@@ -208,6 +260,7 @@ export const useTaskMutations = (taskDate: string) => {
       });
 
       // Create optimistic task with all required fields
+      const primaryImageUrl = firstImageFromAttachments(params.attachments) ?? params.imageUrl ?? null;
       const optimisticTask = {
         id: `temp-${Date.now()}`,
         user_id: user?.id,
@@ -231,6 +284,7 @@ export const useTaskMutations = (taskDate: string) => {
         reminder_sent: false,
         parent_template_id: null,
         notes: params.notes || null,
+        image_url: primaryImageUrl,
         location: params.location || null,
         source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
       };
@@ -690,6 +744,7 @@ export const useTaskMutations = (taskDate: string) => {
         notes?: string | null;
         image_url?: string | null;
         location?: string | null;
+        attachments?: QuestAttachmentInput[];
       }
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -744,6 +799,11 @@ export const useTaskMutations = (taskDate: string) => {
       if (updates.image_url !== undefined) {
         updateData.image_url = updates.image_url;
       }
+
+      const hasAttachmentUpdates = updates.attachments !== undefined;
+      if (hasAttachmentUpdates) {
+        updateData.image_url = firstImageFromAttachments(updates.attachments) ?? null;
+      }
       
       // Handle location
       if (updates.location !== undefined) {
@@ -779,6 +839,11 @@ export const useTaskMutations = (taskDate: string) => {
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      if (hasAttachmentUpdates) {
+        await persistTaskAttachments(taskId, updates.attachments ?? []);
+      }
+
       return { normalizedToInbox, strippedScheduledTime };
     },
     onSuccess: (data, variables) => {

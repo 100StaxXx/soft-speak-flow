@@ -226,6 +226,23 @@ serve(async (req) => {
         transcript: []
       });
 
+    // Non-blocking transcript sync to reduce client-side sync retries.
+    try {
+      console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
+      const { error: syncError } = await supabase.functions.invoke('sync-daily-pep-talk-transcript', {
+        body: { id: dailyPepTalk.id },
+      });
+
+      if (syncError) {
+        console.error(`Transcript sync failed for ${dailyPepTalk.id}:`, syncError);
+      } else {
+        console.log(`✓ Transcript synced for ${dailyPepTalk.id}`);
+      }
+    } catch (syncError) {
+      console.error(`Transcript sync threw for ${dailyPepTalk.id}:`, syncError);
+      // Keep pep talk generation successful even when transcript sync fails.
+    }
+
     console.log(`✓ Successfully generated daily pep talk for ${mentorSlug}`);
 
     return new Response(

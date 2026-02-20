@@ -182,6 +182,8 @@ const InboxPage = memo(function InboxPage() {
       contactId: data.contactId,
       autoLogInteraction: data.autoLogInteraction,
       subtasks: data.subtasks,
+      imageUrl: data.imageUrl,
+      attachments: data.attachments,
     });
 
     if (data.sendToCalendar && createdTask?.id) {

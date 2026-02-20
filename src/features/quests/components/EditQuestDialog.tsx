@@ -21,9 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
-import { QuestImageThumbnail } from "@/components/QuestImageThumbnail";
-import { QuestImagePicker } from "@/components/QuestImagePicker";
-import { useQuestImagePicker } from "@/hooks/useQuestImagePicker";
+import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import {
   DIFFICULTY_COLORS,
@@ -40,6 +38,7 @@ import {
   parseTaskDate,
 } from "../utils/editQuestDialogNormalization";
 import { parseScheduledTime } from "@/utils/scheduledTime";
+import type { QuestAttachmentInput, TaskAttachment } from "@/types/questAttachments";
 
 interface Task {
   id: string;
@@ -56,6 +55,7 @@ interface Task {
   notes?: string | null;
   habit_source_id?: string | null;
   image_url?: string | null;
+  attachments?: TaskAttachment[] | null;
   location?: string | null;
 }
 
@@ -77,6 +77,7 @@ interface EditQuestDialogProps {
     category: string | null;
     image_url: string | null;
     location: string | null;
+    attachments?: QuestAttachmentInput[];
   }) => Promise<void>;
   isSaving: boolean;
   onDelete?: (taskId: string) => Promise<void>;
@@ -110,7 +111,7 @@ export function EditQuestDialog({
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
   const [location, setLocation] = useState<string | null>(null);
   const [showDurationChips, setShowDurationChips] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -120,7 +121,6 @@ export function EditQuestDialog({
   const timeWheelRef = useRef<HTMLDivElement>(null);
   const selectedTimeRef = useRef<HTMLButtonElement>(null);
 
-  const { deleteImage } = useQuestImagePicker();
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
 
   // Initialize state from task
@@ -140,7 +140,30 @@ export function EditQuestDialog({
           : 15,
       );
       setMoreInformation(task.notes || null);
-      setImageUrl(task.image_url || null);
+      const taskAttachments = (task.attachments ?? []).map((attachment, index) => ({
+        fileUrl: attachment.fileUrl,
+        filePath: attachment.filePath,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        fileSizeBytes: attachment.fileSizeBytes,
+        isImage: attachment.isImage,
+        sortOrder: attachment.sortOrder ?? index,
+      }));
+      if (taskAttachments.length > 0) {
+        setAttachments(taskAttachments);
+      } else if (task.image_url) {
+        setAttachments([{
+          fileUrl: task.image_url,
+          filePath: "",
+          fileName: "image",
+          mimeType: "image/jpeg",
+          fileSizeBytes: 0,
+          isImage: true,
+          sortOrder: 0,
+        }]);
+      } else {
+        setAttachments([]);
+      }
       setLocation(task.location || null);
       setShowDurationChips(false);
       setShowTimePicker(false);
@@ -206,18 +229,12 @@ export function EditQuestDialog({
       reminder_minutes_before: Number.isFinite(reminderMinutesBefore) && reminderMinutesBefore > 0 ? reminderMinutesBefore : 15,
       notes: moreInformation,
       category: task.category || null,
-      image_url: imageUrl,
+      image_url: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       location,
+      attachments,
     });
     onOpenChange(false);
-  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, imageUrl, location, onSave, onOpenChange]);
-
-  const handleRemoveImage = async () => {
-    if (imageUrl) {
-      await deleteImage(imageUrl);
-      setImageUrl(null);
-    }
-  };
+  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, attachments, location, onSave, onOpenChange]);
 
   const handleDelete = async () => {
     if (!task || !onDelete) return;
@@ -507,26 +524,13 @@ export function EditQuestDialog({
               />
             </div>
 
-            {/* Photo Section */}
-            <div className="flex items-center gap-3 px-1">
-              {imageUrl ? (
-                <div className="flex items-center gap-3">
-                  <QuestImageThumbnail
-                    imageUrl={imageUrl}
-                    size="lg"
-                    onRemove={handleRemoveImage}
-                  />
-                  <QuestImagePicker
-                    onImageSelected={(url) => setImageUrl(url)}
-                    variant="button"
-                  />
-                </div>
-              ) : (
-                <QuestImagePicker
-                  onImageSelected={(url) => setImageUrl(url)}
-                  variant="button"
-                />
-              )}
+            {/* Attachments Section */}
+            <div className="space-y-2 px-1">
+              <p className="text-sm font-medium text-muted-foreground">Photo / Files</p>
+              <QuestAttachmentPicker
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+              />
             </div>
 
             {/* Advanced Settings */}

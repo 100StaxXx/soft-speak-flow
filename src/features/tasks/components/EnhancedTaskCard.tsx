@@ -9,6 +9,7 @@ import {
   Star,
   MoreHorizontal,
   Sparkles,
+  Paperclip,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QuestImageThumbnail } from '@/components/QuestImageThumbnail';
@@ -32,6 +33,7 @@ import { useSubtasks } from '../hooks/useSubtasks';
 import { useTaskDependencies } from '../hooks/useTaskDependencies';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { Priority, EnergyLevel } from '../hooks/usePriorityTasks';
+import type { TaskAttachment } from '@/types/questAttachments';
 
 export interface TaskCardTask {
   id: string;
@@ -50,6 +52,7 @@ export interface TaskCardTask {
     avatar_url: string | null;
   } | null;
   image_url?: string | null;
+  attachments?: TaskAttachment[];
 }
 
 interface EnhancedTaskCardProps {
@@ -207,6 +210,12 @@ export function EnhancedTaskCard({
               {hasSubtasks && (
                 <span className="text-xs text-muted-foreground">
                   {subtasks.filter(s => s.completed).length}/{subtasks.length} subtasks
+                </span>
+              )}
+              {task.attachments && task.attachments.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Paperclip className="w-3 h-3" />
+                  {task.attachments.length}
                 </span>
               )}
             </div>

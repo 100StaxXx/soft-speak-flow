@@ -9,6 +9,7 @@ import { globalAudio } from "@/utils/globalAudio";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { EvolutionErrorFallback } from "@/components/ErrorFallback";
 import { getEvolutionTheme, type EvoTheme, type ParticleStyle } from "@/config/evolutionThemes";
+import { logger } from "@/utils/logger";
 
 interface CompanionEvolutionProps {
   isEvolving: boolean;
@@ -22,6 +23,7 @@ interface CompanionEvolutionProps {
 
 // 4-phase emotional arc
 type EvolutionPhase = 'anticipation' | 'impact' | 'reveal' | 'settle';
+const log = logger.scope('CompanionEvolution');
 
 // Convergence particles - spawn in ring, drift inward
 const ConvergenceParticles = ({ 
@@ -203,7 +205,7 @@ const CompanionEvolutionContent = ({
         audioRef.current.currentTime = 0;
         audioRef.current.src = '';
       } catch (error) {
-        console.error('Error cleaning up audio:', error);
+        log.error('Error cleaning up audio', { error });
       } finally {
         audioRef.current = null;
       }
@@ -261,7 +263,7 @@ const CompanionEvolutionContent = ({
         }
         setIsLoadingVoice(false);
       } catch (error) {
-        console.error('Failed to generate evolution voice:', error);
+        log.error('Failed to generate evolution voice', { error });
         if (isMounted) {
           setVoiceLine(isFirstEvolution 
             ? "A new companion has hatched! Your journey together begins now." 
@@ -277,7 +279,7 @@ const CompanionEvolutionContent = ({
     // Emergency timeout - 15 seconds
     emergencyTimeoutRef.current = window.setTimeout(() => {
       if (isMounted) {
-        console.warn('Evolution modal timeout reached, showing emergency exit');
+        log.info('Evolution modal timeout reached, showing emergency exit');
         setShowEmergencyExit(true);
       }
     }, 15000);
@@ -310,7 +312,7 @@ const CompanionEvolutionContent = ({
       
       // Play voice
       if (audioRef.current && !isLoadingVoice && !globalAudio.getMuted()) {
-        audioRef.current.play().catch(err => console.error('Audio play failed:', err));
+        audioRef.current.play().catch((error) => log.error('Audio play failed', { error }));
       }
       
       // Confetti 100ms AFTER reveal starts (not during)
@@ -378,7 +380,7 @@ const CompanionEvolutionContent = ({
     }
     
     cleanupAudio();
-    console.log('[CompanionEvolution] Dispatching evolution events and closing modal');
+    log.debug('Dispatching evolution events and closing modal');
     window.dispatchEvent(new CustomEvent('companion-evolved'));
     window.dispatchEvent(new CustomEvent('evolution-complete'));
     window.dispatchEvent(new CustomEvent('evolution-modal-closed'));
@@ -387,7 +389,7 @@ const CompanionEvolutionContent = ({
   };
 
   const handleEmergencyExit = () => {
-    console.log('[CompanionEvolution] Emergency exit triggered');
+    log.info('Emergency exit triggered');
     cleanupAudio();
     if (emergencyTimeoutRef.current) {
       clearTimeout(emergencyTimeoutRef.current);

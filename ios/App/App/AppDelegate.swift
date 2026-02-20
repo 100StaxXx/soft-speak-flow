@@ -1,6 +1,5 @@
 import UIKit
 import Capacitor
-import AVFoundation
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,7 +7,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        configureAudioSession()
         return true
     }
 
@@ -67,25 +65,4 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         print("[APNs] Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
-}
-
-private extension AppDelegate {
-    func configureAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(
-                .playback,
-                mode: .default,
-                options: [
-                    .mixWithOthers,
-                    .allowBluetoothHFP,
-                    .allowBluetoothA2DP,
-                    .defaultToSpeaker
-                ]
-            )
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("Failed to configure AVAudioSession: \(error.localizedDescription)")
-        }
-    }
 }

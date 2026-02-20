@@ -3,6 +3,51 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
 
+interface TranscriptWord {
+  word: string;
+  start: number;
+  end: number;
+}
+
+function normalizeTranscript(input: unknown): TranscriptWord[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input
+    .filter((word): word is TranscriptWord => {
+      if (!word || typeof word !== "object") {
+        return false;
+      }
+
+      const candidate = word as { word?: unknown; start?: unknown; end?: unknown };
+      return (
+        typeof candidate.word === "string" &&
+        typeof candidate.start === "number" &&
+        Number.isFinite(candidate.start) &&
+        typeof candidate.end === "number" &&
+        Number.isFinite(candidate.end)
+      );
+    })
+    .map((word) => ({
+      word: word.word,
+      start: word.start,
+      end: word.end,
+    }));
+}
+
+function transcriptsEqual(a: TranscriptWord[], b: TranscriptWord[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((word, index) => {
+    const other = b[index];
+    return (
+      word.word === other.word &&
+      word.start === other.start &&
+      word.end === other.end
+    );
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return handleCors(req);
@@ -32,7 +77,7 @@ serve(async (req) => {
     if (id) {
       const { data, error } = await supabase
         .from("daily_pep_talks")
-        .select("id, mentor_slug, script, audio_url, for_date")
+        .select("id, mentor_slug, script, transcript, audio_url, for_date")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
@@ -40,7 +85,7 @@ serve(async (req) => {
     } else if (mentor_slug && for_date) {
       const { data, error } = await supabase
         .from("daily_pep_talks")
-        .select("id, mentor_slug, script, audio_url, for_date")
+        .select("id, mentor_slug, script, transcript, audio_url, for_date")
         .eq("mentor_slug", mentor_slug)
         .eq("for_date", for_date)
         .maybeSingle();
@@ -81,27 +126,42 @@ serve(async (req) => {
       const t = await transcribeResp.text();
       console.error("transcribe-audio error:", transcribeResp.status, t);
       return new Response(
-        JSON.stringify({ error: "Transcription failed", details: t }),
+        JSON.stringify({
+          error: "Transcription failed",
+          details: t,
+          updated: false,
+          scriptChanged: false,
+          transcriptChanged: false,
+          upstreamStatus: transcribeResp.status,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const transcribed = await transcribeResp.json();
     const transcribedText: string | undefined = transcribed?.text;
-    const wordTimestamps: any[] = transcribed?.transcript || [];
+    const wordTimestamps = normalizeTranscript(transcribed?.transcript);
 
     if (!transcribedText) {
       return new Response(
-        JSON.stringify({ error: "No transcription text returned" }),
+        JSON.stringify({
+          error: "No transcription text returned",
+          updated: false,
+          scriptChanged: false,
+          transcriptChanged: false,
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // If the new text differs significantly, update the row with both script and transcript
+    // Track text and transcript changes independently so we persist transcript-only deltas.
     const currentText: string = pepTalk.script || "";
-    const differs = currentText.trim() !== transcribedText.trim();
+    const currentTranscript = normalizeTranscript(pepTalk.transcript);
+    const scriptChanged = currentText.trim() !== transcribedText.trim();
+    const transcriptChanged = !transcriptsEqual(currentTranscript, wordTimestamps);
+    const updated = scriptChanged || transcriptChanged;
 
-    if (differs) {
+    if (updated) {
       const { error: updateErr } = await supabase
         .from("daily_pep_talks")
         .update({ 
@@ -113,7 +173,13 @@ serve(async (req) => {
       if (updateErr) {
         console.error("Failed updating daily_pep_talks.script:", updateErr);
         return new Response(
-          JSON.stringify({ error: "Failed to update script", script: transcribedText }),
+          JSON.stringify({
+            error: "Failed to update script/transcript",
+            script: transcribedText,
+            updated: false,
+            scriptChanged,
+            transcriptChanged,
+          }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -125,7 +191,9 @@ serve(async (req) => {
         id: pepTalk.id, 
         script: transcribedText, 
         transcript: wordTimestamps,
-        changed: differs 
+        updated,
+        scriptChanged,
+        transcriptChanged,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { format, addDays, addWeeks, addMonths, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, setMonth, setDate, getYear, endOfMonth, startOfMonth } from 'date-fns';
+import type { QuestAttachmentInput } from '@/types/questAttachments';
 
 export interface ParsedTask {
   text: string;
@@ -62,6 +63,7 @@ export interface ParsedTask {
   
   // Photo attachment
   imageUrl: string | null;
+  attachments: QuestAttachmentInput[];
 }
 
 // Month name to number mapping
@@ -519,6 +521,7 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     triggerPlanMyDay: false,
     triggerPlanMyWeek: false,
     imageUrl: null,
+    attachments: [],
   };
 
   // Parse clear patterns first

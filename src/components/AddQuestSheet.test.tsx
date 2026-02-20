@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
+import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 const mocks = vi.hoisted(() => ({
   integrationVisible: false,
@@ -14,6 +15,30 @@ vi.mock("@/hooks/useCalendarIntegrations", () => ({
     defaultProvider: mocks.defaultProvider,
     connections: mocks.connections,
   }),
+}));
+
+const buildAttachments = (count: number): QuestAttachmentInput[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    fileUrl: `https://example.com/file-${idx + 1}.png`,
+    filePath: `user/file-${idx + 1}.png`,
+    fileName: `file-${idx + 1}.png`,
+    mimeType: "image/png",
+    fileSizeBytes: 1024,
+    isImage: true,
+    sortOrder: idx,
+  }));
+
+vi.mock("@/components/QuestAttachmentPicker", () => ({
+  QuestAttachmentPicker: ({ onAttachmentsChange }: { onAttachmentsChange: (attachments: QuestAttachmentInput[]) => void }) => (
+    <div>
+      <button type="button" onClick={() => onAttachmentsChange(buildAttachments(10))}>
+        Attach 10
+      </button>
+      <button type="button" onClick={() => onAttachmentsChange(buildAttachments(11))}>
+        Attach 11
+      </button>
+    </div>
+  ),
 }));
 
 describe("AddQuestSheet", () => {
@@ -306,5 +331,33 @@ describe("AddQuestSheet", () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-create-attempted" }));
     dispatchSpy.mockRestore();
+  });
+
+  it("submits attachment payload with primary image when files are added", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Quest with files" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Attach 10" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    const payload = onAdd.mock.calls[0][0];
+    expect(payload.attachments).toHaveLength(10);
+    expect(payload.imageUrl).toBe("https://example.com/file-1.png");
   });
 });

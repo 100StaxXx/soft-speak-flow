@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditQuestDialog } from "./EditQuestDialog";
 
 const mocks = vi.hoisted(() => ({
-  deleteImage: vi.fn().mockResolvedValue(undefined),
   addSubtask: vi.fn(),
   toggleSubtask: vi.fn(),
   deleteSubtask: vi.fn(),
@@ -11,7 +10,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/hooks/useQuestImagePicker", () => ({
   useQuestImagePicker: () => ({
-    deleteImage: mocks.deleteImage,
+    deleteImage: vi.fn().mockResolvedValue(undefined),
+    pickAttachments: vi.fn().mockResolvedValue([]),
+    deleteAttachment: vi.fn().mockResolvedValue(true),
+    isUploading: false,
   }),
 }));
 
@@ -25,12 +27,33 @@ vi.mock("@/features/tasks/hooks/useSubtasks", () => ({
   }),
 }));
 
-vi.mock("@/components/QuestImagePicker", () => ({
-  QuestImagePicker: () => <div data-testid="quest-image-picker" />,
-}));
-
-vi.mock("@/components/QuestImageThumbnail", () => ({
-  QuestImageThumbnail: () => <div data-testid="quest-image-thumbnail" />,
+vi.mock("@/components/QuestAttachmentPicker", () => ({
+  QuestAttachmentPicker: ({ onAttachmentsChange }: { onAttachmentsChange: (attachments: Array<{
+    fileUrl: string;
+    filePath: string;
+    fileName: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    isImage: boolean;
+    sortOrder?: number;
+  }>) => void }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onAttachmentsChange([{
+          fileUrl: "https://example.com/a.png",
+          filePath: "user/a.png",
+          fileName: "a.png",
+          mimeType: "image/png",
+          fileSizeBytes: 1000,
+          isImage: true,
+          sortOrder: 0,
+        }])
+      }
+    >
+      Add Attachments
+    </button>
+  ),
 }));
 
 describe("EditQuestDialog", () => {
@@ -146,6 +169,38 @@ describe("EditQuestDialog", () => {
       "task-1",
       expect.objectContaining({
         scheduled_time: "11:17",
+      }),
+    );
+  });
+
+  it("includes attachments in save payload", async () => {
+    const onOpenChange = vi.fn();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={onOpenChange}
+        onSave={onSave}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Attachments" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(
+      "task-1",
+      expect.objectContaining({
+        attachments: expect.arrayContaining([
+          expect.objectContaining({ fileUrl: "https://example.com/a.png" }),
+        ]),
+        image_url: "https://example.com/a.png",
       }),
     );
   });

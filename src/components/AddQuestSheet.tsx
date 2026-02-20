@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { ContactPicker } from "@/components/tasks/ContactPicker";
+import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { parseScheduledTime } from "@/utils/scheduledTime";
+import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 export interface AddQuestData {
   text: string;
@@ -39,6 +41,8 @@ export interface AddQuestData {
   sendToInbox: boolean;
   sendToCalendar: boolean;
   subtasks: string[];
+  imageUrl: string | null;
+  attachments: QuestAttachmentInput[];
 }
 
 interface AddQuestSheetProps {
@@ -97,6 +101,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [customDurationInput, setCustomDurationInput] = useState("");
   const [sendToCalendar, setSendToCalendar] = useState(false);
+  const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
 
   const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
   const effectiveProvider = useMemo(() => {
@@ -137,6 +142,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setShowTimePicker(false);
       setSubtasks([]);
       setSendToCalendar(false);
+      setAttachments([]);
       hasEmittedTitleEnteredRef.current = false;
     } else {
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
@@ -265,9 +271,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       sendToInbox: false,
       sendToCalendar: sendToCalendar && canShowCalendarSendOption,
       subtasks: subtasks.filter(s => s.trim()),
+      imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
+      attachments,
     });
     onOpenChange(false);
-  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, sendToCalendar, canShowCalendarSendOption, subtasks, onAdd, onOpenChange]);
+  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onAdd, onOpenChange]);
 
   const handleAddToInbox = useCallback(async () => {
     if (!taskText.trim()) return;
@@ -288,9 +296,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       sendToInbox: true,
       sendToCalendar: false,
       subtasks: subtasks.filter(s => s.trim()),
+      imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
+      attachments,
     });
     onOpenChange(false);
-  }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, onAdd, onOpenChange]);
+  }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, attachments, onAdd, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -585,6 +595,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 className="min-h-[70px] border-0 rounded-none bg-transparent resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
                 style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
                 data-vaul-no-drag
+              />
+            </div>
+
+            <div className="space-y-2 px-1">
+              <Label className="text-sm font-medium text-muted-foreground">Photo / Files</Label>
+              <QuestAttachmentPicker
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
               />
             </div>
 

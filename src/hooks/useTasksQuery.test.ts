@@ -110,6 +110,20 @@ describe("fetchDailyTasks", () => {
           location: null,
           epics: { title: "Growth Sprint" },
           contact: { id: "contact-1", name: "Jordan", avatar_url: null },
+          task_attachments: [
+            {
+              id: "att-1",
+              task_id: "task-1",
+              file_url: "https://example.com/att-1.png",
+              file_path: "user/att-1.png",
+              file_name: "att-1.png",
+              mime_type: "image/png",
+              file_size_bytes: 1000,
+              is_image: true,
+              sort_order: 0,
+              created_at: "2026-02-13T00:00:00.000Z",
+            },
+          ],
           subtasks: [
             { id: "s3", title: "Ship", completed: false, sort_order: 2 },
             { id: "s1", title: "Research", completed: true, sort_order: 0 },
@@ -126,6 +140,7 @@ describe("fetchDailyTasks", () => {
     expect(result).toHaveLength(1);
     expect(result[0].epic_title).toBe("Growth Sprint");
     expect(result[0].contact?.name).toBe("Jordan");
+    expect(result[0].attachments?.[0]?.fileUrl).toBe("https://example.com/att-1.png");
     expect(result[0].subtasks?.map((subtask) => subtask.id)).toEqual(["s1", "s2", "s3"]);
   });
 });
