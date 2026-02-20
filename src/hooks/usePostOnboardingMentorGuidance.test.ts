@@ -29,6 +29,16 @@ const mocks = vi.hoisted(() => ({
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
     },
     awardCustomXP: vi.fn().mockResolvedValue(undefined),
+    personality: null as
+      | {
+          name: string;
+          slug: string;
+          tone: string;
+          style: string;
+          avatar_url?: string;
+          primary_color: string;
+        }
+      | null,
   },
 }));
 
@@ -66,7 +76,7 @@ vi.mock("@/hooks/useXPRewards", () => ({
 }));
 
 vi.mock("@/hooks/useMentorPersonality", () => ({
-  useMentorPersonality: () => null,
+  useMentorPersonality: () => mocks.state.personality,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -288,6 +298,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     mocks.state.profileUpdatePayloads = [];
     mocks.state.queryClient.invalidateQueries.mockClear();
     mocks.state.awardCustomXP.mockClear();
+    mocks.state.personality = null;
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
   });
 
@@ -299,20 +310,9 @@ describe("guided tutorial intro dialogue sequence", () => {
         React.createElement(PostOnboardingMentorGuidanceProvider, null, children)
       );
 
-  it("shows two intro dialogue milestones before resuming normal tutorial", async () => {
+  it("shows one intro dialogue milestone before resuming normal tutorial", async () => {
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
       wrapper: createWrapper("/mentor"),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isIntroDialogueActive).toBe(true);
-      expect(result.current.dialogueActionLabel).toBe("Continue");
-      expect(result.current.activeTargetSelectors).toEqual([]);
-      expect(result.current.isStrictLockActive).toBe(false);
-    });
-
-    await act(async () => {
-      result.current.onDialogueAction?.();
     });
 
     await waitFor(() => {
@@ -331,6 +331,60 @@ describe("guided tutorial intro dialogue sequence", () => {
       expect(result.current.isActive).toBe(true);
       expect(result.current.dialogueActionLabel).toBeUndefined();
       expect(result.current.onDialogueAction).toBeUndefined();
+    });
+  });
+
+  it("uses atlas voice for the intro hello", async () => {
+    mocks.state.personality = {
+      name: "Atlas",
+      slug: "atlas",
+      tone: "Direct",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/mentor"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.dialogueText).toContain("focused and practical");
+    });
+  });
+
+  it("uses sienna voice for the intro hello", async () => {
+    mocks.state.personality = {
+      name: "Sienna",
+      slug: "sienna",
+      tone: "Supportive",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/mentor"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.dialogueText).toContain("really glad you're here");
+    });
+  });
+
+  it("falls back to neutral greeting for unknown mentor slug", async () => {
+    mocks.state.personality = {
+      name: "Nova",
+      slug: "unknown-mentor",
+      tone: "",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/mentor"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.dialogueText).toContain("I'm Nova");
     });
   });
 });

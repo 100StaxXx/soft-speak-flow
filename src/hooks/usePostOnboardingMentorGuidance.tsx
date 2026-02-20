@@ -37,7 +37,6 @@ const STEP_XP_REWARDS: Partial<Record<GuidedTutorialStepId, number>> = {
 
 type GuidedMilestoneId =
   | "mentor_intro_hello"
-  | "mentor_intro_ready"
   | "stay_on_quests"
   | "open_add_quest"
   | "enter_title"
@@ -101,7 +100,6 @@ const isProgressRecord = (value: unknown): value is Record<string, unknown> =>
 
 const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "mentor_intro_hello",
-  "mentor_intro_ready",
   "stay_on_quests",
   "open_add_quest",
   "enter_title",
@@ -137,7 +135,6 @@ const emitTutorialEvent = (eventName: string, detail: Record<string, unknown>) =
 const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[] => {
   switch (milestoneId) {
     case "mentor_intro_hello":
-    case "mentor_intro_ready":
       return [];
     case "stay_on_quests":
       return ['[data-tour="quests-tab"]'];
@@ -165,6 +162,56 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     default:
       return [];
   }
+};
+
+const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, { text: string; support: string }> = {
+  atlas: {
+    text: "Glad you're here. We'll keep this focused and practical.",
+    support: "One quick walkthrough, then you're in control.",
+  },
+  eli: {
+    text: "Welcome. Take one calm breath, then we'll move with clarity.",
+    support: "This short tutorial gives you your first solid rhythm.",
+  },
+  sienna: {
+    text: "Hey, I'm really glad you're here. We'll make this feel easy together.",
+    support: "I'll guide the first steps so you can settle in with confidence.",
+  },
+  stryker: {
+    text: "You showed up. I respect that. Let's lock this in.",
+    support: "A fast walkthrough now, then you run your day.",
+  },
+  carmen: {
+    text: "Welcome. Let's get organized and moving in the right direction.",
+    support: "A few guided taps, then your system is live.",
+  },
+  reign: {
+    text: "I love this energy. Let's set your pace and own today.",
+    support: "I'll guide the setup, and then we build momentum.",
+  },
+  solace: {
+    text: "Hi friend, you're in the right place. Let's begin with one steady win.",
+    support: "We'll keep this short, supportive, and clear.",
+  },
+};
+
+const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: string) => {
+  const slug = mentorSlug?.toLowerCase();
+  if (slug && INTRO_DIALOGUE_BY_MENTOR_SLUG[slug]) {
+    return INTRO_DIALOGUE_BY_MENTOR_SLUG[slug];
+  }
+
+  if (speakerName && speakerName !== "Your mentor") {
+    return {
+      text: `Hey, I'm ${speakerName}. I'm glad you're here.`,
+      support: "I'll guide your first few taps so you can settle in quickly.",
+    };
+  }
+
+  return {
+    text: "Hey, I'm your mentor. I'm glad you're here.",
+    support: "I'll guide your first few taps so you can settle in quickly.",
+  };
 };
 
 const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
@@ -386,16 +433,6 @@ export const getMentorInstructionLines = (
 
 const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; support?: string } => {
   switch (milestoneId) {
-    case "mentor_intro_hello":
-      return {
-        text: "Hey, I'm here with you. We'll move fast and keep this simple.",
-        support: "Two quick notes, then we jump into your full guided walkthrough.",
-      };
-    case "mentor_intro_ready":
-      return {
-        text: "Follow my prompts and tap the highlighted targets.",
-        support: "You only need a few actions to finish this tutorial.",
-      };
     case "stay_on_quests":
       return {
         text: "Start on Quests. We'll build your first quest together.",
@@ -466,7 +503,6 @@ const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; s
 export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): boolean => {
   if (!milestoneId) return false;
   if (milestoneId === "mentor_intro_hello") return false;
-  if (milestoneId === "mentor_intro_ready") return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
   if (milestoneId === "complete_companion_evolution") return false;
@@ -591,9 +627,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   );
 
   const tutorialComplete = tutorialReady && (tutorialMarkedComplete || !currentStep);
-  const hasIntroHello = milestoneSet.has("mentor_intro_hello");
-  const hasIntroReady = milestoneSet.has("mentor_intro_ready");
-  const hasPendingIntroDialogue = Boolean(currentStep) && (!hasIntroHello || !hasIntroReady);
+  const hasPendingIntroDialogue = Boolean(currentStep) && !milestoneSet.has("mentor_intro_hello");
   const stepRoute = currentStep?.route ?? null;
   const shouldRestoreRoute = shouldRestoreTutorialRoute({
     pathname: location.pathname,
@@ -1000,7 +1034,6 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const currentMilestone = useMemo<GuidedMilestoneId | null>(() => {
     if (!currentStep) return null;
     if (!milestoneSet.has("mentor_intro_hello")) return "mentor_intro_hello";
-    if (!milestoneSet.has("mentor_intro_ready")) return "mentor_intro_ready";
 
     if (currentStep.id === "create_quest") {
       return createQuestProgress.current;
@@ -1029,9 +1062,8 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
     return null;
   }, [createQuestProgress.current, currentStep, evolutionInFlight, milestoneSet]);
 
-  const isIntroDialogueActive =
-    currentMilestone === "mentor_intro_hello" || currentMilestone === "mentor_intro_ready";
-  const dialogueActionLabel = currentMilestone === "mentor_intro_ready" ? "Start Tutorial" : "Continue";
+  const isIntroDialogueActive = currentMilestone === "mentor_intro_hello";
+  const dialogueActionLabel = "Start Tutorial";
   const onDialogueAction = useCallback(() => {
     if (!currentMilestone || !isIntroDialogueActive) return;
     markMilestoneComplete(currentMilestone);
@@ -1177,7 +1209,11 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         ? `Step ${currentIndex + 1} of ${GUIDED_STEPS.length}`
         : "";
 
-  const dialogue = currentMilestone ? getMilestoneDialogue(currentMilestone) : { text: "", support: undefined };
+  const dialogue = currentMilestone
+    ? currentMilestone === "mentor_intro_hello"
+      ? getMentorIntroDialogue(personality?.slug, personality?.name ?? "Your mentor")
+      : getMilestoneDialogue(currentMilestone)
+    : { text: "", support: undefined };
   const mentorInstructionLines = dialogue.support ? [dialogue.text, dialogue.support] : [dialogue.text];
 
   const isMissingTarget = isActive && activeTargetSelectors.length > 0 && !activeTargetSelector;

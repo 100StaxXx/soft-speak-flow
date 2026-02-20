@@ -54,11 +54,11 @@ describe("MentorGuidanceCard", () => {
 
   it("renders intro action button and triggers callback", () => {
     mocks.guidance.isIntroDialogueActive = true;
-    mocks.guidance.dialogueActionLabel = "Continue";
+    mocks.guidance.dialogueActionLabel = "Start Tutorial";
     mocks.guidance.onDialogueAction = mocks.onDialogueAction;
 
     render(<MentorGuidanceCard />);
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Tutorial" }));
 
     expect(mocks.onDialogueAction).toHaveBeenCalledTimes(1);
 
