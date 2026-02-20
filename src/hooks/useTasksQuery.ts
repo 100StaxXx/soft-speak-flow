@@ -68,24 +68,39 @@ export interface DailyTask {
 export const DAILY_TASKS_STALE_TIME = 2 * 60 * 1000;
 export const DAILY_TASKS_GC_TIME = 30 * 60 * 1000;
 const NETWORK_TASK_FETCH_ERROR_MESSAGE = 'Network error. Please check your connection and try again.';
+const DAILY_TASKS_SELECT_WITH_ATTACHMENTS = `
+  *,
+  epics(title),
+  contact:contacts!contact_id(id, name, avatar_url),
+  subtasks(id, title, completed, sort_order),
+  task_attachments(id, task_id, file_url, file_path, file_name, mime_type, file_size_bytes, is_image, sort_order, created_at)
+`;
+const DAILY_TASKS_SELECT_WITHOUT_ATTACHMENTS = `
+  *,
+  epics(title),
+  contact:contacts!contact_id(id, name, avatar_url),
+  subtasks(id, title, completed, sort_order)
+`;
 
 export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: string) =>
   ['daily-tasks', userId, taskDate] as const;
 
 export const fetchDailyTasks = async (userId: string, taskDate: string): Promise<DailyTask[]> => {
-  const { data, error } = await supabase
-    .from('daily_tasks')
-    .select(`
-      *,
-      epics(title),
-      contact:contacts!contact_id(id, name, avatar_url),
-      subtasks(id, title, completed, sort_order),
-      task_attachments(id, task_id, file_url, file_path, file_name, mime_type, file_size_bytes, is_image, sort_order, created_at)
-    `)
-    .eq('user_id', userId)
-    .eq('task_date', taskDate)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false });
+  const fetchWithSelect = (selectClause: string) =>
+    supabase
+      .from('daily_tasks')
+      .select(selectClause)
+      .eq('user_id', userId)
+      .eq('task_date', taskDate)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false });
+
+  let { data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITH_ATTACHMENTS);
+
+  if (isTaskAttachmentsRelationError(error)) {
+    console.warn('daily_tasks query could not embed task_attachments, retrying without attachments relation');
+    ({ data, error } = await fetchWithSelect(DAILY_TASKS_SELECT_WITHOUT_ATTACHMENTS));
+  }
 
   if (error) {
     if (isNetworkFetchFailure(error)) {
@@ -184,4 +199,21 @@ function isNetworkFetchFailure(error: { message?: string } | null): boolean {
     || message.includes('failed to fetch')
     || message.includes('network request failed')
     || message.includes('typeerror: failed to fetch');
+}
+
+function isTaskAttachmentsRelationError(
+  error: { code?: string; message?: string; details?: string; hint?: string } | null,
+): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? '').toUpperCase();
+  const haystack = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+
+  return haystack.includes('task_attachments')
+    && (
+      code.startsWith('PGRST')
+      || haystack.includes('relationship')
+      || haystack.includes('embed')
+      || haystack.includes('could not find')
+    );
 }
