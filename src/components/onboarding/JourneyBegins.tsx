@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Star, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMotionProfile } from "@/hooks/useMotionProfile";
 
 interface JourneyBeginsProps {
   userName: string;
@@ -11,48 +10,42 @@ interface JourneyBeginsProps {
 }
 
 const narrativeLines = [
-  "A covenant now glows between your spirit and the cosmos.",
-  "Your companion stirs, answering the light of your presence.",
-  "Together, you will write a story even the stars will remember.",
-  "Each quest fulfilled and each habit forged becomes living starlight.",
-  "Step by step, your destinies braid into one radiant path.",
+  "A bond has been forged across the cosmos...",
+  "Your companion stirs, awakening to your presence.",
+  "Together, you will write a story the stars themselves will remember.",
+  "Every quest completed, every habit built, every moment of growth...",
+  "...will shape both your destinies.",
 ];
 
-const LINE_DISPLAY_MS = 3000;
-const FINAL_LINE_HOLD_MS = 2600;
-const FINAL_BUTTON_DELAY_MS = 2200;
+const LINE_DISPLAY_MS = 3400;
+const FINAL_LINE_HOLD_MS = LINE_DISPLAY_MS;
+const FINAL_BUTTON_DELAY_MS = 3200;
 
 export const JourneyBegins = ({ userName, companionAnimal, onComplete }: JourneyBeginsProps) => {
   const [currentLine, setCurrentLine] = useState(0);
   const [showFinalMessage, setShowFinalMessage] = useState(false);
   const [showButton, setShowButton] = useState(false);
-  const { capabilities, signals } = useMotionProfile();
-  const prefersReducedMotion = signals.prefersReducedMotion;
-  const shouldAnimateAmbient =
-    capabilities.allowBackgroundAnimation && !signals.prefersReducedMotion && !signals.isBackgrounded;
 
-  const particlePositions = useMemo(
-    () =>
-      [...Array(14)].map(() => ({
-        left: `${10 + Math.random() * 80}%`,
-        top: `${18 + Math.random() * 74}%`,
-        duration: 6 + Math.random() * 4,
-        delay: Math.random() * 2.5,
-      })),
-    [],
-  );
+  // Memoize particle positions to prevent them from jumping on re-render
+  const particlePositions = useMemo(() => 
+    [...Array(12)].map(() => ({
+      left: `${10 + Math.random() * 80}%`,
+      top: `${50 + Math.random() * 40}%`,
+      duration: 5 + Math.random() * 3,
+    })), []);
 
   useEffect(() => {
     if (currentLine < narrativeLines.length) {
       const timer = setTimeout(() => {
-        setCurrentLine((prev) => prev + 1);
+        setCurrentLine(prev => prev + 1);
       }, LINE_DISPLAY_MS);
       return () => clearTimeout(timer);
+    } else {
+      const finalTimer = setTimeout(() => {
+        setShowFinalMessage(true);
+      }, FINAL_LINE_HOLD_MS);
+      return () => clearTimeout(finalTimer);
     }
-    const finalTimer = setTimeout(() => {
-      setShowFinalMessage(true);
-    }, FINAL_LINE_HOLD_MS);
-    return () => clearTimeout(finalTimer);
   }, [currentLine]);
 
   useEffect(() => {
@@ -64,130 +57,77 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
     }
   }, [showFinalMessage]);
 
-  const activeLine = currentLine > 0 ? narrativeLines[currentLine - 1] : null;
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-safe-top safe-area-bottom relative overflow-hidden">
-      {/* Ambient glow */}
+      {/* Ambient glow - pulsing cosmic energy */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <motion.div
-          className={`w-[560px] h-[560px] rounded-full bg-primary/18 blur-[124px] ${shouldAnimateAmbient ? "onb-animated onb-animate-halo-breathe" : ""}`}
-          animate={
-            shouldAnimateAmbient
-              ? { scale: [1, 1.1, 1], opacity: [0.33, 0.56, 0.36] }
-              : { scale: 1, opacity: 0.33 }
-          }
-          transition={{ duration: 6.6, repeat: Infinity, ease: "easeInOut" }}
+        <motion.div 
+          className="w-[400px] h-[400px] bg-primary/15 rounded-full blur-[100px]"
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         />
-        <motion.div
-          className={`absolute w-[440px] h-[440px] rounded-full bg-stardust-gold/12 blur-[110px] ${shouldAnimateAmbient ? "onb-animated onb-animate-halo-breathe" : ""}`}
-          animate={
-            shouldAnimateAmbient
-              ? { scale: [1.08, 0.95, 1.08], opacity: [0.18, 0.36, 0.22] }
-              : { scale: 1, opacity: 0.2 }
-          }
-          transition={{ duration: 8.1, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+        <motion.div 
+          className="absolute w-[300px] h-[300px] bg-accent/10 rounded-full blur-[80px]"
+          animate={{ 
+            scale: [1.2, 1, 1.2],
+            opacity: [0.2, 0.4, 0.2],
+          }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
-      {/* Floating stardust */}
-      {particlePositions.map((particle, index) => (
-        <motion.div
-          key={`journey-particle-${index}`}
-          className={`absolute onb-decorative-star ${shouldAnimateAmbient ? "onb-animated onb-animate-ornament-drift" : ""}`}
-          initial={{ opacity: 0 }}
-          animate={
-            shouldAnimateAmbient
-              ? {
-                  y: [0, -24, 0],
-                  opacity: [0, 0.82, 0.24],
-                  scale: [0.86, 1.26, 0.92],
-                }
-              : { opacity: 0.6, scale: 1 }
-          }
-          transition={{
-            duration: particle.duration,
-            repeat: Infinity,
-            delay: particle.delay,
-            ease: "easeInOut",
-          }}
-          style={{
-            left: particle.left,
-            top: particle.top,
-          }}
-        />
-      ))}
-
-      <div className="relative z-10 w-full max-w-2xl text-center space-y-9">
-        <div className="min-h-[290px] flex flex-col items-center justify-center space-y-6">
+      <div className="relative z-10 max-w-lg text-center space-y-8">
+        {/* Narrative lines */}
+        <div className="min-h-[220px] flex flex-col items-center justify-center space-y-6">
           <AnimatePresence mode="wait">
-            {!showFinalMessage && activeLine && (
-              <motion.div
-                key={`journey-line-${currentLine}`}
-                initial={
-                  prefersReducedMotion
-                    ? { opacity: 0 }
-                    : { opacity: 0, y: 20, filter: "blur(8px)", scale: 0.992 }
-                }
-                animate={
-                  prefersReducedMotion
-                    ? { opacity: 1 }
-                    : { opacity: 1, y: 0, filter: "blur(0px)", scale: 1 }
-                }
-                exit={
-                  prefersReducedMotion
-                    ? { opacity: 0 }
-                    : { opacity: 0, y: -16, filter: "blur(6px)", scale: 0.996 }
-                }
-                transition={{ duration: prefersReducedMotion ? 0.24 : 0.74, ease: "easeOut" }}
-                className={`onb-mystic-panel relative w-full max-w-xl px-8 py-10 ${shouldAnimateAmbient ? "onb-animated onb-animate-text-glint" : ""}`}
-              >
-                <div className="onb-decorative-arc absolute left-7 right-7 top-4 h-4" />
-                <div className="onb-decorative-arc absolute left-7 right-7 bottom-4 h-4 rotate-180" />
-                <div className="relative z-10 space-y-5">
-                  <p className="onb-mystic-kicker">Celestial Oath</p>
-                  <p className="onb-mystic-line text-xl md:text-2xl font-medium">{activeLine}</p>
-                </div>
-              </motion.div>
-            )}
+            {!showFinalMessage && narrativeLines.map((line, index) => (
+              index === currentLine - 1 && (
+                <motion.p
+                  key={index}
+                  initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -10, filter: "blur(2px)" }}
+                  transition={{ duration: 0.9 }}
+                  className="text-lg md:text-xl text-white/80 italic leading-relaxed"
+                >
+                  {line}
+                </motion.p>
+              )
+            ))}
           </AnimatePresence>
 
+          {/* Final message */}
           <AnimatePresence>
             {showFinalMessage && (
               <motion.div
-                initial={
-                  prefersReducedMotion
-                    ? { opacity: 0 }
-                    : { opacity: 0, scale: 0.92, y: 12, filter: "blur(8px)" }
-                }
-                animate={
-                  prefersReducedMotion
-                    ? { opacity: 1 }
-                    : { opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }
-                }
-                transition={{ duration: prefersReducedMotion ? 0.28 : 1, ease: "easeOut" }}
-                className={`onb-mystic-panel relative w-full max-w-xl px-8 py-10 ${shouldAnimateAmbient ? "onb-animated onb-animate-text-glint" : ""}`}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="space-y-5"
               >
-                <div className="onb-decorative-arc absolute left-7 right-7 top-4 h-4" />
-                <div className="onb-decorative-arc absolute left-7 right-7 bottom-4 h-4 rotate-180" />
                 <motion.div
-                  initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -8 }}
+                  initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: prefersReducedMotion ? 0 : 0.2 }}
-                  className="relative z-10 flex items-center justify-center gap-3"
+                  transition={{ delay: 0.2 }}
+                  className="flex items-center justify-center gap-3"
                 >
-                  <Star className="h-4 w-4 text-stardust-gold/85" />
-                  <span className="onb-mystic-kicker">Your Journey Awaits</span>
-                  <Star className="h-4 w-4 text-stardust-gold/85" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <span className="text-xs uppercase tracking-[0.4em] font-medium text-primary/80">
+                    Your Journey Awaits
+                  </span>
+                  <Star className="h-4 w-4 text-primary" />
                 </motion.div>
-
+                
                 <motion.h1
-                  initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: prefersReducedMotion ? 0 : 0.4 }}
-                  className="relative z-10 mt-4 text-3xl md:text-4xl onb-mystic-heading"
+                  transition={{ delay: 0.5 }}
+                  className="text-3xl md:text-4xl font-bold"
                 >
-                  <span className="onb-gilded-text">
+                  <span className="bg-gradient-to-r from-white via-primary-foreground to-white bg-clip-text text-transparent">
                     {userName} & {companionAnimal}
                   </span>
                 </motion.h1>
@@ -195,45 +135,43 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: prefersReducedMotion ? 0 : 0.6 }}
-                  className="relative z-10 mt-4 text-base text-white/72 md:text-lg"
+                  transition={{ delay: 0.8 }}
+                  className="text-white/60 text-base"
                 >
-                  Bound by wonder, guided by purpose.
+                  An unbreakable bond, a shared destiny.
                 </motion.p>
-
+                
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: prefersReducedMotion ? 0 : 0.86 }}
-                  className="relative z-10 pt-2"
+                  transition={{ delay: 1.2 }}
+                  className="pt-2"
                 >
-                  <p className="text-white/78 text-lg">
-                    The cosmos is listening.
+                  <p className="text-white/70 text-lg">
+                    The cosmos holds infinite possibilities.
                   </p>
-                  <p className="text-white/58 text-sm mt-1">
-                    Your first quest awaits.
+                  <p className="text-white/50 text-sm mt-1">
+                    Your first quest awaits...
                   </p>
                 </motion.div>
-
-                <Sparkles className="absolute left-6 top-6 h-4 w-4 text-stardust-gold/50" />
-                <Sparkles className="absolute right-6 bottom-6 h-4 w-4 text-stardust-gold/45" />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
+        {/* Continue button */}
         <AnimatePresence>
           {showButton && (
             <motion.div
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 18 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: prefersReducedMotion ? 0.24 : 0.54 }}
+              transition={{ duration: 0.6 }}
             >
               <Button
                 onClick={onComplete}
                 variant="cta"
                 size="lg"
-                className="px-10 py-6 text-lg gap-2 shadow-glow"
+                className="px-10 py-6 text-lg gap-2"
               >
                 <Rocket className="h-5 w-5" />
                 Begin My Journey
@@ -242,6 +180,60 @@ export const JourneyBegins = ({ userName, companionAnimal, onComplete }: Journey
           )}
         </AnimatePresence>
       </div>
+
+      {/* Floating star particles */}
+      {particlePositions.map((particle, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-1 h-1 bg-white/50 rounded-full"
+          initial={{ 
+            opacity: 0,
+          }}
+          animate={{ 
+            y: [0, -150],
+            opacity: [0, 0.8, 0],
+            scale: [0.5, 1, 0.5],
+          }}
+          transition={{
+            duration: particle.duration,
+            repeat: Infinity,
+            delay: i * 0.6,
+            ease: "easeOut",
+          }}
+          style={{
+            left: particle.left,
+            top: particle.top,
+          }}
+        />
+      ))}
+
+      {/* Orbiting sparkles */}
+      {[...Array(4)].map((_, i) => (
+        <motion.div
+          key={`orbit-${i}`}
+          className="absolute"
+          style={{
+            left: "50%",
+            top: "50%",
+          }}
+          animate={{
+            rotate: 360,
+          }}
+          transition={{
+            duration: 15 + i * 5,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        >
+          <Sparkles 
+            className="text-primary/30" 
+            size={12 + i * 4}
+            style={{
+              transform: `translate(${80 + i * 40}px, 0)`,
+            }}
+          />
+        </motion.div>
+      ))}
     </div>
   );
 };

@@ -2,10 +2,10 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { JourneyBegins } from "./JourneyBegins";
 
-const LINE_DISPLAY_MS = 3000;
+const LINE_DISPLAY_MS = 3400;
 const NARRATIVE_LINE_COUNT = 5;
-const FINAL_LINE_HOLD_MS = 2600;
-const FINAL_LINE_TEXT = "Step by step, your destinies braid into one radiant path.";
+const FINAL_LINE_HOLD_MS = LINE_DISPLAY_MS;
+const FINAL_LINE_TEXT = "...will shape both your destinies.";
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
