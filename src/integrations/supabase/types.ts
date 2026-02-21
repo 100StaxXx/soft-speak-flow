@@ -2233,7 +2233,6 @@ export type Database = {
           context_id: string | null
           created_at: string | null
           difficulty: string | null
-          energy_level: string | null
           epic_id: string | null
           estimated_duration: number | null
           habit_source_id: string | null
@@ -2276,7 +2275,6 @@ export type Database = {
           context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
-          energy_level?: string | null
           epic_id?: string | null
           estimated_duration?: number | null
           habit_source_id?: string | null
@@ -2319,7 +2317,6 @@ export type Database = {
           context_id?: string | null
           created_at?: string | null
           difficulty?: string | null
-          energy_level?: string | null
           epic_id?: string | null
           estimated_duration?: number | null
           habit_source_id?: string | null

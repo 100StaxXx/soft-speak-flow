@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, Battery, BatteryLow, BatteryFull, AlertTriangle, Repeat, Bell, Check, X, Users, CalendarOff } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, AlertTriangle, Repeat, Bell, Check, X, Users, CalendarOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format, parseISO } from 'date-fns';
@@ -44,12 +44,6 @@ const difficultyOptions = [
   { value: 'easy', label: 'Easy', icon: Zap, color: 'text-green-500' },
   { value: 'medium', label: 'Medium', icon: Flame, color: 'text-yellow-500' },
   { value: 'hard', label: 'Hard', icon: Mountain, color: 'text-red-500' },
-] as const;
-
-const energyOptions = [
-  { value: 'low', label: 'Low', icon: BatteryLow, color: 'text-blue-400' },
-  { value: 'medium', label: 'Medium', icon: Battery, color: 'text-blue-500' },
-  { value: 'high', label: 'High', icon: BatteryFull, color: 'text-blue-600' },
 ] as const;
 
 const priorityOptions = [
@@ -92,7 +86,6 @@ export function TaskAdvancedEditSheet({
   const [scheduledTime, setScheduledTime] = useState(parsed.scheduledTime || '');
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(parsed.estimatedDuration || null);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>(parsed.difficulty || 'medium');
-  const [energyLevel, setEnergyLevel] = useState<'low' | 'medium' | 'high'>(parsed.energyLevel || 'medium');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent' | null>(parsed.priority || null);
   const [notes, setNotes] = useState(parsed.notes || '');
   const [reminderEnabled, setReminderEnabled] = useState(parsed.reminderEnabled || false);
@@ -151,7 +144,6 @@ export function TaskAdvancedEditSheet({
       scheduledTime: scheduledTime || null,
       estimatedDuration,
       difficulty,
-      energyLevel,
       priority,
       notes: notes || null,
       reminderEnabled,
@@ -277,31 +269,6 @@ export function TaskAdvancedEditSheet({
                     onClick={() => setDifficulty(opt.value)}
                   >
                     <Icon className={cn("w-3.5 h-3.5", difficulty !== opt.value && opt.color)} />
-                    {opt.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Energy Level */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Energy Required</Label>
-            <div className="flex gap-2">
-              {energyOptions.map(opt => {
-                const Icon = opt.icon;
-                return (
-                  <Button
-                    key={opt.value}
-                    variant={energyLevel === opt.value ? "default" : "outline"}
-                    size="sm"
-                    className={cn(
-                      "flex-1 gap-1.5",
-                      energyLevel === opt.value && "bg-primary"
-                    )}
-                    onClick={() => setEnergyLevel(opt.value)}
-                  >
-                    <Icon className={cn("w-3.5 h-3.5", energyLevel !== opt.value && opt.color)} />
                     {opt.label}
                   </Button>
                 );

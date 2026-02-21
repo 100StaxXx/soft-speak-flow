@@ -35,7 +35,6 @@ export interface DailyTask {
   created_at: string | null;
   // Enhanced task features
   priority: string | null;
-  energy_level: string | null;
   is_top_three: boolean | null;
   actual_time_spent: number | null;
   ai_generated: boolean | null;

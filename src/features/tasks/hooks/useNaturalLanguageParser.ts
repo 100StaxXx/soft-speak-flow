@@ -11,7 +11,6 @@ export interface ParsedTask {
   recurrencePattern: string | null;
   recurrenceEndDate: string | null;
   priority: 'low' | 'medium' | 'high' | 'urgent' | null;
-  energyLevel: 'low' | 'medium' | 'high';
   context: string | null;
   isTopThree: boolean;
   reminderEnabled: boolean;
@@ -329,19 +328,6 @@ const CONTEXT_PATTERNS = [
   { regex: /@online\b/i, result: 'online' },
 ];
 
-// Energy patterns
-const ENERGY_PATTERNS = [
-  { regex: /\blow\s*energy\b/i, result: 'low' as const },
-  { regex: /\btired\b/i, result: 'low' as const },
-  { regex: /\bexhausted\b/i, result: 'low' as const },
-  { regex: /\blazy\b/i, result: 'low' as const },
-  { regex: /\bhigh\s*energy\b/i, result: 'high' as const },
-  { regex: /\bfocused\b/i, result: 'high' as const },
-  { regex: /\benergetic\b/i, result: 'high' as const },
-  { regex: /\bpumped\b/i, result: 'high' as const },
-  { regex: /\bpeak\b/i, result: 'high' as const },
-];
-
 // Reminder patterns
 const REMINDER_PATTERNS: Array<{ regex: RegExp; handler: (m: RegExpMatchArray) => number }> = [
   { regex: /remind\s*(?:me\s+)?(\d+)\s*(?:min(?:ute)?s?)\s*(?:before|early|prior)/i, handler: (m) => parseInt(m[1]) },
@@ -451,7 +437,6 @@ function cleanTaskText(text: string): string {
     ...RECURRENCE_PATTERNS.map(p => p.regex),
     ...FREQUENCY_PATTERNS.map(p => p.regex),
     ...CONTEXT_PATTERNS.map(p => p.regex),
-    ...ENERGY_PATTERNS.map(p => p.regex),
     ...REMINDER_PATTERNS.map(p => p.regex),
     ...NOTE_PATTERNS.map(p => p.regex),
     ...CLEAR_PATTERNS.map(p => p.regex),
@@ -489,7 +474,6 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     recurrencePattern: null,
     recurrenceEndDate: null,
     priority: null,
-    energyLevel: 'medium',
     context: null,
     isTopThree: false,
     reminderEnabled: false,
@@ -604,14 +588,6 @@ export function parseNaturalLanguage(input: string): ParsedTask {
   for (const pattern of CONTEXT_PATTERNS) {
     if (pattern.regex.test(input)) {
       result.context = pattern.result;
-      break;
-    }
-  }
-
-  // Parse energy
-  for (const pattern of ENERGY_PATTERNS) {
-    if (pattern.regex.test(input)) {
-      result.energyLevel = pattern.result;
       break;
     }
   }

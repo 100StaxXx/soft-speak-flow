@@ -332,7 +332,6 @@ Available habits with streaks: ${habitsToProtect.length > 0 ? habitsToProtect.ma
       source: 'plan_my_day',
       completed: false,
       is_main_quest: false,
-      energy_level: energyLevel,
     }));
 
     const { data: insertedTasks, error: insertError } = await supabase

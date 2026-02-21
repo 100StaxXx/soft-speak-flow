@@ -12,9 +12,6 @@ import {
   AlertTriangle,
   Repeat,
   Timer,
-  Battery,
-  BatteryLow,
-  BatteryFull,
   Mic,
   MicOff,
   Send,
@@ -206,7 +203,6 @@ export function SmartTaskInput({
     if (parsed.isTopThree && !prev.isTopThree) hasNewElement = true;
     if (parsed.recurrencePattern && !prev.recurrencePattern) hasNewElement = true;
     if (parsed.difficulty !== 'medium' && prev.difficulty === 'medium') hasNewElement = true;
-    if (parsed.energyLevel !== 'medium' && prev.energyLevel === 'medium') hasNewElement = true;
     
     if (hasNewElement) {
       tap(); // Subtle haptic when element is parsed
@@ -295,9 +291,6 @@ export function SmartTaskInput({
         }
         if (task.estimatedDuration && !parsedTask.estimatedDuration) {
           parsedTask.estimatedDuration = task.estimatedDuration;
-        }
-        if (task.energyLevel && parsedTask.energyLevel === 'medium') {
-          parsedTask.energyLevel = task.energyLevel;
         }
         onSubmit(parsedTask);
       }
@@ -574,20 +567,13 @@ export function SmartTaskInput({
     parsed.priority ||
     parsed.context ||
     parsed.recurrencePattern ||
-    parsed.isTopThree ||
-    parsed.energyLevel !== 'medium'
+    parsed.isTopThree
   );
 
   const difficultyConfig = {
     easy: { icon: Zap, label: 'Easy', color: 'text-green-500 bg-green-500/10 border-green-500/30' },
     medium: { icon: Flame, label: 'Medium', color: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/30' },
     hard: { icon: Mountain, label: 'Hard', color: 'text-red-500 bg-red-500/10 border-red-500/30' },
-  };
-
-  const energyConfig = {
-    low: { icon: BatteryLow, label: 'Low Energy', color: 'text-blue-400 bg-blue-400/10 border-blue-400/30' },
-    medium: { icon: Battery, label: 'Medium Energy', color: 'text-blue-500 bg-blue-500/10 border-blue-500/30' },
-    high: { icon: BatteryFull, label: 'High Energy', color: 'text-blue-600 bg-blue-600/10 border-blue-600/30' },
   };
 
   // Build badges array for staggered animation
@@ -685,15 +671,6 @@ export function SmartTaskInput({
       label: parsed.recurrencePattern,
       color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/30',
       onRemove: clearRecurrence,
-    });
-  }
-
-  if (parsed?.energyLevel && parsed.energyLevel !== 'medium') {
-    badges.push({
-      key: 'energy',
-      icon: energyConfig[parsed.energyLevel].icon,
-      label: energyConfig[parsed.energyLevel].label,
-      color: energyConfig[parsed.energyLevel].color,
     });
   }
 

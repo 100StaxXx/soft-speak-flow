@@ -40,7 +40,6 @@ export function TaskManagerPanel({
       scheduledTime: parsed.scheduledTime,
       context: parsed.context,
       estimatedDuration: parsed.estimatedDuration,
-      energyLevel: parsed.energyLevel,
       recurrencePattern: parsed.recurrencePattern,
       isTopThree: parsed.isTopThree,
       contactId: parsed.contactId,

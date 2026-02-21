@@ -693,7 +693,6 @@ export const useTaskMutations = (taskDate: string) => {
       sort_order?: number | null;
       notes?: string | null;
       priority?: string | null;
-      energy_level?: string | null;
       category?: string | null;
       habit_source_id?: string | null;
       is_recurring?: boolean;
@@ -727,7 +726,6 @@ export const useTaskMutations = (taskDate: string) => {
           sort_order: taskData.sort_order,
           notes: taskData.notes,
           priority: taskData.priority,
-          energy_level: taskData.energy_level,
           category: taskData.category,
           habit_source_id: taskData.habit_source_id,
           is_recurring: taskData.is_recurring ?? false,

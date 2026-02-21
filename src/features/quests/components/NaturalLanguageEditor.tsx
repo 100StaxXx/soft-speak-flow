@@ -36,7 +36,6 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
     parsed.isBonus !== null || parsed.isMilestone !== null ||
     parsed.xpReward || parsed.xpMultiplier ||
     parsed.newTitle || parsed.triggerDecomposition ||
-    parsed.energyLevel !== 'medium' ||
     // Clear values
     parsed.clearTime || parsed.clearDate || parsed.clearDuration || parsed.clearRecurrence ||
     parsed.clearAll || parsed.clearCategory || parsed.clearPriority || 
@@ -123,11 +122,6 @@ export function NaturalLanguageEditor({ onApply }: NaturalLanguageEditorProps) {
           )}
           {parsed.context && (
             <Badge color="secondary">📍 @{parsed.context}</Badge>
-          )}
-          {parsed.energyLevel !== 'medium' && (
-            <Badge color={parsed.energyLevel === 'low' ? 'gray' : 'yellow'}>
-              {parsed.energyLevel === 'low' ? '😴' : '⚡'} {parsed.energyLevel} energy
-            </Badge>
           )}
           {parsed.frequency && (
             <Badge color="purple">📊 {parsed.frequency}</Badge>

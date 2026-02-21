@@ -622,7 +622,6 @@ const Journeys = () => {
       epic_id: taskToDelete.epic_id,
       sort_order: taskToDelete.sort_order,
       priority: taskToDelete.priority,
-      energy_level: taskToDelete.energy_level,
       category: taskToDelete.category,
       habit_source_id: taskToDelete.habit_source_id,
       is_recurring: taskToDelete.is_recurring,

@@ -3,12 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
-export type EnergyLevel = 'low' | 'medium' | 'high';
 
 export interface PriorityUpdate {
   taskId: string;
   priority?: Priority;
-  energyLevel?: EnergyLevel;
   isTopThree?: boolean;
 }
 
@@ -17,12 +15,6 @@ const PRIORITY_ORDER: Record<Priority, number> = {
   high: 1,
   medium: 2,
   low: 3,
-};
-
-const ENERGY_LABELS: Record<EnergyLevel, { label: string; emoji: string }> = {
-  high: { label: 'High Energy', emoji: '⚡' },
-  medium: { label: 'Medium Energy', emoji: '🔋' },
-  low: { label: 'Low Energy', emoji: '🌙' },
 };
 
 const PRIORITY_LABELS: Record<Priority, { label: string; color: string }> = {
@@ -56,31 +48,6 @@ export function usePriorityTasks() {
       console.error('Failed to update priority:', error);
       toast({
         title: "Failed to update priority",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update task energy level
-  const updateEnergyLevelMutation = useMutation({
-    mutationFn: async ({ taskId, energyLevel }: { taskId: string; energyLevel: EnergyLevel }) => {
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .update({ energy_level: energyLevel })
-        .eq('id', taskId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
-    },
-    onError: (error) => {
-      console.error('Failed to update energy level:', error);
-      toast({
-        title: "Failed to update energy level",
         variant: "destructive",
       });
     },
@@ -158,65 +125,16 @@ export function usePriorityTasks() {
     });
   };
 
-  // Filter tasks by energy level
-  const filterByEnergy = <T extends { energy_level?: string | null }>(
-    tasks: T[], 
-    currentEnergy: EnergyLevel
-  ): T[] => {
-    const energyOrder: EnergyLevel[] = ['low', 'medium', 'high'];
-    const currentIndex = energyOrder.indexOf(currentEnergy);
-    
-    return tasks.filter(task => {
-      const taskEnergy = (task.energy_level as EnergyLevel) || 'medium';
-      const taskIndex = energyOrder.indexOf(taskEnergy);
-      return taskIndex <= currentIndex;
-    });
-  };
-
-  // Get suggested tasks based on time and energy
-  const getSuggestedTasks = <T extends { 
-    priority?: string | null; 
-    energy_level?: string | null;
-    estimated_duration?: number | null;
-  }>(
-    tasks: T[],
-    availableMinutes: number,
-    currentEnergy: EnergyLevel
-  ): T[] => {
-    return tasks
-      .filter(task => {
-        const duration = task.estimated_duration || 30;
-        const taskEnergy = (task.energy_level as EnergyLevel) || 'medium';
-        const energyOrder: EnergyLevel[] = ['low', 'medium', 'high'];
-        
-        return duration <= availableMinutes && 
-               energyOrder.indexOf(taskEnergy) <= energyOrder.indexOf(currentEnergy);
-      })
-      .sort((a, b) => {
-        const priorityA = PRIORITY_ORDER[(a.priority as Priority) || 'medium'];
-        const priorityB = PRIORITY_ORDER[(b.priority as Priority) || 'medium'];
-        return priorityA - priorityB;
-      })
-      .slice(0, 3);
-  };
-
   return {
     updatePriority: (taskId: string, priority: Priority) => 
       updatePriorityMutation.mutate({ taskId, priority }),
-    updateEnergyLevel: (taskId: string, energyLevel: EnergyLevel) => 
-      updateEnergyLevelMutation.mutate({ taskId, energyLevel }),
     toggleTopThree: (taskId: string, isTopThree: boolean) => 
       toggleTopThreeMutation.mutate({ taskId, isTopThree }),
     setTopThree: (taskIds: string[]) => 
       setTopThreeMutation.mutate(taskIds),
     sortByPriority,
-    filterByEnergy,
-    getSuggestedTasks,
     PRIORITY_ORDER,
     PRIORITY_LABELS,
-    ENERGY_LABELS,
-    isUpdating: updatePriorityMutation.isPending || 
-                updateEnergyLevelMutation.isPending || 
-                toggleTopThreeMutation.isPending,
+    isUpdating: updatePriorityMutation.isPending || toggleTopThreeMutation.isPending,
   };
 }

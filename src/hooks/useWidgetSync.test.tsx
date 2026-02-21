@@ -75,7 +75,6 @@ function makeTask(overrides: Partial<DailyTask> = {}): DailyTask {
     is_bonus: null,
     created_at: null,
     priority: null,
-    energy_level: null,
     is_top_three: null,
     actual_time_spent: null,
     ai_generated: null,

@@ -41,7 +41,6 @@ interface Task {
   scheduled_time: string | null;
   estimated_duration: number | null;
   difficulty: string | null;
-  energy_level: string | null;
   is_top_three: boolean | null;
   category: string | null;
 }
@@ -275,7 +274,7 @@ serve(async (req) => {
       // Today's tasks
       supabase
         .from('daily_tasks')
-        .select('id, task_text, completed, scheduled_time, estimated_duration, difficulty, energy_level, is_top_three, category')
+        .select('id, task_text, completed, scheduled_time, estimated_duration, difficulty, is_top_three, category')
         .eq('user_id', userId)
         .eq('task_date', today),
       
@@ -340,7 +339,6 @@ serve(async (req) => {
 
     // Check for overload
     const hardTasks = todayTasks.filter(t => t.difficulty === 'hard').length;
-    const highEnergyTasks = todayTasks.filter(t => t.energy_level === 'high').length;
     const totalEstimatedMinutes = todayTasks.reduce((sum, t) => sum + (t.estimated_duration || 30), 0);
 
     // 1. Overload warning

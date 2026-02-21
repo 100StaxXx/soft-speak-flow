@@ -7,9 +7,6 @@ import {
   Zap, 
   Flame, 
   Mountain,
-  Battery,
-  BatteryLow,
-  BatteryFull,
   AlertTriangle,
   Star,
   MapPin,
@@ -173,12 +170,6 @@ export function TaskPreviewCard({
     hard: { icon: Mountain, label: 'Hard', color: 'text-red-500 bg-red-500/10' },
   };
 
-  const energyConfig = {
-    low: { icon: BatteryLow, label: 'Low Energy', color: 'text-blue-400 bg-blue-400/10' },
-    medium: { icon: Battery, label: 'Medium Energy', color: 'text-blue-500 bg-blue-500/10' },
-    high: { icon: BatteryFull, label: 'High Energy', color: 'text-blue-600 bg-blue-600/10' },
-  };
-
   const hasMetadata = parsed.scheduledDate || 
     parsed.scheduledTime || 
     parsed.estimatedDuration || 
@@ -188,7 +179,6 @@ export function TaskPreviewCard({
     parsed.recurrencePattern ||
     parsed.reminderEnabled ||
     parsed.difficulty !== 'medium' ||
-    parsed.energyLevel !== 'medium' ||
     parsed.imageUrl;
 
   const showBreakdownPrompt = onBreakdown && 
@@ -316,13 +306,6 @@ export function TaskPreviewCard({
                 icon={Bell} 
                 label={formatReminderTime(parsed.reminderMinutesBefore)} 
                 colorClass="text-amber-500 bg-amber-500/10"
-              />
-            )}
-            {parsed.energyLevel !== 'medium' && (
-              <MetaBadge 
-                icon={energyConfig[parsed.energyLevel].icon} 
-                label={energyConfig[parsed.energyLevel].label} 
-                colorClass={energyConfig[parsed.energyLevel].color}
               />
             )}
             {parsed.imageUrl && (

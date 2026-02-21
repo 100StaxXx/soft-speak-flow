@@ -5,9 +5,6 @@ import {
   Clock, 
   Sparkles, 
   Lightbulb, 
-  Battery, 
-  BatteryLow, 
-  BatteryFull,
   Sun,
   Sunset,
   Moon,
@@ -40,12 +37,6 @@ interface SelectableTask extends ExtractedTask {
   isSuggestion: boolean;
   reason?: string;
 }
-
-const energyIcons = {
-  low: BatteryLow,
-  medium: Battery,
-  high: BatteryFull,
-};
 
 const timeIcons = {
   morning: Sun,
@@ -292,7 +283,6 @@ function TaskRow({
   formatDuration 
 }: TaskRowProps) {
   const [editValue, setEditValue] = useState(task.title);
-  const EnergyIcon = task.energyLevel ? energyIcons[task.energyLevel] : null;
   const TimeIcon = task.suggestedTimeOfDay ? timeIcons[task.suggestedTimeOfDay] : null;
   const duration = formatDuration(task.estimatedDuration);
 
@@ -355,12 +345,6 @@ function TaskRow({
             <Badge variant="outline" className="text-[10px] h-5 gap-1">
               <Clock className="w-3 h-3" />
               {duration}
-            </Badge>
-          )}
-          {EnergyIcon && (
-            <Badge variant="outline" className="text-[10px] h-5 gap-1">
-              <EnergyIcon className="w-3 h-3" />
-              {task.energyLevel}
             </Badge>
           )}
           {TimeIcon && (

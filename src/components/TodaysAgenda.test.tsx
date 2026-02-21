@@ -338,6 +338,126 @@ describe("TodaysAgenda subtasks", () => {
   });
 });
 
+describe("TodaysAgenda attachments", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.isDragging = false;
+    mocks.timelineDragState.justDroppedId = null;
+    mocks.dragOffsetMotionValue.set(0);
+    mocks.dragEdgeMotionValue.set(0);
+    mocks.timelineDragState.dragEdgeOffsetY = mocks.dragOffsetMotionValue;
+    mocks.timelineDragState.previewTime = undefined;
+    mocks.timelineDragState.snapMode = "coarse";
+    mocks.timelineDragState.zoomRail = null;
+    mocks.handlePointerDownSpy.mockClear();
+    mocks.handleTouchStartSpy.mockClear();
+    mocks.rowPointerDownSpy.mockClear();
+    mocks.rowTouchStartSpy.mockClear();
+    mocks.nudgeByFineStepMock.mockReset();
+    mocks.nudgeByFineStepMock.mockReturnValue(true);
+    mocks.getDragHandlePropsMock.mockClear();
+    mocks.getRowDragPropsMock.mockClear();
+  });
+
+  it("shows clickable attachment file names when expanded", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { container } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-1",
+            task_text: "Review budget",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "10:00",
+            attachments: [
+              {
+                id: "att-1",
+                taskId: "task-1",
+                fileUrl: "https://example.com/budget.pdf",
+                filePath: "users/u1/budget.pdf",
+                fileName: "Budget Plan.pdf",
+                mimeType: "application/pdf",
+                fileSizeBytes: 2048,
+                isImage: false,
+                sortOrder: 0,
+                createdAt: "2026-02-13T10:00:00.000Z",
+              },
+            ],
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T10:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const chevron = container.querySelector("svg.lucide-chevron-down");
+    expect(chevron).toBeTruthy();
+    const chevronButton = chevron?.closest("button");
+    expect(chevronButton).toBeTruthy();
+
+    fireEvent.click(chevronButton!);
+
+    expect(await screen.findByText("Attachments")).toBeInTheDocument();
+    const attachmentLink = screen.getByRole("link", { name: "Budget Plan.pdf" });
+    expect(attachmentLink).toHaveAttribute("href", "https://example.com/budget.pdf");
+    expect(attachmentLink).toHaveAttribute("target", "_blank");
+  });
+
+  it("falls back to a clickable photo attachment label for legacy image_url", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { container } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-legacy",
+            task_text: "Legacy image quest",
+            completed: false,
+            xp_reward: 12,
+            scheduled_time: "11:00",
+            image_url: "https://example.com/legacy-image.png",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T11:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const chevron = container.querySelector("svg.lucide-chevron-down");
+    expect(chevron).toBeTruthy();
+    const chevronButton = chevron?.closest("button");
+    expect(chevronButton).toBeTruthy();
+
+    fireEvent.click(chevronButton!);
+
+    expect(await screen.findByText("Attachments")).toBeInTheDocument();
+    const fallbackLink = screen.getByRole("link", { name: "Photo attachment" });
+    expect(fallbackLink).toHaveAttribute("href", "https://example.com/legacy-image.png");
+    expect(fallbackLink).toHaveAttribute("target", "_blank");
+  });
+});
+
 describe("TodaysAgenda combo feedback", () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -25,14 +25,13 @@ import {
 import { cn } from '@/lib/utils';
 import { SubtaskList } from './SubtaskList';
 import { PriorityBadge } from './PriorityBadge';
-import { EnergyBadge } from './EnergyLevelPicker';
 import { BlockedBadge } from './BlockedBadge';
 import { ProgressRing } from './ProgressRing';
 import { DecomposeTaskDialog } from './DecomposeTaskDialog';
 import { useSubtasks } from '../hooks/useSubtasks';
 import { useTaskDependencies } from '../hooks/useTaskDependencies';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { Priority, EnergyLevel } from '../hooks/usePriorityTasks';
+import { Priority } from '../hooks/usePriorityTasks';
 import type { TaskAttachment } from '@/types/questAttachments';
 
 export interface TaskCardTask {
@@ -40,7 +39,6 @@ export interface TaskCardTask {
   task_text: string;
   completed: boolean;
   priority?: Priority | null;
-  energy_level?: EnergyLevel | null;
   is_top_three?: boolean | null;
   estimated_duration?: number | null;
   scheduled_time?: string | null;
@@ -59,7 +57,6 @@ interface EnhancedTaskCardProps {
   task: TaskCardTask;
   onToggleComplete: (taskId: string, completed: boolean) => void;
   onUpdatePriority?: (taskId: string, priority: Priority) => void;
-  onUpdateEnergy?: (taskId: string, energy: EnergyLevel) => void;
   onToggleTopThree?: (taskId: string, isTopThree: boolean) => void;
   onStartFocus?: (taskId: string, taskName: string) => void;
   onDelete?: (taskId: string) => void;
@@ -72,7 +69,6 @@ export function EnhancedTaskCard({
   task,
   onToggleComplete,
   onUpdatePriority,
-  onUpdateEnergy: _onUpdateEnergy,
   onToggleTopThree,
   onStartFocus,
   onDelete,
@@ -184,7 +180,6 @@ export function EnhancedTaskCard({
                   readonly={!onUpdatePriority}
                 />
               )}
-              {task.energy_level && <EnergyBadge level={task.energy_level} />}
               {task.contact && (
                 <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-full">
                   <Avatar className="h-3.5 w-3.5">

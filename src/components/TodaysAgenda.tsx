@@ -18,8 +18,9 @@ import {
   ChevronDown,
   ChevronUp,
   Target,
-  Zap,
   FileText,
+  FileImage,
+  Paperclip,
   Timer,
   Brain,
   Heart,
@@ -59,6 +60,7 @@ import { useMotionProfile } from "@/hooks/useMotionProfile";
 import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
 import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
 import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
+import type { TaskAttachment } from "@/types/questAttachments";
 
 // Helper to calculate days remaining
 const getDaysLeft = (endDate?: string | null) => {
@@ -97,7 +99,6 @@ interface Task {
   // Expandable detail fields
   notes?: string | null;
   priority?: string | null;
-  energy_level?: string | null;
   estimated_duration?: number | null;
   is_recurring?: boolean | null;
   recurrence_pattern?: string | null;
@@ -106,6 +107,7 @@ interface Task {
   reminder_minutes_before?: number | null;
   category?: string | null;
   image_url?: string | null;
+  attachments?: TaskAttachment[] | null;
   subtasks?: TaskSubtask[];
 }
 
@@ -115,6 +117,38 @@ interface TaskSubtask {
   completed: boolean | null;
   sort_order: number | null;
 }
+
+interface DisplayAttachment {
+  fileUrl: string;
+  fileName: string;
+  isImage: boolean;
+}
+
+const FALLBACK_ATTACHMENT_NAME = "Photo attachment";
+
+const normalizeDisplayAttachments = (task: Task): DisplayAttachment[] => {
+  const normalized = (task.attachments ?? [])
+    .filter((attachment) => typeof attachment.fileUrl === "string" && attachment.fileUrl.trim().length > 0)
+    .map((attachment) => ({
+      fileUrl: attachment.fileUrl,
+      fileName: attachment.fileName?.trim() || FALLBACK_ATTACHMENT_NAME,
+      isImage: !!attachment.isImage,
+    }));
+
+  if (normalized.length > 0) return normalized;
+
+  if (task.image_url) {
+    return [
+      {
+        fileUrl: task.image_url,
+        fileName: FALLBACK_ATTACHMENT_NAME,
+        isImage: true,
+      },
+    ];
+  }
+
+  return [];
+};
 
 const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: TaskSubtask[] }>(
   tasks: T[] | undefined,
@@ -1388,11 +1422,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   // Check if a task has expandable details
   const hasExpandableDetails = useCallback((task: Task) => {
+    const displayAttachments = normalizeDisplayAttachments(task);
     return !!(
       (task.subtasks && task.subtasks.length > 0) ||
+      displayAttachments.length > 0 ||
       task.notes || 
       task.priority || 
-      task.energy_level || 
       task.estimated_duration || 
       (task.is_recurring && task.recurrence_pattern) || 
       task.difficulty ||
@@ -1436,12 +1471,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const hasDetails = hasExpandableDetails(task);
     const CategoryIcon = getCategoryIcon(task.category);
     const subtasks = task.subtasks ?? [];
+    const displayAttachments = normalizeDisplayAttachments(task);
     const completedSubtaskCount = subtasks.filter(subtask => !!subtask.completed).length;
     const hasDetailBadges = !!(
       (CategoryIcon && task.category) ||
       task.difficulty ||
       task.priority ||
-      task.energy_level ||
       task.estimated_duration ||
       (task.is_recurring && task.recurrence_pattern)
     );
@@ -1736,6 +1771,37 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               </div>
             )}
 
+            {displayAttachments.length > 0 && (
+              <div className="space-y-1.5 rounded-md border border-border/40 bg-muted/20 p-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Attachments
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {displayAttachments.length}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  {displayAttachments.map((attachment, index) => (
+                    <a
+                      key={`${attachment.fileUrl}-${index}`}
+                      href={attachment.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-sm px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                    >
+                      {attachment.isImage ? (
+                        <FileImage className="h-3.5 w-3.5 flex-shrink-0" />
+                      ) : (
+                        <Paperclip className="h-3.5 w-3.5 flex-shrink-0" />
+                      )}
+                      <span className="truncate">{attachment.fileName}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Notes */}
             {task.notes && (
               useLiteAnimations ? (
@@ -1789,14 +1855,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                   )}
                 >
                   {task.priority} priority
-                </Badge>
-              )}
-              
-              {/* Energy level */}
-              {task.energy_level && (
-                <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-5 gap-1 border-muted-foreground/30">
-                  <Zap className="w-3 h-3" />
-                  {formatDisplayLabel(task.energy_level)}
                 </Badge>
               )}
               
