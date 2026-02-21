@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { FileText } from "lucide-react";
+import { getActiveWordIndex } from "@/utils/captionTiming";
 
 interface CaptionWord {
   word: string;
@@ -19,19 +20,22 @@ export const TimedCaptions = ({ transcript, currentTime, className }: TimedCapti
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
+  const sortedTranscript = useMemo(
+    () => [...transcript].sort((a, b) => (a.start - b.start) || (a.end - b.end)),
+    [transcript],
+  );
 
   useEffect(() => {
-    // Find the current active word based on audio time
-    const currentIndex = transcript.findIndex(
-      (word) => currentTime >= word.start && currentTime < word.end
+    setActiveWordIndex((previousIndex) =>
+      getActiveWordIndex(sortedTranscript, currentTime, previousIndex),
     );
-    
-    if (currentIndex !== activeWordIndex) {
-      setActiveWordIndex(currentIndex);
-    }
-  }, [currentTime, transcript, activeWordIndex]);
+  }, [currentTime, sortedTranscript]);
 
   useEffect(() => {
+    if (activeWordIndex < 0) {
+      return;
+    }
+
     // Auto-scroll to keep active word in upper portion of container
     if (activeWordRef.current && containerRef.current) {
       const container = containerRef.current;
@@ -91,7 +95,7 @@ export const TimedCaptions = ({ transcript, currentTime, className }: TimedCapti
         className="max-h-[300px] overflow-y-auto scroll-smooth pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
       >
         <div className="text-base leading-relaxed">
-          {transcript.map((word, index) => (
+          {sortedTranscript.map((word, index) => (
             <span
               key={index}
               ref={index === activeWordIndex ? activeWordRef : null}

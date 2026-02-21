@@ -24,9 +24,9 @@ export const QUEST_XP_REWARDS = {
  * Done daily, these become the core XP engine.
  */
 export const HABIT_XP_REWARDS = {
-  EASY: 8,
-  MEDIUM: 12,
-  HARD: 18,
+  EASY: 10,
+  MEDIUM: 14,
+  HARD: 20,
 } as const;
 
 /**
@@ -38,7 +38,7 @@ export const SYSTEM_XP_REWARDS = {
   /** Completing a habit (base - multiplied by difficulty) */
   HABIT_COMPLETE: 8,
   /** Completing ALL daily habits */
-  ALL_HABITS_COMPLETE: 12,
+  ALL_HABITS_COMPLETE: 20,
   /** Completing a challenge day */
   CHALLENGE_COMPLETE: 25,
   /** Completing a full weekly challenge */
@@ -227,8 +227,8 @@ export const MILESTONE_XP_REWARDS = {
 } as const;
 
 export const MAIN_QUEST_XP_MULTIPLIER = 1.5;
-export const DAILY_XP_CAP = 220;
-export const POST_CAP_REPEATABLE_MULTIPLIER = 0.2;
+export const DAILY_XP_CAP = 260;
+export const POST_CAP_REPEATABLE_MULTIPLIER = 0.35;
 
 /**
  * Type-safe difficulty type

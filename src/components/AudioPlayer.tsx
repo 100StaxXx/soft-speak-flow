@@ -102,6 +102,16 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
         duration: audio.duration,
       });
     };
+    const handleSeeked = () => {
+      const time = audio.currentTime;
+      setCurrentTime(time);
+      onTimeUpdate?.(time);
+      updateMediaSession({
+        position: time,
+        duration: audio.duration,
+        playbackState: audio.paused ? 'paused' : 'playing',
+      });
+    };
     const handleEnded = () => {
       setIsPlaying(false);
       updateMediaSession({ playbackState: 'none' });
@@ -109,11 +119,13 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("seeked", handleSeeked);
     audio.addEventListener("ended", handleEnded);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("seeked", handleSeeked);
       audio.removeEventListener("ended", handleEnded);
     };
   }, [audioUrl, onTimeUpdate]);
@@ -147,14 +159,19 @@ export const AudioPlayer = ({ audioUrl, title, onTimeUpdate }: AudioPlayerProps)
   const handleSeek = (value: number[]) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.currentTime = value[0];
-    setCurrentTime(value[0]);
+    const nextTime = value[0];
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+    onTimeUpdate?.(nextTime);
   };
 
   const skipTime = (seconds: number) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+    const nextTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
+    onTimeUpdate?.(nextTime);
   };
 
   const formatTime = (time: number) => {

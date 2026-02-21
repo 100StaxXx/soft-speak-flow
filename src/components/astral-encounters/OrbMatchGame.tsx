@@ -6,6 +6,14 @@ import { triggerHaptic } from './gameUtils';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
+import {
+  generateInitialColorGrid,
+  MAX_CASCADE_STEPS,
+  MAX_INITIAL_GEN_ATTEMPTS,
+  normalizeSpecialCreations,
+  pickSpawnColor,
+  runCascadeLoopWithLimit,
+} from './orbMatchLogic';
 
 interface OrbMatchGameProps {
   companionStats: { mind: number; body: number; soul: number };
@@ -643,12 +651,19 @@ export const OrbMatchGame = ({
 
   const initializeGrid = useCallback((colorsOverride?: OrbColor[]) => {
     const colors = colorsOverride || availableColors;
+    const initialColorGrid = generateInitialColorGrid<OrbColor>({
+      rows: GRID_ROWS,
+      cols: GRID_COLS,
+      availableColors: colors,
+      maxAttempts: MAX_INITIAL_GEN_ATTEMPTS,
+    });
+
     const newOrbs: Orb[] = [];
     for (let row = 0; row < GRID_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
         newOrbs.push({
           id: `${row}-${col}`,
-          color: colors[Math.floor(Math.random() * colors.length)],
+          color: initialColorGrid[row][col],
           row, col, special: 'normal',
         });
       }
@@ -896,6 +911,7 @@ export const OrbMatchGame = ({
   const dropAndFill = useCallback((currentOrbs: Orb[], specialsToCreate: SpecialCreation[] = []): Orb[] => {
     const grid: (Orb | null)[][] = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
     currentOrbs.forEach(orb => { if (!orb.matched) grid[orb.row][orb.col] = orb; });
+    const colorGrid: (OrbColor | null)[][] = grid.map((row) => row.map((orb) => orb?.color ?? null));
 
     // Group specials by column for proper placement
     const specialsByCol = new Map<number, SpecialCreation[]>();
@@ -924,15 +940,25 @@ export const OrbMatchGame = ({
       for (let row = emptyRow; row >= 0; row--) {
         // Create special orb if available for this column
         const special = colSpecials[specialIndex];
-        const isSpecialOrb = special && specialIndex < colSpecials.length;
-        
+        const isSpecialOrb = Boolean(special && specialIndex < colSpecials.length);
+        const spawnColor = isSpecialOrb
+          ? special!.color
+          : pickSpawnColor<OrbColor>({
+              grid: colorGrid,
+              row,
+              col,
+              availableColors,
+              strategy: 'refill',
+            });
+
         grid[row][col] = {
           id: `${row}-${col}-${Date.now()}-${Math.random()}`,
-          color: isSpecialOrb ? special.color : availableColors[Math.floor(Math.random() * availableColors.length)],
+          color: spawnColor,
           row, col, 
-          special: isSpecialOrb ? special.type : 'normal', 
+          special: isSpecialOrb ? special!.type : 'normal', 
           isNew: true,
         };
+        colorGrid[row][col] = spawnColor;
         
         if (isSpecialOrb) specialIndex++;
       }
@@ -964,13 +990,24 @@ export const OrbMatchGame = ({
     let currentCascade = 0;
     let totalScore = 0;
 
-    const processNextCascade = async (): Promise<void> => {
-      const { matched, matchGroups, specialsToCreate, specialsActivated } = findMatches(orbsToProcess);
-      
-      if (matched.size >= 3) {
-        currentCascade++;
-        setCascadeLevel(currentCascade);
-        if (currentCascade > 1) { setShowCascade(true); setTimeout(() => setShowCascade(false), 500); }
+    const getCascadeStep = () => {
+      const next = findMatches(orbsToProcess);
+      return next.matched.size >= 3 ? next : null;
+    };
+
+    const cascadeRun = await runCascadeLoopWithLimit({
+      maxSteps: MAX_CASCADE_STEPS,
+      getStep: getCascadeStep,
+      onStep: async (stepIndex, stepData) => {
+        const { matched, matchGroups, specialsActivated } = stepData;
+        const specialsToCreate = normalizeSpecialCreations(stepData.specialsToCreate);
+
+        currentCascade = stepIndex;
+        setCascadeLevel(stepIndex);
+        if (stepIndex > 1) {
+          setShowCascade(true);
+          setTimeout(() => setShowCascade(false), 500);
+        }
 
         // Process special activations - add visual effects and deal bonus damage
         for (const activation of specialsActivated) {
@@ -982,27 +1019,25 @@ export const OrbMatchGame = ({
             color: ORB_COLORS[activation.orb.color].glow,
           };
           setSpecialEffects(prev => [...prev, newEffect]);
-          
+
           // Deal bonus damage for special
-          onDamage?.({ 
-            target: 'adversary', 
-            amount: activation.bonusDamage, 
+          onDamage?.({
+            target: 'adversary',
+            amount: activation.bonusDamage,
             source: `special_${activation.orb.special}`,
-            isCritical: true 
+            isCritical: true
           });
-          
+
           totalScore += activation.bonusDamage * 5; // Bonus score for specials
           triggerHaptic('heavy');
         }
 
         const newExplosions: MatchExplosion[] = matchGroups.map(group => {
           const baseScore = group.size * 10;
-          const cascadeMultiplier = 1 + (currentCascade - 1) * 0.5;
+          const cascadeMultiplier = 1 + (stepIndex - 1) * 0.5;
           const groupScore = Math.round(baseScore * cascadeMultiplier);
           totalScore += groupScore;
-          
-          // Note: Per-match damage removed - only special activations deal damage now
-          
+
           return {
             id: `exp-${Date.now()}-${Math.random()}`,
             x: group.centerCol * cellSize + cellSize / 2,
@@ -1011,28 +1046,29 @@ export const OrbMatchGame = ({
           };
         });
         setExplosions(prev => [...prev, ...newExplosions]);
-        
+
         orbsToProcess = orbsToProcess.map(orb => matched.has(orb.id) ? { ...orb, matched: true } : orb);
         setOrbs([...orbsToProcess]);
         orbsRef.current = [...orbsToProcess];
-        
+
         if (matched.size >= 5 || specialsActivated.length > 0) {
           triggerHaptic('heavy');
         } else {
           triggerHaptic('success');
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, specialsActivated.length > 0 ? 350 : 200));
         orbsToProcess = dropAndFill(orbsToProcess, specialsToCreate);
         setOrbs([...orbsToProcess]);
         orbsRef.current = [...orbsToProcess];
-        
-        await new Promise(resolve => setTimeout(resolve, 180));
-        await processNextCascade();
-      }
-    };
 
-    await processNextCascade();
+        await new Promise(resolve => setTimeout(resolve, 180));
+      },
+    });
+
+    if (cascadeRun.hitLimit) {
+      setShowCascade(false);
+    }
 
     if (currentCascade > 0) {
       setScore(s => s + totalScore);

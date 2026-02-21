@@ -7,19 +7,19 @@
  * XP VALUES:
  *
  * QUESTS (One-time missions, max 4/day):
- * - Easy Quest: 8 XP
+ * - Easy Quest: 12 XP
  * - Medium Quest: 16 XP
- * - Hard Quest: 28 XP
+ * - Hard Quest: 22 XP
  * - Main Quest Multiplier: 1.5x
  *
  * HABITS (Recurring daily activities, max 2 active):
- * - Easy Habit: 7 XP
+ * - Easy Habit: 10 XP
  * - Medium Habit: 14 XP
- * - Hard Habit: 24 XP
- * - All Habits Complete (daily bonus): 15 XP
+ * - Hard Habit: 20 XP
+ * - All Habits Complete (daily bonus): 20 XP
  *
  * SYSTEM ACTIVITIES:
- * - Check-in: 3 XP
+ * - Check-in: 4 XP
  * - Pep Talk Listened (80%+): 8 XP
  * - Challenge Day Complete: 25 XP
  * - Weekly Challenge Complete: 60 XP
@@ -55,8 +55,13 @@
  *
  * STREAK MULTIPLIER:
  * - 0-6 day streak: 1.0x XP
- * - 7-29 day streak: 1.5x XP
- * - 30+ day streak: 2.0x XP (capped)
+ * - 7-29 day streak: 1.25x XP
+ * - 30-59 day streak: 1.5x XP
+ * - 60+ day streak: 1.75x XP
+ *
+ * REPEATABLE XP CAP (applies to quests, habits, focus sessions):
+ * - Full XP up to: 260 repeatable XP/day
+ * - Post-cap multiplier: 0.35x
  * 
  * EVOLUTION THRESHOLDS (21-Stage System):
  * - Stage 0 (Egg): 0 XP

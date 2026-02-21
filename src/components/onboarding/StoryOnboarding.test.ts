@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deriveOnboardingMentorCandidates, mapGuidanceToneToIntensity } from "./StoryOnboarding";
+import {
+  deriveOnboardingMentorCandidates,
+  mapGuidanceToneToIntensity,
+  resolveOnboardingBackdropStage,
+} from "./StoryOnboarding";
 
 describe("mapGuidanceToneToIntensity", () => {
   it("maps plain-text guidance tones to the expected intensity", () => {
@@ -63,5 +67,22 @@ describe("deriveOnboardingMentorCandidates", () => {
 
     expect(result.energyPreference).toBe("masculine");
     expect(result.mentorsForSelection).toEqual([]);
+  });
+});
+
+describe("resolveOnboardingBackdropStage", () => {
+  it("covers all cinematic onboarding stages", () => {
+    expect(resolveOnboardingBackdropStage("prologue")).toBe("prologue");
+    expect(resolveOnboardingBackdropStage("destiny")).toBe("destiny");
+    expect(resolveOnboardingBackdropStage("questionnaire")).toBe("questionnaire");
+    expect(resolveOnboardingBackdropStage("calculating")).toBe("calculating");
+    expect(resolveOnboardingBackdropStage("journey-begins")).toBe("journey-begins");
+  });
+
+  it("skips non-cinematic stages", () => {
+    expect(resolveOnboardingBackdropStage("faction")).toBeNull();
+    expect(resolveOnboardingBackdropStage("mentor-result")).toBeNull();
+    expect(resolveOnboardingBackdropStage("mentor-grid")).toBeNull();
+    expect(resolveOnboardingBackdropStage("companion")).toBeNull();
   });
 });

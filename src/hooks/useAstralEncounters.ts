@@ -39,6 +39,8 @@ export interface EncounterTriggerResult {
   reason?: EncounterTriggerReason;
 }
 
+const RECENT_ADVERSARY_HISTORY_LIMIT = 10;
+
 export const useAstralEncounters = () => {
   const { user } = useAuth();
   const { companion } = useCompanion();
@@ -149,10 +151,21 @@ export const useAstralEncounters = () => {
         throw new Error('User or companion not found');
       }
 
+      const recentAdversaryNames = Array.from(
+        new Set(
+          (encounters ?? [])
+            .slice(0, RECENT_ADVERSARY_HISTORY_LIMIT)
+            .map((encounter) => encounter.adversary_name?.trim())
+            .filter((name): name is string => Boolean(name)),
+        ),
+      );
+
       const adversary = generateAdversary(
         params.triggerType,
         params.epicProgress,
-        params.epicCategory
+        params.epicCategory,
+        undefined,
+        { avoidNames: recentAdversaryNames },
       );
 
       const { data, error } = await supabase

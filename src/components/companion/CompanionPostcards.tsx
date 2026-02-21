@@ -180,7 +180,7 @@ export const CompanionPostcards = () => {
             Your Story Awaits
           </h4>
           <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">
-            As you progress through Star Paths, your companion's journey unfolds through cosmic postcards—each one a chapter in your adventure!
+            As you complete Quests and progress through Campaigns, your companion's journey unfolds through cosmic postcards—each one a chapter in your adventure.
           </p>
 
           <div className="bg-card/50 rounded-xl p-4 border border-border/50 text-left max-w-xs mx-auto">
@@ -191,15 +191,15 @@ export const CompanionPostcards = () => {
             <ul className="text-xs text-muted-foreground space-y-1.5">
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-3 h-3 mt-0.5 text-primary" />
-                <span>Start a Star Path from the Epics tab</span>
+                <span>Open Quests and start a Campaign (or choose a Star Path).</span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-3 h-3 mt-0.5 text-primary" />
-                <span>Complete habits to progress your journey</span>
+                <span>Complete quests and rituals to progress your campaign.</span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-3 h-3 mt-0.5 text-primary" />
-                <span>Reach milestones to unlock story chapters</span>
+                <span>Reach campaign milestones to unlock story chapters.</span>
               </li>
             </ul>
           </div>

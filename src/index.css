@@ -455,6 +455,17 @@ All colors MUST be HSL.
     --stardust-gold: 45 100% 65%;
     --deep-space: 240 15% 8%;
     --cosmiq-glow: 270 80% 65%;
+
+    /* Onboarding cinematic backdrop tokens */
+    --onb-base-1: 236 48% 9%;
+    --onb-base-2: 246 38% 8%;
+    --onb-base-3: 218 34% 7%;
+    --onb-nebula-1: 264 72% 50%;
+    --onb-nebula-2: 211 86% 58%;
+    --onb-nebula-3: 44 96% 68%;
+    --onb-ring: 260 96% 86%;
+    --onb-mask: 228 58% 9%;
+    --onb-particle: 210 52% 92%;
     
     /* Primary RGB for effects - ONLY use in rgba() contexts */
     --primary-rgb: 167, 108, 255;
@@ -1266,6 +1277,51 @@ All colors MUST be HSL.
     }
   }
 
+  @keyframes onb-nebula-drift {
+    0% {
+      transform: translate3d(-2%, 0, 0) scale(1);
+      opacity: 0.72;
+    }
+    50% {
+      transform: translate3d(2%, -1.5%, 0) scale(1.04);
+      opacity: 0.9;
+    }
+    100% {
+      transform: translate3d(-1%, 1.5%, 0) scale(1.01);
+      opacity: 0.74;
+    }
+  }
+
+  @keyframes onb-ring-breathe {
+    0% {
+      transform: scale(0.98);
+      opacity: 0.75;
+    }
+    50% {
+      transform: scale(1.02);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(0.99);
+      opacity: 0.82;
+    }
+  }
+
+  @keyframes onb-particle-float {
+    0% {
+      transform: translateY(0) translateX(0) scale(0.9);
+      opacity: 0.25;
+    }
+    50% {
+      transform: translateY(calc(var(--onb-drift-distance, 22px) * -0.55)) translateX(6px) scale(1.15);
+      opacity: 0.85;
+    }
+    100% {
+      transform: translateY(calc(var(--onb-drift-distance, 22px) * -1)) translateX(-4px) scale(0.88);
+      opacity: 0.15;
+    }
+  }
+
   /* Supernova burst for quest completion */
   @keyframes supernova {
     0% {
@@ -1539,6 +1595,79 @@ All colors MUST be HSL.
 
   .animate-sweep-line {
     animation: sweep-line 1.2s ease-out forwards;
+  }
+
+  .onb-cosmic-base {
+    background:
+      radial-gradient(120% 110% at 50% 42%, hsl(var(--onb-base-1)) 0%, hsl(var(--onb-base-2)) 48%, hsl(var(--onb-base-3)) 100%),
+      linear-gradient(180deg, hsl(var(--onb-base-2)), hsl(var(--onb-base-3)));
+  }
+
+  .onb-nebula-haze {
+    background:
+      radial-gradient(46% 40% at 24% 32%, hsl(var(--onb-nebula-1) / 0.26), transparent 78%),
+      radial-gradient(44% 38% at 78% 28%, hsl(var(--onb-nebula-2) / 0.2), transparent 74%),
+      radial-gradient(56% 54% at 54% 74%, hsl(var(--onb-nebula-3) / 0.15), transparent 84%);
+    filter: blur(48px);
+    will-change: transform, opacity;
+  }
+
+  .onb-faction-tint {
+    background:
+      radial-gradient(52% 42% at 50% 54%, hsl(var(--onb-faction-accent, var(--onb-nebula-1)) / 0.42), transparent 76%);
+  }
+
+  .onb-cosmic-ring {
+    position: absolute;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--onb-ring) / 0.28);
+    box-shadow:
+      inset 0 0 44px hsl(var(--onb-ring) / 0.1),
+      0 0 36px hsl(var(--onb-nebula-1) / 0.18);
+    transform-origin: center;
+  }
+
+  .onb-cosmic-particle {
+    position: absolute;
+    border-radius: 9999px;
+    background: hsl(var(--onb-particle));
+    box-shadow: 0 0 12px hsl(var(--onb-particle) / 0.5);
+    will-change: transform, opacity;
+  }
+
+  .onb-readability-mask {
+    width: min(94vw, 760px);
+    height: min(70vh, 540px);
+    transform: translate(-50%, -50%);
+    background:
+      radial-gradient(ellipse at center, hsl(var(--onb-mask) / 0.62) 0%, hsl(var(--onb-mask) / 0.4) 52%, transparent 90%);
+  }
+
+  .onb-vignette {
+    background:
+      radial-gradient(140% 118% at 50% 50%, transparent 30%, hsl(var(--background) / 0.36) 66%, hsl(var(--background) / 0.68) 100%);
+  }
+
+  .onb-animate-nebula-drift {
+    animation: onb-nebula-drift 30s ease-in-out infinite;
+  }
+
+  .onb-animate-ring-breathe {
+    animation-name: onb-ring-breathe;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+
+  .onb-animate-particle-float {
+    animation-name: onb-particle-float;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .onb-animated {
+      animation: none !important;
+    }
   }
 
   .animate-pulse-once {

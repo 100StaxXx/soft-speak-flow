@@ -13,6 +13,7 @@ import { DestinyReveal } from "./DestinyReveal";
 import { FactionSelector, type FactionType } from "./FactionSelector";
 import { StoryQuestionnaire, type OnboardingAnswer } from "./StoryQuestionnaire";
 import { MentorCalculating } from "./MentorCalculating";
+import { OnboardingCosmicBackdrop, type OnboardingBackdropStage } from "./OnboardingCosmicBackdrop";
 import { CompanionPersonalization } from "@/components/CompanionPersonalization";
 import { JourneyBegins } from "./JourneyBegins";
 import { MentorGrid } from "@/components/MentorGrid";
@@ -41,6 +42,21 @@ type OnboardingStage =
   | "mentor-grid"
   | "companion"
   | "journey-begins";
+
+export const resolveOnboardingBackdropStage = (
+  stage: OnboardingStage,
+): OnboardingBackdropStage | null => {
+  if (
+    stage === "prologue"
+    || stage === "destiny"
+    || stage === "questionnaire"
+    || stage === "calculating"
+    || stage === "journey-begins"
+  ) {
+    return stage;
+  }
+  return null;
+};
 
 interface Mentor {
   id: string;
@@ -128,6 +144,7 @@ export const StoryOnboarding = () => {
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
+  const backdropStage = resolveOnboardingBackdropStage(stage);
 
   const waitForCompanionDisplayName = async (companionId: string) => {
     await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
@@ -731,6 +748,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
   return (
     <div className="min-h-screen relative overflow-hidden bg-background">
       <StarfieldBackground />
+      {backdropStage && <OnboardingCosmicBackdrop stage={backdropStage} faction={faction} motionLevel="balanced" />}
       
       <AnimatePresence mode="wait">
         {stage === "prologue" && (

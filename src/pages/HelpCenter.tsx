@@ -75,7 +75,7 @@ const HelpCenter = () => {
         },
         {
           title: "Earning XP",
-          content: "Gain XP through: completing daily quests (Easy 12, Medium 16, Hard 22 before modifiers), maintaining habits (Easy 8, Medium 12, Hard 18), focus sessions, milestones, and mentor activities. Completing your Main Quest applies a 1.5x quest multiplier. Consistency is key—daily engagement compounds your growth."
+          content: "Gain XP through: completing daily quests (Easy 12, Medium 16, Hard 22 before modifiers), maintaining habits (Easy 10, Medium 14, Hard 20), focus sessions, milestones, and mentor activities. Completing your Main Quest applies a 1.5x quest multiplier. Consistency is key—daily engagement compounds your growth."
         },
         {
           title: "Companion Skins",

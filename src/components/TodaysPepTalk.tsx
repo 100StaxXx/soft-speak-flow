@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, memo } from "react";
+import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { useXPRewards } from "@/hooks/useXPRewards";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { safeLocalStorage } from "@/utils/storage";
+import { getActiveWordIndex } from "@/utils/captionTiming";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -61,7 +62,10 @@ function sanitizeTranscript(transcript: unknown): CaptionWord[] {
   if (!Array.isArray(transcript)) {
     return [];
   }
-  return transcript.filter(isCaptionWord);
+  return transcript
+    .filter(isCaptionWord)
+    .slice()
+    .sort((a, b) => (a.start - b.start) || (a.end - b.end));
 }
 
 function getTranscriptSyncCooldownKey(pepTalkId: string): string {
@@ -167,6 +171,10 @@ export const TodaysPepTalk = memo(() => {
 
 
   const resolvedMentorId = getResolvedMentorId(profile);
+  const timedTranscript = useMemo(
+    () => sanitizeTranscript(pepTalk?.transcript),
+    [pepTalk?.transcript],
+  );
 
   const fetchDailyPepTalk = useCallback(async () => {
     if (!resolvedMentorId) {
@@ -468,18 +476,6 @@ export const TodaysPepTalk = memo(() => {
         setHasAwardedXP(true);
         awardPepTalkListened({ pep_talk_id: pepTalk.id });
       }
-      
-      // Update active word index based on word timestamps
-      if (pepTalk?.transcript && Array.isArray(pepTalk.transcript) && pepTalk.transcript.length > 0) {
-        const wordIndex = pepTalk.transcript.findIndex((w: CaptionWord) => 
-          time >= w.start && time <= w.end
-        );
-        if (wordIndex >= 0) {
-          setActiveWordIndex((previousIndex) => (
-            wordIndex !== previousIndex ? wordIndex : previousIndex
-          ));
-        }
-      }
     };
     
     const updateDuration = () => setDuration(audio.duration);
@@ -497,7 +493,13 @@ export const TodaysPepTalk = memo(() => {
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", handleEnded);
     };
-  }, [pepTalk?.transcript, hasAwardedXP, awardPepTalkListened, pepTalk?.id, profile?.id]);
+  }, [hasAwardedXP, awardPepTalkListened, pepTalk?.id, profile?.id]);
+
+  useEffect(() => {
+    setActiveWordIndex((previousIndex) =>
+      getActiveWordIndex(timedTranscript, currentTime, previousIndex),
+    );
+  }, [timedTranscript, currentTime]);
 
   // Cleanup seek debounce on unmount
   useEffect(() => {
@@ -577,7 +579,9 @@ export const TodaysPepTalk = memo(() => {
   const skipTime = (seconds: number) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+    const nextTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+    audio.currentTime = nextTime;
+    setCurrentTime(nextTime);
   };
 
   const formatTime = (time: number) => {
@@ -607,7 +611,7 @@ export const TodaysPepTalk = memo(() => {
   };
 
   const renderFullTranscript = () => {
-    if (!Array.isArray(pepTalk?.transcript) || pepTalk.transcript.length === 0) {
+    if (timedTranscript.length === 0) {
       // Fallback to plain text if no word timestamps
       if (!pepTalk?.script) return null;
       return (
@@ -625,7 +629,7 @@ export const TodaysPepTalk = memo(() => {
         ref={transcriptRef}
         className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
       >
-        {pepTalk.transcript.map((wordData: CaptionWord, index: number) => (
+        {timedTranscript.map((wordData: CaptionWord, index: number) => (
           <span
             key={index}
             ref={index === activeWordIndex ? activeWordRef : null}

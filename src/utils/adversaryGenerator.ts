@@ -204,12 +204,78 @@ export interface BossOverride {
   tier?: AdversaryTier;
 }
 
+export interface GenerateAdversaryOptions {
+  avoidNames?: string[];
+}
+
+const getNamePoolForThemeAndTier = (
+  theme: AdversaryTheme,
+  tier: AdversaryTier,
+): string[] => {
+  const prefixes = NAME_PREFIXES[theme];
+  const suffixes = NAME_SUFFIXES[tier];
+  return prefixes.flatMap((prefix) => suffixes.map((suffix) => `${prefix} ${suffix}`));
+};
+
+const buildAvoidNameSet = (avoidNames?: string[]): Set<string> => {
+  if (!avoidNames || avoidNames.length === 0) {
+    return new Set<string>();
+  }
+
+  return new Set(
+    avoidNames
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0),
+  );
+};
+
+const pickReusableName = (
+  theme: AdversaryTheme,
+  tier: AdversaryTier,
+  avoidNames?: string[],
+): string => {
+  const fullPool = getNamePoolForThemeAndTier(theme, tier);
+  if (fullPool.length === 0) {
+    return `${randomFrom(NAME_PREFIXES[theme])} ${randomFrom(NAME_SUFFIXES[tier])}`;
+  }
+
+  const avoidSet = buildAvoidNameSet(avoidNames);
+  const availablePool = avoidSet.size > 0
+    ? fullPool.filter((name) => !avoidSet.has(name))
+    : fullPool;
+  const selectedPool = availablePool.length > 0 ? availablePool : fullPool;
+
+  return randomFrom(selectedPool);
+};
+
+const hashString = (value: string): number => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash * 31) + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+};
+
+const pickDeterministicLore = (
+  theme: AdversaryTheme,
+  identityName: string,
+): string => {
+  const templates = LORE_TEMPLATES[theme];
+  if (!templates || templates.length === 0) {
+    return '';
+  }
+
+  const templateIndex = hashString(`${theme}:${identityName}`) % templates.length;
+  return templates[templateIndex];
+};
+
 // Generate a complete adversary
 export const generateAdversary = (
   triggerType: TriggerType,
   epicProgress?: number,
   epicCategory?: string,
-  bossOverride?: BossOverride
+  bossOverride?: BossOverride,
+  options?: GenerateAdversaryOptions,
 ): Adversary => {
   // If boss override provided (story boss), use those values
   if (bossOverride) {
@@ -235,12 +301,9 @@ export const generateAdversary = (
   const tier = getTierFromTrigger(triggerType, epicProgress);
   const theme = getThemeForTrigger(triggerType, epicCategory);
   const config = TIER_CONFIG[tier];
-  
-  const prefix = randomFrom(NAME_PREFIXES[theme]);
-  const suffix = randomFrom(NAME_SUFFIXES[tier]);
-  const name = `${prefix} ${suffix}`;
-  
-  const lore = randomFrom(LORE_TEMPLATES[theme]);
+
+  const name = pickReusableName(theme, tier, options?.avoidNames);
+  const lore = pickDeterministicLore(theme, name);
   const essenceName = randomFrom(ESSENCE_NAMES[theme]);
   const essenceDescription = ESSENCE_DESCRIPTIONS[theme];
   
@@ -308,12 +371,9 @@ export const generateArcadeAdversary = (
     'confusion', 'vulnerability', 'imbalance'
   ];
   const theme = randomFrom(allThemes);
-  
-  const prefix = randomFrom(NAME_PREFIXES[theme]);
-  const suffix = randomFrom(NAME_SUFFIXES[tier]);
-  const name = `${prefix} ${suffix}`;
-  
-  const lore = randomFrom(LORE_TEMPLATES[theme]);
+
+  const name = pickReusableName(theme, tier);
+  const lore = pickDeterministicLore(theme, name);
   const essenceName = randomFrom(ESSENCE_NAMES[theme]);
   const essenceDescription = ESSENCE_DESCRIPTIONS[theme];
   
