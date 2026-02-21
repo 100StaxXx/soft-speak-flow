@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveOnboardingMentorCandidates,
   mapGuidanceToneToIntensity,
+  resolveQuestionnaireCompletionStage,
   resolveOnboardingBackdropStage,
 } from "./StoryOnboarding";
 
@@ -84,5 +85,12 @@ describe("resolveOnboardingBackdropStage", () => {
     expect(resolveOnboardingBackdropStage("mentor-result")).toBeNull();
     expect(resolveOnboardingBackdropStage("mentor-grid")).toBeNull();
     expect(resolveOnboardingBackdropStage("companion")).toBeNull();
+  });
+});
+
+describe("questionnaire completion stage", () => {
+  it("routes directly to mentor-result with no calculating transition", () => {
+    expect(resolveQuestionnaireCompletionStage()).toBe("mentor-result");
+    expect(resolveQuestionnaireCompletionStage()).not.toBe("calculating");
   });
 });

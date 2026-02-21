@@ -27,12 +27,8 @@ import {
   type EnergyPreference,
   getDesiredIntensityFromGuidanceTone,
   getEnergyPreferenceFromAnswers,
-  resolveMentorEnergy,
 } from "@/utils/onboardingMentorMatching";
-import {
-  calculateMentorCompatibilityPercent,
-  recommendMentorFromAnswers,
-} from "@/utils/onboardingMentorRecommendation";
+import { resolveAssignedMentorFromActiveMentors } from "@/config/onboardingMentorAssignments";
 
 // Removed duplicate outer function - using inner component method instead
 
@@ -61,6 +57,8 @@ export const resolveOnboardingBackdropStage = (
   }
   return null;
 };
+
+export const resolveQuestionnaireCompletionStage = (): OnboardingStage => "mentor-result";
 
 interface Mentor {
   id: string;
@@ -280,9 +278,6 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
     setAnswers(questionAnswers);
-    
-    // Show loading screen immediately
-    setStage("calculating");
     const mentorPool = mentors.length > 0 ? mentors : await fetchActiveMentors();
 
     if (mentors.length === 0 && mentorPool.length > 0) {
@@ -296,36 +291,20 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       return;
     }
 
-    const recommendation = recommendMentorFromAnswers(mentorPool, questionAnswers);
-
-    if (recommendation.reason === "no_active_mentors") {
-      onboardingLog.error("Mentor recommendation returned no_active_mentors unexpectedly", {
-        mentorPoolCount: mentorPool.length,
-      });
-      toast.error("Mentor catalog is temporarily unavailable. Please try again in a moment.");
-      setStage("questionnaire");
-      return;
-    }
-
-    if (recommendation.usedEnergyFallback) {
-      const availableEnergies = Array.from(new Set(mentorPool.map((mentor) => resolveMentorEnergy(mentor))));
-      onboardingLog.warn("No strict energy mentors matched; using full mentor pool fallback", {
-        selectedEnergyPreference: recommendation.energyPreference,
-        availableEnergies,
-        mentorPoolCount: mentorPool.length,
-      });
-    }
-
-    const bestMatch = recommendation.mentor;
+    const assignment = resolveAssignedMentorFromActiveMentors(questionAnswers, mentorPool);
+    const bestMatch = assignment.mentor;
 
     if (bestMatch) {
-      setRecommendedMentor(bestMatch);
+      if (assignment.usedFallback) {
+        onboardingLog.warn("Preassigned mentor unavailable; using same-energy fallback", {
+          requestedSlug: assignment.requestedSlug,
+          resolvedSlug: assignment.resolvedSlug,
+          mentorPoolCount: mentorPool.length,
+        });
+      }
 
-      // Calculate compatibility percentage
-      const bestMatchEntry = recommendation.mentorScores.find((scoreEntry) => scoreEntry.mentor.id === bestMatch.id);
-      const bestScore = bestMatchEntry?.score ?? recommendation.topScore;
-      const compatibilityPercent = calculateMentorCompatibilityPercent(bestMatch, bestScore);
-      setCompatibilityScore(compatibilityPercent);
+      setRecommendedMentor(bestMatch);
+      setCompatibilityScore(null);
 
       // Convert answers to Record format for explanation generator
       const selectedAnswers: Record<string, string> = {};
@@ -348,12 +327,12 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
         }
       }
 
-      setStage("mentor-result");
+      setStage(resolveQuestionnaireCompletionStage());
       return;
     }
 
-    // Ultimate fallback if recommendation fails unexpectedly
-    onboardingLog.error("Mentor recommendation returned no mentor with non-empty mentor pool", {
+    onboardingLog.error("Preassigned mentor resolution failed with non-empty mentor pool", {
+      requestedSlug: assignment.requestedSlug,
       mentorPoolCount: mentorPool.length,
     });
     toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");

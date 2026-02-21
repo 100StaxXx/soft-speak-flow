@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { type FactionType } from "./FactionSelector";
 
 interface QuestionOption {
+  optionId: string;
   text: string;
   tags: string[];
 }
@@ -48,9 +49,9 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What kind of mentor energy resonates with you?",
     options: [
-      { text: "Feminine presence", tags: ["feminine_preference"] },
-      { text: "Masculine presence", tags: ["masculine_preference"] },
-      { text: "Either works for me", tags: [] },
+      { optionId: "feminine_presence", text: "Feminine presence", tags: ["feminine_preference"] },
+      { optionId: "masculine_presence", text: "Masculine presence", tags: ["masculine_preference"] },
+      { optionId: "either_works", text: "Either works for me", tags: [] },
     ],
   },
   {
@@ -58,10 +59,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What do you want to work on right now?",
     options: [
-      { text: "Clarity & mindset", tags: ["calm", "discipline"] },
-      { text: "Emotions & healing", tags: ["healing", "supportive"] },
-      { text: "Discipline & performance", tags: ["discipline", "momentum"] },
-      { text: "Confidence & self-belief", tags: ["confidence", "supportive"] },
+      { optionId: "clarity_mindset", text: "Clarity & mindset", tags: ["calm", "discipline"] },
+      { optionId: "emotions_healing", text: "Emotions & healing", tags: ["healing", "supportive"] },
+      { optionId: "discipline_performance", text: "Discipline & performance", tags: ["discipline", "momentum"] },
+      { optionId: "confidence_self_belief", text: "Confidence & self-belief", tags: ["confidence", "supportive"] },
     ],
   },
   {
@@ -69,10 +70,10 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "How do you want guidance to feel?",
     options: [
-      { text: "Gentle & compassionate", tags: ["healing", "calm"] },
-      { text: "Encouraging & supportive", tags: ["supportive", "confidence"] },
-      { text: "Calm & grounded", tags: ["calm", "discipline"] },
-      { text: "Direct & demanding", tags: ["discipline", "momentum"] },
+      { optionId: "gentle_compassionate", text: "Gentle & compassionate", tags: ["healing", "calm"] },
+      { optionId: "encouraging_supportive", text: "Encouraging & supportive", tags: ["supportive", "confidence"] },
+      { optionId: "calm_grounded", text: "Calm & grounded", tags: ["calm", "discipline"] },
+      { optionId: "direct_demanding", text: "Direct & demanding", tags: ["discipline", "momentum"] },
     ],
   },
   {
@@ -80,16 +81,17 @@ const questions: StoryQuestion[] = [
     narrative: "",
     question: "What helps you make progress?",
     options: [
-      { text: "Clear principles and logic", tags: ["calm", "discipline"] },
-      { text: "Emotional reassurance", tags: ["supportive", "healing"] },
-      { text: "Someone who believes in me", tags: ["confidence", "supportive"] },
-      { text: "Pressure and high standards", tags: ["discipline", "momentum"] },
+      { optionId: "principles_logic", text: "Clear principles and logic", tags: ["calm", "discipline"] },
+      { optionId: "emotional_reassurance", text: "Emotional reassurance", tags: ["supportive", "healing"] },
+      { optionId: "belief_support", text: "Someone who believes in me", tags: ["confidence", "supportive"] },
+      { optionId: "pressure_standards", text: "Pressure and high standards", tags: ["discipline", "momentum"] },
     ],
   },
 ];
 
 export interface OnboardingAnswer {
   questionId: string;
+  optionId: string;
   answer: string;
   tags: string[];
 }
@@ -128,6 +130,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
   const handleAnswer = (option: QuestionOption) => {
     const newAnswer: OnboardingAnswer = {
       questionId: currentQuestion.id,
+      optionId: option.optionId,
       answer: option.text,
       tags: option.tags,
     };
