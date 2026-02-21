@@ -156,7 +156,7 @@ describe("sanitizeCreateQuestProgress", () => {
 describe("getMentorInstructionLines", () => {
   it("returns mentor-led instructions for each step", () => {
     expect(getMentorInstructionLines("quests_campaigns_intro", null)[0]).toContain(
-      "quests and longer campaigns"
+      "tasks can be done now or saved for later"
     );
     expect(getMentorInstructionLines("create_quest", "open_add_quest")[0]).toContain(
       "Tap the + in the bottom right"
@@ -398,7 +398,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.dialogueText).toContain("focused and practical");
+      expect(result.current.dialogueText).toContain("deliberate step");
     });
   });
 
@@ -416,8 +416,173 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.dialogueText).toContain("really glad you're here");
+      expect(result.current.dialogueText).toContain("gentle and steady");
     });
+  });
+
+  it.each([
+    { name: "Atlas", slug: "atlas", tone: "Wise", questsSnippet: "choose what matters now" },
+    { name: "Eli", slug: "eli", tone: "Supportive", questsSnippet: "We can do a task now" },
+    { name: "Sienna", slug: "sienna", tone: "Empathetic", questsSnippet: "set a gentle to-do for later" },
+    { name: "Stryker", slug: "stryker", tone: "Direct", questsSnippet: "Execute a task now" },
+    { name: "Carmen", slug: "carmen", tone: "Direct", questsSnippet: "Handle priority tasks now" },
+    { name: "Reign", slug: "reign", tone: "Tough", questsSnippet: "Hit a task now" },
+    { name: "Solace", slug: "solace", tone: "Supportive", questsSnippet: "take care of something now" },
+  ])(
+    "uses mentor-specific quests intro voice for $slug and includes now/later + long-term goals",
+    async ({ name, slug, tone, questsSnippet }) => {
+      mocks.state.personality = {
+        name,
+        slug,
+        tone,
+        style: "",
+        primary_color: "#f59e0b",
+      };
+      mocks.state.guidedTutorial = {
+        version: 2,
+        eligible: true,
+        completed: false,
+        completedSteps: [],
+        xpAwardedSteps: [],
+        milestonesCompleted: ["mentor_intro_hello"],
+      };
+      globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+
+      const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+        wrapper: createWrapper("/journeys"),
+      });
+
+      await waitFor(() => {
+        expect(result.current.currentStep).toBe("quests_campaigns_intro");
+        expect(result.current.dialogueText).toContain(questsSnippet);
+        expect(result.current.dialogueText.toLowerCase()).toContain("now");
+        expect(result.current.dialogueText.toLowerCase()).toContain("later");
+        expect(result.current.dialogueSupportText?.toLowerCase()).toContain("campaign");
+        expect(result.current.dialogueSupportText?.toLowerCase()).toContain("long-term");
+      });
+    }
+  );
+
+  it("uses different mentor-specific copy for intro and quests milestones across slugs", async () => {
+    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+
+    mocks.state.personality = {
+      name: "Atlas",
+      slug: "atlas",
+      tone: "Wise",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: [],
+    };
+
+    const { result: atlasIntroResult, unmount: unmountAtlasIntro } = renderHook(
+      () => usePostOnboardingMentorGuidance(),
+      { wrapper: createWrapper("/mentor") }
+    );
+
+    let atlasIntroText = "";
+    await waitFor(() => {
+      atlasIntroText = atlasIntroResult.current.dialogueText;
+      expect(atlasIntroText).toContain("deliberate step");
+    });
+    unmountAtlasIntro();
+
+    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    mocks.state.personality = {
+      name: "Stryker",
+      slug: "stryker",
+      tone: "Direct",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: [],
+    };
+
+    const { result: strykerIntroResult, unmount: unmountStrykerIntro } = renderHook(
+      () => usePostOnboardingMentorGuidance(),
+      { wrapper: createWrapper("/mentor") }
+    );
+
+    let strykerIntroText = "";
+    await waitFor(() => {
+      strykerIntroText = strykerIntroResult.current.dialogueText;
+      expect(strykerIntroText).toContain("execute this fast and clean");
+    });
+    unmountStrykerIntro();
+
+    expect(atlasIntroText).not.toEqual(strykerIntroText);
+
+    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    mocks.state.personality = {
+      name: "Atlas",
+      slug: "atlas",
+      tone: "Wise",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+
+    const { result: atlasQuestsResult, unmount: unmountAtlasQuests } = renderHook(
+      () => usePostOnboardingMentorGuidance(),
+      { wrapper: createWrapper("/journeys") }
+    );
+
+    let atlasQuestsText = "";
+    await waitFor(() => {
+      atlasQuestsText = atlasQuestsResult.current.dialogueText;
+      expect(atlasQuestsText).toContain("choose what matters now");
+    });
+    unmountAtlasQuests();
+
+    globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
+    mocks.state.personality = {
+      name: "Stryker",
+      slug: "stryker",
+      tone: "Direct",
+      style: "",
+      primary_color: "#f59e0b",
+    };
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: [],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+
+    const { result: strykerQuestsResult } = renderHook(
+      () => usePostOnboardingMentorGuidance(),
+      { wrapper: createWrapper("/journeys") }
+    );
+
+    let strykerQuestsText = "";
+    await waitFor(() => {
+      strykerQuestsText = strykerQuestsResult.current.dialogueText;
+      expect(strykerQuestsText).toContain("Execute a task now");
+    });
+
+    expect(atlasQuestsText).not.toEqual(strykerQuestsText);
   });
 
   it("falls back to neutral greeting for unknown mentor slug", async () => {

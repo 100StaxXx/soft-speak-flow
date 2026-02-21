@@ -78,7 +78,7 @@ DO NOT:
 - Change silhouette dramatically.
 - Invent new features.
 - Change colors.
-- Change style.
+- Change style drastically.
 
 Your output must be an image that tightly adheres to these continuity rules with 95% visual continuity.`;
 
@@ -382,11 +382,12 @@ LIGHTING:
 - Divine backlight creating rim glow around egg
 - Dramatic ${companion.favorite_color} radiance from within
 - Motivated light sources showing dimensional depth
-- High contrast creating epic mood
+- Controlled contrast for an epic mood with readable shadows and no underexposed midtones
 
 STYLE & QUALITY:
 - Stylized fantasy digital painting style (high-quality game art)
 - Cinematic composition and lighting
+- Slightly lifted midtones with clean, readable highlights
 - Awe-inspiring larger-than-life scale
 - Professional concept art mastery
 - 8K detail with perfect materials
@@ -467,6 +468,7 @@ STYLE & QUALITY:
 - Stylized fantasy art with tender softness
 - Studio Ghibli emotional resonance meets fantasy illustration
 - Charming yet detailed creature design
+- Subtle creature-collecting RPG cartoon charm (Neopets/P&D-adjacent) while staying anatomically grounded
 - Cinematic newborn portrait quality
 - Rich detail with expressive features
 
@@ -739,6 +741,8 @@ The viewer should immediately recognize this as THE SAME companion from Stage ${
 - Proper subsurface scattering and material response
 - Atmospheric volumetric effects
 - Dynamic heroic composition
+- Slightly brighter exposure with lifted midtones to avoid dark or muddy mids
+- Subtle cartoon readability touch (not chibi, not exaggerated)
 - 8K ultra-detail resolution
 
 Focus on these continuity percentages for Stage ${nextStage}:

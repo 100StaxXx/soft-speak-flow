@@ -755,7 +755,7 @@ serve(async (req) => {
 
     if (stage === 0 || stage === 1) {
       // Egg stages
-      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}\n\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere.`;
+      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}\n\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere, slightly brighter exposure with lifted midtones and readable highlights, with a very subtle creature-collecting game illustration charm (not chibi).`;
 
     } else if (extractedMetadata && stage >= 2 && stage <= 14) {
       // Text-to-image with extracted visual metadata from previous stage
@@ -826,7 +826,8 @@ ${negativePrompts}
 Stylized digital fantasy art, appealing and charming, expressive features.
 MUST use the exact color palette specified above.
 Match the art style: ${extractedMetadata.artStyle}
-Painterly digital art with rich saturated colors, soft but defined edges.`;
+Painterly digital art with rich saturated colors, soft but defined edges.
+Slightly lifted midtones and clean highlights; avoid muddy shadows with a very subtle creature-game readability touch (Neopets/P&D-adjacent, not chibi).`;
 
     } else {
       // Text-to-image (egg stages, cosmic stages 15-20, or when no previous image/metadata)
@@ -853,8 +854,9 @@ ${negativePrompts}
 
 ━━━ RENDERING STYLE ━━━
 Stylized digital fantasy art, appealing and charming, expressive features.
-NOT photorealistic, NOT hyper-cartoonish.
-Painterly digital art with rich saturated colors, soft but defined edges.`;
+NOT photorealistic; avoid extreme/chibi cartoon exaggeration.
+Painterly digital art with rich saturated colors, soft but defined edges.
+Slightly brighter exposure with lifted midtones and clearer highlights for readability.`;
     }
     promptBuildDurationMs = Date.now() - promptBuildStartedAt;
     console.log(`[CompanionImageTiming] prompt_build_ms=${promptBuildDurationMs}`);
@@ -931,6 +933,23 @@ Painterly digital art with rich saturated colors, soft but defined edges.`;
       if (!aiResponse.ok) {
         const errorText = await aiResponse.text();
         console.error("AI error:", errorText);
+
+        if (aiResponse.status === 400) {
+          const payload: Record<string, unknown> = {
+            error: "AI request was rejected by provider.",
+            code: "AI_BAD_REQUEST",
+          };
+          if (debug === true) {
+            payload.providerError = errorText.slice(0, 1000);
+            payload.imageSize = imageSize;
+            payload.flowType = normalizedFlowType;
+          }
+          return timedResponse(
+            new Response(JSON.stringify(payload), 
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 502 }),
+            "generation_bad_request",
+          );
+        }
 
         if (aiResponse.status === 402) {
           return timedResponse(

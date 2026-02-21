@@ -170,6 +170,7 @@ async function handleImageRequest(
 ): Promise<Response> {
   const prompt = extractTextPrompt(body.messages);
   const referenceUrls = extractReferenceImageUrls(body.messages);
+  const preferredSize = resolveImageSize(body.image_size, DEFAULT_IMAGE_SIZE);
 
   const referenceHint =
     referenceUrls.length > 0
@@ -178,17 +179,22 @@ async function handleImageRequest(
           .join("\n")}`
       : "";
 
-  const imageRequest = {
-    model: mapModel(body.model, true),
-    prompt: `${prompt}${referenceHint}`,
-    size: resolveImageSize(body.image_size, DEFAULT_IMAGE_SIZE),
-  };
+  const requestImage = (size: SupportedImageSize) =>
+    originalFetch(OPENAI_IMAGE_GENERATIONS_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: mapModel(body.model, true),
+        prompt: `${prompt}${referenceHint}`,
+        size,
+      }),
+    });
 
-  const response = await originalFetch(OPENAI_IMAGE_GENERATIONS_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(imageRequest),
-  });
+  let response = await requestImage(preferredSize);
+  if (!response.ok && response.status === 400 && preferredSize !== "1024x1024") {
+    // Some provider/model combinations reject non-square sizes.
+    response = await requestImage("1024x1024");
+  }
 
   if (!response.ok) {
     return response;

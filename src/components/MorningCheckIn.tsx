@@ -1,4 +1,4 @@
-import { useState, useRef, memo } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useXPRewards } from "@/hooks/useXPRewards";
@@ -15,6 +15,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CheckInErrorFallback } from "@/components/ErrorFallback";
 import { logger } from "@/utils/logger";
 import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { loadMentorImage } from "@/utils/mentorImageLoader";
 
 const MorningCheckInContent = () => {
   const { user } = useAuth();
@@ -27,11 +28,49 @@ const MorningCheckInContent = () => {
   const [mood, setMood] = useState<string>("");
   const [intention, setIntention] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mentorPortraitUrl, setMentorPortraitUrl] = useState("");
   // Use ref for pollStartTime to avoid stale closure in refetchInterval callback
   const pollStartTimeRef = useRef<number | null>(null);
 
   const today = new Date().toLocaleDateString('en-CA');
   const MAX_POLL_DURATION = 30000; // 30 seconds max polling
+
+  useEffect(() => {
+    if (!personality) {
+      setMentorPortraitUrl("");
+      return;
+    }
+
+    const avatarUrl = personality.avatar_url?.trim();
+    if (avatarUrl) {
+      setMentorPortraitUrl(avatarUrl);
+      return;
+    }
+
+    const mentorSlug = (personality.slug || "").trim().toLowerCase();
+    if (!mentorSlug) {
+      setMentorPortraitUrl("");
+      return;
+    }
+
+    let cancelled = false;
+
+    loadMentorImage(mentorSlug)
+      .then((imageUrl) => {
+        if (!cancelled) {
+          setMentorPortraitUrl(imageUrl || "");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMentorPortraitUrl("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [personality?.avatar_url, personality?.slug, personality?.name]);
 
   const { data: existingCheckIn } = useQuery({
     queryKey: ['morning-check-in', today, user?.id],
@@ -202,19 +241,32 @@ const MorningCheckInContent = () => {
                   <p className="text-xs sm:text-sm font-semibold text-foreground">{personality.name}</p>
                   <Sparkles className="h-3.5 w-3.5 text-stardust-gold" />
                 </div>
-                {existingCheckIn.mentor_response ? (
-                  <p className="text-base italic text-foreground/90 leading-relaxed">
-                    "{existingCheckIn.mentor_response}"
-                  </p>
-                ) : pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION ? (
-                  <p className="text-base text-foreground/80 italic leading-relaxed">
-                    "Great work on setting your intention today. Stay focused and crush it."
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    Preparing your personalized message...
-                  </p>
-                )}
+                <div data-testid="mentor-response-body" className="flow-root">
+                  {mentorPortraitUrl && (
+                    <img
+                      data-testid="mentor-portrait-tile"
+                      src={mentorPortraitUrl}
+                      alt={`${personality.name} portrait`}
+                      className="float-right ml-3 mb-2 h-16 w-12 sm:h-20 sm:w-14 rounded-xl object-cover border border-white/10 shadow-[0_10px_24px_rgba(0,0,0,0.28)]"
+                      style={{ objectPosition: "center 25%" }}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  {existingCheckIn.mentor_response ? (
+                    <p className="text-base italic text-foreground/90 leading-relaxed">
+                      "{existingCheckIn.mentor_response}"
+                    </p>
+                  ) : pollStartTimeRef.current && Date.now() - pollStartTimeRef.current > MAX_POLL_DURATION ? (
+                    <p className="text-base text-foreground/80 italic leading-relaxed">
+                      "Great work on setting your intention today. Stay focused and crush it."
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      Preparing your personalized message...
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}

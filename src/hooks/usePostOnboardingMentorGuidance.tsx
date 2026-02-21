@@ -168,34 +168,39 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
   }
 };
 
-const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, { text: string; support: string }> = {
+interface MentorDialogueLine {
+  text: string;
+  support: string;
+}
+
+const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   atlas: {
-    text: "Glad you're here. We'll keep this focused and practical.",
-    support: "One quick walkthrough, then you're in control.",
+    text: "Welcome. We begin with one deliberate step, then the next becomes clear.",
+    support: "Stay with me for this short walkthrough, and your path will settle into focus.",
   },
   eli: {
-    text: "Welcome. Take one calm breath, then we'll move with clarity.",
-    support: "This short tutorial gives you your first solid rhythm.",
+    text: "Hey, I'm glad you're here. We'll take this one clear step at a time together.",
+    support: "Short walkthrough now, then you'll have a rhythm you can trust.",
   },
   sienna: {
-    text: "Hey, I'm really glad you're here. We'll make this feel easy together.",
-    support: "I'll guide the first steps so you can settle in with confidence.",
+    text: "Hi, I'm really glad you're here. We'll keep this gentle and steady together.",
+    support: "I'll guide your first steps so this feels safe, clear, and doable.",
   },
   stryker: {
-    text: "You showed up. I respect that. Let's lock this in.",
-    support: "A fast walkthrough now, then you run your day.",
+    text: "You showed up. Good. We execute this fast and clean.",
+    support: "Lock the walkthrough, then run your day like a mission.",
   },
   carmen: {
-    text: "Welcome. Let's get organized and moving in the right direction.",
-    support: "A few guided taps, then your system is live.",
+    text: "Welcome. We're setting your standard from the first tap.",
+    support: "Quick walkthrough, then your system is live and accountable.",
   },
   reign: {
-    text: "I love this energy. Let's set your pace and own today.",
-    support: "I'll guide the setup, and then we build momentum.",
+    text: "I love this energy. Let's set your pace and move with intention.",
+    support: "Nail this walkthrough, then build momentum and own the day.",
   },
   solace: {
     text: "Hi friend, you're in the right place. Let's begin with one steady win.",
-    support: "We'll keep this short, supportive, and clear.",
+    support: "I'll keep this calm and clear so you feel grounded right away.",
   },
 };
 
@@ -215,6 +220,51 @@ const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: str
   return {
     text: "Hey, I'm your mentor. I'm glad you're here.",
     support: "I'll guide your first few taps so you can settle in quickly.",
+  };
+};
+
+const QUESTS_CAMPAIGNS_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
+  atlas: {
+    text: "This is Quests: choose what matters now, or place a to-do for later.",
+    support: "Campaigns are for long-term goals, pursued with steady direction over time.",
+  },
+  eli: {
+    text: "This is Quests. We can do a task now or save a to-do for later.",
+    support: "Campaigns are how we go after long-term goals one step at a time.",
+  },
+  sienna: {
+    text: "This is Quests. You can handle something now or set a gentle to-do for later.",
+    support: "Campaigns support your long-term goals so growth feels steady, not rushed.",
+  },
+  stryker: {
+    text: "This is Quests. Execute a task now or queue a to-do for later.",
+    support: "Campaigns are for long-term goals; we run them with consistent follow-through.",
+  },
+  carmen: {
+    text: "This is Quests. Handle priority tasks now or schedule to-dos for later.",
+    support: "Campaigns are your long-term goals, managed with structure and standards.",
+  },
+  reign: {
+    text: "This is Quests. Hit a task now or line up a to-do for later.",
+    support: "Campaigns are for long-term goals and sustained momentum.",
+  },
+  solace: {
+    text: "This is Quests. You can take care of something now or leave a to-do for later.",
+    support: "Campaigns hold your long-term goals so you can keep moving with calm consistency.",
+  },
+};
+
+const getQuestsCampaignsIntroDialogue = (
+  mentorSlug: string | undefined
+): MentorDialogueLine => {
+  const slug = mentorSlug?.toLowerCase();
+  if (slug && QUESTS_CAMPAIGNS_DIALOGUE_BY_MENTOR_SLUG[slug]) {
+    return QUESTS_CAMPAIGNS_DIALOGUE_BY_MENTOR_SLUG[slug];
+  }
+
+  return {
+    text: "This is Quests. You can do a task now or save a to-do for later.",
+    support: "Campaigns are for long-term goals you want to pursue with consistency.",
   };
 };
 
@@ -547,7 +597,7 @@ export const getMentorInstructionLines = (
   currentSubstep: CreateQuestSubstepId | null
 ): string[] => {
   if (currentStep === "quests_campaigns_intro") {
-    return ["This is Quests, where you run daily quests and longer campaigns."];
+    return ["This is Quests: tasks can be done now or saved for later, while campaigns track long-term goals."];
   }
 
   if (currentStep === "create_quest") {
@@ -585,13 +635,13 @@ export const getMentorInstructionLines = (
   return [];
 };
 
-const getMilestoneDialogue = (milestoneId: GuidedMilestoneId): { text: string; support?: string } => {
+const getMilestoneDialogue = (
+  milestoneId: GuidedMilestoneId,
+  mentorSlug: string | undefined
+): { text: string; support?: string } => {
   switch (milestoneId) {
     case "quests_campaigns_intro":
-      return {
-        text: "This is Quests. Daily quests keep momentum, and campaigns guide your long-term path.",
-        support: "We'll build your first quest now.",
-      };
+      return getQuestsCampaignsIntroDialogue(mentorSlug);
     case "stay_on_quests":
       return {
         text: "Start on Quests. We'll build your first quest together.",
@@ -1529,7 +1579,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const dialogue = currentMilestone
     ? currentMilestone === "mentor_intro_hello"
       ? getMentorIntroDialogue(personality?.slug, personality?.name ?? "Your mentor")
-      : getMilestoneDialogue(currentMilestone)
+      : getMilestoneDialogue(currentMilestone, personality?.slug)
     : { text: "", support: undefined };
   const mentorInstructionLines = dialogue.support ? [dialogue.text, dialogue.support] : [dialogue.text];
 
