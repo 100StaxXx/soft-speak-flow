@@ -1,0 +1,12 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/splash-screen/ios/Sources/SplashScreenPlugin/SplashScreen.swift" : {
+    "abi-baseline-json" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen.abi.json",
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary.dia",
+    "objc-header" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-Swift.h",
+    "swiftdoc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen.swiftdoc",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen.swiftmodule",
+    "swiftsourceinfo" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen.swiftsourceinfo"
+  }
+}

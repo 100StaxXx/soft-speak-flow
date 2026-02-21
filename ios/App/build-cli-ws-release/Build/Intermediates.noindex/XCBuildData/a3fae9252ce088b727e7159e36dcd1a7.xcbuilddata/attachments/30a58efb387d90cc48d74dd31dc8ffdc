@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/GTMAppAuth/GTMAppAuth.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/GTMAppAuth/GTMAppAuth.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "GTMAppAuth-Swift.h",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/unextended-interface-header.h",
+    }]
+  }]
+}

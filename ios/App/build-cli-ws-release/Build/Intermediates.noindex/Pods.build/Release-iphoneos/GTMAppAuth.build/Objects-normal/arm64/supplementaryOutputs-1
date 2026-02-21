@@ -1,0 +1,12 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GTMAppAuth/GTMAppAuth/Sources/AuthSession.swift" : {
+    "abi-baseline-json" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth.abi.json",
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.dia",
+    "objc-header" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-Swift.h",
+    "swiftdoc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth.swiftdoc",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth.swiftmodule",
+    "swiftsourceinfo" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth.swiftsourceinfo"
+  }
+}

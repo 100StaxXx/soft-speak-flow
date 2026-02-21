@@ -1,0 +1,168 @@
+{
+  "source": "/Users/macbookair/Developer/soft-speak-flow/ios/CosmiqWidget/WidgetViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "⚔️",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "Today",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 31
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 49
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lldQ • %lldR",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 54
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld quests",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 58
+        }
+      },
+      {
+        "comment": "",
+        "key": "No tasks",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 62
+        }
+      },
+      {
+        "comment": "",
+        "key": "⚔️",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 101
+        }
+      },
+      {
+        "comment": "",
+        "key": "Today's Quests",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 103
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 129
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lldQ • %lldR",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 133
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "⚔️",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 202
+        }
+      },
+      {
+        "comment": "",
+        "key": "Daily Quests",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 220
+        }
+      },
+      {
+        "comment": "",
+        "key": "Complete",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 223
+        }
+      },
+      {
+        "comment": "",
+        "key": "⭐",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 303
+        }
+      },
+      {
+        "comment": "",
+        "key": "+%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 309
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 389
+        }
+      },
+      {
+        "comment": "",
+        "key": "✨",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 401
+        }
+      },
+      {
+        "comment": "",
+        "key": "No quests today",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 403
+        }
+      }
+    ]
+  },
+  "version": 1
+}

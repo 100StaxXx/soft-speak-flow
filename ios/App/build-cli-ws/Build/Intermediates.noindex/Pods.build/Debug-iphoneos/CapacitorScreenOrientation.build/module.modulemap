@@ -1,0 +1,11 @@
+framework module CapacitorScreenOrientation {
+  umbrella header "CapacitorScreenOrientation-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module CapacitorScreenOrientation.Swift {
+  header "CapacitorScreenOrientation-Swift.h"
+  requires objc
+}

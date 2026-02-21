@@ -1,0 +1,221 @@
+{
+  "" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/AFError.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AFError.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AFError.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AFError.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/DataRequest.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DataRequest.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DataRequest.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DataRequest.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/DataStreamRequest.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DataStreamRequest.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DataStreamRequest.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DataStreamRequest.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/DownloadRequest.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DownloadRequest.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DownloadRequest.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DownloadRequest.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/HTTPHeaders.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/HTTPHeaders.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/HTTPHeaders.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/HTTPHeaders.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/HTTPMethod.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/HTTPMethod.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/HTTPMethod.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/HTTPMethod.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/Notifications.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Notifications.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Notifications.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Notifications.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/ParameterEncoder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ParameterEncoder.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ParameterEncoder.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ParameterEncoder.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/ParameterEncoding.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ParameterEncoding.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ParameterEncoding.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ParameterEncoding.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/Protected.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Protected.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Protected.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Protected.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/Request.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Request.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Request.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Request.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/RequestTaskMap.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestTaskMap.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestTaskMap.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestTaskMap.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/Response.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Response.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Response.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Response.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/Session.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Session.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Session.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Session.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/SessionDelegate.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/SessionDelegate.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/SessionDelegate.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/SessionDelegate.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/URLConvertible+URLRequestConvertible.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLConvertible+URLRequestConvertible.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLConvertible+URLRequestConvertible.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLConvertible+URLRequestConvertible.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/UploadRequest.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/UploadRequest.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/UploadRequest.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/UploadRequest.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Core/WebSocketRequest.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/WebSocketRequest.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/WebSocketRequest.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/WebSocketRequest.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/DispatchQueue+Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/DispatchQueue+Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/OperationQueue+Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/OperationQueue+Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/OperationQueue+Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/OperationQueue+Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/Result+Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Result+Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Result+Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Result+Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/StringEncoding+Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/StringEncoding+Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/StringEncoding+Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/StringEncoding+Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/URLRequest+Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLRequest+Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLRequest+Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLRequest+Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Extensions/URLSessionConfiguration+Alamofire.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLSessionConfiguration+Alamofire.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLSessionConfiguration+Alamofire.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLSessionConfiguration+Alamofire.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/AlamofireExtended.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AlamofireExtended.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AlamofireExtended.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AlamofireExtended.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/AuthenticationInterceptor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AuthenticationInterceptor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AuthenticationInterceptor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/AuthenticationInterceptor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/CachedResponseHandler.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/CachedResponseHandler.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/CachedResponseHandler.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/CachedResponseHandler.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/Combine.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Combine.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Combine.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Combine.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/Concurrency.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Concurrency.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Concurrency.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Concurrency.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/EventMonitor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/EventMonitor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/EventMonitor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/EventMonitor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/MultipartFormData.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/MultipartFormData.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/MultipartFormData.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/MultipartFormData.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/MultipartUpload.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/MultipartUpload.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/MultipartUpload.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/MultipartUpload.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/NetworkReachabilityManager.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/NetworkReachabilityManager.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/NetworkReachabilityManager.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/NetworkReachabilityManager.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RedirectHandler.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RedirectHandler.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RedirectHandler.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RedirectHandler.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RequestCompression.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestCompression.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestCompression.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestCompression.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RequestInterceptor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestInterceptor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestInterceptor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RequestInterceptor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/ResponseSerialization.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ResponseSerialization.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ResponseSerialization.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ResponseSerialization.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/RetryPolicy.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RetryPolicy.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RetryPolicy.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/RetryPolicy.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/ServerTrustEvaluation.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ServerTrustEvaluation.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ServerTrustEvaluation.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/ServerTrustEvaluation.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/URLEncodedFormEncoder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLEncodedFormEncoder.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLEncodedFormEncoder.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/URLEncodedFormEncoder.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Alamofire/Source/Features/Validation.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Validation.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Validation.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Alamofire.build/Objects-normal/arm64/Validation.o"
+  }
+}

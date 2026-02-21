@@ -1,0 +1,5 @@
+
+module CapacitorHaptics.Swift {
+  header "CapacitorHaptics-Swift.h"
+  requires objc
+}

@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-FfY6MM0Z.js";import{I as o}from"./index-sX_cJ3I4.js";import"./date-vendor-Bk4KiHsJ.js";import"./three-vendor-qI8GXUTd.js";const n=()=>r.jsx(o,{enableOnboardingGuard:!0});export{n as default};

@@ -1,0 +1,45 @@
+{
+	"appId": "com.darrylgraham.revolution",
+	"appName": "Cosmiq",
+	"webDir": "dist",
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 2000,
+			"backgroundColor": "#1a1a1a",
+			"androidSplashResourceName": "splash",
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": false,
+			"splashFullScreen": true,
+			"splashImmersive": true
+		},
+		"SocialLogin": {
+			"providers": {
+				"google": true,
+				"facebook": false,
+				"apple": true,
+				"twitter": false
+			}
+		},
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	},
+	"packageClassList": [
+		"SignInWithApple",
+		"ContactsPlugin",
+		"AppPlugin",
+		"CAPCameraPlugin",
+		"FilesystemPlugin",
+		"HapticsPlugin",
+		"PushNotificationsPlugin",
+		"ScreenOrientationPlugin",
+		"SharePlugin",
+		"SplashScreenPlugin",
+		"SocialLoginPlugin",
+		"NativePurchasesPlugin"
+	]
+}

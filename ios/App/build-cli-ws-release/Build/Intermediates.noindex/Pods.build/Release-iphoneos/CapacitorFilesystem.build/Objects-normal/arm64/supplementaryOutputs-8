@@ -1,0 +1,12 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/CAPPluginCall+Accelerators.swift" : {
+    "abi-baseline-json" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem.abi.json",
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.dia",
+    "objc-header" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-Swift.h",
+    "swiftdoc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem.swiftdoc",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem.swiftmodule",
+    "swiftsourceinfo" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem.swiftsourceinfo"
+  }
+}

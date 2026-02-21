@@ -1,0 +1,30 @@
+dependencies: \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/GTMAppAuth.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/GoogleSignIn.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDSignIn.m \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/Public/GoogleSignIn/GIDSignIn.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/include/DarwinFoundation1.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDSignIn_Private.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/Public/GoogleSignIn/GIDConfiguration.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/Public/GoogleSignIn/GIDGoogleUser.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/GTMSessionFetcher.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/Public/GoogleSignIn/GIDProfileData.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/Public/GoogleSignIn/GIDSignInResult.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDAuthStateMigration/GIDAuthStateMigration.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDEMMSupport.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDSignInInternalOptions.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDSignInPreferences.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDCallbackQueue.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDScopes.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDSignInCallbackSchemes.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/AppCheckCore.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDAppCheck/Implementations/GIDAppCheck.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDAppCheck/UI/GIDActivityIndicatorViewController.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDEMMErrorHandler.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDTimedLoader/GIDTimedLoader.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDGoogleUser_Private.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/AppAuth.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDProfileData_Private.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/GoogleSignIn/GoogleSignIn/Sources/GIDSignInResult_Private.h

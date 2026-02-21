@@ -1,0 +1,22 @@
+moduledependenciestarget: \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Modules/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CapacitorCordova.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/AppDelegate.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVViewController.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDV.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVAvailability.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPlugin.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPluginResult.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVCommandDelegate.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVInvokedUrlCommand.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/WebKit.framework/Modules/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVURLProtocol.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVScreenOrientationDelegate.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVWebViewProcessPoolFactory.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVCommandDelegateImpl.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPluginManager.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVConfigParser.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/CDVPlugin+Resources.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCordova/Cordova.framework/Headers/NSDictionary+CordovaPreferences.h

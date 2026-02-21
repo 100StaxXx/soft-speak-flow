@@ -1,0 +1,69 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CapacitorCommunityContacts-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CapacitorCommunityContacts-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CapacitorCommunityContacts-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CapacitorCommunityContacts-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CapacitorCommunityContacts-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor-community/contacts/ios/Plugin/BiMap.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/BiMap~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor-community/contacts/ios/Plugin/ContactPayload.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactPayload~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor-community/contacts/ios/Plugin/Contacts.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/Contacts~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor-community/contacts/ios/Plugin/ContactsPlugin.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/ContactsPlugin-9f6c5a7bd564fa6b5fb4e1691b80ae34~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor-community/contacts/ios/Plugin/CreateContactInput.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/CreateContactInput~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor-community/contacts/ios/Plugin/GetContactsProjectionInput.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorCommunityContacts.build/Objects-normal/arm64/GetContactsProjectionInput~partial.swiftmodule"
+  }
+}

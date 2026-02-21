@@ -1,0 +1,4 @@
+Target dependency graph (2 targets)
+Target 'App' in project 'App'
+➜ Explicit dependency on target 'CosmiqWidgetExtension' in project 'App'
+Target 'CosmiqWidgetExtension' in project 'App' (no dependencies)

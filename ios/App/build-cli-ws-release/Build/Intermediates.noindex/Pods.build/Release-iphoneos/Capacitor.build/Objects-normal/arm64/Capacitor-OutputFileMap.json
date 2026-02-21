@@ -1,0 +1,236 @@
+{
+  "" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Capacitor-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/AppUUID.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/AppUUID.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/AppUUID.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/AppUUID.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Array+Capacitor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Array+Capacitor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Array+Capacitor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Array+Capacitor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPApplicationDelegateProxy.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPApplicationDelegateProxy.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPApplicationDelegateProxy.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPApplicationDelegateProxy.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridge.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridge.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridge.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridge.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridgeDelegate.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeDelegate.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeDelegate.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeDelegate.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridgeProtocol.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeProtocol.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeProtocol.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeProtocol.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridgeViewController.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeViewController.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeViewController.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgeViewController.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridgedPlugin+getMethod.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgedPlugin+getMethod.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgedPlugin+getMethod.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPBridgedPlugin+getMethod.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPFile.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPFile.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPFile.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPFile.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPInstanceConfiguration.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstanceConfiguration-1df802e2818cd8b79a34077c42a3af98.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstanceConfiguration-1df802e2818cd8b79a34077c42a3af98.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstanceConfiguration-1df802e2818cd8b79a34077c42a3af98.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPInstanceDescriptor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstanceDescriptor-0553921f5f97748384e48673a3984745.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstanceDescriptor-0553921f5f97748384e48673a3984745.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstanceDescriptor-0553921f5f97748384e48673a3984745.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPInstancePlugin.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstancePlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstancePlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPInstancePlugin.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPLog.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPLog.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPNotifications.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPNotifications.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPlugin+LoadInstance.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPluginCall.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-eb671126bc8bb832622a1266ff24c4b5.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-eb671126bc8bb832622a1266ff24c4b5.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginCall-eb671126bc8bb832622a1266ff24c4b5.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPluginMethod.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-0b0b2f276ab6d11dcdb019124f4c8af5.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-0b0b2f276ab6d11dcdb019124f4c8af5.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-0b0b2f276ab6d11dcdb019124f4c8af5.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CapacitorBridge.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorBridge.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorBridge.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorBridge.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/CapacitorExtension.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorExtension.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorExtension.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorExtension.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Codable/JSValueDecoder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSValueDecoder.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSValueDecoder.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSValueDecoder.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Codable/JSValueEncoder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSValueEncoder.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSValueEncoder.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSValueEncoder.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Data+Capacitor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Data+Capacitor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Data+Capacitor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Data+Capacitor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/DocLinks.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/DocLinks.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/DocLinks.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/DocLinks.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/JS.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JS.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JS.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JS.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/JSExport.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSExport.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSExport.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSExport.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/JSTypes.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSTypes.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSTypes.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/JSTypes.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/KeyPath.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/KeyPath.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/KeyPath.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/KeyPath.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/KeyValueStore.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/KeyValueStore.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/KeyValueStore.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/KeyValueStore.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/NotificationHandlerProtocol.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/NotificationHandlerProtocol.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/NotificationHandlerProtocol.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/NotificationHandlerProtocol.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/NotificationRouter.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/NotificationRouter.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/NotificationRouter.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/NotificationRouter.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/PluginCallResult.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/PluginCallResult.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/PluginCallResult.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/PluginCallResult.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/PluginConfig.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/PluginConfig.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/PluginConfig.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/PluginConfig.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/CapacitorCookieManager.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorCookieManager.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorCookieManager.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorCookieManager.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/CapacitorCookies.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorCookies.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorCookies.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorCookies.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/CapacitorHttp.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorHttp.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorHttp.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorHttp.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/CapacitorUrlRequest.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorUrlRequest.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorUrlRequest.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/CapacitorUrlRequest.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/Console.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Console.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Console.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Console.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/HttpRequestHandler.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/HttpRequestHandler.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/HttpRequestHandler.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/HttpRequestHandler.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/WebView.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebView.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebView.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebView.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/Router.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Router.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Router.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/Router.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/TmpViewController.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/TmpViewController.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/TmpViewController.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/TmpViewController.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/UIColor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/UIColor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/UIColor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/UIColor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/WKWebView+Capacitor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WKWebView+Capacitor-7444f51d804c7af0ab898455800dd0c2.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WKWebView+Capacitor-7444f51d804c7af0ab898455800dd0c2.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WKWebView+Capacitor-7444f51d804c7af0ab898455800dd0c2.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/WebViewAssetHandler.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebViewAssetHandler.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebViewAssetHandler.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebViewAssetHandler.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/ios/Capacitor/Capacitor/WebViewDelegationHandler.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebViewDelegationHandler.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebViewDelegationHandler.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/Capacitor.build/Objects-normal/arm64/WebViewDelegationHandler.o"
+  }
+}

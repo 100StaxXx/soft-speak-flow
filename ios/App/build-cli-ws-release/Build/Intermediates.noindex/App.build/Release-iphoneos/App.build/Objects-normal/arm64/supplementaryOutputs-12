@@ -1,0 +1,12 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/ios/App/App/AppDelegate.swift" : {
+    "abi-baseline-json" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App.abi.json",
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App-primary.dia",
+    "objc-header" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App-Swift.h",
+    "swiftdoc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App.swiftdoc",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App.swiftmodule",
+    "swiftsourceinfo" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/App.build/Release-iphoneos/App.build/Objects-normal/arm64/App.swiftsourceinfo"
+  }
+}

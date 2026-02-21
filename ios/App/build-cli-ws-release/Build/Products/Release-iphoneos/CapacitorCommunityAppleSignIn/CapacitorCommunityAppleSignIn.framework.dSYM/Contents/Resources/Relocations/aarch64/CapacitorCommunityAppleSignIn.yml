@@ -1,0 +1,58 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapacitorCommunityAppleSignIn/CapacitorCommunityAppleSignIn.framework/CapacitorCommunityAppleSignIn'
+relocations:
+  - { offset: 0x5CF38, size: 0x8, addend: 0x0, symName: _CapacitorCommunityAppleSignInVersionString, symObjAddr: 0x0, symBinAddr: 0x7E40, symSize: 0x0 }
+  - { offset: 0x5CF6F, size: 0x8, addend: 0x0, symName: _CapacitorCommunityAppleSignInVersionNumber, symObjAddr: 0x40, symBinAddr: 0x7E80, symSize: 0x0 }
+  - { offset: 0x5CFC5, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C10identifierSSvpfi', symObjAddr: 0x0, symBinAddr: 0x4000, symSize: 0x24 }
+  - { offset: 0x5D187, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C13pluginMethodsSaySo15CAPPluginMethodCGvpfi', symObjAddr: 0x118, symBinAddr: 0x40F4, symSize: 0xF8 }
+  - { offset: 0x5D254, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0CfETo', symObjAddr: 0xB2C, symBinAddr: 0x4B08, symSize: 0x50 }
+  - { offset: 0x5D283, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C23authorizationController10controller011didCompleteF13AuthorizationySo015ASAuthorizationH0C_So0M0CtF', symObjAddr: 0xB7C, symBinAddr: 0x4B58, symSize: 0x8 }
+  - { offset: 0x5D31F, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C23authorizationController10controller011didCompleteF13AuthorizationySo015ASAuthorizationH0C_So0M0CtFTo', symObjAddr: 0xDE0, symBinAddr: 0x4DBC, symSize: 0x68 }
+  - { offset: 0x5D351, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C23authorizationController10controller011didCompleteF5ErrorySo015ASAuthorizationH0C_s0L0_ptF', symObjAddr: 0xE48, symBinAddr: 0x4E24, symSize: 0x8 }
+  - { offset: 0x5D374, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C23authorizationController10controller011didCompleteF5ErrorySo015ASAuthorizationH0C_s0L0_ptFTo', symObjAddr: 0xE50, symBinAddr: 0x4E2C, symSize: 0x68 }
+  - { offset: 0x5D463, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0CMa', symObjAddr: 0x1234, symBinAddr: 0x5210, symSize: 0x20 }
+  - { offset: 0x5D4DA, size: 0x8, addend: 0x0, symName: '_$ss12_ArrayBufferV20_consumeAndCreateNew14bufferIsUnique15minimumCapacity13growForAppendAByxGSb_SiSbtFSo20ASAuthorizationScopea_Tg5', symObjAddr: 0x12CC, symBinAddr: 0x52A8, symSize: 0x124 }
+  - { offset: 0x5D5DC, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4findys10_HashTableV6BucketV6bucket_Sb5foundtxSHRzlFSS_Tg5', symObjAddr: 0x13F0, symBinAddr: 0x53CC, symSize: 0x64 }
+  - { offset: 0x5D609, size: 0x8, addend: 0x0, symName: '_$ss22__RawDictionaryStorageC4find_9hashValues10_HashTableV6BucketV6bucket_Sb5foundtx_SitSHRzlFSS_Tg5', symObjAddr: 0x1454, symBinAddr: 0x5430, symSize: 0xB4 }
+  - { offset: 0x5D80D, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C23authorizationController10controller011didCompleteF13AuthorizationySo015ASAuthorizationH0C_So0M0CtFTf4dnn_n', symObjAddr: 0x193C, symBinAddr: 0x5918, symSize: 0x800 }
+  - { offset: 0x5DA79, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C23authorizationController10controller011didCompleteF5ErrorySo015ASAuthorizationH0C_s0L0_ptFTf4dnn_n', symObjAddr: 0x213C, symBinAddr: 0x6118, symSize: 0x210 }
+  - { offset: 0x5DB28, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaMa', symObjAddr: 0x234C, symBinAddr: 0x6328, symSize: 0x50 }
+  - { offset: 0x5DB3C, size: 0x8, addend: 0x0, symName: ___swift_instantiateConcreteTypeFromMangledNameV2, symObjAddr: 0x239C, symBinAddr: 0x6378, symSize: 0x44 }
+  - { offset: 0x5DB50, size: 0x8, addend: 0x0, symName: '_$sS2SSysWl', symObjAddr: 0x23E0, symBinAddr: 0x63BC, symSize: 0x40 }
+  - { offset: 0x5DB64, size: 0x8, addend: 0x0, symName: '_$s10Foundation20PersonNameComponentsVSgWOb', symObjAddr: 0x2460, symBinAddr: 0x643C, symSize: 0x50 }
+  - { offset: 0x5DB78, size: 0x8, addend: 0x0, symName: '_$s10Foundation4DataV15_RepresentationOWOe', symObjAddr: 0x24B0, symBinAddr: 0x648C, symSize: 0x40 }
+  - { offset: 0x5DB8C, size: 0x8, addend: 0x0, symName: '_$sypWOb', symObjAddr: 0x2530, symBinAddr: 0x650C, symSize: 0x10 }
+  - { offset: 0x5DBA0, size: 0x8, addend: 0x0, symName: ___swift_destroy_boxed_opaque_existential_0, symObjAddr: 0x2540, symBinAddr: 0x651C, symSize: 0x20 }
+  - { offset: 0x5DBB4, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas20_SwiftNewtypeWrapperSCSYWb', symObjAddr: 0x2560, symBinAddr: 0x653C, symSize: 0x24 }
+  - { offset: 0x5DBC8, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas20_SwiftNewtypeWrapperSCs35_HasCustomAnyHashableRepresentationPWb', symObjAddr: 0x2584, symBinAddr: 0x6560, symSize: 0x24 }
+  - { offset: 0x5DBDC, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSHSCSQWb', symObjAddr: 0x25A8, symBinAddr: 0x6584, symSize: 0x24 }
+  - { offset: 0x5DC84, size: 0x8, addend: 0x0, symName: '_$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lFSS_SDyS2SSgGSSypTg5', symObjAddr: 0xB84, symBinAddr: 0x4B60, symSize: 0x25C }
+  - { offset: 0x5DDC6, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas21_ObjectiveCBridgeableSCsACP09_bridgeToC1C01_C5CTypeQzyFTW', symObjAddr: 0xEB8, symBinAddr: 0x4E94, symSize: 0x8 }
+  - { offset: 0x5DE43, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas21_ObjectiveCBridgeableSCsACP016_forceBridgeFromC1C_6resulty01_C5CTypeQz_xSgztFZTW', symObjAddr: 0xEC0, symBinAddr: 0x4E9C, symSize: 0x74 }
+  - { offset: 0x5DEF8, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas21_ObjectiveCBridgeableSCsACP024_conditionallyBridgeFromC1C_6resultSb01_C5CTypeQz_xSgztFZTW', symObjAddr: 0xF34, symBinAddr: 0x4F10, symSize: 0x7C }
+  - { offset: 0x5DFA6, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas21_ObjectiveCBridgeableSCsACP026_unconditionallyBridgeFromC1Cyx01_C5CTypeQzSgFZTW', symObjAddr: 0xFB0, symBinAddr: 0x4F8C, symSize: 0x40 }
+  - { offset: 0x5E016, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeas35_HasCustomAnyHashableRepresentationSCsACP03_todeF0s0eF0VSgyFTW', symObjAddr: 0x105C, symBinAddr: 0x5038, symSize: 0x6C }
+  - { offset: 0x5E041, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSHSCSH9hashValueSivgTW', symObjAddr: 0x10C8, symBinAddr: 0x50A4, symSize: 0x38 }
+  - { offset: 0x5E0BF, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSHSCSH4hash4intoys6HasherVz_tFTW', symObjAddr: 0x1100, symBinAddr: 0x50DC, symSize: 0x40 }
+  - { offset: 0x5E13D, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSHSCSH13_rawHashValue4seedS2i_tFTW', symObjAddr: 0x1140, symBinAddr: 0x511C, symSize: 0x70 }
+  - { offset: 0x5E1BB, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSQSCSQ2eeoiySbx_xtFZTW', symObjAddr: 0x11B0, symBinAddr: 0x518C, symSize: 0x84 }
+  - { offset: 0x5E2AE, size: 0x8, addend: 0x0, symName: '_$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SSSgTt0g5Tf4g_n', symObjAddr: 0x172C, symBinAddr: 0x5708, symSize: 0x110 }
+  - { offset: 0x5E3E8, size: 0x8, addend: 0x0, symName: '_$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SDyS2SSgGTt0g5Tf4g_n', symObjAddr: 0x183C, symBinAddr: 0x5818, symSize: 0x100 }
+  - { offset: 0x5E5CF, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C10identifierSSvg', symObjAddr: 0x30, symBinAddr: 0x4030, symSize: 0x38 }
+  - { offset: 0x5E5F4, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C6jsNameSSvg', symObjAddr: 0xE0, symBinAddr: 0x40BC, symSize: 0x38 }
+  - { offset: 0x5E747, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C13pluginMethodsSaySo15CAPPluginMethodCGvgTo', symObjAddr: 0x210, symBinAddr: 0x41EC, symSize: 0x60 }
+  - { offset: 0x5E77A, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C13pluginMethodsSaySo15CAPPluginMethodCGvg', symObjAddr: 0x270, symBinAddr: 0x424C, symSize: 0x10 }
+  - { offset: 0x5E92B, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C9authorizeyySo13CAPPluginCallCF', symObjAddr: 0x280, symBinAddr: 0x425C, symSize: 0x374 }
+  - { offset: 0x5EA92, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C9authorizeyySo13CAPPluginCallCFTo', symObjAddr: 0x5F4, symBinAddr: 0x45D0, symSize: 0x50 }
+  - { offset: 0x5EAC8, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C6bridge8pluginId0H4NameAC0A017CAPBridgeProtocol_p_S2StcfC', symObjAddr: 0x644, symBinAddr: 0x4620, symSize: 0xB4 }
+  - { offset: 0x5EADC, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C6bridge8pluginId0H4NameAC0A017CAPBridgeProtocol_p_S2Stcfc', symObjAddr: 0x6F8, symBinAddr: 0x46D4, symSize: 0x1E8 }
+  - { offset: 0x5EBBF, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C6bridge8pluginId0H4NameAC0A017CAPBridgeProtocol_p_S2StcfcTo', symObjAddr: 0x8E0, symBinAddr: 0x48BC, symSize: 0x74 }
+  - { offset: 0x5EBD3, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0CACycfC', symObjAddr: 0x954, symBinAddr: 0x4930, symSize: 0x20 }
+  - { offset: 0x5EBE7, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0CACycfc', symObjAddr: 0x974, symBinAddr: 0x4950, symSize: 0x168 }
+  - { offset: 0x5ECA0, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0CACycfcTo', symObjAddr: 0xADC, symBinAddr: 0x4AB8, symSize: 0x20 }
+  - { offset: 0x5ECB4, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0CfD', symObjAddr: 0xAFC, symBinAddr: 0x4AD8, symSize: 0x30 }
+  - { offset: 0x5ED08, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSYSCSY8rawValuexSg03RawD0Qz_tcfCTW', symObjAddr: 0xFF0, symBinAddr: 0x4FCC, symSize: 0x44 }
+  - { offset: 0x5ED32, size: 0x8, addend: 0x0, symName: '_$sSo20ASAuthorizationScopeaSYSCSY8rawValue03RawD0QzvgTW', symObjAddr: 0x1034, symBinAddr: 0x5010, symSize: 0x28 }
+  - { offset: 0x5ED5B, size: 0x8, addend: 0x0, symName: '_$s29CapacitorCommunityAppleSignIn0de4WithC0C18getRequestedScopes4fromSaySo20ASAuthorizationScopeaGSgSo13CAPPluginCallC_tFTf4nd_n', symObjAddr: 0x1508, symBinAddr: 0x54E4, symSize: 0x224 }
+...

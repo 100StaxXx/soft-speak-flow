@@ -1,0 +1,56 @@
+{
+  "" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/CAPPluginCall+Accelerators.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemConstants.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemError.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemLocationResolver.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemOperation.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemOperationExecutor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemPlugin.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/IONFileStructures+Converters.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/LegacyFilesystemImplementation.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.o"
+  }
+}

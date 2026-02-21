@@ -1,0 +1,43 @@
+moduledependenciestarget: \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/AppAuth.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/Target\ Support\ Files/AppAuth/AppAuth-umbrella.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/usr/include/DarwinFoundation1.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDAuthState.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDAuthStateChangeDelegate.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDAuthStateErrorDelegate.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDAuthorizationRequest.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDExternalUserAgentRequest.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDResponseTypes.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDScopes.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDAuthorizationResponse.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDAuthorizationService.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDError.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDErrorUtilities.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDExternalUserAgent.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDExternalUserAgentSession.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDGrantTypes.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDIDToken.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDRegistrationRequest.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDRegistrationResponse.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDScopeUtilities.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDServiceConfiguration.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDServiceDiscovery.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDTokenRequest.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDTokenResponse.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDTokenUtilities.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDURLSessionProvider.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDEndSessionRequest.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDEndSessionResponse.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDClientMetadataParameters.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDDefines.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDFieldMapping.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuthCore/OIDURLQueryComponent.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuth.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuth/iOS/OIDAuthState+IOS.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuth/iOS/OIDAuthorizationService+IOS.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuth/iOS/OIDExternalUserAgentIOS.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuth/iOS/OIDExternalUserAgentIOSCustomBrowser.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppAuth/Sources/AppAuth/iOS/OIDExternalUserAgentCatalyst.h

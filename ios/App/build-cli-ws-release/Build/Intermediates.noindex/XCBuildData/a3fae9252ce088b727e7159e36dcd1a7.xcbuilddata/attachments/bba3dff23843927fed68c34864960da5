@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapgoCapacitorSocialLogin/CapgoCapacitorSocialLogin.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapgoCapacitorSocialLogin.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Products/Release-iphoneos/CapgoCapacitorSocialLogin/CapgoCapacitorSocialLogin.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "CapgoCapacitorSocialLogin-Swift.h",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapgoCapacitorSocialLogin.build/unextended-interface-header.h",
+    }]
+  }]
+}

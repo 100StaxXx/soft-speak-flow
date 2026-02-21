@@ -1,0 +1,12 @@
+{
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/camera/ios/Sources/CameraPlugin/CameraExtensions.swift" : {
+    "abi-baseline-json" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera.abi.json",
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera-primary.dia",
+    "objc-header" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera-Swift.h",
+    "swiftdoc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera.swiftdoc",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera.swiftmodule",
+    "swiftsourceinfo" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorCamera.build/Objects-normal/arm64/CapacitorCamera.swiftsourceinfo"
+  }
+}

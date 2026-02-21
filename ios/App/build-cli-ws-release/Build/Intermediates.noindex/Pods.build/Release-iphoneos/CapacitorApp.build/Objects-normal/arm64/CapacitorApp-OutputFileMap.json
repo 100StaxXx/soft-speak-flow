@@ -1,0 +1,16 @@
+{
+  "" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/CapacitorApp-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/app/ios/Sources/AppPlugin/AppPlugin.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/AppPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/AppPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorApp.build/Objects-normal/arm64/AppPlugin.o"
+  }
+}

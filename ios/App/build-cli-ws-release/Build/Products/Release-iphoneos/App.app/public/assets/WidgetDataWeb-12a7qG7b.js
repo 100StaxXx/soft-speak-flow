@@ -1,0 +1,1 @@
+import{ee as e}from"./vendor-FfY6MM0Z.js";import"./date-vendor-Bk4KiHsJ.js";import"./three-vendor-qI8GXUTd.js";class d extends e{async updateWidgetData(a){}async reloadWidget(){}}export{d as WidgetDataWeb};

@@ -1,0 +1,21 @@
+{
+  "" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/CapacitorPushNotifications-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsHandler.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/PushNotificationsHandler.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/PushNotificationsHandler.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/PushNotificationsHandler.o"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/push-notifications/ios/Sources/PushNotificationsPlugin/PushNotificationsPlugin.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/PushNotificationsPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/PushNotificationsPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-ws-release/Build/Intermediates.noindex/Pods.build/Release-iphoneos/CapacitorPushNotifications.build/Objects-normal/arm64/PushNotificationsPlugin.o"
+  }
+}
