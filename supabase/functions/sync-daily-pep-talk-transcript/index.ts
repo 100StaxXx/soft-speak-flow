@@ -101,6 +101,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "No transcription text returned",
+          hasWordTimestamps: false,
+          wordCount: 0,
+          retryRecommended: true,
           updated: false,
           scriptChanged: false,
           transcriptChanged: false,
@@ -125,6 +128,9 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             error: "Failed to load matching library pep talks",
+            hasWordTimestamps: false,
+            wordCount: 0,
+            retryRecommended: true,
             updated: false,
             scriptChanged: false,
             transcriptChanged: false,
@@ -160,6 +166,10 @@ serve(async (req) => {
           JSON.stringify({
             error: "Failed to update script/transcript",
             script: syncPlan.nextScript,
+            transcript: syncPlan.nextTranscript,
+            hasWordTimestamps: syncPlan.hasWordTimestamps,
+            wordCount: syncPlan.wordCount,
+            retryRecommended: syncPlan.retryRecommended,
             updated: false,
             scriptChanged: syncPlan.scriptChanged,
             transcriptChanged: syncPlan.transcriptChanged,
@@ -189,6 +199,9 @@ serve(async (req) => {
             id: pepTalk.id,
             script: syncPlan.nextScript,
             transcript: syncPlan.nextTranscript,
+            hasWordTimestamps: syncPlan.hasWordTimestamps,
+            wordCount: syncPlan.wordCount,
+            retryRecommended: syncPlan.retryRecommended,
             updated: syncPlan.updated,
             scriptChanged: syncPlan.scriptChanged,
             transcriptChanged: syncPlan.transcriptChanged,
@@ -212,6 +225,9 @@ serve(async (req) => {
         id: pepTalk.id,
         script: syncPlan.nextScript,
         transcript: syncPlan.nextTranscript,
+        hasWordTimestamps: syncPlan.hasWordTimestamps,
+        wordCount: syncPlan.wordCount,
+        retryRecommended: syncPlan.retryRecommended,
         updated: syncPlan.updated,
         scriptChanged: syncPlan.scriptChanged,
         transcriptChanged: syncPlan.transcriptChanged,

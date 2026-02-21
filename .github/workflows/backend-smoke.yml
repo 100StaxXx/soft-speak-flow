@@ -59,16 +59,25 @@ jobs:
       - name: Verify service-auth scheduled endpoint executes
         run: |
           set -euo pipefail
-          status=$(curl -sS -o /tmp/scheduled.json -w "%{http_code}" \
-            -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/dispatch-daily-pushes" \
-            -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-            -H "apikey: ${SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{}')
+          check_service_function() {
+            local fn="$1"
+            local body="$2"
+            local status
 
-          echo "dispatch-daily-pushes (service role) => HTTP $status"
-          cat /tmp/scheduled.json || true
+            status=$(curl -sS -o /tmp/scheduled.json -w "%{http_code}" \
+              -X POST "https://${PROJECT_REF}.supabase.co/functions/v1/${fn}" \
+              -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+              -H "apikey: ${SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$body")
 
-          if [ "$status" -ge 300 ]; then
-            exit 1
-          fi
+            echo "${fn} (service role) => HTTP ${status}"
+            cat /tmp/scheduled.json || true
+
+            if [ "$status" -ge 300 ]; then
+              exit 1
+            fi
+          }
+
+          check_service_function "dispatch-daily-pushes" '{}'
+          check_service_function "retry-missing-pep-talk-transcripts" '{"mode":"scheduled","limit":5}'

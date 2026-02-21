@@ -20,6 +20,9 @@ export interface TranscriptSyncPlanInput {
 export interface TranscriptSyncPlan {
   nextScript: string;
   nextTranscript: TranscriptWord[];
+  hasWordTimestamps: boolean;
+  wordCount: number;
+  retryRecommended: boolean;
   scriptChanged: boolean;
   transcriptChanged: boolean;
   updated: boolean;
@@ -30,6 +33,9 @@ export interface TranscriptSyncPlan {
 export interface TranscriptSyncFailurePayload {
   error: string;
   details: string;
+  hasWordTimestamps: false;
+  wordCount: 0;
+  retryRecommended: true;
   updated: false;
   scriptChanged: false;
   transcriptChanged: false;
@@ -87,6 +93,9 @@ export function buildTranscriptSyncPlan(input: TranscriptSyncPlanInput): Transcr
 
   const currentTranscript = normalizeTranscript(input.currentTranscript);
   const transcribedTranscript = normalizeTranscript(input.transcribedTranscript);
+  const wordCount = transcribedTranscript.length;
+  const hasWordTimestamps = wordCount > 0;
+  const retryRecommended = !hasWordTimestamps;
 
   let nextTranscript = transcribedTranscript;
   let warning: string | undefined;
@@ -111,6 +120,9 @@ export function buildTranscriptSyncPlan(input: TranscriptSyncPlanInput): Transcr
   return {
     nextScript,
     nextTranscript,
+    hasWordTimestamps,
+    wordCount,
+    retryRecommended,
     scriptChanged,
     transcriptChanged,
     updated,
@@ -126,6 +138,9 @@ export function buildTranscriptionFailurePayload(
   return {
     error: "Transcription failed",
     details,
+    hasWordTimestamps: false,
+    wordCount: 0,
+    retryRecommended: true,
     updated: false,
     scriptChanged: false,
     transcriptChanged: false,

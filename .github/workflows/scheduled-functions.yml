@@ -4,13 +4,24 @@ on:
   schedule:
     - cron: "1 0 * * *"
     - cron: "5 0 * * *"
+    - cron: "*/10 * * * *"
     - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       function_name:
         description: "Function to invoke manually"
-        required: true
+        required: false
         type: string
+      backfill_recent_transcripts:
+        description: "Run one-time transcript backfill (last N days)"
+        required: false
+        default: false
+        type: boolean
+      backfill_lookback_days:
+        description: "How many days to include in backfill mode"
+        required: false
+        default: 30
+        type: number
 
 jobs:
   invoke:
@@ -25,8 +36,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          payload='{}'
+          run_backfill_loop="false"
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            fn="${{ inputs.function_name }}"
+            if [ "${{ inputs.backfill_recent_transcripts }}" = "true" ]; then
+              fn="retry-missing-pep-talk-transcripts"
+              payload=$(jq -cn \
+                --argjson lookback "${{ inputs.backfill_lookback_days }}" \
+                --argjson limit 50 \
+                '{mode:"backfill", lookbackDays:$lookback, limit:$limit}')
+              run_backfill_loop="true"
+            else
+              fn="${{ inputs.function_name }}"
+              if [ -z "$fn" ]; then
+                echo "workflow_dispatch requires function_name when backfill mode is disabled" >&2
+                exit 1
+              fi
+            fi
           else
             case "${{ github.event.schedule }}" in
               "1 0 * * *")
@@ -34,6 +61,10 @@ jobs:
                 ;;
               "5 0 * * *")
                 fn="schedule-daily-mentor-pushes"
+                ;;
+              "*/10 * * * *")
+                fn="retry-missing-pep-talk-transcripts"
+                payload='{"mode":"scheduled"}'
                 ;;
               "*/5 * * * *")
                 fn="dispatch-daily-pushes"
@@ -46,17 +77,21 @@ jobs:
           fi
 
           echo "function_name=$fn" >> "$GITHUB_OUTPUT"
+          echo "payload=$payload" >> "$GITHUB_OUTPUT"
+          echo "run_backfill_loop=$run_backfill_loop" >> "$GITHUB_OUTPUT"
 
       - name: Invoke scheduled function
+        if: steps.select.outputs.run_backfill_loop != 'true'
         run: |
           set -euo pipefail
           fn="${{ steps.select.outputs.function_name }}"
+          payload='${{ steps.select.outputs.payload }}'
           url="https://${PROJECT_REF}.supabase.co/functions/v1/${fn}"
           status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
             -X POST "$url" \
             -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -d '{}')
+            -d "$payload")
 
           echo "HTTP $status"
           cat /tmp/function-response.json || true
@@ -64,3 +99,43 @@ jobs:
           if [ "$status" -ge 300 ]; then
             exit 1
           fi
+
+      - name: Run transcript backfill batches
+        if: steps.select.outputs.run_backfill_loop == 'true'
+        run: |
+          set -euo pipefail
+          fn="${{ steps.select.outputs.function_name }}"
+          lookback="${{ inputs.backfill_lookback_days }}"
+          url="https://${PROJECT_REF}.supabase.co/functions/v1/${fn}"
+
+          max_batches=50
+          for batch in $(seq 1 "$max_batches"); do
+            payload=$(jq -cn \
+              --argjson lookback "$lookback" \
+              --argjson limit 50 \
+              '{mode:"backfill", lookbackDays:$lookback, limit:$limit}')
+
+            status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
+              -X POST "$url" \
+              -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload")
+
+            echo "Batch $batch => HTTP $status"
+            cat /tmp/function-response.json || true
+
+            if [ "$status" -ge 300 ]; then
+              exit 1
+            fi
+
+            attempted=$(jq -r '.attempted // 0' /tmp/function-response.json)
+            scanned=$(jq -r '.scanned // 0' /tmp/function-response.json)
+            backfill_queued=$(jq -r '.backfillQueued // 0' /tmp/function-response.json)
+
+            if [ "$attempted" -eq 0 ] && [ "$scanned" -eq 0 ] && [ "$backfill_queued" -eq 0 ]; then
+              echo "Backfill complete after $batch batch(es)."
+              exit 0
+            fi
+          done
+
+          echo "Backfill hit max_batches=${max_batches}; rerun workflow if more work remains."

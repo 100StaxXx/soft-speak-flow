@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
+import {
+  buildReadyTranscriptState,
+  buildRetryTranscriptState,
+  parseTranscriptSyncPayload,
+  TRANSCRIPT_STATUS_PENDING,
+} from "../_shared/transcriptRetryState.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -172,7 +178,10 @@ serve(async (req) => {
             summary,
             script,
             audio_url: audioUrl,
-            for_date: todayDate
+            for_date: todayDate,
+            transcript_status: TRANSCRIPT_STATUS_PENDING,
+            transcript_attempt_count: 0,
+            transcript_next_retry_at: new Date().toISOString(),
           })
           .select()
           .single();
@@ -209,6 +218,18 @@ serve(async (req) => {
           // Don't fail the whole process if library insert fails
         }
 
+        const currentAttemptCount = dailyPepTalk.transcript_attempt_count ?? 0;
+        const persistTranscriptState = async (payload: Record<string, unknown>) => {
+          const { error } = await supabase
+            .from('daily_pep_talks')
+            .update(payload)
+            .eq('id', dailyPepTalk.id);
+
+          if (error) {
+            console.error(`Failed to persist transcript state for ${mentorSlug}:`, error);
+          }
+        };
+
         // Sync transcript for the daily pep talk to enable word-by-word highlighting
         try {
           console.log(`Syncing transcript for daily pep talk ${dailyPepTalk.id}...`);
@@ -219,16 +240,38 @@ serve(async (req) => {
           if (syncError) {
             const summary = await summarizeFunctionInvokeError(syncError);
             console.error(`Transcript sync returned error for ${mentorSlug}:`, summary);
+            const retryState = buildRetryTranscriptState({
+              currentAttemptCount,
+              errorMessage: typeof summary === "string" ? summary : "Transcript sync returned error",
+            });
+            await persistTranscriptState(retryState.update);
           } else {
             const syncPayload = (syncData && typeof syncData === "object")
               ? syncData as Record<string, unknown>
               : {};
+            const parsedPayload = parseTranscriptSyncPayload(syncPayload);
             const libraryRowsUpdated =
               typeof syncPayload.libraryRowsUpdated === "number" ? syncPayload.libraryRowsUpdated : 0;
             const warning = typeof syncPayload.warning === "string" ? syncPayload.warning : null;
 
+            if (parsedPayload.hasWordTimestamps && parsedPayload.wordCount > 0) {
+              await persistTranscriptState(buildReadyTranscriptState(currentAttemptCount));
+            } else {
+              const retryState = buildRetryTranscriptState({
+                currentAttemptCount,
+                errorMessage:
+                  parsedPayload.error ??
+                  warning ??
+                  "Transcription returned no word-level timestamps",
+              });
+              await persistTranscriptState(retryState.update);
+            }
+
             console.log(`✓ Transcript synced for ${mentorSlug}`, {
               updated: syncPayload.updated === true,
+              hasWordTimestamps: parsedPayload.hasWordTimestamps,
+              wordCount: parsedPayload.wordCount,
+              retryRecommended: parsedPayload.retryRecommended,
               transcriptChanged: syncPayload.transcriptChanged === true,
               libraryUpdated: syncPayload.libraryUpdated === true,
               libraryRowsUpdated,
@@ -238,6 +281,11 @@ serve(async (req) => {
         } catch (syncError) {
           const summary = await summarizeFunctionInvokeError(syncError);
           console.error(`Failed to sync transcript for ${mentorSlug}:`, summary);
+          const retryState = buildRetryTranscriptState({
+            currentAttemptCount,
+            errorMessage: typeof summary === "string" ? summary : "Transcript sync threw",
+          });
+          await persistTranscriptState(retryState.update);
           // Non-blocking - continue even if transcript sync fails
         }
 

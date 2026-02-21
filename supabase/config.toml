@@ -305,3 +305,6 @@ verify_jwt = false
 
 [functions.sync-daily-pep-talk-transcript]
 verify_jwt = false
+
+[functions.retry-missing-pep-talk-transcripts]
+verify_jwt = false

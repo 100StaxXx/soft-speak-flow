@@ -20,6 +20,9 @@ describe("buildTranscriptSyncPlan", () => {
     expect(plan.updated).toBe(true);
     expect(plan.scriptChanged).toBe(true);
     expect(plan.transcriptChanged).toBe(true);
+    expect(plan.hasWordTimestamps).toBe(true);
+    expect(plan.wordCount).toBe(1);
+    expect(plan.retryRecommended).toBe(false);
     expect(plan.nextTranscript).toEqual([{ word: "new", start: 0, end: 0.4 }]);
     expect(plan.libraryIdsToUpdate).toEqual(["library-1"]);
     expect(plan.warning).toBeUndefined();
@@ -36,6 +39,9 @@ describe("buildTranscriptSyncPlan", () => {
     });
 
     expect(plan.transcriptChanged).toBe(false);
+    expect(plan.hasWordTimestamps).toBe(false);
+    expect(plan.wordCount).toBe(0);
+    expect(plan.retryRecommended).toBe(true);
     expect(plan.nextTranscript).toEqual(existingTranscript);
     expect(plan.libraryIdsToUpdate).toEqual(["library-1"]);
     expect(plan.warning).toContain("no word timestamps");
@@ -49,6 +55,9 @@ describe("buildTranscriptionFailurePayload", () => {
     expect(payload).toEqual({
       error: "Transcription failed",
       details: "upstream down",
+      hasWordTimestamps: false,
+      wordCount: 0,
+      retryRecommended: true,
       updated: false,
       scriptChanged: false,
       transcriptChanged: false,

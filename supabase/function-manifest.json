@@ -68,6 +68,7 @@
   "scheduled": [
     "dispatch-daily-pushes",
     "generate-daily-mentor-pep-talks",
+    "retry-missing-pep-talk-transcripts",
     "schedule-daily-mentor-pushes"
   ],
   "allowList": [
@@ -126,6 +127,7 @@
     "process-paypal-payout",
     "request-referral-payout",
     "reset-companion",
+    "retry-missing-pep-talk-transcripts",
     "resolve-streak-freeze",
     "schedule-daily-mentor-pushes",
     "send-apns-notification",
