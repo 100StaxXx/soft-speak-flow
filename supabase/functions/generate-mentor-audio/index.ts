@@ -52,9 +52,10 @@ const mentorVoices: Record<string, any> = {
   },
   stryker: {
     voiceId: "pNInz6obpgDQGcFmaJgB", // Rich
-    stability: 0.85,
-    similarity_boost: 0.9,
-    style_exaggeration: 0.7,
+    stability: 0.58,
+    similarity_boost: 0.96,
+    style_exaggeration: 1.0,
+    use_speaker_boost: true,
   },
   carmen: {
     voiceId: "AZnzlk1XvdvUeBnXmlld", // Domi - Strong, assertive female
@@ -64,9 +65,10 @@ const mentorVoices: Record<string, any> = {
   },
   reign: {
     voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah - Commanding, high-energy
-    stability: 0.65,
-    similarity_boost: 0.90,
-    style_exaggeration: 0.85,
+    stability: 0.52,
+    similarity_boost: 0.97,
+    style_exaggeration: 1.0,
+    use_speaker_boost: true,
   },
   elizabeth: {
     voiceId: "XrExE9yKIg1WjnnlVkGX", // Matilda - Warm, nurturing
@@ -144,7 +146,15 @@ serve(async (req) => {
       throw new Error(`No voice configuration found for mentor: ${mentorSlug}`);
     }
 
+    const voiceSettings = {
+      stability: voiceConfig.stability,
+      similarity_boost: voiceConfig.similarity_boost,
+      style: voiceConfig.style_exaggeration,
+      use_speaker_boost: voiceConfig.use_speaker_boost ?? true,
+    };
+
     console.log(`Generating audio for mentor ${mentorSlug} with voice ${voiceConfig.voiceId}`);
+    console.log(`Applying voice settings for mentor ${mentorSlug}: ${JSON.stringify(voiceSettings)}`);
 
     // Call ElevenLabs TTS API with timeout handling
     const controller = new AbortController();
@@ -163,12 +173,7 @@ serve(async (req) => {
           body: JSON.stringify({
             text: script,
             model_id: "eleven_multilingual_v2",
-            voice_settings: {
-              stability: voiceConfig.stability,
-              similarity_boost: voiceConfig.similarity_boost,
-              style: voiceConfig.style_exaggeration,
-              use_speaker_boost: true,
-            },
+            voice_settings: voiceSettings,
           }),
           signal: controller.signal,
         }

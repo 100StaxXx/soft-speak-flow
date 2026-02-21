@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -234,7 +235,8 @@ serve(async (req) => {
       });
 
       if (syncError) {
-        console.error(`Transcript sync failed for ${dailyPepTalk.id}:`, syncError);
+        const summary = await summarizeFunctionInvokeError(syncError);
+        console.error(`Transcript sync failed for ${dailyPepTalk.id}:`, summary);
       } else {
         const syncPayload = (syncData && typeof syncData === "object")
           ? syncData as Record<string, unknown>
@@ -251,7 +253,8 @@ serve(async (req) => {
         });
       }
     } catch (syncError) {
-      console.error(`Transcript sync threw for ${dailyPepTalk.id}:`, syncError);
+      const summary = await summarizeFunctionInvokeError(syncError);
+      console.error(`Transcript sync threw for ${dailyPepTalk.id}:`, summary);
       // Keep pep talk generation successful even when transcript sync fails.
     }
 

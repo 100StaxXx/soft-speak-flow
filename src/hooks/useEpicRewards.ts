@@ -108,9 +108,11 @@ export const useEpicRewards = () => {
   ): Promise<{ reward: EpicReward | null; isDuplicate: boolean; bonusXP?: number }> => {
     if (!user?.id) return { reward: null, isDuplicate: false };
     
-    // Get eligible rewards (universal + story-specific)
+    // Get eligible campaign rewards (universal + story-specific).
+    // Exclude astral/theme rewards so campaign completion doesn't pull from adversary loot pools.
     const eligibleRewards = allRewards.filter(r => 
-      r.story_type_slug === null || r.story_type_slug === storyTypeSlug
+      (r.story_type_slug === null || r.story_type_slug === storyTypeSlug) &&
+      r.adversary_theme === null
     );
     
     if (eligibleRewards.length === 0) {

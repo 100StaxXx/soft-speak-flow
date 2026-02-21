@@ -15,6 +15,7 @@ export interface EpicReward {
   css_effect: RewardCssEffect | null;
   image_url: string | null;
   story_type_slug: string | null;
+  adversary_theme: string | null;
   drop_weight: number;
   created_at: string;
 }

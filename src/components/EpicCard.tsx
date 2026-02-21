@@ -26,6 +26,7 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
 import { useCompanionPostcards } from "@/hooks/useCompanionPostcards";
 import { useMilestones } from "@/hooks/useMilestones";
+import { useXPRewards } from "@/hooks/useXPRewards";
 
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 // HIDDEN: Boss battle feature disabled
@@ -107,6 +108,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
   const { health } = useCompanionHealth();
   const { checkAndGeneratePostcard } = useCompanionPostcards();
   const { milestones } = useMilestones(epic.id);
+  const { awardCustomXP } = useXPRewards();
   const { generateRewardReveal } = useEpicRewards();
   
   const trailMilestones = useMemo(() => {
@@ -409,6 +411,17 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
         onOpenChange={setShowRewardReveal}
         rewardData={rewardRevealData}
         onClaim={() => {
+          if (rewardRevealData?.isDuplicate && rewardRevealData.bonusXP) {
+            void awardCustomXP(
+              rewardRevealData.bonusXP,
+              "reward_duplicate",
+              "Duplicate reward bonus",
+              {
+                epic_id: epic.id,
+                reward_id: rewardRevealData.loot?.id,
+              },
+            );
+          }
           onComplete?.();
           toast.success('Campaign Complete!', {
             description: 'Your rewards have been added to your collection.',

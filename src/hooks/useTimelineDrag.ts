@@ -18,6 +18,7 @@ import {
 const DROP_BOUNCE_MS = 300;
 const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
 const DEFAULT_ACTIVATION_THRESHOLD_PX = 8;
+const LONG_PRESS_FEEDBACK_MS = 500;
 const POINTER_NUDGE_RELEASE_DEADZONE_PX = 2;
 
 const triggerHaptic = async (style: ImpactStyle) => {
@@ -119,6 +120,7 @@ export function useTimelineDrag({
   const resolvedActivationThresholdPx = Math.max(0, activationThresholdPx);
 
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [longPressTaskId, setLongPressTaskId] = useState<string | null>(null);
   const [previewTime, setPreviewTime] = useState<string | null>(null);
   const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
   const [snapMode, setSnapMode] = useState<DragSnapMode>("coarse");
@@ -140,6 +142,7 @@ export function useTimelineDrag({
     buildAdaptiveSnapRuntimeScale(resolvedSnapConfig, getViewportHeight()),
   );
   const dropResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowListenersRef = useRef<WindowListeners>({});
   const pendingDragRef = useRef<PendingDragCandidate | null>(null);
   const scrollContextRef = useRef<ScrollContext>({ kind: "window" });
@@ -164,6 +167,13 @@ export function useTimelineDrag({
     if (dropResetTimerRef.current) {
       clearTimeout(dropResetTimerRef.current);
       dropResetTimerRef.current = null;
+    }
+  }, []);
+
+  const clearLongPressFeedbackTimer = useCallback(() => {
+    if (longPressFeedbackTimerRef.current) {
+      clearTimeout(longPressFeedbackTimerRef.current);
+      longPressFeedbackTimerRef.current = null;
     }
   }, []);
 
@@ -332,6 +342,8 @@ export function useTimelineDrag({
       const normalizedStartTime = minuteToTime24(startMinute, resolvedSnapConfig);
 
       pendingDragRef.current = null;
+      clearLongPressFeedbackTimer();
+      setLongPressTaskId(null);
       draggingTaskIdRef.current = pendingDrag.taskId;
       originalTimeRef.current = normalizedStartTime;
       originalMinutesRef.current = startMinute;
@@ -355,7 +367,7 @@ export function useTimelineDrag({
       setZoomRail(null);
       attachActiveScrollListener();
     },
-    [attachActiveScrollListener, dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig],
+    [attachActiveScrollListener, clearLongPressFeedbackTimer, dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig],
   );
 
   const maybeActivateDrag = useCallback(
@@ -381,6 +393,8 @@ export function useTimelineDrag({
     flushQueuedMove({ skipAutoscrollUpdate: true });
     removeWindowListeners();
     pendingDragRef.current = null;
+    clearLongPressFeedbackTimer();
+    setLongPressTaskId(null);
 
     const taskId = draggingTaskIdRef.current;
     const finalMinute = snapMinuteByMode(currentRawMinutesRef.current, "fine", resolvedSnapConfig);
@@ -414,6 +428,7 @@ export function useTimelineDrag({
     dragMovedRef.current = false;
     resetSnapState();
   }, [
+    clearLongPressFeedbackTimer,
     clearDropResetTimer,
     clearQueuedMove,
     dragEdgeOffsetY,
@@ -432,12 +447,20 @@ export function useTimelineDrag({
 
       removeWindowListeners();
       clearQueuedMove();
+      clearLongPressFeedbackTimer();
+      setLongPressTaskId(null);
       const safeStartY = Number.isFinite(startY) ? startY : 0;
       pendingDragRef.current = {
         taskId,
         scheduledTime,
         startY: safeStartY,
       };
+      longPressFeedbackTimerRef.current = setTimeout(() => {
+        if (draggingTaskIdRef.current) return;
+        if (pendingDragRef.current?.taskId !== taskId) return;
+        setLongPressTaskId(taskId);
+        void triggerHaptic(ImpactStyle.Medium);
+      }, LONG_PRESS_FEEDBACK_MS);
       lastPointerClientYRef.current = safeStartY;
       nudgeOffsetMinutesRef.current = 0;
       dragMovedRef.current = false;
@@ -453,6 +476,8 @@ export function useTimelineDrag({
           return;
         }
         pendingDragRef.current = null;
+        clearLongPressFeedbackTimer();
+        setLongPressTaskId(null);
         pointerMinutesRef.current = originalMinutesRef.current;
         nudgeOffsetMinutesRef.current = 0;
         clearQueuedMove();
@@ -472,6 +497,8 @@ export function useTimelineDrag({
           return;
         }
         pendingDragRef.current = null;
+        clearLongPressFeedbackTimer();
+        setLongPressTaskId(null);
         pointerMinutesRef.current = originalMinutesRef.current;
         nudgeOffsetMinutesRef.current = 0;
         clearQueuedMove();
@@ -497,6 +524,7 @@ export function useTimelineDrag({
       }
     },
     [
+      clearLongPressFeedbackTimer,
       clearQueuedMove,
       finishDrag,
       maybeActivateDrag,
@@ -594,17 +622,19 @@ export function useTimelineDrag({
     return () => {
       removeWindowListeners();
       clearDropResetTimer();
+      clearLongPressFeedbackTimer();
       clearQueuedMove();
       pendingDragRef.current = null;
       pointerMinutesRef.current = originalMinutesRef.current;
       nudgeOffsetMinutesRef.current = 0;
       stopScroll();
     };
-  }, [clearDropResetTimer, clearQueuedMove, removeWindowListeners, stopScroll]);
+  }, [clearDropResetTimer, clearLongPressFeedbackTimer, clearQueuedMove, removeWindowListeners, stopScroll]);
 
   return {
     draggingTaskId,
     previewTime,
+    longPressTaskId,
     dragOffsetY: dragOffsetY as MotionValue<number>,
     dragVisualOffsetY: dragOffsetY as MotionValue<number>,
     dragEdgeOffsetY: dragEdgeOffsetY as MotionValue<number>,

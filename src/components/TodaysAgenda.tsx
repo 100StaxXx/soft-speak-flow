@@ -2040,6 +2040,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
                     const task = row.task;
                     const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                    const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
+                    const isThisEngaged = isThisDragging || isThisLongPressed;
                     const isAnyDragging = timelineDrag.isDragging;
                     const isJustDropped = timelineDrag.justDroppedId === task.id;
                     const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
@@ -2062,11 +2064,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       touchAction: isThisDragging && !usesOverlayPlaceholder ? 'none' : 'pan-y',
                       pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
                       opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
-                      boxShadow: isThisDragging && !usesOverlayPlaceholder
+                      boxShadow: isThisEngaged && !usesOverlayPlaceholder
                         ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
                         : "none",
-                      backgroundColor: isThisDragging && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
-                      borderRadius: isThisDragging && !usesOverlayPlaceholder ? 12 : 0,
+                      backgroundColor: isThisEngaged && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
+                      borderRadius: isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
                       transition: 'none',
                       willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
                     };
@@ -2110,7 +2112,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                           }
                         }}
                         key={task.id}
-                        className={cn("relative", isThisDragging && !usesOverlayPlaceholder && "z-50")}
+                        className={cn("relative", isThisEngaged && !usesOverlayPlaceholder && "z-50")}
                         layout={!isThisDragging || usesOverlayPlaceholder}
                         animate={bounceAnimation}
                         transition={bounceAnimation ? {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -20,7 +20,6 @@ import { MentorGrid } from "@/components/MentorGrid";
 import { MentorResult } from "@/components/MentorResult";
 import { generateMentorExplanation, type MentorExplanation } from "@/utils/mentorExplanation";
 import { useCompanion } from "@/hooks/useCompanion";
-import { canonicalizeTags, getCanonicalTag, MENTOR_FALLBACK_TAGS } from "@/config/mentorMatching";
 import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
 import {
@@ -28,7 +27,12 @@ import {
   type EnergyPreference,
   getDesiredIntensityFromGuidanceTone,
   getEnergyPreferenceFromAnswers,
+  resolveMentorEnergy,
 } from "@/utils/onboardingMentorMatching";
+import {
+  calculateMentorCompatibilityPercent,
+  recommendMentorFromAnswers,
+} from "@/utils/onboardingMentorRecommendation";
 
 // Removed duplicate outer function - using inner component method instead
 
@@ -76,14 +80,6 @@ interface Mentor {
   gender_energy?: string | null;
 }
 
-const normalizeIntensityLevel = (value?: string | null): "high" | "medium" | "gentle" => {
-  const normalized = value?.toLowerCase();
-  if (!normalized) return "medium";
-  if (["gentle", "soft", "low"].includes(normalized)) return "gentle";
-  if (["high", "strong", "intense"].includes(normalized)) return "high";
-  return "medium";
-};
-
 export const mapGuidanceToneToIntensity = (answer: string): "high" | "medium" | "gentle" => {
   return getDesiredIntensityFromGuidanceTone(answer.trim());
 };
@@ -120,6 +116,7 @@ const COMPANION_RECOVERY_INTERVAL_MS = 3_000;
 const DISPLAY_NAME_INITIAL_DELAY_MS = 2_000;
 const DISPLAY_NAME_DEADLINE_MS = 20_000;
 const DISPLAY_NAME_INTERVAL_MS = 1_000;
+const onboardingLog = logger.scope("StoryOnboarding");
 
 
 export const StoryOnboarding = () => {
@@ -145,6 +142,43 @@ export const StoryOnboarding = () => {
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const backdropStage = resolveOnboardingBackdropStage(stage);
+
+  const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
+    const { data, error } = await supabase
+      .from("mentors")
+      .select("*")
+      .eq("is_active", true);
+
+    if (error) {
+      onboardingLog.error("Failed to load active mentors", {
+        error: error.message,
+      });
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      onboardingLog.warn("No active mentors returned from query");
+      return [];
+    }
+
+    return data.map((mentorRow) => ({
+      id: mentorRow.id,
+      name: mentorRow.name,
+      description: mentorRow.description,
+      tone_description: mentorRow.tone_description,
+      avatar_url: mentorRow.avatar_url ?? undefined,
+      tags: mentorRow.tags || [],
+      mentor_type: mentorRow.mentor_type,
+      target_user_type: mentorRow.target_user_type ?? undefined,
+      slug: mentorRow.slug || "",
+      short_title: mentorRow.short_title || "",
+      primary_color: mentorRow.primary_color || "#7B68EE",
+      target_user: mentorRow.target_user || "",
+      themes: mentorRow.themes ?? undefined,
+      intensity_level: mentorRow.intensity_level ?? undefined,
+      gender_energy: mentorRow.gender_energy ?? null,
+    }));
+  }, []);
 
   const waitForCompanionDisplayName = async (companionId: string) => {
     await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
@@ -178,35 +212,17 @@ export const StoryOnboarding = () => {
 
   // Load mentors on mount
   useEffect(() => {
+    let cancelled = false;
     const loadMentors = async () => {
-      const { data } = await supabase
-        .from("mentors")
-        .select("*")
-        .eq("is_active", true);
-      if (data) {
-        // Map to our Mentor interface with defaults for required fields
-        const mappedMentors: Mentor[] = data.map(m => ({
-          id: m.id,
-          name: m.name,
-          description: m.description,
-          tone_description: m.tone_description,
-          avatar_url: m.avatar_url ?? undefined,
-          tags: m.tags || [],
-          mentor_type: m.mentor_type,
-          target_user_type: m.target_user_type ?? undefined,
-          slug: m.slug || "",
-          short_title: m.short_title || "",
-          primary_color: m.primary_color || "#7B68EE",
-          target_user: m.target_user || "",
-          themes: m.themes ?? undefined,
-          intensity_level: m.intensity_level ?? undefined,
-          gender_energy: m.gender_energy ?? null,
-        }));
-        setMentors(mappedMentors);
-      }
+      const activeMentors = await fetchActiveMentors();
+      if (cancelled) return;
+      setMentors(activeMentors);
     };
-    loadMentors();
-  }, []);
+    void loadMentors();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchActiveMentors]);
 
   const handlePrologueComplete = async (name: string) => {
     setUserName(name);
@@ -267,150 +283,48 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
     
     // Show loading screen immediately
     setStage("calculating");
+    const mentorPool = mentors.length > 0 ? mentors : await fetchActiveMentors();
 
-    // Question weights: Q1=1.0 (energy - filtered separately), Q2=1.5 (focus), Q3=1.3 (tone), Q4=1.1 (progress)
-    const QUESTION_WEIGHTS = [1.0, 1.5, 1.3, 1.1];
+    if (mentors.length === 0 && mentorPool.length > 0) {
+      setMentors(mentorPool);
+    }
 
-    // Build canonical tag weight map instead of duplicating strings
-    const canonicalTagWeights: Record<string, number> = {};
-    questionAnswers.forEach((answer, index) => {
-      const weight = QUESTION_WEIGHTS[index] ?? 1.0;
-      answer.tags.forEach(tag => {
-        const canonical = getCanonicalTag(tag);
-        if (!canonical) return;
-        canonicalTagWeights[canonical] = (canonicalTagWeights[canonical] ?? 0) + weight;
-      });
-    });
-
-    // Extract desired intensity from Q2 (guidance_tone)
-    const toneAnswer = questionAnswers.find(a => a.questionId === "guidance_tone");
-    const desiredIntensity = mapGuidanceToneToIntensity(toneAnswer?.answer ?? "");
-
-    // Apply strict energy preference filtering for recommendation lock
-    const {
-      energyPreference,
-      mentorsForSelection: mentorsForScoring,
-    } = deriveOnboardingMentorCandidates(mentors, questionAnswers);
-
-    if (energyPreference !== "no_preference" && mentorsForScoring.length === 0) {
-      console.error(
-        `[Onboarding] No mentors matched strict energy preference "${energyPreference}".`,
-      );
-      toast.error("No mentors matched your selected preference. Please review mentor setup.");
-      setStage("mentor-grid");
+    if (mentorPool.length === 0) {
+      onboardingLog.error("Mentor recommendation aborted: no active mentors available");
+      toast.error("Mentor catalog is temporarily unavailable. Please try again in a moment.");
+      setStage("questionnaire");
       return;
     }
 
-    // Calculate scores for each mentor
-    interface MentorScore {
-      mentor: Mentor;
-      score: number;
-      exactMatches: number;
-      intensityMatch: boolean;
-    }
-    const mentorScores: MentorScore[] = mentorsForScoring.map(mentor => {
-      const mentorCanonicalTags = (() => {
-        const normalized = canonicalizeTags([...(mentor.tags || []), ...(mentor.themes || [])]);
-        if (normalized.length > 0) {
-          return normalized;
-        }
-        return MENTOR_FALLBACK_TAGS[mentor.slug] ?? [];
-      })();
+    const recommendation = recommendMentorFromAnswers(mentorPool, questionAnswers);
 
-      let score = 0;
-      let exactMatches = 0;
-
-      mentorCanonicalTags.forEach(tag => {
-        const tagWeight = canonicalTagWeights[tag];
-        if (tagWeight) {
-          score += tagWeight;
-          exactMatches += 1;
-        }
+    if (recommendation.reason === "no_active_mentors") {
+      onboardingLog.error("Mentor recommendation returned no_active_mentors unexpectedly", {
+        mentorPoolCount: mentorPool.length,
       });
-
-      const mentorIntensity = normalizeIntensityLevel(mentor.intensity_level);
-      const intensityMatch = mentorIntensity === desiredIntensity;
-      if (intensityMatch) {
-        score += 0.8;
-      }
-
-      return {
-        mentor,
-        score,
-        exactMatches,
-        intensityMatch,
-      };
-    });
-
-    // Sort by score descending
-    mentorScores.sort((a, b) => b.score - a.score);
-
-    // Get top score
-    const topScore = mentorScores[0]?.score ?? 0;
-
-    // Find all mentors tied at the top
-    const topMentors = mentorScores.filter(m => m.score === topScore);
-
-    // Tie-breaking logic
-    let bestMatch: Mentor | null = null;
-
-    if (topMentors.length === 1) {
-      bestMatch = topMentors[0].mentor;
-    } else if (topMentors.length > 1) {
-      // First tie-breaker: prefer intensity match
-      const intensityMatches = topMentors.filter(m => m.intensityMatch);
-      if (intensityMatches.length === 1) {
-        bestMatch = intensityMatches[0].mentor;
-      } else if (intensityMatches.length > 1) {
-        // Second tie-breaker: prefer more exact matches
-        intensityMatches.sort((a, b) => b.exactMatches - a.exactMatches);
-        const topExactMatches = intensityMatches[0].exactMatches;
-        const topExactMatchMentors = intensityMatches.filter(m => m.exactMatches === topExactMatches);
-
-        if (topExactMatchMentors.length === 1) {
-          bestMatch = topExactMatchMentors[0].mentor;
-        } else {
-          // Final tie-breaker: random selection
-          const randomIndex = Math.floor(Math.random() * topExactMatchMentors.length);
-          bestMatch = topExactMatchMentors[randomIndex].mentor;
-        }
-      } else {
-        // No intensity matches, use exact match count
-        topMentors.sort((a, b) => b.exactMatches - a.exactMatches);
-        const topExactMatches = topMentors[0].exactMatches;
-        const topExactMatchMentors = topMentors.filter(m => m.exactMatches === topExactMatches);
-
-        if (topExactMatchMentors.length === 1) {
-          bestMatch = topExactMatchMentors[0].mentor;
-        } else {
-          // Final tie-breaker: random selection
-          const randomIndex = Math.floor(Math.random() * topExactMatchMentors.length);
-          bestMatch = topExactMatchMentors[randomIndex].mentor;
-        }
-      }
+      toast.error("Mentor catalog is temporarily unavailable. Please try again in a moment.");
+      setStage("questionnaire");
+      return;
     }
 
-    // Fallback: if no match or score is 0, default to a reasonable mentor
-    if (!bestMatch || topScore === 0) {
-      // Try to find Atlas or Eli as fallbacks, or just pick the first mentor
-      bestMatch = mentorsForScoring.find(m => m.slug === "atlas")
-        || mentorsForScoring.find(m => m.slug === "eli")
-        || mentorsForScoring[0];
+    if (recommendation.usedEnergyFallback) {
+      const availableEnergies = Array.from(new Set(mentorPool.map((mentor) => resolveMentorEnergy(mentor))));
+      onboardingLog.warn("No strict energy mentors matched; using full mentor pool fallback", {
+        selectedEnergyPreference: recommendation.energyPreference,
+        availableEnergies,
+        mentorPoolCount: mentorPool.length,
+      });
     }
+
+    const bestMatch = recommendation.mentor;
 
     if (bestMatch) {
       setRecommendedMentor(bestMatch);
 
       // Calculate compatibility percentage
-      const bestMatchEntry = mentorScores.find(m => m.mentor.id === bestMatch.id);
-      const bestScore = bestMatchEntry?.score ?? 0;
-      const bestMentorTags = MENTOR_FALLBACK_TAGS[bestMatch.slug] ?? 
-        canonicalizeTags([...(bestMatch.tags || []), ...(bestMatch.themes || [])]);
-      const totalWeight = QUESTION_WEIGHTS.reduce((a, b) => a + b, 0);
-      // Max possible = mentor tags × average weight per question + intensity bonus
-      const maxScore = Math.max(bestMentorTags.length * (totalWeight / QUESTION_WEIGHTS.length) * 2, 4) + 0.8;
-      const rawPercent = Math.round((bestScore / maxScore) * 100);
-      const compatibilityPercent = Math.max(65, Math.min(99, rawPercent));
+      const bestMatchEntry = recommendation.mentorScores.find((scoreEntry) => scoreEntry.mentor.id === bestMatch.id);
+      const bestScore = bestMatchEntry?.score ?? recommendation.topScore;
+      const compatibilityPercent = calculateMentorCompatibilityPercent(bestMatch, bestScore);
       setCompatibilityScore(compatibilityPercent);
 
       // Convert answers to Record format for explanation generator
@@ -438,7 +352,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       return;
     }
 
-    // Ultimate fallback if no mentors exist at all
+    // Ultimate fallback if recommendation fails unexpectedly
+    onboardingLog.error("Mentor recommendation returned no mentor with non-empty mentor pool", {
+      mentorPoolCount: mentorPool.length,
+    });
     toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
     setStage("mentor-grid");
   };

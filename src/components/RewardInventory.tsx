@@ -245,7 +245,7 @@ const LockedRewardCard = ({ reward: _reward }: LockedRewardCardProps) => {
         {/* Reward info */}
         <p className="font-medium text-sm truncate text-muted-foreground">???</p>
         <p className="text-xs text-muted-foreground/50">
-          Complete epics to unlock
+          Complete campaigns to unlock
         </p>
       </Card>
     </motion.div>

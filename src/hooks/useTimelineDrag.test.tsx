@@ -368,6 +368,74 @@ describe("useTimelineDrag", () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 
+  it("activates long-press feedback before movement after the configured delay", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const handleProps = result.current.getDragHandleProps("task-long-press", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(result.current.longPressTaskId).toBe("task-long-press");
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(mocks.hapticImpactMock).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticImpactMock).toHaveBeenCalledWith({ style: "MEDIUM" });
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("cancels pending long-press feedback when released before the delay", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const handleProps = result.current.getDragHandleProps("task-long-press-cancel", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      vi.advanceTimersByTime(300);
+      dispatchPointerUp();
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(mocks.hapticImpactMock).not.toHaveBeenCalled();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("does not fire additional long-press haptics when drag activates before delay", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const handleProps = result.current.getDragHandleProps("task-quick-drag", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(120);
+      vi.advanceTimersByTime(700);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-quick-drag");
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(mocks.hapticImpactMock).not.toHaveBeenCalled();
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-quick-drag", "09:10");
+    expect(mocks.hapticImpactMock).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticImpactMock).toHaveBeenCalledWith({ style: "MEDIUM" });
+  });
+
   it("activates drag on touch after threshold and supports quick touch drag/drop", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>

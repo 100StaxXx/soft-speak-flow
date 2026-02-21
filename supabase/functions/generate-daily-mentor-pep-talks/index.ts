@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -216,7 +217,8 @@ serve(async (req) => {
           });
 
           if (syncError) {
-            console.error(`Transcript sync returned error for ${mentorSlug}:`, syncError);
+            const summary = await summarizeFunctionInvokeError(syncError);
+            console.error(`Transcript sync returned error for ${mentorSlug}:`, summary);
           } else {
             const syncPayload = (syncData && typeof syncData === "object")
               ? syncData as Record<string, unknown>
@@ -234,7 +236,8 @@ serve(async (req) => {
             });
           }
         } catch (syncError) {
-          console.error(`Failed to sync transcript for ${mentorSlug}:`, syncError);
+          const summary = await summarizeFunctionInvokeError(syncError);
+          console.error(`Failed to sync transcript for ${mentorSlug}:`, summary);
           // Non-blocking - continue even if transcript sync fails
         }
 

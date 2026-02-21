@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { requireRequestAuth } from "../_shared/auth.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -12,6 +13,21 @@ serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
   try {
+    const auth = await requireRequestAuth(req, corsHeaders);
+    if (auth instanceof Response) {
+      return auth;
+    }
+
+    if (!auth.isServiceRole) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
+    }
+
     const { audioUrl, pepTalkId } = await req.json();
 
     if (!audioUrl) {

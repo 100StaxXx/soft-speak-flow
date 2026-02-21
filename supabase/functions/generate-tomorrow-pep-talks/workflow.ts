@@ -1,3 +1,5 @@
+import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
+
 export interface TranscriptSyncLog {
   log: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
@@ -74,7 +76,8 @@ export async function insertTomorrowDailyPepTalkAndSync({
       : null;
 
     if (syncError) {
-      logger.warn(`Transcript sync returned error for ${mentorSlug}:`, syncError);
+      const summary = await summarizeFunctionInvokeError(syncError);
+      logger.warn(`Transcript sync returned error for ${mentorSlug}:`, summary);
       return {
         dailyPepTalkId: dailyPepTalk.id,
         transcriptSyncAttempted: true,
@@ -107,7 +110,8 @@ export async function insertTomorrowDailyPepTalkAndSync({
       transcriptSyncData: syncPayload,
     };
   } catch (syncError) {
-    logger.error(`Failed to sync transcript for ${mentorSlug}:`, syncError);
+    const summary = await summarizeFunctionInvokeError(syncError);
+    logger.error(`Failed to sync transcript for ${mentorSlug}:`, summary);
     return {
       dailyPepTalkId: dailyPepTalk.id,
       transcriptSyncAttempted: true,

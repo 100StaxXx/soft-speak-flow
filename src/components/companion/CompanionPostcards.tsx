@@ -180,7 +180,7 @@ export const CompanionPostcards = () => {
             Your Story Awaits
           </h4>
           <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">
-            As you complete Quests and progress through Campaigns, your companion's journey unfolds through cosmic postcards—each one a chapter in your adventure.
+            As you complete Quests and progress through Campaigns, your companion's journey unfolds through cosmic postcards, each one a chapter in your adventure.
           </p>
 
           <div className="bg-card/50 rounded-xl p-4 border border-border/50 text-left max-w-xs mx-auto">

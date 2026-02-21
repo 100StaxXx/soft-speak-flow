@@ -459,6 +459,7 @@ export const useAstralEncounters = () => {
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
       queryClient.invalidateQueries({ queryKey: ['adversary-essences'] });
       queryClient.invalidateQueries({ queryKey: ['cosmic-codex'] });
+      queryClient.invalidateQueries({ queryKey: ['user-epic-rewards'] });
       queryClient.invalidateQueries({ queryKey: ['companion'] });
       queryClient.invalidateQueries({ queryKey: ['bad-habits'] });
       queryClient.invalidateQueries({ queryKey: ['resist-log'] });
