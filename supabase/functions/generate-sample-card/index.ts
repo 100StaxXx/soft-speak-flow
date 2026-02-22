@@ -3,7 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { calculateBondLevel, calculateEnergyCost, calculateStats } from "../_shared/cardMath.ts";
+import { calculateBondLevel, calculateEnergyCost, normalizeStats } from "../_shared/cardMath.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,9 +87,9 @@ serve(async (req) => {
       resolve: soul * 10,
       alignment: soul * 10,
     };
-    const stats = calculateStats(stage, userStats);
+    const stats = normalizeStats(userStats);
     const energyCost = calculateEnergyCost(stage);
-    const bondLevel = calculateBondLevel(stage, userStats);
+    const bondLevel = calculateBondLevel(stage, stats);
 
     // Step 3: Determine rarity
     let rarity = "Common";
@@ -107,10 +107,16 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY not configured");
     }
 
+    const powerScore = stats.vitality + stats.discipline;
+    const insightScore = stats.wisdom + stats.creativity;
+    const spiritScore = stats.resolve + stats.alignment;
+
     const personality =
-      body > 60 ? "powerful and energetic" :
-      mind > 60 ? "wise and focused" :
-      soul > 60 ? "compassionate and deeply connected" : "mysterious and evolving";
+      powerScore >= insightScore && powerScore >= spiritScore
+        ? "powerful and disciplined"
+        : insightScore >= spiritScore
+          ? "wise and imaginative"
+          : "steadfast and deeply aligned";
 
     const vibes =
       stage >= 15 ? "ancient, radiant, transcendent" :

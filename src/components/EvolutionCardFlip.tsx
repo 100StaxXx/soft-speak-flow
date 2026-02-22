@@ -1,13 +1,14 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { Badge } from "./ui/badge";
-import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { X, Share2 } from "lucide-react";
 import { downloadCardElement } from "@/utils/imageDownload";
 import { cn } from "@/lib/utils";
 import type { RewardCssEffect } from "@/types/epicRewards";
 import { FrameCornerDecorations } from "./companion/FrameCornerDecorations";
+import { ATTRIBUTE_DESCRIPTIONS, type AttributeType } from "@/config/attributeDescriptions";
 
 interface EvolutionCard {
   id: string;
@@ -58,13 +59,64 @@ const fallbackEnergyCost = (stage: number) => {
   return 3;
 };
 
+interface CardStatSnapshot {
+  vitality: number;
+  wisdom: number;
+  discipline: number;
+  resolve: number;
+  creativity: number;
+  alignment: number;
+}
+
+const CARD_ATTRIBUTE_ORDER: AttributeType[] = [
+  "vitality",
+  "wisdom",
+  "discipline",
+  "resolve",
+  "creativity",
+  "alignment",
+];
+
+const LEGACY_CARD_STATS_MESSAGE = "Legacy card: regenerate to view 6 attributes.";
+
+const toCardStatSnapshot = (input: unknown): CardStatSnapshot | null => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  const parsed: Partial<CardStatSnapshot> = {};
+
+  for (const key of CARD_ATTRIBUTE_ORDER) {
+    const value = record[key];
+    if (typeof value !== "number" || Number.isNaN(value)) {
+      return null;
+    }
+    parsed[key] = value;
+  }
+
+  return parsed as CardStatSnapshot;
+};
+
 export function EvolutionCardFlip({ card, equippedFrame }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const { tap } = useHapticFeedback();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const stats = card.stats as { mind?: number; body?: number; soul?: number };
+  const stats = useMemo(() => toCardStatSnapshot(card.stats), [card.stats]);
+  const statEntries = useMemo(
+    () =>
+      stats
+        ? CARD_ATTRIBUTE_ORDER.map((key: AttributeType) => ({
+            key,
+            icon: ATTRIBUTE_DESCRIPTIONS[key].icon,
+            name: ATTRIBUTE_DESCRIPTIONS[key].name,
+            value: stats[key],
+          }))
+        : [],
+    [stats],
+  );
   const energyCost = card.energy_cost ?? fallbackEnergyCost(card.evolution_stage);
   const bondLevel = card.bond_level ?? null;
 
@@ -117,6 +169,9 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
       <div 
         className="relative h-[280px] cursor-pointer rounded-xl overflow-hidden"
         onClick={handleCardClick}
+        role="button"
+        tabIndex={0}
+        aria-label={`Open ${card.creature_name} companion card`}
       >
         <div className={`h-full rounded-xl border-2 bg-gradient-to-br ${RARITY_COLORS[card.rarity]} p-[2px] shadow-lg`}>
           <div className="h-full rounded-lg bg-card relative overflow-hidden">
@@ -156,21 +211,29 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                   </span>
                 )}
               </div>
-              
-              <div className="grid grid-cols-3 gap-1 text-xs bg-black/40 backdrop-blur-sm rounded-lg p-2">
-                <div className="flex flex-col items-center text-white/90">
-                  <span>🧠</span>
-                  <span className="font-semibold">{stats.mind || 0}</span>
+
+              {stats ? (
+                <div className="grid grid-cols-2 gap-1 text-[9px] bg-black/40 backdrop-blur-sm rounded-lg p-2">
+                  {statEntries.map((entry) => (
+                    <div
+                      key={entry.key}
+                      className="flex items-center justify-between gap-1 text-white/90 rounded bg-black/20 px-1.5 py-0.5"
+                    >
+                      <span className="truncate">
+                        {entry.icon} {entry.name}
+                      </span>
+                      <span className="font-semibold">{entry.value}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex flex-col items-center text-white/90">
-                  <span>💪</span>
-                  <span className="font-semibold">{stats.body || 0}</span>
+              ) : (
+                <div
+                  data-testid="legacy-stats-message"
+                  className="text-[10px] text-white/85 bg-black/40 backdrop-blur-sm rounded-lg p-2 text-center leading-snug"
+                >
+                  {LEGACY_CARD_STATS_MESSAGE}
                 </div>
-                <div className="flex flex-col items-center text-white/90">
-                  <span>🔥</span>
-                  <span className="font-semibold">{stats.soul || 0}</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -181,11 +244,11 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
         setIsOpen(open);
         if (!open) setIsFlipped(false);
       }}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-transparent border-0 overflow-hidden" aria-describedby="evolution-card-description">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-transparent border-0 overflow-hidden">
           <DialogTitle className="sr-only">{card.creature_name} - Evolution Card</DialogTitle>
-          <span id="evolution-card-description" className="sr-only">
+          <DialogDescription className="sr-only">
             Detailed view of {card.creature_name}, a {card.rarity} {card.element} {card.species} at evolution stage {card.evolution_stage}
-          </span>
+          </DialogDescription>
           {/* Clickable backdrop to close */}
           <div 
             className="absolute inset-0 z-40"
@@ -196,6 +259,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
             <button
               onClick={handleShare}
               className="absolute top-4 right-20 z-50 p-3 rounded-full bg-black/70 backdrop-blur-sm text-white hover:bg-black/90 active:bg-black transition-colors touch-manipulation"
+              aria-label="Share companion card"
             >
               <Share2 className="w-6 h-6" />
             </button>
@@ -207,6 +271,7 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                 setIsOpen(false);
               }}
               className="absolute top-4 right-4 z-50 p-3 rounded-full bg-black/70 backdrop-blur-sm text-white hover:bg-black/90 active:bg-black transition-colors touch-manipulation"
+              aria-label="Close companion card"
             >
               <X className="w-6 h-6" />
             </button>
@@ -214,11 +279,14 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
             <div 
               className="relative w-full max-w-[320px] aspect-[2.5/3.5] cursor-pointer perspective-1000"
               onClick={handleFlip}
+              data-testid="evolution-card-flip-target"
             >
               <motion.div
                 className="relative w-full h-full preserve-3d"
                 animate={{ rotateY: isFlipped ? 180 : 0 }}
                 transition={{ duration: 0.6, type: "spring" }}
+                data-testid="evolution-card-inner"
+                data-flipped={isFlipped}
               >
                 {/* Front - Full Image Trading Card */}
                 <div className="absolute w-full h-full backface-hidden" style={{ transform: 'rotateY(0deg)' }}>
@@ -315,20 +383,30 @@ export function EvolutionCardFlip({ card, equippedFrame }: Props) {
                         </Badge>
                       </div>
 
-                      {/* Compact Stats Row - Top Left */}
-                      <div className="absolute top-14 left-2 z-10 flex gap-1.5">
-                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-white/80 text-[10px] border border-white/10">
-                          <span className="text-[10px]">🧠</span>
-                          <span className="font-medium">{stats.mind || 0}</span>
-                        </div>
-                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-white/80 text-[10px] border border-white/10">
-                          <span className="text-[10px]">💪</span>
-                          <span className="font-medium">{stats.body || 0}</span>
-                        </div>
-                        <div className="bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5 text-white/80 text-[10px] border border-white/10">
-                          <span className="text-[10px]">🔥</span>
-                          <span className="font-medium">{stats.soul || 0}</span>
-                        </div>
+                      {/* Compact Stats Grid */}
+                      <div className="absolute top-14 left-2 right-2 z-10">
+                        {stats ? (
+                          <div className="grid grid-cols-2 gap-1">
+                            {statEntries.map((entry) => (
+                              <div
+                                key={entry.key}
+                                className="bg-black/45 backdrop-blur-sm rounded px-1.5 py-0.5 flex items-center justify-between gap-1 text-white/85 text-[9px] border border-white/10"
+                              >
+                                <span className="truncate">
+                                  {entry.icon} {entry.name}
+                                </span>
+                                <span className="font-medium">{entry.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div
+                            data-testid="legacy-stats-message-modal"
+                            className="bg-black/45 backdrop-blur-sm rounded px-2 py-1 text-[10px] text-white/85 border border-white/10 text-center"
+                          >
+                            {LEGACY_CARD_STATS_MESSAGE}
+                          </div>
+                        )}
                       </div>
 
                       {/* Bottom Section - Name & Rarity */}

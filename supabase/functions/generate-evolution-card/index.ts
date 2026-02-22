@@ -3,7 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { calculateBondLevel, calculateEnergyCost, calculateStats } from "../_shared/cardMath.ts";
+import { calculateBondLevel, calculateEnergyCost, normalizeStats } from "../_shared/cardMath.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,7 +36,7 @@ serve(async (req) => {
       species, 
       element, 
       color,
-      userAttributes // mind, body, soul
+      userAttributes // vitality, wisdom, discipline, resolve, creativity, alignment
     } = await req.json();
 
     console.log('Generating evolution card for:', { companionId, stage, species, element });
@@ -66,7 +66,7 @@ serve(async (req) => {
     else if (stage >= 4) rarity = 'Epic';      // Stage 4-6: Juvenile, Apprentice, Scout
     else if (stage >= 1) rarity = 'Rare';      // Stage 1-3: Hatchling, Sproutling, Cub
 
-    const stats = calculateStats(stage, userAttributes);
+    const stats = normalizeStats(userAttributes ?? {});
     const energyCost = calculateEnergyCost(stage);
 
     // Generate frame type based on element
@@ -78,9 +78,15 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    const personality = userAttributes?.body > 60 ? 'powerful and energetic' :
-                       userAttributes?.mind > 60 ? 'wise and focused' :
-                       userAttributes?.soul > 60 ? 'compassionate and deeply connected' : 'mysterious and evolving';
+    const powerScore = stats.vitality + stats.discipline;
+    const insightScore = stats.wisdom + stats.creativity;
+    const spiritScore = stats.resolve + stats.alignment;
+
+    const personality = powerScore >= insightScore && powerScore >= spiritScore
+      ? 'powerful and disciplined'
+      : insightScore >= spiritScore
+        ? 'wise and imaginative'
+        : 'steadfast and deeply aligned';
     
     const vibes = stage >= 15 ? 'ancient, radiant, transcendent' :
                  stage >= 10 ? 'majestic, powerful, legendary' :
@@ -231,7 +237,7 @@ Make it LEGENDARY. This is the birth of a companion.`;
     }
 
     // Calculate bond level based on user attributes
-    const bondLevel = calculateBondLevel(stage, userAttributes);
+    const bondLevel = calculateBondLevel(stage, stats);
 
     // Insert the card into database
     const { data: card, error: insertError } = await supabaseClient
