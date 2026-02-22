@@ -45,7 +45,7 @@ export const MentorQuickChat = memo(() => {
   };
 
   return (
-    <Card className="p-6 space-y-5 rounded-3xl bg-card/25 backdrop-blur-2xl border-white/[0.08] relative overflow-hidden">
+    <Card className="p-6 space-y-5 rounded-2xl bg-card/25 backdrop-blur-2xl border-white/[0.08] relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       

@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MentorGuidanceCard, resolveMentorGuidancePlacement } from "./MentorGuidanceCard";
+import {
+  MentorGuidanceCard,
+  resolveMentorGuidanceMinTopPx,
+  resolveMentorGuidancePlacement,
+} from "./MentorGuidanceCard";
 
 const mocks = vi.hoisted(() => ({
   onDialogueAction: vi.fn(),
@@ -125,6 +129,7 @@ describe("MentorGuidanceCard", () => {
 
 describe("resolveMentorGuidancePlacement", () => {
   const viewportHeight = 844;
+  const minTopPx = 64;
   const panelRect = {
     top: 620,
     right: 390,
@@ -166,10 +171,12 @@ describe("resolveMentorGuidancePlacement", () => {
       panelRect,
       targetRect: mentorTabRect,
       viewportHeight,
+      minTopPx,
     });
 
     const rect = placedRect(placement);
     expect(rect.bottom).toBeLessThanOrEqual(mentorTabRect.top - 12);
+    expect(rect.top).toBeGreaterThanOrEqual(minTopPx);
   });
 
   it("repositions to avoid morning check-in submit button overlap", () => {
@@ -186,10 +193,12 @@ describe("resolveMentorGuidancePlacement", () => {
       panelRect,
       targetRect: submitRect,
       viewportHeight,
+      minTopPx,
     });
 
     const rect = placedRect(placement);
     expect(rect.bottom).toBeLessThanOrEqual(submitRect.top - 12);
+    expect(rect.top).toBeGreaterThanOrEqual(minTopPx);
   });
 
   it("repositions to avoid morning check-in card overlap", () => {
@@ -206,9 +215,59 @@ describe("resolveMentorGuidancePlacement", () => {
       panelRect,
       targetRect: checkInCardRect,
       viewportHeight,
+      minTopPx,
     });
 
     const rect = placedRect(placement);
     expect(rect.bottom).toBeLessThanOrEqual(checkInCardRect.top - 12);
+    expect(rect.top).toBeGreaterThanOrEqual(minTopPx);
+  });
+
+  it("uses minTopPx when top fallback is the selected non-overlapping candidate", () => {
+    const topOnlyPanelRect = {
+      top: 0,
+      right: 390,
+      bottom: 120,
+      left: 0,
+      width: 390,
+      height: 120,
+    };
+    const topTargetRect = {
+      top: 10,
+      right: 180,
+      bottom: 52,
+      left: 24,
+      width: 156,
+      height: 42,
+    };
+
+    const placement = resolveMentorGuidancePlacement({
+      panelRect: topOnlyPanelRect,
+      targetRect: topTargetRect,
+      viewportHeight,
+      baseBottomPx: 760,
+      minTopPx,
+    });
+
+    expect(placement.anchor).toBe("top");
+    if (placement.anchor === "top") {
+      expect(placement.topPx).toBe(minTopPx);
+    }
+  });
+});
+
+describe("resolveMentorGuidanceMinTopPx", () => {
+  it("adds safe area inset, base top margin, and iOS breathing room buffer", () => {
+    expect(resolveMentorGuidanceMinTopPx({ safeAreaInsetTopPx: 47 })).toBe(67);
+  });
+
+  it("supports custom margins and clamps negative values to zero", () => {
+    expect(
+      resolveMentorGuidanceMinTopPx({
+        safeAreaInsetTopPx: -10,
+        topMarginPx: 6,
+        topSafeBufferPx: 4,
+      })
+    ).toBe(0);
   });
 });

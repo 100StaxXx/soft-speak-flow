@@ -26,7 +26,6 @@ import { getResolvedMentorId } from "@/utils/mentor";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
-import { AstrologySettings } from "@/components/AstrologySettings";
 import { QuestBehaviorSettings } from "@/components/QuestBehaviorSettings";
 import { DisplayNameSetting } from "@/components/DisplayNameSetting";
 import { CalendarIntegrationsSettings } from "@/components/CalendarIntegrationsSettings";
@@ -556,8 +555,6 @@ const Profile = () => {
               <QuestBehaviorSettings />
               <CalendarIntegrationsSettings />
               <SoundSettings />
-              <AstrologySettings />
-              
             </TabsContent>
           </Tabs>
 

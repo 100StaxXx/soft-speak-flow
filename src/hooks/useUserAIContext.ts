@@ -132,7 +132,7 @@ export function useUserAIContext() {
   // Capacity warning message
   const getCapacityWarning = (): string | null => {
     if (isAtEpicLimit) {
-      return 'You have 2 active epics. Consider completing one before starting another.';
+      return 'You have 2 active campaigns. Consider completing one before starting another.';
     }
     if (isOverloaded) {
       return 'You seem overloaded. Consider simplifying your current habits before adding more.';

@@ -21,6 +21,7 @@ import { haptics } from "@/utils/haptics";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -186,7 +187,7 @@ const InboxPage = memo(function InboxPage() {
       attachments: data.attachments,
     });
 
-    if (data.sendToCalendar && createdTask?.id) {
+    if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       await handleSendTaskToCalendar(createdTask.id);
     }
     if (!data.sendToInbox) {
@@ -310,7 +311,7 @@ const InboxPage = memo(function InboxPage() {
           onOpenChange={(open) => !open && setEditingTask(null)}
           onSave={handleSaveEdit}
           isSaving={isUpdating}
-          onSendToCalendar={handleSendTaskToCalendar}
+          onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
           hasCalendarLink={editingTask ? hasLinkedEvent(editingTask.id) : false}
           isSendingToCalendar={sendTaskToCalendar.isPending}
           onDelete={async (taskId) => {

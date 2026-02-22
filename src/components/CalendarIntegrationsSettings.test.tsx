@@ -99,6 +99,8 @@ vi.mock("@/hooks/useCalendarIntegrations", () => ({
     integrationVisible: mocks.state.integrationVisible,
     defaultProvider: mocks.state.defaultProvider,
     connectedByProvider: mocks.state.connectedByProvider,
+    canConnectAppleNative: false,
+    appleNativeUnavailableReason: "This app build needs an update to enable Apple Calendar.",
     isLoading: false,
     upsertSettings: { mutateAsync: mocks.upsertSettingsMutateAsync },
     beginOAuthConnection: { mutateAsync: mocks.beginOAuthConnectionMutateAsync },
@@ -116,6 +118,7 @@ import { CalendarIntegrationsSettings } from "./CalendarIntegrationsSettings";
 describe("CalendarIntegrationsSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/profile");
     mocks.state.integrationVisible = false;
     mocks.state.defaultProvider = null;
     mocks.state.connectedByProvider = {};
@@ -162,6 +165,28 @@ describe("CalendarIntegrationsSettings", () => {
         provider: "google",
         syncMode: "full_sync",
       });
+    });
+  });
+
+  it("shows callback error toast from calendar oauth query params", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/profile?calendar_oauth_provider=google&calendar_oauth_status=error&calendar_oauth_message=OAuth%20failed",
+    );
+
+    mocks.state.integrationVisible = true;
+
+    render(<CalendarIntegrationsSettings />);
+
+    await waitFor(() => {
+      expect(mocks.toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Failed to complete connection",
+          description: "OAuth failed",
+          variant: "destructive",
+        }),
+      );
     });
   });
 });

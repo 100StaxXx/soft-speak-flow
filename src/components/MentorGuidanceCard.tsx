@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 
 const PANEL_GAP_PX = 12;
 const PANEL_TOP_MARGIN_PX = 12;
+const PANEL_TOP_SAFE_BUFFER_PX = 8;
 const PANEL_BASE_BOTTOM_PX = 0;
 
 type PanelPlacement =
@@ -58,6 +59,46 @@ const placementScore = (rect: RectLike, targetRect: RectLike): number => {
   return verticalGap * 1000 + horizontalGap;
 };
 
+const parsePxValue = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, parsed);
+};
+
+const readSafeAreaInsetTopPx = (): number => {
+  if (typeof window === "undefined" || typeof document === "undefined") return 0;
+
+  const rootStyle = window.getComputedStyle(document.documentElement);
+  const fromVars =
+    parsePxValue(rootStyle.getPropertyValue("--safe-area-inset-top")) ??
+    parsePxValue(rootStyle.getPropertyValue("--sat"));
+  if (fromVars !== null) return fromVars;
+
+  if (!document.body) return 0;
+  const probe = document.createElement("div");
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.paddingTop = "env(safe-area-inset-top, 0px)";
+  document.body.appendChild(probe);
+  const fromProbe = parsePxValue(window.getComputedStyle(probe).paddingTop) ?? 0;
+  probe.remove();
+  return fromProbe;
+};
+
+export const resolveMentorGuidanceMinTopPx = ({
+  safeAreaInsetTopPx,
+  topMarginPx = PANEL_TOP_MARGIN_PX,
+  topSafeBufferPx = PANEL_TOP_SAFE_BUFFER_PX,
+}: {
+  safeAreaInsetTopPx: number;
+  topMarginPx?: number;
+  topSafeBufferPx?: number;
+}): number => {
+  return Math.max(0, Math.round(safeAreaInsetTopPx + topMarginPx + topSafeBufferPx));
+};
+
 export const resolveMentorGuidancePlacement = ({
   panelRect,
   targetRect,
@@ -65,6 +106,7 @@ export const resolveMentorGuidancePlacement = ({
   baseBottomPx = PANEL_BASE_BOTTOM_PX,
   gapPx = PANEL_GAP_PX,
   topMarginPx = PANEL_TOP_MARGIN_PX,
+  minTopPx,
 }: {
   panelRect: RectLike;
   targetRect: RectLike | null;
@@ -72,17 +114,22 @@ export const resolveMentorGuidancePlacement = ({
   baseBottomPx?: number;
   gapPx?: number;
   topMarginPx?: number;
+  minTopPx?: number;
 }): PanelPlacement => {
+  const resolvedMinTopPx = Math.max(
+    0,
+    Math.round(Math.max(topMarginPx, minTopPx ?? topMarginPx))
+  );
   const baseline: PanelPlacement = { anchor: "bottom", bottomPx: baseBottomPx };
 
   if (!targetRect) {
     return normalizePlacement(baseline);
   }
 
-  const maxBottomPx = Math.max(baseBottomPx, viewportHeight - panelRect.height - topMarginPx);
+  const maxBottomPx = Math.max(baseBottomPx, viewportHeight - panelRect.height - resolvedMinTopPx);
   const desiredBottomPx = Math.max(baseBottomPx, viewportHeight - targetRect.top + gapPx);
   const lifted: PanelPlacement = { anchor: "bottom", bottomPx: Math.min(desiredBottomPx, maxBottomPx) };
-  const topFallback: PanelPlacement = { anchor: "top", topPx: topMarginPx };
+  const topFallback: PanelPlacement = { anchor: "top", topPx: resolvedMinTopPx };
 
   const candidates = [baseline, lifted, topFallback].map(normalizePlacement).filter((placement, index, arr) => {
     return index === arr.findIndex((item) => arePlacementsEqual(item, placement));
@@ -144,11 +191,14 @@ export const MentorGuidanceCard = () => {
       ? (document.querySelector(activeTargetSelector) as HTMLElement | null)
       : null;
     const targetRect = targetElement?.getBoundingClientRect() ?? null;
+    const safeAreaInsetTopPx = readSafeAreaInsetTopPx();
+    const minTopPx = resolveMentorGuidanceMinTopPx({ safeAreaInsetTopPx });
 
     const next = resolveMentorGuidancePlacement({
       panelRect,
       targetRect,
       viewportHeight: window.innerHeight,
+      minTopPx,
     });
 
     setPlacement((prev) => (arePlacementsEqual(prev, next) ? prev : next));

@@ -858,7 +858,7 @@ export function Pathfinder({
                 <div className="p-6 pt-4 border-t bg-background space-y-3">
                   <Button
                     onClick={handleCreateEpic}
-                    disabled={isCreating || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
+                    disabled={isAtEpicLimit || isCreating || selectedHabits.length === 0 || epicWhy.trim().length === 0 || epicTitle.trim().length === 0}
                     className="w-full bg-gradient-to-r from-primary to-purple-600"
                   >
                     {isCreating ? (

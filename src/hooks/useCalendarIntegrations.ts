@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { NativeCalendar } from '@/plugins/NativeCalendarPlugin';
+import { parseFunctionInvokeError, toUserFacingFunctionError } from '@/utils/supabaseFunctionErrors';
 
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type CalendarSyncMode = 'send_only' | 'full_sync';
@@ -40,11 +41,42 @@ interface CalendarIntegrationsOptions {
 const providerToFunction = (provider: CalendarProvider) => `${provider}-calendar-auth`;
 
 const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+const APP_UPDATE_REQUIRED_MESSAGE = 'This app build needs an update to enable Apple Calendar.';
+
+function isPluginAvailable(pluginName: string): boolean {
+  const maybeChecker = (Capacitor as { isPluginAvailable?: (name: string) => boolean }).isPluginAvailable;
+  return typeof maybeChecker === 'function' ? maybeChecker(pluginName) : false;
+}
+
+function providerLabel(provider: Exclude<CalendarProvider, 'apple'>): string {
+  return provider === 'google' ? 'Google' : 'Outlook';
+}
+
+async function toCalendarInvokeError(args: {
+  provider: Exclude<CalendarProvider, 'apple'>;
+  action: string;
+  error: unknown;
+}): Promise<Error> {
+  const { provider, action, error } = args;
+  const parsed = await parseFunctionInvokeError(error);
+  const backend = `${parsed.backendMessage ?? ''} ${parsed.message ?? ''}`.toLowerCase();
+
+  if (backend.includes('integration not configured')) {
+    return new Error(
+      `${providerLabel(provider)} Calendar is not configured on the server yet. Please contact support.`,
+    );
+  }
+
+  return new Error(toUserFacingFunctionError(parsed, { action }));
+}
 
 export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { enabled = true } = options;
+  const applePluginAvailable = isNativeIOS() && isPluginAvailable('NativeCalendar');
+  const canConnectAppleNative = isNativeIOS() && applePluginAvailable;
+  const appleNativeUnavailableReason = canConnectAppleNative ? null : APP_UPDATE_REQUIRED_MESSAGE;
 
   const settingsQuery = useQuery({
     queryKey: ['calendar-user-settings', user?.id],
@@ -138,7 +170,14 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         body: { action: 'getAuthUrl', redirectUri, syncMode },
       });
 
-      if (error) throw new Error(error.message || `Failed to start ${provider} connection`);
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'start calendar connection',
+          error,
+        });
+      }
+
       return (data?.url || data?.auth_url) as string;
     },
   });
@@ -149,18 +188,27 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       code,
       redirectUri,
       syncMode = 'send_only',
+      state,
     }: {
       provider: Exclude<CalendarProvider, 'apple'>;
       code: string;
       redirectUri: string;
       syncMode?: CalendarSyncMode;
+      state?: string;
     }) => {
       const fn = providerToFunction(provider);
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { action: 'exchangeCode', code, redirectUri, syncMode },
+        body: { action: 'exchangeCode', code, redirectUri, syncMode, state },
       });
 
-      if (error) throw new Error(error.message || `Failed to connect ${provider}`);
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'connect your calendar',
+          error,
+        });
+      }
+
       return data;
     },
     onSuccess: invalidate,
@@ -183,7 +231,13 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       const { error } = await supabase.functions.invoke(fn, {
         body: { action: 'disconnect' },
       });
-      if (error) throw new Error(error.message || `Failed to disconnect ${provider}`);
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'disconnect your calendar',
+          error,
+        });
+      }
     },
     onSuccess: invalidate,
   });
@@ -205,7 +259,13 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       const { error } = await supabase.functions.invoke(fn, {
         body: { action: 'setSyncMode', syncMode },
       });
-      if (error) throw new Error(error.message || `Failed to set ${provider} sync mode`);
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'update calendar sync mode',
+          error,
+        });
+      }
     },
     onSuccess: invalidate,
   });
@@ -213,6 +273,10 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
   const listProviderCalendars = useMutation({
     mutationFn: async (provider: CalendarProvider): Promise<ProviderCalendarOption[]> => {
       if (provider === 'apple') {
+        if (!canConnectAppleNative) {
+          throw new Error(appleNativeUnavailableReason ?? APP_UPDATE_REQUIRED_MESSAGE);
+        }
+
         const available = await NativeCalendar.isAvailable();
         if (!available.available) return [];
 
@@ -232,7 +296,13 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         body: { action: 'listCalendars' },
       });
 
-      if (error) throw new Error(error.message || `Failed to list ${provider} calendars`);
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'list calendars',
+          error,
+        });
+      }
 
       const calendars = Array.isArray(data?.calendars) ? data.calendars : [];
       return calendars.map((calendar: Record<string, unknown>) => ({
@@ -279,7 +349,13 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
         },
       });
 
-      if (error) throw new Error(error.message || `Failed to set ${provider} primary calendar`);
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'set a primary calendar',
+          error,
+        });
+      }
     },
     onSuccess: invalidate,
   });
@@ -288,6 +364,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     mutationFn: async ({ syncMode = 'send_only' as CalendarSyncMode } = {}) => {
       if (!user?.id) throw new Error('User not authenticated');
       if (!isNativeIOS()) throw new Error('Apple Calendar is only available on iOS native');
+      if (!canConnectAppleNative) throw new Error(appleNativeUnavailableReason ?? APP_UPDATE_REQUIRED_MESSAGE);
 
       const available = await NativeCalendar.isAvailable();
       if (!available.available) throw new Error('Native Apple Calendar plugin unavailable');
@@ -330,6 +407,9 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     connectedByProvider,
     defaultProvider,
     integrationVisible,
+    applePluginAvailable,
+    canConnectAppleNative,
+    appleNativeUnavailableReason,
     isLoading: settingsQuery.isLoading || connectionsQuery.isLoading,
 
     upsertSettings,

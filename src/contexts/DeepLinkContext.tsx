@@ -26,6 +26,22 @@ export const DeepLinkProvider = ({ children }: { children: ReactNode }) => {
       window.dispatchEvent(new CustomEvent('deep-link-navigation', { 
         detail: { path: '/journeys', taskId: data.taskId } 
       }));
+      return;
+    }
+
+    if (data.type === 'calendar_oauth' && data.provider && data.status) {
+      const params = new URLSearchParams({
+        calendar_oauth_provider: data.provider,
+        calendar_oauth_status: data.status,
+      });
+
+      if (data.message) {
+        params.set('calendar_oauth_message', data.message);
+      }
+
+      window.dispatchEvent(new CustomEvent('deep-link-navigation', {
+        detail: { path: `/profile?${params.toString()}` },
+      }));
     }
   }, []);
 

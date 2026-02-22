@@ -2,9 +2,15 @@ import { App, type URLOpenListenerEvent } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { logger } from './logger';
 
+export type CalendarOAuthProvider = 'google' | 'outlook';
+export type CalendarOAuthStatus = 'success' | 'error';
+
 export interface DeepLinkData {
-  type: 'task' | 'unknown';
+  type: 'task' | 'calendar_oauth' | 'unknown';
   taskId?: string;
+  provider?: CalendarOAuthProvider;
+  status?: CalendarOAuthStatus;
+  message?: string;
   rawUrl: string;
 }
 
@@ -17,6 +23,24 @@ export const parseDeepLink = (url: string): DeepLinkData => {
     if (url.startsWith('cosmiq://task/')) {
       const taskId = url.replace('cosmiq://task/', '').split('?')[0];
       return { type: 'task', taskId, rawUrl: url };
+    }
+
+    if (url.startsWith('cosmiq://calendar/oauth/callback')) {
+      const parsed = new URL(url);
+      const providerRaw = parsed.searchParams.get('provider');
+      const statusRaw = parsed.searchParams.get('status');
+      const message = parsed.searchParams.get('message') ?? undefined;
+
+      const provider = providerRaw === 'google' || providerRaw === 'outlook' ? providerRaw : undefined;
+      const status = statusRaw === 'success' || statusRaw === 'error' ? statusRaw : undefined;
+
+      return {
+        type: 'calendar_oauth',
+        provider,
+        status,
+        message,
+        rawUrl: url,
+      };
     }
     
     return { type: 'unknown', rawUrl: url };

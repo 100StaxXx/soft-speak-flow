@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { parseScheduledTime } from "@/utils/scheduledTime";
+import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 
 export interface AddQuestData {
@@ -110,7 +111,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       : null;
     return connectedDefaultProvider || connections[0]?.provider || null;
   }, [connections, defaultProvider]);
-  const canShowCalendarSendOption = Boolean(integrationVisible && connections.length > 0 && effectiveProvider);
+  const canShowCalendarSendOption = Boolean(
+    SEND_TO_CALENDAR_ENABLED
+      && integrationVisible
+      && connections.length > 0
+      && effectiveProvider,
+  );
 
   const timeWheelRef = useRef<HTMLDivElement>(null);
   const selectedTimeRef = useRef<HTMLButtonElement>(null);

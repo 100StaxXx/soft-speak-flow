@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { CalendarDays, Link2, Unlink2, RefreshCcw, EyeOff, Eye } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import {
   type CalendarSyncMode,
 } from '@/hooks/useCalendarIntegrations';
 import { useQuestCalendarSync } from '@/hooks/useQuestCalendarSync';
+import { getRedirectUrlWithPath } from '@/utils/redirectUrl';
 
 const PROVIDERS: Array<{ key: CalendarProvider; label: string; web: boolean; ios: boolean }> = [
   { key: 'google', label: 'Google Calendar', web: true, ios: true },
@@ -41,6 +42,8 @@ export function CalendarIntegrationsSettings() {
     listProviderCalendars,
     setPrimaryCalendar,
     connectAppleNative,
+    canConnectAppleNative,
+    appleNativeUnavailableReason,
   } = useCalendarIntegrations();
 
   const { syncProviderPull } = useQuestCalendarSync();
@@ -52,6 +55,40 @@ export function CalendarIntegrationsSettings() {
 
   const canUseApple = isNativeIOS();
 
+  const clearOauthParams = useCallback((params: URLSearchParams, keys: string[]) => {
+    keys.forEach((key) => params.delete(key));
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`,
+    );
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get('calendar_oauth_provider') as CalendarProvider | null;
+    const status = params.get('calendar_oauth_status');
+    const message = params.get('calendar_oauth_message');
+
+    if (!provider || !status) return;
+
+    if (status === 'success') {
+      toast({ title: 'Calendar connected', description: `${provider} connected successfully.` });
+    } else {
+      toast({
+        title: 'Failed to complete connection',
+        description: message || 'Unable to connect calendar. Please try again.',
+        variant: 'destructive',
+      });
+    }
+
+    clearOauthParams(params, [
+      'calendar_oauth_provider',
+      'calendar_oauth_status',
+      'calendar_oauth_message',
+    ]);
+  }, [clearOauthParams, toast]);
+
   const visibleProviders = useMemo(
     () => PROVIDERS.filter((provider) => (canUseApple ? provider.ios : provider.web)),
     [canUseApple],
@@ -62,15 +99,13 @@ export function CalendarIntegrationsSettings() {
     const provider = params.get('calendar_provider') as CalendarProvider | null;
     const code = params.get('code');
     const error = params.get('error');
+    const state = params.get('state');
 
     if (!provider || (!code && !error)) return;
 
     if (error) {
       toast({ title: 'Calendar connection cancelled', description: `Provider: ${provider}` });
-      params.delete('calendar_provider');
-      params.delete('error');
-      params.delete('error_description');
-      window.history.replaceState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`);
+      clearOauthParams(params, ['calendar_provider', 'error', 'error_description']);
       return;
     }
 
@@ -79,7 +114,7 @@ export function CalendarIntegrationsSettings() {
     const redirectUri = `${window.location.origin}${window.location.pathname}?calendar_provider=${provider}`;
 
     completeOAuthConnection
-      .mutateAsync({ provider: provider as Exclude<CalendarProvider, 'apple'>, code, redirectUri })
+      .mutateAsync({ provider: provider as Exclude<CalendarProvider, 'apple'>, code, redirectUri, state: state ?? undefined })
       .then(() => {
         toast({ title: 'Calendar connected', description: `${provider} connected successfully.` });
       })
@@ -91,13 +126,9 @@ export function CalendarIntegrationsSettings() {
         });
       })
       .finally(() => {
-        params.delete('calendar_provider');
-        params.delete('code');
-        params.delete('scope');
-        params.delete('state');
-        window.history.replaceState({}, '', `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`);
+        clearOauthParams(params, ['calendar_provider', 'code', 'scope', 'state']);
       });
-  }, [completeOAuthConnection, toast]);
+  }, [clearOauthParams, completeOAuthConnection, toast]);
 
   const handleConnect = async (provider: CalendarProvider) => {
     try {
@@ -109,7 +140,9 @@ export function CalendarIntegrationsSettings() {
         return;
       }
 
-      const redirectUri = `${window.location.origin}${window.location.pathname}?calendar_provider=${provider}`;
+      const source = Capacitor.isNativePlatform() ? 'native' : 'web';
+      const callbackBase = getRedirectUrlWithPath('/calendar/oauth/callback');
+      const redirectUri = `${callbackBase}?calendar_provider=${provider}&calendar_source=${source}`;
       const url = await beginOAuthConnection.mutateAsync({ provider, redirectUri, syncMode: 'send_only' });
       window.location.href = url;
     } catch (err) {
@@ -232,6 +265,8 @@ export function CalendarIntegrationsSettings() {
                       ? connection.calendar_email || connection.primary_calendar_name || 'Connected'
                       : provider.key === 'apple' && !canUseApple
                         ? 'Apple Calendar works only on iOS native'
+                        : provider.key === 'apple' && !canConnectAppleNative
+                          ? appleNativeUnavailableReason || 'Apple Calendar is unavailable in this app build.'
                         : 'Not connected'}
                   </p>
                 </div>
@@ -247,11 +282,18 @@ export function CalendarIntegrationsSettings() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={connectingProvider === provider.key || (provider.key === 'apple' && !canUseApple)}
+                  disabled={
+                    connectingProvider === provider.key
+                    || (provider.key === 'apple' && (!canUseApple || !canConnectAppleNative))
+                  }
                   onClick={() => handleConnect(provider.key)}
                 >
                   <Link2 className="h-4 w-4 mr-2" />
-                  {connectingProvider === provider.key ? 'Connecting...' : `Connect ${provider.label}`}
+                  {connectingProvider === provider.key
+                    ? 'Connecting...'
+                    : provider.key === 'apple' && canUseApple && !canConnectAppleNative
+                      ? 'Update App to Connect Apple Calendar'
+                      : `Connect ${provider.label}`}
                 </Button>
               ) : (
                 <div className="space-y-3">

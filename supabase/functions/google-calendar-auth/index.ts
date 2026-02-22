@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createSignedOAuthState, verifySignedOAuthState } from "../_shared/oauthState.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,13 +59,17 @@ function normalizeSyncMode(mode: unknown): SyncMode {
   return mode === "full_sync" ? "full_sync" : "send_only";
 }
 
+function isSyncMode(mode: unknown): mode is SyncMode {
+  return mode === "send_only" || mode === "full_sync";
+}
+
 function getBearerToken(req: Request): string | null {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return null;
   return authHeader.replace("Bearer ", "").trim() || null;
 }
 
-async function getAuthedUserId(supabaseAdmin: ReturnType<typeof createClient>, req: Request): Promise<string> {
+async function getAuthedUserId(supabaseAdmin: any, req: Request): Promise<string> {
   const token = getBearerToken(req);
   if (!token) {
     throw new Error("Missing Authorization bearer token");
@@ -82,8 +87,19 @@ async function getAuthedUserId(supabaseAdmin: ReturnType<typeof createClient>, r
   return user.id;
 }
 
+async function tryGetAuthedUserId(
+  supabaseAdmin: any,
+  req: Request,
+): Promise<string | null> {
+  try {
+    return await getAuthedUserId(supabaseAdmin, req);
+  } catch {
+    return null;
+  }
+}
+
 async function refreshAccessTokenIfNeeded(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   connection: {
     id: string;
     access_token: string | null;
@@ -175,6 +191,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const googleClientId = Deno.env.get("GOOGLE_CALENDAR_CLIENT_ID");
     const googleClientSecret = Deno.env.get("GOOGLE_CALENDAR_CLIENT_SECRET");
+    const internalFunctionSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
 
     if (!googleClientId || !googleClientSecret) {
       return jsonResponse({ error: "Google Calendar integration not configured" }, 500);
@@ -188,15 +205,25 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const userId = await getAuthedUserId(supabase, req);
 
     if (action === "getAuthUrl") {
+      const userId = await getAuthedUserId(supabase, req);
       const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
+      const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
       if (!redirectUri) {
         return jsonResponse({ error: "redirectUri is required" }, 400);
       }
 
-      const state = btoa(JSON.stringify({ userId }));
+      if (!internalFunctionSecret) {
+        return jsonResponse({ error: "OAuth state signing is not configured" }, 500);
+      }
+
+      const state = await createSignedOAuthState({
+        provider: "google",
+        userId,
+        syncMode: requestedSyncMode,
+        secret: internalFunctionSecret,
+      });
 
       const authUrl = new URL(GOOGLE_AUTH_URL);
       authUrl.searchParams.set("client_id", googleClientId);
@@ -214,10 +241,36 @@ Deno.serve(async (req) => {
     if (action === "exchangeCode") {
       const code = body?.code as string | undefined;
       const redirectUri = (body?.redirectUri || body?.redirect_uri) as string | undefined;
-      const requestedSyncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode);
+      const state = body?.state as string | undefined;
+      const requestedSyncModeFromBody = isSyncMode(body?.syncMode ?? body?.sync_mode)
+        ? (body?.syncMode ?? body?.sync_mode)
+        : null;
 
       if (!code || !redirectUri) {
         return jsonResponse({ error: "code and redirectUri are required" }, 400);
+      }
+
+      let userId = await tryGetAuthedUserId(supabase, req);
+      let requestedSyncMode: SyncMode = normalizeSyncMode(requestedSyncModeFromBody);
+
+      if (!userId) {
+        if (!internalFunctionSecret) {
+          return jsonResponse({ error: "OAuth state validation is not configured" }, 500);
+        }
+
+        try {
+          const verified = await verifySignedOAuthState({
+            state,
+            provider: "google",
+            secret: internalFunctionSecret,
+          });
+          userId = verified.userId;
+          if (!requestedSyncModeFromBody) {
+            requestedSyncMode = verified.syncMode;
+          }
+        } catch {
+          return jsonResponse({ error: "Invalid or expired OAuth state" }, 401);
+        }
       }
 
       const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
@@ -296,6 +349,8 @@ Deno.serve(async (req) => {
         calendarEmail,
       });
     }
+
+    const userId = await getAuthedUserId(supabase, req);
 
     const { data: connection, error: connectionError } = await supabase
       .from("user_calendar_connections")

@@ -328,9 +328,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
           <ParallaxCard offset={8}>
             <CompanionErrorBoundary>
               <ErrorBoundary>
-                <div className="cosmiq-glass-ultra rounded-2xl">
-                  <MentorQuickChat />
-                </div>
+                <MentorQuickChat />
               </ErrorBoundary>
             </CompanionErrorBoundary>
           </ParallaxCard>

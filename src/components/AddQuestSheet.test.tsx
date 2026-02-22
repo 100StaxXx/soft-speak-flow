@@ -286,7 +286,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByText(/Send to .* Calendar after create/i)).not.toBeInTheDocument();
   });
 
-  it("shows connected provider label when default provider is stale", () => {
+  it("hides send-to-calendar option while feature is disabled", () => {
     mocks.integrationVisible = true;
     mocks.defaultProvider = "outlook";
     mocks.connections = [{ provider: "google" }];
@@ -300,7 +300,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByText("Send to Google Calendar after create")).toBeInTheDocument();
+    expect(screen.queryByText("Send to Google Calendar after create")).not.toBeInTheDocument();
   });
 
   it("blocks close requests when preventClose is enabled", () => {

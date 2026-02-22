@@ -76,6 +76,70 @@ interface EpicsOptions {
   enabled?: boolean;
 }
 
+const ACTIVE_CAMPAIGN_LIMIT = 2;
+const CAMPAIGN_LIMIT_REACHED_MESSAGE =
+  `You can only have ${ACTIVE_CAMPAIGN_LIMIT} active campaigns at a time. Complete or abandon one before creating another.`;
+
+type ErrorLike = {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+};
+
+const toErrorHaystack = (error: unknown): string => {
+  if (!error) return '';
+
+  if (typeof error === 'string') {
+    return error.toLowerCase();
+  }
+
+  if (error instanceof Error) {
+    return error.message.toLowerCase();
+  }
+
+  if (typeof error === 'object') {
+    const candidate = error as ErrorLike;
+    return `${candidate.message ?? ''} ${candidate.details ?? ''} ${candidate.hint ?? ''} ${candidate.code ?? ''}`.toLowerCase();
+  }
+
+  return '';
+};
+
+const normalizeCreateCampaignError = (error: unknown): { title: string; description?: string } => {
+  const haystack = toErrorHaystack(error);
+
+  if (
+    haystack.includes('2 active epics') ||
+    haystack.includes('active epics at a time') ||
+    haystack.includes('active campaigns at a time')
+  ) {
+    return {
+      title: 'Campaign limit reached',
+      description: CAMPAIGN_LIMIT_REACHED_MESSAGE,
+    };
+  }
+
+  if (haystack.includes('not authenticated') || haystack.includes('jwt') || haystack.includes('auth')) {
+    return {
+      title: 'Sign in required',
+      description: 'Please refresh and sign in again before creating a campaign.',
+    };
+  }
+
+  if (haystack.includes('failed to create habits') || haystack.includes('no habits were created')) {
+    return {
+      title: 'Failed to create campaign',
+      description: "We couldn't save your rituals. Please review your plan and try again.",
+    };
+  }
+
+  return {
+    title: 'Failed to create campaign',
+    description: 'Please try again in a moment. If this keeps happening, close and reopen the planner.',
+  };
+};
+
 export const useEpics = (options: EpicsOptions = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -161,7 +225,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       const currentUserId = session.user.id;
 
       if (!epicData.habits || epicData.habits.length === 0) {
-        throw new Error("Epic must have at least one habit");
+        throw new Error("Campaign must have at least one ritual");
       }
 
       // Validate target_days
@@ -173,6 +237,16 @@ export const useEpics = (options: EpicsOptions = {}) => {
       let createdEpic: CreatedEpic | null = null;
 
       try {
+        // Preflight capacity check so users get a clear campaign-level message before writes.
+        const { data: activeCampaignCount, error: countError } = await supabase.rpc("count_user_epics", {
+          p_user_id: currentUserId,
+        });
+        if (countError) {
+          console.error("Failed to check active campaign limit (continuing):", countError);
+        } else if ((activeCampaignCount ?? 0) >= ACTIVE_CAMPAIGN_LIMIT) {
+          throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
+        }
+
         // Create habits first with normalized values
         const { data: habits, error: habitError } = await supabase
           .from("habits")
@@ -235,17 +309,17 @@ export const useEpics = (options: EpicsOptions = {}) => {
           .single();
 
         if (epicError) {
-          console.error("Failed to create epic:", epicError);
+          console.error("Failed to create campaign:", epicError);
           // Rollback: delete created habits
           await supabase
             .from("habits")
             .delete()
             .in("id", createdHabits.map(h => h.id));
-          throw new Error(`Failed to create epic: ${epicError.message}`);
+          throw new Error(`Failed to create campaign: ${epicError.message}`);
         }
 
         if (!epic) {
-          throw new Error("Epic creation returned no data");
+          throw new Error("Campaign creation returned no data");
         }
 
         createdEpic = epic;
@@ -451,14 +525,18 @@ export const useEpics = (options: EpicsOptions = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       window.dispatchEvent(new CustomEvent("campaign-created"));
-      toast.success("Epic quest created! 🎯", {
-        description: "Your companion is excited for this legendary journey!",
+      toast.success("Campaign created! 🎯", {
+        description: "Your companion is excited for this new journey!",
       });
     },
     onError: (error) => {
-      console.error("Failed to create epic:", error);
-      toast.error("Failed to create epic");
+      console.error("Failed to create campaign:", error);
+      const normalized = normalizeCreateCampaignError(error);
+      toast.error(normalized.title, {
+        description: normalized.description,
+      });
     },
   });
 
@@ -578,6 +656,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       // Track epic outcome for AI learning
       if (status === "completed" || status === "abandoned") {
         trackEpicOutcome(variables.epicId, status).catch(err => {

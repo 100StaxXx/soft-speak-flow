@@ -46,6 +46,7 @@ import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentor
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
 const Auth = lazy(() => import("./pages/Auth"));
+const CalendarOAuthCallback = lazy(() => import("./pages/CalendarOAuthCallback"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Welcome = lazy(() => import("./pages/Welcome"));
@@ -226,7 +227,7 @@ const AppContent = memo(() => {
   // Respond to deep link navigation events (from widget taps)
   useEffect(() => {
     const handler = (event: Event) => {
-      const { path } = (event as CustomEvent<{ path: string; taskId: string }>).detail;
+      const { path } = (event as CustomEvent<{ path?: string }>).detail ?? {};
       if (path) {
         navigate(path);
       }
@@ -293,6 +294,7 @@ const AppContent = memo(() => {
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/calendar/oauth/callback" element={<CalendarOAuthCallback />} />
                   <Route path="/auth/reset-password" element={<ResetPassword />} />
                   <Route path="/creator" element={<Creator />} />
                   <Route path="/creator/dashboard" element={<InfluencerDashboard />} />
