@@ -401,9 +401,19 @@ describe("useCompanion evolveCompanion", () => {
       expect.objectContaining({
         flowType: "onboarding",
         stage: 0,
+        eyeColor: "",
+        furColor: "",
       }),
       expect.objectContaining({
         maxRetries: 0,
+      }),
+    );
+
+    expect(mocks.rpcMock).toHaveBeenCalledWith(
+      "create_companion_if_not_exists",
+      expect.objectContaining({
+        p_eye_color: "",
+        p_fur_color: "",
       }),
     );
   });

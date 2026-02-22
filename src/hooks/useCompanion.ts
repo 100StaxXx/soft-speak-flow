@@ -396,8 +396,8 @@ export const useCompanion = (options: UseCompanionOptions = {}) => {
         });
 
         // Determine consistent colors for the companion's lifetime
-        const eyeColor = `glowing ${data.favoriteColor}`;
-        const furColor = data.favoriteColor;
+        const eyeColor = "";
+        const furColor = "";
 
         // Generate initial companion image with validation (retries on anatomical issues)
         logger.log("Generating companion image with validation...");
