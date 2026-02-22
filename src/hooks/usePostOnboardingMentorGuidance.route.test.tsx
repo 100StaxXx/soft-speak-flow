@@ -20,9 +20,9 @@ const createEvolveStepTutorial = () => ({
   version: 2,
   eligible: true,
   completed: false,
-  completedSteps: ["create_quest", "meet_companion", "morning_checkin"] as const,
+  completedSteps: ["create_quest", "meet_companion", "morning_checkin", "companion_tab_intro"] as const,
   xpAwardedSteps: [] as string[],
-  milestonesCompleted: ["mentor_intro_hello"] as const,
+  milestonesCompleted: ["mentor_intro_hello", "companion_tab_intro"] as const,
 });
 
 const mocks = vi.hoisted(() => ({
@@ -218,7 +218,7 @@ describe("guided tutorial route restoration", () => {
     });
   });
 
-  it("routes from morning check-in to companion evolve, then shows post-evolution companion explainer", async () => {
+  it("routes from morning check-in to companion intro, then evolve, then post-evolution explainer", async () => {
     renderWithProviders("/mentor");
 
     await waitFor(() => {
@@ -234,6 +234,13 @@ describe("guided tutorial route restoration", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("path")).toHaveTextContent("/companion");
+      expect(screen.getByTestId("step")).toHaveTextContent("companion_tab_intro");
+      expect(screen.getByTestId("intro-action")).toHaveTextContent("Continue");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "intro-action" }));
+
+    await waitFor(() => {
       expect(screen.getByTestId("step")).toHaveTextContent("evolve_companion");
     });
 

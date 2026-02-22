@@ -477,7 +477,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             story_tone: preferences.storyTone,
             guided_tutorial: {
               version: 2,
-              flowVersion: 2,
+              flowVersion: 3,
               eligible: true,
               completedSteps: [],
               xpAwardedSteps: [],

@@ -7,6 +7,7 @@ export type GuidedTutorialStepId =
   | "create_quest"
   | "meet_companion" // legacy step retained for migration compatibility
   | "morning_checkin"
+  | "companion_tab_intro"
   | "evolve_companion"
   | "post_evolution_companion_intro"
   | "mentor_closeout";
@@ -30,6 +31,7 @@ export type GuidedMilestoneId =
   | "confirm_companion_progress" // legacy
   | "open_mentor_tab"
   | "submit_morning_checkin"
+  | "companion_tab_intro"
   | "tap_evolve_companion"
   | "complete_companion_evolution"
   | "post_evolution_companion_intro"

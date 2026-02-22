@@ -156,24 +156,33 @@ describe("sanitizeCreateQuestProgress", () => {
 describe("getMentorInstructionLines", () => {
   it("returns mentor-led instructions for each step", () => {
     expect(getMentorInstructionLines("quests_campaigns_intro", null)[0]).toContain(
-      "tasks can be done now or saved for later"
+      "daily to-do list"
     );
     expect(getMentorInstructionLines("create_quest", "open_add_quest")[0]).toContain(
       "Tap the + in the bottom right"
     );
     expect(getMentorInstructionLines("create_quest", "enter_title")[0]).toContain(
-      "Type your quest title"
+      "Enter your quest title"
     );
-    expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Head to Mentor");
-    expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve");
-    expect(getMentorInstructionLines("post_evolution_companion_intro", null)[0]).toContain("track growth");
-    expect(getMentorInstructionLines("mentor_closeout", null)[0]).toContain("tutorial is complete");
+    expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Open Mentor");
+    expect(getMentorInstructionLines("companion_tab_intro", null)[0]).toContain("Companion Tab");
+    expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve to ascend");
+    expect(getMentorInstructionLines("post_evolution_companion_intro", null)[0]).toContain(
+      "first step to greatness"
+    );
+    expect(getMentorInstructionLines("mentor_closeout", null)[0]).toContain(
+      "concludes the tutorial"
+    );
   });
 });
 
 describe("milestoneUsesStrictLock", () => {
   it("does not strict-lock submit morning check-in", () => {
     expect(milestoneUsesStrictLock("submit_morning_checkin")).toBe(false);
+  });
+
+  it("does not strict-lock companion intro", () => {
+    expect(milestoneUsesStrictLock("companion_tab_intro")).toBe(false);
   });
 
   it("does not strict-lock quests explainer", () => {
@@ -352,9 +361,9 @@ describe("guided tutorial intro dialogue sequence", () => {
       version: 2,
       eligible: true,
       completed: false,
-      completedSteps: ["create_quest", "meet_companion", "morning_checkin"],
+      completedSteps: ["create_quest", "meet_companion", "morning_checkin", "companion_tab_intro"],
       xpAwardedSteps: [],
-      milestonesCompleted: ["mentor_intro_hello"],
+      milestonesCompleted: ["mentor_intro_hello", "companion_tab_intro"],
     };
 
     const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
@@ -398,7 +407,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.dialogueText).toContain("deliberate step");
+      expect(result.current.dialogueText).toContain("I'm Atlas");
     });
   });
 
@@ -416,21 +425,21 @@ describe("guided tutorial intro dialogue sequence", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.dialogueText).toContain("gentle and steady");
+      expect(result.current.dialogueText).toContain("I'm Sienna");
     });
   });
 
   it.each([
-    { name: "Atlas", slug: "atlas", tone: "Wise", questsSnippet: "choose what matters now" },
-    { name: "Eli", slug: "eli", tone: "Supportive", questsSnippet: "We can do a task now" },
-    { name: "Sienna", slug: "sienna", tone: "Empathetic", questsSnippet: "set a gentle to-do for later" },
-    { name: "Stryker", slug: "stryker", tone: "Direct", questsSnippet: "Execute a task now" },
-    { name: "Carmen", slug: "carmen", tone: "Direct", questsSnippet: "Handle priority tasks now" },
-    { name: "Reign", slug: "reign", tone: "Tough", questsSnippet: "Hit a task now" },
-    { name: "Solace", slug: "solace", tone: "Supportive", questsSnippet: "take care of something now" },
+    { name: "Atlas", slug: "atlas", tone: "Wise" },
+    { name: "Eli", slug: "eli", tone: "Supportive" },
+    { name: "Sienna", slug: "sienna", tone: "Empathetic" },
+    { name: "Stryker", slug: "stryker", tone: "Direct" },
+    { name: "Carmen", slug: "carmen", tone: "Direct" },
+    { name: "Reign", slug: "reign", tone: "Tough" },
+    { name: "Solace", slug: "solace", tone: "Supportive" },
   ])(
-    "uses mentor-specific quests intro voice for $slug and includes now/later + long-term goals",
-    async ({ name, slug, tone, questsSnippet }) => {
+    "uses shared quests intro voice for $slug",
+    async ({ name, slug, tone }) => {
       mocks.state.personality = {
         name,
         slug,
@@ -454,16 +463,14 @@ describe("guided tutorial intro dialogue sequence", () => {
 
       await waitFor(() => {
         expect(result.current.currentStep).toBe("quests_campaigns_intro");
-        expect(result.current.dialogueText).toContain(questsSnippet);
-        expect(result.current.dialogueText.toLowerCase()).toContain("now");
-        expect(result.current.dialogueText.toLowerCase()).toContain("later");
-        expect(result.current.dialogueSupportText?.toLowerCase()).toContain("campaign");
-        expect(result.current.dialogueSupportText?.toLowerCase()).toContain("long-term");
+        expect(result.current.dialogueText).toContain("daily to-do list");
+        expect(result.current.dialogueText.toLowerCase()).toContain("schedule");
+        expect(result.current.dialogueSupportText?.toLowerCase()).toContain("routines");
       });
     }
   );
 
-  it("uses different mentor-specific copy for intro and quests milestones across slugs", async () => {
+  it("uses different mentor-specific intro copy while keeping shared quests copy", async () => {
     globalThis.localStorage?.removeItem?.("guided_tutorial_progress_user-1");
 
     mocks.state.personality = {
@@ -490,7 +497,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     let atlasIntroText = "";
     await waitFor(() => {
       atlasIntroText = atlasIntroResult.current.dialogueText;
-      expect(atlasIntroText).toContain("deliberate step");
+      expect(atlasIntroText).toContain("I'm Atlas");
     });
     unmountAtlasIntro();
 
@@ -519,7 +526,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     let strykerIntroText = "";
     await waitFor(() => {
       strykerIntroText = strykerIntroResult.current.dialogueText;
-      expect(strykerIntroText).toContain("execute this fast and clean");
+      expect(strykerIntroText).toContain("We move fast and execute clean");
     });
     unmountStrykerIntro();
 
@@ -550,7 +557,7 @@ describe("guided tutorial intro dialogue sequence", () => {
     let atlasQuestsText = "";
     await waitFor(() => {
       atlasQuestsText = atlasQuestsResult.current.dialogueText;
-      expect(atlasQuestsText).toContain("choose what matters now");
+      expect(atlasQuestsText).toContain("daily to-do list");
     });
     unmountAtlasQuests();
 
@@ -579,10 +586,31 @@ describe("guided tutorial intro dialogue sequence", () => {
     let strykerQuestsText = "";
     await waitFor(() => {
       strykerQuestsText = strykerQuestsResult.current.dialogueText;
-      expect(strykerQuestsText).toContain("Execute a task now");
+      expect(strykerQuestsText).toContain("daily to-do list");
     });
 
-    expect(atlasQuestsText).not.toEqual(strykerQuestsText);
+    expect(atlasQuestsText).toEqual(strykerQuestsText);
+  });
+
+  it("returns no support text for open mentor milestone copy", async () => {
+    mocks.state.guidedTutorial = {
+      version: 2,
+      eligible: true,
+      completed: false,
+      completedSteps: ["quests_campaigns_intro", "create_quest"],
+      xpAwardedSteps: [],
+      milestonesCompleted: ["mentor_intro_hello"],
+    };
+
+    const { result } = renderHook(() => usePostOnboardingMentorGuidance(), {
+      wrapper: createWrapper("/profile"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentStep).toBe("morning_checkin");
+      expect(result.current.dialogueText).toBe("Open Mentor.");
+      expect(result.current.dialogueSupportText).toBeUndefined();
+    });
   });
 
   it("falls back to neutral greeting for unknown mentor slug", async () => {

@@ -26,7 +26,7 @@ import type {
 } from "@/types/profile";
 
 const GUIDED_TUTORIAL_VERSION = 2;
-const GUIDED_TUTORIAL_FLOW_VERSION = 2;
+const GUIDED_TUTORIAL_FLOW_VERSION = 3;
 const TARGET_RESOLVE_POLL_MS = 250;
 const TARGET_MISSING_FALLBACK_MS = 1400;
 const CLOSEOUT_AUTO_COMPLETE_MS = 2600;
@@ -55,6 +55,10 @@ const GUIDED_STEPS: GuidedStep[] = [
   {
     id: "morning_checkin",
     route: "/mentor",
+  },
+  {
+    id: "companion_tab_intro",
+    route: "/companion",
   },
   {
     id: "evolve_companion",
@@ -109,6 +113,7 @@ const MILESTONE_ID_SET = new Set<GuidedMilestoneId>([
   "confirm_companion_progress",
   "open_mentor_tab",
   "submit_morning_checkin",
+  "companion_tab_intro",
   "tap_evolve_companion",
   "complete_companion_evolution",
   "post_evolution_companion_intro",
@@ -138,6 +143,7 @@ const getTargetSelectorsForMilestone = (milestoneId: GuidedMilestoneId): string[
     case "mentor_intro_hello":
       return [];
     case "quests_campaigns_intro":
+    case "companion_tab_intro":
     case "post_evolution_companion_intro":
       return [];
     case "stay_on_quests":
@@ -175,32 +181,32 @@ interface MentorDialogueLine {
 
 const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   atlas: {
-    text: "Welcome. We begin with one deliberate step, then the next becomes clear.",
-    support: "Stay with me for this short walkthrough, and your path will settle into focus.",
+    text: "Hi, I'm Atlas. Let's begin your path to productivity.",
+    support: "Stay with me through this short walkthrough.",
   },
   eli: {
-    text: "Hey, I'm glad you're here. We'll take this one clear step at a time together.",
-    support: "Short walkthrough now, then you'll have a rhythm you can trust.",
+    text: "Hey, I'm glad you're here. I'm Eli. We'll take this one step at a time.",
+    support: "Quick walkthrough first. Then you'll have a rhythm you can rely on.",
   },
   sienna: {
-    text: "Hi, I'm really glad you're here. We'll keep this gentle and steady together.",
-    support: "I'll guide your first steps so this feels safe, clear, and doable.",
+    text: "Hi. I'm really glad you're here. I'm Sienna. Let's get started.",
+    support: "I'll guide your first steps so everything feels clear and manageable.",
   },
   stryker: {
-    text: "You showed up. Good. We execute this fast and clean.",
-    support: "Lock the walkthrough, then run your day like a mission.",
+    text: "You showed up. Good. We move fast and execute clean.",
+    support: "Complete the walkthrough. Then run your day like a mission.",
   },
   carmen: {
-    text: "Welcome. We're setting your standard from the first tap.",
-    support: "Quick walkthrough, then your system is live and accountable.",
+    text: "Welcome. I'm Carmen. Today we establish your standard.",
+    support: "Finish this walkthrough and your system goes live.",
   },
   reign: {
-    text: "I love this energy. Let's set your pace and move with intention.",
-    support: "Nail this walkthrough, then build momentum and own the day.",
+    text: "Good. you're here. I'm Reign. Let's set your pace and move with intention.",
+    support: "Lock in this walkthrough, then build momentum and own the day.",
   },
   solace: {
-    text: "Hi friend, you're in the right place. Let's begin with one steady win.",
-    support: "I'll keep this calm and clear so you feel grounded right away.",
+    text: "Hi! I'm Solace. You're exactly where you need to be.",
+    support: "I'll keep this walkthrough clear and concise so you feel grounded from the start.",
   },
 };
 
@@ -223,50 +229,10 @@ const getMentorIntroDialogue = (mentorSlug: string | undefined, speakerName: str
   };
 };
 
-const QUESTS_CAMPAIGNS_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
-  atlas: {
-    text: "This is Quests: choose what matters now, or place a to-do for later.",
-    support: "Campaigns are for long-term goals, pursued with steady direction over time.",
-  },
-  eli: {
-    text: "This is Quests. We can do a task now or save a to-do for later.",
-    support: "Campaigns are how we go after long-term goals one step at a time.",
-  },
-  sienna: {
-    text: "This is Quests. You can handle something now or set a gentle to-do for later.",
-    support: "Campaigns support your long-term goals so growth feels steady, not rushed.",
-  },
-  stryker: {
-    text: "This is Quests. Execute a task now or queue a to-do for later.",
-    support: "Campaigns are for long-term goals; we run them with consistent follow-through.",
-  },
-  carmen: {
-    text: "This is Quests. Handle priority tasks now or schedule to-dos for later.",
-    support: "Campaigns are your long-term goals, managed with structure and standards.",
-  },
-  reign: {
-    text: "This is Quests. Hit a task now or line up a to-do for later.",
-    support: "Campaigns are for long-term goals and sustained momentum.",
-  },
-  solace: {
-    text: "This is Quests. You can take care of something now or leave a to-do for later.",
-    support: "Campaigns hold your long-term goals so you can keep moving with calm consistency.",
-  },
-};
-
-const getQuestsCampaignsIntroDialogue = (
-  mentorSlug: string | undefined
-): MentorDialogueLine => {
-  const slug = mentorSlug?.toLowerCase();
-  if (slug && QUESTS_CAMPAIGNS_DIALOGUE_BY_MENTOR_SLUG[slug]) {
-    return QUESTS_CAMPAIGNS_DIALOGUE_BY_MENTOR_SLUG[slug];
-  }
-
-  return {
-    text: "This is Quests. You can do a task now or save a to-do for later.",
-    support: "Campaigns are for long-term goals you want to pursue with consistency.",
-  };
-};
+const getQuestsCampaignsIntroDialogue = (): MentorDialogueLine => ({
+  text: "This is your Quests tab. Think of Quests as your daily to-do list. Tasks you can schedule on your calendar, or save to your inbox to plan later.",
+  support: "Campaigns are goals that build routines and rituals to help you succeed.",
+});
 
 const resolveSelectorFromCandidates = (selectors: string[]): string | null => {
   for (const selector of selectors) {
@@ -436,6 +402,13 @@ const migrateGuidedTutorialProgress = ({
   const migratedCompletedSet = new Set<GuidedTutorialStepId>(
     completedSteps.filter((stepId) => ACTIVE_GUIDED_STEP_ID_SET.has(stepId))
   );
+  const hasProgressPastCompanionIntro =
+    rawCompletedSet.has("evolve_companion") ||
+    rawCompletedSet.has("post_evolution_companion_intro") ||
+    rawCompletedSet.has("mentor_closeout");
+  if (hasProgressPastCompanionIntro) {
+    migratedCompletedSet.add("companion_tab_intro");
+  }
   if (shouldMarkQuestsIntroComplete) {
     migratedCompletedSet.add("quests_campaigns_intro");
   }
@@ -597,7 +570,9 @@ export const getMentorInstructionLines = (
   currentSubstep: CreateQuestSubstepId | null
 ): string[] => {
   if (currentStep === "quests_campaigns_intro") {
-    return ["This is Quests: tasks can be done now or saved for later, while campaigns track long-term goals."];
+    return [
+      "This is your Quests tab. Think of Quests as your daily to-do list. Tasks you can schedule on your calendar, or save to your inbox to plan later.",
+    ];
   }
 
   if (currentStep === "create_quest") {
@@ -606,30 +581,34 @@ export const getMentorInstructionLines = (
     }
 
     if (currentSubstep === "enter_title") {
-      return ["Type your quest title here."];
+      return ["Enter your quest title."];
     }
 
     if (currentSubstep === "select_time") {
-      return ["Set a time so this is scheduled."];
+      return ["Set a time."];
     }
 
-    return ["Now tap Create Quest."];
+    return ["Tap Create Quest."];
   }
 
   if (currentStep === "morning_checkin") {
-    return ["Head to Mentor."];
+    return ["Open Mentor."];
+  }
+
+  if (currentStep === "companion_tab_intro") {
+    return ["This is your Companion Tab. See your progress reflected in your Companion's growth."];
   }
 
   if (currentStep === "evolve_companion") {
-    return ["Your companion is ready. Tap Evolve."];
+    return ["Your companion has gathered enough strength. Tap Evolve to ascend."];
   }
 
   if (currentStep === "post_evolution_companion_intro") {
-    return ["You're on Companion. This is where you track growth after evolution."];
+    return ["AMAZING! You've taken your first step to greatness."];
   }
 
   if (currentStep === "mentor_closeout") {
-    return ["Beautiful work. Your tutorial is complete."];
+    return ["You're ready. This concludes the tutorial."];
   }
 
   return [];
@@ -637,11 +616,11 @@ export const getMentorInstructionLines = (
 
 const getMilestoneDialogue = (
   milestoneId: GuidedMilestoneId,
-  mentorSlug: string | undefined
+  _mentorSlug: string | undefined
 ): { text: string; support?: string } => {
   switch (milestoneId) {
     case "quests_campaigns_intro":
-      return getQuestsCampaignsIntroDialogue(mentorSlug);
+      return getQuestsCampaignsIntroDialogue();
     case "stay_on_quests":
       return {
         text: "Start on Quests. We'll build your first quest together.",
@@ -650,22 +629,22 @@ const getMilestoneDialogue = (
     case "open_add_quest":
       return {
         text: "Tap the + in the bottom right.",
-        support: "This opens your quest forge.",
+        support: "This opens your Create a Quest Menu.",
       };
     case "enter_title":
       return {
-        text: "Type your quest title here.",
+        text: "Enter your quest title.",
         support: "Name it clearly so future-you knows exactly what to do.",
       };
     case "select_time":
       return {
-        text: "Set a time so this is scheduled.",
-        support: "A quest with a time gets done.",
+        text: "Set a time.",
+        support: "Scheduled quests get completed.",
       };
     case "submit_create_quest":
       return {
-        text: "Now tap Create Quest.",
-        support: "Once you submit, your first mission goes live.",
+        text: "Tap Create Quest.",
+        support: "Your first mission is now live.",
       };
     case "open_companion_tab":
       return {
@@ -679,33 +658,37 @@ const getMilestoneDialogue = (
       };
     case "open_mentor_tab":
       return {
-        text: "Head to Mentor.",
-        support: "We're about to lock in your focus for the day.",
+        text: "Open Mentor.",
       };
     case "submit_morning_checkin":
       return {
-        text: "Complete your check-in and submit.",
-        support: "Keep it honest and simple.",
+        text: "Welcome to your Mentor Tab. Receive a Pep Talk or talk to your Mentor to stay on track. Complete your check-in.",
+        support: "Keep it honest. Keep it simple.",
+      };
+    case "companion_tab_intro":
+      return {
+        text: "This is your Companion Tab. See your progress reflected in your Companion's growth.",
+        support: "Stay locked in with the Pomodoro Timer and Resist mini games to break bad habits",
       };
     case "tap_evolve_companion":
       return {
-        text: "Your companion is ready. Tap Evolve.",
-        support: "This is the moment your effort transforms into growth.",
+        text: "Your companion has gathered enough strength. Tap Evolve to ascend.",
+        support: "Effort becomes growth here.",
       };
     case "complete_companion_evolution":
       return {
-        text: "Evolution is in progress. This may take a little while.",
-        support: "You can leave this screen and use the app like usual. I'll bring you back to complete your tutorial when it's ready.",
+        text: "Evolution in progress.",
+        support: "You can continue using the app. I'll bring you back when it's ready.",
       };
     case "post_evolution_companion_intro":
       return {
-        text: "Great evolution. This Companion page is where you follow your bond and growth.",
-        support: "Take a look here before we close out.",
+        text: "AMAZING! You've taken your first step to greatness.",
+        support: "Here you track your bond and growth.",
       };
     case "mentor_closeout_message":
       return {
-        text: "Outstanding. You completed your tutorial.",
-        support: "Now keep the momentum going with your daily quests and check-ins.",
+        text: "You're ready. This concludes the tutorial.",
+        support: "Keep momentum through daily quests and check-ins.",
       };
     default:
       return {
@@ -720,6 +703,7 @@ export const milestoneUsesStrictLock = (milestoneId: GuidedMilestoneId | null): 
   if (milestoneId === "quests_campaigns_intro") return false;
   if (milestoneId === "confirm_companion_progress") return false;
   if (milestoneId === "submit_morning_checkin") return false;
+  if (milestoneId === "companion_tab_intro") return false;
   if (milestoneId === "complete_companion_evolution") return false;
   if (milestoneId === "post_evolution_companion_intro") return false;
   if (milestoneId === "mentor_closeout_message") return false;
@@ -1159,6 +1143,14 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
       return;
     }
 
+    if (currentStep.id === "companion_tab_intro") {
+      if (location.pathname !== "/companion") return;
+      if (milestoneSet.has("companion_tab_intro")) {
+        markStepComplete("companion_tab_intro");
+      }
+      return;
+    }
+
     if (currentStep.id === "evolve_companion") {
       const cachedCompanion = user?.id
         ? queryClient.getQueryData<Companion | null>(getCompanionQueryKey(user.id))
@@ -1345,6 +1337,10 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
         : "open_mentor_tab";
     }
 
+    if (currentStep.id === "companion_tab_intro") {
+      return "companion_tab_intro";
+    }
+
     if (currentStep.id === "evolve_companion") {
       return evolutionInFlight ? "complete_companion_evolution" : "tap_evolve_companion";
     }
@@ -1364,6 +1360,7 @@ const usePostOnboardingMentorGuidanceController = (): PostOnboardingMentorGuidan
   const supportsDialogueAction =
     currentMilestone === "mentor_intro_hello" ||
     currentMilestone === "quests_campaigns_intro" ||
+    currentMilestone === "companion_tab_intro" ||
     currentMilestone === "post_evolution_companion_intro";
   const dialogueActionLabel = supportsDialogueAction
     ? currentMilestone === "mentor_intro_hello"
