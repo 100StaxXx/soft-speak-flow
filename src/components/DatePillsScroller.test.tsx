@@ -468,4 +468,185 @@ describe("DatePillsScroller", () => {
       });
     }
   });
+
+  it("re-centers after horizontal scrolling settles", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    vi.useFakeTimers();
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 280,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+      setScrollMetrics(scroller, { scrollLeft: 280, clientWidth: 220, scrollWidth: 1200 });
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      scrollToSpy.mockClear();
+
+      setScrollMetrics(scroller, { scrollLeft: 260, clientWidth: 220, scrollWidth: 1200 });
+      fireEvent.scroll(scroller);
+      const baselineCalls = scrollToSpy.mock.calls.length;
+      expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
+
+      await act(async () => {
+        vi.advanceTimersByTime(99);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
+
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls + 1);
+      expect(scroller.scrollLeft).toBe(280);
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
+  it("debounces repeated scroll events into one idle recenter", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    vi.useFakeTimers();
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 280,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+      setScrollMetrics(scroller, { scrollLeft: 280, clientWidth: 220, scrollWidth: 1200 });
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      scrollToSpy.mockClear();
+
+      setScrollMetrics(scroller, { scrollLeft: 250, clientWidth: 220, scrollWidth: 1200 });
+      fireEvent.scroll(scroller);
+      await act(async () => {
+        vi.advanceTimersByTime(40);
+      });
+
+      setScrollMetrics(scroller, { scrollLeft: 240, clientWidth: 220, scrollWidth: 1200 });
+      fireEvent.scroll(scroller);
+      await act(async () => {
+        vi.advanceTimersByTime(40);
+      });
+
+      setScrollMetrics(scroller, { scrollLeft: 230, clientWidth: 220, scrollWidth: 1200 });
+      fireEvent.scroll(scroller);
+      const baselineCalls = scrollToSpy.mock.calls.length;
+      expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
+
+      await act(async () => {
+        vi.advanceTimersByTime(99);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
+
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls + 1);
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
+  it("ignores programmatic scroll events so recentering does not loop", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    vi.useFakeTimers();
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1200,
+        containerWidth: 220,
+        selectedLeft: 360,
+        selectedWidth: 60,
+      });
+      setScrollMetrics(scroller, { scrollLeft: 0, clientWidth: 220, scrollWidth: 1200 });
+
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T20:30:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+
+      fireEvent.scroll(scroller);
+
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
 });

@@ -23,6 +23,8 @@ interface DatePillsScrollerProps {
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
+const SCROLL_IDLE_DELAY_MS = 100;
+const PROGRAMMATIC_SCROLL_GUARD_MS = 180;
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -50,17 +52,19 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 }: DatePillsScrollerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
-  const shouldCenterOnSelectedRef = useRef(true);
-  const previousIsActiveRef = useRef(isActive);
   const pendingLeftCompensationRef = useRef<{
     previousScrollWidth: number;
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false);
+  const programmaticScrollResetTimeoutRef = useRef<number | null>(null);
+  const scrollIdleTimeoutRef = useRef<number | null>(null);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
   const [edgeSpacerWidth, setEdgeSpacerWidth] = useState(0);
+  const [centerRequestVersion, setCenterRequestVersion] = useState(0);
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
 
@@ -119,9 +123,55 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     setEdgeSpacerWidth((currentWidth) => (Math.abs(currentWidth - nextWidth) < 0.5 ? currentWidth : nextWidth));
   }, [calculateEdgeSpacerWidth]);
 
+  const clearProgrammaticScrollResetTimeout = useCallback(() => {
+    if (programmaticScrollResetTimeoutRef.current === null) return;
+    window.clearTimeout(programmaticScrollResetTimeoutRef.current);
+    programmaticScrollResetTimeoutRef.current = null;
+  }, []);
+
+  const clearScrollIdleTimeout = useCallback(() => {
+    if (scrollIdleTimeoutRef.current === null) return;
+    window.clearTimeout(scrollIdleTimeoutRef.current);
+    scrollIdleTimeoutRef.current = null;
+  }, []);
+
+  const requestCenterSelectedDate = useCallback(() => {
+    setCenterRequestVersion((currentVersion) => currentVersion + 1);
+  }, []);
+
+  const markProgrammaticScroll = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    isProgrammaticScrollRef.current = true;
+    clearProgrammaticScrollResetTimeout();
+    programmaticScrollResetTimeoutRef.current = window.setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+      programmaticScrollResetTimeoutRef.current = null;
+    }, PROGRAMMATIC_SCROLL_GUARD_MS);
+  }, [clearProgrammaticScrollResetTimeout]);
+
+  const scheduleCenterAfterScrollIdle = useCallback(() => {
+    if (!isActive) return;
+
+    if (typeof window === "undefined") {
+      requestCenterSelectedDate();
+      return;
+    }
+
+    clearScrollIdleTimeout();
+    scrollIdleTimeoutRef.current = window.setTimeout(() => {
+      scrollIdleTimeoutRef.current = null;
+      requestCenterSelectedDate();
+    }, SCROLL_IDLE_DELAY_MS);
+  }, [clearScrollIdleTimeout, isActive, requestCenterSelectedDate]);
+
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
     if (!container || isExpandingRef.current) return;
+
+    if (!isProgrammaticScrollRef.current) {
+      scheduleCenterAfterScrollIdle();
+    }
 
     const { scrollLeft, clientWidth, scrollWidth } = container;
 
@@ -139,7 +189,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       isExpandingRef.current = true;
       setRangeEnd((currentEnd) => addDays(currentEnd, extensionChunk));
     }
-  }, [extensionChunk]);
+  }, [extensionChunk, scheduleCenterAfterScrollIdle]);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -170,17 +220,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   }, [rangeEnd, rangeStart]);
 
   useLayoutEffect(() => {
-    shouldCenterOnSelectedRef.current = true;
-  }, [selectedDate]);
-
-  useLayoutEffect(() => {
-    if (isActive && !previousIsActiveRef.current) {
-      shouldCenterOnSelectedRef.current = true;
-    }
-    previousIsActiveRef.current = isActive;
-  }, [isActive]);
-
-  useLayoutEffect(() => {
     recalculateEdgeSpacers();
   }, [dates, selectedDate, isActive, recalculateEdgeSpacers]);
 
@@ -199,16 +238,28 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     };
   }, [recalculateEdgeSpacers]);
 
-  // Scroll selected date to center only after explicit selected-date changes.
+  useEffect(() => {
+    if (isActive) return;
+    clearScrollIdleTimeout();
+  }, [clearScrollIdleTimeout, isActive]);
+
+  useEffect(() => {
+    return () => {
+      clearScrollIdleTimeout();
+      clearProgrammaticScrollResetTimeout();
+      isProgrammaticScrollRef.current = false;
+    };
+  }, [clearProgrammaticScrollResetTimeout, clearScrollIdleTimeout]);
+
+  // Keep selected date centered after selected-date changes and scroll-idle events.
   useLayoutEffect(() => {
     if (!isActive) return;
-    if (!shouldCenterOnSelectedRef.current) return;
 
     let frameId: number | null = null;
     let isCancelled = false;
 
     const centerSelectedDate = (remainingAttempts: number) => {
-      if (isCancelled || !shouldCenterOnSelectedRef.current) return;
+      if (isCancelled) return;
 
       const container = scrollRef.current;
       const selected = selectedRef.current;
@@ -252,6 +303,11 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       const targetLeft = selectedLeft - containerWidth / 2 + selectedWidth / 2;
       const maxScrollLeft = Math.max(0, container.scrollWidth - containerWidth);
       const clampedLeft = Math.min(Math.max(targetLeft, 0), maxScrollLeft);
+      const hasMeaningfulDelta = Math.abs(container.scrollLeft - clampedLeft) > 0.5;
+
+      if (hasMeaningfulDelta) {
+        markProgrammaticScroll();
+      }
 
       try {
         container.scrollTo({
@@ -263,7 +319,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       }
 
       container.scrollLeft = clampedLeft;
-      shouldCenterOnSelectedRef.current = false;
     };
 
     centerSelectedDate(CENTER_RETRY_ATTEMPTS);
@@ -274,7 +329,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [calculateEdgeSpacerWidth, dates, edgeSpacerWidth, isActive, selectedDate]);
+  }, [calculateEdgeSpacerWidth, centerRequestVersion, dates, edgeSpacerWidth, isActive, markProgrammaticScroll, selectedDate]);
 
   return (
     <div
