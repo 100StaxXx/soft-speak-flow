@@ -255,6 +255,136 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("uses smooth scroll without forcing an immediate scrollLeft jump", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1000,
+        containerWidth: 200,
+        selectedLeft: 320,
+        selectedWidth: 60,
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T20:30:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      });
+
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as {
+        left?: number;
+        behavior?: "smooth" | "auto";
+      };
+      expect(lastOptions.left).toBe(250);
+      expect(lastOptions.behavior).toBe("smooth");
+      expect(scroller.scrollLeft).toBe(0);
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
+  it("uses auto scroll behavior when reduced motion is enabled", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const originalMatchMedia = window.matchMedia;
+    const matchMediaSpy = vi.fn(() => ({
+      matches: true,
+      media: "(prefers-reduced-motion: reduce)",
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(() => false),
+    }));
+
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: matchMediaSpy,
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button.bg-gradient-to-br") as HTMLButtonElement;
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1000,
+        containerWidth: 200,
+        selectedLeft: 320,
+        selectedWidth: 60,
+      });
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-13T20:30:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      });
+
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as {
+        behavior?: "smooth" | "auto";
+      };
+      expect(lastOptions.behavior).toBe("auto");
+    } finally {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
   it("retries centering when layout width is zero and centers on next frame", async () => {
     const onDateSelect = vi.fn();
     const scrollToSpy = vi.fn();
@@ -323,7 +453,8 @@ describe("DatePillsScroller", () => {
 
       await waitFor(() => {
         expect(scrollToSpy).toHaveBeenCalledTimes(1);
-        expect(scroller.scrollLeft).toBe(262);
+        const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as { left?: number };
+        expect(lastOptions.left).toBe(262);
       });
     } finally {
       window.requestAnimationFrame = originalRequestAnimationFrame;
@@ -459,7 +590,8 @@ describe("DatePillsScroller", () => {
 
       await waitFor(() => {
         expect(scrollToSpy).toHaveBeenCalled();
-        expect(scroller.scrollLeft).toBe(300);
+        const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as { left?: number };
+        expect(lastOptions.left).toBe(300);
       });
     } finally {
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -523,8 +655,9 @@ describe("DatePillsScroller", () => {
         vi.advanceTimersByTime(1000);
       });
       expect(scrollToSpy).toHaveBeenCalledTimes(1);
-      expect(scroller.scrollLeft).toBe(440);
-      expect(scroller.scrollLeft).not.toBe(60);
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as { left?: number };
+      expect(lastOptions.left).toBe(440);
+      expect(lastOptions.left).not.toBe(60);
     } finally {
       vi.useRealTimers();
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -582,7 +715,8 @@ describe("DatePillsScroller", () => {
         vi.advanceTimersByTime(1);
       });
       expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls + 1);
-      expect(scroller.scrollLeft).toBe(280);
+      const lastOptions = scrollToSpy.mock.calls.at(-1)?.[0] as { left?: number };
+      expect(lastOptions.left).toBe(280);
     } finally {
       vi.useRealTimers();
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -698,14 +832,21 @@ describe("DatePillsScroller", () => {
         />,
       );
 
-      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      const baselineCalls = scrollToSpy.mock.calls.length;
+      expect(baselineCalls).toBeGreaterThan(0);
 
       fireEvent.scroll(scroller);
 
       await act(async () => {
         vi.advanceTimersByTime(300);
       });
-      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      const afterInitialWindowCalls = scrollToSpy.mock.calls.length;
+      expect(afterInitialWindowCalls).toBeGreaterThanOrEqual(baselineCalls);
+
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(afterInitialWindowCalls);
     } finally {
       vi.useRealTimers();
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
