@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles } from "lucide-react";
+import { PawPrint, Sparkles } from "lucide-react";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useReferrals } from "@/hooks/useReferrals";
 import { useCompanionHealth } from "@/hooks/useCompanionHealth";
@@ -448,7 +448,7 @@ export const CompanionDisplay = memo(() => {
               }}
               aria-hidden="true"
             >
-              <Sparkles className="h-7 w-7" style={{ color: companionPalette.accentText }} />
+              <PawPrint fill="currentColor" className="h-7 w-7 -rotate-45" style={{ color: companionPalette.accentText }} />
             </div>
           </div>
 
