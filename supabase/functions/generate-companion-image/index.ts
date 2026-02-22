@@ -755,7 +755,7 @@ serve(async (req) => {
 
     if (stage === 0 || stage === 1) {
       // Egg stages
-      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}\n\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere, slightly brighter exposure with lifted midtones and readable highlights, with a very subtle creature-collecting game illustration charm (not chibi).`;
+      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}\n\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere, slightly brighter exposure with lifted midtones and readable highlights, with a very subtle creature-collecting game illustration charm (not chibi). Use a varied multi-color palette; keep ${favoriteColor} clearly visible as the identity anchor while allowing secondary/tertiary accents; avoid monochrome single-hue output.`;
 
     } else if (extractedMetadata && stage >= 2 && stage <= 14) {
       // Text-to-image with extracted visual metadata from previous stage
@@ -1014,6 +1014,7 @@ Expected characteristics:
 - Wings expected: ${anatomy.hasWings ? 'YES' : 'NO'}
 - Body type: ${anatomy.bodyType}
 - Primary color should be: ${favoriteColor}
+- Color variety is allowed: ${favoriteColor} must remain clearly visible as the anchor, while secondary/tertiary accent colors are acceptable
 ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` : ''}
 
 Score each aspect from 0-100 and list any issues.`;

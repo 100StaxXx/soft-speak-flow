@@ -430,8 +430,10 @@ HATCHING SCENE:
 - Some shells stuck to the hatchling's back/head (cute detail)
 - Clear evidence this just happened - wet, fresh, brand new life
 
-COLOR PALETTE (CRITICAL MATCH):
-- Primary colors: ${companion.favorite_color} tones
+COLOR PALETTE (ANCHOR + VARIATION):
+- Favorite color anchor: ${companion.favorite_color} must be clearly visible as the identity anchor (not a full single-color wash)
+- Add 2-3 supporting accents: one ${companion.core_element}-driven accent, one contrast/complement accent, and one neutral balancing tone
+- Avoid monochrome or single-hue results; maintain a varied palette while keeping the favorite-color anchor obvious
 - Animal species: ${companion.spirit_animal}
 - Elemental affinity: ${companion.core_element}
 ${companion.eye_color ? `- Eye color: ${companion.eye_color} with infant brightness` : ''}
@@ -440,12 +442,12 @@ ${companion.fur_color ? `- Fur/scales/feathers: ${companion.fur_color} with baby
 ELEMENTAL MANIFESTATION:
 - Small delicate wisps of ${companion.core_element} elemental energy beginning to manifest
 - Energy tentative and gentle, just awakening
-- Soft ${companion.favorite_color} glow particles rising from the hatching
+- Mixed glow particles may include anchor and accent colors, with ${companion.favorite_color} still clearly visible
 - Elemental aura flickering uncertainly like a candle flame
 
 ENVIRONMENT:
 - Mystical nursery realm with soft ethereal lighting
-- Warm ambient ${companion.favorite_color} atmospheric glow
+- Ambient glow can blend the anchor and supporting accents, with readable ${companion.favorite_color} highlights
 - Gentle floating particles and magical dust motes
 - Soft ground with natural materials (moss, petals, soft earth, or water)
 - Background slightly out of focus creating dreamy depth

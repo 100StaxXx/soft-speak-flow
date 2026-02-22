@@ -50,7 +50,7 @@ import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
-import { getTodayIfDateStale, JOURNEYS_ROUTE, shouldResetJourneysDate } from "@/pages/journeysDateSync";
+import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { formatTime12 } from "@/components/quest-shared";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
@@ -80,8 +80,7 @@ const Journeys = () => {
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
-  const previousPathRef = useRef<string | null>(location.pathname);
-  const activePathRef = useRef(location.pathname);
+  const previousIsTabActiveRef = useRef(isTabActive);
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -98,22 +97,16 @@ const Journeys = () => {
     isResolving 
   } = useStreakAtRisk();
 
-  useEffect(() => {
-    activePathRef.current = location.pathname;
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const previousPath = previousPathRef.current;
-    if (shouldResetJourneysDate(previousPath, location.pathname)) {
-      setSelectedDate(() => new Date());
-    }
-    previousPathRef.current = location.pathname;
-  }, [location.pathname]);
-
-  const syncSelectedDateToTodayIfJourneysActive = useCallback(() => {
-    if (activePathRef.current !== JOURNEYS_ROUTE) return;
+  const syncSelectedDateToTodayIfStale = useCallback(() => {
     setSelectedDate((currentDate) => getTodayIfDateStale(currentDate));
   }, []);
+
+  useEffect(() => {
+    if (isTabActive && !previousIsTabActiveRef.current) {
+      syncSelectedDateToTodayIfStale();
+    }
+    previousIsTabActiveRef.current = isTabActive;
+  }, [isTabActive, syncSelectedDateToTodayIfStale]);
 
   useEffect(() => {
     if (!isTabActive) return;
@@ -121,14 +114,14 @@ const Journeys = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
-      syncSelectedDateToTodayIfJourneysActive();
+      syncSelectedDateToTodayIfStale();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isTabActive, syncSelectedDateToTodayIfJourneysActive]);
+  }, [isTabActive, syncSelectedDateToTodayIfStale]);
 
   useEffect(() => {
     if (!isTabActive) return;
@@ -140,7 +133,7 @@ const Journeys = () => {
     const setupListener = async () => {
       const handle = await CapacitorApp.addListener("appStateChange", ({ isActive }) => {
         if (!isActive) return;
-        syncSelectedDateToTodayIfJourneysActive();
+        syncSelectedDateToTodayIfStale();
       });
 
       if (isDisposed) {
@@ -159,7 +152,7 @@ const Journeys = () => {
         void listenerHandle.remove();
       }
     };
-  }, [isTabActive, syncSelectedDateToTodayIfJourneysActive]);
+  }, [isTabActive, syncSelectedDateToTodayIfStale]);
   
   // Combo tracking
   

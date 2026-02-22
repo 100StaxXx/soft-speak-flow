@@ -24,6 +24,7 @@ import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDisplayLabel } from "@/lib/utils";
+import { deriveCompanionPalette } from "@/lib/companionPalette";
 import {
   useState,
   useEffect,
@@ -327,6 +328,17 @@ export const CompanionDisplay = memo(() => {
     };
   }, []);
 
+  const companionPalette = useMemo(
+    () =>
+      deriveCompanionPalette({
+        coreElement: companion?.core_element,
+        favoriteColor: companion?.favorite_color,
+        stage: companion?.current_stage,
+        companionId: companion?.id,
+      }),
+    [companion?.core_element, companion?.favorite_color, companion?.current_stage, companion?.id],
+  );
+
   // Fetch creature name from evolution cards if not cached
   useEffect(() => {
     const fetchCreatureName = async () => {
@@ -375,7 +387,10 @@ export const CompanionDisplay = memo(() => {
 
   return (
     <>
-      <Card className="relative overflow-hidden bg-card/25 backdrop-blur-2xl border-celestial-blue/20 hover:border-nebula-pink/40 transition-all duration-500 animate-scale-in">
+      <Card
+        className="relative overflow-hidden bg-card/25 backdrop-blur-2xl border transition-all duration-500 animate-scale-in"
+        style={{ borderColor: companionPalette.chipBorder }}
+      >
         {/* Equipped background or default nebula gradients */}
         {equippedBackgroundStyle ? (
           <div 
@@ -384,9 +399,24 @@ export const CompanionDisplay = memo(() => {
           />
         ) : (
           <>
-            <div className="absolute inset-0 bg-gradient-to-br from-nebula-pink/10 via-celestial-blue/10 to-cosmiq-glow/10 opacity-60 animate-nebula-shift" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--celestial-blue)/0.2),transparent_50%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--nebula-pink)/0.2),transparent_50%)]" />
+            <div
+              className={`absolute inset-0 opacity-60 ${!prefersReducedMotion ? "animate-nebula-shift" : ""}`}
+              style={{
+                background: `linear-gradient(135deg, ${companionPalette.cardGradientA}, ${companionPalette.cardGradientB})`,
+              }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `radial-gradient(circle at top right, ${companionPalette.glow}, transparent 52%)`,
+              }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `radial-gradient(circle at bottom left, ${companionPalette.badgeBorder}, transparent 56%)`,
+              }}
+            />
           </>
         )}
         
@@ -395,7 +425,12 @@ export const CompanionDisplay = memo(() => {
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
               <div className="flex items-center">
-                <h2 className={`text-3xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent ${!prefersReducedMotion ? 'animate-gradient' : ''}`}>
+                <h2
+                  className={`text-3xl font-heading font-black bg-clip-text text-transparent ${!prefersReducedMotion ? 'animate-gradient' : ''}`}
+                  style={{
+                    backgroundImage: `linear-gradient(90deg, ${companionPalette.accentText}, ${companionPalette.badgeText}, ${companionPalette.accentText})`,
+                  }}
+                >
                   {stageName}
                 </h2>
                 <AttributeTooltip title="Stage" description="Your companion's evolution stage" />
@@ -404,13 +439,21 @@ export const CompanionDisplay = memo(() => {
                 Stage {companion.current_stage}
               </p>
             </div>
-            <div className={`h-14 w-14 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shadow-glow ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true">
-              <Sparkles className="h-7 w-7 text-primary" />
+            <div
+              className={`h-14 w-14 rounded-full flex items-center justify-center ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
+              style={{
+                background: companionPalette.badgeBg,
+                boxShadow: `0 0 26px ${companionPalette.glow}`,
+                border: `1px solid ${companionPalette.badgeBorder}`,
+              }}
+              aria-hidden="true"
+            >
+              <Sparkles className="h-7 w-7" style={{ color: companionPalette.accentText }} />
             </div>
           </div>
 
           {/* Companion Name - Centered */}
-          <p className="text-center text-2xl font-semibold text-primary/90 tracking-wide -mt-1">
+          <p className="text-center text-2xl font-semibold tracking-wide -mt-1" style={{ color: companionPalette.accentText }}>
             {creatureName || 'Companion'}
           </p>
 
@@ -505,6 +548,8 @@ export const CompanionDisplay = memo(() => {
                 element={companion.core_element} 
                 stage={companion.current_stage}
                 showStage={true}
+                favoriteColor={companion.favorite_color}
+                companionId={companion.id}
               />
               <CompanionBondBadge />
             </div>

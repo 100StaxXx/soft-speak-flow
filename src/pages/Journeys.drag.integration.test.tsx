@@ -83,6 +83,17 @@ vi.mock("@/components/DatePillsScroller", () => ({
         >
           set-same-day-non-current
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            const staleDate = new Date();
+            staleDate.setDate(staleDate.getDate() - 3);
+            staleDate.setHours(12, 0, 0, 0);
+            onDateSelect(staleDate);
+          }}
+        >
+          set-stale-day
+        </button>
       </div>
     );
   },
@@ -638,7 +649,7 @@ describe("Journeys row drag integration", () => {
     });
   });
 
-  it("resets selected date to current day when returning to /journeys", async () => {
+  it("does not reset selected date from pathname changes alone", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -681,13 +692,15 @@ describe("Journeys row drag integration", () => {
     const initialSelectedDate = new Date(initialSelectedDateIso);
     expect(isSameDay(initialSelectedDate, new Date())).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "set-same-day-non-current" }));
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
 
-    let manuallySelectedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    let staleSelectedDate = new Date(staleSelectedDateIso);
     await waitFor(() => {
-      manuallySelectedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
-      expect(manuallySelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
-      expect(isSameDay(manuallySelectedDate, new Date())).toBe(true);
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      staleSelectedDate = new Date(staleSelectedDateIso);
+      expect(staleSelectedDate.getTime()).not.toBe(initialSelectedDate.getTime());
+      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "go-inbox" }));
@@ -702,10 +715,100 @@ describe("Journeys row drag integration", () => {
 
     await waitFor(() => {
       const reenteredDateIso = screen.getByTestId("selected-date-iso").textContent as string;
-      const reenteredDate = new Date(reenteredDateIso);
+      expect(reenteredDateIso).toBe(staleSelectedDateIso);
+    });
+  });
 
-      expect(reenteredDate.getTime()).not.toBe(manuallySelectedDate.getTime());
-      expect(isSameDay(reenteredDate, new Date())).toBe(true);
+  it("resets stale selected date when quests tab becomes active again", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    let staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    let staleSelectedDate = new Date(staleSelectedDateIso);
+    await waitFor(() => {
+      staleSelectedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      staleSelectedDate = new Date(staleSelectedDateIso);
+      expect(isSameDay(staleSelectedDate, new Date())).toBe(false);
+    });
+
+    mocks.isTabActive = false;
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    mocks.isTabActive = true;
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      const activeDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      const activeDate = new Date(activeDateIso);
+      expect(activeDateIso).not.toBe(staleSelectedDateIso);
+      expect(isSameDay(activeDate, new Date())).toBe(true);
+    });
+  });
+
+  it("resets stale selected date on app foreground visibility sync", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-stale-day" }));
+
+    await waitFor(() => {
+      const staleDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+      expect(isSameDay(staleDate, new Date())).toBe(false);
+    });
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await waitFor(() => {
+      const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
+      expect(isSameDay(refreshedDate, new Date())).toBe(true);
     });
   });
 });
