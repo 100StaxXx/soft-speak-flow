@@ -57,6 +57,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     previousScrollLeft: number;
   } | null>(null);
   const isExpandingRef = useRef(false);
+  const pendingCenterAfterExpansionRef = useRef(false);
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollResetTimeoutRef = useRef<number | null>(null);
   const scrollIdleTimeoutRef = useRef<number | null>(null);
@@ -67,6 +68,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const [centerRequestVersion, setCenterRequestVersion] = useState(0);
 
   const extensionChunk = Math.max(DEFAULT_EXTENSION_CHUNK, daysToShow);
+  const selectedDateKey = useMemo(() => format(selectedDate, "yyyy-MM-dd"), [selectedDate]);
 
   useEffect(() => {
     const nextRange = getInitialRange(selectedDate, daysToShow);
@@ -98,15 +100,25 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     [tasksPerDay],
   );
 
-  const calculateEdgeSpacerWidth = useCallback(() => {
+  const getSelectedPillElement = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return null;
 
     const selected = selectedRef.current;
-    const measuredPill =
-      selected ??
-      container.querySelector<HTMLButtonElement>("button[data-date-pill='true']");
+    if (selected?.dataset.dateKey === selectedDateKey) {
+      return selected;
+    }
 
+    return container.querySelector<HTMLButtonElement>(
+      `button[data-date-pill='true'][data-date-key='${selectedDateKey}']`,
+    );
+  }, [selectedDateKey]);
+
+  const calculateEdgeSpacerWidth = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container) return null;
+
+    const measuredPill = getSelectedPillElement();
     if (!measuredPill) return null;
 
     const containerWidth = container.offsetWidth;
@@ -114,7 +126,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     if (containerWidth === 0 || pillWidth === 0) return null;
 
     return Math.max(0, containerWidth / 2 - pillWidth / 2);
-  }, []);
+  }, [getSelectedPillElement]);
 
   const recalculateEdgeSpacers = useCallback(() => {
     const nextWidth = calculateEdgeSpacerWidth();
@@ -167,7 +179,13 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
-    if (!container || isExpandingRef.current) return;
+    if (!container) return;
+    if (isExpandingRef.current) {
+      if (!isProgrammaticScrollRef.current) {
+        pendingCenterAfterExpansionRef.current = true;
+      }
+      return;
+    }
 
     if (!isProgrammaticScrollRef.current) {
       scheduleCenterAfterScrollIdle();
@@ -177,6 +195,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     if (scrollLeft <= EDGE_THRESHOLD_PX) {
       isExpandingRef.current = true;
+      pendingCenterAfterExpansionRef.current = true;
       pendingLeftCompensationRef.current = {
         previousScrollWidth: scrollWidth,
         previousScrollLeft: scrollLeft,
@@ -187,6 +206,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
     if (scrollLeft + clientWidth >= scrollWidth - EDGE_THRESHOLD_PX) {
       isExpandingRef.current = true;
+      pendingCenterAfterExpansionRef.current = true;
       setRangeEnd((currentEnd) => addDays(currentEnd, extensionChunk));
     }
   }, [extensionChunk, scheduleCenterAfterScrollIdle]);
@@ -209,6 +229,10 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       typeof window !== "undefined"
         ? window.requestAnimationFrame(() => {
             isExpandingRef.current = false;
+            if (pendingCenterAfterExpansionRef.current) {
+              pendingCenterAfterExpansionRef.current = false;
+              requestCenterSelectedDate();
+            }
           })
         : null;
 
@@ -217,7 +241,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frame);
       }
     };
-  }, [rangeEnd, rangeStart]);
+  }, [rangeEnd, rangeStart, requestCenterSelectedDate]);
 
   useLayoutEffect(() => {
     recalculateEdgeSpacers();
@@ -262,7 +286,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       if (isCancelled) return;
 
       const container = scrollRef.current;
-      const selected = selectedRef.current;
+      const selected = getSelectedPillElement();
 
       if (!container || !selected) {
         if (remainingAttempts > 0 && typeof window !== "undefined") {
@@ -329,7 +353,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [calculateEdgeSpacerWidth, centerRequestVersion, dates, edgeSpacerWidth, isActive, markProgrammaticScroll, selectedDate]);
+  }, [calculateEdgeSpacerWidth, centerRequestVersion, dates, edgeSpacerWidth, getSelectedPillElement, isActive, markProgrammaticScroll, selectedDate]);
 
   return (
     <div
@@ -355,6 +379,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
             key={dateKey}
             ref={isSelected ? selectedRef : undefined}
             data-date-pill="true"
+            data-date-key={dateKey}
             onClick={async () => {
               await triggerHaptic(ImpactStyle.Light);
               onDateSelect(date);

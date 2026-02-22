@@ -469,6 +469,71 @@ describe("DatePillsScroller", () => {
     }
   });
 
+  it("centers the selected date pill even when today is a different date", async () => {
+    const onDateSelect = vi.fn();
+    const scrollToSpy = vi.fn();
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-22T12:00:00.000Z"));
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToSpy,
+    });
+
+    try {
+      const { rerender, container } = render(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-19T08:00:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      const scroller = container.querySelector("div.overflow-x-auto") as HTMLDivElement;
+      const selectedButton = scroller.querySelector("button[data-date-key='2026-02-19']") as HTMLButtonElement;
+      const todayButton = scroller.querySelector("button[data-date-key='2026-02-22']") as HTMLButtonElement;
+      expect(selectedButton).toBeTruthy();
+      expect(todayButton).toBeTruthy();
+
+      setCenteringMetrics(scroller, selectedButton, {
+        scrollLeft: 0,
+        scrollWidth: 1400,
+        containerWidth: 220,
+        selectedLeft: 520,
+        selectedWidth: 60,
+      });
+      Object.defineProperty(todayButton, "offsetLeft", {
+        configurable: true,
+        value: 140,
+      });
+      Object.defineProperty(todayButton, "offsetWidth", {
+        configurable: true,
+        value: 60,
+      });
+
+      scrollToSpy.mockClear();
+      rerender(
+        <DatePillsScroller
+          selectedDate={new Date("2026-02-19T20:30:00.000Z")}
+          onDateSelect={onDateSelect}
+        />,
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(scrollToSpy).toHaveBeenCalledTimes(1);
+      expect(scroller.scrollLeft).toBe(440);
+      expect(scroller.scrollLeft).not.toBe(60);
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        value: originalScrollTo,
+      });
+    }
+  });
+
   it("re-centers after horizontal scrolling settles", async () => {
     const onDateSelect = vi.fn();
     const scrollToSpy = vi.fn();
