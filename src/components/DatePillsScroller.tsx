@@ -23,7 +23,7 @@ interface DatePillsScrollerProps {
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
-const SCROLL_IDLE_DELAY_MS = 100;
+const SCROLL_IDLE_DELAY_MS = 3000;
 const PROGRAMMATIC_SCROLL_GUARD_MS = 500;
 
 const triggerHaptic = async (style: ImpactStyle) => {

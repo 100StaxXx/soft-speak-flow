@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import { motion, useScroll, useTransform, useSpring, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Capacitor } from "@capacitor/core";
 
 interface ParallaxCardProps {
   children: React.ReactNode;
@@ -21,10 +22,7 @@ export const ParallaxCard = ({
   const prefersReducedMotion = useReducedMotion();
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
-    const capacitor = (window as Window & {
-      Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
-    }).Capacitor;
-    return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
   }, []);
   const disableParallax = prefersReducedMotion || isNativeIOS;
   

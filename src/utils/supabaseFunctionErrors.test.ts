@@ -108,6 +108,12 @@ describe("supabaseFunctionErrors", () => {
       isOffline: false,
       status: 503,
     };
+    const serverParsedWithMessage: ParsedFunctionInvokeError = {
+      category: "http",
+      isOffline: false,
+      status: 500,
+      backendMessage: "No themes configured for mentor: solace",
+    };
     const unknownParsed: ParsedFunctionInvokeError = {
       category: "unknown",
       isOffline: false,
@@ -121,6 +127,7 @@ describe("supabaseFunctionErrors", () => {
     ).toContain("session has expired");
     expect(toUserFacingFunctionError(rateLimitParsed)).toBe("Daily limit reached");
     expect(toUserFacingFunctionError(serverParsed)).toContain("temporarily unavailable");
+    expect(toUserFacingFunctionError(serverParsedWithMessage)).toBe("No themes configured for mentor: solace");
     expect(
       toUserFacingFunctionError(unknownParsed, { action: "evolve your companion" }),
     ).toBe("Unable to evolve your companion. Please try again.");

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { logger } from "@/utils/logger";
+import { Capacitor } from "@capacitor/core";
 
 export type MotionProfile = "reduced" | "balanced" | "enhanced";
 
@@ -25,10 +26,7 @@ interface MotionProfileState {
 
 const getNativeIOS = () => {
   if (typeof window === "undefined") return false;
-  const capacitor = (window as Window & {
-    Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string };
-  }).Capacitor;
-  return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 };
 
 const readReducedMotionPreference = () => {

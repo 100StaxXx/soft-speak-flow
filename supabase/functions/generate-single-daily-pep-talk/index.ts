@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
+import { selectThemeForDate, resolveMentorSlug } from "../_shared/mentorPepTalkConfig.ts";
 import {
   buildReadyTranscriptState,
   buildRetryTranscriptState,
@@ -13,47 +14,55 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const mentorDailyThemes: Record<string, any[]> = {
-  atlas: [
-    { topic_category: 'focus', intensity: 'medium', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['In Transition', 'Self-Doubt'] },
-    { topic_category: 'business', intensity: 'medium', triggers: ['In Transition', 'Avoiding Action'] }
-  ],
-  darius: [
-    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline', 'Unmotivated'] },
-    { topic_category: 'business', intensity: 'medium', triggers: ['Feeling Stuck', 'In Transition'] }
-  ],
-  eli: [
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Emotionally Hurt'] }
-  ],
-  nova: [
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] },
-    { topic_category: 'focus', intensity: 'medium', triggers: ['Avoiding Action', 'Exhausted'] }
-  ],
-  sienna: [
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Emotionally Hurt', 'Heavy or Low'] },
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] }
-  ],
-  lumi: [
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Anxious & Overthinking'] },
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Heavy or Low', 'Unmotivated'] }
-  ],
-  kai: [
-    { topic_category: 'discipline', intensity: 'medium', triggers: ['Needing Discipline', 'Unmotivated'] },
-    { topic_category: 'physique', intensity: 'medium', triggers: ['Unmotivated', 'Feeling Stuck'] }
-  ],
-  stryker: [
-    { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] }
-  ],
-  solace: [
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Heavy or Low', 'Emotionally Hurt'] },
-    { topic_category: 'focus', intensity: 'soft', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] }
-  ]
-};
+interface ErrorResponseDetails {
+  code?: string;
+  upstreamStatus?: number;
+  upstreamError?: string | null;
+}
 
-function generateTitle(mentorSlug: string, category: string): string {
+function normalizeStatus(status: number): number {
+  if (!Number.isFinite(status)) return 500;
+  if (status < 400 || status > 599) return 500;
+  return status;
+}
+
+function buildErrorResponse(
+  status: number,
+  message: string,
+  details: ErrorResponseDetails = {},
+): Response {
+  const payload: Record<string, unknown> = { error: message };
+
+  if (details.code) payload.code = details.code;
+  if (typeof details.upstreamStatus === "number") payload.upstream_status = details.upstreamStatus;
+  if (typeof details.upstreamError === "string" && details.upstreamError.length > 0) {
+    payload.upstream_error = details.upstreamError;
+  }
+
+  return new Response(
+    JSON.stringify(payload),
+    { status: normalizeStatus(status), headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+function parseUpstreamError(rawBody: string): string | null {
+  const trimmed = rawBody.trim();
+  if (trimmed.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const message = typeof parsed.error === "string"
+      ? parsed.error
+      : typeof parsed.message === "string"
+        ? parsed.message
+        : null;
+    return message ?? trimmed.slice(0, 300);
+  } catch {
+    return trimmed.slice(0, 300);
+  }
+}
+
+function generateTitle(_mentorSlug: string, category: string): string {
   const titles: Record<string, string[]> = {
     discipline: ['Lock In and Execute', 'Stay Consistent Today', 'Build Your Discipline', 'No Excuses, Just Action'],
     confidence: ['Step Into Your Power', 'Believe in Yourself', 'Own Your Worth', 'Rise Above Doubt'],
@@ -87,16 +96,27 @@ serve(async (req) => {
   }
 
   try {
-    const { mentorSlug } = await req.json();
-
-    if (!mentorSlug) {
-      throw new Error('mentorSlug is required');
+    let mentorSlugInput: string | null = null;
+    try {
+      const body = await req.json();
+      mentorSlugInput = body && typeof body.mentorSlug === "string" ? body.mentorSlug : null;
+    } catch {
+      return buildErrorResponse(400, "Invalid request payload", { code: "INVALID_JSON" });
     }
 
-    console.log(`Starting single pep talk generation for mentor: ${mentorSlug}`);
+    if (!mentorSlugInput || mentorSlugInput.trim().length === 0) {
+      return buildErrorResponse(400, "mentorSlug is required", { code: "INVALID_REQUEST" });
+    }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const requestedMentorSlug = mentorSlugInput.trim().toLowerCase();
+    const resolvedMentorSlug = resolveMentorSlug(requestedMentorSlug) ?? requestedMentorSlug;
+    console.log(`Starting single pep talk generation for mentor: ${requestedMentorSlug} (resolved=${resolvedMentorSlug})`);
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return buildErrorResponse(500, "Missing Supabase environment variables", { code: "MISSING_ENV" });
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get today's date
@@ -108,50 +128,48 @@ serve(async (req) => {
     const { data: existing, error: checkError } = await supabase
       .from('daily_pep_talks')
       .select('*')
-      .eq('mentor_slug', mentorSlug)
+      .eq('mentor_slug', resolvedMentorSlug)
       .eq('for_date', todayDate)
       .maybeSingle();
 
     if (checkError) {
       console.error('Error checking existing pep talk:', checkError);
-      throw new Error('Failed to check existing pep talk');
+      return buildErrorResponse(500, "Failed to check existing pep talk", { code: "DB_CHECK_FAILED" });
     }
 
     // If already exists, return it
     if (existing) {
-      console.log(`Pep talk already exists for ${mentorSlug} on ${todayDate}, returning existing`);
+      console.log(`Pep talk already exists for ${resolvedMentorSlug} on ${todayDate}, returning existing`);
       return new Response(
         JSON.stringify({ pepTalk: existing, status: 'existing' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get mentor themes
-    const themes = mentorDailyThemes[mentorSlug];
-    if (!themes || themes.length === 0) {
-      throw new Error(`No themes configured for mentor: ${mentorSlug}`);
+    const { theme, usedFallbackTheme } = selectThemeForDate(resolvedMentorSlug, today);
+    if (usedFallbackTheme) {
+      console.warn(`Using fallback pep talk theme for mentor: ${resolvedMentorSlug}`);
     }
 
-    // Select theme based on day of year (consistent rotation)
-    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
-    const themeIndex = dayOfYear % themes.length;
-    const theme = themes[themeIndex];
-    
-    console.log(`Selected theme for ${mentorSlug}:`, theme);
+    console.log(`Selected theme for ${resolvedMentorSlug}:`, theme);
 
     // Fetch mentor details
     const { data: mentor, error: mentorError } = await supabase
       .from('mentors')
       .select('*')
-      .eq('slug', mentorSlug)
+      .eq('slug', resolvedMentorSlug)
       .maybeSingle();
 
-    if (mentorError || !mentor) {
-      throw new Error(`Mentor not found: ${mentorSlug}`);
+    if (mentorError) {
+      return buildErrorResponse(500, "Failed to fetch mentor", { code: "MENTOR_FETCH_FAILED" });
+    }
+
+    if (!mentor) {
+      return buildErrorResponse(404, `Mentor not found: ${resolvedMentorSlug}`, { code: "MENTOR_NOT_FOUND" });
     }
 
     // Generate pep talk using existing function via direct fetch (edge-to-edge call)
-    console.log(`Calling generate-full-mentor-audio for ${mentorSlug}...`);
+    console.log(`Calling generate-full-mentor-audio for ${resolvedMentorSlug}...`);
     
     const audioResponse = await fetch(
       `${supabaseUrl}/functions/v1/generate-full-mentor-audio`,
@@ -162,7 +180,7 @@ serve(async (req) => {
           'Authorization': `Bearer ${supabaseServiceKey}`,
         },
         body: JSON.stringify({
-          mentorSlug: mentorSlug,
+          mentorSlug: resolvedMentorSlug,
           topic_category: theme.topic_category,
           intensity: theme.intensity,
           emotionalTriggers: theme.triggers
@@ -171,30 +189,49 @@ serve(async (req) => {
     );
 
     if (!audioResponse.ok) {
-      const errorText = await audioResponse.text();
-      console.error('Error generating audio:', audioResponse.status, errorText);
-      throw new Error(`Audio generation failed: ${audioResponse.status}`);
+      const upstreamRaw = await audioResponse.text();
+      const upstreamError = parseUpstreamError(upstreamRaw);
+      console.error('Error generating audio:', audioResponse.status, upstreamRaw);
+      return buildErrorResponse(
+        audioResponse.status,
+        "Failed to prepare pep talk audio",
+        {
+          code: "AUDIO_PIPELINE_FAILED",
+          upstreamStatus: audioResponse.status,
+          upstreamError,
+        },
+      );
     }
 
-    const generatedData = await audioResponse.json();
+    let generatedData: Record<string, unknown>;
+    try {
+      generatedData = await audioResponse.json() as Record<string, unknown>;
+    } catch {
+      return buildErrorResponse(502, "Invalid response from audio generation pipeline", {
+        code: "AUDIO_PIPELINE_INVALID_RESPONSE",
+      });
+    }
 
-    const { script, audioUrl } = generatedData;
+    const script = typeof generatedData.script === "string" ? generatedData.script : null;
+    const audioUrl = typeof generatedData.audioUrl === "string" ? generatedData.audioUrl : null;
     
     if (!script || !audioUrl) {
-      throw new Error('Incomplete generation response - missing script or audioUrl');
+      return buildErrorResponse(502, "Incomplete generation response", {
+        code: "AUDIO_PIPELINE_INCOMPLETE_RESPONSE",
+      });
     }
 
     // Generate title and summary
-    const title = generateTitle(mentorSlug, theme.topic_category);
+    const title = generateTitle(resolvedMentorSlug, theme.topic_category);
     const summary = generateSummary(theme.topic_category);
 
-    console.log(`Generated content for ${mentorSlug}: ${title}`);
+    console.log(`Generated content for ${resolvedMentorSlug}: ${title}`);
 
     // Insert into daily_pep_talks
     const { data: dailyPepTalk, error: dailyInsertError } = await supabase
       .from('daily_pep_talks')
       .insert({
-        mentor_slug: mentorSlug,
+        mentor_slug: resolvedMentorSlug,
         topic_category: theme.topic_category,
         emotional_triggers: theme.triggers,
         intensity: theme.intensity,
@@ -212,11 +249,11 @@ serve(async (req) => {
 
     if (dailyInsertError) {
       console.error('Error inserting daily pep talk:', dailyInsertError);
-      throw new Error('Failed to save pep talk');
+      return buildErrorResponse(500, "Failed to save pep talk", { code: "DAILY_PEP_TALK_INSERT_FAILED" });
     }
 
     // Also insert into main pep_talks library
-    await supabase
+    const { error: libraryInsertError } = await supabase
       .from('pep_talks')
       .insert({
         title,
@@ -227,7 +264,7 @@ serve(async (req) => {
         topic_category: [theme.topic_category],
         emotional_triggers: theme.triggers,
         intensity: theme.intensity,
-        mentor_slug: mentorSlug,
+        mentor_slug: resolvedMentorSlug,
         mentor_id: mentor.id,
         source: 'user_generated',
         for_date: todayDate,
@@ -235,6 +272,9 @@ serve(async (req) => {
         is_premium: false,
         transcript: []
       });
+    if (libraryInsertError) {
+      console.error("Error inserting pep talk into library (non-blocking):", libraryInsertError);
+    }
 
     const currentAttemptCount = dailyPepTalk.transcript_attempt_count ?? 0;
     const persistTranscriptState = async (payload: Record<string, unknown>) => {
@@ -260,7 +300,7 @@ serve(async (req) => {
         console.error(`Transcript sync failed for ${dailyPepTalk.id}:`, summary);
         const retryState = buildRetryTranscriptState({
           currentAttemptCount,
-          errorMessage: typeof summary === "string" ? summary : "Transcript sync failed",
+          errorMessage: typeof summary.body === "string" ? summary.body : summary.message,
         });
         await persistTranscriptState(retryState.update);
       } else {
@@ -301,13 +341,13 @@ serve(async (req) => {
       console.error(`Transcript sync threw for ${dailyPepTalk.id}:`, summary);
       const retryState = buildRetryTranscriptState({
         currentAttemptCount,
-        errorMessage: typeof summary === "string" ? summary : "Transcript sync threw",
+        errorMessage: typeof summary.body === "string" ? summary.body : summary.message,
       });
       await persistTranscriptState(retryState.update);
       // Keep pep talk generation successful even when transcript sync fails.
     }
 
-    console.log(`✓ Successfully generated daily pep talk for ${mentorSlug}`);
+    console.log(`✓ Successfully generated daily pep talk for ${resolvedMentorSlug}`);
 
     return new Response(
       JSON.stringify({ 
@@ -320,9 +360,6 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in generate-single-daily-pep-talk:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return buildErrorResponse(500, errorMessage, { code: "INTERNAL_ERROR" });
   }
 });

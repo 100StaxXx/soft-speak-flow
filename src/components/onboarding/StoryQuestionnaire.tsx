@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -99,11 +99,18 @@ export interface OnboardingAnswer {
 interface StoryQuestionnaireProps {
   faction: FactionType;
   onComplete: (answers: OnboardingAnswer[]) => void;
+  isSubmitting?: boolean;
 }
 
-export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnaireProps) => {
+export const StoryQuestionnaire = ({
+  faction,
+  onComplete,
+  isSubmitting = false,
+}: StoryQuestionnaireProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswer[]>([]);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const answerLockRef = useRef(false);
 
   // Memoize star positions to prevent them from jumping on re-render
   const starPositions = useMemo(() => 
@@ -125,9 +132,20 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
   };
   const factionColor = factionColors[faction];
 
-  const canGoBack = currentIndex > 0;
+  const controlsLocked = isSubmitting || isTransitioning;
+  const canGoBack = currentIndex > 0 && !controlsLocked;
+
+  useEffect(() => {
+    if (isSubmitting) return;
+    answerLockRef.current = false;
+    setIsTransitioning(false);
+  }, [isSubmitting, currentIndex]);
 
   const handleAnswer = (option: QuestionOption) => {
+    if (controlsLocked || answerLockRef.current) return;
+    answerLockRef.current = true;
+    setIsTransitioning(true);
+
     const newAnswer: OnboardingAnswer = {
       questionId: currentQuestion.id,
       optionId: option.optionId,
@@ -147,7 +165,9 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
 
   const handleBack = () => {
     if (!canGoBack) return;
+    answerLockRef.current = false;
     setAnswers((prev) => prev.slice(0, -1));
+    setIsTransitioning(false);
     setCurrentIndex((prev) => Math.max(0, prev - 1));
   };
 
@@ -199,6 +219,11 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
           </span>
         </div>
         <Progress value={progress} className="h-2" />
+        {isSubmitting ? (
+          <p className="mt-3 text-center text-xs uppercase tracking-[0.14em] text-white/70">
+            Matching your mentor...
+          </p>
+        ) : null}
       </motion.div>
 
       {/* Question Content */}
@@ -244,6 +269,7 @@ export const StoryQuestionnaire = ({ faction, onComplete }: StoryQuestionnairePr
                   <Button
                     variant="outline"
                     onClick={() => handleAnswer(option)}
+                    disabled={controlsLocked}
                     className="w-full flex items-center text-left gap-4 sm:gap-5 min-h-[88px] py-5 px-5 text-white border border-white/15 rounded-2xl hover:border-white/40 bg-black/30 backdrop-blur-xl hover:bg-black/40 transition-all shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
                     style={{
                       ["--hover-bg" as string]: `${factionColor}20`,

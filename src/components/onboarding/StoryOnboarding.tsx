@@ -60,12 +60,36 @@ export const resolveOnboardingBackdropStage = (
 
 export const resolveQuestionnaireCompletionStage = (): OnboardingStage => "calculating";
 export const CALCULATING_STAGE_DURATION_MS = 2_000;
+export const QUESTIONNAIRE_PIPELINE_TIMEOUT_MS = 8_000;
 
 export const scheduleMentorRevealTransition = (
   onComplete: () => void,
   setTimeoutFn: (handler: () => void, timeout: number) => ReturnType<typeof setTimeout> = setTimeout,
 ): ReturnType<typeof setTimeout> => {
   return setTimeoutFn(onComplete, CALCULATING_STAGE_DURATION_MS);
+};
+
+export const runWithTimeout = async <T,>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  timeoutLabel: string,
+): Promise<T> => {
+  return await new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(timeoutLabel));
+    }, timeoutMs);
+
+    operation.then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
 };
 
 interface Mentor {
@@ -146,6 +170,7 @@ export const StoryOnboarding = () => {
   const [mentorExplanation, setMentorExplanation] = useState<MentorExplanation | null>(null);
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
+  const [isSubmittingQuestionnaire, setIsSubmittingQuestionnaire] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
   const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backdropStage = resolveOnboardingBackdropStage(stage);
@@ -299,71 +324,108 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 };
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
+    if (isSubmittingQuestionnaire) {
+      return;
+    }
+
     clearMentorRevealTimeout();
+    setIsSubmittingQuestionnaire(true);
     setAnswers(questionAnswers);
-    const mentorPool = mentors.length > 0 ? mentors : await fetchActiveMentors();
+    setStage(resolveQuestionnaireCompletionStage());
 
-    if (mentors.length === 0 && mentorPool.length > 0) {
-      setMentors(mentorPool);
-    }
+    try {
+      const mentorPool = await runWithTimeout(
+        mentors.length > 0 ? Promise.resolve(mentors) : fetchActiveMentors(),
+        QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
+        "mentor_pipeline_timeout",
+      );
 
-    if (mentorPool.length === 0) {
-      onboardingLog.error("Mentor recommendation aborted: no active mentors available");
-      toast.error("Mentor catalog is temporarily unavailable. Please try again in a moment.");
-      setStage("questionnaire");
-      return;
-    }
-
-    const assignment = resolveAssignedMentorFromActiveMentors(questionAnswers, mentorPool);
-    const bestMatch = assignment.mentor;
-
-    if (bestMatch) {
-      if (assignment.usedFallback) {
-        onboardingLog.warn("Preassigned mentor unavailable; using same-energy fallback", {
-          requestedSlug: assignment.requestedSlug,
-          resolvedSlug: assignment.resolvedSlug,
-          mentorPoolCount: mentorPool.length,
-        });
+      if (mentors.length === 0 && mentorPool.length > 0) {
+        setMentors(mentorPool);
       }
 
-      setRecommendedMentor(bestMatch);
-      setCompatibilityScore(null);
+      if (mentorPool.length === 0) {
+        onboardingLog.error("Mentor recommendation aborted: no active mentors available");
+        toast.error("Mentor catalog is temporarily unavailable. Please try again in a moment.");
+        setStage("questionnaire");
+        return;
+      }
 
-      // Convert answers to Record format for explanation generator
-      const selectedAnswers: Record<string, string> = {};
-      questionAnswers.forEach(answer => {
-        selectedAnswers[answer.questionId] = answer.tags[0] || "";
-      });
+      const assignment = resolveAssignedMentorFromActiveMentors(questionAnswers, mentorPool);
+      const bestMatch = assignment.mentor;
 
-      // Generate explanation
-      const explanation = generateMentorExplanation(bestMatch, selectedAnswers);
-      setMentorExplanation(explanation);
-
-      // Save questionnaire responses
-      if (user) {
-        for (const answer of questionAnswers) {
-          await supabase.from("questionnaire_responses").upsert({
-            user_id: user.id,
-            question_id: answer.questionId,
-            answer_tags: answer.tags,
-          }, { onConflict: "user_id,question_id" });
+      if (bestMatch) {
+        if (assignment.usedFallback) {
+          onboardingLog.warn("Preassigned mentor unavailable; using same-energy fallback", {
+            requestedSlug: assignment.requestedSlug,
+            resolvedSlug: assignment.resolvedSlug,
+            mentorPoolCount: mentorPool.length,
+          });
         }
+
+        setRecommendedMentor(bestMatch);
+        setCompatibilityScore(null);
+
+        // Convert answers to Record format for explanation generator
+        const selectedAnswers: Record<string, string> = {};
+        questionAnswers.forEach(answer => {
+          selectedAnswers[answer.questionId] = answer.tags[0] || "";
+        });
+
+        // Generate explanation
+        const explanation = generateMentorExplanation(bestMatch, selectedAnswers);
+        setMentorExplanation(explanation);
+
+        // Persist questionnaire responses without blocking mentor reveal.
+        if (user) {
+          void Promise.all(
+            questionAnswers.map((answer) =>
+              supabase.from("questionnaire_responses").upsert({
+                user_id: user.id,
+                question_id: answer.questionId,
+                answer_tags: answer.tags,
+              }, { onConflict: "user_id,question_id" })
+            ),
+          )
+            .then((results) => {
+              const failedWrites = results.filter((result) => result.error);
+              if (failedWrites.length > 0) {
+                onboardingLog.warn("Some questionnaire responses failed to persist", {
+                  failedCount: failedWrites.length,
+                  userId: user.id,
+                });
+              }
+            })
+            .catch((error: unknown) => {
+              onboardingLog.warn("Questionnaire response persistence failed", {
+                userId: user.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            });
+        }
+
+        mentorRevealTimeoutRef.current = scheduleMentorRevealTransition(() => {
+          setStage("mentor-result");
+          mentorRevealTimeoutRef.current = null;
+        });
+        return;
       }
 
-      setStage(resolveQuestionnaireCompletionStage());
-      mentorRevealTimeoutRef.current = scheduleMentorRevealTransition(() => {
-        setStage("mentor-result");
-        mentorRevealTimeoutRef.current = null;
+      onboardingLog.error("Preassigned mentor resolution failed with non-empty mentor pool", {
+        requestedSlug: assignment.requestedSlug,
+        mentorPoolCount: mentorPool.length,
       });
-      return;
+      toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
+      setStage("mentor-grid");
+    } catch (error) {
+      onboardingLog.error("Questionnaire completion failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast.error("We hit a temporary snag matching your mentor. Please try again.");
+      setStage("questionnaire");
+    } finally {
+      setIsSubmittingQuestionnaire(false);
     }
-
-    onboardingLog.error("Preassigned mentor resolution failed with non-empty mentor pool", {
-      requestedSlug: assignment.requestedSlug,
-      mentorPoolCount: mentorPool.length,
-    });
-    toast.error("We couldn't automatically match a mentor. Please pick one from the grid.");
-    setStage("mentor-grid");
   };
 
   const handleMentorConfirm = async (mentor: Mentor, explanationOverride?: MentorExplanation | null) => {
@@ -722,6 +784,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             <StoryQuestionnaire
               faction={faction}
               onComplete={handleQuestionnaireComplete}
+              isSubmitting={isSubmittingQuestionnaire}
             />
           </motion.div>
         )}

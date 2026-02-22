@@ -217,9 +217,15 @@ export function toUserFacingFunctionError(
 
   if (
     parsed.category === "relay" ||
-    parsed.status === 408 ||
-    (typeof parsed.status === "number" && parsed.status >= 500)
+    parsed.status === 408
   ) {
+    return "Our servers are temporarily unavailable. Please try again in a moment.";
+  }
+
+  if (typeof parsed.status === "number" && parsed.status >= 500) {
+    if (parsed.backendMessage && !isLikelyTechnicalMessage(parsed.backendMessage)) {
+      return parsed.backendMessage;
+    }
     return "Our servers are temporarily unavailable. Please try again in a moment.";
   }
 

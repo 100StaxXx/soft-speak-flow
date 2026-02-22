@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { summarizeFunctionInvokeError } from "../_shared/functionInvokeError.ts";
+import { ACTIVE_MENTOR_SLUGS, selectThemeForDate } from "../_shared/mentorPepTalkConfig.ts";
 import {
   buildReadyTranscriptState,
   buildRetryTranscriptState,
@@ -12,53 +13,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const mentorDailyThemes: Record<string, any[]> = {
-  atlas: [
-    { topic_category: 'focus', intensity: 'medium', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['In Transition', 'Self-Doubt'] },
-    { topic_category: 'business', intensity: 'medium', triggers: ['In Transition', 'Avoiding Action'] }
-  ],
-  eli: [
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Emotionally Hurt'] }
-  ],
-  nova: [
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] },
-    { topic_category: 'focus', intensity: 'medium', triggers: ['Avoiding Action', 'Exhausted'] }
-  ],
-  sienna: [
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Emotionally Hurt', 'Heavy or Low'] },
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] }
-  ],
-  lumi: [
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Anxious & Overthinking'] },
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Heavy or Low', 'Unmotivated'] }
-  ],
-  kai: [
-    { topic_category: 'discipline', intensity: 'medium', triggers: ['Needing Discipline', 'Unmotivated'] },
-    { topic_category: 'physique', intensity: 'medium', triggers: ['Unmotivated', 'Feeling Stuck'] }
-  ],
-  stryker: [
-    { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] }
-  ],
-  carmen: [
-    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['In Transition', 'Feeling Stuck'] }
-  ],
-  reign: [
-    { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] },
-    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline'] }
-  ],
-  elizabeth: [
-    { topic_category: 'confidence', intensity: 'medium', triggers: ['Self-Doubt', 'Feeling Stuck'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Unmotivated'] }
-  ]
-};
-
-const MENTOR_SLUGS = ['atlas', 'eli', 'nova', 'sienna', 'lumi', 'kai', 'stryker', 'carmen', 'reign', 'elizabeth'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -80,7 +34,7 @@ serve(async (req) => {
     const results = [];
     const errors = [];
 
-    for (const mentorSlug of MENTOR_SLUGS) {
+    for (const mentorSlug of ACTIVE_MENTOR_SLUGS) {
       try {
         console.log(`Processing mentor: ${mentorSlug}`);
 
@@ -104,18 +58,10 @@ serve(async (req) => {
           continue;
         }
 
-        // Get mentor themes
-        const themes = mentorDailyThemes[mentorSlug];
-        if (!themes || themes.length === 0) {
-          console.error(`No themes found for mentor: ${mentorSlug}`);
-          errors.push({ mentor: mentorSlug, error: 'No themes configured' });
-          continue;
+        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, today);
+        if (usedFallbackTheme) {
+          console.warn(`Using fallback theme for mentor ${mentorSlug}`);
         }
-
-        // Select theme based on day of year (consistent rotation)
-        const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
-        const themeIndex = dayOfYear % themes.length;
-        const theme = themes[themeIndex];
         
         console.log(`Selected theme for ${mentorSlug}:`, theme);
 

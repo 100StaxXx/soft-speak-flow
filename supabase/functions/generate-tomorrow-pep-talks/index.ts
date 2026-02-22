@@ -1,55 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { insertTomorrowDailyPepTalkAndSync, type SupabaseLikeClient } from "./workflow.ts";
+import { ACTIVE_MENTOR_SLUGS, selectThemeForDate } from "../_shared/mentorPepTalkConfig.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const mentorDailyThemes: Record<string, any[]> = {
-  atlas: [
-    { topic_category: 'focus', intensity: 'medium', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['In Transition', 'Self-Doubt'] },
-    { topic_category: 'business', intensity: 'medium', triggers: ['In Transition', 'Avoiding Action'] }
-  ],
-  eli: [
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Emotionally Hurt'] }
-  ],
-  nova: [
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Anxious & Overthinking', 'Feeling Stuck'] },
-    { topic_category: 'focus', intensity: 'medium', triggers: ['Avoiding Action', 'Exhausted'] }
-  ],
-  sienna: [
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Emotionally Hurt', 'Heavy or Low'] },
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Heavy or Low'] }
-  ],
-  lumi: [
-    { topic_category: 'confidence', intensity: 'soft', triggers: ['Self-Doubt', 'Anxious & Overthinking'] },
-    { topic_category: 'mindset', intensity: 'soft', triggers: ['Heavy or Low', 'Unmotivated'] }
-  ],
-  kai: [
-    { topic_category: 'discipline', intensity: 'medium', triggers: ['Needing Discipline', 'Unmotivated'] },
-    { topic_category: 'physique', intensity: 'medium', triggers: ['Unmotivated', 'Feeling Stuck'] }
-  ],
-  stryker: [
-    { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] }
-  ],
-  carmen: [
-    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['In Transition', 'Feeling Stuck'] }
-  ],
-  reign: [
-    { topic_category: 'physique', intensity: 'strong', triggers: ['Unmotivated', 'Needing Discipline', 'Frustrated'] },
-    { topic_category: 'business', intensity: 'strong', triggers: ['Motivated & Ready', 'Feeling Stuck'] },
-    { topic_category: 'discipline', intensity: 'strong', triggers: ['Avoiding Action', 'Needing Discipline'] }
-  ],
-  elizabeth: [
-    { topic_category: 'confidence', intensity: 'medium', triggers: ['Self-Doubt', 'Feeling Stuck'] },
-    { topic_category: 'mindset', intensity: 'medium', triggers: ['Heavy or Low', 'Unmotivated'] }
-  ]
 };
 
 function generateTitle(mentorSlug: string, category: string): string {
@@ -98,25 +54,32 @@ serve(async (req) => {
     const tomorrowDate = tomorrow.toLocaleDateString('en-CA');
     console.log(`Pre-generating pep talks for date: ${tomorrowDate}`);
 
-    // Get all active mentors
+    // Get active canonical mentors for pre-generation.
     const { data: mentors, error: mentorsError } = await supabase
       .from('mentors')
       .select('slug, id')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .in('slug', [...ACTIVE_MENTOR_SLUGS]);
 
     if (mentorsError) {
       throw new Error(`Failed to fetch mentors: ${mentorsError.message}`);
     }
 
+    const mentorsBySlug = new Map<string, { slug: string; id: string }>();
+    for (const mentor of mentors || []) {
+      if (mentor?.slug && mentor?.id) {
+        mentorsBySlug.set(mentor.slug, { slug: mentor.slug, id: mentor.id });
+      }
+    }
+
     const results: { mentor: string; status: string; error?: string }[] = [];
 
     // Process each mentor sequentially to avoid rate limits
-    for (const mentor of mentors || []) {
-      const mentorSlug = mentor.slug;
-      
-      if (!mentorSlug || !mentorDailyThemes[mentorSlug]) {
-        console.log(`Skipping mentor without themes: ${mentorSlug}`);
-        results.push({ mentor: mentorSlug, status: 'skipped', error: 'No themes configured' });
+    for (const mentorSlug of ACTIVE_MENTOR_SLUGS) {
+      const mentor = mentorsBySlug.get(mentorSlug);
+      if (!mentor) {
+        console.log(`Skipping missing/inactive mentor row: ${mentorSlug}`);
+        results.push({ mentor: mentorSlug, status: 'skipped', error: 'Mentor row missing or inactive' });
         continue;
       }
 
@@ -135,11 +98,10 @@ serve(async (req) => {
           continue;
         }
 
-        // Get themes and select based on day
-        const themes = mentorDailyThemes[mentorSlug];
-        const dayOfYear = Math.floor((tomorrow.getTime() - new Date(tomorrow.getFullYear(), 0, 0).getTime()) / 86400000);
-        const themeIndex = dayOfYear % themes.length;
-        const theme = themes[themeIndex];
+        const { theme, usedFallbackTheme } = selectThemeForDate(mentorSlug, tomorrow);
+        if (usedFallbackTheme) {
+          console.warn(`Using fallback theme for mentor ${mentorSlug}`);
+        }
 
         console.log(`Generating for ${mentorSlug} with theme:`, theme);
 

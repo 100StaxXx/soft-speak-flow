@@ -1,10 +1,57 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.81.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+interface ErrorResponseDetails {
+  code?: string;
+  upstreamStatus?: number;
+  upstreamError?: string | null;
+}
+
+function normalizeStatus(status: number): number {
+  if (!Number.isFinite(status)) return 500;
+  if (status < 400 || status > 599) return 500;
+  return status;
+}
+
+function buildErrorResponse(
+  status: number,
+  message: string,
+  details: ErrorResponseDetails = {},
+): Response {
+  const payload: Record<string, unknown> = { error: message };
+
+  if (details.code) payload.code = details.code;
+  if (typeof details.upstreamStatus === "number") payload.upstream_status = details.upstreamStatus;
+  if (typeof details.upstreamError === "string" && details.upstreamError.length > 0) {
+    payload.upstream_error = details.upstreamError;
+  }
+
+  return new Response(
+    JSON.stringify(payload),
+    { status: normalizeStatus(status), headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+function parseUpstreamError(rawBody: string): string | null {
+  const trimmed = rawBody.trim();
+  if (trimmed.length === 0) return null;
+
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const message = typeof parsed.error === "string"
+      ? parsed.error
+      : typeof parsed.message === "string"
+        ? parsed.message
+        : null;
+    return message ?? trimmed.slice(0, 300);
+  } catch {
+    return trimmed.slice(0, 300);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,13 +62,14 @@ serve(async (req) => {
     const { mentorSlug, topic_category, intensity, emotionalTriggers } = await req.json();
 
     if (!mentorSlug) {
-      throw new Error("mentorSlug is required");
+      return buildErrorResponse(400, "mentorSlug is required", { code: "INVALID_REQUEST" });
     }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return buildErrorResponse(500, "Missing Supabase environment variables", { code: "MISSING_ENV" });
+    }
 
     console.log(`Starting full audio generation for mentor ${mentorSlug}`);
 
@@ -45,12 +93,32 @@ serve(async (req) => {
     );
 
     if (!scriptResponse.ok) {
-      const errorText = await scriptResponse.text();
-      console.error("Script generation error:", scriptResponse.status, errorText);
-      throw new Error(`Failed to generate script: ${scriptResponse.status}`);
+      const upstreamRaw = await scriptResponse.text();
+      const upstreamError = parseUpstreamError(upstreamRaw);
+      console.error("Script generation error:", scriptResponse.status, upstreamRaw);
+      return buildErrorResponse(scriptResponse.status, "Failed to generate script", {
+        code: "SCRIPT_GENERATION_FAILED",
+        upstreamStatus: scriptResponse.status,
+        upstreamError,
+      });
     }
 
-    const { script } = await scriptResponse.json();
+    let scriptPayload: Record<string, unknown>;
+    try {
+      scriptPayload = await scriptResponse.json() as Record<string, unknown>;
+    } catch {
+      return buildErrorResponse(502, "Invalid script generation response", {
+        code: "SCRIPT_GENERATION_INVALID_RESPONSE",
+      });
+    }
+
+    const script = typeof scriptPayload.script === "string" ? scriptPayload.script : null;
+    if (!script) {
+      return buildErrorResponse(502, "Script generation response missing script", {
+        code: "SCRIPT_GENERATION_INCOMPLETE_RESPONSE",
+      });
+    }
+
     console.log(`Script generated: ${script.substring(0, 100)}...`);
 
     // Step 2: Generate audio from script
@@ -71,12 +139,30 @@ serve(async (req) => {
     );
 
     if (!audioResponse.ok) {
-      const errorText = await audioResponse.text();
-      console.error("Audio generation error:", audioResponse.status, errorText);
-      throw new Error(`Failed to generate audio: ${audioResponse.status}`);
+      const upstreamRaw = await audioResponse.text();
+      const upstreamError = parseUpstreamError(upstreamRaw);
+      console.error("Audio generation error:", audioResponse.status, upstreamRaw);
+      return buildErrorResponse(audioResponse.status, "Failed to generate audio", {
+        code: "AUDIO_GENERATION_FAILED",
+        upstreamStatus: audioResponse.status,
+        upstreamError,
+      });
     }
 
-    const { audioUrl } = await audioResponse.json();
+    let audioPayload: Record<string, unknown>;
+    try {
+      audioPayload = await audioResponse.json() as Record<string, unknown>;
+    } catch {
+      return buildErrorResponse(502, "Invalid audio generation response", {
+        code: "AUDIO_GENERATION_INVALID_RESPONSE",
+      });
+    }
+    const audioUrl = typeof audioPayload.audioUrl === "string" ? audioPayload.audioUrl : null;
+    if (!audioUrl) {
+      return buildErrorResponse(502, "Audio generation response missing audioUrl", {
+        code: "AUDIO_GENERATION_INCOMPLETE_RESPONSE",
+      });
+    }
     console.log(`Audio generated: ${audioUrl}`);
 
     return new Response(
@@ -85,9 +171,8 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in generate-full-mentor-audio function:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return buildErrorResponse(500, error instanceof Error ? error.message : "Unknown error", {
+      code: "INTERNAL_ERROR",
+    });
   }
 });

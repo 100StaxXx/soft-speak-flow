@@ -707,7 +707,7 @@ describe("DatePillsScroller", () => {
       expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
 
       await act(async () => {
-        vi.advanceTimersByTime(99);
+        vi.advanceTimersByTime(2999);
       });
       expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
 
@@ -778,7 +778,7 @@ describe("DatePillsScroller", () => {
       expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
 
       await act(async () => {
-        vi.advanceTimersByTime(99);
+        vi.advanceTimersByTime(2999);
       });
       expect(scrollToSpy).toHaveBeenCalledTimes(baselineCalls);
 

@@ -1,6 +1,5 @@
 import { useTasksQuery, type DailyTask } from "./useTasksQuery";
 import { useTaskMutations, type AddTaskParams } from "./useTaskMutations";
-import { useWidgetSync } from "./useWidgetSync";
 
 interface DailyTasksOptions {
   enabled?: boolean;
@@ -19,9 +18,6 @@ export const useDailyTasks = (selectedDate?: Date, options: DailyTasksOptions = 
     completedCount, 
     totalCount 
   } = useTasksQuery(selectedDate, { enabled });
-  
-  // Sync tasks to iOS WidgetKit extension
-  useWidgetSync(tasks, taskDate, { enabled });
   
   const { 
     addTask, 

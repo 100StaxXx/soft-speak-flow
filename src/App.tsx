@@ -33,6 +33,7 @@ import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
 import { useAppResumeRefresh } from "@/hooks/useAppResumeRefresh";
+import { useGlobalWidgetSync } from "@/hooks/useGlobalWidgetSync";
 import { safeSessionStorage } from "@/utils/storage";
 import { TalkPopupProvider } from "@/contexts/TalkPopupContext";
 import { MainTabsKeepAlive, isMainTabPath } from "@/components/MainTabsKeepAlive";
@@ -186,6 +187,7 @@ const AppContent = memo(() => {
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
+  useGlobalWidgetSync({ enabled: status === "authenticated" && Boolean(session?.user) });
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {

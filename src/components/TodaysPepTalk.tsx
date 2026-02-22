@@ -12,6 +12,8 @@ import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { getResolvedMentorId } from "@/utils/mentor";
 import { safeLocalStorage } from "@/utils/storage";
 import { getActiveWordIndex } from "@/utils/captionTiming";
+import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
+import { Capacitor } from "@capacitor/core";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -145,6 +147,12 @@ export const TodaysPepTalk = memo(() => {
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const seekDebounceRef = useRef<number | null>(null);
+  const transcriptScrollRafRef = useRef<number | null>(null);
+  const lastTranscriptScrollTopRef = useRef<number>(0);
+  const isNativeIOS = useMemo(
+    () => typeof window !== "undefined" && Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios",
+    [],
+  );
   
 
   // Reset audio ready state when audio URL changes
@@ -287,7 +295,17 @@ export const TodaysPepTalk = memo(() => {
 
       if (error) {
         console.error("Generation error:", error);
-        throw new Error(error.message || "Failed to prepare pep talk");
+        const parsedError = await parseFunctionInvokeError(error);
+        const userMessage = toUserFacingFunctionError(parsedError, {
+          action: "refresh today's pep talk",
+        });
+        log.warn("Pep talk generation returned HTTP error", {
+          status: parsedError.status,
+          backendMessage: parsedError.backendMessage,
+          category: parsedError.category,
+          code: parsedError.code,
+        });
+        throw new Error(userMessage);
       }
 
       if (data?.pepTalk) {
@@ -316,7 +334,19 @@ export const TodaysPepTalk = memo(() => {
       }
     } catch (err) {
       console.error("Error generating pep talk:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to prepare pep talk";
+      let errorMessage = err instanceof Error ? err.message : "Failed to prepare pep talk";
+
+      const shouldParseFunctionError =
+        (typeof err === "object" && err !== null && "context" in err) ||
+        /edge function|functions(fetch|http|relay)error|non-2xx|failed to send a request/i.test(errorMessage);
+
+      if (shouldParseFunctionError) {
+        const parsedError = await parseFunctionInvokeError(err);
+        errorMessage = toUserFacingFunctionError(parsedError, {
+          action: "refresh today's pep talk",
+        });
+      }
+
       toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
@@ -504,25 +534,46 @@ export const TodaysPepTalk = memo(() => {
   // Cleanup seek debounce on unmount
   useEffect(() => {
     return () => {
+      if (transcriptScrollRafRef.current !== null) {
+        window.cancelAnimationFrame(transcriptScrollRafRef.current);
+      }
       if (seekDebounceRef.current) {
         clearTimeout(seekDebounceRef.current);
       }
     };
   }, []);
 
-  // Auto-scroll to active word
+  // Auto-scroll active word only inside transcript container.
   useEffect(() => {
     if (activeWordRef.current && transcriptRef.current && showFullTranscript) {
       const container = transcriptRef.current;
       const activeWord = activeWordRef.current;
-      
-      const containerRect = container.getBoundingClientRect();
-      const wordRect = activeWord.getBoundingClientRect();
-      
-      if (wordRect.top < containerRect.top || wordRect.bottom > containerRect.bottom) {
-        activeWord.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
+
+      const visibleTop = container.scrollTop;
+      const visibleBottom = visibleTop + container.clientHeight;
+      const wordTop = activeWord.offsetTop;
+      const wordBottom = wordTop + activeWord.offsetHeight;
+      const isWordOutsideViewport = wordTop < visibleTop || wordBottom > visibleBottom;
+
+      if (isWordOutsideViewport) {
+        const centeredTarget = wordTop - (container.clientHeight / 2) + (activeWord.offsetHeight / 2);
+        const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+        const nextScrollTop = Math.max(0, Math.min(centeredTarget, maxScrollTop));
+
+        if (Math.abs(nextScrollTop - visibleTop) < 1) return;
+        if (Math.abs(nextScrollTop - lastTranscriptScrollTopRef.current) < 1) return;
+
+        if (transcriptScrollRafRef.current !== null) {
+          window.cancelAnimationFrame(transcriptScrollRafRef.current);
+        }
+
+        transcriptScrollRafRef.current = window.requestAnimationFrame(() => {
+          container.scrollTo({
+            top: nextScrollTop,
+            behavior: "smooth",
+          });
+          lastTranscriptScrollTopRef.current = nextScrollTop;
+          transcriptScrollRafRef.current = null;
         });
       }
     }
@@ -617,6 +668,7 @@ export const TodaysPepTalk = memo(() => {
       return (
         <div 
           ref={transcriptRef}
+          data-testid="pep-talk-transcript"
           className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
         >
           {pepTalk.script}
@@ -627,6 +679,7 @@ export const TodaysPepTalk = memo(() => {
     return (
       <div 
         ref={transcriptRef}
+        data-testid="pep-talk-transcript"
         className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
       >
         {timedTranscript.map((wordData: CaptionWord, index: number) => (
@@ -708,7 +761,13 @@ export const TodaysPepTalk = memo(() => {
   }
 
   return (
-    <Card className="relative overflow-hidden group animate-fade-in rounded-3xl border-2">
+    <Card
+      className={cn(
+        "relative overflow-hidden group rounded-3xl border-2",
+        !isNativeIOS && "animate-fade-in",
+        isNativeIOS && "gpu-layer",
+      )}
+    >
       {/* Pokemon-style gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-accent/15 to-primary/10 animate-gradient-shift" />
       

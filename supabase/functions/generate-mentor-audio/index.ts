@@ -13,7 +13,15 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-const mentorVoices: Record<string, any> = {
+interface MentorVoiceConfig {
+  voiceId: string;
+  stability: number;
+  similarity_boost: number;
+  style_exaggeration: number;
+  use_speaker_boost?: boolean;
+}
+
+const mentorVoices: Record<string, MentorVoiceConfig> = {
   atlas: {
     voiceId: "JBFqnCBsd6RMkjVDRZzb", // George
     stability: 0.75,
@@ -70,12 +78,16 @@ const mentorVoices: Record<string, any> = {
     style_exaggeration: 1.0,
     use_speaker_boost: true,
   },
-  elizabeth: {
+  solace: {
     voiceId: "XrExE9yKIg1WjnnlVkGX", // Matilda - Warm, nurturing
     stability: 0.80,
     similarity_boost: 0.80,
     style_exaggeration: 0.35,
   },
+};
+
+const legacyVoiceAliases: Record<string, string> = {
+  elizabeth: "solace",
 };
 
 serve(async (req) => {
@@ -141,9 +153,12 @@ serve(async (req) => {
       throw new Error("ELEVENLABS_API_KEY is not configured");
     }
 
-    const voiceConfig = mentorVoices[mentorSlug];
+    const requestedMentorSlug = String(mentorSlug).trim().toLowerCase();
+    const resolvedMentorSlug = legacyVoiceAliases[requestedMentorSlug] ?? requestedMentorSlug;
+
+    const voiceConfig = mentorVoices[resolvedMentorSlug];
     if (!voiceConfig) {
-      throw new Error(`No voice configuration found for mentor: ${mentorSlug}`);
+      throw new Error(`No voice configuration found for mentor: ${requestedMentorSlug}`);
     }
 
     const voiceSettings = {
@@ -153,8 +168,8 @@ serve(async (req) => {
       use_speaker_boost: voiceConfig.use_speaker_boost ?? true,
     };
 
-    console.log(`Generating audio for mentor ${mentorSlug} with voice ${voiceConfig.voiceId}`);
-    console.log(`Applying voice settings for mentor ${mentorSlug}: ${JSON.stringify(voiceSettings)}`);
+    console.log(`Generating audio for mentor ${requestedMentorSlug} (resolved=${resolvedMentorSlug}) with voice ${voiceConfig.voiceId}`);
+    console.log(`Applying voice settings for mentor ${resolvedMentorSlug}: ${JSON.stringify(voiceSettings)}`);
 
     // Call ElevenLabs TTS API with timeout handling
     const controller = new AbortController();
@@ -202,7 +217,7 @@ serve(async (req) => {
 
     // Upload to Supabase Storage
     const timestamp = Date.now();
-    const fileName = `${mentorSlug}_${timestamp}.mp3`;
+    const fileName = `${resolvedMentorSlug}_${timestamp}.mp3`;
     const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabaseAdmin.storage

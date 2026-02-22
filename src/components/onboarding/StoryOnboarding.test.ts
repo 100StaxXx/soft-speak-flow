@@ -3,8 +3,10 @@ import {
   CALCULATING_STAGE_DURATION_MS,
   deriveOnboardingMentorCandidates,
   mapGuidanceToneToIntensity,
+  QUESTIONNAIRE_PIPELINE_TIMEOUT_MS,
   resolveQuestionnaireCompletionStage,
   resolveOnboardingBackdropStage,
+  runWithTimeout,
   scheduleMentorRevealTransition,
 } from "./StoryOnboarding";
 
@@ -115,6 +117,26 @@ describe("mentor reveal transition timer", () => {
     vi.advanceTimersByTime(1);
     expect(didTransition).toBe(true);
 
+    vi.useRealTimers();
+  });
+});
+
+describe("questionnaire pipeline timeout helper", () => {
+  it("uses an explicit bounded timeout for mentor matching", () => {
+    expect(QUESTIONNAIRE_PIPELINE_TIMEOUT_MS).toBe(8000);
+  });
+
+  it("rejects when operation exceeds timeout", async () => {
+    vi.useFakeTimers();
+
+    const pending = new Promise<never>(() => {
+      // Intentionally unresolved.
+    });
+
+    const timedOperation = runWithTimeout(pending, 25, "mentor_pipeline_timeout");
+    vi.advanceTimersByTime(25);
+
+    await expect(timedOperation).rejects.toThrow("mentor_pipeline_timeout");
     vi.useRealTimers();
   });
 });

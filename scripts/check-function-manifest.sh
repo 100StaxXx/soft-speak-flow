@@ -13,9 +13,8 @@ if [ ! -f "$MANIFEST" ]; then
 fi
 
 collect_frontend() {
-  grep -RhoE "functions\\.invoke\\([[:space:]]*['\"][^'\"]+['\"]" \
-    --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' src \
-    | perl -nE 'while(/functions\.invoke\(\s*["\x27]([^"\x27]+)["\x27]/g){say $1}' \
+  find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0 \
+    | xargs -0 perl -0777 -ne 'while(/functions\.invoke\(\s*["\x27]([^"\x27]+)["\x27]/sg){print "$1\n"}' \
     | sort -u
 }
 
@@ -30,7 +29,8 @@ collect_scheduled() {
     printf '%s\n' \
       'generate-daily-mentor-pep-talks' \
       'schedule-daily-mentor-pushes' \
-      'dispatch-daily-pushes'
+      'dispatch-daily-pushes' \
+      'retry-missing-pep-talk-transcripts'
     find supabase/migrations -name '*.sql' -type f -print0 \
       | xargs -0 perl -0777 -ne 'while(/cron\.schedule\(\s*["\x27]([^"\x27]+)["\x27]/sg){print "$1\n"}'
   } | sed '/^$/d' | sort -u

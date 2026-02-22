@@ -115,6 +115,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
     },
     onSuccess: () => {
       invalidateInboxQueries();
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     },
   });
 
@@ -128,6 +129,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
     },
     onSuccess: () => {
       invalidateInboxQueries();
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
     },
   });
 
