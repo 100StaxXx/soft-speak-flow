@@ -161,6 +161,325 @@ an entity that births universes. This is the pinnacle - absolute divine manifest
 
 Maintain the SOUL of the species while achieving cosmiq transcendence.`;
 
+const SYSTEM_PROMPT_STAGE1_COLOR_DISTRIBUTION = `You are generating a Stage 1 hatchling portrait.
+Your top priority is species-correct baby anatomy plus bold, intentional multi-hue color distribution.
+
+COLOR DISTRIBUTION RULES (MANDATORY):
+1. Use the provided five-swatch palette exactly as role guidance.
+2. Keep the anchor color dominant (35-45%) while clearly using all other swatches.
+3. Ensure both warm and cool hues are visible in the final image.
+4. Maintain at least four visually distinct hue groups.
+5. Strictly avoid monochrome outputs.
+
+ANTI-MONOCHROME HARD FAILS:
+- Do not output single-hue wash.
+- Do not tint all materials with only anchor color.
+- If output appears mostly one color, rebalance using provided ratio targets.
+
+SPECIES & STYLE RULES:
+- Preserve pure baby species identity with correct anatomy and limb count.
+- Keep elemental mood visible through ambient effects and accents.
+- Stylized fantasy game-art quality with readable, non-muddy color separation.`;
+
+interface HslColor {
+  h: number;
+  s: number;
+  l: number;
+}
+
+interface StageOnePaletteInput {
+  companionId: string;
+  favoriteColor: string;
+  coreElement: string;
+}
+
+interface StageOnePalette {
+  anchor: string;
+  elementAccent: string;
+  contrastAccent: string;
+  secondaryAccent: string;
+  neutralBalance: string;
+  anchorHue: number;
+  elementHue: number;
+  contrastHue: number;
+  secondaryHue: number;
+  neutralHue: number;
+  distinctHueGroups: number;
+  hasWarmHue: boolean;
+  hasCoolHue: boolean;
+  hueDistances: {
+    anchorElement: number;
+    anchorContrast: number;
+    anchorSecondary: number;
+    elementContrast: number;
+    elementSecondary: number;
+    contrastSecondary: number;
+  };
+}
+
+const DEFAULT_STAGE1_COLOR = "#8B5CF6";
+const STAGE1_COVERAGE_TARGETS = {
+  anchor: "35-45%",
+  elementAccent: "20-25%",
+  contrastAccent: "15-20%",
+  secondaryAccent: "10-15%",
+  neutralBalance: "8-12%",
+} as const;
+
+const ELEMENT_HUE_FAMILY: Record<string, number> = {
+  fire: 18,
+  water: 205,
+  earth: 95,
+  air: 195,
+  lightning: 52,
+  ice: 192,
+  light: 48,
+  shadow: 270,
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function wrapHue(value: number): number {
+  const normalized = value % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function hueDistance(a: number, b: number): number {
+  const diff = Math.abs(wrapHue(a) - wrapHue(b));
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function hashString(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function normalizeHexColor(input: string | null | undefined, fallback = DEFAULT_STAGE1_COLOR): string {
+  if (!input) return fallback;
+  const trimmed = input.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed.toUpperCase();
+  if (/^[0-9a-f]{6}$/i.test(trimmed)) return `#${trimmed.toUpperCase()}`;
+  return fallback;
+}
+
+function hexToHsl(hexColor: string): HslColor {
+  const hex = normalizeHexColor(hexColor).slice(1);
+  const r = Number.parseInt(hex.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(hex.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(hex.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const lightness = (max + min) / 2;
+
+  let hue = 0;
+  if (delta !== 0) {
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+    hue *= 60;
+  }
+
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+
+  return {
+    h: wrapHue(hue),
+    s: saturation * 100,
+    l: lightness * 100,
+  };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const hue = wrapHue(h);
+  const sat = clamp(s, 0, 100) / 100;
+  const light = clamp(l, 0, 100) / 100;
+  const chroma = (1 - Math.abs(2 * light - 1)) * sat;
+  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = light - chroma / 2;
+
+  let rPrime = 0;
+  let gPrime = 0;
+  let bPrime = 0;
+
+  if (hue < 60) {
+    rPrime = chroma; gPrime = x; bPrime = 0;
+  } else if (hue < 120) {
+    rPrime = x; gPrime = chroma; bPrime = 0;
+  } else if (hue < 180) {
+    rPrime = 0; gPrime = chroma; bPrime = x;
+  } else if (hue < 240) {
+    rPrime = 0; gPrime = x; bPrime = chroma;
+  } else if (hue < 300) {
+    rPrime = x; gPrime = 0; bPrime = chroma;
+  } else {
+    rPrime = chroma; gPrime = 0; bPrime = x;
+  }
+
+  const toHex = (value: number) => {
+    const channel = Math.round((value + m) * 255);
+    return channel.toString(16).padStart(2, "0");
+  };
+
+  return `#${toHex(rPrime)}${toHex(gPrime)}${toHex(bPrime)}`.toUpperCase();
+}
+
+function isWarmHue(hue: number): boolean {
+  const h = wrapHue(hue);
+  return h < 70 || h >= 330;
+}
+
+function isCoolHue(hue: number): boolean {
+  const h = wrapHue(hue);
+  return h >= 140 && h <= 260;
+}
+
+function countDistinctHueGroups(hues: number[], minSeparation = 28): number {
+  const groups: number[] = [];
+  for (const hue of hues) {
+    if (!groups.some((existing) => hueDistance(existing, hue) < minSeparation)) {
+      groups.push(hue);
+    }
+  }
+  return groups.length;
+}
+
+function selectMostDistinctHue(candidates: number[], anchors: number[], minDistance: number): number {
+  let selected = candidates[0];
+  let bestScore = -1;
+
+  for (const candidate of candidates) {
+    const minObserved = anchors.reduce((acc, anchor) => Math.min(acc, hueDistance(candidate, anchor)), 360);
+    const score = minObserved >= minDistance ? 1000 + minObserved : minObserved;
+    if (score > bestScore) {
+      bestScore = score;
+      selected = candidate;
+    }
+  }
+
+  return wrapHue(selected);
+}
+
+function resolveElementHue(coreElement: string, fallbackHue: number): number {
+  const key = coreElement.trim().toLowerCase();
+  return ELEMENT_HUE_FAMILY[key] ?? wrapHue(fallbackHue);
+}
+
+function buildStageOnePalette({
+  companionId,
+  favoriteColor,
+  coreElement,
+}: StageOnePaletteInput): StageOnePalette {
+  const anchor = normalizeHexColor(favoriteColor);
+  const anchorHsl = hexToHsl(anchor);
+  const seed = hashString(`${companionId}:${anchor}:${coreElement.toLowerCase()}`);
+  const jitter = (seed % 21) - 10;
+
+  let elementHue = wrapHue(resolveElementHue(coreElement, anchorHsl.h + 105) + jitter * 0.85);
+  if (hueDistance(anchorHsl.h, elementHue) < 30) {
+    elementHue = wrapHue(elementHue + 42 + (seed % 17));
+  }
+
+  let contrastHue = wrapHue(
+    (isWarmHue(anchorHsl.h) ? 208 : 24) + ((seed >> 5) % 35) - 17,
+  );
+  if (hueDistance(anchorHsl.h, contrastHue) < 120) {
+    contrastHue = wrapHue(anchorHsl.h + 180 + ((seed >> 7) % 21) - 10);
+  }
+
+  const secondaryCandidates = [
+    wrapHue(anchorHsl.h + 120 + ((seed >> 9) % 15) - 7),
+    wrapHue(anchorHsl.h + 240 + ((seed >> 10) % 15) - 7),
+    wrapHue(elementHue + 95 + ((seed >> 11) % 23) - 11),
+    wrapHue(contrastHue - 110 + ((seed >> 12) % 23) - 11),
+  ];
+  let secondaryHue = selectMostDistinctHue(
+    secondaryCandidates,
+    [anchorHsl.h, elementHue, contrastHue],
+    52,
+  );
+
+  let hueGroupCount = countDistinctHueGroups([anchorHsl.h, elementHue, contrastHue, secondaryHue], 28);
+  if (hueGroupCount < 4) {
+    secondaryHue = wrapHue(secondaryHue + 84);
+    hueGroupCount = countDistinctHueGroups([anchorHsl.h, elementHue, contrastHue, secondaryHue], 28);
+  }
+  if (hueGroupCount < 4) {
+    elementHue = wrapHue(elementHue + 56);
+    hueGroupCount = countDistinctHueGroups([anchorHsl.h, elementHue, contrastHue, secondaryHue], 28);
+  }
+
+  let hasWarm = [anchorHsl.h, elementHue, contrastHue, secondaryHue].some((hue) => isWarmHue(hue));
+  let hasCool = [anchorHsl.h, elementHue, contrastHue, secondaryHue].some((hue) => isCoolHue(hue));
+
+  if (!hasWarm) {
+    contrastHue = wrapHue(24 + ((seed >> 13) % 28) - 14);
+  }
+  if (!hasCool) {
+    contrastHue = wrapHue(210 + ((seed >> 14) % 34) - 17);
+  }
+
+  hasWarm = [anchorHsl.h, elementHue, contrastHue, secondaryHue].some((hue) => isWarmHue(hue));
+  hasCool = [anchorHsl.h, elementHue, contrastHue, secondaryHue].some((hue) => isCoolHue(hue));
+
+  const neutralHue = wrapHue(anchorHsl.h + ((seed >> 15) % 18) - 9);
+  const neutralSat = clamp(10 + ((seed >> 16) % 9), 8, 18);
+  const neutralLight = clamp(52 + ((seed >> 17) % 12) - 6, 46, 66);
+
+  const palette: StageOnePalette = {
+    anchor,
+    elementAccent: hslToHex(elementHue, clamp(78 + ((seed >> 2) % 12), 74, 94), clamp(56 + ((seed >> 3) % 10) - 4, 48, 66)),
+    contrastAccent: hslToHex(contrastHue, clamp(84 + ((seed >> 4) % 12), 78, 98), clamp(58 + ((seed >> 5) % 10) - 4, 50, 70)),
+    secondaryAccent: hslToHex(secondaryHue, clamp(66 + ((seed >> 6) % 16), 62, 88), clamp(57 + ((seed >> 7) % 12) - 6, 48, 68)),
+    neutralBalance: hslToHex(neutralHue, neutralSat, neutralLight),
+    anchorHue: anchorHsl.h,
+    elementHue,
+    contrastHue,
+    secondaryHue,
+    neutralHue,
+    distinctHueGroups: hueGroupCount,
+    hasWarmHue: hasWarm,
+    hasCoolHue: hasCool,
+    hueDistances: {
+      anchorElement: hueDistance(anchorHsl.h, elementHue),
+      anchorContrast: hueDistance(anchorHsl.h, contrastHue),
+      anchorSecondary: hueDistance(anchorHsl.h, secondaryHue),
+      elementContrast: hueDistance(elementHue, contrastHue),
+      elementSecondary: hueDistance(elementHue, secondaryHue),
+      contrastSecondary: hueDistance(contrastHue, secondaryHue),
+    },
+  };
+
+  return palette;
+}
+
+function formatStageOnePaletteInstructions(palette: StageOnePalette): string {
+  return `COLOR PALETTE SPEC (MANDATORY - VERY BOLD MULTI-HUE):
+- anchor: ${palette.anchor} (identity anchor)
+- element_accent: ${palette.elementAccent} (element-led aura/accent)
+- contrast_accent: ${palette.contrastAccent} (high-contrast pop)
+- secondary_accent: ${palette.secondaryAccent} (supporting hue family)
+- neutral_balance: ${palette.neutralBalance} (soft balancing tone)
+
+TARGET COVERAGE RATIOS:
+- anchor: ${STAGE1_COVERAGE_TARGETS.anchor}
+- element_accent: ${STAGE1_COVERAGE_TARGETS.elementAccent}
+- contrast_accent: ${STAGE1_COVERAGE_TARGETS.contrastAccent}
+- secondary_accent: ${STAGE1_COVERAGE_TARGETS.secondaryAccent}
+- neutral_balance: ${STAGE1_COVERAGE_TARGETS.neutralBalance}
+
+HUE DIVERSITY REQUIREMENTS:
+- Include both warm and cool hue presence in the final composition.
+- Maintain at least 4 visually distinct hue groups across creature + environment.
+- Preserve strong hue separation (especially anchor vs contrast accent).`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -397,7 +716,29 @@ MOOD: Legendary destiny sealed within, unstoppable divine potential, the champio
     } else if (nextStage === 1) {
       // Stage 1: Hatchling emerging from the egg - NEW LIFE!
       console.log("Creating stage 1 hatchling emergence");
-      
+      systemPrompt = SYSTEM_PROMPT_STAGE1_COLOR_DISTRIBUTION;
+
+      const stageOnePalette = buildStageOnePalette({
+        companionId: companion.id,
+        favoriteColor: companion.favorite_color,
+        coreElement: companion.core_element,
+      });
+      const stageOnePaletteInstructions = formatStageOnePaletteInstructions(stageOnePalette);
+
+      console.log("[Stage1Palette]", JSON.stringify({
+        stage: 1,
+        anchor: stageOnePalette.anchor,
+        elementAccent: stageOnePalette.elementAccent,
+        contrastAccent: stageOnePalette.contrastAccent,
+        secondaryAccent: stageOnePalette.secondaryAccent,
+        neutralBalance: stageOnePalette.neutralBalance,
+        targetRatios: STAGE1_COVERAGE_TARGETS,
+        distinctHueGroups: stageOnePalette.distinctHueGroups,
+        hasWarmHue: stageOnePalette.hasWarmHue,
+        hasCoolHue: stageOnePalette.hasCoolHue,
+        hueDistances: stageOnePalette.hueDistances,
+      }));
+
       // Special handling for aquatic creatures to prevent legs
       const aquaticCreatures = ['shark', 'whale', 'dolphin', 'fish', 'orca', 'manta ray', 'stingray', 'seahorse', 'jellyfish', 'octopus', 'squid', 'sea turtle', 'kraken', 'leviathan'];
       const isAquatic = aquaticCreatures.some(creature => companion.spirit_animal.toLowerCase().includes(creature));
@@ -430,10 +771,21 @@ HATCHING SCENE:
 - Some shells stuck to the hatchling's back/head (cute detail)
 - Clear evidence this just happened - wet, fresh, brand new life
 
-COLOR PALETTE (ANCHOR + VARIATION):
-- Favorite color anchor: ${companion.favorite_color} must be clearly visible as the identity anchor (not a full single-color wash)
-- Add 2-3 supporting accents: one ${companion.core_element}-driven accent, one contrast/complement accent, and one neutral balancing tone
-- Avoid monochrome or single-hue results; maintain a varied palette while keeping the favorite-color anchor obvious
+${stageOnePaletteInstructions}
+
+PALETTE PLACEMENT GUIDANCE (STRICT):
+- Anchor color on body base / dominant fur, feather, or scale regions.
+- Element accent in aura edges, magical wisps, rim lighting, and elemental particles.
+- Contrast accent in eye reflections/iris ring, shell crack glow, and selective small markings.
+- Secondary accent in ambient particles, atmospheric bloom, and background support zones.
+- Neutral balance in shadows, ground plane, shell interiors, and low-frequency background materials.
+
+ANTI-MONOCHROME CONSTRAINTS (MANDATORY):
+- Do not output single-hue wash.
+- Do not tint all materials with only anchor color.
+- If output appears mostly one color, rebalance using provided ratio targets.
+
+COLOR CONTEXT:
 - Animal species: ${companion.spirit_animal}
 - Elemental affinity: ${companion.core_element}
 ${companion.eye_color ? `- Eye color: ${companion.eye_color} with infant brightness` : ''}
@@ -442,12 +794,12 @@ ${companion.fur_color ? `- Fur/scales/feathers: ${companion.fur_color} with baby
 ELEMENTAL MANIFESTATION:
 - Small delicate wisps of ${companion.core_element} elemental energy beginning to manifest
 - Energy tentative and gentle, just awakening
-- Mixed glow particles may include anchor and accent colors, with ${companion.favorite_color} still clearly visible
+- Mixed glow particles should use element/contrast/secondary accents while keeping anchor visibility
 - Elemental aura flickering uncertainly like a candle flame
 
 ENVIRONMENT:
 - Mystical nursery realm with soft ethereal lighting
-- Ambient glow can blend the anchor and supporting accents, with readable ${companion.favorite_color} highlights
+- Ambient glow should preserve swatch separation; avoid collapsing hues into a single tint
 - Gentle floating particles and magical dust motes
 - Soft ground with natural materials (moss, petals, soft earth, or water)
 - Background slightly out of focus creating dreamy depth
@@ -473,6 +825,7 @@ STYLE & QUALITY:
 - Subtle creature-collecting RPG cartoon charm (Neopets/P&D-adjacent) while staying anatomically grounded
 - Cinematic newborn portrait quality
 - Rich detail with expressive features
+- Color separation should remain readable in midtones and shadows
 
 MOOD: Pure wonder, new beginning, innocent potential, sacred first breath, protective tenderness, hope incarnate`;
     } else {
@@ -775,8 +1128,8 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
     console.log("Generating evolution image...");
 
     // 6. Generate new evolution image with Nano Banana
-    // For stage 0 (destiny preview) and stage 1 (first hatchling), don't use the continuity system prompt
-    const shouldUseContinuityPrompt = nextStage > 1;
+    // Stage 0 remains user-only; Stage 1 and above use a system prompt.
+    const shouldUseSystemPrompt = nextStage !== 0;
     
     const imageResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -786,7 +1139,7 @@ Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while mai
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image-preview",
-        messages: shouldUseContinuityPrompt ? [
+        messages: shouldUseSystemPrompt ? [
           {
             role: "system",
             content: systemPrompt

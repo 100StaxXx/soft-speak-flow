@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { safeNavigate } from "@/utils/nativeNavigation";
@@ -58,7 +58,15 @@ export const resolveOnboardingBackdropStage = (
   return null;
 };
 
-export const resolveQuestionnaireCompletionStage = (): OnboardingStage => "mentor-result";
+export const resolveQuestionnaireCompletionStage = (): OnboardingStage => "calculating";
+export const CALCULATING_STAGE_DURATION_MS = 2_000;
+
+export const scheduleMentorRevealTransition = (
+  onComplete: () => void,
+  setTimeoutFn: (handler: () => void, timeout: number) => ReturnType<typeof setTimeout> = setTimeout,
+): ReturnType<typeof setTimeout> => {
+  return setTimeoutFn(onComplete, CALCULATING_STAGE_DURATION_MS);
+};
 
 interface Mentor {
   id: string;
@@ -139,7 +147,21 @@ export const StoryOnboarding = () => {
   const [companionAnimal, setCompanionAnimal] = useState("");
   const [isCreatingCompanion, setIsCreatingCompanion] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
+  const mentorRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backdropStage = resolveOnboardingBackdropStage(stage);
+
+  const clearMentorRevealTimeout = useCallback(() => {
+    if (mentorRevealTimeoutRef.current) {
+      clearTimeout(mentorRevealTimeoutRef.current);
+      mentorRevealTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearMentorRevealTimeout();
+    };
+  }, [clearMentorRevealTimeout]);
 
   const fetchActiveMentors = useCallback(async (): Promise<Mentor[]> => {
     const { data, error } = await supabase
@@ -277,6 +299,7 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
 };
 
   const handleQuestionnaireComplete = async (questionAnswers: OnboardingAnswer[]) => {
+    clearMentorRevealTimeout();
     setAnswers(questionAnswers);
     const mentorPool = mentors.length > 0 ? mentors : await fetchActiveMentors();
 
@@ -328,6 +351,10 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       }
 
       setStage(resolveQuestionnaireCompletionStage());
+      mentorRevealTimeoutRef.current = scheduleMentorRevealTransition(() => {
+        setStage("mentor-result");
+        mentorRevealTimeoutRef.current = null;
+      });
       return;
     }
 

@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  CALCULATING_STAGE_DURATION_MS,
   deriveOnboardingMentorCandidates,
   mapGuidanceToneToIntensity,
   resolveQuestionnaireCompletionStage,
   resolveOnboardingBackdropStage,
+  scheduleMentorRevealTransition,
 } from "./StoryOnboarding";
 
 describe("mapGuidanceToneToIntensity", () => {
@@ -89,8 +91,30 @@ describe("resolveOnboardingBackdropStage", () => {
 });
 
 describe("questionnaire completion stage", () => {
-  it("routes directly to mentor-result with no calculating transition", () => {
-    expect(resolveQuestionnaireCompletionStage()).toBe("mentor-result");
-    expect(resolveQuestionnaireCompletionStage()).not.toBe("calculating");
+  it("routes to calculating before mentor reveal", () => {
+    expect(resolveQuestionnaireCompletionStage()).toBe("calculating");
+    expect(resolveQuestionnaireCompletionStage()).not.toBe("mentor-result");
+  });
+});
+
+describe("mentor reveal transition timer", () => {
+  it("advances to mentor reveal after exactly 2000ms", () => {
+    vi.useFakeTimers();
+    let didTransition = false;
+
+    scheduleMentorRevealTransition(() => {
+      didTransition = true;
+    });
+
+    expect(CALCULATING_STAGE_DURATION_MS).toBe(2000);
+    expect(didTransition).toBe(false);
+
+    vi.advanceTimersByTime(1999);
+    expect(didTransition).toBe(false);
+
+    vi.advanceTimersByTime(1);
+    expect(didTransition).toBe(true);
+
+    vi.useRealTimers();
   });
 });
