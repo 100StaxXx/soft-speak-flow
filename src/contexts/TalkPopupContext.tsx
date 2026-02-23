@@ -8,11 +8,11 @@
  import { supabase } from "@/integrations/supabase/client";
  import { CompanionTalkPopup } from "@/components/companion/CompanionTalkPopup";
  
- interface ShowOptions {
-   message: string;
-   companionName?: string;
-   companionImageUrl?: string;
- }
+interface ShowOptions {
+  message: string;
+  companionName?: string | null;
+  companionImageUrl?: string;
+}
  
  interface TalkPopupContextType {
    show: (options: ShowOptions) => Promise<void>;
@@ -20,37 +20,32 @@
    isVisible: boolean;
  }
  
- const TalkPopupContext = createContext<TalkPopupContextType | null>(null);
- 
- // Capitalize first letter of each word
- const capitalizeWords = (str: string): string => {
-   return str.replace(/\b\w/g, (char) => char.toUpperCase());
- };
+const TalkPopupContext = createContext<TalkPopupContextType | null>(null);
  
  interface TalkPopupProviderProps {
    children: ReactNode;
  }
  
- export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => {
-   const { companion } = useCompanion();
-   const [isVisible, setIsVisible] = useState(false);
-   const [message, setMessage] = useState("");
-   const [companionName, setCompanionName] = useState("Companion");
-   const [companionImageUrl, setCompanionImageUrl] = useState<string | null>(null);
+export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => {
+  const { companion } = useCompanion();
+  const [isVisible, setIsVisible] = useState(false);
+  const [message, setMessage] = useState("");
+  const [companionName, setCompanionName] = useState("");
+  const [companionImageUrl, setCompanionImageUrl] = useState<string | null>(null);
    
    // Queue for pending messages
    const queueRef = useRef<ShowOptions[]>([]);
    const isShowingRef = useRef(false);
  
    // Get companion name using fallback chain
-   const getCompanionName = useCallback(async (): Promise<string> => {
-     if (!companion) return "Companion";
+  const getCompanionName = useCallback(async (): Promise<string | null> => {
+    if (!companion) return null;
      
      // 1. Check cached_creature_name (fastest)
-     const cachedName = (companion as any).cached_creature_name;
-     if (cachedName) {
-       return cachedName;
-     }
+    const cachedName = companion.cached_creature_name;
+    if (cachedName) {
+      return cachedName;
+    }
      
      // 2. Query evolution cards for current stage
      try {
@@ -71,18 +66,12 @@
          
          return data.creature_name;
        }
-     } catch (error) {
-       console.error('Failed to fetch creature name:', error);
-     }
-     
-     // 3. Fallback to spirit_animal
-     if (companion.spirit_animal) {
-       return capitalizeWords(companion.spirit_animal);
-     }
-     
-     // 4. Default
-     return "Companion";
-   }, [companion]);
+    } catch (error) {
+      console.error('Failed to fetch creature name:', error);
+    }
+
+    return null;
+  }, [companion]);
    
    // Show the popup with a message
    const show = useCallback(async (options: ShowOptions) => {
@@ -94,8 +83,10 @@
      
      isShowingRef.current = true;
      
-     const name = options.companionName || await getCompanionName();
-     const imageUrl = options.companionImageUrl || companion?.current_image_url || null;
+    const name = options.companionName !== undefined
+      ? (options.companionName ?? "")
+      : ((await getCompanionName()) ?? "");
+    const imageUrl = options.companionImageUrl || companion?.current_image_url || null;
      
      setMessage(options.message);
      setCompanionName(name);

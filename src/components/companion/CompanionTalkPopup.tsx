@@ -25,15 +25,16 @@
    return Math.min(5, Math.max(3.2, 3 + (length / 50)));
  };
  
- export const CompanionTalkPopup = memo(({
+export const CompanionTalkPopup = memo(({
    isVisible,
    onDismiss,
    message,
    companionName,
    companionImageUrl,
- }: CompanionTalkPopupProps) => {
-   const [progress, setProgress] = useState(0);
-   const duration = getAutoDismissDuration(message);
+}: CompanionTalkPopupProps) => {
+  const [progress, setProgress] = useState(0);
+  const duration = getAutoDismissDuration(message);
+  const hasCompanionName = companionName.trim().length > 0;
    
    // Check for reduced motion preference
    const prefersReducedMotion = 
@@ -97,11 +98,11 @@
              // Position above nav bar with safe area
              "bottom-[calc(64px+env(safe-area-inset-bottom,0px)+12px)]"
            )}
-           onClick={handleDismiss}
-           role="dialog"
-           aria-modal="false"
-           aria-label={`${companionName} says: ${message}`}
-         >
+         onClick={handleDismiss}
+         role="dialog"
+         aria-modal="false"
+         aria-label={hasCompanionName ? `${companionName} says: ${message}` : `Companion says: ${message}`}
+        >
            <div className={cn(
              "relative rounded-2xl overflow-hidden",
              "bg-card/95 backdrop-blur-lg",
@@ -139,10 +140,12 @@
                  <p className="text-foreground text-base leading-relaxed">
                    "{message}"
                  </p>
-                 <p className="mt-2 text-sm text-muted-foreground flex items-center gap-1">
-                   — {companionName} <span className="text-primary">✨</span>
-                 </p>
-               </div>
+                {hasCompanionName ? (
+                  <p className="mt-2 text-sm text-muted-foreground flex items-center gap-1">
+                    — {companionName} <span className="text-primary">✨</span>
+                  </p>
+                ) : null}
+              </div>
                
                {/* Dismiss button */}
                <button
