@@ -27,7 +27,6 @@ export const useWidgetSync = (
   const syncRef = useRef<(force?: boolean) => void>(() => {});
   const sessionSyncDisabledRef = useRef(false);
   const isIOS = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
-  const isWidgetPluginAvailable = isIOS && isPluginAvailable('WidgetData');
   
   const syncToWidget = useCallback(async (force = false) => {
     if (!enabled) {
@@ -39,7 +38,7 @@ export const useWidgetSync = (
     }
 
     // Only run on iOS native platform
-    if (!isWidgetPluginAvailable) {
+    if (!isIOS) {
       return;
     }
 
@@ -96,9 +95,14 @@ export const useWidgetSync = (
         console.info('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
         return;
       }
-      console.error('[WidgetSync] Failed to sync:', error);
+      const details = getErrorDetails(error);
+      console.error('[WidgetSync] Failed to sync widget payload', {
+        taskDate,
+        code: details.code,
+        message: details.message,
+      });
     }
-  }, [enabled, isWidgetPluginAvailable, taskDate, tasks]);
+  }, [enabled, isIOS, taskDate, tasks]);
 
   useEffect(() => {
     syncRef.current = syncToWidget;
@@ -114,7 +118,7 @@ export const useWidgetSync = (
   
   // Force sync shortly after mount
   useEffect(() => {
-    if (!enabled || !isWidgetPluginAvailable) {
+    if (!enabled || !isIOS) {
       return;
     }
 
@@ -122,11 +126,11 @@ export const useWidgetSync = (
       syncRef.current(true);
     }, 500);
     return () => clearTimeout(timer);
-  }, [enabled, isWidgetPluginAvailable]);
+  }, [enabled, isIOS]);
   
   // Sync when app resumes from background (single listener, latest callback via ref)
   useEffect(() => {
-    if (!enabled || !isWidgetPluginAvailable) return;
+    if (!enabled || !isIOS) return;
     
     const listener = App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
@@ -137,7 +141,47 @@ export const useWidgetSync = (
     return () => {
       listener.then(l => l.remove());
     };
-  }, [enabled, isWidgetPluginAvailable]);
+  }, [enabled, isIOS]);
+
+  // Run a one-time diagnostics check to confirm App Group payload visibility on iOS.
+  useEffect(() => {
+    if (!isIOS) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const runDiagnostics = async () => {
+      try {
+        const diagnostics = await WidgetData.getWidgetSyncDiagnostics();
+        if (cancelled) {
+          return;
+        }
+
+        if (!diagnostics.appGroupAccessible || !diagnostics.hasPayload) {
+          console.warn('[WidgetSync] Diagnostics indicate missing shared payload state', diagnostics);
+        }
+      } catch (error) {
+        if (isUnimplementedPluginError(error)) {
+          sessionSyncDisabledRef.current = true;
+          console.info('[WidgetSync] WidgetData plugin unavailable at runtime; disabling widget sync for this session.');
+          return;
+        }
+
+        const details = getErrorDetails(error);
+        console.warn('[WidgetSync] Diagnostics check failed', {
+          code: details.code,
+          message: details.message,
+        });
+      }
+    };
+
+    void runDiagnostics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isIOS]);
   
   return { syncToWidget };
 };
@@ -160,11 +204,6 @@ function getLocalDateString(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-function isPluginAvailable(pluginName: string): boolean {
-  const maybeChecker = (Capacitor as { isPluginAvailable?: (name: string) => boolean }).isPluginAvailable;
-  return typeof maybeChecker === 'function' ? maybeChecker(pluginName) : false;
-}
-
 function isUnimplementedPluginError(error: unknown): boolean {
   const code = typeof error === 'object' && error !== null && 'code' in error
     ? String((error as { code?: unknown }).code ?? '')
@@ -179,4 +218,20 @@ function isUnimplementedPluginError(error: unknown): boolean {
         : '';
 
   return code.toUpperCase() === 'UNIMPLEMENTED' || message.toUpperCase().includes('UNIMPLEMENTED');
+}
+
+function getErrorDetails(error: unknown): { code: string; message: string } {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code ?? '')
+    : '';
+
+  const message = typeof error === 'string'
+    ? error
+    : error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : 'Unknown error';
+
+  return { code, message };
 }

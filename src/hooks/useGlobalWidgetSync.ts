@@ -8,9 +8,9 @@ interface GlobalWidgetSyncOptions {
 
 export const useGlobalWidgetSync = (options: GlobalWidgetSyncOptions = {}): void => {
   const { enabled = true } = options;
-  const { user, status } = useAuth();
+  const { user } = useAuth();
 
-  const syncEnabled = enabled && status === "authenticated" && !!user;
+  const syncEnabled = enabled && !!user;
   const { tasks, taskDate } = useTasksQuery(undefined, { enabled: syncEnabled });
 
   useWidgetSync(tasks, taskDate, { enabled: syncEnabled });

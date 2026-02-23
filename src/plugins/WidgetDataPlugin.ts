@@ -11,6 +11,14 @@ export interface WidgetTask {
   scheduledTime: string | null;
 }
 
+export interface WidgetSyncDiagnostics {
+  appGroupAccessible: boolean;
+  hasPayload: boolean;
+  payloadDate: string | null;
+  payloadUpdatedAt: string | null;
+  payloadByteCount: number;
+}
+
 export interface WidgetDataPlugin {
   updateWidgetData(options: {
     tasks: WidgetTask[];
@@ -21,6 +29,7 @@ export interface WidgetDataPlugin {
     date: string;
   }): Promise<void>;
   reloadWidget(): Promise<void>;
+  getWidgetSyncDiagnostics(): Promise<WidgetSyncDiagnostics>;
 }
 
 export const WidgetData = registerPlugin<WidgetDataPlugin>('WidgetData', {

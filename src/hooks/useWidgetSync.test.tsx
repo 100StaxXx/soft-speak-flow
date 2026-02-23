@@ -4,6 +4,7 @@ import type { DailyTask } from "./useTasksQuery";
 
 const mocks = vi.hoisted(() => {
   const updateWidgetDataMock = vi.fn();
+  const getWidgetSyncDiagnosticsMock = vi.fn();
   const addListenerMock = vi.fn();
   const removeListenerMock = vi.fn();
 
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     updateWidgetDataMock,
+    getWidgetSyncDiagnosticsMock,
     addListenerMock,
     removeListenerMock,
     platformState,
@@ -39,6 +41,7 @@ vi.mock("@capacitor/app", () => ({
 vi.mock("@/plugins/WidgetDataPlugin", () => ({
   WidgetData: {
     updateWidgetData: mocks.updateWidgetDataMock,
+    getWidgetSyncDiagnostics: mocks.getWidgetSyncDiagnosticsMock,
   },
 }));
 
@@ -110,6 +113,13 @@ describe("useWidgetSync", () => {
     mocks.platformState.platform = "ios";
     mocks.platformState.widgetPluginAvailable = true;
     mocks.updateWidgetDataMock.mockResolvedValue(undefined);
+    mocks.getWidgetSyncDiagnosticsMock.mockResolvedValue({
+      appGroupAccessible: true,
+      hasPayload: true,
+      payloadDate: localDateString(),
+      payloadUpdatedAt: null,
+      payloadByteCount: 32,
+    });
     mocks.addListenerMock.mockResolvedValue({ remove: mocks.removeListenerMock });
   });
 
@@ -252,15 +262,15 @@ describe("useWidgetSync", () => {
     );
   });
 
-  it("skips sync and listeners when the WidgetData plugin is unavailable", async () => {
+  it("still syncs when isPluginAvailable reports false", async () => {
     const today = localDateString();
     mocks.platformState.widgetPluginAvailable = false;
 
     renderHook(() => useWidgetSync([makeTask()], today));
     await flushEffects();
 
-    expect(mocks.updateWidgetDataMock).not.toHaveBeenCalled();
-    expect(mocks.addListenerMock).not.toHaveBeenCalled();
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
+    expect(mocks.addListenerMock).toHaveBeenCalledTimes(1);
   });
 
   it("disables further sync attempts after an unimplemented plugin error", async () => {
@@ -283,7 +293,7 @@ describe("useWidgetSync", () => {
     });
 
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith("[WidgetSync] Failed to sync:", expect.anything());
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
 
     const appStateCallback = mocks.addListenerMock.mock.calls[0]?.[1];
     await act(async () => {
@@ -294,5 +304,47 @@ describe("useWidgetSync", () => {
     expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
     consoleInfoSpy.mockRestore();
     consoleErrorSpy.mockRestore();
+  });
+
+  it("runs diagnostics on iOS mount and logs warning for missing payload", async () => {
+    const today = localDateString();
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.getWidgetSyncDiagnosticsMock.mockResolvedValueOnce({
+      appGroupAccessible: true,
+      hasPayload: false,
+      payloadDate: null,
+      payloadUpdatedAt: null,
+      payloadByteCount: 0,
+    });
+
+    renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    expect(mocks.getWidgetSyncDiagnosticsMock).toHaveBeenCalledTimes(1);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "[WidgetSync] Diagnostics indicate missing shared payload state",
+      expect.objectContaining({
+        hasPayload: false,
+      }),
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
+  it("does not crash when diagnostics call fails", async () => {
+    const today = localDateString();
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.getWidgetSyncDiagnosticsMock.mockRejectedValueOnce(new Error("diagnostics failed"));
+
+    renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "[WidgetSync] Diagnostics check failed",
+      expect.objectContaining({
+        message: "diagnostics failed",
+      }),
+    );
+    consoleWarnSpy.mockRestore();
   });
 });

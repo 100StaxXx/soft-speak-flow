@@ -50,7 +50,7 @@ describe("useGlobalWidgetSync", () => {
     mocks.useTasksQueryMock.mockReturnValue(mocks.tasksState);
   });
 
-  it("uses today's tasks query and syncs widget when authenticated", () => {
+  it("uses today's tasks query and syncs widget when a user exists", () => {
     renderHook(() => useGlobalWidgetSync());
 
     expect(mocks.useTasksQueryMock).toHaveBeenCalledWith(undefined, { enabled: true });
@@ -72,7 +72,20 @@ describe("useGlobalWidgetSync", () => {
     );
   });
 
-  it("disables querying and syncing when user is not authenticated", () => {
+  it("keeps sync enabled while auth is recovering when user exists", () => {
+    mocks.authState.status = "recovering";
+
+    renderHook(() => useGlobalWidgetSync());
+
+    expect(mocks.useTasksQueryMock).toHaveBeenCalledWith(undefined, { enabled: true });
+    expect(mocks.useWidgetSyncMock).toHaveBeenCalledWith(
+      mocks.tasksState.tasks,
+      mocks.tasksState.taskDate,
+      { enabled: true },
+    );
+  });
+
+  it("disables querying and syncing when user is missing", () => {
     mocks.authState.user = null;
     mocks.authState.status = "unauthenticated";
 

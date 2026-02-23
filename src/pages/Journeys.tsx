@@ -849,13 +849,13 @@ const Journeys = () => {
           onClose={() => setShowPageInfo(false)}
           title="About Quests"
           icon={Compass}
-          description="Quests unite your daily tasks and recurring rituals into one powerful view."
+          description="Quests and Campaigns work together in one powerful view."
           features={[
-            "Complete daily quests to earn XP",
-            "Rituals repeat automatically to build habits",
-            "Track your streak and maintain momentum"
+            "Quests are your daily actions to earn XP and build momentum",
+            "Campaigns are goals you break down with your mentor into routines",
+            "Track progress across quests and campaigns to stay consistent"
           ]}
-          tip="Add quests by tapping the + button in the corner!"
+          tip="Add a quest with +, or start a Campaign to plan your bigger goal."
         />
 
         {/* Streak Freeze Prompt */}

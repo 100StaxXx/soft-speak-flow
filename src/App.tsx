@@ -187,7 +187,7 @@ const AppContent = memo(() => {
   
   // Refresh critical data on app resume (iOS/Android) or tab visibility (web)
   useAppResumeRefresh({ enabled: status === "authenticated" && Boolean(session?.user) });
-  useGlobalWidgetSync({ enabled: status === "authenticated" && Boolean(session?.user) });
+  useGlobalWidgetSync({ enabled: Boolean(session?.user) });
   
   // Handle password recovery tokens BEFORE routes render - prevents paywall from blocking reset
   useEffect(() => {
