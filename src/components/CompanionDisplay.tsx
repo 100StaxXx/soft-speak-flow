@@ -22,9 +22,9 @@ import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
 import { formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
+import { resolveCompanionName } from "@/lib/companionName";
 import {
   useState,
   useEffect,
@@ -339,43 +339,28 @@ export const CompanionDisplay = memo(() => {
     [companion?.core_element, companion?.favorite_color, companion?.current_stage, companion?.id],
   );
 
-  // Fetch creature name from evolution cards if not cached
+  // Resolve a consistent display name through shared name resolver
   useEffect(() => {
+    let cancelled = false;
     const fetchCreatureName = async () => {
       if (!companion) return;
-      
-      // Use cached name if available
-      if (companion.cached_creature_name) {
-        setCreatureName(companion.cached_creature_name);
-        return;
-      }
-      
-      // Fetch from evolution cards
-      const { data } = await supabase
-        .from('companion_evolution_cards')
-        .select('creature_name')
-        .eq('companion_id', companion.id)
-        .eq('evolution_stage', companion.current_stage)
-        .maybeSingle();
-      
-      if (data?.creature_name) {
-        setCreatureName(data.creature_name);
-        // Cache it for next time (fire and forget)
-        supabase
-          .from('user_companion')
-          .update({ cached_creature_name: data.creature_name })
-          .eq('id', companion.id);
-      } else {
-        // Final fallback to capitalized spirit animal
-        setCreatureName(
-          companion.spirit_animal.charAt(0).toUpperCase() + 
-          companion.spirit_animal.slice(1)
-        );
+
+      const resolvedName = await resolveCompanionName({
+        companion,
+        fallback: "species",
+      });
+
+      if (!cancelled) {
+        setCreatureName(resolvedName);
       }
     };
-    
-    fetchCreatureName();
-  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name]);
+
+    void fetchCreatureName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
 
   if (isLoading) return <CompanionSkeleton />;
   if (!companion) return null;

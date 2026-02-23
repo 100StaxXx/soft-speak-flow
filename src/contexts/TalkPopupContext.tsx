@@ -3,10 +3,10 @@
   * Provides popup state and trigger function to entire app
   */
  
- import { createContext, useContext, ReactNode, memo, useState, useCallback, useRef } from "react";
- import { useCompanion } from "@/hooks/useCompanion";
- import { supabase } from "@/integrations/supabase/client";
- import { CompanionTalkPopup } from "@/components/companion/CompanionTalkPopup";
+import { createContext, useContext, ReactNode, memo, useState, useCallback, useRef } from "react";
+import { useCompanion } from "@/hooks/useCompanion";
+import { CompanionTalkPopup } from "@/components/companion/CompanionTalkPopup";
+import { resolveCompanionName } from "@/lib/companionName";
  
 interface ShowOptions {
   message: string;
@@ -37,44 +37,8 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
    const queueRef = useRef<ShowOptions[]>([]);
    const isShowingRef = useRef(false);
  
-   // Get companion name using fallback chain
-  const getCompanionName = useCallback(async (): Promise<string | null> => {
-    if (!companion) return null;
-     
-     // 1. Check cached_creature_name (fastest)
-    const cachedName = companion.cached_creature_name;
-    if (cachedName) {
-      return cachedName;
-    }
-     
-     // 2. Query evolution cards for current stage
-     try {
-       const { data } = await supabase
-         .from('companion_evolution_cards')
-         .select('creature_name')
-         .eq('companion_id', companion.id)
-         .eq('evolution_stage', companion.current_stage)
-         .maybeSingle();
-       
-       if (data?.creature_name) {
-         // Cache it for next time (fire and forget)
-         supabase
-           .from('user_companion')
-           .update({ cached_creature_name: data.creature_name })
-           .eq('id', companion.id)
-           .then(() => {});
-         
-         return data.creature_name;
-       }
-    } catch (error) {
-      console.error('Failed to fetch creature name:', error);
-    }
-
-    return null;
-  }, [companion]);
-   
-   // Show the popup with a message
-   const show = useCallback(async (options: ShowOptions) => {
+  // Show the popup with a message
+  const show = useCallback(async (options: ShowOptions) => {
      // If already showing, add to queue
      if (isShowingRef.current) {
        queueRef.current.push(options);
@@ -83,16 +47,18 @@ export const TalkPopupProvider = memo(({ children }: TalkPopupProviderProps) => 
      
      isShowingRef.current = true;
      
-    const name = options.companionName !== undefined
-      ? (options.companionName ?? "")
-      : ((await getCompanionName()) ?? "");
+    const name = await resolveCompanionName({
+      companion,
+      overrideName: options.companionName,
+      fallback: "empty",
+    });
     const imageUrl = options.companionImageUrl || companion?.current_image_url || null;
      
      setMessage(options.message);
      setCompanionName(name);
      setCompanionImageUrl(imageUrl);
      setIsVisible(true);
-   }, [companion, getCompanionName]);
+  }, [companion]);
    
    // Dismiss the current popup and show next in queue
    const dismiss = useCallback(() => {
