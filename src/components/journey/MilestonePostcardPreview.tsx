@@ -16,7 +16,7 @@ interface MilestonePostcardPreviewProps {
   onClick?: () => void;
   storySeed?: StorySeed | null;
   totalChapters?: number | null;
-  companionSpecies?: string;
+  companionDisplayName?: string;
 }
 
 // Progress tier thresholds
@@ -34,14 +34,14 @@ function getStoryTeaser(
   tier: ProgressTier, 
   chapterNumber: number, 
   storySeed?: StorySeed | null,
-  companionSpecies?: string
+  companionDisplayName?: string
 ): { tagline: string; narrative: string } {
   const chapter = storySeed?.chapter_blueprints?.[chapterNumber - 1];
   const mystery = storySeed?.the_great_mystery;
   const prophecy = storySeed?.the_prophecy?.full_text;
   const characters = chapter?.featured_characters || storySeed?.the_ensemble_cast?.map(c => c.name) || [];
   const featuredCharacter = characters[0];
-  const companionLabel = companionSpecies ? `Your ${companionSpecies}` : "Your companion";
+  const companionLabel = companionDisplayName ? `Your ${companionDisplayName}` : "Your companion";
   
   // Default fallbacks with adventure flavor
   const defaults = {
@@ -161,7 +161,7 @@ export function MilestonePostcardPreview({
   onClick,
   storySeed,
   totalChapters,
-  companionSpecies,
+  companionDisplayName,
 }: MilestonePostcardPreviewProps) {
   const remaining = Math.max(0, targetPercent - currentProgress);
   const progressTowardMilestone = remaining > 0 
@@ -170,13 +170,13 @@ export function MilestonePostcardPreview({
 
   const tier = useMemo(() => getProgressTier(progressTowardMilestone), [progressTowardMilestone]);
   const { tagline, narrative } = useMemo(
-    () => getStoryTeaser(tier, chapterNumber, storySeed, companionSpecies),
-    [tier, chapterNumber, storySeed, companionSpecies]
+    () => getStoryTeaser(tier, chapterNumber, storySeed, companionDisplayName),
+    [tier, chapterNumber, storySeed, companionDisplayName]
   );
   
   const TierIcon = getTierIcon(tier);
   const tierGlow = getTierGlow(tier);
-  const companionLabel = companionSpecies ? `Your ${companionSpecies}` : "Your companion";
+  const companionLabel = companionDisplayName ? `Your ${companionDisplayName}` : "Your companion";
 
   if (compact && !isExpanded) {
     return (

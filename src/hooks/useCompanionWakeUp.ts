@@ -3,6 +3,7 @@ import { useCompanionCareSignals } from './useCompanionCareSignals';
 import { useCompanion } from './useCompanion';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveCompanionName } from '@/lib/companionName';
 
 const WAKE_UP_SEEN_KEY = 'companion_wake_up_seen';
 
@@ -26,9 +27,36 @@ export function useCompanionWakeUp(): WakeUpState {
   const { care, isLoading } = useCompanionCareSignals();
   
   const [showCelebration, setShowCelebration] = useState(false);
+  const [companionName, setCompanionName] = useState('Companion');
   const previousDormantRef = useRef<boolean | null>(null);
   const hasInitialized = useRef(false);
   const memoryTriggered = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateCompanionName = async () => {
+      if (!companion) {
+        if (!cancelled) setCompanionName('Companion');
+        return;
+      }
+
+      const name = await resolveCompanionName({
+        companion,
+        fallback: 'companion',
+      });
+
+      if (!cancelled) {
+        setCompanionName(name);
+      }
+    };
+
+    void hydrateCompanionName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
 
   // Check if we've already shown this celebration
   const getSeenKey = useCallback(() => {
@@ -111,7 +139,7 @@ export function useCompanionWakeUp(): WakeUpState {
   return {
     showCelebration,
     dismissCelebration,
-    companionName: companion?.spirit_animal || 'companion',
+    companionName,
     companionImageUrl: companion?.current_image_url || '',
     dormantImageUrl: companion?.dormant_image_url || null,
     bondLevel: care?.bond?.level || 1,

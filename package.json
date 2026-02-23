@@ -23,7 +23,8 @@
     "previews:sync": "node --import tsx scripts/sync-badge-reward-previews.ts",
     "previews:validate": "node --import tsx scripts/validate-badge-reward-previews.ts",
     "previews:build": "npm run previews:manifest && npm run previews:render",
-    "previews:pipeline": "npm run previews:build && npm run previews:sync && npm run previews:validate"
+    "previews:pipeline": "npm run previews:build && npm run previews:sync && npm run previews:validate",
+    "adversaries:prewarm": "node scripts/prewarm-adversary-images.mjs"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",

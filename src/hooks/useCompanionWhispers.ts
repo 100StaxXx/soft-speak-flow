@@ -4,6 +4,7 @@ import { useCompanionPresence, CompanionMood } from "@/contexts/CompanionPresenc
 import { useCompanion } from "./useCompanion";
 import { useCompanionCareSignals } from "./useCompanionCareSignals";
 import { safeSessionStorage } from "@/utils/storage";
+import { resolveCompanionName } from "@/lib/companionName";
 
 export type WhisperTrigger = 
   | 'navigation'      // User navigated to a new page
@@ -170,10 +171,37 @@ const STORAGE_KEYS = {
 export function useCompanionWhispers() {
   const [currentWhisper, setCurrentWhisper] = useState<Whisper | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [resolvedCompanionName, setResolvedCompanionName] = useState('Companion');
   const location = useLocation();
   const { presence, isLoading: presenceLoading } = useCompanionPresence();
   const { companion } = useCompanion();
   const { care } = useCompanionCareSignals();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateCompanionName = async () => {
+      if (!companion) {
+        if (!cancelled) setResolvedCompanionName('Companion');
+        return;
+      }
+
+      const name = await resolveCompanionName({
+        companion,
+        fallback: 'companion',
+      });
+
+      if (!cancelled) {
+        setResolvedCompanionName(name);
+      }
+    };
+
+    void hydrateCompanionName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companion?.id, companion?.current_stage, companion?.cached_creature_name, companion?.spirit_animal]);
 
   // Check if whisper is allowed based on cooldown and session limit
   const canShowWhisper = useCallback((): boolean => {
@@ -287,10 +315,10 @@ export function useCompanionWhispers() {
     }
   }, [presence.mood, showWhisper]);
 
-  // Companion name for personalization (use spirit animal as name)
-  const companionName = companion?.spirit_animal 
-    ? `Your ${companion.spirit_animal.charAt(0).toUpperCase() + companion.spirit_animal.slice(1).toLowerCase()}`
-    : 'Your companion';
+  const companionName =
+    resolvedCompanionName === 'Companion'
+      ? 'Your companion'
+      : `Your ${resolvedCompanionName}`;
 
   return {
     currentWhisper,

@@ -252,6 +252,7 @@ export type Database = {
           image_url: string
           theme: string
           tier: string
+          variant_index: number
         }
         Insert: {
           created_at?: string
@@ -259,6 +260,7 @@ export type Database = {
           image_url: string
           theme: string
           tier: string
+          variant_index?: number
         }
         Update: {
           created_at?: string
@@ -266,6 +268,7 @@ export type Database = {
           image_url?: string
           theme?: string
           tier?: string
+          variant_index?: number
         }
         Relationships: []
       }

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   },
   companion: {
     current_image_url: null as string | null,
+    cached_creature_name: "Wolf" as string | null,
     spirit_animal: "Wolf",
   },
   talkPopup: {
@@ -84,6 +85,7 @@ describe("CompanionDialogue", () => {
     mocks.dialogue.dialogueMood = "content";
     mocks.dialogue.isLoading = false;
     mocks.companion.current_image_url = null;
+    mocks.companion.cached_creature_name = "Wolf";
     mocks.companion.spirit_animal = "Wolf";
     mocks.talkPopup.dismiss.mockClear();
     mocks.talkPopup.show.mockClear();
@@ -99,6 +101,16 @@ describe("CompanionDialogue", () => {
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByText(/Primary greeting/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Secondary bond line/)).toBeInTheDocument();
+  });
+
+  it("uses provided companionName instead of species labels", () => {
+    render(<CompanionDialogue companionName="Cindarion" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open cindarion dialogue/i }));
+
+    const dialog = screen.getByRole("dialog", { name: "Cindarion" });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Wolf" })).not.toBeInTheDocument();
   });
 
   it("opens from keyboard with Enter and Space", async () => {
@@ -189,7 +201,7 @@ describe("CompanionDialogue", () => {
     expect(mocks.talkPopup.show).not.toHaveBeenCalled();
   });
 
-  it("shows micro-title when shimmer is active", () => {
+  it("shows event header from micro-title when shimmer is active", () => {
     mocks.dialogue.shimmerType = "green";
     mocks.dialogue.microTitle = "Momentum Boost";
 
@@ -198,13 +210,36 @@ describe("CompanionDialogue", () => {
     expect(screen.getByText("Momentum Boost")).toBeInTheDocument();
   });
 
-  it("hides micro-title when shimmer is none", () => {
+  it("falls back to Companion Event when micro-title is absent", () => {
     mocks.dialogue.shimmerType = "none";
     mocks.dialogue.microTitle = null;
 
     render(<CompanionDialogue />);
 
+    expect(screen.getByText("Companion Event")).toBeInTheDocument();
     expect(screen.queryByText("Momentum Boost")).not.toBeInTheDocument();
+  });
+
+  it("uses the same event header in modal description", () => {
+    mocks.dialogue.shimmerType = "green";
+    mocks.dialogue.microTitle = "Momentum Boost";
+
+    render(<CompanionDialogue />);
+    fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
+
+    const dialog = screen.getByRole("dialog", { name: "Wolf" });
+    expect(within(dialog).getByText("Momentum Boost")).toBeInTheDocument();
+  });
+
+  it("does not duplicate event header inside the modal body", () => {
+    mocks.dialogue.shimmerType = "green";
+    mocks.dialogue.microTitle = "Momentum Boost";
+
+    render(<CompanionDialogue />);
+    fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
+
+    const dialog = screen.getByRole("dialog", { name: "Wolf" });
+    expect(within(dialog).getAllByText("Momentum Boost")).toHaveLength(1);
   });
 
   it("applies shimmer accent styling based on shimmer type", () => {
@@ -229,5 +264,17 @@ describe("CompanionDialogue", () => {
     render(<CompanionDialogue />);
 
     expect(screen.getByTestId("companion-dialogue-accent")).not.toHaveClass("animate-pulse");
+
+    fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
+    expect(screen.getByTestId("companion-dialogue-modal-accent")).not.toHaveClass("animate-pulse");
+  });
+
+  it("falls back to Companion when both explicit and cached names are empty", () => {
+    mocks.companion.cached_creature_name = null;
+
+    render(<CompanionDialogue companionName="   " />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open companion dialogue/i }));
+    expect(screen.getByRole("dialog", { name: "Companion" })).toBeInTheDocument();
   });
 });

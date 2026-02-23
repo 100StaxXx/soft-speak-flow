@@ -14,6 +14,7 @@ interface UserContext {
   displayName: string | null;
   zodiac: string | null;
   companion: {
+    companionDisplayName: string | null;
     spiritAnimal: string;
     currentMood: string;
     currentStage: number;
@@ -46,6 +47,12 @@ interface VoiceTemplate {
   encouragementTemplates: string[];
   concernTemplates: string[];
 }
+
+const normalizeCompanionName = (value: string | null | undefined): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
 
 // Calculate lunar phase (simplified)
 const getLunarPhase = (): 'new_moon' | 'full_moon' | 'first_quarter' | 'last_quarter' | null => {
@@ -134,15 +141,18 @@ const generateNotificationContent = async (
   openAIApiKey: string
 ): Promise<{ title: string; body: string }> => {
   
-  const companionName = context.companion?.spiritAnimal || 'companion';
-  const capitalizedCompanion = companionName.charAt(0).toUpperCase() + companionName.slice(1);
+  const assignedCompanionName = normalizeCompanionName(context.companion?.companionDisplayName);
+  const hasAssignedCompanionName = Boolean(assignedCompanionName);
+  const companionTitleName = assignedCompanionName || 'Your companion';
+  const companionReference = assignedCompanionName || 'your companion';
+  const companionSpecies = context.companion?.spiritAnimal || 'companion';
   
   // Build system prompt based on notification type
   let systemPrompt = '';
   let userPrompt = '';
   
   if (voiceTemplate) {
-    systemPrompt = `You are a ${companionName} companion with these traits: ${voiceTemplate.personalityTraits.join(', ')}.
+    systemPrompt = `You are ${hasAssignedCompanionName ? assignedCompanionName : 'a loyal companion'} with these traits: ${voiceTemplate.personalityTraits.join(', ')}.
 Voice style: ${voiceTemplate.voiceStyle}
 You speak in first person as the companion, directly to your human.
 Keep messages SHORT (1-2 sentences max). Be warm but authentic to your personality.
@@ -222,7 +232,7 @@ Mood: ${context.companion?.currentMood || 'worried'}
 
 STYLE: Write like a handwritten note on a postcard. Short, personal, emotional but not guilt-tripping.
 Start with "Day ${inactiveDays}." then the message. Make it feel like a moment captured in time.`;
-      userPrompt = `Generate a postcard message from a ${companionName} on day ${inactiveDays} of missing their human. Keep it under 3 sentences.`;
+      userPrompt = `Generate a postcard message from ${hasAssignedCompanionName ? assignedCompanionName : 'their companion'} on day ${inactiveDays} of missing their human. Species context: ${companionSpecies}. Keep it under 3 sentences.`;
       break;
       
     case 'streak_protection':
@@ -282,8 +292,8 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
       
       // For duo, we'll format the body specially
       return {
-        title: `${mentorName} & ${capitalizedCompanion} celebrate you`,
-        body: `"${milestoneData.mentorLine}" — ${mentorName}\n\n*${capitalizedCompanion} ${milestoneData.companionCue}*`,
+        title: `${mentorName} & ${companionTitleName} celebrate you`,
+        body: `"${milestoneData.mentorLine}" — ${mentorName}\n\n*${companionTitleName} ${milestoneData.companionCue}*`,
       };
       
     default:
@@ -317,21 +327,21 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
     // Generate title based on notification type
     const inactiveDaysForTitle = context.companion?.inactiveDays || 0;
     const neglectTitles: Record<number, string> = {
-      1: `📮 A note from ${capitalizedCompanion}`,
-      2: `💌 ${capitalizedCompanion} sent you a postcard`,
-      3: `🪶 ${capitalizedCompanion} is keeping the light on`,
-      4: `🌧️ ${capitalizedCompanion} misses you`,
+      1: `📮 A note from ${companionTitleName}`,
+      2: `💌 ${companionTitleName} sent you a postcard`,
+      3: `🪶 ${companionTitleName} is keeping the light on`,
+      4: `🌧️ ${companionTitleName} misses you`,
       5: `💔 Day 5 without you...`,
-      6: `🕯️ ${capitalizedCompanion} is still waiting`,
-      7: `📜 A letter from ${capitalizedCompanion}`,
+      6: `🕯️ ${companionTitleName} is still waiting`,
+      7: `📜 A letter from ${companionTitleName}`,
     };
     
     const titles: Record<string, string> = {
-      'companion_morning': `${capitalizedCompanion} says good morning`,
-      'companion_evening': `${capitalizedCompanion} checking in`,
-      'companion_voice': `From your ${companionName}`,
-      'mood_followup': `${capitalizedCompanion} is thinking of you`,
-      'neglect_escalation': neglectTitles[Math.min(inactiveDaysForTitle, 7) as keyof typeof neglectTitles] || `${capitalizedCompanion} misses you`,
+      'companion_morning': `${companionTitleName} says good morning`,
+      'companion_evening': `${companionTitleName} checking in`,
+      'companion_voice': `From ${companionReference}`,
+      'mood_followup': `${companionTitleName} is thinking of you`,
+      'neglect_escalation': neglectTitles[Math.min(inactiveDaysForTitle, 7) as keyof typeof neglectTitles] || `${companionTitleName} misses you`,
       'streak_protection': `${context.currentStreak}-day streak at risk`,
       'cosmic_timing': `Cosmic energy alert`,
       'cosmic_lunar': `${context.lunarPhase === 'full_moon' ? '🌕' : context.lunarPhase === 'new_moon' ? '🌑' : '🌙'} ${context.lunarPhase?.replace('_', ' ')} tonight`,
@@ -339,7 +349,7 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
     };
     
     return {
-      title: titles[notificationType] || `Message from ${capitalizedCompanion}`,
+      title: titles[notificationType] || `Message from ${companionReference}`,
       body: messageBody,
     };
   } catch (error) {
@@ -356,7 +366,7 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
       const randomTemplate = templates[Math.floor(Math.random() * templates.length)] || "I'm here for you.";
       
       return {
-        title: `From your ${companionName}`,
+        title: `From ${companionReference}`,
         body: randomTemplate,
       };
     }
@@ -452,7 +462,7 @@ serve(async (req) => {
         const [companionRes, mentorRes, checkInRes, horoscopeRes, activityRes] = await Promise.all([
           supabase
             .from('user_companion')
-            .select('spirit_animal, current_mood, current_stage, inactive_days')
+            .select('spirit_animal, current_mood, current_stage, inactive_days, cached_creature_name')
             .eq('user_id', profile.id)
             .maybeSingle(),
           profile.selected_mentor_id 
@@ -498,6 +508,7 @@ serve(async (req) => {
           displayName: profile.display_name,
           zodiac: profile.zodiac,
           companion: companionRes.data ? {
+            companionDisplayName: normalizeCompanionName(companionRes.data.cached_creature_name),
             spiritAnimal: companionRes.data.spirit_animal,
             currentMood: companionRes.data.current_mood,
             currentStage: companionRes.data.current_stage,
@@ -572,6 +583,7 @@ serve(async (req) => {
             body,
             scheduled_for: scheduledFor.toISOString(),
             context: {
+              companion_name: userContext.companion.companionDisplayName,
               companion_mood: userContext.companion.currentMood,
               companion_species: userContext.companion.spiritAnimal,
               streak: userContext.currentStreak,

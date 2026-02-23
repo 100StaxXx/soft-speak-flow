@@ -1,0 +1,65 @@
+name: Adversary Image Pool
+
+on:
+  schedule:
+    - cron: "17 10 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only report missing variants without generating"
+        required: false
+        default: false
+        type: boolean
+      target_variants:
+        description: "Variants per theme+tier combo (1-5)"
+        required: false
+        default: "3"
+        type: string
+      max_combos:
+        description: "Limit number of combos (0 = all)"
+        required: false
+        default: "0"
+        type: string
+      retries:
+        description: "Retry attempts per combo"
+        required: false
+        default: "2"
+        type: string
+      delay_ms:
+        description: "Delay between combos in ms"
+        required: false
+        default: "250"
+        type: string
+
+jobs:
+  topup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run adversary image prewarm
+        run: |
+          set -euo pipefail
+
+          args=(
+            "--target-variants" "${{ github.event_name == 'workflow_dispatch' && inputs.target_variants || '3' }}"
+            "--max-combos" "${{ github.event_name == 'workflow_dispatch' && inputs.max_combos || '0' }}"
+            "--retries" "${{ github.event_name == 'workflow_dispatch' && inputs.retries || '2' }}"
+            "--delay-ms" "${{ github.event_name == 'workflow_dispatch' && inputs.delay_ms || '250' }}"
+          )
+
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}" = "true" ]; then
+            args+=("--dry-run")
+          fi
+
+          node scripts/prewarm-adversary-images.mjs "${args[@]}"

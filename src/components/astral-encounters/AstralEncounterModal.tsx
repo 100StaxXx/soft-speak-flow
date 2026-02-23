@@ -49,6 +49,12 @@ interface AstralEncounterModalProps {
 
 type Phase = 'boss_intro' | 'reveal' | 'instructions' | 'practice' | 'battle' | 'result';
 
+const normalizeCompanionName = (value: string | null | undefined) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 export const AstralEncounterModal = ({
   open,
   onOpenChange,
@@ -99,6 +105,11 @@ export const AstralEncounterModal = ({
     },
     enabled: !!companion?.id && open,
   });
+
+  const resolvedCompanionName =
+    normalizeCompanionName(currentCard?.creature_name)
+    ?? normalizeCompanionName(companion?.cached_creature_name)
+    ?? 'Companion';
 
   // Initialize battle state
   const {
@@ -203,11 +214,13 @@ export const AstralEncounterModal = ({
     return () => clearInterval(timer);
   }, [phase, battleTimeLeft, battleState.adversaryHPPercent, battleState.playerHPPercent, handleBattleEnd]);
 
-  // Fetch/generate adversary image
-  const { imageUrl: adversaryImageUrl, isLoading: isLoadingImage } = useAdversaryImage({
+  // Fetch cached adversary image immediately; top up variants asynchronously in background.
+  const { imageUrl: adversaryImageUrl } = useAdversaryImage({
     theme: adversary?.theme || '',
     tier: adversary?.tier || '',
     name: adversary?.name || '',
+    selectionSeed: encounter?.id,
+    targetVariants: 3,
     enabled: !!adversary && open,
   });
 
@@ -464,9 +477,8 @@ export const AstralEncounterModal = ({
                     <BattleVSScreen 
                       adversary={adversary}
                       adversaryImageUrl={adversaryImageUrl || undefined}
-                      isLoadingImage={isLoadingImage}
                       companionImageUrl={companion?.current_image_url || undefined}
-                      companionName={currentCard?.creature_name || companion?.spirit_animal || "Companion"}
+                      companionName={resolvedCompanionName}
                       companionStage={companion?.current_stage || 0}
                       onReady={handleBeginBattle}
                       onPass={onPass}
@@ -565,7 +577,7 @@ export const AstralEncounterModal = ({
                       }
                       tiltBonus={finalResult.tiltBonus}
                       companionImageUrl={companion?.current_image_url || undefined}
-                      companionName={currentCard?.creature_name || companion?.spirit_animal || 'Your companion'}
+                      companionName={resolvedCompanionName}
                     />
                   </motion.div>
                 )}

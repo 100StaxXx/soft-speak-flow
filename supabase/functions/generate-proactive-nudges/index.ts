@@ -26,6 +26,12 @@ const getConcernLevel = (inactiveDays: number) => {
   return null;
 };
 
+const normalizeCompanionName = (value: string | null | undefined): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -67,7 +73,7 @@ serve(async (req) => {
         // Check if user has an inactive companion
         const { data: companion } = await supabase
           .from('user_companion')
-          .select('inactive_days, spirit_animal')
+          .select('inactive_days, spirit_animal, cached_creature_name')
           .eq('user_id', profile.id)
           .maybeSingle()
 
@@ -92,36 +98,39 @@ serve(async (req) => {
                 .maybeSingle()
 
               if (mentor) {
-                const companionName = companion.spirit_animal || 'companion';
+                const companionDisplayName = normalizeCompanionName(companion.cached_creature_name);
+                const companionIdentity = companionDisplayName
+                  ? `their companion ${companionDisplayName}`
+                  : 'their companion';
                 
                 let contextPrompt = '';
                 switch (concernInfo.level) {
                   case 'gentle':
-                    contextPrompt = `The user hasn't checked in for 1 day. Their ${companionName} companion is starting to miss them. Generate a brief, ${concernInfo.tone} message (1 sentence) checking in.`;
+                    contextPrompt = `The user hasn't checked in for 1 day. ${companionIdentity} is starting to miss them. Generate a brief, ${concernInfo.tone} message (1 sentence) checking in.`;
                     break;
                   case 'concerned':
-                    contextPrompt = `The user has been away for 2 days. Their ${companionName} companion is worried and their energy is starting to fade. Generate a ${concernInfo.tone} message (1-2 sentences) expressing concern about both the user and their companion.`;
+                    contextPrompt = `The user has been away for 2 days. ${companionIdentity} is worried and their energy is starting to fade. Generate a ${concernInfo.tone} message (1-2 sentences) expressing concern about both the user and their companion.`;
                     break;
                   case 'urgent':
-                    contextPrompt = `The user has been inactive for 3 days! Their ${companionName} companion is sad and losing energy daily. Generate an ${concernInfo.tone} message (1-2 sentences) that conveys urgency without being guilt-trippy. Mention the companion misses them.`;
+                    contextPrompt = `The user has been inactive for 3 days! ${companionIdentity} is sad and losing energy daily. Generate an ${concernInfo.tone} message (1-2 sentences) that conveys urgency without being guilt-trippy. Mention the companion misses them.`;
                     break;
                   case 'waiting':
-                    contextPrompt = `The user has been away for ${companion.inactive_days} days. Their ${companionName} companion is waiting patiently. Generate a ${concernInfo.tone} message (1 sentence) - gentle and understanding.`;
+                    contextPrompt = `The user has been away for ${companion.inactive_days} days. ${companionIdentity} is waiting patiently. Generate a ${concernInfo.tone} message (1 sentence) - gentle and understanding.`;
                     break;
                   case 'dormancy_warning':
-                    contextPrompt = `The user has been away for 5 days. Their ${companionName} companion is in danger - if they don't return within 2 days, the companion will go dormant (a deep sleep state). Generate a ${concernInfo.tone} message (2 sentences max). Mention they only have 2 days left before their companion falls into a deep sleep. Be genuine, not guilt-trippy.`;
+                    contextPrompt = `The user has been away for 5 days. ${companionIdentity} is in danger - if they don't return within 2 days, the companion will go dormant (a deep sleep state). Generate a ${concernInfo.tone} message (2 sentences max). Mention they only have 2 days left before their companion falls into a deep sleep. Be genuine, not guilt-trippy.`;
                     break;
                   case 'dormancy_imminent':
-                    contextPrompt = `URGENT: The user has been away for 6 days. Their ${companionName} companion will go dormant TOMORROW if they don't return. Generate a ${concernInfo.tone} message (2 sentences max). This is the final warning before dormancy. Convey urgency without being manipulative - their companion truly needs them.`;
+                    contextPrompt = `URGENT: The user has been away for 6 days. ${companionIdentity} will go dormant TOMORROW if they don't return. Generate a ${concernInfo.tone} message (2 sentences max). This is the final warning before dormancy. Convey urgency without being manipulative - their companion truly needs them.`;
                     break;
                   case 'emotional':
-                    contextPrompt = `The user has been gone for a week (${companion.inactive_days} days). Their ${companionName} companion is not doing well - visibly sad and weakening. Generate a ${concernInfo.tone} message (2 sentences max) from the heart. This should feel personal, not like a notification.`;
+                    contextPrompt = `The user has been gone for a week (${companion.inactive_days} days). ${companionIdentity} is not doing well - visibly sad and weakening. Generate a ${concernInfo.tone} message (2 sentences max) from the heart. This should feel personal, not like a notification.`;
                     break;
                   case 'hopeful':
-                    contextPrompt = `The user has been away for ${companion.inactive_days} days. Their ${companionName} companion is still waiting faithfully. Generate a ${concernInfo.tone} brief message (1 sentence) - patient, no pressure.`;
+                    contextPrompt = `The user has been away for ${companion.inactive_days} days. ${companionIdentity} is still waiting faithfully. Generate a ${concernInfo.tone} brief message (1 sentence) - patient, no pressure.`;
                     break;
                   case 'final':
-                    contextPrompt = `The user has been away for over two weeks (${companion.inactive_days} days). Their ${companionName} companion is waiting faithfully but struggling. Generate a ${concernInfo.tone} final message (2 sentences max). Don't be dramatic, just genuine - like a friend who really misses them and wants them to know the door is always open.`;
+                    contextPrompt = `The user has been away for over two weeks (${companion.inactive_days} days). ${companionIdentity} is waiting faithfully but struggling. Generate a ${concernInfo.tone} final message (2 sentences max). Don't be dramatic, just genuine - like a friend who really misses them and wants them to know the door is always open.`;
                     break;
                 }
 
@@ -157,6 +166,7 @@ IMPORTANT: Stay true to your mentor personality. Don't be preachy or use guilt t
                       context: {
                         inactive_days: companion.inactive_days,
                         concern_level: concernInfo.level,
+                        companion_name: companionDisplayName,
                         companion_animal: companion.spirit_animal,
                         send_push: concernInfo.sendPush, // Flag for push notification
                       },

@@ -103,8 +103,8 @@ serve(async (req) => {
         }
 
         // Get companion name from context
-        const context = nudge.context as { companion_animal?: string; concern_level?: string } | null
-        const companionName = context?.companion_animal || 'Your companion'
+        const context = nudge.context as { companion_name?: string | null; companion_animal?: string; concern_level?: string } | null
+        const companionName = context?.companion_name || context?.companion_animal || 'Your companion'
         const concernLevel = context?.concern_level
 
         // Build notification title based on nudge type and concern level

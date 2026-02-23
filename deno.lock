@@ -124,6 +124,7 @@
         "npm:react-router-dom@^6.30.3",
         "npm:react@^19.2.2",
         "npm:recharts@^2.15.4",
+        "npm:sharp@~0.34.5",
         "npm:sonner@^1.7.4",
         "npm:tailwind-merge@^2.6.0",
         "npm:tailwindcss-animate@^1.0.7",

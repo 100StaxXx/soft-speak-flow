@@ -32,6 +32,143 @@ const TIER_MODIFIERS: Record<string, string> = {
   legendary: "god-like entity of immense power, celestial and apocalyptic, universe-shaking presence",
 };
 
+const MAX_VARIANTS = 5;
+const DEFAULT_TARGET_VARIANTS = 1;
+
+interface CachedVariant {
+  image_url: string;
+  variant_index: number;
+}
+
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
+const jsonHeaders = {
+  ...corsHeaders,
+  "Content-Type": "application/json",
+};
+
+const toResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+
+const clampInteger = (value: unknown, min: number, max: number, fallback: number): number => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.floor(value)));
+};
+
+const resolveRequestedVariant = (value: unknown): number | null => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const parsed = Math.floor(value);
+  if (parsed < 0 || parsed >= MAX_VARIANTS) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const hashString = (value: string): number => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash * 31) + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+};
+
+const buildPrompt = (
+  theme: string,
+  tier: string,
+  name: string | undefined,
+  variantIndex: number,
+  variantCount: number,
+) => {
+  const themeDesc = THEME_DESCRIPTIONS[theme] || "a mysterious dark energy creature";
+  const tierMod = TIER_MODIFIERS[tier] || "moderate power level";
+  const resolvedName = (typeof name === "string" && name.trim().length > 0) ? name.trim() : "Astral Adversary";
+
+  return `Create a dark fantasy creature portrait for a mobile game battle screen. The creature is called "${resolvedName}" and represents ${theme} energy.
+
+Description: ${themeDesc}
+
+Power level: ${tierMod}
+
+Variant guidance:
+- Produce variant ${variantIndex + 1} of ${variantCount} for the same creature identity.
+- Keep species/theme consistent while varying pose, camera angle, expression, or energy effect.
+
+Style requirements:
+- Digital painting style, high-quality fantasy game concept art
+- Dark and menacing but stylized and appealing (not grotesque)
+- Cosmic/astral aesthetic with subtle star and nebula elements
+- Glowing eyes or energy effects
+- Portrait composition focused on the creature's upper body/face
+- Dark background with magical ambient lighting
+- Single creature only, no multiple entities
+- Professional game asset quality`;
+};
+
+const generateImage = async (prompt: string, openAiApiKey: string): Promise<string> => {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openAiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash-image-preview",
+      messages: [{ role: "user", content: prompt }],
+      modalities: ["image", "text"],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("AI gateway error:", response.status, errorText);
+    if (response.status === 429) {
+      throw new HttpError(429, "Rate limited, please try again later");
+    }
+    throw new HttpError(response.status, `AI generation failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (!imageUrl) {
+    console.error("No image in response:", JSON.stringify(data));
+    throw new HttpError(502, "No image generated");
+  }
+
+  return imageUrl;
+};
+
+const pickDeterministicVariant = (
+  variants: CachedVariant[],
+  requestedVariant: number | null,
+  seed: string,
+): CachedVariant => {
+  if (requestedVariant !== null) {
+    const explicitMatch = variants.find((variant) => variant.variant_index === requestedVariant);
+    if (explicitMatch) {
+      return explicitMatch;
+    }
+  }
+
+  const sorted = [...variants].sort((a, b) => a.variant_index - b.variant_index);
+  const index = hashString(seed) % sorted.length;
+  return sorted[index];
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -43,114 +180,138 @@ serve(async (req) => {
       return auth;
     }
 
-    const { theme, tier, name } = await req.json();
+    const body = await req.json();
+    const theme = typeof body?.theme === "string" ? body.theme.trim() : "";
+    const tier = typeof body?.tier === "string" ? body.tier.trim() : "";
+    const name = typeof body?.name === "string" ? body.name : undefined;
+    const targetVariantsInput = body?.targetVariants;
+    const requestedVariant = resolveRequestedVariant(body?.variantIndex);
 
     if (!theme || !tier) {
       throw new Error("Missing required parameters: theme, tier");
     }
 
+    const targetVariants = clampInteger(targetVariantsInput, 1, MAX_VARIANTS, DEFAULT_TARGET_VARIANTS);
+    const effectiveTargetVariants = requestedVariant === null
+      ? targetVariants
+      : Math.max(targetVariants, requestedVariant + 1);
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check cache first
-    const { data: cachedImage } = await supabase
+    const { data: cachedImages, error: cachedImagesError } = await supabase
       .from("adversary_images")
-      .select("image_url")
+      .select("image_url, variant_index")
       .eq("theme", theme)
       .eq("tier", tier)
-      .single();
+      .order("variant_index", { ascending: true });
 
-    if (cachedImage?.image_url) {
-      console.log(`Cache hit for ${theme}/${tier}`);
-      return new Response(
-        JSON.stringify({ imageUrl: cachedImage.image_url, cached: true }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    if (cachedImagesError) {
+      throw new Error(`Failed to load cached adversary images: ${cachedImagesError.message}`);
+    }
+
+    const variantsByIndex = new Map<number, CachedVariant>();
+    for (const row of cachedImages ?? []) {
+      if (
+        typeof row?.image_url === "string" &&
+        typeof row?.variant_index === "number" &&
+        !variantsByIndex.has(row.variant_index)
+      ) {
+        variantsByIndex.set(row.variant_index, {
+          image_url: row.image_url,
+          variant_index: row.variant_index,
+        });
+      }
+    }
+
+    const initiallyCachedVariantIndexes = new Set<number>(variantsByIndex.keys());
+    const missingVariantIndexes: number[] = [];
+    for (let variantIndex = 0; variantIndex < effectiveTargetVariants; variantIndex += 1) {
+      if (!variantsByIndex.has(variantIndex)) {
+        missingVariantIndexes.push(variantIndex);
+      }
+    }
+
+    let generatedVariants = 0;
+    let sawRateLimit = false;
+    const generationFailures: string[] = [];
+
+    if (missingVariantIndexes.length > 0) {
+      console.log(
+        `Generating ${missingVariantIndexes.length} adversary variant(s) for ${theme}/${tier} (target ${effectiveTargetVariants})`,
       );
     }
 
-    console.log(`Generating new adversary image for ${theme}/${tier}`);
-
-    const themeDesc = THEME_DESCRIPTIONS[theme] || "a mysterious dark energy creature";
-    const tierMod = TIER_MODIFIERS[tier] || "moderate power level";
-
-    const prompt = `Create a dark fantasy creature portrait for a mobile game battle screen. The creature is called "${name || 'Astral Adversary'}" and represents ${theme} energy.
-
-Description: ${themeDesc}
-
-Power level: ${tierMod}
-
-Style requirements:
-- Digital painting style, high-quality fantasy game concept art
-- Dark and menacing but stylized and appealing (not grotesque)
-- Cosmic/astral aesthetic with subtle star and nebula elements
-- Glowing eyes or energy effects
-- Portrait composition focused on the creature's upper body/face
-- Dark background with magical ambient lighting
-- Single creature only, no multiple entities
-- Professional game asset quality`;
-
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is not configured");
-    }
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [{ role: "user", content: prompt }],
-        modalities: ["image", "text"],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limited, please try again later" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    let openAiApiKey: string | undefined;
+    if (missingVariantIndexes.length > 0) {
+      openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!openAiApiKey) {
+        throw new Error("OPENAI_API_KEY is not configured");
       }
-      
-      throw new Error(`AI generation failed: ${response.status}`);
     }
 
-    const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    for (const missingVariantIndex of missingVariantIndexes) {
+      try {
+        const prompt = buildPrompt(theme, tier, name, missingVariantIndex, effectiveTargetVariants);
+        const imageUrl = await generateImage(prompt, openAiApiKey as string);
+        generatedVariants += 1;
 
-    if (!imageUrl) {
-      console.error("No image in response:", JSON.stringify(data));
-      throw new Error("No image generated");
+        variantsByIndex.set(missingVariantIndex, {
+          image_url: imageUrl,
+          variant_index: missingVariantIndex,
+        });
+
+        const { error: upsertError } = await supabase
+          .from("adversary_images")
+          .upsert(
+            { theme, tier, variant_index: missingVariantIndex, image_url: imageUrl },
+            { onConflict: "theme,tier,variant_index", ignoreDuplicates: true },
+          );
+
+        if (upsertError) {
+          console.error(
+            `Failed to cache adversary variant ${missingVariantIndex} for ${theme}/${tier}:`,
+            upsertError,
+          );
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown generation failure";
+        generationFailures.push(errorMessage);
+        if (error instanceof HttpError && error.status === 429) {
+          sawRateLimit = true;
+          break;
+        }
+      }
     }
 
-    // Cache the image
-    const { error: insertError } = await supabase
-      .from("adversary_images")
-      .insert({ theme, tier, image_url: imageUrl });
+    const availableVariants = Array.from(variantsByIndex.values())
+      .sort((a, b) => a.variant_index - b.variant_index);
 
-    if (insertError) {
-      console.error("Failed to cache image:", insertError);
-      // Continue anyway - image was generated successfully
+    if (availableVariants.length === 0) {
+      if (sawRateLimit) {
+        return toResponse({ error: "Rate limited, please try again later" }, 429);
+      }
+      const failureMessage = generationFailures[0] ?? "No image generated";
+      throw new Error(failureMessage);
     }
 
-    console.log(`Successfully generated and cached image for ${theme}/${tier}`);
-
-    return new Response(
-      JSON.stringify({ imageUrl, cached: false }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    const selectedVariant = pickDeterministicVariant(
+      availableVariants,
+      requestedVariant,
+      (name?.trim() || `${theme}:${tier}`),
     );
+    const wasCached = initiallyCachedVariantIndexes.has(selectedVariant.variant_index);
+
+    return toResponse({
+      imageUrl: selectedVariant.image_url,
+      cached: wasCached,
+      variantIndex: selectedVariant.variant_index,
+      availableVariants: availableVariants.length,
+      generatedVariants,
+    });
   } catch (error) {
     console.error("Error generating adversary image:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return toResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }
 });

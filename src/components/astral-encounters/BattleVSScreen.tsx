@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Skull, Sparkles, Zap, Loader2, SkipForward } from "lucide-react";
+import { Skull, Sparkles, Zap, SkipForward } from "lucide-react";
 import { Adversary, AdversaryTier } from "@/types/astralEncounters";
 import { Button } from "@/components/ui/button";
 import { getStageName } from "@/config/companionStages";
@@ -12,7 +12,6 @@ interface BattleVSScreenProps {
   companionStage?: number;
   adversary: Adversary;
   adversaryImageUrl?: string;
-  isLoadingImage?: boolean;
   onReady: () => void;
   onPass?: () => void;
 }
@@ -31,7 +30,6 @@ export const BattleVSScreen = ({
   companionStage = 0,
   adversary,
   adversaryImageUrl,
-  isLoadingImage,
   onReady,
   onPass,
 }: BattleVSScreenProps) => {
@@ -260,12 +258,7 @@ export const BattleVSScreen = ({
                   boxShadow: `0 0 30px ${tierColors.glow}`,
                 }}
               >
-                {isLoadingImage ? (
-                  <div className="w-full h-full bg-gradient-to-br from-muted/30 to-muted/10 flex flex-col items-center justify-center gap-2">
-                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: tierColors.primary }} />
-                    <span className="text-xs text-muted-foreground">Materializing...</span>
-                  </div>
-                ) : adversaryImageUrl ? (
+                {adversaryImageUrl ? (
                   <img
                     src={adversaryImageUrl}
                     alt={adversary.name}

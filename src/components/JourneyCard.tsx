@@ -109,6 +109,12 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
   
   const postcardProgress = getProgressToNextPostcard();
   const journeyHealth = getJourneyHealth(journey.start_date, journey.end_date);
+  const companionDisplayName = useMemo(() => {
+    const rawName = companion?.cached_creature_name;
+    if (typeof rawName !== "string") return undefined;
+    const trimmed = rawName.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, [companion?.cached_creature_name]);
   
   const trailMilestones = useMemo(() => {
     if (!milestones || milestones.length === 0) return undefined;
@@ -260,7 +266,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
                 chapterNumber={postcardProgress.milestone.chapter_number || 1}
                 storySeed={journey.story_seed as StorySeed | null}
                 totalChapters={journey.total_chapters}
-                companionSpecies={companion?.spirit_animal}
+                companionDisplayName={companionDisplayName}
                 isExpanded={true}
               />
             </motion.div>

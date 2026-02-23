@@ -76,9 +76,16 @@ const shimmerConfig: Record<CompanionShimmerType, ShimmerConfig> = {
 
 interface CompanionDialogueProps {
   className?: string;
+  companionName?: string | null;
 }
 
-export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) => {
+const normalizeCompanionName = (value: string | null | undefined) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+export const CompanionDialogue = memo(({ className, companionName }: CompanionDialogueProps) => {
   const { 
     greeting, 
     bondDialogue,
@@ -91,7 +98,10 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
   const { companion } = useCompanion();
   const { dismiss: dismissTalkPopup } = useTalkPopupContextSafe();
   const companionImageUrl = companion?.current_image_url;
-  const companionName = companion?.spirit_animal || "Companion";
+  const resolvedCompanionName =
+    normalizeCompanionName(companionName)
+    ?? normalizeCompanionName(companion?.cached_creature_name)
+    ?? "Companion";
   
   const [displayText, setDisplayText] = useState(greeting);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -140,6 +150,8 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
   const shimmer = shimmerConfig[shimmerType];
   const animateShimmer = shimmerType !== "none" && !prefersReducedMotion;
   const avatarRingClass = shimmerType === "none" ? config.ringColor : shimmer.ringClass;
+  const eventHeader = microTitle?.trim() || "Companion Event";
+  const hasMicroTitle = Boolean(microTitle?.trim());
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
@@ -153,7 +165,7 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
           config.bgColor,
           className,
         )}
-        aria-label={`Open ${companionName} dialogue`}
+        aria-label={`Open ${resolvedCompanionName} dialogue`}
         onClick={openDialogueModal}
         onKeyDown={handleTriggerKeyDown}
         initial={{ opacity: 0, y: 10 }}
@@ -183,23 +195,26 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
                 {companionImageUrl ? (
                   <AvatarImage 
                     src={companionImageUrl} 
-                    alt={companionName}
+                    alt={resolvedCompanionName}
                     className="object-cover"
                   />
                 ) : null}
                 <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
-                  {companionName.charAt(0).toUpperCase()}
+                  {resolvedCompanionName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </div>
             
             {/* Dialogue text */}
             <div className="flex-1 min-w-0">
-              {microTitle ? (
-                <p className={cn("mb-1 text-[11px] font-semibold uppercase tracking-[0.08em]", shimmer.titleClass)}>
-                  {microTitle}
-                </p>
-              ) : null}
+              <p
+                className={cn(
+                  "mb-1 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                  hasMicroTitle ? shimmer.titleClass : "text-muted-foreground/80",
+                )}
+              >
+                {eventHeader}
+              </p>
               <AnimatePresence mode="wait">
                 <motion.p
                   key={displayText}
@@ -217,37 +232,42 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
         </div>
       </motion.button>
 
-      <DialogContent className="max-w-md overflow-hidden border-border/60 p-0">
-        <div className={cn("space-y-4 p-5", config.bgColor)}>
+      <DialogContent className={cn("max-w-md overflow-hidden p-0", shimmer.borderClass)}>
+        <div className={cn("relative p-5", config.bgColor)}>
+          <div
+            data-testid="companion-dialogue-modal-accent"
+            className={cn(
+              "pointer-events-none absolute inset-0 transition-colors",
+              shimmer.accentClass,
+              animateShimmer && "animate-pulse",
+            )}
+            aria-hidden="true"
+          />
+          <div className="relative space-y-4">
           <DialogHeader className="text-left">
             <div className="flex items-center gap-3">
               <Avatar className={cn("h-12 w-12 rounded-lg ring-2", config.ringColor)}>
                 {companionImageUrl ? (
                   <AvatarImage
                     src={companionImageUrl}
-                    alt={companionName}
+                    alt={resolvedCompanionName}
                     className="object-cover"
                   />
                 ) : null}
                 <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
-                  {companionName.charAt(0).toUpperCase()}
+                  {resolvedCompanionName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="space-y-1">
-                <DialogTitle>{companionName}</DialogTitle>
-                <DialogDescription>
-                  Companion dialogue
+                <DialogTitle>{resolvedCompanionName}</DialogTitle>
+                <DialogDescription className={cn("text-[11px] font-semibold uppercase tracking-[0.08em]", hasMicroTitle ? shimmer.titleClass : "text-muted-foreground/80")}>
+                  {eventHeader}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           <div className="space-y-3 rounded-lg border border-border/50 bg-background/20 p-4">
-            {microTitle ? (
-              <p className={cn("text-[11px] font-semibold uppercase tracking-[0.08em]", shimmer.titleClass)}>
-                {microTitle}
-              </p>
-            ) : null}
             <p className="text-sm leading-relaxed text-foreground">
               "{displayText}"
             </p>
@@ -256,6 +276,7 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
                 {bondDialogue}
               </p>
             ) : null}
+          </div>
           </div>
         </div>
       </DialogContent>

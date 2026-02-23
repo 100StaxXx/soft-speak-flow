@@ -24,6 +24,7 @@ interface UserCompanion {
   hunger: number | null;
   happiness: number | null;
   spirit_animal: string | null;
+  cached_creature_name: string | null;
   core_element: string | null;
   current_stage: number | null;
   created_at: string | null;
@@ -103,6 +104,12 @@ function scaledMaintenance(current: number, base: number): number {
   const above = Math.max(0, current - STAT_FLOOR);
   const factor = clamp(above / 600, 0.35, 1.25);
   return Math.round(base * factor);
+}
+
+function normalizeCompanionName(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 serve(async (req) => {
@@ -1032,10 +1039,14 @@ async function handleDormantCompanion(supabase: any, companion: UserCompanion, t
 async function triggerCompanionDeath(supabase: any, companion: UserCompanion, today: string) {
   const createdAt = companion.created_at ? new Date(companion.created_at) : new Date();
   const daysTogether = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+  const companionName =
+    normalizeCompanionName(companion.cached_creature_name)
+    ?? normalizeCompanionName(companion.spirit_animal)
+    ?? "Companion";
 
   await supabase.from("companion_memorials").insert({
     user_id: companion.user_id,
-    companion_name: `The ${companion.spirit_animal || "Companion"}`,
+    companion_name: companionName,
     spirit_animal: companion.spirit_animal || "Unknown",
     core_element: companion.core_element,
     days_together: daysTogether,
