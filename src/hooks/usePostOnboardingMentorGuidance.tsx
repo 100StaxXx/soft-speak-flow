@@ -181,7 +181,7 @@ interface MentorDialogueLine {
 
 const INTRO_DIALOGUE_BY_MENTOR_SLUG: Record<string, MentorDialogueLine> = {
   atlas: {
-    text: "Hi, I'm Atlas. Let's begin your path to productivity.",
+    text: "Greetings, I'm Atlas. Let's begin your path to productivity.",
     support: "Stay with me through this short walkthrough.",
   },
   eli: {
