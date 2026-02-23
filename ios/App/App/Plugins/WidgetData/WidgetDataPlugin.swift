@@ -21,6 +21,7 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
               let completedCount = call.getInt("completedCount"),
               let totalCount = call.getInt("totalCount"),
               let date = call.getString("date") else {
+            print("[WidgetDataPlugin] updateWidgetData rejected: missing required parameters")
             call.reject("Missing required parameters")
             return
         }
@@ -41,29 +42,44 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         
         // Write to App Group shared container
         guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+            print("[WidgetDataPlugin] updateWidgetData rejected: failed to access App Group container \(appGroupId)")
             call.reject("Failed to access App Group container")
             return
         }
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: widgetData) else {
+            print("[WidgetDataPlugin] updateWidgetData rejected: failed to serialize widget payload")
             call.reject("Failed to serialize widget data")
             return
         }
 
         userDefaults.set(jsonData, forKey: dataKey)
-        _ = userDefaults.synchronize()
+        let didSynchronize = userDefaults.synchronize()
 
-        triggerWidgetReload(withDelay: 0.15)
+        print(
+            "[WidgetDataPlugin] Wrote widget payload " +
+            "date=\(date) " +
+            "tasks=\(tasksArray.count) " +
+            "total=\(totalCount) " +
+            "completed=\(completedCount) " +
+            "rituals=\(ritualCompleted)/\(ritualCount) " +
+            "bytes=\(jsonData.count) " +
+            "synchronized=\(didSynchronize)"
+        )
+
+        triggerWidgetReload(withDelay: 0.15, reason: "updateWidgetData")
         call.resolve()
     }
 
     @objc func reloadWidget(_ call: CAPPluginCall) {
-        triggerWidgetReload(withDelay: 0.0)
+        print("[WidgetDataPlugin] reloadWidget called from JS")
+        triggerWidgetReload(withDelay: 0.0, reason: "reloadWidget")
         call.resolve()
     }
 
     @objc func getWidgetSyncDiagnostics(_ call: CAPPluginCall) {
         guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+            print("[WidgetDataPlugin] Diagnostics: App Group inaccessible \(appGroupId)")
             call.resolve([
                 "appGroupAccessible": false,
                 "hasPayload": false,
@@ -86,6 +102,15 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         let payloadObject = payloadData
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
 
+        print(
+            "[WidgetDataPlugin] Diagnostics " +
+            "accessible=true " +
+            "hasPayload=\(hasPayload) " +
+            "payloadDate=\(payloadObject?["date"] as? String ?? "nil") " +
+            "payloadUpdatedAt=\(payloadObject?["updatedAt"] as? String ?? "nil") " +
+            "payloadBytes=\(payloadByteCount)"
+        )
+
         call.resolve([
             "appGroupAccessible": true,
             "hasPayload": hasPayload,
@@ -95,12 +120,15 @@ public class WidgetDataPlugin: CAPPlugin, CAPBridgedPlugin {
         ])
     }
 
-    private func triggerWidgetReload(withDelay delay: TimeInterval) {
+    private func triggerWidgetReload(withDelay delay: TimeInterval, reason: String) {
         guard #available(iOS 14.0, *) else {
+            print("[WidgetDataPlugin] Skipped widget reload (\(reason)): iOS < 14")
             return
         }
 
+        print("[WidgetDataPlugin] Scheduling widget reload reason=\(reason) delay=\(delay)s")
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            print("[WidgetDataPlugin] Reloading widget timelines reason=\(reason)")
             WidgetCenter.shared.reloadTimelines(ofKind: "CosmiqWidget")
             WidgetCenter.shared.reloadAllTimelines()
         }

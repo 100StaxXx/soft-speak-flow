@@ -52,6 +52,9 @@ export const useWidgetSync = (
     const quests = tasks.filter(task => !task.habit_source_id);
     const rituals = tasks.filter(task => !!task.habit_source_id);
 
+    const completedCount = quests.filter(t => !!t.completed).length;
+    const ritualCompleted = rituals.filter(t => !!t.completed).length;
+
     // Map quests to widget format (limit to 10 for performance)
     const widgetTasks: WidgetTask[] = quests.slice(0, 10).map(task => ({
       id: task.id,
@@ -69,9 +72,9 @@ export const useWidgetSync = (
       date: taskDate,
       tasks: widgetTasks,
       questCount: quests.length,
-      questCompleted: quests.filter(t => !!t.completed).length,
+      questCompleted: completedCount,
       ritualCount: rituals.length,
-      ritualCompleted: rituals.filter(t => !!t.completed).length,
+      ritualCompleted,
     });
     
     // Skip if nothing changed (unless force)
@@ -82,13 +85,22 @@ export const useWidgetSync = (
     try {
       await WidgetData.updateWidgetData({
         tasks: widgetTasks,
-        completedCount: quests.filter(t => !!t.completed).length,
+        completedCount,
         totalCount: quests.length,
         ritualCount: rituals.length,
-        ritualCompleted: rituals.filter(t => !!t.completed).length,
+        ritualCompleted,
         date: taskDate,
       });
       lastSyncRef.current = fingerprint;
+      console.info('[WidgetSync] Synced widget payload', {
+        taskDate,
+        force,
+        totalCount: quests.length,
+        completedCount,
+        ritualCount: rituals.length,
+        ritualCompleted,
+        widgetTaskCount: widgetTasks.length,
+      });
     } catch (error) {
       if (isUnimplementedPluginError(error)) {
         sessionSyncDisabledRef.current = true;
@@ -157,6 +169,7 @@ export const useWidgetSync = (
         if (cancelled) {
           return;
         }
+        console.info('[WidgetSync] Diagnostics snapshot', diagnostics);
 
         if (!diagnostics.appGroupAccessible || !diagnostics.hasPayload) {
           console.warn('[WidgetSync] Diagnostics indicate missing shared payload state', diagnostics);

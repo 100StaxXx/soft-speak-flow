@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
 import { cn } from "@/lib/utils";
+import type { CompanionShimmerType } from "@/config/companionDialoguePacks";
 
 interface MoodConfig {
   color: string;
@@ -27,6 +28,52 @@ const moodConfig: Record<DialogueMood, MoodConfig> = {
   recovering: { color: "text-green-400", ringColor: "ring-green-400/50", bgColor: "bg-green-400/10" },
 };
 
+interface ShimmerConfig {
+  borderClass: string;
+  ringClass: string;
+  accentClass: string;
+  titleClass: string;
+}
+
+const shimmerConfig: Record<CompanionShimmerType, ShimmerConfig> = {
+  none: {
+    borderClass: "border-border/30",
+    ringClass: "",
+    accentClass: "",
+    titleClass: "text-muted-foreground/80",
+  },
+  green: {
+    borderClass: "border-emerald-300/45",
+    ringClass: "ring-emerald-300/65",
+    accentClass: "bg-emerald-300/10",
+    titleClass: "text-emerald-200",
+  },
+  blue: {
+    borderClass: "border-sky-300/45",
+    ringClass: "ring-sky-300/65",
+    accentClass: "bg-sky-300/10",
+    titleClass: "text-sky-200",
+  },
+  purple: {
+    borderClass: "border-violet-300/45",
+    ringClass: "ring-violet-300/65",
+    accentClass: "bg-violet-300/10",
+    titleClass: "text-violet-200",
+  },
+  red: {
+    borderClass: "border-rose-300/45",
+    ringClass: "ring-rose-300/65",
+    accentClass: "bg-rose-300/10",
+    titleClass: "text-rose-200",
+  },
+  gold: {
+    borderClass: "border-amber-300/50",
+    ringClass: "ring-amber-300/70",
+    accentClass: "bg-amber-300/10",
+    titleClass: "text-amber-200",
+  },
+};
+
 interface CompanionDialogueProps {
   className?: string;
 }
@@ -35,6 +82,8 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
   const { 
     greeting, 
     bondDialogue,
+    microTitle,
+    shimmerType,
     dialogueMood, 
     isLoading 
   } = useCompanionDialogue();
@@ -47,6 +96,10 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
   const [displayText, setDisplayText] = useState(greeting);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const prefersReducedMotion =
+    typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   
   // Animate text change
   useEffect(() => {
@@ -84,13 +137,19 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
   }
 
   const config = moodConfig[dialogueMood];
+  const shimmer = shimmerConfig[shimmerType];
+  const animateShimmer = shimmerType !== "none" && !prefersReducedMotion;
+  const avatarRingClass = shimmerType === "none" ? config.ringColor : shimmer.ringClass;
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
       <motion.button
         type="button"
+        data-testid="companion-dialogue-trigger"
+        data-shimmer-type={shimmerType}
         className={cn(
-          "relative w-full overflow-hidden rounded-xl border border-border/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "relative w-full overflow-hidden rounded-xl border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          shimmer.borderClass,
           config.bgColor,
           className,
         )}
@@ -101,6 +160,15 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
+        <div
+          data-testid="companion-dialogue-accent"
+          className={cn(
+            "pointer-events-none absolute inset-0 rounded-xl transition-colors",
+            shimmer.accentClass,
+            animateShimmer && "animate-pulse",
+          )}
+          aria-hidden="true"
+        />
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
         
@@ -109,7 +177,7 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
             {/* Companion portrait with mood-colored ring */}
             <div className={cn(
               "flex-shrink-0 rounded-lg overflow-hidden",
-              "ring-2", config.ringColor
+              "ring-2", avatarRingClass
             )}>
               <Avatar className="h-10 w-10 rounded-lg">
                 {companionImageUrl ? (
@@ -127,6 +195,11 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
             
             {/* Dialogue text */}
             <div className="flex-1 min-w-0">
+              {microTitle ? (
+                <p className={cn("mb-1 text-[11px] font-semibold uppercase tracking-[0.08em]", shimmer.titleClass)}>
+                  {microTitle}
+                </p>
+              ) : null}
               <AnimatePresence mode="wait">
                 <motion.p
                   key={displayText}
@@ -170,6 +243,11 @@ export const CompanionDialogue = memo(({ className }: CompanionDialogueProps) =>
           </DialogHeader>
 
           <div className="space-y-3 rounded-lg border border-border/50 bg-background/20 p-4">
+            {microTitle ? (
+              <p className={cn("text-[11px] font-semibold uppercase tracking-[0.08em]", shimmer.titleClass)}>
+                {microTitle}
+              </p>
+            ) : null}
             <p className="text-sm leading-relaxed text-foreground">
               "{displayText}"
             </p>

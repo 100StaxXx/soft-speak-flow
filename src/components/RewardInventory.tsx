@@ -32,6 +32,19 @@ const REWARD_TYPE_LABELS: Record<RewardType, string> = {
   artifact: 'Artifacts',
 };
 
+const rewardPreviewModules = import.meta.glob("/src/assets/rewards/*.webp", {
+  eager: true,
+  import: "default",
+}) as Record<string, string>;
+
+const rewardPreviewLocalUrls = Object.fromEntries(
+  Object.entries(rewardPreviewModules).map(([modulePath, moduleUrl]) => {
+    const filename = modulePath.split("/").pop() || "";
+    const rewardId = filename.replace(/\.webp$/i, "");
+    return [rewardId, moduleUrl];
+  }),
+) as Record<string, string>;
+
 export const RewardInventory = memo(({ className }: RewardInventoryProps) => {
   const { allRewards, userRewards, equipReward, isEquipping, isLoading } = useEpicRewards();
   const [activeTab, setActiveTab] = useState<RewardType>('background');
@@ -155,6 +168,8 @@ const RewardCard = ({ userReward, isEquipped, onToggleEquip, isEquipping }: Rewa
   if (!reward) return null;
 
   const rarityConfig = RARITY_CONFIG[reward.rarity];
+  // Local bundled preview is fastest (no network). Remote URL remains fallback.
+  const previewUrl = rewardPreviewLocalUrls[reward.id] || reward.image_url || null;
 
   return (
     <motion.div
@@ -191,7 +206,15 @@ const RewardCard = ({ userReward, isEquipped, onToggleEquip, isEquipping }: Rewa
             boxShadow: isEquipped ? `0 0 20px ${rarityConfig.color}40` : undefined,
           }}
         >
-          {reward.reward_type === 'artifact' && reward.css_effect?.icon ? (
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt={reward.name}
+              className="h-full w-full rounded-lg object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : reward.reward_type === 'artifact' && reward.css_effect?.icon ? (
             <span className="text-4xl">{reward.css_effect.icon}</span>
           ) : (
             <Sparkles 

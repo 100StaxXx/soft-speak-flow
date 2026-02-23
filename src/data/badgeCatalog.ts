@@ -2,6 +2,7 @@
  * Badge Catalog - Defines all possible badges in the app
  * Used to show both earned and locked badges in the collection
  */
+import { BADGE_PREVIEW_URLS } from "@/data/badgePreviewUrls";
 
 export type BadgeCategory = 'streaks' | 'companion' | 'starpaths' | 'challenges' | 'firsts' | 'special' | 'astral';
 export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum';
@@ -15,9 +16,10 @@ export interface BadgeDefinition {
   tier: BadgeTier;
   category: BadgeCategory;
   unlockHint: string;
+  image_url?: string | null;
 }
 
-export const BADGE_CATALOG: BadgeDefinition[] = [
+const BADGE_CATALOG_BASE: Omit<BadgeDefinition, "image_url">[] = [
   // === STREAK BADGES ===
   {
     id: 'three_day_streak',
@@ -918,6 +920,11 @@ export const BADGE_CATALOG: BadgeDefinition[] = [
     unlockHint: 'Defeat 50 Imbalance-themed adversaries',
   },
 ];
+
+export const BADGE_CATALOG: BadgeDefinition[] = BADGE_CATALOG_BASE.map((badge) => ({
+  ...badge,
+  image_url: BADGE_PREVIEW_URLS[badge.id] ?? null,
+}));
 
 export const CATEGORY_LABELS: Record<BadgeCategory, string> = {
   streaks: 'Streaks',

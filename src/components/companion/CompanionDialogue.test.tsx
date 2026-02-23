@@ -5,6 +5,12 @@ const mocks = vi.hoisted(() => ({
   dialogue: {
     greeting: "Primary greeting",
     bondDialogue: "Secondary bond line",
+    shimmerType: "none" as ("none" | "green" | "blue" | "purple" | "red" | "gold"),
+    microTitle: null as string | null,
+    outcomeTag: "basic_checkin" as ("basic_checkin" | "momentum_boost" | "clarity_prompt" | "mystery_event" | "reset_flow" | "turning_point"),
+    tonePack: "soft" as ("soft" | "playful" | "witty_sassy"),
+    bucketKey: "base_greetings" as ("base_greetings" | "growth_moments" | "clarity_moments" | "mystery_moments" | "repair_moments" | "legendary_moments" | "recovery_moments" | "critical_gentle_moments"),
+    lineId: "soft.base_greetings.01",
     dialogueMood: "content" as const,
     isLoading: false,
   },
@@ -22,6 +28,12 @@ vi.mock("@/hooks/useCompanionDialogue", () => ({
   useCompanionDialogue: () => ({
     greeting: mocks.dialogue.greeting,
     bondDialogue: mocks.dialogue.bondDialogue,
+    shimmerType: mocks.dialogue.shimmerType,
+    microTitle: mocks.dialogue.microTitle,
+    outcomeTag: mocks.dialogue.outcomeTag,
+    tonePack: mocks.dialogue.tonePack,
+    bucketKey: mocks.dialogue.bucketKey,
+    lineId: mocks.dialogue.lineId,
     dialogueMood: mocks.dialogue.dialogueMood,
     isLoading: mocks.dialogue.isLoading,
   }),
@@ -43,16 +55,39 @@ vi.mock("@/contexts/TalkPopupContext", () => ({
 
 import { CompanionDialogue } from "./CompanionDialogue";
 
+const setReducedMotion = (enabled: boolean) => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: query.includes("prefers-reduced-motion") ? enabled : false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+};
+
 describe("CompanionDialogue", () => {
   beforeEach(() => {
     mocks.dialogue.greeting = "Primary greeting";
     mocks.dialogue.bondDialogue = "Secondary bond line";
+    mocks.dialogue.shimmerType = "none";
+    mocks.dialogue.microTitle = null;
+    mocks.dialogue.outcomeTag = "basic_checkin";
+    mocks.dialogue.tonePack = "soft";
+    mocks.dialogue.bucketKey = "base_greetings";
+    mocks.dialogue.lineId = "soft.base_greetings.01";
     mocks.dialogue.dialogueMood = "content";
     mocks.dialogue.isLoading = false;
     mocks.companion.current_image_url = null;
     mocks.companion.spirit_animal = "Wolf";
     mocks.talkPopup.dismiss.mockClear();
     mocks.talkPopup.show.mockClear();
+    setReducedMotion(false);
   });
 
   it("opens the centered dialogue popup when the card is clicked", () => {
@@ -152,5 +187,47 @@ describe("CompanionDialogue", () => {
 
     expect(mocks.talkPopup.dismiss).toHaveBeenCalledTimes(1);
     expect(mocks.talkPopup.show).not.toHaveBeenCalled();
+  });
+
+  it("shows micro-title when shimmer is active", () => {
+    mocks.dialogue.shimmerType = "green";
+    mocks.dialogue.microTitle = "Momentum Boost";
+
+    render(<CompanionDialogue />);
+
+    expect(screen.getByText("Momentum Boost")).toBeInTheDocument();
+  });
+
+  it("hides micro-title when shimmer is none", () => {
+    mocks.dialogue.shimmerType = "none";
+    mocks.dialogue.microTitle = null;
+
+    render(<CompanionDialogue />);
+
+    expect(screen.queryByText("Momentum Boost")).not.toBeInTheDocument();
+  });
+
+  it("applies shimmer accent styling based on shimmer type", () => {
+    mocks.dialogue.shimmerType = "red";
+    mocks.dialogue.microTitle = "Reset Moment";
+
+    render(<CompanionDialogue />);
+
+    const trigger = screen.getByTestId("companion-dialogue-trigger");
+    const accent = screen.getByTestId("companion-dialogue-accent");
+
+    expect(trigger).toHaveAttribute("data-shimmer-type", "red");
+    expect(trigger).toHaveClass("border-rose-300/45");
+    expect(accent).toHaveClass("bg-rose-300/10");
+  });
+
+  it("disables shimmer animation for reduced-motion users", () => {
+    setReducedMotion(true);
+    mocks.dialogue.shimmerType = "purple";
+    mocks.dialogue.microTitle = "Surprise Support";
+
+    render(<CompanionDialogue />);
+
+    expect(screen.getByTestId("companion-dialogue-accent")).not.toHaveClass("animate-pulse");
   });
 });

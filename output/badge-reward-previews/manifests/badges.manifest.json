@@ -1,0 +1,611 @@
+[
+  {
+    "id": "arcade_explorer",
+    "title": "Arcade Explorer",
+    "tier": "silver",
+    "category": "special",
+    "icon": "🕹️"
+  },
+  {
+    "id": "astral_anxiety_10",
+    "title": "Serenity Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "🧘"
+  },
+  {
+    "id": "astral_anxiety_25",
+    "title": "Serenity Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "🧘"
+  },
+  {
+    "id": "astral_anxiety_3",
+    "title": "Serenity Seeker",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "🧘"
+  },
+  {
+    "id": "astral_anxiety_50",
+    "title": "Serenity Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "🧘"
+  },
+  {
+    "id": "astral_chaos_10",
+    "title": "Order Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "⚡"
+  },
+  {
+    "id": "astral_chaos_25",
+    "title": "Order Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "⚡"
+  },
+  {
+    "id": "astral_chaos_3",
+    "title": "Order Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "⚡"
+  },
+  {
+    "id": "astral_chaos_50",
+    "title": "Order Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "⚡"
+  },
+  {
+    "id": "astral_confusion_10",
+    "title": "Wisdom Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "✨"
+  },
+  {
+    "id": "astral_confusion_25",
+    "title": "Wisdom Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "✨"
+  },
+  {
+    "id": "astral_confusion_3",
+    "title": "Wisdom Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "✨"
+  },
+  {
+    "id": "astral_confusion_50",
+    "title": "Wisdom Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "✨"
+  },
+  {
+    "id": "astral_distraction_10",
+    "title": "Focus Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "🎯"
+  },
+  {
+    "id": "astral_distraction_25",
+    "title": "Focus Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "🎯"
+  },
+  {
+    "id": "astral_distraction_3",
+    "title": "Focus Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "🎯"
+  },
+  {
+    "id": "astral_distraction_50",
+    "title": "Focus Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "🎯"
+  },
+  {
+    "id": "astral_doubt_10",
+    "title": "Confidence Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "💪"
+  },
+  {
+    "id": "astral_doubt_25",
+    "title": "Confidence Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "💪"
+  },
+  {
+    "id": "astral_doubt_3",
+    "title": "Confidence Seeker",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "💪"
+  },
+  {
+    "id": "astral_doubt_50",
+    "title": "Confidence Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "💪"
+  },
+  {
+    "id": "astral_fear_10",
+    "title": "Courage Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "🛡️"
+  },
+  {
+    "id": "astral_fear_25",
+    "title": "Courage Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "🛡️"
+  },
+  {
+    "id": "astral_fear_3",
+    "title": "Courage Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "🛡️"
+  },
+  {
+    "id": "astral_fear_50",
+    "title": "Courage Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "🛡️"
+  },
+  {
+    "id": "astral_imbalance_10",
+    "title": "Harmony Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "☯️"
+  },
+  {
+    "id": "astral_imbalance_25",
+    "title": "Harmony Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "☯️"
+  },
+  {
+    "id": "astral_imbalance_3",
+    "title": "Harmony Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "☯️"
+  },
+  {
+    "id": "astral_imbalance_50",
+    "title": "Harmony Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "☯️"
+  },
+  {
+    "id": "astral_laziness_10",
+    "title": "Drive Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "🔥"
+  },
+  {
+    "id": "astral_laziness_25",
+    "title": "Drive Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "🔥"
+  },
+  {
+    "id": "astral_laziness_3",
+    "title": "Drive Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "🔥"
+  },
+  {
+    "id": "astral_laziness_50",
+    "title": "Drive Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "🔥"
+  },
+  {
+    "id": "astral_overthinking_10",
+    "title": "Clarity Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "🧠"
+  },
+  {
+    "id": "astral_overthinking_25",
+    "title": "Clarity Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "🧠"
+  },
+  {
+    "id": "astral_overthinking_3",
+    "title": "Clarity Seeker",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "🧠"
+  },
+  {
+    "id": "astral_overthinking_50",
+    "title": "Clarity Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "🧠"
+  },
+  {
+    "id": "astral_stagnation_10",
+    "title": "Momentum Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "🌊"
+  },
+  {
+    "id": "astral_stagnation_25",
+    "title": "Momentum Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "🌊"
+  },
+  {
+    "id": "astral_stagnation_3",
+    "title": "Momentum Starter",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "🌊"
+  },
+  {
+    "id": "astral_stagnation_50",
+    "title": "Momentum Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "🌊"
+  },
+  {
+    "id": "astral_vulnerability_10",
+    "title": "Resilience Warrior",
+    "tier": "silver",
+    "category": "astral",
+    "icon": "💎"
+  },
+  {
+    "id": "astral_vulnerability_25",
+    "title": "Resilience Champion",
+    "tier": "gold",
+    "category": "astral",
+    "icon": "💎"
+  },
+  {
+    "id": "astral_vulnerability_3",
+    "title": "Resilience Initiate",
+    "tier": "bronze",
+    "category": "astral",
+    "icon": "💎"
+  },
+  {
+    "id": "astral_vulnerability_50",
+    "title": "Resilience Transcendent",
+    "tier": "platinum",
+    "category": "astral",
+    "icon": "💎"
+  },
+  {
+    "id": "attribute_master_body",
+    "title": "Body Master",
+    "tier": "gold",
+    "category": "special",
+    "icon": "💪"
+  },
+  {
+    "id": "attribute_master_mind",
+    "title": "Mind Master",
+    "tier": "gold",
+    "category": "special",
+    "icon": "🧠"
+  },
+  {
+    "id": "attribute_master_soul",
+    "title": "Soul Master",
+    "tier": "gold",
+    "category": "special",
+    "icon": "✨"
+  },
+  {
+    "id": "challenge_5",
+    "title": "Challenge Seeker",
+    "tier": "gold",
+    "category": "challenges",
+    "icon": "🏹"
+  },
+  {
+    "id": "challenge_complete",
+    "title": "Challenge Accepted",
+    "tier": "silver",
+    "category": "challenges",
+    "icon": "🎯"
+  },
+  {
+    "id": "comeback",
+    "title": "Comeback King",
+    "tier": "silver",
+    "category": "special",
+    "icon": "🦋"
+  },
+  {
+    "id": "companion_stage_10",
+    "title": "Champion Bond",
+    "tier": "gold",
+    "category": "companion",
+    "icon": "🏅"
+  },
+  {
+    "id": "companion_stage_15",
+    "title": "Prime Evolution",
+    "tier": "platinum",
+    "category": "companion",
+    "icon": "💎"
+  },
+  {
+    "id": "companion_stage_20",
+    "title": "Ultimate Form",
+    "tier": "platinum",
+    "category": "companion",
+    "icon": "🌌"
+  },
+  {
+    "id": "companion_stage_3",
+    "title": "First Evolution",
+    "tier": "bronze",
+    "category": "companion",
+    "icon": "✨"
+  },
+  {
+    "id": "companion_stage_5",
+    "title": "Rising Star",
+    "tier": "silver",
+    "category": "companion",
+    "icon": "🌟"
+  },
+  {
+    "id": "first_check_in",
+    "title": "Self Aware",
+    "tier": "bronze",
+    "category": "firsts",
+    "icon": "🪞"
+  },
+  {
+    "id": "first_epic",
+    "title": "Epic Starter",
+    "tier": "bronze",
+    "category": "firsts",
+    "icon": "🚀"
+  },
+  {
+    "id": "first_habit",
+    "title": "Habit Starter",
+    "tier": "bronze",
+    "category": "firsts",
+    "icon": "✅"
+  },
+  {
+    "id": "first_pep_talk",
+    "title": "First Listen",
+    "tier": "bronze",
+    "category": "firsts",
+    "icon": "🎧"
+  },
+  {
+    "id": "first_quest",
+    "title": "Quest Beginner",
+    "tier": "bronze",
+    "category": "firsts",
+    "icon": "⚔️"
+  },
+  {
+    "id": "full_storyline",
+    "title": "Lore Master",
+    "tier": "platinum",
+    "category": "special",
+    "icon": "📚"
+  },
+  {
+    "id": "month_streak",
+    "title": "Monthly Master",
+    "tier": "platinum",
+    "category": "streaks",
+    "icon": "👑"
+  },
+  {
+    "id": "pep_talk_listener_10",
+    "title": "Avid Listener",
+    "tier": "silver",
+    "category": "special",
+    "icon": "🎵"
+  },
+  {
+    "id": "pep_talk_listener_50",
+    "title": "Wisdom Seeker",
+    "tier": "gold",
+    "category": "special",
+    "icon": "🎶"
+  },
+  {
+    "id": "perfect_day",
+    "title": "Perfect Day",
+    "tier": "gold",
+    "category": "special",
+    "icon": "🌈"
+  },
+  {
+    "id": "starpath_body_forge",
+    "title": "Body Forge",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "💪"
+  },
+  {
+    "id": "starpath_clean_machine",
+    "title": "Clean Machine",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "🥗"
+  },
+  {
+    "id": "starpath_dawn_champion",
+    "title": "Dawn Champion",
+    "tier": "silver",
+    "category": "starpaths",
+    "icon": "🌅"
+  },
+  {
+    "id": "starpath_detox_warrior",
+    "title": "Detox Warrior",
+    "tier": "silver",
+    "category": "starpaths",
+    "icon": "⚔️"
+  },
+  {
+    "id": "starpath_digital_minimalist",
+    "title": "Digital Minimalist",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "📵"
+  },
+  {
+    "id": "starpath_iron_mind",
+    "title": "Iron Mind",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "🧠"
+  },
+  {
+    "id": "starpath_mindful_master",
+    "title": "Mindful Master",
+    "tier": "silver",
+    "category": "starpaths",
+    "icon": "🧘"
+  },
+  {
+    "id": "starpath_scholars_path",
+    "title": "Scholar's Path",
+    "tier": "platinum",
+    "category": "starpaths",
+    "icon": "📚"
+  },
+  {
+    "id": "starpath_sleep_sovereign",
+    "title": "Sleep Sovereign",
+    "tier": "platinum",
+    "category": "starpaths",
+    "icon": "😴"
+  },
+  {
+    "id": "starpath_social_butterfly",
+    "title": "Social Butterfly",
+    "tier": "platinum",
+    "category": "starpaths",
+    "icon": "🦋"
+  },
+  {
+    "id": "story_exploration",
+    "title": "Star Cartographer",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "🌌"
+  },
+  {
+    "id": "story_heroes_journey",
+    "title": "Legendary Hero",
+    "tier": "platinum",
+    "category": "starpaths",
+    "icon": "⚔️"
+  },
+  {
+    "id": "story_mystery",
+    "title": "Truth Unveiler",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "🔮"
+  },
+  {
+    "id": "story_pilgrimage",
+    "title": "Soul Pilgrim",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "🧘"
+  },
+  {
+    "id": "story_reader",
+    "title": "Story Lover",
+    "tier": "bronze",
+    "category": "special",
+    "icon": "📖"
+  },
+  {
+    "id": "story_rescue_mission",
+    "title": "Cosmic Savior",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "🛡️"
+  },
+  {
+    "id": "story_treasure_hunt",
+    "title": "Fortune Seeker",
+    "tier": "gold",
+    "category": "starpaths",
+    "icon": "💎"
+  },
+  {
+    "id": "three_day_streak",
+    "title": "Getting Started",
+    "tier": "bronze",
+    "category": "streaks",
+    "icon": "🔥"
+  },
+  {
+    "id": "total_attributes",
+    "title": "Well Rounded",
+    "tier": "platinum",
+    "category": "special",
+    "icon": "⭐"
+  },
+  {
+    "id": "two_week_streak",
+    "title": "Fortnight Force",
+    "tier": "gold",
+    "category": "streaks",
+    "icon": "⚡"
+  },
+  {
+    "id": "week_streak",
+    "title": "Week of Discipline",
+    "tier": "silver",
+    "category": "streaks",
+    "icon": "🏆"
+  }
+]

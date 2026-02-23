@@ -17,7 +17,13 @@
     "ios:verify-assets": "node scripts/verify-ios-web-assets.mjs",
     "ios:preflight": "npm run build && npm run ios:sync && npm run ios:verify-assets",
     "ios:testflight": "npm run ios:preflight && node scripts/open-xcode.js",
-    "pep-talks:backfill-transcripts": "node scripts/backfill-missing-pep-talk-transcripts.mjs"
+    "pep-talks:backfill-transcripts": "node scripts/backfill-missing-pep-talk-transcripts.mjs",
+    "previews:manifest": "node --import tsx scripts/generate-badge-reward-manifests.ts",
+    "previews:render": "node --import tsx scripts/render-badge-reward-previews.ts",
+    "previews:sync": "node --import tsx scripts/sync-badge-reward-previews.ts",
+    "previews:validate": "node --import tsx scripts/validate-badge-reward-previews.ts",
+    "previews:build": "npm run previews:manifest && npm run previews:render",
+    "previews:pipeline": "npm run previews:build && npm run previews:sync && npm run previews:validate"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
@@ -118,6 +124,7 @@
     "globals": "^15.15.0",
     "patch-package": "^8.0.1",
     "postcss": "^8.5.6",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",

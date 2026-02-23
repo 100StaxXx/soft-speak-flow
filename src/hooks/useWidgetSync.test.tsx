@@ -190,6 +190,65 @@ describe("useWidgetSync", () => {
     });
   });
 
+  it("updates widget immediately when quests are created and deleted", async () => {
+    const today = localDateString();
+    const createdQuest = makeTask({
+      id: "quest-created",
+      task_text: "Ship update",
+      completed: false,
+      habit_source_id: null,
+      scheduled_time: "16:30",
+    });
+
+    const { rerender } = renderHook(
+      ({ tasks }) => useWidgetSync(tasks, today),
+      { initialProps: { tasks: [] as DailyTask[] } },
+    );
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(1);
+    expect(mocks.updateWidgetDataMock).toHaveBeenLastCalledWith({
+      tasks: [],
+      completedCount: 0,
+      totalCount: 0,
+      ritualCount: 0,
+      ritualCompleted: 0,
+      date: today,
+    });
+
+    rerender({ tasks: [createdQuest] });
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(2);
+    expect(mocks.updateWidgetDataMock).toHaveBeenLastCalledWith({
+      tasks: [
+        expect.objectContaining({
+          id: "quest-created",
+          text: "Ship update",
+          scheduledTime: "16:30",
+        }),
+      ],
+      completedCount: 0,
+      totalCount: 1,
+      ritualCount: 0,
+      ritualCompleted: 0,
+      date: today,
+    });
+
+    rerender({ tasks: [] });
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledTimes(3);
+    expect(mocks.updateWidgetDataMock).toHaveBeenLastCalledWith({
+      tasks: [],
+      completedCount: 0,
+      totalCount: 0,
+      ritualCount: 0,
+      ritualCompleted: 0,
+      date: today,
+    });
+  });
+
   it("skips syncing when the selected date is not today", async () => {
     renderHook(() => useWidgetSync([makeTask()], "2026-02-11"));
     await flushEffects();

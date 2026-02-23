@@ -16,6 +16,19 @@ import {
 
 type FilterCategory = 'all' | BadgeCategory;
 
+const badgePreviewModules = import.meta.glob("/src/assets/badges/*.webp", {
+  eager: true,
+  import: "default",
+}) as Record<string, string>;
+
+const badgePreviewLocalUrls = Object.fromEntries(
+  Object.entries(badgePreviewModules).map(([modulePath, moduleUrl]) => {
+    const filename = modulePath.split("/").pop() || "";
+    const badgeId = filename.replace(/\.webp$/i, "");
+    return [badgeId, moduleUrl];
+  }),
+) as Record<string, string>;
+
 export const BadgesCollectionPanel = () => {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
@@ -144,7 +157,11 @@ export const BadgesCollectionPanel = () => {
           {selectedBadge && (
             <div className="text-center space-y-4 py-2">
               <div className={`text-6xl ${selectedBadge.earned ? '' : 'grayscale'}`}>
-                {selectedBadge.earned ? selectedBadge.badge.icon : '🔒'}
+                {selectedBadge.earned ? (
+                  <BadgePreview badge={selectedBadge.badge} className="h-16 w-16 rounded-xl mx-auto" />
+                ) : (
+                  "🔒"
+                )}
               </div>
               {selectedBadge.earned ? (
                 <>
@@ -189,7 +206,11 @@ const BadgeCard = ({ badge, earned, onSelect }: BadgeCardProps) => {
     >
       {/* Badge Icon */}
       <div className={`text-3xl mb-2 ${earned ? '' : 'grayscale'}`}>
-        {earned ? badge.icon : '🔒'}
+        {earned ? (
+          <BadgePreview badge={badge} className="h-10 w-10 rounded-lg mx-auto" />
+        ) : (
+          "🔒"
+        )}
       </div>
 
       {/* Badge Title */}
@@ -203,4 +224,22 @@ const BadgeCard = ({ badge, earned, onSelect }: BadgeCardProps) => {
       )}
     </Card>
   );
+};
+
+const BadgePreview = ({ badge, className }: { badge: BadgeDefinition; className?: string }) => {
+  const previewUrl = badgePreviewLocalUrls[badge.id] || badge.image_url || null;
+
+  if (previewUrl) {
+    return (
+      <img
+        src={previewUrl}
+        alt={badge.title}
+        className={className}
+        loading="lazy"
+        decoding="async"
+      />
+    );
+  }
+
+  return <span className={`inline-flex items-center justify-center ${className ?? ""}`}>{badge.icon}</span>;
 };

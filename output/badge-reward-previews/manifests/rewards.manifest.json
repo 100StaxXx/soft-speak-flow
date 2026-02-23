@@ -1,0 +1,755 @@
+[
+  {
+    "id": "08b0e4b0-ad2f-4bf7-b65a-57c44db6011a",
+    "name": "Laser Focus Aura",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "08f5ef23-5c12-4dba-bfa2-abeed471c4d9",
+    "name": "Celestial Circuit",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "0a598103-1816-41bd-a4d3-ab77fb2b4c35",
+    "name": "Radiant Wings",
+    "rarity": "legendary",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "animation",
+      "color",
+      "effectType",
+      "image"
+    ]
+  },
+  {
+    "id": "0d243dd3-38a3-48de-86ba-30dbfe2338b6",
+    "name": "Equilibrium Effect",
+    "rarity": "legendary",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "0d592bd4-d3c4-4d0a-8682-b6571275777d",
+    "name": "Nebula Dreams",
+    "rarity": "common",
+    "reward_type": "background",
+    "icon": "🌌",
+    "css_effect_keys": [
+      "animation",
+      "gradient"
+    ]
+  },
+  {
+    "id": "1374d56f-9d88-489a-9215-958d90278724",
+    "name": "Sparkle Trail",
+    "rarity": "rare",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "effectType",
+      "intensity"
+    ]
+  },
+  {
+    "id": "21fa6b1f-c55e-4f41-b032-d24c4b9f664d",
+    "name": "Perfect Balance Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "animatedGradient",
+      "cornerStyle",
+      "gradientBorder"
+    ]
+  },
+  {
+    "id": "259d22ce-3382-4a49-b73f-adee68885af6",
+    "name": "Sacred Pilgrim Frame",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "2a49ccd0-4e1a-4137-a50e-21239c88bd07",
+    "name": "Star Mapper Frame",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "34a9772d-9e67-4622-9532-513e4e936d5e",
+    "name": "Enlightenment Stone",
+    "rarity": "legendary",
+    "reward_type": "artifact",
+    "icon": "💎",
+    "css_effect_keys": [
+      "glow",
+      "icon"
+    ]
+  },
+  {
+    "id": "421ca3b4-c0e6-4cfc-867a-12fb6485ecd3",
+    "name": "Dimensional Tear",
+    "rarity": "legendary",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "animatedGradient",
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "gradientBorder",
+      "particleEffect",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "443cdb1f-9b19-4480-a00b-1d50f54127ad",
+    "name": "Focused Mind Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "44a034b2-083f-4317-b8e6-5b46142686a3",
+    "name": "Dragon Scale",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "4f98cd81-76a7-4b45-8961-95883ccf3d82",
+    "name": "Void Embrace",
+    "rarity": "epic",
+    "reward_type": "background",
+    "icon": "🌌",
+    "css_effect_keys": [
+      "animation",
+      "glow",
+      "gradient"
+    ]
+  },
+  {
+    "id": "5621e964-2e9c-4c70-a809-0485f348740e",
+    "name": "Calm Waters Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation"
+    ]
+  },
+  {
+    "id": "628e85bf-2beb-45e0-83ed-9f284dbab8f0",
+    "name": "Starweaver Border",
+    "rarity": "common",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "63bcee48-b290-490f-b434-5abea53da5d6",
+    "name": "Pathfinder Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "645f3303-ea17-4f5b-b66f-c770b32d3187",
+    "name": "The Wanderers Map",
+    "rarity": "legendary",
+    "reward_type": "artifact",
+    "icon": "🗺️",
+    "css_effect_keys": [
+      "glow",
+      "icon"
+    ]
+  },
+  {
+    "id": "67b8628c-92bd-4d2b-b2c0-69650c4a59b4",
+    "name": "Primal Deity",
+    "rarity": "legendary",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "particleEffect",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "6be89d84-2085-4a2f-89e6-d6fce01cdfa6",
+    "name": "Void Rift",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "particleEffect",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "7b7d09d4-afa1-408b-91cb-ca31948836d1",
+    "name": "Momentum Trail",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "7c360e47-ea7b-4d0c-8eee-26dd2636f113",
+    "name": "Courage Aura",
+    "rarity": "legendary",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "803e2bef-8ddb-4974-bc5c-6d7d830695f9",
+    "name": "Eternal Flame Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor"
+    ]
+  },
+  {
+    "id": "84071e6c-0379-463c-a72a-2b0458c38105",
+    "name": "Conviction Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle"
+    ]
+  },
+  {
+    "id": "85ae62ba-6b30-4ed0-8a89-84aceba7c0d3",
+    "name": "Cosmic Ocean",
+    "rarity": "rare",
+    "reward_type": "background",
+    "icon": "🌌",
+    "css_effect_keys": [
+      "animation",
+      "gradient"
+    ]
+  },
+  {
+    "id": "87eaaa2e-b19f-4720-a340-2d29729e5877",
+    "name": "Thought Liberation",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "89672d4a-a837-48b8-ad55-bbde78c9d079",
+    "name": "Nebula Wisp",
+    "rarity": "common",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor"
+    ]
+  },
+  {
+    "id": "92a6c51c-0ce4-4de3-a6a3-34665f6ca776",
+    "name": "Cosmic Crown",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "effectType",
+      "image",
+      "position"
+    ]
+  },
+  {
+    "id": "93eeea63-4d51-4dd8-8e78-5d60460fa54d",
+    "name": "Bronze Constellation",
+    "rarity": "common",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "965b073f-4363-4e20-b744-3a341d704154",
+    "name": "Shadow Detective Frame",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "9d0414de-c952-49dc-8604-574d5103df20",
+    "name": "Fortune Seeker Frame",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "a0493985-892c-41ce-a56e-d133b060f639",
+    "name": "Guardians Shield",
+    "rarity": "legendary",
+    "reward_type": "artifact",
+    "icon": "🛡️",
+    "css_effect_keys": [
+      "glow",
+      "icon"
+    ]
+  },
+  {
+    "id": "a1198277-2ccc-4402-975d-0c75ae47e320",
+    "name": "Inner Fire Effect",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "a1babd23-e642-4b40-814b-3be95d0c27df",
+    "name": "Order From Chaos Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "a4b93e2b-f714-4409-9ada-c15431ccc4c2",
+    "name": "Serenity Glow",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "glow",
+      "glowAnimation",
+      "glowIntensity"
+    ]
+  },
+  {
+    "id": "a5174218-e6f1-4a9d-85b4-34ad12a0173c",
+    "name": "Golden Galaxy",
+    "rarity": "rare",
+    "reward_type": "background",
+    "icon": "🌌",
+    "css_effect_keys": [
+      "gradient",
+      "particles"
+    ]
+  },
+  {
+    "id": "abd95104-6b95-4052-92a4-70811f492315",
+    "name": "Flow State Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation"
+    ]
+  },
+  {
+    "id": "aca5fba0-50da-4888-b931-d166c31f30e8",
+    "name": "Frost Crystal",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowColor",
+      "particleEffect",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "afcca42a-5069-44bb-a748-0b1446961c28",
+    "name": "Guiding Light Effect",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "b762e7dd-6d58-44d9-bcaf-9f7d5220032d",
+    "name": "Phoenix Ember",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "particleEffect",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "b8e22263-ddbf-417b-936a-ee7e55d5d618",
+    "name": "Guardian's Shield Frame",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "bbcf195f-872c-42cd-a920-ba381e44488a",
+    "name": "Starfield Classic",
+    "rarity": "common",
+    "reward_type": "background",
+    "icon": "🌌",
+    "css_effect_keys": [
+      "gradient",
+      "particles"
+    ]
+  },
+  {
+    "id": "c183c4b1-e498-4301-815d-c903cc6c81c4",
+    "name": "Diamond Shell Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation"
+    ]
+  },
+  {
+    "id": "c5840e60-eae3-4531-9e6f-b3555cb43d45",
+    "name": "Resilience Shield",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "d3f0433d-8569-44e8-89cd-1b385cb2185e",
+    "name": "Harmony Particles",
+    "rarity": "legendary",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "d5ae6487-b65f-48fa-bda7-cd66dc595e9b",
+    "name": "Heros Medallion",
+    "rarity": "legendary",
+    "reward_type": "artifact",
+    "icon": "🏅",
+    "css_effect_keys": [
+      "glow",
+      "icon"
+    ]
+  },
+  {
+    "id": "d9ae63ad-55d3-4cb9-a427-5b0e89e78fd5",
+    "name": "Self-Belief Radiance",
+    "rarity": "epic",
+    "reward_type": "effect",
+    "icon": "✨",
+    "css_effect_keys": [
+      "color",
+      "intensity",
+      "particleEffect"
+    ]
+  },
+  {
+    "id": "e3b35fa1-1479-4081-b721-ffe3a1f1f387",
+    "name": "Fearless Guardian Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle"
+    ]
+  },
+  {
+    "id": "e9963482-ea99-4ffb-b5df-715a80cd85c3",
+    "name": "Silver Stardust",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "ee2203ac-368a-4737-bd4a-16c6cace03c0",
+    "name": "Compass of Infinity",
+    "rarity": "legendary",
+    "reward_type": "artifact",
+    "icon": "🧭",
+    "css_effect_keys": [
+      "glow",
+      "icon"
+    ]
+  },
+  {
+    "id": "f4a7895a-501a-45f1-bbd9-20d6fa67f5dd",
+    "name": "Hero's Mantle Frame",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "f4bb6c12-b9a3-4031-977c-d12fdaa69758",
+    "name": "Cosmic Ascendant",
+    "rarity": "legendary",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "animatedGradient",
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation",
+      "glowColor",
+      "gradientBorder",
+      "particleEffect",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "f6de3790-1159-4545-b8a2-1bc24e45515d",
+    "name": "Crystal of Truth",
+    "rarity": "legendary",
+    "reward_type": "artifact",
+    "icon": "🔮",
+    "css_effect_keys": [
+      "glow",
+      "icon"
+    ]
+  },
+  {
+    "id": "fe0425e9-44f6-40e8-853e-6527a0d5676c",
+    "name": "Clear Mind Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderWidth",
+      "cornerStyle",
+      "glowAnimation"
+    ]
+  },
+  {
+    "id": "fe475668-1c71-4211-9728-bd3a4eee456c",
+    "name": "Mythic Glow",
+    "rarity": "epic",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "glowColor",
+      "shimmer"
+    ]
+  },
+  {
+    "id": "ff29ee39-7b81-4a57-9559-7cf92dcca929",
+    "name": "Aurora Frame",
+    "rarity": "rare",
+    "reward_type": "frame",
+    "icon": "🖼️",
+    "css_effect_keys": [
+      "animatedGradient",
+      "borderColor",
+      "borderStyle",
+      "borderWidth",
+      "cornerStyle",
+      "gradientBorder",
+      "shimmer"
+    ]
+  }
+]
