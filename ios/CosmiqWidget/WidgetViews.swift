@@ -40,7 +40,8 @@ struct SmallWidgetView: View {
             // Central progress circle
             CosmicProgressCircle(
                 completed: completedCount,
-                total: totalCount
+                total: totalCount,
+                showsPercentage: false
             )
             .frame(width: 60, height: 60)
             
@@ -54,7 +55,6 @@ struct SmallWidgetView: View {
                         CosmicTaskLinkRow(
                             task: task,
                             compact: true,
-                            showsXP: false,
                             showsMainQuestBadge: false
                         )
                     }
@@ -106,7 +106,7 @@ struct MediumWidgetView: View {
                         CosmicTaskLinkRow(
                             task: task,
                             showsTime: true,
-                            xpFont: .caption2
+                            showsMainQuestBadge: false
                         )
                     }
                 } else {
@@ -266,9 +266,7 @@ struct CosmicTaskRow: View {
     let task: WidgetTask
     var showsTime: Bool = false
     var compact: Bool = false
-    var showsXP: Bool = true
-    var showsMainQuestBadge: Bool = true
-    var xpFont: Font = .caption
+    var showsMainQuestBadge: Bool = false
     
     var body: some View {
         HStack(spacing: compact ? 4 : 6) {
@@ -291,28 +289,26 @@ struct CosmicTaskRow: View {
 
             if showsTime {
                 Text(formattedTime)
-                    .font(.system(size: compact ? 8 : 9, weight: .semibold, design: .rounded))
+                    .font(.system(size: compact ? 8 : 10, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(width: compact ? 34 : 52, alignment: .leading)
                     .foregroundColor(.cosmicSecondary)
             }
             
             Text(task.text)
                 .font(compact ? .system(size: 11) : .caption)
                 .lineLimit(1)
+                .truncationMode(.tail)
                 .strikethrough(task.completed)
                 .foregroundColor(task.completed ? .cosmicSecondary : .cosmicText)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
             
             if showsMainQuestBadge && task.isMainQuest && !compact {
                 Text("⭐")
                     .font(.caption2)
-            }
-            
-            Spacer()
-            
-            if showsXP {
-                Text("+\(task.xpReward)")
-                    .font(xpFont)
-                    .foregroundColor(.cosmicGold)
             }
         }
     }
@@ -353,9 +349,7 @@ struct CosmicTaskLinkRow: View {
     let task: WidgetTask
     var showsTime: Bool = false
     var compact: Bool = false
-    var showsXP: Bool = true
-    var showsMainQuestBadge: Bool = true
-    var xpFont: Font = .caption
+    var showsMainQuestBadge: Bool = false
 
     var body: some View {
         if let url = taskDeepLink(task.id) {
@@ -364,9 +358,7 @@ struct CosmicTaskLinkRow: View {
                     task: task,
                     showsTime: showsTime,
                     compact: compact,
-                    showsXP: showsXP,
-                    showsMainQuestBadge: showsMainQuestBadge,
-                    xpFont: xpFont
+                    showsMainQuestBadge: showsMainQuestBadge
                 )
             }
         } else {
@@ -374,9 +366,7 @@ struct CosmicTaskLinkRow: View {
                 task: task,
                 showsTime: showsTime,
                 compact: compact,
-                showsXP: showsXP,
-                showsMainQuestBadge: showsMainQuestBadge,
-                xpFont: xpFont
+                showsMainQuestBadge: showsMainQuestBadge
             )
         }
     }
@@ -387,6 +377,7 @@ struct CosmicTaskLinkRow: View {
 struct CosmicProgressCircle: View {
     let completed: Int
     let total: Int
+    var showsPercentage: Bool = true
     
     private var progress: Double {
         total > 0 ? Double(completed) / Double(total) : 0
@@ -414,10 +405,12 @@ struct CosmicProgressCircle: View {
                 )
                 .rotationEffect(.degrees(-90))
             
-            // Percentage text
-            Text("\(Int(progress * 100))%")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundColor(.cosmicText)
+            if showsPercentage {
+                // Percentage text
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.cosmicText)
+            }
         }
     }
 }
