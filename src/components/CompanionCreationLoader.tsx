@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles } from "lucide-react";
 
@@ -18,6 +18,39 @@ const CREATION_TIPS = [
   "They'll grow and evolve as you complete quests",
 ];
 
+const PROGRESS_UPDATE_INTERVAL_MS = 1_000;
+const LONG_WAIT_THRESHOLD_MS = 90_000;
+const INITIAL_PROGRESS = 3;
+const FINAL_PROGRESS_CAP = 99;
+const POST_120_SECONDS_PROGRESS_PER_SECOND = 0.08;
+
+const lerp = (start: number, end: number, ratio: number): number =>
+  start + ((end - start) * ratio);
+
+export const getCompanionCreationProgress = (elapsedMs: number): number => {
+  const elapsedSeconds = Math.max(0, elapsedMs / 1000);
+
+  if (elapsedSeconds <= 30) {
+    return lerp(INITIAL_PROGRESS, 32, elapsedSeconds / 30);
+  }
+
+  if (elapsedSeconds <= 60) {
+    return lerp(32, 50, (elapsedSeconds - 30) / 30);
+  }
+
+  if (elapsedSeconds <= 90) {
+    return lerp(50, 64, (elapsedSeconds - 60) / 30);
+  }
+
+  if (elapsedSeconds <= 120) {
+    return lerp(64, 74, (elapsedSeconds - 90) / 30);
+  }
+
+  const post120Progress =
+    74 + ((elapsedSeconds - 120) * POST_120_SECONDS_PROGRESS_PER_SECOND);
+  return Math.min(post120Progress, FINAL_PROGRESS_CAP);
+};
+
 /**
  * Full-screen loading experience for companion creation
  * Shows animated progress and rotating messages to keep users engaged
@@ -25,8 +58,10 @@ const CREATION_TIPS = [
 export const CompanionCreationLoader = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
-  const [progress, setProgress] = useState(5);
-  const takingLongerThanExpected = progress >= 90;
+  const startTimeRef = useRef(Date.now());
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [progress, setProgress] = useState(INITIAL_PROGRESS);
+  const takingLongerThanExpected = elapsedMs >= LONG_WAIT_THRESHOLD_MS;
 
   // Cycle messages every 4 seconds
   useEffect(() => {
@@ -47,13 +82,10 @@ export const CompanionCreationLoader = () => {
   // Simulate progress over time (visual comfort only)
   useEffect(() => {
     const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 95) return prev;
-        // Slow down as we approach the end
-        const increment = prev < 60 ? 3 : prev < 80 ? 2 : 1;
-        return Math.min(prev + increment, 95);
-      });
-    }, 1000);
+      const elapsed = Date.now() - startTimeRef.current;
+      setElapsedMs(elapsed);
+      setProgress((prev) => Math.max(prev, getCompanionCreationProgress(elapsed)));
+    }, PROGRESS_UPDATE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
 

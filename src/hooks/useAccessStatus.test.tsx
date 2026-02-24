@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => ({
   subscriptionLoading: false,
 }));
 
+const localStorageState = vi.hoisted(() => ({
+  store: new Map<string, string>(),
+}));
+
 vi.mock("./useProfile", () => ({
   useProfile: () => ({
     profile: mocks.profile,
@@ -25,6 +29,7 @@ vi.mock("./useSubscription", () => ({
 import { useAccessStatus } from "./useAccessStatus";
 
 const createProfile = (overrides: Partial<Record<string, unknown>> = {}) => ({
+  id: "user-1",
   created_at: "2026-02-01T00:00:00.000Z",
   trial_started_at: null,
   trial_ends_at: null,
@@ -32,8 +37,32 @@ const createProfile = (overrides: Partial<Record<string, unknown>> = {}) => ({
   ...overrides,
 });
 
+const installLocalStorageMock = () => {
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => localStorageState.store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        localStorageState.store.set(key, value);
+      },
+      removeItem: (key: string) => {
+        localStorageState.store.delete(key);
+      },
+      clear: () => {
+        localStorageState.store.clear();
+      },
+      key: (index: number) => Array.from(localStorageState.store.keys())[index] ?? null,
+      get length() {
+        return localStorageState.store.size;
+      },
+    } as Storage,
+  });
+};
+
 describe("useAccessStatus", () => {
   beforeEach(() => {
+    installLocalStorageMock();
+    localStorageState.store.clear();
     mocks.profileLoading = false;
     mocks.subscriptionLoading = false;
     mocks.isSubscribed = false;
@@ -94,5 +123,37 @@ describe("useAccessStatus", () => {
     expect(result.current.hasAccess).toBe(true);
     expect(result.current.accessSource).toBe("subscription");
     expect(result.current.gateReason).toBe("none");
+  });
+
+  it("shows pre-trial signup gate after tutorial completion even if legacy trial dates exist", () => {
+    mocks.profile = createProfile({
+      onboarding_data: {
+        guided_tutorial: { completed: true },
+      },
+      trial_started_at: "2026-02-20T00:00:00.000Z",
+      trial_ends_at: "2026-03-01T00:00:00.000Z",
+    });
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.gateReason).toBe("pre_trial_signup");
+  });
+
+  it("shows pre-trial signup gate from local guided tutorial completion before profile refresh", () => {
+    mocks.profile = createProfile({
+      onboarding_data: {
+        guided_tutorial: { completed: false },
+      },
+    });
+    globalThis.localStorage?.setItem?.(
+      "guided_tutorial_progress_user-1",
+      JSON.stringify({ completed: true })
+    );
+
+    const { result } = renderHook(() => useAccessStatus());
+
+    expect(result.current.hasAccess).toBe(false);
+    expect(result.current.gateReason).toBe("pre_trial_signup");
   });
 });
