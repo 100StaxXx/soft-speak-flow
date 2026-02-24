@@ -59,7 +59,7 @@ export default function Premium() {
       : IAP_PRODUCTS.MONTHLY;
     const success = await handlePurchase(productId);
     if (success) {
-      navigate('/premium-success');
+      navigate('/premium/success');
     }
   }, [selectedProduct, selectedPlan, handlePurchase, navigate, toast]);
 

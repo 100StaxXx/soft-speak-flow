@@ -24,6 +24,7 @@ export interface Profile {
   onboarding_completed: boolean | null;
   onboarding_data: Record<string, unknown> | null;
   // Trial & subscription fields
+  trial_started_at: string | null;
   trial_ends_at: string | null;
   subscription_status: string | null;
   subscription_expires_at: string | null;

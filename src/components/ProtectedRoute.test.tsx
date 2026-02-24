@@ -10,6 +10,7 @@ const authState = vi.hoisted(() => ({
 
 const accessState = vi.hoisted(() => ({
   hasAccess: true,
+  gateReason: "none" as "none" | "pre_trial_signup" | "trial_expired",
   loading: false,
 }));
 
@@ -22,7 +23,9 @@ vi.mock("@/hooks/useAccessStatus", () => ({
 }));
 
 vi.mock("@/components/TrialExpiredPaywall", () => ({
-  TrialExpiredPaywall: () => <div>Paywall</div>,
+  TrialExpiredPaywall: ({ variant }: { variant?: "pre_trial_signup" | "trial_expired" }) => (
+    <div>{`Paywall:${variant ?? "pre_trial_signup"}`}</div>
+  ),
 }));
 
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -50,6 +53,7 @@ describe("ProtectedRoute", () => {
     authState.loading = false;
     authState.status = "unauthenticated";
     accessState.hasAccess = true;
+    accessState.gateReason = "none";
     accessState.loading = false;
   });
 
@@ -84,5 +88,29 @@ describe("ProtectedRoute", () => {
     renderProtectedRoute();
 
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
+  });
+
+  it("renders pre-trial paywall variant when access requires trial signup", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-3" };
+    accessState.hasAccess = false;
+    accessState.gateReason = "pre_trial_signup";
+
+    renderProtectedRoute();
+
+    expect(screen.getByText("Paywall:pre_trial_signup")).toBeInTheDocument();
+  });
+
+  it("renders trial-expired paywall variant when trial is expired", () => {
+    authState.status = "authenticated";
+    authState.loading = false;
+    authState.user = { id: "user-4" };
+    accessState.hasAccess = false;
+    accessState.gateReason = "trial_expired";
+
+    renderProtectedRoute();
+
+    expect(screen.getByText("Paywall:trial_expired")).toBeInTheDocument();
   });
 });

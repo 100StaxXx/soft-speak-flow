@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Crown, Sparkles, MessageCircle, Lock, RefreshCw, LogOut, Trash2 } from "lucide-react";
+import { Crown, Sparkles, MessageCircle, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
@@ -22,8 +22,13 @@ import {
 import { Input } from "@/components/ui/input";
 
 type PlanType = "monthly" | "yearly";
+export type TrialGateVariant = "pre_trial_signup" | "trial_expired";
 
-export const TrialExpiredPaywall = () => {
+interface TrialExpiredPaywallProps {
+  variant?: TrialGateVariant;
+}
+
+export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpiredPaywallProps) => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -149,6 +154,21 @@ export const TrialExpiredPaywall = () => {
     },
   };
 
+  const copy = variant === "trial_expired"
+    ? {
+        title: "Your Free Trial Has Ended",
+        subtitle: "Subscribe to keep building momentum with your companion",
+        cta: `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`,
+        legalIntro: "Payment will be charged to your Apple ID account at confirmation of purchase.",
+      }
+    : {
+        title: "Keep Your Journey Going",
+        subtitle: "Start your free trial to unlock premium guidance, quests, and companion growth",
+        cta: "Start Free Trial",
+        legalIntro:
+          "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
+      };
+
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 overflow-y-auto">
       <div className="w-full max-w-md space-y-6">
@@ -158,10 +178,10 @@ export const TrialExpiredPaywall = () => {
             <Crown className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="font-display text-3xl text-foreground">
-            Your Free Trial Has Ended
+            {copy.title}
           </h1>
           <p className="text-muted-foreground">
-            Subscribe to continue your journey with your companion
+            {copy.subtitle}
           </p>
         </div>
 
@@ -188,7 +208,7 @@ export const TrialExpiredPaywall = () => {
                   {plan}
                 </p>
                 <p className="text-2xl font-bold text-foreground">
-                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.price : productMap[IAP_PRODUCTS.MONTHLY]?.price) ?? plans[plan].fallbackPrice}
+                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.priceString : productMap[IAP_PRODUCTS.MONTHLY]?.priceString) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {plans[plan].period}
@@ -269,7 +289,7 @@ export const TrialExpiredPaywall = () => {
               Processing...
             </>
           ) : (
-            `Subscribe ${selectedPlan === "yearly" ? "Yearly" : "Monthly"}`
+            copy.cta
           )}
         </Button>
 
@@ -285,7 +305,7 @@ export const TrialExpiredPaywall = () => {
         </Button>
 
         <p className="text-xs text-center text-muted-foreground leading-relaxed">
-          Payment will be charged to your Apple ID account at confirmation of purchase.
+          {copy.legalIntro}
           Subscription automatically renews unless canceled at least 24 hours before the end of the current period.
           Your account will be charged for renewal within 24 hours prior to the end of the current period.
           You can manage and cancel your subscriptions by going to Settings {">"} [Your Name] {">"} Subscriptions after purchase.
@@ -295,37 +315,29 @@ export const TrialExpiredPaywall = () => {
           <a href="/terms" className="text-muted-foreground underline hover:text-foreground">Terms of Use</a>
         </div>
 
-        {/* Sign Out & Delete Account Options */}
-        <div className="relative flex items-center py-2">
-          <div className="flex-grow border-t border-muted" />
-          <span className="px-3 text-xs text-muted-foreground">or</span>
-          <div className="flex-grow border-t border-muted" />
-        </div>
-
-        <div className="flex justify-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {isSigningOut ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-1.5" />
-            ) : (
-              <LogOut className="h-4 w-4 mr-1.5" />
-            )}
-            Sign Out
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            Delete Account
-          </Button>
+        {/* Subtle account options */}
+        <div className="pt-1 text-center space-y-2">
+          <p className="text-xs text-muted-foreground">Need another account?</p>
+          <div className="flex items-center justify-center gap-3">
+            <Button
+              variant="link"
+              size="sm"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </Button>
+            <span className="text-xs text-muted-foreground/60">•</span>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              className="h-auto p-0 text-xs text-muted-foreground hover:text-destructive"
+            >
+              Delete account
+            </Button>
+          </div>
         </div>
       </div>
 

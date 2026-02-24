@@ -14,12 +14,12 @@ struct SmallWidgetView: View {
         entry.data?.totalAllCount ?? 0
     }
     
-    private var questCount: Int {
-        entry.data?.totalCount ?? 0
+    private var visibleTasks: [WidgetTask] {
+        Array((entry.data?.tasks ?? []).prefix(3))
     }
-    
-    private var ritualCount: Int {
-        entry.data?.ritualCount ?? 0
+
+    private var remainingTaskCount: Int {
+        max((entry.data?.tasks.count ?? 0) - visibleTasks.count, 0)
     }
     
     var body: some View {
@@ -35,7 +35,7 @@ struct SmallWidgetView: View {
             }
             .padding(.top, 4)
             
-            Spacer()
+            Spacer(minLength: 2)
             
             // Central progress circle
             CosmicProgressCircle(
@@ -44,28 +44,31 @@ struct SmallWidgetView: View {
             )
             .frame(width: 60, height: 60)
             
-            // Combined count with quest/ritual breakdown
-            VStack(spacing: 2) {
-                Text("\(completedCount)/\(totalCount)")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.cosmicGold)
-                
-                if ritualCount > 0 {
-                    Text("\(questCount)Q • \(ritualCount)R")
-                        .font(.system(size: 10))
-                        .foregroundColor(.cosmicSecondary)
-                } else if questCount > 0 {
-                    Text("\(questCount) quests")
-                        .font(.caption2)
-                        .foregroundColor(.cosmicSecondary)
-                } else {
-                    Text("No tasks")
-                        .font(.caption2)
-                        .foregroundColor(.cosmicSecondary)
+            if visibleTasks.isEmpty {
+                Text("No quests today")
+                    .font(.caption2)
+                    .foregroundColor(.cosmicSecondary)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(visibleTasks, id: \.id) { task in
+                        CosmicTaskLinkRow(
+                            task: task,
+                            compact: true,
+                            showsXP: false,
+                            showsMainQuestBadge: false
+                        )
+                    }
+
+                    if remainingTaskCount > 0 {
+                        Text("+\(remainingTaskCount) more")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.cosmicSecondary)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -85,14 +88,6 @@ struct MediumWidgetView: View {
         entry.data?.totalAllCount ?? 0
     }
     
-    private var questCount: Int {
-        entry.data?.totalCount ?? 0
-    }
-    
-    private var ritualCount: Int {
-        entry.data?.ritualCount ?? 0
-    }
-    
     var body: some View {
         HStack(spacing: 16) {
             // Left side - tasks
@@ -108,7 +103,11 @@ struct MediumWidgetView: View {
                 
                 if let tasks = entry.data?.tasks.prefix(4), !tasks.isEmpty {
                     ForEach(Array(tasks), id: \.id) { task in
-                        CosmicTaskLinkRow(task: task)
+                        CosmicTaskLinkRow(
+                            task: task,
+                            showsTime: true,
+                            xpFont: .caption2
+                        )
                     }
                 } else {
                     CosmicEmptyState()
@@ -126,18 +125,9 @@ struct MediumWidgetView: View {
                 .frame(width: 56, height: 56)
                 
                 VStack(spacing: 2) {
-                    Text("\(completedCount)/\(totalCount)")
-                        .font(.caption.bold())
-                        .foregroundColor(.cosmicGold)
-                    if ritualCount > 0 {
-                        Text("\(questCount)Q • \(ritualCount)R")
-                            .font(.system(size: 10))
-                            .foregroundColor(.cosmicSecondary)
-                    } else {
-                        Text("Done")
-                            .font(.caption2)
-                            .foregroundColor(.cosmicSecondary)
-                    }
+                    Text("Progress")
+                        .font(.caption2)
+                        .foregroundColor(.cosmicSecondary)
                 }
             }
             .frame(width: 70)
@@ -217,10 +207,7 @@ struct LargeWidgetView: View {
                         .frame(width: 40, height: 40)
                     
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("\(completedCount)/\(totalCount)")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.cosmicGold)
-                        Text("Complete")
+                        Text("Progress")
                             .font(.caption2)
                             .foregroundColor(.cosmicSecondary)
                     }
@@ -245,7 +232,11 @@ struct LargeWidgetView: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     ForEach(Array(visibleSections.enumerated()), id: \.offset) { item in
-                        CosmicTaskSection(title: item.element.title, tasks: item.element.tasks)
+                        CosmicTaskSection(
+                            title: item.element.title,
+                            tasks: item.element.tasks,
+                            showsTime: true
+                        )
                     }
                 }
             }
@@ -273,42 +264,56 @@ struct LargeWidgetView: View {
 
 struct CosmicTaskRow: View {
     let task: WidgetTask
+    var showsTime: Bool = false
+    var compact: Bool = false
+    var showsXP: Bool = true
+    var showsMainQuestBadge: Bool = true
+    var xpFont: Font = .caption
     
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: compact ? 4 : 6) {
             // Cosmic checkbox
             ZStack {
                 Circle()
                     .stroke(checkColor.opacity(0.5), lineWidth: 1.5)
-                    .frame(width: 14, height: 14)
+                    .frame(width: compact ? 12 : 14, height: compact ? 12 : 14)
                 
                 if task.completed {
                     Circle()
                         .fill(checkColor)
-                        .frame(width: 10, height: 10)
+                        .frame(width: compact ? 8 : 10, height: compact ? 8 : 10)
                     
                     Image(systemName: "checkmark")
-                        .font(.system(size: 7, weight: .bold))
+                        .font(.system(size: compact ? 6 : 7, weight: .bold))
                         .foregroundColor(.cosmicBackground)
                 }
             }
+
+            if showsTime {
+                Text(formattedTime)
+                    .font(.system(size: compact ? 8 : 9, weight: .semibold, design: .rounded))
+                    .foregroundColor(.cosmicSecondary)
+            }
             
             Text(task.text)
-                .font(.caption)
+                .font(compact ? .system(size: 11) : .caption)
                 .lineLimit(1)
                 .strikethrough(task.completed)
                 .foregroundColor(task.completed ? .cosmicSecondary : .cosmicText)
+                .layoutPriority(1)
             
-            if task.isMainQuest {
+            if showsMainQuestBadge && task.isMainQuest && !compact {
                 Text("⭐")
                     .font(.caption2)
             }
             
             Spacer()
             
-            Text("+\(task.xpReward)")
-                .font(.caption)
-                .foregroundColor(.cosmicGold)
+            if showsXP {
+                Text("+\(task.xpReward)")
+                    .font(xpFont)
+                    .foregroundColor(.cosmicGold)
+            }
         }
     }
     
@@ -318,6 +323,10 @@ struct CosmicTaskRow: View {
         }
         return task.completed ? .cosmicGreen : .cosmicPurple
     }
+
+    private var formattedTime: String {
+        WidgetTaskTimeFormatter.displayString(from: task.scheduledTime)
+    }
 }
 
 // MARK: - Cosmic Task Section
@@ -325,6 +334,7 @@ struct CosmicTaskRow: View {
 struct CosmicTaskSection: View {
     let title: String
     let tasks: [WidgetTask]
+    var showsTime: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -333,7 +343,7 @@ struct CosmicTaskSection: View {
                 .foregroundColor(.cosmicPurple)
             
             ForEach(tasks.prefix(3), id: \.id) { task in
-                CosmicTaskLinkRow(task: task)
+                CosmicTaskLinkRow(task: task, showsTime: showsTime)
             }
         }
     }
@@ -341,14 +351,33 @@ struct CosmicTaskSection: View {
 
 struct CosmicTaskLinkRow: View {
     let task: WidgetTask
+    var showsTime: Bool = false
+    var compact: Bool = false
+    var showsXP: Bool = true
+    var showsMainQuestBadge: Bool = true
+    var xpFont: Font = .caption
 
     var body: some View {
         if let url = taskDeepLink(task.id) {
             Link(destination: url) {
-                CosmicTaskRow(task: task)
+                CosmicTaskRow(
+                    task: task,
+                    showsTime: showsTime,
+                    compact: compact,
+                    showsXP: showsXP,
+                    showsMainQuestBadge: showsMainQuestBadge,
+                    xpFont: xpFont
+                )
             }
         } else {
-            CosmicTaskRow(task: task)
+            CosmicTaskRow(
+                task: task,
+                showsTime: showsTime,
+                compact: compact,
+                showsXP: showsXP,
+                showsMainQuestBadge: showsMainQuestBadge,
+                xpFont: xpFont
+            )
         }
     }
 }
@@ -414,4 +443,62 @@ private func taskDeepLink(_ taskId: String) -> URL? {
         return nil
     }
     return URL(string: "cosmiq://task/\(encodedTaskId)")
+}
+
+private enum WidgetTaskTimeFormatter {
+    static let displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale.current
+        formatter.timeZone = TimeZone.current
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    static func displayString(from rawTime: String?) -> String {
+        guard let rawTime else {
+            return "Anytime"
+        }
+
+        let trimmed = rawTime.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "Anytime"
+        }
+
+        let segments = trimmed.split(separator: ":")
+        guard segments.count == 2 || segments.count == 3,
+              let hour = Int(segments[0]),
+              let minute = Int(segments[1]),
+              (0...23).contains(hour),
+              (0...59).contains(minute) else {
+            return "Anytime"
+        }
+
+        let second: Int
+        if segments.count == 3 {
+            guard let parsedSecond = Int(segments[2]), (0...59).contains(parsedSecond) else {
+                return "Anytime"
+            }
+            second = parsedSecond
+        } else {
+            second = 0
+        }
+
+        var components = DateComponents()
+        components.calendar = Calendar.current
+        components.timeZone = TimeZone.current
+        components.year = 2000
+        components.month = 1
+        components.day = 1
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+
+        guard let date = components.date else {
+            return "Anytime"
+        }
+
+        return displayFormatter.string(from: date)
+    }
 }

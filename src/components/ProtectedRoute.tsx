@@ -12,7 +12,7 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true }: ProtectedRouteProps) => {
   const { user, loading: authLoading, status } = useAuth();
-  const { hasAccess, loading: accessLoading } = useAccessStatus();
+  const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const authStatus = status ?? (authLoading ? 'loading' : user ? 'authenticated' : 'unauthenticated');
@@ -65,9 +65,9 @@ export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true 
   // Don't render children until auth is confirmed
   if (authStatus === 'unauthenticated' || !user) return null;
 
-  // Show hard paywall if no access (trial expired and not subscribed)
+  // Show hard paywall if no access.
   if (!hasAccess) {
-    return <TrialExpiredPaywall />;
+    return <TrialExpiredPaywall variant={gateReason === "trial_expired" ? "trial_expired" : "pre_trial_signup"} />;
   }
 
   return <>{children}</>;

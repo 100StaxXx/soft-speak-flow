@@ -66,3 +66,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
 }
+
+/// Bridge VC used by Main.storyboard to register local plugins at runtime.
+@objc(AppBridgeViewController)
+class AppBridgeViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+
+        // Local plugins are not auto-registered from capacitor.config.json packageClassList.
+        bridge?.registerPluginInstance(WidgetDataPlugin())
+        bridge?.registerPluginInstance(NativeCalendarPlugin())
+    }
+}
