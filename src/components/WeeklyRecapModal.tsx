@@ -52,11 +52,7 @@ export const WeeklyRecapModal = () => {
   const dateRange = `${format(startDate, "MMMM d")} – ${format(endDate, "d, yyyy")}`;
 
   const storyContent = selectedRecap.mentor_insight || selectedRecap.mentor_story;
-  const maxStoryLength = 900;
-  const shortenedStoryContent = storyContent && storyContent.length > maxStoryLength
-    ? `${storyContent.slice(0, maxStoryLength).trimEnd()}...`
-    : storyContent;
-  const paragraphs = shortenedStoryContent?.split(/\n{2,}/).filter(p => p.trim()) || [];
+  const paragraphs = storyContent?.split(/\n{2,}/).filter(p => p.trim()) || [];
 
   const handleShare = async () => {
     if (!cardRef.current) return;

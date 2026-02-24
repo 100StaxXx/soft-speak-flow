@@ -29,13 +29,9 @@ const createAdversaryImagesBuilder = () => {
   const builder: Record<string, unknown> = {};
   const returnBuilder = () => builder;
   let selectedColumns = "";
+  const filters: Record<string, unknown> = {};
 
-  builder.select = vi.fn((columns: string) => {
-    selectedColumns = columns;
-    return returnBuilder();
-  });
-  builder.eq = vi.fn(returnBuilder);
-  builder.order = vi.fn(async () => {
+  const execute = () => {
     const queued = mocks.selectResponses[selectedColumns]?.shift();
     if (queued) {
       return {
@@ -44,10 +40,48 @@ const createAdversaryImagesBuilder = () => {
       };
     }
 
+    if (selectedColumns === "variant_index") {
+      return {
+        data: mocks.cachedRows.map((row) => ({ variant_index: row.variant_index })),
+        error: mocks.cacheError,
+      };
+    }
+
+    if (selectedColumns === "image_url, variant_index") {
+      const variantFilter = filters.variant_index;
+      const row = typeof variantFilter === "number"
+        ? mocks.cachedRows.find((candidate) => candidate.variant_index === variantFilter) ?? null
+        : mocks.cachedRows[0] ?? null;
+      return {
+        data: row ? [row] : [],
+        error: mocks.cacheError,
+      };
+    }
+
+    if (selectedColumns === "image_url") {
+      const row = mocks.cachedRows[0];
+      return {
+        data: row ? [{ image_url: row.image_url }] : [],
+        error: mocks.cacheError,
+      };
+    }
+
     return {
       data: mocks.cachedRows,
       error: mocks.cacheError,
     };
+  };
+
+  builder.select = vi.fn((columns: string) => {
+    selectedColumns = columns;
+    return returnBuilder();
+  });
+  builder.eq = vi.fn((column: string, value: unknown) => {
+    filters[column] = value;
+    return returnBuilder();
+  });
+  builder.order = vi.fn(async () => {
+    return execute();
   });
 
   return builder;
@@ -173,7 +207,7 @@ describe("useAdversaryImage", () => {
   });
 
   it("falls back to legacy schema query when variant_index column is missing", async () => {
-    queueSelectResponse("image_url, variant_index", {
+    queueSelectResponse("variant_index", {
       data: null,
       error: {
         code: "42703",

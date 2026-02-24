@@ -222,6 +222,34 @@ describe("TodaysPepTalk transcript expand behavior", () => {
     });
   });
 
+  it("re-applies punctuation from script for timed transcript display", async () => {
+    mocks.state.dailyPepTalk = makePepTalk({
+      id: "pep-talk-punctuation",
+      script: "Focus your gaze on what truly matters. Identify your priorities.",
+      transcript: [
+        { word: "Focus", start: 0, end: 0.5 },
+        { word: "your", start: 0.5, end: 0.8 },
+        { word: "gaze", start: 0.8, end: 1.0 },
+        { word: "on", start: 1.0, end: 1.2 },
+        { word: "what", start: 1.2, end: 1.4 },
+        { word: "truly", start: 1.4, end: 1.7 },
+        { word: "matters", start: 1.7, end: 2.0 },
+        { word: "Identify", start: 2.0, end: 2.4 },
+        { word: "your", start: 2.4, end: 2.7 },
+        { word: "priorities", start: 2.7, end: 3.1 },
+      ],
+    });
+
+    renderComponent();
+
+    await screen.findByText("Show Full Transcript");
+    fireEvent.click(screen.getByRole("button", { name: /show full transcript/i }));
+
+    const transcriptContainer = await screen.findByTestId("pep-talk-transcript");
+    expect(transcriptContainer.textContent).toContain("matters.");
+    expect(transcriptContainer.textContent).toContain("priorities.");
+  });
+
   it("returns to preview mode and label after collapsing", async () => {
     mocks.state.dailyPepTalk = makePepTalk({
       id: "pep-talk-toggle",

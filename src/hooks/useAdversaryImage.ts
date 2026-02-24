@@ -10,8 +10,7 @@ interface UseAdversaryImageParams {
   enabled?: boolean;
 }
 
-interface CachedAdversaryImage {
-  image_url: string;
+interface VariantIndexRow {
   variant_index: number;
 }
 
@@ -19,6 +18,7 @@ const DEFAULT_TARGET_VARIANTS = 3;
 const MAX_TARGET_VARIANTS = 5;
 const MISSING_COLUMN_CODE = '42703';
 const topUpRequestStatus = new Map<string, 'in_flight' | 'success'>();
+const selectedImageCache = new Map<string, string>();
 
 const clampVariants = (value: number | undefined) => {
   if (!Number.isFinite(value)) return DEFAULT_TARGET_VARIANTS;
@@ -33,12 +33,6 @@ const hashString = (value: string): number => {
   return hash;
 };
 
-const pickDeterministicVariant = (variants: CachedAdversaryImage[], seed: string) => {
-  const sorted = [...variants].sort((left, right) => left.variant_index - right.variant_index);
-  const selectionIndex = hashString(seed) % sorted.length;
-  return sorted[selectionIndex];
-};
-
 const isMissingVariantColumnError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
 
@@ -49,26 +43,13 @@ const isMissingVariantColumnError = (error: unknown) => {
   return message.includes('variant_index') && message.includes('does not exist');
 };
 
-const normalizeVariantRows = (rows: Array<{ image_url?: unknown; variant_index?: unknown }>) => {
-  const variantsByIndex = new Map<number, CachedAdversaryImage>();
-
+const normalizeVariantIndexes = (rows: Array<{ variant_index?: unknown }>) => {
+  const indexes = new Set<number>();
   for (const row of rows) {
-    if (typeof row?.image_url !== 'string') continue;
-
-    const index = typeof row.variant_index === 'number' && Number.isFinite(row.variant_index)
-      ? Math.floor(row.variant_index)
-      : 0;
-
-    if (!variantsByIndex.has(index)) {
-      variantsByIndex.set(index, {
-        image_url: row.image_url,
-        variant_index: index,
-      });
-    }
+    if (typeof row?.variant_index !== 'number' || !Number.isFinite(row.variant_index)) continue;
+    indexes.add(Math.floor(row.variant_index));
   }
-
-  return Array.from(variantsByIndex.values())
-    .sort((left, right) => left.variant_index - right.variant_index);
+  return Array.from(indexes).sort((left, right) => left - right);
 };
 
 export const useAdversaryImage = ({
@@ -94,24 +75,52 @@ export const useAdversaryImage = ({
     const clampedTargetVariants = clampVariants(targetVariants);
     const topUpKey = `${theme}:${tier}:${clampedTargetVariants}`;
     const variantSeed = selectionSeed?.trim() || name.trim() || `${theme}:${tier}`;
+    const selectedImageCacheKey = `${theme}:${tier}:${variantSeed}`;
     let isMounted = true;
+
+    const cachedSelectionImage = selectedImageCache.get(selectedImageCacheKey);
+    if (cachedSelectionImage) {
+      setImageUrl(cachedSelectionImage);
+    }
 
     const fetchCachedVariants = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const { data: variantRows, error: variantError } = await supabase
+        const { data: variantIndexRows, error: variantError } = await supabase
           .from('adversary_images')
-          .select('image_url, variant_index')
+          .select('variant_index')
           .eq('theme', theme)
           .eq('tier', tier)
           .order('variant_index', { ascending: true });
 
-        let usableVariants: CachedAdversaryImage[];
+        let availableVariantCount = 0;
+        let selectedImageUrl: string | null = null;
 
         if (!variantError) {
-          usableVariants = normalizeVariantRows((variantRows ?? []) as Array<{ image_url?: unknown; variant_index?: unknown }>);
+          const variantIndexes = normalizeVariantIndexes((variantIndexRows ?? []) as Array<VariantIndexRow>);
+          availableVariantCount = variantIndexes.length;
+
+          if (variantIndexes.length > 0) {
+            const selectedVariantIndex = variantIndexes[hashString(variantSeed) % variantIndexes.length];
+            const { data: selectedImageRows, error: selectedImageError } = await supabase
+              .from('adversary_images')
+              .select('image_url, variant_index')
+              .eq('theme', theme)
+              .eq('tier', tier)
+              .eq('variant_index', selectedVariantIndex)
+              .order('variant_index', { ascending: true });
+
+            if (selectedImageError) {
+              throw selectedImageError;
+            }
+
+            const selectedImageRow = selectedImageRows?.[0];
+            if (selectedImageRow && typeof selectedImageRow.image_url === 'string') {
+              selectedImageUrl = selectedImageRow.image_url;
+            }
+          }
         } else if (isMissingVariantColumnError(variantError)) {
           const { data: legacyRows, error: legacyError } = await supabase
             .from('adversary_images')
@@ -124,16 +133,20 @@ export const useAdversaryImage = ({
             throw legacyError;
           }
 
-          usableVariants = normalizeVariantRows((legacyRows ?? []) as Array<{ image_url?: unknown; variant_index?: unknown }>);
+          const legacyRow = legacyRows?.[0];
+          if (legacyRow && typeof legacyRow.image_url === 'string') {
+            selectedImageUrl = legacyRow.image_url;
+            availableVariantCount = 1;
+          }
         } else {
           throw variantError;
         }
 
         if (!isMounted) return;
 
-        if (usableVariants.length > 0) {
-          const selectedVariant = pickDeterministicVariant(usableVariants, variantSeed);
-          setImageUrl(selectedVariant.image_url);
+        if (selectedImageUrl) {
+          setImageUrl(selectedImageUrl);
+          selectedImageCache.set(selectedImageCacheKey, selectedImageUrl);
         } else {
           // Strict no-wait policy: show fallback art while background top-up runs.
           setImageUrl(null);
@@ -142,7 +155,7 @@ export const useAdversaryImage = ({
         const existingTopUpStatus = topUpRequestStatus.get(topUpKey);
         const canTriggerTopUp = existingTopUpStatus !== 'in_flight' && existingTopUpStatus !== 'success';
 
-        if (usableVariants.length < clampedTargetVariants && canTriggerTopUp) {
+        if (availableVariantCount < clampedTargetVariants && canTriggerTopUp) {
           topUpRequestStatus.set(topUpKey, 'in_flight');
 
           supabase.functions
@@ -155,8 +168,9 @@ export const useAdversaryImage = ({
               }
 
               topUpRequestStatus.set(topUpKey, 'success');
-              if (isMounted && usableVariants.length === 0 && typeof data?.imageUrl === 'string') {
+              if (isMounted && !selectedImageUrl && typeof data?.imageUrl === 'string') {
                 setImageUrl(data.imageUrl);
+                selectedImageCache.set(selectedImageCacheKey, data.imageUrl);
               }
             })
             .catch((topUpError) => {

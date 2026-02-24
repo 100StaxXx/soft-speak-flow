@@ -14,6 +14,7 @@ import { safeLocalStorage } from "@/utils/storage";
 import { getActiveWordIndex } from "@/utils/captionTiming";
 import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 import { Capacitor } from "@capacitor/core";
+import { applyScriptPunctuationToTranscript } from "@/utils/transcriptPunctuation";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -182,6 +183,10 @@ export const TodaysPepTalk = memo(() => {
   const timedTranscript = useMemo(
     () => sanitizeTranscript(pepTalk?.transcript),
     [pepTalk?.transcript],
+  );
+  const displayTranscript = useMemo(
+    () => applyScriptPunctuationToTranscript(timedTranscript, pepTalk?.script),
+    [timedTranscript, pepTalk?.script],
   );
 
   const fetchDailyPepTalk = useCallback(async () => {
@@ -662,7 +667,7 @@ export const TodaysPepTalk = memo(() => {
   };
 
   const renderFullTranscript = () => {
-    if (timedTranscript.length === 0) {
+    if (displayTranscript.length === 0) {
       // Fallback to plain text if no word timestamps
       if (!pepTalk?.script) return null;
       return (
@@ -682,7 +687,7 @@ export const TodaysPepTalk = memo(() => {
         data-testid="pep-talk-transcript"
         className="text-sm leading-relaxed max-h-64 overflow-y-auto scroll-smooth pr-2 text-foreground/80"
       >
-        {timedTranscript.map((wordData: CaptionWord, index: number) => (
+        {displayTranscript.map((wordData: CaptionWord, index: number) => (
           <span
             key={index}
             ref={index === activeWordIndex ? activeWordRef : null}

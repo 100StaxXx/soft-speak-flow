@@ -18,7 +18,7 @@ const THEME_DESCRIPTIONS: Record<string, string> = {
   chaos: "a wild elemental of fire and wind intertwined, unpredictable flames dancing in spiral patterns",
   laziness: "a large slumbering beast made of clouds and soft mist, comfortable and heavy, weighing down everything",
   overthinking: "a many-headed serpent with gears and clockwork visible through transparent scales, endless calculation",
-  fear: "a dark wraith with hollow eyes that glow with pale light, long spectral claws reaching from shadow",
+  fear: "a shadow guardian with glowing eyes and flowing mist-like limbs, cautious and mysterious presence emerging from twilight",
   confusion: "a maze-like creature whose body is corridors and dead ends, geometric and impossible angles",
   vulnerability: "a cracked crystal being with exposed inner light, beautiful but fragile, defensive spikes emerging",
   imbalance: "a creature split down the middle - one half fire, one half ice, struggling against itself",
@@ -35,6 +35,7 @@ const TIER_MODIFIERS: Record<string, string> = {
 const MAX_VARIANTS = 5;
 const DEFAULT_TARGET_VARIANTS = 1;
 const MISSING_COLUMN_CODE = "42703";
+const IMAGE_GENERATION_TIMEOUT_MS = 90_000;
 
 interface CachedVariant {
   image_url: string;
@@ -125,17 +126,28 @@ Style requirements:
 };
 
 const generateImage = async (prompt: string, openAiApiKey: string): Promise<string> => {
+  const abortController = new AbortController();
+  const timeoutHandle = setTimeout(() => abortController.abort(), IMAGE_GENERATION_TIMEOUT_MS);
+
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openAiApiKey}`,
       "Content-Type": "application/json",
     },
+    signal: abortController.signal,
     body: JSON.stringify({
       model: "google/gemini-2.5-flash-image-preview",
       messages: [{ role: "user", content: prompt }],
       modalities: ["image", "text"],
     }),
+  }).catch((error) => {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new HttpError(504, "Image generation timed out");
+    }
+    throw error;
+  }).finally(() => {
+    clearTimeout(timeoutHandle);
   });
 
   if (!response.ok) {
@@ -188,15 +200,42 @@ const isMissingVariantColumnError = (error: unknown): boolean => {
   return message.includes("variant_index") && message.includes("does not exist");
 };
 
+const extractBearerToken = (req: Request): string | null => {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.slice(7).trim();
+  return token.length > 0 ? token : null;
+};
+
+const parseServiceRoleClaim = (token: string): boolean => {
+  const parts = token.split(".");
+  if (parts.length < 2) return false;
+
+  try {
+    const payloadJson = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(payloadJson) as { role?: string; app_metadata?: { role?: string } };
+    return payload.role === "service_role" || payload.app_metadata?.role === "service_role";
+  } catch {
+    return false;
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const bearerToken = extractBearerToken(req);
     const auth = await requireRequestAuth(req, corsHeaders);
     if (auth instanceof Response) {
-      return auth;
+      const serviceRoleFromJwt = bearerToken ? parseServiceRoleClaim(bearerToken) : false;
+      if (!serviceRoleFromJwt) {
+        return auth;
+      }
     }
 
     const body = await req.json();
