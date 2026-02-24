@@ -14,7 +14,7 @@ fi
 
 collect_frontend() {
   find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0 \
-    | xargs -0 perl -0777 -ne 'while(/functions\.invoke\(\s*["\x27]([^"\x27]+)["\x27]/sg){print "$1\n"}' \
+    | xargs -0 perl -0777 -ne 'while(/functions\s*\.\s*invoke\(\s*["\x27]([^"\x27]+)["\x27]/sg){print "$1\n"}' \
     | sort -u
 }
 

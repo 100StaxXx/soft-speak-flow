@@ -4,6 +4,7 @@ import { Heart, Shield, Zap, Clock, Star, ChevronLeft, ChevronRight, Crosshair }
 import { MiniGameResult } from '@/types/astralEncounters';
 import { CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
+import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -608,6 +609,9 @@ export function EnergyBeamGame({
   isPractice = false,
   compact = false,
 }: EnergyBeamGameProps) {
+  const mountedRef = useMountedRef();
+  const { completeOnce } = useSingleCompletion(onComplete);
+  const { registerTimeout, registerInterval, clearTimer } = useTimerRegistry();
   const config = DIFFICULTY_CONFIG[difficulty];
   
   // Game state - NO TIMER
@@ -644,6 +648,19 @@ export function EnergyBeamGame({
   const animationFrameRef = useRef<number>();
   const lastUpdateTime = useRef(0);
   const isWaveTransitioning = useRef(false);
+  const gameStateRef = useRef(gameState);
+  const playerXRef = useRef(playerX);
+  const rapidFireRef = useRef(rapidFire);
+  const spreadShotRef = useRef(spreadShot);
+  const hasShieldRef = useRef(hasShield);
+  const isSlowMoRef = useRef(isSlowMo);
+  const isInvulnerableRef = useRef(isInvulnerable);
+  const currentConfigRef = useRef({
+    enemySpeed: config.enemySpeed,
+    diveChance: config.diveChance,
+    enemyFireRate: config.enemyFireRate,
+    powerUpChance: config.powerUpChance,
+  });
   
   // Stats tracking
   const statsRef = useRef({
@@ -654,9 +671,6 @@ export function EnergyBeamGame({
     powerUpsCollected: 0,
   });
   
-  // Speed multiplier for slow-mo effect
-  const speedMultiplier = isSlowMo ? 0.5 : 1;
-  
   // Current wave difficulty (scales with wave)
   const currentConfig = useMemo(() => ({
     enemySpeed: config.enemySpeed + (wave - 1) * config.speedIncreasePerWave,
@@ -664,6 +678,38 @@ export function EnergyBeamGame({
     enemyFireRate: config.enemyFireRate + (wave - 1) * 0.001,
     powerUpChance: config.powerUpChance,
   }), [config, wave]);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
+    playerXRef.current = playerX;
+  }, [playerX]);
+
+  useEffect(() => {
+    rapidFireRef.current = rapidFire;
+  }, [rapidFire]);
+
+  useEffect(() => {
+    spreadShotRef.current = spreadShot;
+  }, [spreadShot]);
+
+  useEffect(() => {
+    hasShieldRef.current = hasShield;
+  }, [hasShield]);
+
+  useEffect(() => {
+    isSlowMoRef.current = isSlowMo;
+  }, [isSlowMo]);
+
+  useEffect(() => {
+    isInvulnerableRef.current = isInvulnerable;
+  }, [isInvulnerable]);
+
+  useEffect(() => {
+    currentConfigRef.current = currentConfig;
+  }, [currentConfig]);
   
   // Initialize first wave - only run if not in wave transition
   useEffect(() => {
@@ -676,7 +722,7 @@ export function EnergyBeamGame({
   useEffect(() => {
     if (gameState !== 'countdown') return;
     
-    const timer = setInterval(() => {
+    const timer = registerInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           setGameState('playing');
@@ -686,20 +732,22 @@ export function EnergyBeamGame({
       });
     }, 1000);
     
-    return () => clearInterval(timer);
-  }, [gameState]);
+    return () => clearTimer(timer);
+  }, [gameState, registerInterval, clearTimer]);
   
   // Fire projectile
   const fireProjectile = useCallback(() => {
     const now = Date.now();
-    const fireDelay = rapidFire ? 100 : 180;
+    const fireDelay = rapidFireRef.current ? 100 : 180;
     
     if (now - lastFireTime.current < fireDelay) return;
     lastFireTime.current = now;
     
     statsRef.current.shotsFired++;
     
-    if (spreadShot) {
+    const playerX = playerXRef.current;
+
+    if (spreadShotRef.current) {
       // Fire 3 projectiles in a spread pattern
       setProjectiles(prev => [
         ...prev,
@@ -716,7 +764,7 @@ export function EnergyBeamGame({
         speed: 3,
       }]);
     }
-  }, [playerX, rapidFire, spreadShot]);
+  }, []);
   
   // Handle keyboard input
   useEffect(() => {
@@ -752,14 +800,14 @@ export function EnergyBeamGame({
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     
-    const moveInterval = setInterval(movePlayer, 16);
+    const moveInterval = registerInterval(movePlayer, 16);
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      clearInterval(moveInterval);
+      clearTimer(moveInterval);
     };
-  }, [gameState, fireProjectile]);
+  }, [gameState, fireProjectile, registerInterval, clearTimer]);
   
   // Touch controls
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -789,12 +837,17 @@ export function EnergyBeamGame({
     if (gameState !== 'playing') return;
     
     const gameLoop = (timestamp: number) => {
+      if (!mountedRef.current || gameStateRef.current !== 'playing') return;
+
       const deltaTime = timestamp - lastUpdateTime.current;
       if (deltaTime < 16) {
         animationFrameRef.current = requestAnimationFrame(gameLoop);
         return;
       }
       lastUpdateTime.current = timestamp;
+      const speedMultiplier = isSlowMoRef.current ? 0.5 : 1;
+      const currentConfig = currentConfigRef.current;
+      const playerX = playerXRef.current;
       
       // Auto-fire
       fireProjectile();
@@ -931,13 +984,14 @@ export function EnergyBeamGame({
           }
           
           // Check enemy projectile hitting player
-          if (proj.isEnemy && !isInvulnerable) {
+          if (proj.isEnemy && !isInvulnerableRef.current) {
             const dx = Math.abs(proj.x - playerX);
             const dy = Math.abs(newY - 85);
             
             if (dx < 4 && dy < 4) {
-              if (hasShield) {
+              if (hasShieldRef.current) {
                 setHasShield(false);
+                hasShieldRef.current = false;
                 triggerHaptic('medium');
                 // Shield break effect
                 setHitEffects(prev => [...prev, {
@@ -947,7 +1001,10 @@ export function EnergyBeamGame({
                   type: 'shield-break',
                 }]);
                 setScreenFlash('rgba(59,130,246,0.4)');
-                setTimeout(() => setScreenFlash(null), 150);
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setScreenFlash(null);
+                }, 150);
               } else {
                 // Player takes damage from enemy projectile
                 onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'player_hit' });
@@ -960,7 +1017,10 @@ export function EnergyBeamGame({
                   type: 'damage',
                 }]);
                 setScreenFlash('rgba(239,68,68,0.5)');
-                setTimeout(() => setScreenFlash(null), 200);
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setScreenFlash(null);
+                }, 200);
                 
                 setLives(l => {
                   const newLives = l - 1;
@@ -970,7 +1030,12 @@ export function EnergyBeamGame({
                   return newLives;
                 });
                 setIsInvulnerable(true);
-                setTimeout(() => setIsInvulnerable(false), 2000);
+                isInvulnerableRef.current = true;
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setIsInvulnerable(false);
+                  isInvulnerableRef.current = false;
+                }, 2000);
                 triggerHaptic('heavy');
               }
               return;
@@ -1020,15 +1085,24 @@ export function EnergyBeamGame({
             
             // Brief screen flash with power-up color
             setScreenFlash(`${powerUpColors[pu.type]}40`);
-            setTimeout(() => setScreenFlash(null), 120);
+            registerTimeout(() => {
+              if (!mountedRef.current) return;
+              setScreenFlash(null);
+            }, 120);
             
             switch (pu.type) {
               case 'shield':
                 setHasShield(true);
+                hasShieldRef.current = true;
                 break;
               case 'rapid':
                 setRapidFire(true);
-                setTimeout(() => setRapidFire(false), 5000);
+                rapidFireRef.current = true;
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setRapidFire(false);
+                  rapidFireRef.current = false;
+                }, 5000);
                 break;
               case 'repair':
                 // Restore 1 life up to the difficulty cap.
@@ -1044,12 +1118,22 @@ export function EnergyBeamGame({
               case 'slowmo':
                 // Slow everything down for 5 seconds
                 setIsSlowMo(true);
-                setTimeout(() => setIsSlowMo(false), 5000);
+                isSlowMoRef.current = true;
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setIsSlowMo(false);
+                  isSlowMoRef.current = false;
+                }, 5000);
                 break;
               case 'spread':
                 // Fire 3 projectiles at once for 5 seconds
                 setSpreadShot(true);
-                setTimeout(() => setSpreadShot(false), 5000);
+                spreadShotRef.current = true;
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setSpreadShot(false);
+                  spreadShotRef.current = false;
+                }, 5000);
                 break;
               case 'bonus':
                 setScore(s => s + 200);
@@ -1073,15 +1157,16 @@ export function EnergyBeamGame({
       });
       
       // Check enemy collision with player
-      if (!isInvulnerable) {
+      if (!isInvulnerableRef.current) {
         setEnemies(prev => {
           prev.forEach(enemy => {
             const dx = Math.abs(enemy.x - playerX);
             const dy = Math.abs(enemy.y - 85);
             
             if (dx < 5 && dy < 5) {
-              if (hasShield) {
+              if (hasShieldRef.current) {
                 setHasShield(false);
+                hasShieldRef.current = false;
                 // Shield break effect
                 setHitEffects(prevEffects => [...prevEffects, {
                   id: `shield-enemy-${Date.now()}`,
@@ -1090,7 +1175,10 @@ export function EnergyBeamGame({
                   type: 'shield-break',
                 }]);
                 setScreenFlash('rgba(59,130,246,0.4)');
-                setTimeout(() => setScreenFlash(null), 150);
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setScreenFlash(null);
+                }, 150);
               } else {
                 onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'enemy_collision' });
 
@@ -1102,7 +1190,10 @@ export function EnergyBeamGame({
                   type: 'damage',
                 }]);
                 setScreenFlash('rgba(239,68,68,0.5)');
-                setTimeout(() => setScreenFlash(null), 200);
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setScreenFlash(null);
+                }, 200);
                 
                 setLives(l => {
                   const newLives = l - 1;
@@ -1112,7 +1203,12 @@ export function EnergyBeamGame({
                   return newLives;
                 });
                 setIsInvulnerable(true);
-                setTimeout(() => setIsInvulnerable(false), 2000);
+                isInvulnerableRef.current = true;
+                registerTimeout(() => {
+                  if (!mountedRef.current) return;
+                  setIsInvulnerable(false);
+                  isInvulnerableRef.current = false;
+                }, 2000);
               }
               triggerHaptic('heavy');
             }
@@ -1137,7 +1233,7 @@ export function EnergyBeamGame({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, playerX, currentConfig, fireProjectile, hasShield, isInvulnerable, onDamage, tierAttackDamage]);
+  }, [gameState, fireProjectile, onDamage, tierAttackDamage, registerTimeout, mountedRef]);
   
   // Check wave completion - ENDLESS, always spawn next wave
   useEffect(() => {
@@ -1165,7 +1261,8 @@ export function EnergyBeamGame({
     
     setGameState('wave-transition');
     
-    setTimeout(() => {
+    registerTimeout(() => {
+      if (!mountedRef.current || gameStateRef.current !== 'wave-transition') return;
       setWave(prevWave => {
         const nextWave = prevWave + 1;
         setEnemies(generateEnemies(nextWave, config));
@@ -1174,7 +1271,7 @@ export function EnergyBeamGame({
       setGameState('playing');
       isWaveTransitioning.current = false; // Unlock after complete
     }, 2000);
-  }, [enemies.length, wave, config, gameState, isPractice, onDamage]);
+  }, [enemies.length, wave, config, gameState, isPractice, onDamage, registerTimeout, mountedRef]);
   
   // Determine result based on accuracy
   const getResult = useCallback((accuracy: number): 'perfect' | 'good' | 'fail' => {
@@ -1204,8 +1301,8 @@ export function EnergyBeamGame({
     // Determine result based on accuracy for consistency
     const result = getResult(accuracy);
     
-    const timer = setTimeout(() => {
-      onComplete({
+    const timer = registerTimeout(() => {
+      completeOnce({
         success: result !== 'fail',
         accuracy,
         result,
@@ -1217,8 +1314,8 @@ export function EnergyBeamGame({
       });
     }, 1500);
     
-    return () => clearTimeout(timer);
-  }, [gameState, lives, difficulty, onComplete, getResult, score]);
+    return () => clearTimer(timer);
+  }, [gameState, lives, difficulty, getResult, score, registerTimeout, clearTimer, completeOnce]);
   
   return (
     <div className="relative w-full h-full flex-1 min-h-0 flex flex-col items-center overflow-hidden select-none">

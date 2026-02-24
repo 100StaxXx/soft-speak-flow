@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
+import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -552,6 +553,9 @@ OrbComponent.displayName = 'OrbComponent';
 export const OrbMatchGame = ({
   companionStats, onComplete, onDamage, tierAttackDamage, difficulty = 'medium', questIntervalScale = 0, maxTimer, isPractice = false, compact = false,
 }: OrbMatchGameProps) => {
+  const mountedRef = useMountedRef();
+  const { completeOnce } = useSingleCompletion(onComplete);
+  const { registerTimeout, registerInterval, clearTimer } = useTimerRegistry();
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'levelComplete' | 'complete'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
   const [selectedOrb, setSelectedOrb] = useState<Orb | null>(null);
@@ -578,13 +582,27 @@ export const OrbMatchGame = ({
   const [specialEffects, setSpecialEffects] = useState<SpecialEffect[]>([]);
   
   const gridRef = useRef<HTMLDivElement>(null);
-  const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const moveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef(false);
   const orbsRef = useRef<Orb[]>(orbs);
   const lastSwapRef = useRef<SwapState | null>(null);
+  const gameStateRef = useRef(gameState);
+  const processRunIdRef = useRef(0);
   
   useEffect(() => { orbsRef.current = orbs; }, [orbs]);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+    if (gameState !== 'playing') {
+      processRunIdRef.current += 1;
+    }
+  }, [gameState]);
+
+  const waitFor = useCallback((delayMs: number) => {
+    return new Promise<void>((resolve) => {
+      registerTimeout(resolve, delayMs);
+    });
+  }, [registerTimeout]);
 
   const soulBonus = companionStats.soul / 100;
   const difficultyMod = DIFFICULTY_MULTIPLIERS[difficulty];
@@ -636,7 +654,8 @@ export const OrbMatchGame = ({
     triggerHaptic('medium');
     // Deal tier-based damage to player for no valid moves
     onDamage?.({ target: 'player', amount: tierAttackDamage || 15, source: 'no_moves' });
-    setTimeout(() => {
+    registerTimeout(() => {
+      if (!mountedRef.current) return;
       setOrbs(currentOrbs => {
         const colors = currentOrbs.map(o => o.color);
         for (let i = colors.length - 1; i > 0; i--) {
@@ -647,7 +666,7 @@ export const OrbMatchGame = ({
       });
       setIsShuffling(false);
     }, 600);
-  }, [onDamage]);
+  }, [onDamage, tierAttackDamage, registerTimeout, mountedRef]);
 
   const initializeGrid = useCallback((colorsOverride?: OrbColor[]) => {
     const colors = colorsOverride || availableColors;
@@ -689,12 +708,13 @@ export const OrbMatchGame = ({
 
   const resetHintTimer = useCallback(() => {
     setHint(null);
-    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-    hintTimerRef.current = setTimeout(() => {
+    clearTimer(hintTimerRef.current);
+    hintTimerRef.current = registerTimeout(() => {
+      if (!mountedRef.current || gameStateRef.current !== 'playing') return;
       const validMove = findValidMove(orbsRef.current);
       if (validMove) { setHint(validMove); triggerHaptic('light'); }
     }, 4000);
-  }, [findValidMove]);
+  }, [findValidMove, clearTimer, registerTimeout, mountedRef]);
 
   // Activate a special orb and return affected orbs - MUST be defined before findMatches
   const activateSpecial = useCallback((orb: Orb, grid: (Orb | null)[][], currentOrbs: Orb[]): {
@@ -982,10 +1002,21 @@ export const OrbMatchGame = ({
       if (orb.id === swap.orb2.id) return { ...orb, row: swap.orb2.row, col: swap.orb2.col };
       return orb;
     }));
-    setTimeout(() => setRevertingOrbs(new Set()), 200);
-  }, []);
+    registerTimeout(() => {
+      if (!mountedRef.current) return;
+      setRevertingOrbs(new Set());
+    }, 200);
+  }, [registerTimeout, mountedRef]);
 
   const processMatches = useCallback(async (currentOrbs: Orb[]): Promise<number> => {
+    const runId = ++processRunIdRef.current;
+    const isRunActive = () =>
+      mountedRef.current &&
+      gameStateRef.current === 'playing' &&
+      runId === processRunIdRef.current;
+
+    if (!isRunActive()) return 0;
+
     let orbsToProcess = currentOrbs;
     let currentCascade = 0;
     let totalScore = 0;
@@ -999,6 +1030,8 @@ export const OrbMatchGame = ({
       maxSteps: MAX_CASCADE_STEPS,
       getStep: getCascadeStep,
       onStep: async (stepIndex, stepData) => {
+        if (!isRunActive()) return;
+
         const { matched, matchGroups, specialsActivated } = stepData;
         const specialsToCreate = normalizeSpecialCreations(stepData.specialsToCreate);
 
@@ -1006,7 +1039,10 @@ export const OrbMatchGame = ({
         setCascadeLevel(stepIndex);
         if (stepIndex > 1) {
           setShowCascade(true);
-          setTimeout(() => setShowCascade(false), 500);
+          registerTimeout(() => {
+            if (!isRunActive()) return;
+            setShowCascade(false);
+          }, 500);
         }
 
         // Process special activations - add visual effects and deal bonus damage
@@ -1057,14 +1093,19 @@ export const OrbMatchGame = ({
           triggerHaptic('success');
         }
 
-        await new Promise(resolve => setTimeout(resolve, specialsActivated.length > 0 ? 350 : 200));
+        await waitFor(specialsActivated.length > 0 ? 350 : 200);
+        if (!isRunActive()) return;
+
         orbsToProcess = dropAndFill(orbsToProcess, specialsToCreate);
         setOrbs([...orbsToProcess]);
         orbsRef.current = [...orbsToProcess];
 
-        await new Promise(resolve => setTimeout(resolve, 180));
+        await waitFor(180);
+        if (!isRunActive()) return;
       },
     });
+
+    if (!isRunActive()) return currentCascade;
 
     if (cascadeRun.hitLimit) {
       setShowCascade(false);
@@ -1075,14 +1116,15 @@ export const OrbMatchGame = ({
       setCombo(c => { const newCombo = c + currentCascade; setMaxCombo(m => Math.max(m, newCombo)); return newCombo; });
       setMoveTimeLeft(levelConfig.moveTime);
       resetHintTimer();
-      setTimeout(() => {
+      registerTimeout(() => {
+        if (!isRunActive()) return;
         const validMove = findValidMove(orbsRef.current);
-        if (!validMove && gameState === 'playing') shuffleBoard();
+        if (!validMove && gameStateRef.current === 'playing') shuffleBoard();
       }, 200);
     }
     setCascadeLevel(0);
     return currentCascade;
-  }, [findMatches, dropAndFill, levelConfig.moveTime, cellSize, resetHintTimer, findValidMove, gameState, shuffleBoard, onDamage]);
+  }, [findMatches, dropAndFill, levelConfig.moveTime, cellSize, resetHintTimer, findValidMove, shuffleBoard, onDamage, waitFor, registerTimeout, mountedRef]);
 
   const getCellFromPosition = useCallback((clientX: number, clientY: number): { row: number; col: number } | null => {
     if (!gridRef.current) return null;
@@ -1139,13 +1181,14 @@ export const OrbMatchGame = ({
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     if (dragPath.length > 1) {
-      if (moveTimerRef.current) { clearInterval(moveTimerRef.current); moveTimerRef.current = null; }
+      clearTimer(moveTimerRef.current);
+      moveTimerRef.current = null;
       const matchCount = await processMatches(orbsRef.current);
       if (matchCount === 0 && lastSwapRef.current) revertSwap(lastSwapRef.current);
       lastSwapRef.current = null;
     }
     setSelectedOrb(null); setDragPath([]); resetHintTimer();
-  }, [dragPath, processMatches, revertSwap, resetHintTimer]);
+  }, [dragPath, processMatches, revertSwap, resetHintTimer, clearTimer]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => handleDragStart(e.clientX, e.clientY), [handleDragStart]);
   const handleMouseMove = useCallback((e: React.MouseEvent) => handleDragMove(e.clientX, e.clientY), [handleDragMove]);
@@ -1166,7 +1209,7 @@ export const OrbMatchGame = ({
     
     if (moveTimeLeft <= 0) return;
     
-    moveTimerRef.current = setInterval(() => {
+    moveTimerRef.current = registerInterval(() => {
       setMoveTimeLeft(prev => {
         if (prev <= 0.15) { 
           if (isDraggingRef.current) handleDragEnd(); 
@@ -1175,22 +1218,36 @@ export const OrbMatchGame = ({
         return prev - 0.15;
       });
     }, 150);
-    return () => { if (moveTimerRef.current) clearInterval(moveTimerRef.current); };
-  }, [gameState, moveTimeLeft, handleDragEnd, levelConfig.moveTime]);
+    return () => {
+      clearTimer(moveTimerRef.current);
+      moveTimerRef.current = null;
+    };
+  }, [gameState, moveTimeLeft, handleDragEnd, levelConfig.moveTime, registerInterval, clearTimer]);
 
   // Game timer
   useEffect(() => {
     if (gameState !== 'playing') return;
-    const timer = setInterval(() => {
+    const timer = registerInterval(() => {
       setTimeLeft(prev => { if (prev <= 1) { setGameState('complete'); return 0; } return prev - 1; });
     }, 1000);
-    return () => clearInterval(timer);
-  }, [gameState]);
+    return () => clearTimer(timer);
+  }, [gameState, registerInterval, clearTimer]);
 
   useEffect(() => {
     if (gameState === 'playing') resetHintTimer();
-    return () => { if (hintTimerRef.current) clearTimeout(hintTimerRef.current); };
-  }, [gameState, resetHintTimer]);
+    return () => {
+      clearTimer(hintTimerRef.current);
+      hintTimerRef.current = null;
+    };
+  }, [gameState, resetHintTimer, clearTimer]);
+
+  useEffect(() => {
+    if (gameState === 'playing') return;
+    clearTimer(moveTimerRef.current);
+    moveTimerRef.current = null;
+    clearTimer(hintTimerRef.current);
+    hintTimerRef.current = null;
+  }, [gameState, clearTimer]);
 
   // Check for level completion (score target reached)
   useEffect(() => {
@@ -1226,7 +1283,10 @@ export const OrbMatchGame = ({
     setScore(0);
     setCombo(0);
     setShowLevelUp(true);
-    setTimeout(() => setShowLevelUp(false), 1000);
+    registerTimeout(() => {
+      if (!mountedRef.current) return;
+      setShowLevelUp(false);
+    }, 1000);
     
     // Get next level config and colors
     const nextLevelCfg = getLevelConfig(nextLevel, difficultyMod);
@@ -1237,7 +1297,7 @@ export const OrbMatchGame = ({
     initializeGrid(nextLevelColors);
     setMoveTimeLeft(nextLevelCfg.moveTime);
     setGameState('playing');
-  }, [level, difficultyMod, initializeGrid, maxTimer]);
+  }, [level, difficultyMod, initializeGrid, maxTimer, registerTimeout, mountedRef]);
 
   // Game over logic
   useEffect(() => {
@@ -1254,22 +1314,24 @@ export const OrbMatchGame = ({
         : Math.round(Math.min(50, (score / levelConfig.targetScore) * 50));
       const result: 'perfect' | 'good' | 'fail' = levelsCompleted >= 5 ? 'perfect' : passed ? 'good' : 'fail';
       
-      setTimeout(() => onComplete({ 
-        success: passed, 
-        accuracy, 
-        result, 
-        highScoreValue: finalScore,
-        gameStats: {
-          score: finalScore,
-          level,
-          levelsCompleted,
-          maxCombo,
-          time: timeLeft,
-          timeBonus: lastTimeBonus,
-        },
-      }), levelsCompleted >= 3 ? 1200 : 400);
+      registerTimeout(() => {
+        completeOnce({
+          success: passed,
+          accuracy,
+          result,
+          highScoreValue: finalScore,
+          gameStats: {
+            score: finalScore,
+            level,
+            levelsCompleted,
+            maxCombo,
+            time: timeLeft,
+            timeBonus: lastTimeBonus,
+          },
+        });
+      }, levelsCompleted >= 3 ? 1200 : 400);
     }
-  }, [gameState, score, totalScore, levelsCompleted, level, levelConfig.targetScore, maxCombo, timeLeft, lastTimeBonus, onComplete]);
+  }, [gameState, score, totalScore, levelsCompleted, level, levelConfig.targetScore, maxCombo, timeLeft, lastTimeBonus, registerTimeout, completeOnce]);
 
   const removeExplosion = useCallback((id: string) => setExplosions(prev => prev.filter(e => e.id !== id)), []);
   const removeSpecialEffect = useCallback((id: string) => setSpecialEffects(prev => prev.filter(e => e.id !== id)), []);

@@ -134,6 +134,13 @@ const normalizeCreateCampaignError = (error: unknown): { title: string; descript
     };
   }
 
+  if (haystack.includes('maximum active habit limit reached')) {
+    return {
+      title: 'Too many active rituals',
+      description: 'Your account hit a legacy ritual limit. Update your app data and try creating this campaign again.',
+    };
+  }
+
   return {
     title: 'Failed to create campaign',
     description: 'Please try again in a moment. If this keeps happening, close and reopen the planner.',

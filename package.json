@@ -15,6 +15,7 @@
     "manifest:check": "./scripts/check-function-manifest.sh",
     "ios:sync": "npx cap sync ios && node scripts/fix-widget-config.cjs",
     "ios:verify-assets": "node scripts/verify-ios-web-assets.mjs",
+    "ios:verify-widget-signing": "node scripts/verify-widget-signing.mjs",
     "ios:preflight": "npm run build && npm run ios:sync && npm run ios:verify-assets",
     "ios:testflight": "npm run ios:preflight && node scripts/open-xcode.js",
     "pep-talks:backfill-transcripts": "node scripts/backfill-missing-pep-talk-transcripts.mjs",

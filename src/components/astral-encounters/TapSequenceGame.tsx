@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars, getGridPositions } from './gameUtils';
+import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -249,6 +250,9 @@ export const TapSequenceGame = ({
   isPractice = false,
   compact = false,
 }: TapSequenceGameProps) => {
+  const mountedRef = useMountedRef();
+  const { completeOnce } = useSingleCompletion(onComplete);
+  const { registerTimeout, clearTimer } = useTimerRegistry();
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const [gameState, setGameState] = useState<'countdown' | 'showing' | 'playing' | 'paused' | 'complete' | 'reshowing'>('countdown');
   const [orbs, setOrbs] = useState<Orb[]>([]);
@@ -264,6 +268,11 @@ export const TapSequenceGame = ({
   const [totalTaps, setTotalTaps] = useState(0);
   const [levelMessage, setLevelMessage] = useState<string | null>(null);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
+  const gameStateRef = useRef(gameState);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   // Get config based on current level and difficulty
   const levelConfig = getLevelConfig(level);
@@ -311,7 +320,8 @@ export const TapSequenceGame = ({
 
     const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);
     
-    const timer = setTimeout(() => {
+    const timer = registerTimeout(() => {
+      if (!mountedRef.current || (gameStateRef.current !== 'showing' && gameStateRef.current !== 'reshowing')) return;
       if (highlightIndex < sortedOrbs.length) {
         triggerHaptic('light');
         setHighlightIndex(prev => prev + 1);
@@ -322,11 +332,12 @@ export const TapSequenceGame = ({
       }
     }, showTimePerOrb);
 
-    return () => clearTimeout(timer);
-  }, [gameState, highlightIndex, orbs, showTimePerOrb]);
+    return () => clearTimer(timer);
+  }, [gameState, highlightIndex, orbs, showTimePerOrb, registerTimeout, clearTimer, mountedRef]);
 
   // Complete game with XP cap
   const finishGame = useCallback((won: boolean) => {
+    if (gameStateRef.current === 'complete') return;
     setGameState('complete');
     
     const accuracy = totalTaps > 0 ? Math.round((totalCorrectTaps / totalTaps) * 100) : 0;
@@ -334,7 +345,7 @@ export const TapSequenceGame = ({
     // Cap accuracy to prevent XP exploit from endless levels
     const finalAccuracy = Math.min(100, accuracy + levelBonus);
     
-    onComplete({
+    completeOnce({
       success: won,
       accuracy: Math.min(finalAccuracy, 100),
       result: won ? (finalAccuracy >= 90 ? 'perfect' : 'good') : 'fail',
@@ -344,7 +355,7 @@ export const TapSequenceGame = ({
         score,
       },
     });
-  }, [level, totalCorrectTaps, totalTaps, onComplete, score]);
+  }, [level, totalCorrectTaps, totalTaps, score, completeOnce]);
 
   // Handle orb tap
   const handleOrbTap = useCallback((orb: Orb) => {
@@ -366,7 +377,10 @@ export const TapSequenceGame = ({
       setScore(prev => prev + (10 * level) * attemptMultiplier);
       
       setLastTapResult({ id: orb.id, success: true });
-      setTimeout(() => setLastTapResult(null), 400);
+      registerTimeout(() => {
+        if (!mountedRef.current) return;
+        setLastTapResult(null);
+      }, 400);
 
       // Check if level complete
       if (currentOrder === orbCount) {
@@ -380,7 +394,8 @@ export const TapSequenceGame = ({
         onDamage?.({ target: 'adversary', amount: damageAmount, source: perfectLevel ? 'perfect_level' : 'level_complete' });
         
         // Next level after brief delay
-        setTimeout(() => {
+        registerTimeout(() => {
+          if (!mountedRef.current || gameStateRef.current !== 'playing') return;
           setLevelMessage(null);
           
           // In practice mode, end after completing 2 levels
@@ -410,7 +425,10 @@ export const TapSequenceGame = ({
         const newLives = prev - 1;
         if (newLives <= 0) {
           // Game over
-          setTimeout(() => finishGame(false), 500);
+          registerTimeout(() => {
+            if (!mountedRef.current) return;
+            finishGame(false);
+          }, 500);
         } else {
           // Re-show sequence
           setAttemptsThisLevel(prev => prev + 1);
@@ -418,7 +436,8 @@ export const TapSequenceGame = ({
           setOrbs(prev => prev.map(o => ({ ...o, tapped: false })));
           setLevelMessage('❌ Wrong! Watch again...');
           
-          setTimeout(() => {
+          registerTimeout(() => {
+            if (!mountedRef.current || gameStateRef.current !== 'playing') return;
             setLevelMessage(null);
             setGameState('reshowing');
             setHighlightIndex(0);
@@ -429,12 +448,13 @@ export const TapSequenceGame = ({
       
       setShake(true);
       setLastTapResult({ id: orb.id, success: false });
-      setTimeout(() => {
+      registerTimeout(() => {
+        if (!mountedRef.current) return;
         setShake(false);
         setLastTapResult(null);
       }, 400);
     }
-  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, mistakesThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, isPractice]);
+  }, [gameState, currentOrder, orbCount, level, attemptsThisLevel, mistakesThisLevel, generateOrbs, finishGame, onDamage, tierAttackDamage, isPractice, registerTimeout, mountedRef]);
 
   const getHighlightedOrbOrder = useCallback(() => {
     const sortedOrbs = [...orbs].sort((a, b) => a.order - b.order);

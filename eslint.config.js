@@ -11,6 +11,7 @@ export default tseslint.config(
       "supabase/functions/**",
       "ios/App/App/public/**",
       "ios/App/build-xc/**",
+      "ios/App/build-*/**",
     ],
   },
   {

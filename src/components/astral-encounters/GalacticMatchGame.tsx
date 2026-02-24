@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
 import { triggerHaptic } from './gameUtils';
 import { playHabitComplete, playXPGain, playMissionComplete } from '@/utils/soundEffects';
 import { Heart } from 'lucide-react';
+import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
 
 interface Card {
   id: string;
@@ -203,6 +204,9 @@ export const GalacticMatchGame = ({
   isPractice = false,
   compact = false,
 }: GalacticMatchGameProps) => {
+  const mountedRef = useMountedRef();
+  const { completeOnce } = useSingleCompletion(onComplete);
+  const { registerTimeout, clearTimer } = useTimerRegistry();
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const maxLives = MAX_LIVES_BY_DIFFICULTY[difficulty];
   const [level, setLevel] = useState(1);
@@ -219,8 +223,15 @@ export const GalacticMatchGame = ({
   const [countdown, setCountdown] = useState(3);
   const [revealCountdown, setRevealCountdown] = useState(0);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
+  const phaseRef = useRef<GamePhase>('countdown');
+  const phaseRunIdRef = useRef(0);
   
   const config = useMemo(() => getLevelConfig(level, round, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, round, diffConfig]);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+    phaseRunIdRef.current += 1;
+  }, [phase]);
 
   // Initialize/shuffle cards for current level
   const initializeCards = useCallback((startFlipped: boolean = false) => {
@@ -256,35 +267,45 @@ export const GalacticMatchGame = ({
     if (phase !== 'countdown') return;
     
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+      const timer = registerTimeout(() => {
+        if (!mountedRef.current || phaseRef.current !== 'countdown') return;
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimer(timer);
     } else {
       // Start reveal phase - initialize cards with flipped state
       initializeCards(true);
       setPhase('revealing');
       setRevealCountdown(Math.ceil(config.revealTime));
     }
-  }, [countdown, phase, config.revealTime, initializeCards]);
+  }, [countdown, phase, config.revealTime, initializeCards, registerTimeout, clearTimer, mountedRef]);
 
   // Reveal countdown
   useEffect(() => {
     if (phase !== 'revealing') return;
     
     if (revealCountdown > 0) {
-      const timer = setTimeout(() => setRevealCountdown(revealCountdown - 1), 1000);
-      return () => clearTimeout(timer);
+      const timer = registerTimeout(() => {
+        if (!mountedRef.current || phaseRef.current !== 'revealing') return;
+        setRevealCountdown(revealCountdown - 1);
+      }, 1000);
+      return () => clearTimer(timer);
     } else {
       // Hide all unmatched cards and start playing (keep matched cards visible)
       setPhase('hiding');
-      setTimeout(() => {
+      registerTimeout(() => {
+        if (!mountedRef.current || phaseRef.current !== 'hiding') return;
         setCards(prev => prev.map(c => ({ 
           ...c, 
           isFlipped: c.isMatched // Only matched cards stay flipped
         })));
-        setTimeout(() => setPhase('playing'), 400);
+        registerTimeout(() => {
+          if (!mountedRef.current || phaseRef.current !== 'hiding') return;
+          setPhase('playing');
+        }, 400);
       }, 200);
     }
-  }, [revealCountdown, phase]);
+  }, [revealCountdown, phase, registerTimeout, clearTimer, mountedRef]);
 
   // Handle level complete
   useEffect(() => {
@@ -308,10 +329,12 @@ export const GalacticMatchGame = ({
       setScore(scoreWithBonus);
       
       // Move to next level/round after delay
-      setTimeout(() => {
+      const levelCompleteRunId = phaseRunIdRef.current;
+      registerTimeout(() => {
+        if (!mountedRef.current || phaseRef.current !== 'levelComplete' || levelCompleteRunId !== phaseRunIdRef.current) return;
         // In practice mode, end after completing 2 levels
         if (isPractice && level >= 2) {
-          onComplete({ 
+          completeOnce({ 
             success: true, 
             accuracy: 100, 
             result: 'good',
@@ -370,7 +393,7 @@ export const GalacticMatchGame = ({
         setRevealCountdown(Math.ceil(nextConfig.revealTime));
       }, 1500);
     }
-  }, [matchedPairs, config.pairs, phase, level, round, isPractice, onComplete, mistakesThisLevel, onDamage, diffConfig, score, combo]);
+  }, [matchedPairs, config.pairs, phase, level, round, isPractice, mistakesThisLevel, onDamage, diffConfig, score, combo, registerTimeout, mountedRef, completeOnce]);
 
   // Handle game over
   useEffect(() => {
@@ -388,8 +411,8 @@ export const GalacticMatchGame = ({
       triggerHaptic('success');
     }
 
-    setTimeout(() => {
-      onComplete({ 
+    registerTimeout(() => {
+      completeOnce({ 
         success: result !== 'fail', 
         accuracy: Math.min(accuracy, 100), 
         result,
@@ -401,7 +424,7 @@ export const GalacticMatchGame = ({
         },
       });
     }, 1500);
-  }, [phase, score, level, onComplete, combo]);
+  }, [phase, score, level, combo, registerTimeout, completeOnce]);
 
   // Handle card click
   const handleCardClick = useCallback((cardId: string) => {
@@ -446,7 +469,8 @@ export const GalacticMatchGame = ({
         const color = COSMIC_SYMBOLS[firstCard.symbolIndex].color;
         setMatchEffects(prev => [...prev, { id: firstId, color }, { id: secondId, color }]);
 
-        setTimeout(() => {
+        registerTimeout(() => {
+          if (!mountedRef.current || phaseRef.current !== 'playing') return;
           setCards(prev => prev.map(c => 
             c.id === firstId || c.id === secondId 
               ? { ...c, isMatched: true } 
@@ -469,7 +493,8 @@ export const GalacticMatchGame = ({
 
         // Check for game over first
         if (newLives <= 0) {
-          setTimeout(() => {
+          registerTimeout(() => {
+            if (!mountedRef.current || phaseRef.current !== 'playing') return;
             setCards(prev => prev.map(c => 
               c.id === firstId || c.id === secondId 
                 ? { ...c, isFlipped: false } 
@@ -481,7 +506,8 @@ export const GalacticMatchGame = ({
           }, 800);
         } else {
           // Show all unmatched cards again for re-memorization
-          setTimeout(() => {
+          registerTimeout(() => {
+            if (!mountedRef.current || phaseRef.current !== 'playing') return;
             // Flip all unmatched cards face-up (keep matched ones as matched)
             setCards(prev => prev.map(c => ({
               ...c,
@@ -500,7 +526,7 @@ export const GalacticMatchGame = ({
         }
       }
     }
-  }, [cards, flippedCards, isLocked, phase, combo, lives, level, onDamage, tierAttackDamage]);
+  }, [cards, flippedCards, isLocked, phase, combo, lives, level, onDamage, tierAttackDamage, registerTimeout, mountedRef]);
 
   // Grid style
   const gridStyle = useMemo(() => ({

@@ -11,11 +11,27 @@ import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { IAP_PRODUCTS, purchaseProduct } from "@/utils/appleIAP";
+import {
+  WidgetData,
+  type WidgetSyncDiagnostics,
+  type WidgetSyncProbeResult,
+} from "@/plugins/WidgetDataPlugin";
+import {
+  WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY,
+  WIDGET_SYNC_LAST_ERROR_STORAGE_KEY,
+} from "@/hooks/useWidgetSync";
 
 interface LogEntry {
   timestamp: string;
   message: string;
   type: 'info' | 'error' | 'success';
+}
+
+interface WidgetSyncErrorSnapshot {
+  code: string | null;
+  message: string;
+  timestamp: string;
+  source: string;
 }
 
 const StatusBadge = memo(({ value, label }: { value: boolean | string; label: string }) => {
@@ -50,6 +66,13 @@ const IAPTest = () => {
     message: string;
     timestamp: string;
   } | null>(null);
+  const [widgetDiagnostics, setWidgetDiagnostics] = useState<WidgetSyncDiagnostics | null>(null);
+  const [widgetProbeResult, setWidgetProbeResult] = useState<WidgetSyncProbeResult | null>(null);
+  const [widgetSessionDiagnostics, setWidgetSessionDiagnostics] = useState<Record<string, unknown> | null>(null);
+  const [widgetErrorSnapshot, setWidgetErrorSnapshot] = useState<WidgetSyncErrorSnapshot | null>(null);
+  const [isFetchingWidgetDiagnostics, setIsFetchingWidgetDiagnostics] = useState(false);
+  const [isRunningWidgetProbe, setIsRunningWidgetProbe] = useState(false);
+  const [isReloadingWidget, setIsReloadingWidget] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -114,6 +137,156 @@ const IAPTest = () => {
     setLogs(prev => [...prev.slice(-100), { timestamp, message, type }]);
   };
 
+  const getPluginErrorDetails = (error: unknown): { code: string | null; message: string } => {
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code ?? "") || null
+      : null;
+
+    const message = typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+          ? String((error as { message?: unknown }).message ?? "")
+          : "Unknown widget diagnostics error";
+
+    return {
+      code,
+      message: message || "Unknown widget diagnostics error",
+    };
+  };
+
+  const loadWidgetSessionSnapshots = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const diagnosticsRaw = window.sessionStorage.getItem(WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY);
+    const errorRaw = window.sessionStorage.getItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY);
+
+    try {
+      setWidgetSessionDiagnostics(diagnosticsRaw ? JSON.parse(diagnosticsRaw) : null);
+    } catch {
+      setWidgetSessionDiagnostics({ parseError: "Failed to parse session diagnostics snapshot." });
+    }
+
+    try {
+      setWidgetErrorSnapshot(errorRaw ? JSON.parse(errorRaw) as WidgetSyncErrorSnapshot : null);
+    } catch {
+      setWidgetErrorSnapshot({
+        code: "PARSE_ERROR",
+        message: "Failed to parse session widget error snapshot.",
+        timestamp: new Date().toISOString(),
+        source: "iap-test",
+      });
+    }
+  }, []);
+
+  const handleFetchWidgetDiagnostics = useCallback(async () => {
+    setIsFetchingWidgetDiagnostics(true);
+    try {
+      const diagnostics = await WidgetData.getWidgetSyncDiagnostics();
+      setWidgetDiagnostics(diagnostics);
+      addLog(
+        `[WIDGET] Diagnostics fetched: accessible=${diagnostics.appGroupAccessible} hasPayload=${diagnostics.hasPayload} payloadDate=${diagnostics.payloadDate ?? "null"}`,
+        diagnostics.appGroupAccessible ? "success" : "error",
+      );
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY,
+          JSON.stringify({
+            ...diagnostics,
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      }
+      loadWidgetSessionSnapshots();
+    } catch (error) {
+      const details = getPluginErrorDetails(error);
+      const snapshot: WidgetSyncErrorSnapshot = {
+        code: details.code,
+        message: details.message,
+        timestamp: new Date().toISOString(),
+        source: "iap-test/getWidgetSyncDiagnostics",
+      };
+      setWidgetErrorSnapshot(snapshot);
+      addLog(`[WIDGET] Diagnostics failed: ${details.code ?? "UNKNOWN"} ${details.message}`, "error");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY, JSON.stringify(snapshot));
+      }
+      loadWidgetSessionSnapshots();
+    } finally {
+      setIsFetchingWidgetDiagnostics(false);
+    }
+  }, [loadWidgetSessionSnapshots]);
+
+  const handleRunWidgetSyncProbe = useCallback(async () => {
+    setIsRunningWidgetProbe(true);
+    try {
+      const probeResult = await WidgetData.runWidgetSyncProbe();
+      setWidgetProbeResult(probeResult);
+      if (probeResult.errorCode || probeResult.errorMessage) {
+        const snapshot: WidgetSyncErrorSnapshot = {
+          code: probeResult.errorCode,
+          message: probeResult.errorMessage ?? "Widget probe failed",
+          timestamp: probeResult.timestamp,
+          source: "iap-test/runWidgetSyncProbe",
+        };
+        setWidgetErrorSnapshot(snapshot);
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY, JSON.stringify(snapshot));
+        }
+      } else if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY);
+      }
+      addLog(
+        `[WIDGET] Probe result: appGroupAccessible=${probeResult.appGroupAccessible} writeSucceeded=${probeResult.writeSucceeded} readBackSucceeded=${probeResult.readBackSucceeded}`,
+        probeResult.writeSucceeded && probeResult.readBackSucceeded ? "success" : "error",
+      );
+      loadWidgetSessionSnapshots();
+    } catch (error) {
+      const details = getPluginErrorDetails(error);
+      const timestamp = new Date().toISOString();
+      const fallbackProbeResult: WidgetSyncProbeResult = {
+        appGroupAccessible: false,
+        writeSucceeded: false,
+        readBackSucceeded: false,
+        payloadByteCount: 0,
+        errorCode: details.code ?? "DIAGNOSTICS_FAILED",
+        errorMessage: details.message,
+        timestamp,
+      };
+      setWidgetProbeResult(fallbackProbeResult);
+      const snapshot: WidgetSyncErrorSnapshot = {
+        code: fallbackProbeResult.errorCode,
+        message: fallbackProbeResult.errorMessage ?? details.message,
+        timestamp,
+        source: "iap-test/runWidgetSyncProbe",
+      };
+      setWidgetErrorSnapshot(snapshot);
+      addLog(`[WIDGET] Probe failed: ${snapshot.code ?? "UNKNOWN"} ${snapshot.message}`, "error");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY, JSON.stringify(snapshot));
+      }
+      loadWidgetSessionSnapshots();
+    } finally {
+      setIsRunningWidgetProbe(false);
+    }
+  }, [loadWidgetSessionSnapshots]);
+
+  const handleReloadWidgetTimeline = useCallback(async () => {
+    setIsReloadingWidget(true);
+    try {
+      await WidgetData.reloadWidget();
+      addLog("[WIDGET] Requested widget timeline reload", "success");
+    } catch (error) {
+      const details = getPluginErrorDetails(error);
+      addLog(`[WIDGET] Reload failed: ${details.code ?? "UNKNOWN"} ${details.message}`, "error");
+    } finally {
+      setIsReloadingWidget(false);
+    }
+  }, []);
+
   // Intercept console.log for IAP-related messages - broadened to capture more
   useEffect(() => {
     const originalLog = console.log;
@@ -157,6 +330,10 @@ const IAPTest = () => {
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  useEffect(() => {
+    loadWidgetSessionSnapshots();
+  }, [loadWidgetSessionSnapshots]);
 
   // Handle purchase with logging - checks return value properly
   const handleTestPurchase = async (productId: string) => {
@@ -249,6 +426,13 @@ const IAPTest = () => {
     addLog('Logs cleared', 'info');
   };
 
+  const widgetProbePassed = !!(
+    widgetProbeResult &&
+    widgetProbeResult.appGroupAccessible &&
+    widgetProbeResult.writeSucceeded &&
+    widgetProbeResult.readBackSucceeded
+  );
+
   return (
     <div className="min-h-screen pb-nav-safe bg-background pb-8">
       {/* Header */}
@@ -279,6 +463,73 @@ const IAPTest = () => {
             <StatusBadge label="iOS" value={isIOS} />
             <StatusBadge label="Products Loaded" value={hasLoadedProducts} />
             <StatusBadge label="IAP Available" value={isNative && isIOS && hasLoadedProducts} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Widget Sync Diagnostics
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              App Group runtime checks for widget payload visibility.
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleFetchWidgetDiagnostics}
+                disabled={isFetchingWidgetDiagnostics}
+              >
+                {isFetchingWidgetDiagnostics ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                Fetch Diagnostics
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRunWidgetSyncProbe}
+                disabled={isRunningWidgetProbe}
+              >
+                {isRunningWidgetProbe ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                Run Write Probe
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReloadWidgetTimeline}
+                disabled={isReloadingWidget}
+              >
+                {isReloadingWidget ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                Reload Widget
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-border/50 px-3 py-2 space-y-1">
+              <StatusBadge label="Probe Status" value={widgetProbeResult ? (widgetProbePassed ? "PASS" : "FAIL") : "Not run"} />
+              <StatusBadge label="App Group Accessible" value={widgetDiagnostics?.appGroupAccessible ?? widgetProbeResult?.appGroupAccessible ?? false} />
+              <StatusBadge label="Has Payload" value={widgetDiagnostics?.hasPayload ?? false} />
+              <StatusBadge label="Write Succeeded" value={widgetProbeResult?.writeSucceeded ?? false} />
+              <StatusBadge label="Readback Succeeded" value={widgetProbeResult?.readBackSucceeded ?? false} />
+              <StatusBadge label="Payload Bytes" value={String(widgetProbeResult?.payloadByteCount ?? widgetDiagnostics?.payloadByteCount ?? 0)} />
+              <StatusBadge label="Last Error Code" value={widgetProbeResult?.errorCode ?? widgetDiagnostics?.lastErrorCode ?? widgetErrorSnapshot?.code ?? "none"} />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Widget Diagnostics JSON</Label>
+              <ScrollArea className="h-44 rounded-lg bg-muted/30 border border-border/30">
+                <pre className="text-xs p-3 font-mono">
+                  {JSON.stringify({
+                    diagnostics: widgetDiagnostics,
+                    probe: widgetProbeResult,
+                    sessionDiagnostics: widgetSessionDiagnostics,
+                    sessionError: widgetErrorSnapshot,
+                  }, null, 2)}
+                </pre>
+              </ScrollArea>
+            </div>
           </CardContent>
         </Card>
 

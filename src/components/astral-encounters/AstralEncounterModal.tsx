@@ -1,5 +1,16 @@
 import { useState, useCallback, useEffect, lazy, Suspense, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Adversary, AstralEncounter, MiniGameResult, MiniGameType } from '@/types/astralEncounters';
 import { DamageEvent, TIER_BATTLE_DURATION } from '@/types/battleSystem';
@@ -18,6 +29,7 @@ import { calculateXPReward } from '@/utils/adversaryGenerator';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { MiniGameSkeleton } from '@/components/skeletons';
 import type { BossBattleContext } from '@/types/narrativeTypes';
+import { X } from 'lucide-react';
 
 // Lazy load mini-games for bundle optimization
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
@@ -40,7 +52,7 @@ interface AstralEncounterModalProps {
   adversary: Adversary | null;
   questInterval?: number;
   onComplete: (params: { encounterId: string; accuracy: number; phasesCompleted: number }) => Promise<boolean>;
-  onPass?: () => void;
+  onPass?: () => void | Promise<void>;
   // Boss battle props
   isBossBattle?: boolean;
   bossBattleContext?: BossBattleContext;
@@ -80,6 +92,8 @@ export const AstralEncounterModal = ({
   const [showScreenShake, setShowScreenShake] = useState(false);
   const [battleTimeLeft, setBattleTimeLeft] = useState(0);
   const [battleTimeTotal, setBattleTimeTotal] = useState(0);
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
+  const [isPassingEncounter, setIsPassingEncounter] = useState(false);
   const { companion, refetch: refetchCompanion } = useCompanion();
   const battleEndedRef = useRef(false);
 
@@ -252,14 +266,50 @@ export const AstralEncounterModal = ({
     // State reset now happens in useEffect when open changes
   }, [onOpenChange]);
 
+  const requestExitEncounter = useCallback(() => {
+    if (!open || phase === 'result' || isPassingEncounter) return;
+    setIsExitConfirmOpen(true);
+  }, [open, phase, isPassingEncounter]);
+
+  const handleConfirmExit = useCallback(async () => {
+    if (isPassingEncounter) return;
+
+    setIsPassingEncounter(true);
+    try {
+      if (phase === 'boss_intro') {
+        onBossBattleCancel?.();
+      }
+
+      if (onPass) {
+        await onPass();
+      } else {
+        onOpenChange(false);
+      }
+    } catch (error) {
+      console.error('Failed to pass encounter during exit:', error);
+    } finally {
+      setIsPassingEncounter(false);
+      setIsExitConfirmOpen(false);
+    }
+  }, [isPassingEncounter, onBossBattleCancel, onOpenChange, onPass, phase]);
+
+  const handleDialogOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      if (phase === 'result') {
+        handleClose();
+      } else {
+        requestExitEncounter();
+      }
+    }
+  }, [handleClose, phase, requestExitEncounter]);
+
   const handleBossIntroComplete = useCallback(() => {
     setPhase('reveal');
   }, []);
 
   const handleBossIntroCancel = useCallback(() => {
-    onBossBattleCancel?.();
-    handleClose();
-  }, [onBossBattleCancel, handleClose]);
+    requestExitEncounter();
+  }, [requestExitEncounter]);
 
   const handleBeginBattle = useCallback(() => {
     setPhase('instructions');
@@ -375,9 +425,28 @@ export const AstralEncounterModal = ({
   const FULLSCREEN_GAMES: MiniGameType[] = ['energy_beam', 'tap_sequence', 'orb_match', 'galactic_match'];
   const currentGameType = getCurrentGameType();
   const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
+  const showPersistentExit = open && phase !== 'result';
 
   return (
     <>
+      {showPersistentExit && (
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={requestExitEncounter}
+          disabled={isPassingEncounter}
+          aria-label="Exit encounter"
+          className="fixed z-[170] h-10 w-10 rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+          style={{
+            top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
+            right: 'calc(env(safe-area-inset-right, 0px) + 0.75rem)',
+          }}
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      )}
+
       {/* Bounded fullscreen overlay for active encounter game phases */}
       {open && needsFullscreen && (
         <div
@@ -441,8 +510,11 @@ export const AstralEncounterModal = ({
       )}
 
       {/* Regular Dialog for non-fullscreen phases/games */}
-      <Dialog open={open && !needsFullscreen} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-background border-border">
+      <Dialog open={open && !needsFullscreen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent
+          hideCloseButton
+          className="sm:max-w-lg p-0 overflow-hidden bg-background border-border"
+        >
           <motion.div 
             className="relative min-h-[500px] max-h-[90dvh] overflow-hidden flex flex-col"
             style={{ paddingBottom: 'env(safe-area-inset-bottom, 24px)' }}
@@ -488,7 +560,7 @@ export const AstralEncounterModal = ({
                       companionName={resolvedCompanionName}
                       companionStage={companion?.current_stage || 0}
                       onReady={handleBeginBattle}
-                      onPass={onPass}
+                      onPass={requestExitEncounter}
                     />
                   </motion.div>
                 )}
@@ -593,6 +665,39 @@ export const AstralEncounterModal = ({
           </motion.div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={isExitConfirmOpen}
+        onOpenChange={(nextOpen) => {
+          if (!isPassingEncounter) {
+            setIsExitConfirmOpen(nextOpen);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pass this encounter and exit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Leaving now will pass this Astral Encounter. Your current battle progress will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPassingEncounter}>
+              Continue Battle
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isPassingEncounter}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmExit();
+              }}
+            >
+              {isPassingEncounter ? 'Passing...' : 'Pass & Exit'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

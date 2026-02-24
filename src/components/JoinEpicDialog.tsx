@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getHabitLimitForTier } from "@/config/habitLimits";
 
 interface JoinEpicDialogProps {
   open: boolean;
@@ -110,18 +109,9 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
 
       if (memberError) throw memberError;
 
-      // Copy habits to user's account (respect tier-based limit)
+      // Copy all habits to user's account.
       if (epic.epic_habits && epic.epic_habits.length > 0) {
-        // Determine difficulty tier from epic (default to beginner if not set)
-        // For joined epics, we infer tier from target_days as a heuristic
-        let tier: string = 'beginner';
-        if (epic.target_days >= 45) tier = 'advanced';
-        else if (epic.target_days >= 21) tier = 'intermediate';
-        
-        const habitLimit = getHabitLimitForTier(tier);
-        const limitedHabits = epic.epic_habits.slice(0, habitLimit);
-        
-        const habitsToCreate = limitedHabits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
+        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
           user_id: user.user.id,
           title: eh.habits.title,
           difficulty: eh.habits.difficulty,

@@ -7,7 +7,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StarPathsInfoTooltip } from "./StarPathsInfoTooltip";
 import { Target, Clock, Users, Sparkles, ChevronRight, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getHabitLimitForTier } from "@/config/habitLimits";
 
 interface StarPathsBrowserProps {
   onSelectTemplate: (template: EpicTemplate) => void;
@@ -117,8 +116,7 @@ interface StarPathCardProps {
 const StarPathCard = ({ template, onSelect, featured }: StarPathCardProps) => {
   const difficultyConfig = DIFFICULTY_CONFIG[template.difficulty_tier];
   const themeGradient = THEME_COLORS[template.theme_color] || THEME_COLORS.heroic;
-  const habitLimit = getHabitLimitForTier(template.difficulty_tier);
-  const displayedHabits = template.habits.slice(0, habitLimit);
+  const displayedHabits = template.habits;
 
   // Track touch start position to differentiate tap from scroll
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);

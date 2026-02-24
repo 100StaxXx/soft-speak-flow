@@ -13,7 +13,7 @@ interface BattleVSScreenProps {
   adversary: Adversary;
   adversaryImageUrl?: string;
   onReady: () => void;
-  onPass?: () => void;
+  onPass?: () => void | Promise<void>;
 }
 
 const TIER_COLORS: Record<AdversaryTier, { primary: string; glow: string; bg: string }> = {

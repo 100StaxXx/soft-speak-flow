@@ -1,6 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { EPIC_XP_REWARDS } from "@/config/xpRewards";
-import { getHabitLimitForTier, DifficultyTier } from "@/config/habitLimits";
 import { categorizeQuest } from "@/utils/questCategorization";
 import {
   Dialog,
@@ -100,7 +99,6 @@ export const CreateEpicDialog = ({
   const [description, setDescription] = useState("");
   const [targetDays, setTargetDays] = useState(30);
   const [themeColor, setThemeColor] = useState<EpicTheme>('heroic');
-  const [difficultyTier, setDifficultyTier] = useState<DifficultyTier>("beginner");
   const [newHabits, setNewHabits] = useState<NewHabit[]>([]);
   const [currentHabitTitle, setCurrentHabitTitle] = useState("");
   const [currentHabitDescription, setCurrentHabitDescription] = useState("");
@@ -111,8 +109,6 @@ export const CreateEpicDialog = ({
   const [currentReminderMinutes, setCurrentReminderMinutes] = useState(15);
   const [editingHabitIndex, setEditingHabitIndex] = useState<number | null>(null);
 
-  // Dynamic habit limit based on difficulty tier
-  const maxHabits = useMemo(() => getHabitLimitForTier(difficultyTier), [difficultyTier]);
   // Pre-fill from template when selected
   useEffect(() => {
     if (template && open) {
@@ -120,14 +116,9 @@ export const CreateEpicDialog = ({
       setDescription(template.description);
       setTargetDays(template.target_days);
       setThemeColor(template.theme_color as EpicTheme || 'heroic');
-      
-      // Set difficulty tier from template
-      const tier = (template.difficulty_tier as DifficultyTier) || "beginner";
-      setDifficultyTier(tier);
-      const limit = getHabitLimitForTier(tier);
-      
-      // Convert template habits to NewHabit format (respect tier limit)
-      const templateHabits: NewHabit[] = template.habits.slice(0, limit).map(h => ({
+
+      // Convert all template habits to NewHabit format.
+      const templateHabits: NewHabit[] = template.habits.map(h => ({
         title: h.title,
         description: h.description || undefined,
         difficulty: h.difficulty as "easy" | "medium" | "hard",
@@ -135,11 +126,6 @@ export const CreateEpicDialog = ({
         custom_days: h.frequency === 'daily' ? [] : [0, 1, 2, 3, 4, 5, 6],
       }));
       setNewHabits(templateHabits);
-      
-      // Warn if template had more habits than allowed for tier
-      if (template.habits.length > limit) {
-        console.info(`Template "${template.name}" has ${template.habits.length} habits, truncated to ${limit} for ${tier} tier`);
-      }
     }
   }, [template, open]);
 
@@ -165,7 +151,7 @@ export const CreateEpicDialog = ({
       // Update existing habit
       setNewHabits(prev => prev.map((h, i) => i === editingHabitIndex ? newHabit : h));
       setEditingHabitIndex(null);
-    } else if (newHabits.length < maxHabits) {
+    } else {
       // Add new habit
       setNewHabits(prev => [...prev, newHabit]);
     }
@@ -178,7 +164,7 @@ export const CreateEpicDialog = ({
     setCurrentPreferredTime("");
     setCurrentReminderEnabled(false);
     setCurrentReminderMinutes(15);
-  }, [currentHabitTitle, currentHabitDescription, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, newHabits.length, editingHabitIndex, maxHabits]);
+  }, [currentHabitTitle, currentHabitDescription, currentHabitDifficulty, currentHabitDays, currentPreferredTime, currentReminderEnabled, currentReminderMinutes, editingHabitIndex]);
 
   const editHabit = useCallback((index: number) => {
     const habit = newHabits[index];
@@ -231,7 +217,6 @@ export const CreateEpicDialog = ({
     setDescription("");
     setTargetDays(30);
     setThemeColor('heroic');
-    setDifficultyTier("beginner");
     setNewHabits([]);
     setCurrentHabitTitle("");
     setCurrentHabitDescription("");
@@ -455,33 +440,28 @@ export const CreateEpicDialog = ({
               />
               
               {/* Add/Edit habit form */}
-              {(newHabits.length < maxHabits || editingHabitIndex !== null) && (
-                <EpicHabitForm
-                  habitTitle={currentHabitTitle}
-                  habitDescription={currentHabitDescription}
-                  difficulty={currentHabitDifficulty}
-                  selectedDays={currentHabitDays}
-                  habitCount={newHabits.length}
-                  maxHabits={maxHabits}
-                  preferredTime={currentPreferredTime}
-                  reminderEnabled={currentReminderEnabled}
-                  reminderMinutesBefore={currentReminderMinutes}
-                  onTitleChange={setCurrentHabitTitle}
-                  onDescriptionChange={setCurrentHabitDescription}
-                  onDifficultyChange={setCurrentHabitDifficulty}
-                  onDaysChange={setCurrentHabitDays}
-                  onPreferredTimeChange={setCurrentPreferredTime}
-                  onReminderEnabledChange={setCurrentReminderEnabled}
-                  onReminderMinutesChange={setCurrentReminderMinutes}
-                  onAddHabit={addHabit}
-                  isEditing={editingHabitIndex !== null}
-                  onCancelEdit={cancelEdit}
-                />
-              )}
+              <EpicHabitForm
+                habitTitle={currentHabitTitle}
+                habitDescription={currentHabitDescription}
+                difficulty={currentHabitDifficulty}
+                selectedDays={currentHabitDays}
+                preferredTime={currentPreferredTime}
+                reminderEnabled={currentReminderEnabled}
+                reminderMinutesBefore={currentReminderMinutes}
+                onTitleChange={setCurrentHabitTitle}
+                onDescriptionChange={setCurrentHabitDescription}
+                onDifficultyChange={setCurrentHabitDifficulty}
+                onDaysChange={setCurrentHabitDays}
+                onPreferredTimeChange={setCurrentPreferredTime}
+                onReminderEnabledChange={setCurrentReminderEnabled}
+                onReminderMinutesChange={setCurrentReminderMinutes}
+                onAddHabit={addHabit}
+                isEditing={editingHabitIndex !== null}
+                onCancelEdit={cancelEdit}
+              />
               
               <p className="text-xs text-muted-foreground">
-                Add up to {maxHabits} habit{maxHabits > 1 ? 's' : ''} that contribute to this epic
-                {difficultyTier === 'advanced' && ' (Advanced tier unlocks 3 habits)'}
+                Add as many habits as you need for this epic.
               </p>
             </div>
 

@@ -20,10 +20,10 @@ export const normalizeTaskSchedulingState = (
   state: TaskSchedulingState,
 ): NormalizedTaskSchedulingState => {
   let taskDate = state.task_date ?? null;
-  let scheduledTime = normalizeScheduledTime(state.scheduled_time);
+  const scheduledTime = normalizeScheduledTime(state.scheduled_time);
   let source = state.source ?? null;
   let normalizedToInbox = false;
-  let strippedScheduledTime = false;
+  const strippedScheduledTime = false;
   let movedFromInboxToScheduled = false;
 
   if (taskDate === null && scheduledTime !== null) {

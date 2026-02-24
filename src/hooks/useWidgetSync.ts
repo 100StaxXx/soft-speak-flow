@@ -1,7 +1,11 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import { WidgetData, type WidgetTask } from '@/plugins/WidgetDataPlugin';
+import {
+  WidgetData,
+  type WidgetSyncDiagnostics,
+  type WidgetTask,
+} from '@/plugins/WidgetDataPlugin';
 import type { DailyTask } from './useTasksQuery';
 
 /**
@@ -16,6 +20,9 @@ import type { DailyTask } from './useTasksQuery';
 interface WidgetSyncOptions {
   enabled?: boolean;
 }
+
+export const WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY = 'widget-sync-diagnostics';
+export const WIDGET_SYNC_LAST_ERROR_STORAGE_KEY = 'widget-sync-last-error';
 
 export const useWidgetSync = (
   tasks: DailyTask[],
@@ -92,6 +99,7 @@ export const useWidgetSync = (
         date: taskDate,
       });
       lastSyncRef.current = fingerprint;
+      persistWidgetErrorToSession(null);
       console.info('[WidgetSync] Synced widget payload', {
         taskDate,
         force,
@@ -108,6 +116,12 @@ export const useWidgetSync = (
         return;
       }
       const details = getErrorDetails(error);
+      persistWidgetErrorToSession({
+        code: details.code || null,
+        message: details.message,
+        timestamp: new Date().toISOString(),
+        source: 'updateWidgetData',
+      });
       console.error('[WidgetSync] Failed to sync widget payload', {
         taskDate,
         code: details.code,
@@ -169,6 +183,7 @@ export const useWidgetSync = (
         if (cancelled) {
           return;
         }
+        persistWidgetDiagnosticsToSession(diagnostics);
         console.info('[WidgetSync] Diagnostics snapshot', diagnostics);
 
         if (!diagnostics.appGroupAccessible || !diagnostics.hasPayload) {
@@ -182,6 +197,12 @@ export const useWidgetSync = (
         }
 
         const details = getErrorDetails(error);
+        persistWidgetErrorToSession({
+          code: details.code || null,
+          message: details.message,
+          timestamp: new Date().toISOString(),
+          source: 'getWidgetSyncDiagnostics',
+        });
         console.warn('[WidgetSync] Diagnostics check failed', {
           code: details.code,
           message: details.message,
@@ -247,4 +268,51 @@ function getErrorDetails(error: unknown): { code: string; message: string } {
         : 'Unknown error';
 
   return { code, message };
+}
+
+function persistWidgetDiagnosticsToSession(diagnostics: WidgetSyncDiagnostics): void {
+  writeSessionStorageValue(
+    WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY,
+    JSON.stringify({
+      ...diagnostics,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+}
+
+function persistWidgetErrorToSession(
+  payload: {
+    code: string | null;
+    message: string;
+    timestamp: string;
+    source: 'updateWidgetData' | 'getWidgetSyncDiagnostics';
+  } | null,
+): void {
+  if (!payload) {
+    removeSessionStorageValue(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY);
+    return;
+  }
+  writeSessionStorageValue(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function writeSessionStorageValue(key: string, value: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // Ignore storage failures in non-browser/privacy-restricted environments.
+  }
+}
+
+function removeSessionStorageValue(key: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures in non-browser/privacy-restricted environments.
+  }
 }

@@ -33,73 +33,69 @@ vi.mock("@/hooks/useTasksQuery", () => ({
 vi.mock("@/pages/Mentor", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
+  const MentorPageMock = () => {
+    const { isTabActive } = useMainTabVisibility();
+    const [counter, setCounter] = React.useState(0);
 
-  return {
-    default: () => {
-      const { isTabActive } = useMainTabVisibility();
-      const [counter, setCounter] = React.useState(0);
+    React.useEffect(() => {
+      mocks.mountCounts.mentor += 1;
+    }, []);
 
-      React.useEffect(() => {
-        mocks.mountCounts.mentor += 1;
-      }, []);
-
-      return (
-        <div data-testid="mentor-tab">
-          <span data-testid="mentor-visibility">{isTabActive ? "active" : "inactive"}</span>
-          <span data-testid="mentor-counter">{counter}</span>
-          <button onClick={() => setCounter((prev) => prev + 1)}>Increment mentor</button>
-        </div>
-      );
-    },
+    return (
+      <div data-testid="mentor-tab">
+        <span data-testid="mentor-visibility">{isTabActive ? "active" : "inactive"}</span>
+        <span data-testid="mentor-counter">{counter}</span>
+        <button onClick={() => setCounter((prev) => prev + 1)}>Increment mentor</button>
+      </div>
+    );
   };
+
+  return { default: MentorPageMock };
 });
 
 vi.mock("@/pages/Inbox", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
+  const InboxPageMock = () => {
+    const { isTabActive } = useMainTabVisibility();
+    React.useEffect(() => {
+      mocks.mountCounts.inbox += 1;
+    }, []);
 
-  return {
-    default: () => {
-      const { isTabActive } = useMainTabVisibility();
-      React.useEffect(() => {
-        mocks.mountCounts.inbox += 1;
-      }, []);
-
-      return <div data-testid="inbox-visibility">{isTabActive ? "active" : "inactive"}</div>;
-    },
+    return <div data-testid="inbox-visibility">{isTabActive ? "active" : "inactive"}</div>;
   };
+
+  return { default: InboxPageMock };
 });
 
 vi.mock("@/pages/Journeys", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
+  const JourneysPageMock = () => {
+    const { isTabActive } = useMainTabVisibility();
+    React.useEffect(() => {
+      mocks.mountCounts.journeys += 1;
+    }, []);
 
-  return {
-    default: () => {
-      const { isTabActive } = useMainTabVisibility();
-      React.useEffect(() => {
-        mocks.mountCounts.journeys += 1;
-      }, []);
-
-      return <div data-testid="journeys-visibility">{isTabActive ? "active" : "inactive"}</div>;
-    },
+    return <div data-testid="journeys-visibility">{isTabActive ? "active" : "inactive"}</div>;
   };
+
+  return { default: JourneysPageMock };
 });
 
 vi.mock("@/pages/Companion", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
+  const CompanionPageMock = () => {
+    const { isTabActive } = useMainTabVisibility();
+    React.useEffect(() => {
+      mocks.mountCounts.companion += 1;
+    }, []);
 
-  return {
-    default: () => {
-      const { isTabActive } = useMainTabVisibility();
-      React.useEffect(() => {
-        mocks.mountCounts.companion += 1;
-      }, []);
-
-      return <div data-testid="companion-visibility">{isTabActive ? "active" : "inactive"}</div>;
-    },
+    return <div data-testid="companion-visibility">{isTabActive ? "active" : "inactive"}</div>;
   };
+
+  return { default: CompanionPageMock };
 });
 
 import { MainTabsKeepAlive } from "@/components/MainTabsKeepAlive";

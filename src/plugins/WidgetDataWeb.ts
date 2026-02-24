@@ -1,5 +1,10 @@
 import { WebPlugin } from '@capacitor/core';
-import type { WidgetDataPlugin, WidgetSyncDiagnostics, WidgetTask } from './WidgetDataPlugin';
+import type {
+  WidgetDataPlugin,
+  WidgetSyncDiagnostics,
+  WidgetSyncProbeResult,
+  WidgetTask,
+} from './WidgetDataPlugin';
 
 export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
   async updateWidgetData(_options: {
@@ -32,6 +37,26 @@ export class WidgetDataWeb extends WebPlugin implements WidgetDataPlugin {
       payloadDate: null,
       payloadUpdatedAt: null,
       payloadByteCount: 0,
+      appGroupId: 'group.com.darrylgraham.revolution',
+      dataKey: 'widget_tasks_data',
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    };
+  }
+
+  async runWidgetSyncProbe(): Promise<WidgetSyncProbeResult> {
+    if (import.meta.env.DEV) {
+      console.debug('[WidgetData] Web fallback - no widget sync probe support');
+    }
+
+    return {
+      appGroupAccessible: false,
+      writeSucceeded: false,
+      readBackSucceeded: false,
+      payloadByteCount: 0,
+      errorCode: 'UNSUPPORTED_PLATFORM',
+      errorMessage: 'Widget sync probe is only available on native iOS.',
+      timestamp: new Date().toISOString(),
     };
   }
 }

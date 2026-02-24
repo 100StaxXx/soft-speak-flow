@@ -45,7 +45,11 @@ vi.mock("@/plugins/WidgetDataPlugin", () => ({
   },
 }));
 
-import { useWidgetSync } from "./useWidgetSync";
+import {
+  WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY,
+  WIDGET_SYNC_LAST_ERROR_STORAGE_KEY,
+  useWidgetSync,
+} from "./useWidgetSync";
 
 function localDateString(date = new Date()): string {
   const year = date.getFullYear();
@@ -119,8 +123,13 @@ describe("useWidgetSync", () => {
       payloadDate: localDateString(),
       payloadUpdatedAt: null,
       payloadByteCount: 32,
+      appGroupId: "group.com.darrylgraham.revolution",
+      dataKey: "widget_tasks_data",
+      lastErrorCode: null,
+      lastErrorMessage: null,
     });
     mocks.addListenerMock.mockResolvedValue({ remove: mocks.removeListenerMock });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -374,6 +383,10 @@ describe("useWidgetSync", () => {
       payloadDate: null,
       payloadUpdatedAt: null,
       payloadByteCount: 0,
+      appGroupId: "group.com.darrylgraham.revolution",
+      dataKey: "widget_tasks_data",
+      lastErrorCode: null,
+      lastErrorMessage: null,
     });
 
     renderHook(() => useWidgetSync([makeTask()], today));
@@ -404,6 +417,77 @@ describe("useWidgetSync", () => {
         message: "diagnostics failed",
       }),
     );
+    consoleWarnSpy.mockRestore();
+  });
+
+  it("persists diagnostics snapshot to sessionStorage", async () => {
+    const today = localDateString();
+    const diagnosticsPayload = {
+      appGroupAccessible: true,
+      hasPayload: true,
+      payloadDate: today,
+      payloadUpdatedAt: "2026-02-12T09:00:00.000Z",
+      payloadByteCount: 64,
+      appGroupId: "group.com.darrylgraham.revolution",
+      dataKey: "widget_tasks_data",
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    };
+    mocks.getWidgetSyncDiagnosticsMock.mockResolvedValueOnce(diagnosticsPayload);
+
+    renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    const raw = window.sessionStorage.getItem(WIDGET_SYNC_DIAGNOSTICS_STORAGE_KEY);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw ?? "{}");
+    expect(parsed).toMatchObject(diagnosticsPayload);
+    expect(typeof parsed.timestamp).toBe("string");
+  });
+
+  it("stores widget sync write errors in sessionStorage", async () => {
+    const today = localDateString();
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.updateWidgetDataMock.mockRejectedValueOnce({
+      code: "PAYLOAD_WRITE_FAILED",
+      message: "Failed to write widget payload",
+    });
+
+    renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    const raw = window.sessionStorage.getItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw ?? "{}");
+    expect(parsed).toMatchObject({
+      code: "PAYLOAD_WRITE_FAILED",
+      message: "Failed to write widget payload",
+      source: "updateWidgetData",
+    });
+    expect(typeof parsed.timestamp).toBe("string");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("stores diagnostics failures in sessionStorage", async () => {
+    const today = localDateString();
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.getWidgetSyncDiagnosticsMock.mockRejectedValueOnce({
+      code: "DIAGNOSTICS_FAILED",
+      message: "diagnostics failed",
+    });
+
+    renderHook(() => useWidgetSync([makeTask()], today));
+    await flushEffects();
+
+    const raw = window.sessionStorage.getItem(WIDGET_SYNC_LAST_ERROR_STORAGE_KEY);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw ?? "{}");
+    expect(parsed).toMatchObject({
+      code: "DIAGNOSTICS_FAILED",
+      message: "diagnostics failed",
+      source: "getWidgetSyncDiagnostics",
+    });
+    expect(typeof parsed.timestamp).toBe("string");
     consoleWarnSpy.mockRestore();
   });
 });
