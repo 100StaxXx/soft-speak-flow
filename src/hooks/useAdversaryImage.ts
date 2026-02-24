@@ -17,7 +17,8 @@ interface CachedAdversaryImage {
 
 const DEFAULT_TARGET_VARIANTS = 3;
 const MAX_TARGET_VARIANTS = 5;
-const topUpTriggeredKeys = new Set<string>();
+const MISSING_COLUMN_CODE = '42703';
+const topUpRequestStatus = new Map<string, 'in_flight' | 'success'>();
 
 const clampVariants = (value: number | undefined) => {
   if (!Number.isFinite(value)) return DEFAULT_TARGET_VARIANTS;
@@ -36,6 +37,38 @@ const pickDeterministicVariant = (variants: CachedAdversaryImage[], seed: string
   const sorted = [...variants].sort((left, right) => left.variant_index - right.variant_index);
   const selectionIndex = hashString(seed) % sorted.length;
   return sorted[selectionIndex];
+};
+
+const isMissingVariantColumnError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const maybeError = error as { code?: string; message?: string };
+  if (maybeError.code === MISSING_COLUMN_CODE) return true;
+
+  const message = (maybeError.message || '').toLowerCase();
+  return message.includes('variant_index') && message.includes('does not exist');
+};
+
+const normalizeVariantRows = (rows: Array<{ image_url?: unknown; variant_index?: unknown }>) => {
+  const variantsByIndex = new Map<number, CachedAdversaryImage>();
+
+  for (const row of rows) {
+    if (typeof row?.image_url !== 'string') continue;
+
+    const index = typeof row.variant_index === 'number' && Number.isFinite(row.variant_index)
+      ? Math.floor(row.variant_index)
+      : 0;
+
+    if (!variantsByIndex.has(index)) {
+      variantsByIndex.set(index, {
+        image_url: row.image_url,
+        variant_index: index,
+      });
+    }
+  }
+
+  return Array.from(variantsByIndex.values())
+    .sort((left, right) => left.variant_index - right.variant_index);
 };
 
 export const useAdversaryImage = ({
@@ -68,23 +101,35 @@ export const useAdversaryImage = ({
       setError(null);
 
       try {
-        const { data: cachedImages, error: cacheError } = await supabase
+        const { data: variantRows, error: variantError } = await supabase
           .from('adversary_images')
           .select('image_url, variant_index')
           .eq('theme', theme)
           .eq('tier', tier)
           .order('variant_index', { ascending: true });
 
-        if (cacheError) {
-          throw cacheError;
+        let usableVariants: CachedAdversaryImage[];
+
+        if (!variantError) {
+          usableVariants = normalizeVariantRows((variantRows ?? []) as Array<{ image_url?: unknown; variant_index?: unknown }>);
+        } else if (isMissingVariantColumnError(variantError)) {
+          const { data: legacyRows, error: legacyError } = await supabase
+            .from('adversary_images')
+            .select('image_url')
+            .eq('theme', theme)
+            .eq('tier', tier)
+            .order('created_at', { ascending: true });
+
+          if (legacyError) {
+            throw legacyError;
+          }
+
+          usableVariants = normalizeVariantRows((legacyRows ?? []) as Array<{ image_url?: unknown; variant_index?: unknown }>);
+        } else {
+          throw variantError;
         }
 
         if (!isMounted) return;
-
-        const usableVariants = (cachedImages ?? [])
-          .filter((row): row is CachedAdversaryImage =>
-            typeof row.image_url === 'string' && typeof row.variant_index === 'number'
-          );
 
         if (usableVariants.length > 0) {
           const selectedVariant = pickDeterministicVariant(usableVariants, variantSeed);
@@ -94,8 +139,11 @@ export const useAdversaryImage = ({
           setImageUrl(null);
         }
 
-        if (usableVariants.length < clampedTargetVariants && !topUpTriggeredKeys.has(topUpKey)) {
-          topUpTriggeredKeys.add(topUpKey);
+        const existingTopUpStatus = topUpRequestStatus.get(topUpKey);
+        const canTriggerTopUp = existingTopUpStatus !== 'in_flight' && existingTopUpStatus !== 'success';
+
+        if (usableVariants.length < clampedTargetVariants && canTriggerTopUp) {
+          topUpRequestStatus.set(topUpKey, 'in_flight');
 
           supabase.functions
             .invoke('generate-adversary-image', {
@@ -106,11 +154,13 @@ export const useAdversaryImage = ({
                 throw new Error(fnError.message);
               }
 
+              topUpRequestStatus.set(topUpKey, 'success');
               if (isMounted && usableVariants.length === 0 && typeof data?.imageUrl === 'string') {
                 setImageUrl(data.imageUrl);
               }
             })
             .catch((topUpError) => {
+              topUpRequestStatus.delete(topUpKey);
               console.error('Background adversary image top-up failed:', topUpError);
             });
         }

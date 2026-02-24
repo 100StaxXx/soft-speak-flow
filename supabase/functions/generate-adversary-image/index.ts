@@ -34,10 +34,15 @@ const TIER_MODIFIERS: Record<string, string> = {
 
 const MAX_VARIANTS = 5;
 const DEFAULT_TARGET_VARIANTS = 1;
+const MISSING_COLUMN_CODE = "42703";
 
 interface CachedVariant {
   image_url: string;
   variant_index: number;
+}
+
+interface LegacyCachedVariant {
+  image_url: string;
 }
 
 class HttpError extends Error {
@@ -169,6 +174,20 @@ const pickDeterministicVariant = (
   return sorted[index];
 };
 
+const isMissingVariantColumnError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeError = error as { code?: string; message?: string };
+  if (maybeError.code === MISSING_COLUMN_CODE) {
+    return true;
+  }
+
+  const message = (maybeError.message ?? "").toLowerCase();
+  return message.includes("variant_index") && message.includes("does not exist");
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -192,9 +211,6 @@ serve(async (req) => {
     }
 
     const targetVariants = clampInteger(targetVariantsInput, 1, MAX_VARIANTS, DEFAULT_TARGET_VARIANTS);
-    const effectiveTargetVariants = requestedVariant === null
-      ? targetVariants
-      : Math.max(targetVariants, requestedVariant + 1);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -206,22 +222,51 @@ serve(async (req) => {
       .eq("theme", theme)
       .eq("tier", tier)
       .order("variant_index", { ascending: true });
+    const legacySchemaMode = isMissingVariantColumnError(cachedImagesError);
 
-    if (cachedImagesError) {
+    if (cachedImagesError && !legacySchemaMode) {
       throw new Error(`Failed to load cached adversary images: ${cachedImagesError.message}`);
     }
 
-    const variantsByIndex = new Map<number, CachedVariant>();
-    for (const row of cachedImages ?? []) {
-      if (
-        typeof row?.image_url === "string" &&
-        typeof row?.variant_index === "number" &&
-        !variantsByIndex.has(row.variant_index)
-      ) {
-        variantsByIndex.set(row.variant_index, {
+    const effectiveTargetVariants = legacySchemaMode
+      ? 1
+      : (requestedVariant === null
+        ? targetVariants
+        : Math.max(targetVariants, requestedVariant + 1));
+
+    let normalizedCachedImages: CachedVariant[] = [];
+
+    if (legacySchemaMode) {
+      console.warn(`adversary_images.variant_index missing; using legacy single-image mode for ${theme}/${tier}`);
+      const { data: legacyCachedImages, error: legacyCacheError } = await supabase
+        .from("adversary_images")
+        .select("image_url")
+        .eq("theme", theme)
+        .eq("tier", tier);
+
+      if (legacyCacheError) {
+        throw new Error(`Failed to load cached adversary images: ${legacyCacheError.message}`);
+      }
+
+      normalizedCachedImages = (legacyCachedImages ?? [])
+        .filter((row): row is LegacyCachedVariant => typeof row?.image_url === "string")
+        .map((row) => ({ image_url: row.image_url, variant_index: 0 }));
+    } else {
+      normalizedCachedImages = (cachedImages ?? [])
+        .filter(
+          (row): row is CachedVariant =>
+            typeof row?.image_url === "string" && typeof row?.variant_index === "number",
+        )
+        .map((row) => ({
           image_url: row.image_url,
-          variant_index: row.variant_index,
-        });
+          variant_index: Math.floor(row.variant_index),
+        }));
+    }
+
+    const variantsByIndex = new Map<number, CachedVariant>();
+    for (const row of normalizedCachedImages) {
+      if (!variantsByIndex.has(row.variant_index)) {
+        variantsByIndex.set(row.variant_index, row);
       }
     }
 
@@ -262,12 +307,19 @@ serve(async (req) => {
           variant_index: missingVariantIndex,
         });
 
-        const { error: upsertError } = await supabase
-          .from("adversary_images")
-          .upsert(
-            { theme, tier, variant_index: missingVariantIndex, image_url: imageUrl },
-            { onConflict: "theme,tier,variant_index", ignoreDuplicates: true },
-          );
+        const { error: upsertError } = legacySchemaMode
+          ? await supabase
+            .from("adversary_images")
+            .upsert(
+              { theme, tier, image_url: imageUrl },
+              { onConflict: "theme,tier", ignoreDuplicates: true },
+            )
+          : await supabase
+            .from("adversary_images")
+            .upsert(
+              { theme, tier, variant_index: missingVariantIndex, image_url: imageUrl },
+              { onConflict: "theme,tier,variant_index", ignoreDuplicates: true },
+            );
 
         if (upsertError) {
           console.error(

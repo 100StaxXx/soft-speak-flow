@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Skull } from 'lucide-react';
 
 interface AdversaryPortraitWithCracksProps {
   imageUrl?: string;
@@ -74,8 +75,8 @@ export const AdversaryPortraitWithCracks = memo(function AdversaryPortraitWithCr
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-900 to-purple-600 flex items-center justify-center">
-            <span className="text-2xl">👹</span>
+          <div className="w-full h-full bg-gradient-to-br from-purple-950 via-purple-900 to-purple-700 flex items-center justify-center">
+            <Skull className="w-7 h-7 text-purple-200/85" />
           </div>
         )}
         

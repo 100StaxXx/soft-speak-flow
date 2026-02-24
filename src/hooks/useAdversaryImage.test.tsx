@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     invokeMock,
     cachedRows: [] as Array<{ image_url: string; variant_index: number }>,
     cacheError: null as { message: string } | null,
+    selectResponses: {} as Record<string, Array<{ data: unknown; error: { message: string; code?: string } | null }>>,
   };
 });
 
@@ -27,13 +28,27 @@ import { useAdversaryImage } from "./useAdversaryImage";
 const createAdversaryImagesBuilder = () => {
   const builder: Record<string, unknown> = {};
   const returnBuilder = () => builder;
+  let selectedColumns = "";
 
-  builder.select = vi.fn(returnBuilder);
+  builder.select = vi.fn((columns: string) => {
+    selectedColumns = columns;
+    return returnBuilder();
+  });
   builder.eq = vi.fn(returnBuilder);
-  builder.order = vi.fn(async () => ({
-    data: mocks.cachedRows,
-    error: mocks.cacheError,
-  }));
+  builder.order = vi.fn(async () => {
+    const queued = mocks.selectResponses[selectedColumns]?.shift();
+    if (queued) {
+      return {
+        data: queued.data,
+        error: queued.error,
+      };
+    }
+
+    return {
+      data: mocks.cachedRows,
+      error: mocks.cacheError,
+    };
+  });
 
   return builder;
 };
@@ -46,11 +61,23 @@ const hashString = (value: string) => {
   return hash;
 };
 
+const queueSelectResponse = (
+  columns: string,
+  response: { data: unknown; error: { message: string; code?: string } | null },
+) => {
+  if (!mocks.selectResponses[columns]) {
+    mocks.selectResponses[columns] = [];
+  }
+
+  mocks.selectResponses[columns].push(response);
+};
+
 describe("useAdversaryImage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.cachedRows = [];
     mocks.cacheError = null;
+    mocks.selectResponses = {};
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "adversary_images") {
         return createAdversaryImagesBuilder();
@@ -145,6 +172,38 @@ describe("useAdversaryImage", () => {
     });
   });
 
+  it("falls back to legacy schema query when variant_index column is missing", async () => {
+    queueSelectResponse("image_url, variant_index", {
+      data: null,
+      error: {
+        code: "42703",
+        message: "column adversary_images.variant_index does not exist",
+      },
+    });
+    queueSelectResponse("image_url", {
+      data: [{ image_url: "https://example.com/legacy.png" }],
+      error: null,
+    });
+
+    const { result } = renderHook(() =>
+      useAdversaryImage({
+        theme: "legacy-theme-a",
+        tier: "common",
+        name: "Legacy Shade",
+        selectionSeed: "legacy-seed",
+        targetVariants: 1,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.imageUrl).toBe("https://example.com/legacy.png");
+    expect(result.current.error).toBeNull();
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
+  });
+
   it("dedupes background top-up requests per theme+tier in-session", async () => {
     mocks.cachedRows = [];
 
@@ -180,5 +239,51 @@ describe("useAdversaryImage", () => {
 
     first.unmount();
     second.unmount();
+  });
+
+  it("retries top-up on subsequent mount after a failed top-up attempt", async () => {
+    mocks.cachedRows = [];
+    mocks.invokeMock
+      .mockRejectedValueOnce(new Error("top-up failed"))
+      .mockResolvedValueOnce({
+        data: { imageUrl: "https://example.com/retry.png" },
+        error: null,
+      });
+
+    const first = renderHook(() =>
+      useAdversaryImage({
+        theme: "resist-theme-retry",
+        tier: "common",
+        name: "Retry One",
+        selectionSeed: "retry-1",
+        targetVariants: 3,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(first.result.current.isLoading).toBe(false);
+    });
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+    });
+
+    first.unmount();
+
+    const second = renderHook(() =>
+      useAdversaryImage({
+        theme: "resist-theme-retry",
+        tier: "common",
+        name: "Retry Two",
+        selectionSeed: "retry-2",
+        targetVariants: 3,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(second.result.current.isLoading).toBe(false);
+    });
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+    });
   });
 });

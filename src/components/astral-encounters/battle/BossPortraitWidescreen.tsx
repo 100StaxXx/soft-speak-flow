@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Skull } from 'lucide-react';
 
 interface BossPortraitWidescreenProps {
   imageUrl?: string;
@@ -66,8 +67,13 @@ export const BossPortraitWidescreen = memo(function BossPortraitWidescreen({
             className="w-full h-full object-cover object-center"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 flex items-center justify-center">
-            <span className="text-5xl">👹</span>
+          <div className="w-full h-full bg-gradient-to-br from-purple-950 via-purple-900 to-purple-700 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-1.5">
+              <Skull className="w-10 h-10 text-purple-200/85" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-purple-200/70">
+                Adversary
+              </span>
+            </div>
           </div>
         )}
 
