@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { normalizeTaskSchedulingState, normalizeTaskSchedulingUpdate } from "./taskSchedulingRules";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("taskSchedulingRules", () => {
   it("moves regular dated/no-time tasks to inbox", () => {
@@ -30,17 +34,22 @@ describe("taskSchedulingRules", () => {
     expect(normalized.normalizedToInbox).toBe(false);
   });
 
-  it("strips time from inbox tasks", () => {
+  it("promotes timed inbox tasks to today's scheduled quests", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-24T10:15:00"));
+
     const normalized = normalizeTaskSchedulingState({
       task_date: null,
       scheduled_time: "09:00",
       habit_source_id: null,
-      source: "manual",
+      source: "inbox",
     });
 
-    expect(normalized.task_date).toBeNull();
-    expect(normalized.scheduled_time).toBeNull();
-    expect(normalized.strippedScheduledTime).toBe(true);
+    expect(normalized.task_date).toBe("2026-02-24");
+    expect(normalized.scheduled_time).toBe("09:00");
+    expect(normalized.source).toBe("manual");
+    expect(normalized.movedFromInboxToScheduled).toBe(true);
+    expect(normalized.strippedScheduledTime).toBe(false);
   });
 
   it("normalizes updates against existing task state", () => {
@@ -61,4 +70,3 @@ describe("taskSchedulingRules", () => {
     expect(normalized.normalizedToInbox).toBe(true);
   });
 });
-

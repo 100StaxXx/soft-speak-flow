@@ -1,7 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const fromMock = vi.fn();
@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => {
   const dailyTasksCountExecuteMock = vi.fn();
   const dailyTasksInsertSingleMock = vi.fn();
   const dailyTasksDeleteExecuteMock = vi.fn();
+  const dailyTasksFetchSchedulingSingleMock = vi.fn();
+  const dailyTasksUpdateMock = vi.fn();
   const dailyTasksUpdateExecuteMock = vi.fn();
   const taskAttachmentsDeleteExecuteMock = vi.fn();
   const taskAttachmentsInsertExecuteMock = vi.fn();
@@ -30,6 +32,8 @@ const mocks = vi.hoisted(() => {
     dailyTasksCountExecuteMock,
     dailyTasksInsertSingleMock,
     dailyTasksDeleteExecuteMock,
+    dailyTasksFetchSchedulingSingleMock,
+    dailyTasksUpdateMock,
     dailyTasksUpdateExecuteMock,
     taskAttachmentsDeleteExecuteMock,
     taskAttachmentsInsertExecuteMock,
@@ -137,6 +141,10 @@ describe("isTaskAttachmentsTableMissingError", () => {
 });
 
 describe("useTaskMutations attachment handling", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -157,19 +165,46 @@ describe("useTaskMutations attachment handling", () => {
       error: null,
     });
     mocks.dailyTasksDeleteExecuteMock.mockResolvedValue({ error: null });
+    mocks.dailyTasksFetchSchedulingSingleMock.mockResolvedValue({
+      data: {
+        task_date: null,
+        scheduled_time: null,
+        habit_source_id: null,
+        source: "inbox",
+      },
+      error: null,
+    });
     mocks.dailyTasksUpdateExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsDeleteExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({ error: null });
 
+    mocks.dailyTasksUpdateMock.mockReturnValue({
+      eq: vi.fn(() => ({
+        eq: mocks.dailyTasksUpdateExecuteMock,
+      })),
+    });
+
     mocks.fromMock.mockImplementation((table: string) => {
       if (table === "daily_tasks") {
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: mocks.dailyTasksCountExecuteMock,
-              is: mocks.dailyTasksCountExecuteMock,
-            })),
-          })),
+          select: vi.fn((selection?: string) => {
+            if (selection === "task_date, scheduled_time, habit_source_id, source") {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: mocks.dailyTasksFetchSchedulingSingleMock,
+                  })),
+                })),
+              };
+            }
+
+            return {
+              eq: vi.fn(() => ({
+                eq: mocks.dailyTasksCountExecuteMock,
+                is: mocks.dailyTasksCountExecuteMock,
+              })),
+            };
+          }),
           insert: vi.fn(() => ({
             select: vi.fn(() => ({
               single: mocks.dailyTasksInsertSingleMock,
@@ -180,11 +215,7 @@ describe("useTaskMutations attachment handling", () => {
               eq: mocks.dailyTasksDeleteExecuteMock,
             })),
           })),
-          update: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: mocks.dailyTasksUpdateExecuteMock,
-            })),
-          })),
+          update: mocks.dailyTasksUpdateMock,
         };
       }
 
@@ -305,5 +336,35 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.dailyTasksUpdateExecuteMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest updated!" }));
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
+  });
+
+  it("moves timed inbox updates into quests with today's date", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-24T08:25:00"));
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.updateTask({
+        taskId: "task-1",
+        updates: {
+          task_date: null,
+          scheduled_time: "09:00",
+        },
+      });
+    });
+
+    expect(mocks.dailyTasksUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      task_date: "2026-02-24",
+      scheduled_time: "09:00",
+      source: "manual",
+    }));
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Moved to Quests",
+      description: "Added a time, so this quest is now scheduled in Quests.",
+    }));
+    expect(mocks.toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Time removed" }));
   });
 });

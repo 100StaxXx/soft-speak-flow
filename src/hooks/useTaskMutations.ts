@@ -812,6 +812,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (!user?.id) throw new Error('User not authenticated');
       let normalizedToInbox = false;
       let strippedScheduledTime = false;
+      let movedFromInboxToScheduled = false;
       let attachmentsSkippedDueToSchema = false;
 
       // Build update object with only provided fields
@@ -889,10 +890,16 @@ export const useTaskMutations = (taskDate: string) => {
 
         normalizedToInbox = normalizedScheduling.normalizedToInbox;
         strippedScheduledTime = normalizedScheduling.strippedScheduledTime;
+        movedFromInboxToScheduled = normalizedScheduling.movedFromInboxToScheduled;
       }
 
       if (Object.keys(updateData).length === 0) {
-        return { normalizedToInbox, strippedScheduledTime, attachmentsSkippedDueToSchema };
+        return {
+          normalizedToInbox,
+          strippedScheduledTime,
+          movedFromInboxToScheduled,
+          attachmentsSkippedDueToSchema,
+        };
       }
 
       const { error } = await supabase
@@ -908,7 +915,12 @@ export const useTaskMutations = (taskDate: string) => {
         attachmentsSkippedDueToSchema = attachmentPersistResult.attachmentsSkippedDueToSchema;
       }
 
-      return { normalizedToInbox, strippedScheduledTime, attachmentsSkippedDueToSchema };
+      return {
+        normalizedToInbox,
+        strippedScheduledTime,
+        movedFromInboxToScheduled,
+        attachmentsSkippedDueToSchema,
+      };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -931,10 +943,10 @@ export const useTaskMutations = (taskDate: string) => {
         return;
       }
 
-      if (data?.strippedScheduledTime && !isScheduledTimeOnlyUpdate) {
+      if (data?.movedFromInboxToScheduled) {
         toast({
-          title: "Time removed",
-          description: "Inbox quests do not keep a scheduled time.",
+          title: "Moved to Quests",
+          description: "Added a time, so this quest is now scheduled in Quests.",
         });
         return;
       }

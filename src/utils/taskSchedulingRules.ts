@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { normalizeScheduledTime } from "@/utils/scheduledTime";
 
 export interface TaskSchedulingState {
@@ -10,6 +11,7 @@ export interface TaskSchedulingState {
 export interface NormalizedTaskSchedulingState extends TaskSchedulingState {
   normalizedToInbox: boolean;
   strippedScheduledTime: boolean;
+  movedFromInboxToScheduled: boolean;
 }
 
 const isRegularQuest = (habitSourceId: string | null | undefined) => !habitSourceId;
@@ -22,21 +24,20 @@ export const normalizeTaskSchedulingState = (
   let source = state.source ?? null;
   let normalizedToInbox = false;
   let strippedScheduledTime = false;
+  let movedFromInboxToScheduled = false;
 
   if (taskDate === null && scheduledTime !== null) {
-    scheduledTime = null;
-    strippedScheduledTime = true;
+    taskDate = format(new Date(), "yyyy-MM-dd");
+    if (source === "inbox") {
+      source = "manual";
+    }
+    movedFromInboxToScheduled = true;
   }
 
   if (isRegularQuest(state.habit_source_id) && taskDate !== null && scheduledTime === null) {
     taskDate = null;
     source = "inbox";
     normalizedToInbox = true;
-  }
-
-  if (taskDate === null && scheduledTime !== null) {
-    scheduledTime = null;
-    strippedScheduledTime = true;
   }
 
   return {
@@ -46,6 +47,7 @@ export const normalizeTaskSchedulingState = (
     source,
     normalizedToInbox,
     strippedScheduledTime,
+    movedFromInboxToScheduled,
   };
 };
 
@@ -64,4 +66,3 @@ export const normalizeTaskSchedulingUpdate = (
     source: updates.source !== undefined ? updates.source : existing.source,
   });
 };
-
