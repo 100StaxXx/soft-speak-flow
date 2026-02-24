@@ -3,7 +3,7 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { mentorNarrativeProfiles, getMentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
+import { getMentorNarrativeProfile } from "../_shared/mentorNarrativeProfiles.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -187,7 +187,6 @@ serve(async (req) => {
         .eq("id", userId)
         .single();
 
-      let mentorSlug = "eli"; // default
       let mentorName = "Your Mentor";
       let narrativeProfile = getMentorNarrativeProfile("eli");
       
@@ -199,7 +198,6 @@ serve(async (req) => {
           .single();
 
         if (mentor) {
-          mentorSlug = mentor.slug;
           mentorName = mentor.name;
           narrativeProfile = getMentorNarrativeProfile(mentor.slug) || narrativeProfile;
         }
@@ -256,8 +254,12 @@ serve(async (req) => {
       // Get all wins
       const allWins = wins.length > 0 ? wins.join("; ") : null;
 
-      // Build the storytelling prompt using mentor narrative profile
-      const storyPrompt = `You are ${mentorName}, reflecting on a week shared with someone you deeply care about guiding.
+      const expectedWeeklyEntries = 7;
+      const missedCheckIns = Math.max(0, expectedWeeklyEntries - stats.checkIns);
+      const missedReflections = Math.max(0, expectedWeeklyEntries - stats.reflections);
+
+      // Build a concise, readable, behavior-grounded prompt using mentor narrative profile
+      const storyPrompt = `You are ${mentorName}. Write a concise weekly recap that is easy to consume and grounded in behavior.
 
 YOUR VOICE & STYLE:
 ${narrativeProfile?.narrativeVoice || "Warm and supportive"}
@@ -268,50 +270,45 @@ ${narrativeProfile?.speechPatterns?.map(p => `- ${p}`).join("\n") || "- Speaks w
 YOUR WISDOM STYLE:
 ${narrativeProfile?.wisdomStyle || "Supportive guidance"}
 
-EXAMPLE OF HOW YOU SPEAK:
-${narrativeProfile?.exampleDialogue?.slice(0, 2).join("\n") || '"I see you. I believe in you."'}
-
 ---
 
-THE WEEK'S JOURNEY:
+WEEK DATA:
 
-## Day-by-Day Mood Flow
+Mood flow by day:
 ${moodJourneyText}
-Overall arc: ${trend === "improving" ? "Rising energy and spirits" : trend === "declining" ? "Some challenges along the way" : "Steady and grounded"}
+Overall trend: ${trend}
 
-## Morning Intentions Set
-${intentionsText || "They moved through the week with quiet purpose"}
+Morning intentions:
+${intentionsText || "No intentions logged"}
 
-## Victories Celebrated
-${allWins || "Small wins, even if unspoken"}
+Wins shared:
+${allWins || "No wins logged"}
 
-## Gratitude Expressed
-${gratitudeTextFull || "Moments of appreciation, felt if not named"}
+Gratitude shared:
+${gratitudeTextFull || "No gratitude logged"}
 
-## The Numbers Tell a Story
-- ${stats.checkIns} mornings began with intention
-- ${stats.reflections} evenings ended with reflection  
-- ${stats.quests} quests completed
-- ${stats.habits} habits honored
+Stats:
+- Check-ins completed: ${stats.checkIns}
+- Reflections completed: ${stats.reflections}
+- Quests completed: ${stats.quests}
+- Habit completions: ${stats.habits}
+- Missed morning check-ins: ${missedCheckIns}
+- Missed evening reflections: ${missedReflections}
 
 ---
 
-WRITE A PERSONAL WEEKLY REFLECTION (300-400 words):
-
-Tell the story of their week as if you were sitting with them on Sunday evening, looking back together. This is NOT a list or summary—it's a narrative, a story told in your unique voice.
-
-Structure your reflection as:
-1. Opening: Set the scene of beginning the week together
-2. The Journey: Weave through specific moments—reference actual moods, intentions, wins, gratitude they shared
-3. Patterns & Growth: What did you notice about their week? What patterns emerged?
-4. Forward Gaze: End with encouragement for the week ahead, in your signature style
-
-IMPORTANT:
-- Write in second person ("you") speaking directly to them
-- Reference SPECIFIC things from their data (not generic advice)
-- Use your unique speech patterns and voice throughout
-- This should feel like a personal letter, not a report
-- End with something memorable in your style (a question, challenge, or blessing)`;
+WRITING REQUIREMENTS:
+- Total length must be 90 to 150 words
+- Use 2 to 4 short paragraphs
+- Plain text only
+- No headings, bullet points, or numbered lists
+- Separate paragraphs with a blank line
+- Use a blended tone: include both follow-through and gaps in a natural flow
+- Keep language direct and concrete; reference real week data
+- Mention missed check-ins and missed reflections naturally
+- Light warmth is allowed (up to 1-2 mild encouraging lines), but avoid heavy fluff
+- Avoid poetic language, metaphors, or dramatic scene setting
+- Final sentence should give one clear focus for next week`;
 
       try {
         const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -323,19 +320,21 @@ IMPORTANT:
           body: JSON.stringify({
             model: "google/gemini-2.5-flash",
             messages: [
-              { role: "system", content: `You are ${mentorName}, a wellness mentor who tells stories and reflects on journeys. You speak in first person as the mentor, addressing the user as "you". Your responses are warm, personal narratives—never lists or bullet points.` },
+              {
+                role: "system",
+                content: `You are ${mentorName}, a concise mentor. Address the user as "you". Write plain-text recap paragraphs that are readable, behavior-specific, and balanced between encouragement and accountability.`,
+              },
               { role: "user", content: storyPrompt },
             ],
-            max_tokens: 800,
+            max_tokens: 320,
           }),
         });
 
         if (aiResponse.ok) {
           const aiData = await aiResponse.json();
-          mentorStory = aiData.choices?.[0]?.message?.content?.trim();
-          
-          // Also generate a shorter insight for backward compatibility
-          mentorInsight = mentorStory ? mentorStory.split('\n\n')[0].slice(0, 400) : null;
+          const generatedRecap = aiData.choices?.[0]?.message?.content?.trim();
+          mentorStory = generatedRecap || null;
+          mentorInsight = generatedRecap ? generatedRecap.slice(0, 500).trim() : null;
         } else {
           console.error("AI response not ok:", await aiResponse.text());
         }

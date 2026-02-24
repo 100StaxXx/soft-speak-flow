@@ -371,30 +371,35 @@ export const AstralEncounterModal = ({
 
   if (!encounter || !adversary) return null;
 
-  // Games that need fullscreen rendering outside the Dialog (shelved games removed)
-  const FULLSCREEN_GAMES: MiniGameType[] = [];
+  // Active encounter games should use bounded fullscreen layout in battle/practice
+  const FULLSCREEN_GAMES: MiniGameType[] = ['energy_beam', 'tap_sequence', 'orb_match', 'galactic_match'];
   const currentGameType = getCurrentGameType();
   const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
 
   return (
     <>
-      {/* Fullscreen overlay for games that need it (like StarfallDodge) */}
+      {/* Bounded fullscreen overlay for active encounter game phases */}
       {open && needsFullscreen && (
-        <div className="fixed inset-0 z-[100] bg-background">
+        <div
+          className="fixed top-0 left-0 right-0 z-[100] overflow-hidden bg-background"
+          style={{ bottom: 'var(--bottom-nav-safe-offset)' }}
+        >
           {/* Practice mode in fullscreen */}
           {phase === 'practice' && (
-            <PracticeRoundWrapper
-              gameType={currentGameType}
-              companionStats={companionStats}
-              onPracticeComplete={handlePracticeComplete}
-              onSkipPractice={handleSkipPractice}
-              isFullscreen
-            />
+            <div className="h-full min-h-0">
+              <PracticeRoundWrapper
+                gameType={currentGameType}
+                companionStats={companionStats}
+                onPracticeComplete={handlePracticeComplete}
+                onSkipPractice={handleSkipPractice}
+                isFullscreen
+              />
+            </div>
           )}
           
           {/* Battle mode in fullscreen */}
           {phase === 'battle' && (
-            <>
+            <div className="relative z-10 flex h-full min-h-0 flex-col">
               {/* Battle HP Overlay */}
               <BattleOverlay
                 battleState={battleState}
@@ -427,8 +432,10 @@ export const AstralEncounterModal = ({
               )}
               
               {/* The fullscreen game */}
-              {renderMiniGame()}
-            </>
+              <div className="flex-1 min-h-0">
+                {renderMiniGame()}
+              </div>
+            </div>
           )}
         </div>
       )}

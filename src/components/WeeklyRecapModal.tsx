@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { X, Share2, Volume2, VolumeX, Calendar, Sparkles, TrendingUp, TrendingDown, Minus, BookOpen } from "lucide-react";
+import { useRef } from "react";
+import { X, Share2, Calendar, Sparkles, TrendingUp, TrendingDown, Minus, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { useWeeklyRecap } from "@/hooks/useWeeklyRecap";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
 import { downloadImage } from "@/utils/imageDownload";
 import { toPng } from "html-to-image";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const TrendBadge = ({ trend }: { trend: string }) => {
   const config = {
@@ -45,7 +44,6 @@ export const WeeklyRecapModal = () => {
   const { isModalOpen, selectedRecap, closeRecap } = useWeeklyRecap();
   const mentor = useMentorPersonality();
   const cardRef = useRef<HTMLDivElement>(null);
-  const [isReading, setIsReading] = useState(false);
 
   if (!selectedRecap) return null;
 
@@ -53,8 +51,12 @@ export const WeeklyRecapModal = () => {
   const endDate = parseISO(selectedRecap.week_end_date);
   const dateRange = `${format(startDate, "MMMM d")} – ${format(endDate, "d, yyyy")}`;
 
-  const storyContent = selectedRecap.mentor_story || selectedRecap.mentor_insight;
-  const paragraphs = storyContent?.split('\n\n').filter(p => p.trim()) || [];
+  const storyContent = selectedRecap.mentor_insight || selectedRecap.mentor_story;
+  const maxStoryLength = 900;
+  const shortenedStoryContent = storyContent && storyContent.length > maxStoryLength
+    ? `${storyContent.slice(0, maxStoryLength).trimEnd()}...`
+    : storyContent;
+  const paragraphs = shortenedStoryContent?.split(/\n{2,}/).filter(p => p.trim()) || [];
 
   const handleShare = async () => {
     if (!cardRef.current) return;
@@ -69,28 +71,7 @@ export const WeeklyRecapModal = () => {
     }
   };
 
-  const handleReadAloud = () => {
-    if (!storyContent) return;
-    
-    if (isReading) {
-      window.speechSynthesis.cancel();
-      setIsReading(false);
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(storyContent);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.onend = () => setIsReading(false);
-    utterance.onerror = () => setIsReading(false);
-    
-    window.speechSynthesis.speak(utterance);
-    setIsReading(true);
-  };
-
   const handleClose = () => {
-    window.speechSynthesis.cancel();
-    setIsReading(false);
     closeRecap();
   };
 
@@ -182,16 +163,6 @@ export const WeeklyRecapModal = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                {storyContent && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handleReadAloud}
-                    className={`rounded-xl transition-colors ${isReading ? "text-amber-400 bg-amber-400/10" : "hover:bg-white/5"}`}
-                  >
-                    {isReading ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                  </Button>
-                )}
                 <Button variant="ghost" size="icon" onClick={handleShare} className="rounded-xl hover:bg-white/5">
                   <Share2 className="h-4 w-4" />
                 </Button>
@@ -202,7 +173,10 @@ export const WeeklyRecapModal = () => {
             </div>
 
             {/* Story Content */}
-            <ScrollArea className="relative flex-1 min-h-0">
+            <div
+              className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain"
+              style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+            >
               <div ref={cardRef} className="px-4 pb-6 space-y-6">
                 {/* Trend Badge */}
                 <div className="flex items-center justify-center pt-2">
@@ -218,11 +192,7 @@ export const WeeklyRecapModal = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 + (i * 0.1), duration: 0.5 }}
-                        className={`text-[15px] leading-[1.8] text-foreground/90 ${
-                          i === 0 
-                            ? "first-letter:text-3xl first-letter:font-serif first-letter:font-bold first-letter:text-amber-400 first-letter:mr-1 first-letter:float-left first-letter:leading-none" 
-                            : ""
-                        }`}
+                        className="text-[15px] leading-[1.65] text-foreground/90"
                       >
                         {paragraph}
                       </motion.p>
@@ -283,7 +253,7 @@ export const WeeklyRecapModal = () => {
                   </p>
                 </motion.div>
               </div>
-            </ScrollArea>
+            </div>
 
             {/* Footer */}
             <div className="relative px-6 py-5 pb-6 border-t border-white/5">
