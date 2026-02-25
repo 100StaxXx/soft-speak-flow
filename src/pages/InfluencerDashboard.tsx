@@ -54,17 +54,33 @@ const InfluencerDashboard = () => {
   const navigate = useNavigate();
   const [codeInput, setCodeInput] = useState("");
   const [verifiedCode, setVerifiedCode] = useState<string | null>(null);
+  const [creatorAccessToken, setCreatorAccessToken] = useState<string | null>(null);
 
   // Check for code in URL params or localStorage
   useEffect(() => {
     const urlCode = searchParams.get("code");
+    const urlToken = searchParams.get("token");
     const storedCode = safeLocalStorage.getItem("influencer_code");
+    const storedToken = safeLocalStorage.getItem("influencer_dashboard_token");
     
     if (urlCode) {
-      setVerifiedCode(urlCode);
-      safeLocalStorage.setItem("influencer_code", urlCode);
+      const normalizedCode = urlCode.toUpperCase();
+      setVerifiedCode(normalizedCode);
+      safeLocalStorage.setItem("influencer_code", normalizedCode);
+
+      if (urlToken) {
+        setCreatorAccessToken(urlToken);
+        safeLocalStorage.setItem("influencer_dashboard_token", urlToken);
+      } else {
+        setCreatorAccessToken(null);
+        safeLocalStorage.removeItem("influencer_dashboard_token");
+      }
     } else if (storedCode) {
       setVerifiedCode(storedCode);
+
+      if (storedToken) {
+        setCreatorAccessToken(storedToken);
+      }
     }
   }, [searchParams]);
 
@@ -146,8 +162,18 @@ const InfluencerDashboard = () => {
   // Request payout mutation
   const requestPayoutMutation = useMutation({
     mutationFn: async () => {
+      if (!verifiedCode) {
+        throw new Error("Missing referral code");
+      }
+      if (!creatorAccessToken) {
+        throw new Error("Secure creator session expired. Re-open your dashboard link from email.");
+      }
+
       const { data, error } = await supabase.functions.invoke("request-referral-payout", {
-        body: { referral_code: verifiedCode },
+        body: {
+          referral_code: verifiedCode,
+          creator_access_token: creatorAccessToken,
+        },
       });
       
       if (error) throw error;
@@ -170,6 +196,8 @@ const InfluencerDashboard = () => {
     }
     setVerifiedCode(codeInput.trim().toUpperCase());
     safeLocalStorage.setItem("influencer_code", codeInput.trim().toUpperCase());
+    setCreatorAccessToken(null);
+    safeLocalStorage.removeItem("influencer_dashboard_token");
   };
 
   const copyCode = () => {
@@ -209,7 +237,9 @@ const InfluencerDashboard = () => {
 
   const logout = () => {
     safeLocalStorage.removeItem("influencer_code");
+    safeLocalStorage.removeItem("influencer_dashboard_token");
     setVerifiedCode(null);
+    setCreatorAccessToken(null);
     navigate("/creator");
   };
 
@@ -475,7 +505,7 @@ const InfluencerDashboard = () => {
                   </div>
                   <Button
                     onClick={() => requestPayoutMutation.mutate()}
-                    disabled={requestPayoutMutation.isPending}
+                    disabled={requestPayoutMutation.isPending || !creatorAccessToken}
                     className="shrink-0"
                   >
                     {requestPayoutMutation.isPending ? (
@@ -486,6 +516,11 @@ const InfluencerDashboard = () => {
                     Request Payout
                   </Button>
                 </div>
+                {!creatorAccessToken && (
+                  <p className="text-xs text-amber-600 mt-3">
+                    Secure session required. Re-open your dashboard link from your confirmation email.
+                  </p>
+                )}
               </div>
             )}
 

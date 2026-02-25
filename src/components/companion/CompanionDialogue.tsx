@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback, type KeyboardEvent } from "react";
+import { memo, useState, useEffect, useCallback, useMemo, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompanionDialogue, DialogueMood } from "@/hooks/useCompanionDialogue";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -13,6 +13,7 @@ import {
 import { useTalkPopupContextSafe } from "@/contexts/TalkPopupContext";
 import { cn } from "@/lib/utils";
 import type { CompanionShimmerType } from "@/config/companionDialoguePacks";
+import { isNearEvolution } from "@/lib/companionEvolutionSignals";
 
 interface MoodConfig {
   color: string;
@@ -74,6 +75,14 @@ const shimmerConfig: Record<CompanionShimmerType, ShimmerConfig> = {
   },
 };
 
+const NEAR_EVOLUTION_LINES = [
+  "I can feel a new form stirring inside me.",
+  "We are so close to a breakthrough together.",
+  "Something bright is building in me.",
+  "One more push and I will transform.",
+  "My next form is almost ready to awaken.",
+] as const;
+
 interface CompanionDialogueProps {
   className?: string;
   companionName?: string | null;
@@ -85,24 +94,41 @@ const normalizeCompanionName = (value: string | null | undefined) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const hashSeed = (value: string): number => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+};
+
 export const CompanionDialogue = memo(({ className, companionName }: CompanionDialogueProps) => {
-  const { 
-    greeting, 
+  const {
+    greeting,
     bondDialogue,
     microTitle,
     shimmerType,
-    dialogueMood, 
-    isLoading 
+    dialogueMood,
+    isLoading,
+    lineId,
   } = useCompanionDialogue();
-  
-  const { companion } = useCompanion();
+
+  const { companion, progressToNext, canEvolve } = useCompanion();
   const { dismiss: dismissTalkPopup } = useTalkPopupContextSafe();
   const companionImageUrl = companion?.current_image_url;
   const resolvedCompanionName =
     normalizeCompanionName(companionName)
     ?? normalizeCompanionName(companion?.cached_creature_name)
     ?? "Companion";
-  
+
+  const nearEvolution = isNearEvolution({ progressToNext, canEvolve });
+  const nearEvolutionLine = useMemo(() => {
+    if (!nearEvolution) return null;
+    const seed = `${companion?.id ?? "companion"}:${companion?.current_stage ?? 0}:${lineId}`;
+    const index = hashSeed(seed) % NEAR_EVOLUTION_LINES.length;
+    return NEAR_EVOLUTION_LINES[index];
+  }, [nearEvolution, companion?.id, companion?.current_stage, lineId]);
+
   const [displayText, setDisplayText] = useState(greeting);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -110,7 +136,7 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
     typeof window !== "undefined"
     && typeof window.matchMedia === "function"
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  
+
   // Animate text change
   useEffect(() => {
     if (greeting !== displayText && !isAnimating) {
@@ -122,7 +148,7 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
       return () => clearTimeout(timer);
     }
   }, [greeting, displayText, isAnimating]);
-  
+
   const handleDialogOpenChange = useCallback((open: boolean) => {
     if (open) {
       dismissTalkPopup();
@@ -183,7 +209,7 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
         />
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
-        
+
         <div className="relative p-4">
           <div className="flex items-start gap-3">
             {/* Companion portrait with mood-colored ring */}
@@ -193,8 +219,8 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
             )}>
               <Avatar className="h-10 w-10 rounded-lg">
                 {companionImageUrl ? (
-                  <AvatarImage 
-                    src={companionImageUrl} 
+                  <AvatarImage
+                    src={companionImageUrl}
                     alt={resolvedCompanionName}
                     className="object-cover"
                   />
@@ -204,7 +230,7 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
                 </AvatarFallback>
               </Avatar>
             </div>
-            
+
             {/* Dialogue text */}
             <div className="flex-1 min-w-0">
               <p
@@ -227,6 +253,11 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
                   "{displayText}"
                 </motion.p>
               </AnimatePresence>
+              {nearEvolutionLine ? (
+                <p data-testid="companion-near-evolution-line" className="mt-2 text-xs italic text-primary/90">
+                  {nearEvolutionLine}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -271,6 +302,11 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
             <p className="text-sm leading-relaxed text-foreground">
               "{displayText}"
             </p>
+            {nearEvolutionLine ? (
+              <p data-testid="companion-near-evolution-line-modal" className="text-xs italic text-primary/90">
+                {nearEvolutionLine}
+              </p>
+            ) : null}
             {bondDialogue ? (
               <p className="text-sm leading-relaxed text-foreground/80">
                 {bondDialogue}

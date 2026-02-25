@@ -1,0 +1,5 @@
+
+module CapgoNativePurchases.Swift {
+  header "CapgoNativePurchases-Swift.h"
+  requires objc
+}

@@ -25,15 +25,9 @@ collect_internal() {
 }
 
 collect_scheduled() {
-  {
-    printf '%s\n' \
-      'generate-daily-mentor-pep-talks' \
-      'schedule-daily-mentor-pushes' \
-      'dispatch-daily-pushes' \
-      'retry-missing-pep-talk-transcripts'
-    find supabase/migrations -name '*.sql' -type f -print0 \
-      | xargs -0 perl -0777 -ne 'while(/cron\.schedule\(\s*["\x27]([^"\x27]+)["\x27]/sg){print "$1\n"}'
-  } | sed '/^$/d' | sort -u
+  find supabase/migrations -name '*.sql' -type f -print0 \
+    | xargs -0 perl -0777 -ne 'while(/cron\.schedule\(\s*["\x27]([^"\x27]+)["\x27]/sg){print "$1\n"}' \
+    | sed '/^$/d' | sort -u
 }
 
 collect_manual_allowlist() {

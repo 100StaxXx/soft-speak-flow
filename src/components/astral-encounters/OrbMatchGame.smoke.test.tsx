@@ -46,4 +46,18 @@ describe('OrbMatchGame smoke', () => {
     expect(screen.getByText('Starburst - Level 1')).toBeInTheDocument();
     expect(screen.getByText(/Target:/)).toBeInTheDocument();
   });
+
+  it('renders compact encounter layout with dynamic board sizing', () => {
+    const { container } = render(
+      <OrbMatchGame
+        companionStats={{ mind: 50, body: 50, soul: 50 }}
+        onComplete={vi.fn()}
+        difficulty="easy"
+        isPractice
+        compact
+      />,
+    );
+
+    expect(container.querySelector('.game-container')).toBeInTheDocument();
+  });
 });

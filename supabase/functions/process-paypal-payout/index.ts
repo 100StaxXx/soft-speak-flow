@@ -105,6 +105,29 @@ serve(async (req) => {
       });
     }
 
+    // Idempotency guard: if payout already has a PayPal batch in-flight or settled,
+    // do not submit another payout request.
+    if (
+      payout.paypal_transaction_id &&
+      (payout.status === "processing" || payout.status === "paid")
+    ) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          idempotent: true,
+          payout_batch_id: payout.paypal_transaction_id,
+          batch_status: payout.status === "paid" ? "SUCCESS" : "PENDING",
+          amount: payout.amount,
+          recipient: payout.referral_code?.payout_identifier || null,
+          environment: paypalEnv,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     // Verify payout is approved
     if (payout.status !== "approved") {
       return new Response(JSON.stringify({ error: "Payout must be approved before processing" }), {
@@ -156,7 +179,8 @@ serve(async (req) => {
     // Create PayPal payout
     const payoutBatch = {
       sender_batch_header: {
-        sender_batch_id: `ref_payout_${payout.id}_${Date.now()}`,
+        // Deterministic sender_batch_id prevents accidental duplicate payouts.
+        sender_batch_id: `ref_payout_${payout.id}`,
         email_subject: "You've received a referral reward from Cosmiq!",
         email_message: "Thank you for referring friends to Cosmiq. Here's your reward!",
       },
@@ -181,6 +205,7 @@ serve(async (req) => {
       headers: {
         "Authorization": `Bearer ${access_token}`,
         "Content-Type": "application/json",
+        "PayPal-Request-Id": `payout-${payout.id}`,
       },
       body: JSON.stringify(payoutBatch),
     });
@@ -188,6 +213,26 @@ serve(async (req) => {
     if (!payoutResponse.ok) {
       const errorText = await payoutResponse.text();
       console.error("PayPal payout failed:", errorText);
+
+      if (errorText.includes("DUPLICATE_REQUEST_ID")) {
+        console.warn(`Duplicate PayPal request detected for payout ${payout.id}, treating as idempotent`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            idempotent: true,
+            payout_batch_id: payout.paypal_transaction_id || null,
+            batch_status: "PENDING",
+            amount: payout.amount,
+            recipient: paypalEmail,
+            environment: paypalEnv,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
       return new Response(JSON.stringify({ error: "PayPal payout failed", details: errorText }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -201,7 +246,7 @@ serve(async (req) => {
     console.log("PayPal payout response:", JSON.stringify(payoutResult, null, 2));
 
     // Update payout status to "processing" - webhook will confirm final status
-    await supabaseClient
+    const { error: updateError } = await supabaseClient
       .from("referral_payouts")
       .update({
         status: batchStatus === "SUCCESS" ? "paid" : "processing",
@@ -209,7 +254,16 @@ serve(async (req) => {
         paypal_transaction_id: payoutBatchId,
         admin_notes: `PayPal batch ${payoutBatchId} - Status: ${batchStatus}`,
       })
-      .eq("id", payout_id);
+      .eq("id", payout_id)
+      .eq("status", "approved");
+
+    if (updateError) {
+      console.error("Failed to persist payout status update:", updateError);
+      return new Response(JSON.stringify({ error: "Payout processed but failed to persist state" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     console.log(`Successfully submitted payout ${payout_id} to PayPal (batch: ${payoutBatchId})`);
 

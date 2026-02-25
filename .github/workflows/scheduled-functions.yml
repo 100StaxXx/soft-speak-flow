@@ -1,19 +1,18 @@
-name: Scheduled Edge Functions
+name: Scheduled Edge Functions (Manual Fallback)
 
 on:
-  schedule:
-    - cron: "1 0 * * *"
-    - cron: "5 0 * * *"
-    - cron: "*/10 * * * *"
-    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       function_name:
         description: "Function to invoke manually"
         required: false
         type: string
+      payload_json:
+        description: "Raw JSON payload for manual invocation"
+        required: false
+        type: string
       backfill_recent_transcripts:
-        description: "Run one-time transcript backfill (last N days)"
+        description: "Run transcript backfill (retry-missing-pep-talk-transcripts)"
         required: false
         default: false
         type: boolean
@@ -31,56 +30,41 @@ jobs:
       SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
-      - name: Select function for this run
+      - name: Select function + payload
         id: select
         run: |
           set -euo pipefail
 
+          fn=""
           payload='{}'
           run_backfill_loop="false"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ inputs.backfill_recent_transcripts }}" = "true" ]; then
-              fn="retry-missing-pep-talk-transcripts"
-              payload=$(jq -cn \
-                --argjson lookback "${{ inputs.backfill_lookback_days }}" \
-                --argjson limit 50 \
-                '{mode:"backfill", lookbackDays:$lookback, limit:$limit}')
-              run_backfill_loop="true"
-            else
-              fn="${{ inputs.function_name }}"
-              if [ -z "$fn" ]; then
-                echo "workflow_dispatch requires function_name when backfill mode is disabled" >&2
-                exit 1
-              fi
-            fi
+          if [ "${{ inputs.backfill_recent_transcripts }}" = "true" ]; then
+            fn="retry-missing-pep-talk-transcripts"
+            payload=$(jq -cn \
+              --argjson lookback "${{ inputs.backfill_lookback_days }}" \
+              --argjson limit 50 \
+              '{mode:"backfill", lookbackDays:$lookback, limit:$limit}')
+            run_backfill_loop="true"
           else
-            case "${{ github.event.schedule }}" in
-              "1 0 * * *")
-                fn="generate-daily-mentor-pep-talks"
-                ;;
-              "5 0 * * *")
-                fn="schedule-daily-mentor-pushes"
-                ;;
-              "*/10 * * * *")
-                fn="retry-missing-pep-talk-transcripts"
-                payload='{"mode":"scheduled"}'
-                ;;
-              "*/5 * * * *")
-                fn="dispatch-daily-pushes"
-                ;;
-              *)
-                echo "Unsupported schedule: ${{ github.event.schedule }}" >&2
-                exit 1
-                ;;
-            esac
+            fn="${{ inputs.function_name }}"
+            if [ -z "$fn" ]; then
+              echo "workflow_dispatch requires function_name when backfill mode is disabled" >&2
+              exit 1
+            fi
+
+            raw_payload='${{ inputs.payload_json }}'
+            if [ -n "$raw_payload" ]; then
+              echo "$raw_payload" | jq . >/dev/null
+              payload="$raw_payload"
+            fi
           fi
 
           echo "function_name=$fn" >> "$GITHUB_OUTPUT"
           echo "payload=$payload" >> "$GITHUB_OUTPUT"
           echo "run_backfill_loop=$run_backfill_loop" >> "$GITHUB_OUTPUT"
 
-      - name: Invoke scheduled function
+      - name: Invoke function once
         if: steps.select.outputs.run_backfill_loop != 'true'
         run: |
           set -euo pipefail
@@ -90,6 +74,7 @@ jobs:
           status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
             -X POST "$url" \
             -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+            -H "apikey: ${SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
             -d "$payload")
 
@@ -118,6 +103,7 @@ jobs:
             status=$(curl -sS -o /tmp/function-response.json -w "%{http_code}" \
               -X POST "$url" \
               -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+              -H "apikey: ${SERVICE_ROLE_KEY}" \
               -H "Content-Type: application/json" \
               -d "$payload")
 

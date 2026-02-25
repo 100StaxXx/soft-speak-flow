@@ -24,6 +24,8 @@ export default function Creator() {
     code: string;
     link: string;
     promo_caption: string;
+    creator_access_token?: string;
+    dashboard_url?: string;
   } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,7 +112,13 @@ export default function Creator() {
             {/* Dashboard Button */}
             <div className="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-lg">
               <Button
-                onClick={() => navigate(`/creator/dashboard?code=${result.code}`)}
+                onClick={() => {
+                  const params = new URLSearchParams({ code: result.code });
+                  if (result.creator_access_token) {
+                    params.set("token", result.creator_access_token);
+                  }
+                  navigate(`/creator/dashboard?${params.toString()}`);
+                }}
                 className="w-full"
                 size="lg"
               >
@@ -195,7 +203,7 @@ export default function Creator() {
                 <h3 className="font-semibold mb-2">How it Works</h3>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Share your code or link with your audience</li>
-                  <li>• Earn 50% of their first month ($5) or 20% of first year ($20)</li>
+                  <li>• Earn 50% of their first month ($5) or 20% of first year ($12)</li>
                   <li>• Minimum payout: $50 via PayPal</li>
                   <li>• Payouts require admin approval</li>
                 </ul>

@@ -1,0 +1,4 @@
+
+module CapgoNativePurchases.__Swift {
+  exclude header "CapgoNativePurchases-Swift.h"
+}

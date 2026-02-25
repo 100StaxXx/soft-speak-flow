@@ -1,0 +1,4 @@
+
+module CapacitorCommunityContacts.__Swift {
+  exclude header "CapacitorCommunityContacts-Swift.h"
+}

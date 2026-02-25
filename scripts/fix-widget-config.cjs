@@ -13,27 +13,22 @@ const fs = require('fs');
 const path = require('path');
 
 const PROJECT_FILE = path.join(__dirname, '..', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
+const APP_BUNDLE_ID = 'com.darrylgraham.revolution';
 const WIDGET_BUNDLE_ID = 'com.darrylgraham.revolution.CosmiqWidget';
 const INFO_PLIST_PATH = '../CosmiqWidget/Info.plist';
 
-function fixWidgetConfig() {
-  console.log('\n🔧 Fixing CosmiqWidgetExtension configuration...\n');
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-  // Check if project file exists
-  if (!fs.existsSync(PROJECT_FILE)) {
-    console.log('⚠️  project.pbxproj not found. Run this after `npx cap add ios`.');
-    return;
-  }
-
-  const content = fs.readFileSync(PROJECT_FILE, 'utf8');
-  const lines = content.split('\n');
-  const changes = [];
+function findConfigBlocksByBundleId(lines, bundleId) {
+  const bundleRegex = new RegExp(
+    `PRODUCT_BUNDLE_IDENTIFIER\\s*=\\s*["']?${escapeRegex(bundleId)}["']?;`,
+  );
   const configBlocks = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (!/PRODUCT_BUNDLE_IDENTIFIER\s*=\s*["']?com\.darrylgraham\.revolution\.CosmiqWidget["']?;/.test(line)) {
+    if (!bundleRegex.test(lines[i])) {
       continue;
     }
 
@@ -62,14 +57,47 @@ function fixWidgetConfig() {
         break;
       }
     }
+
     configBlocks.push({ start: startIdx, end: endIdx });
   }
 
-  const uniqueBlocks = configBlocks
+  return configBlocks
     .filter((block, index, self) => index === self.findIndex((b) => b.start === block.start && b.end === block.end))
     .sort((a, b) => b.start - a.start);
+}
 
-  for (const block of uniqueBlocks) {
+function findCurrentProjectVersion(lines, blocks) {
+  for (const block of blocks) {
+    const blockLines = lines.slice(block.start, block.end + 1);
+    const versionLine = blockLines.find((line) => /^\s*CURRENT_PROJECT_VERSION\s*=/.test(line));
+    if (!versionLine) {
+      continue;
+    }
+    const match = versionLine.match(/CURRENT_PROJECT_VERSION\s*=\s*([^;]+);/);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
+function fixWidgetConfig() {
+  console.log('\n🔧 Fixing CosmiqWidgetExtension configuration...\n');
+
+  // Check if project file exists
+  if (!fs.existsSync(PROJECT_FILE)) {
+    console.log('⚠️  project.pbxproj not found. Run this after `npx cap add ios`.');
+    return;
+  }
+
+  const content = fs.readFileSync(PROJECT_FILE, 'utf8');
+  const lines = content.split('\n');
+  const changes = [];
+  const appBlocks = findConfigBlocksByBundleId(lines, APP_BUNDLE_ID);
+  const widgetBlocks = findConfigBlocksByBundleId(lines, WIDGET_BUNDLE_ID);
+  const appProjectVersion = findCurrentProjectVersion(lines, appBlocks);
+
+  for (const block of widgetBlocks) {
     const blockLines = lines.slice(block.start, block.end + 1);
     const buildSettingsIndex = blockLines.findIndex((line) => line.includes('buildSettings = {'));
     if (buildSettingsIndex < 0) {
@@ -79,7 +107,8 @@ function fixWidgetConfig() {
     const defaultIndent = '\t\t\t\t';
     const existingIndentLine =
       blockLines.find((line) => /^\s*INFOPLIST_FILE\s*=/.test(line)) ??
-      blockLines.find((line) => /^\s*GENERATE_INFOPLIST_FILE\s*=/.test(line));
+      blockLines.find((line) => /^\s*GENERATE_INFOPLIST_FILE\s*=/.test(line)) ??
+      blockLines.find((line) => /^\s*CURRENT_PROJECT_VERSION\s*=/.test(line));
     const indent = existingIndentLine ? existingIndentLine.match(/^\s*/)[0] : defaultIndent;
 
     const infoPlistLine = `${indent}INFOPLIST_FILE = ${INFO_PLIST_PATH};`;
@@ -107,6 +136,20 @@ function fixWidgetConfig() {
       changes.push('  ✓ Added GENERATE_INFOPLIST_FILE = NO');
     }
 
+    if (appProjectVersion) {
+      const currentProjectVersionLine = `${indent}CURRENT_PROJECT_VERSION = ${appProjectVersion};`;
+      const versionIndex = blockLines.findIndex((line) => /^\s*CURRENT_PROJECT_VERSION\s*=/.test(line));
+      if (versionIndex >= 0) {
+        if (blockLines[versionIndex] !== currentProjectVersionLine) {
+          blockLines[versionIndex] = currentProjectVersionLine;
+          changes.push(`  ✓ Set CURRENT_PROJECT_VERSION = ${appProjectVersion}`);
+        }
+      } else {
+        blockLines.splice(buildSettingsIndex + 1, 0, currentProjectVersionLine);
+        changes.push(`  ✓ Added CURRENT_PROJECT_VERSION = ${appProjectVersion}`);
+      }
+    }
+
     lines.splice(block.start, block.end - block.start + 1, ...blockLines);
   }
 
@@ -116,11 +159,15 @@ function fixWidgetConfig() {
     console.log('📝 Changes made to project.pbxproj:');
     [...new Set(changes)].forEach((change) => console.log(change));
     console.log('\n✅ Widget configuration fixed successfully!\n');
-  } else if (uniqueBlocks.length > 0) {
+  } else if (widgetBlocks.length > 0) {
     console.log('✅ Widget configuration already correct. No changes needed.\n');
   } else {
     console.log('⚠️  Could not find CosmiqWidgetExtension configuration blocks.');
     console.log('   Make sure the widget extension exists in your Xcode project.\n');
+  }
+
+  if (!appProjectVersion) {
+    console.log('⚠️  Could not infer app CURRENT_PROJECT_VERSION from App target blocks.');
   }
 }
 

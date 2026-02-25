@@ -16,6 +16,7 @@ import {
   Crown,
   Shield,
   Bell,
+  Bug,
   ChevronRight,
   Map,
   Heart,
@@ -33,10 +34,14 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { haptics } from "@/utils/haptics";
+import { useResilience } from "@/contexts/ResilienceContext";
+import { QueuedActionsSheet } from "@/components/resilience/QueuedActionsSheet";
 
 const HelpCenter = () => {
   const navigate = useNavigate();
+  const { queueCount } = useResilience();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [showQueuedActions, setShowQueuedActions] = useState(false);
 
   const sections = [
     {
@@ -428,7 +433,7 @@ const HelpCenter = () => {
                             <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
                               <span className="text-left">{item.title}</span>
                             </AccordionTrigger>
-                            <AccordionContent className="px-3 pb-3 text-sm text-muted-foreground">
+                            <AccordionContent className="allow-text-select px-3 pb-3 text-sm text-muted-foreground">
                               {item.content}
                             </AccordionContent>
                           </AccordionItem>
@@ -530,11 +535,32 @@ const HelpCenter = () => {
                 <MessageCircle className="h-4 w-4 mr-2" />
                 Chat with Your Mentor
               </Button>
+              <Button
+                className="mt-2 w-full"
+                variant="outline"
+                onClick={() => {
+                  haptics.light();
+                  setShowQueuedActions(true);
+                }}
+              >
+                View queued actions ({queueCount})
+              </Button>
+              <Button
+                className="mt-2 w-full"
+                variant="outline"
+                onClick={() => {
+                  haptics.light();
+                  navigate("/support/report");
+                }}
+              >
+                <Bug className="h-4 w-4 mr-2" />
+                Report a Problem
+              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
-      
+      <QueuedActionsSheet open={showQueuedActions} onOpenChange={setShowQueuedActions} />
     </PageTransition>
   );
 };

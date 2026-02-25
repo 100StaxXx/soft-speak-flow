@@ -85,7 +85,12 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
   // Handle passing on an encounter
   const handlePass = useCallback(async () => {
     const didPass = await passEncounter();
-    if (!didPass) return;
+    if (!didPass) {
+      // Always let users exit the modal even if remote pass/delete fails.
+      closeEncounter();
+      toast.error('Could not pass encounter. Exited battle and kept it pending.');
+      return;
+    }
 
     const newCount = recordPass();
 
@@ -93,7 +98,7 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
     if (newCount >= 3) {
       setShowDisableDialog(true);
     }
-  }, [recordPass, passEncounter]);
+  }, [closeEncounter, recordPass, passEncounter]);
 
   // Handle disabling encounters via profile setting
   const handleDisableEncounters = useCallback(async () => {

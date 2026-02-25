@@ -1,0 +1,24 @@
+{
+  "source": "/Users/macbookair/Developer/soft-speak-flow/ios/CosmiqWidget/CosmiqWidget.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Cosmiq Quests",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 78
+        }
+      },
+      {
+        "comment": "",
+        "key": "View your daily quests and track progress.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 79
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   hapticsLight: vi.fn(),
   inboxCount: 0,
+  companion: null as { id: string } | null,
+  canEvolve: false,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -32,8 +34,8 @@ vi.mock("@/hooks/useProfile", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: null,
-    progressToNext: 0,
+    companion: mocks.companion,
+    canEvolve: mocks.canEvolve,
   }),
 }));
 
@@ -89,6 +91,8 @@ describe("BottomNav", () => {
     mocks.prefetchQuery.mockClear();
     mocks.hapticsLight.mockClear();
     mocks.inboxCount = 0;
+    mocks.companion = null;
+    mocks.canEvolve = false;
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   });
 
@@ -129,5 +133,23 @@ describe("BottomNav", () => {
 
     expect(screen.getByTestId("pathname")).toHaveTextContent("/mentor");
     expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  it("does not show companion ready badge when companion is not evolvable", () => {
+    mocks.companion = { id: "companion-1" };
+    mocks.canEvolve = false;
+
+    renderBottomNav("/mentor");
+
+    expect(screen.queryByText("!")).not.toBeInTheDocument();
+  });
+
+  it("shows companion ready badge only when evolution is ready", () => {
+    mocks.companion = { id: "companion-1" };
+    mocks.canEvolve = true;
+
+    renderBottomNav("/mentor");
+
+    expect(screen.getByText("!")).toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
+import { useMaxAspectRect } from './useMaxAspectRect';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -497,6 +498,8 @@ const OrbComponent = memo(({
   };
   
   const specialStyle = getSpecialStyle();
+  const glyphSize = Math.max(14, Math.min(36, cellSize * 0.4));
+  const specialIconSize = Math.max(12, Math.min(18, cellSize * 0.2));
   const x = orb.col * cellSize + (cellSize - orbSize) / 2;
   const y = orb.row * cellSize + (cellSize - orbSize) / 2;
   const scale = orb.matched ? 0 : isSelected ? 1.15 : isInPath ? 1.08 : 1;
@@ -529,12 +532,22 @@ const OrbComponent = memo(({
         }}
       />
       {/* Main content: emoji or shape */}
-      <span className="text-base select-none relative z-10 drop-shadow-sm">
+      <span
+        className="select-none relative z-10 drop-shadow-sm"
+        style={{ fontSize: glyphSize }}
+      >
         {showAccessibility ? ORB_SHAPES[orb.color] : colorConfig.emoji}
       </span>
       {/* Special orb indicator icon */}
       {specialStyle.icon && (
-        <span className="absolute -top-1 -right-1 text-xs bg-black/60 rounded-full w-4 h-4 flex items-center justify-center z-20">
+        <span
+          className="absolute -top-1 -right-1 bg-black/60 rounded-full flex items-center justify-center z-20"
+          style={{
+            width: specialIconSize,
+            height: specialIconSize,
+            fontSize: Math.max(9, Math.min(12, specialIconSize * 0.7)),
+          }}
+        >
           {specialStyle.icon}
         </span>
       )}
@@ -622,7 +635,8 @@ export const OrbMatchGame = ({
     return allColors.slice(0, levelConfig.colors);
   }, [levelConfig.colors]);
 
-  const cellSize = useMemo(() => 280 / GRID_COLS, []);
+  const { hostRef: boardHostRef, rect: boardRect } = useMaxAspectRect(GRID_COLS, GRID_ROWS);
+  const cellSize = useMemo(() => boardRect.width / GRID_COLS, [boardRect.width]);
 
   const findValidMove = useCallback((currentOrbs: Orb[]): { row: number; col: number }[] | null => {
     const grid: (Orb | null)[][] = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
@@ -1363,7 +1377,7 @@ export const OrbMatchGame = ({
         compact={compact}
       />
 
-      <div className="relative w-full max-w-xs mb-2">
+      <div className="relative w-full mb-2 mx-auto" style={{ width: boardRect.width, maxWidth: '100%' }}>
         <LevelIndicator level={level} progress={scoreProgress} />
         <div className="absolute right-0 top-0">
           <ScoreProgressRing progress={scoreProgress} isComplete={score >= levelConfig.targetScore} />
@@ -1390,10 +1404,11 @@ export const OrbMatchGame = ({
         </button>
       )}
 
-      <div
-        ref={gridRef}
-        className="relative w-full max-w-xs rounded-2xl overflow-hidden cursor-pointer touch-none game-container"
-        style={{ aspectRatio: `${GRID_COLS}/${GRID_ROWS}`, maxWidth: 300 }}
+      <div ref={boardHostRef} className="w-full flex-1 min-h-0 flex items-center justify-center px-2 pb-2">
+        <div
+          ref={gridRef}
+        className="relative rounded-2xl overflow-hidden cursor-pointer touch-none game-container"
+        style={{ width: boardRect.width, height: boardRect.height }}
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
       >
@@ -1441,6 +1456,7 @@ export const OrbMatchGame = ({
         {isShuffling && <ShuffleOverlay />}
         {showPerfect && <PerfectGameBanner />}
         <AnimatePresence>{showLevelUp && <LevelUpBanner />}</AnimatePresence>
+        </div>
       </div>
 
       {!compact && (

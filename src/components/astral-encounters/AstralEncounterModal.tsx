@@ -245,7 +245,7 @@ export const AstralEncounterModal = ({
     soul: Math.floor(((companion?.resolve ?? 300) + (companion?.alignment ?? 300)) / 12),
   };
 
-  // Get current mini-game type for instructions (only active games: galactic_match, orb_match, tap_sequence, energy_beam)
+  // Get current mini-game type for instructions.
   const getCurrentGameType = useCallback((): MiniGameType => {
     if (!adversary) return 'energy_beam';
     
@@ -270,6 +270,19 @@ export const AstralEncounterModal = ({
     if (!open || phase === 'result' || isPassingEncounter) return;
     setIsExitConfirmOpen(true);
   }, [open, phase, isPassingEncounter]);
+
+  useEffect(() => {
+    if (!open || phase === 'result' || isPassingEncounter || isExitConfirmOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        requestExitEncounter();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [open, phase, isPassingEncounter, isExitConfirmOpen, requestExitEncounter]);
 
   const handleConfirmExit = useCallback(async () => {
     if (isPassingEncounter) return;
@@ -422,10 +435,17 @@ export const AstralEncounterModal = ({
   if (!encounter || !adversary) return null;
 
   // Active encounter games should use bounded fullscreen layout in battle/practice
-  const FULLSCREEN_GAMES: MiniGameType[] = ['energy_beam', 'tap_sequence', 'orb_match', 'galactic_match'];
+  const FULLSCREEN_GAMES: MiniGameType[] = [
+    'energy_beam',
+    'tap_sequence',
+    'orb_match',
+    'galactic_match',
+    'astral_frequency',
+    'starfall_dodge',
+  ];
   const currentGameType = getCurrentGameType();
   const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
-  const showPersistentExit = open && phase !== 'result';
+  const showPersistentExit = open && phase !== 'result' && !isExitConfirmOpen;
 
   return (
     <>
@@ -437,7 +457,7 @@ export const AstralEncounterModal = ({
           onClick={requestExitEncounter}
           disabled={isPassingEncounter}
           aria-label="Exit encounter"
-          className="fixed z-[170] h-10 w-10 rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-sm hover:bg-black/70"
+          className="fixed z-[170] h-10 w-10 rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 touch-manipulation"
           style={{
             top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
             right: 'calc(env(safe-area-inset-right, 0px) + 0.75rem)',

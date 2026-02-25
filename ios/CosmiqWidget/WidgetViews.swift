@@ -28,11 +28,6 @@ struct SmallWidgetView: View {
         }
         return min(max(Double(completedCount) / Double(totalCount), 0), 1)
     }
-
-    private var progressPercent: Int {
-        Int((progress * 100).rounded())
-    }
-
     private var remainingCount: Int {
         max(totalCount - completedCount, 0)
     }
@@ -53,9 +48,6 @@ struct SmallWidgetView: View {
                     .font(.caption.bold())
                     .foregroundColor(.cosmicText)
                 Spacer()
-                Text("\(progressPercent)%")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundColor(progress >= 1 ? .cosmicGold : .cosmicText)
             }
 
             VStack(alignment: .leading, spacing: 4) {

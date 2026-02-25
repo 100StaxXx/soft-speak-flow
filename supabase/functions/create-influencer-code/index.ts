@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { createCreatorAccessToken } from "../_shared/influencerAuth.ts";
 
 /**
  * Create Influencer Referral Code
@@ -309,9 +310,11 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingCode) {
+      const creatorAccessToken = await createCreatorAccessToken(existingCode.code);
+
       // Return existing code instead of creating duplicate
       const appLink = `${appUrl}/?ref=${existingCode.code}`;
-      const dashboardUrl = `${appUrl}/creator/dashboard?code=${existingCode.code}`;
+      const dashboardUrl = `${appUrl}/creator/dashboard?code=${existingCode.code}&token=${encodeURIComponent(creatorAccessToken)}`;
       
       // Send reminder email with existing code
       await sendConfirmationEmail(name, email, existingCode.code, dashboardUrl, appLink);
@@ -320,6 +323,8 @@ serve(async (req) => {
         JSON.stringify({
           code: existingCode.code,
           link: appLink,
+          creator_access_token: creatorAccessToken,
+          dashboard_url: dashboardUrl,
           message: "You already have a referral code. We've sent you a reminder email!",
         }),
         {
@@ -376,7 +381,8 @@ serve(async (req) => {
     }
 
     const appLink = `${appUrl}/?ref=${code}`;
-    const dashboardUrl = `${appUrl}/creator/dashboard?code=${code}`;
+    const creatorAccessToken = await createCreatorAccessToken(code);
+    const dashboardUrl = `${appUrl}/creator/dashboard?code=${code}&token=${encodeURIComponent(creatorAccessToken)}`;
 
     // Send confirmation email
     await sendConfirmationEmail(name, email, code, dashboardUrl, appLink);
@@ -387,6 +393,8 @@ serve(async (req) => {
       JSON.stringify({
         code,
         link: appLink,
+        creator_access_token: creatorAccessToken,
+        dashboard_url: dashboardUrl,
         promo_caption: `✨ Transform your habits into an epic journey! Use my code ${code} or click: ${appLink}`,
       }),
       {

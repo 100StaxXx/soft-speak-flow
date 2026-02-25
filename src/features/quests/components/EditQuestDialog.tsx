@@ -131,8 +131,12 @@ export function EditQuestDialog({
       setDifficulty(normalizeQuestDifficulty(task.difficulty));
       setScheduledTime(normalizeScheduledTime(task.scheduled_time));
       setEstimatedDuration(task.estimated_duration ?? 30);
-      setRecurrencePattern(task.recurrence_pattern || null);
-      setRecurrenceDays(Array.isArray(task.recurrence_days) ? task.recurrence_days : []);
+      const normalizedRecurrenceDays = Array.isArray(task.recurrence_days) ? task.recurrence_days : [];
+      const normalizedRecurrencePattern = task.recurrence_pattern === "weekly" && normalizedRecurrenceDays.length > 1
+        ? "custom"
+        : (task.recurrence_pattern || null);
+      setRecurrencePattern(normalizedRecurrencePattern);
+      setRecurrenceDays(normalizedRecurrenceDays);
       setReminderEnabled(Boolean(task.reminder_enabled));
       setReminderMinutesBefore(
         typeof task.reminder_minutes_before === "number" && task.reminder_minutes_before > 0
@@ -567,6 +571,7 @@ export function EditQuestDialog({
                     onMoreInformationChange={setMoreInformation}
                     location={location}
                     onLocationChange={setLocation}
+                    selectedDate={parsedTaskDate ?? new Date()}
                     hideScheduledTime
                     hideDuration
                     hideMoreInformation

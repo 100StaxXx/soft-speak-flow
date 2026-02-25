@@ -1,0 +1,5 @@
+
+module CapgoCapacitorSocialLogin.Swift {
+  header "CapgoCapacitorSocialLogin-Swift.h"
+  requires objc
+}

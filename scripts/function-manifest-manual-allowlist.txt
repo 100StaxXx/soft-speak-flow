@@ -7,3 +7,10 @@ optimize-weekly-plan
 outlook-calendar-auth
 outlook-calendar-events
 process-companion-evolution-job
+retry-missing-pep-talk-transcripts
+schedule-daily-mentor-pushes
+dispatch-daily-pushes
+check-task-reminders
+check-habit-reminders
+check-contact-reminders
+dispatch-mentor-nudge-pushes

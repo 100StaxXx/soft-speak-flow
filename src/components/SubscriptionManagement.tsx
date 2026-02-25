@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Loader2, Settings, Bug, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { IAP_PRODUCTS } from "@/utils/appleIAP";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -23,7 +22,6 @@ type PlanOption = {
 
 export const SubscriptionManagement = memo(function SubscriptionManagement() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { subscription, isLoading, isActive, nextBillingDate, planPrice, plan, isCancelled } = useSubscription();
   const {
     handlePurchase,
@@ -151,10 +149,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                 <Button size="sm" variant="outline" onClick={() => { void reloadProducts(); }}>
                   Try Again
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => toast({
-                  title: "Need help?",
-                  description: "Please ensure you're signed in to the App Store and try again.",
-                })}>
+                <Button size="sm" variant="ghost" onClick={() => navigate("/support/report")}>
                   Need help?
                 </Button>
               </div>

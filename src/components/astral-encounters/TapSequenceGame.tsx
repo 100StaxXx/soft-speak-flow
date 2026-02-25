@@ -5,6 +5,7 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars, getGridPositions } from './gameUtils';
 import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
+import { useMaxAspectRect } from './useMaxAspectRect';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
 import { ArcadeDifficulty } from '@/types/arcadeDifficulty';
@@ -80,6 +81,7 @@ interface OrbComponentProps {
   tapResult: { id: number; success: boolean } | null;
   onClick: () => void;
   disabled: boolean;
+  orbDiameter: number;
 }
 
 const OrbComponent = memo(({ 
@@ -89,8 +91,9 @@ const OrbComponent = memo(({
   isNext, 
   showNumber,
   tapResult, 
-  onClick, 
+  onClick,
   disabled,
+  orbDiameter,
 }: OrbComponentProps) => {
   const getOrbStyle = useMemo(() => {
     if (orb.tapped) return {
@@ -120,13 +123,17 @@ const OrbComponent = memo(({
     };
   }, [orb.tapped, isHighlighted, isPast, isNext]);
 
+  const orbLabelSize = Math.max(16, Math.min(36, orbDiameter * 0.38));
+
   return (
     <motion.button
-      className="absolute rounded-full flex items-center justify-center font-bold gpu-accelerated touch-target w-14 h-14"
+      className="absolute rounded-full flex items-center justify-center font-bold gpu-accelerated touch-target"
       style={{
         left: `${orb.x}%`,
         top: `${orb.y}%`,
         transform: 'translate(-50%, -50%)',
+        width: orbDiameter,
+        height: orbDiameter,
         background: getOrbStyle.bg,
         border: `2px solid ${getOrbStyle.border}`,
         boxShadow: getOrbStyle.shadow,
@@ -143,10 +150,11 @@ const OrbComponent = memo(({
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
     >
       <span 
-        className={`text-lg ${isHighlighted || orb.tapped ? 'text-white' : 'text-white/70'}`}
+        className={`${isHighlighted || orb.tapped ? 'text-white' : 'text-white/70'}`}
         style={{ 
           textShadow: isHighlighted ? '0 0 10px white' : 'none',
           fontWeight: isHighlighted ? 800 : 600,
+          fontSize: orbLabelSize,
         }}
       >
         {showNumber ? orb.order : '?'}
@@ -280,6 +288,14 @@ export const TapSequenceGame = ({
   const showTimePerOrb = levelConfig.showTimePerOrb + diffConfig.showTimeBonus + (companionStats.mind / 100 * 150);
 
   const stars = useStaticStars(10);
+  const { hostRef: boardHostRef, rect: boardRect } = useMaxAspectRect(1, 1);
+
+  const orbDiameter = useMemo(() => {
+    const estimatedColumns = Math.ceil(Math.sqrt(orbCount));
+    const estimatedRows = Math.ceil(orbCount / estimatedColumns);
+    const cellSize = Math.min(boardRect.width / estimatedColumns, boardRect.height / estimatedRows);
+    return Math.max(44, Math.min(92, cellSize * 0.72));
+  }, [boardRect.height, boardRect.width, orbCount]);
 
   // Generate orbs for current level
   const generateOrbs = useCallback(() => {
@@ -500,7 +516,7 @@ export const TapSequenceGame = ({
 
       {/* Lives and Level display - compact */}
       {!compact && (
-        <div className="w-full max-w-[280px] mb-1 flex items-center justify-between">
+        <div className="w-full mb-1 flex items-center justify-between" style={{ width: boardRect.width, maxWidth: '100%' }}>
           <LivesDisplay lives={lives} />
           <motion.div 
             key={level}
@@ -513,7 +529,7 @@ export const TapSequenceGame = ({
         </div>
       )}
       {compact && (
-        <div className="w-full max-w-[280px] mb-0.5 flex items-center justify-between text-xs">
+        <div className="w-full mb-0.5 flex items-center justify-between text-xs" style={{ width: boardRect.width, maxWidth: '100%' }}>
           <LivesDisplay lives={lives} />
           <span className="font-bold text-primary text-[10px]">Lv{level}</span>
           <span className="text-muted-foreground text-[10px]">{orbCount} orbs</span>
@@ -522,7 +538,7 @@ export const TapSequenceGame = ({
 
       {/* Difficulty indicator - hidden in compact */}
       {!compact && (
-        <div className="mb-0.5 flex items-center gap-1.5">
+        <div className="mb-0.5 flex items-center gap-1.5" style={{ width: boardRect.width, maxWidth: '100%' }}>
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
             difficulty === 'beginner' ? 'bg-blue-500/20 text-blue-400' :
             difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
@@ -537,14 +553,17 @@ export const TapSequenceGame = ({
       )}
 
       {/* Game area */}
-      <div 
-        className="relative w-full aspect-square max-w-[280px] rounded-2xl overflow-hidden"
-        style={{
-          background: 'linear-gradient(145deg, rgba(0,0,0,0.85) 0%, rgba(15,15,35,0.95) 50%, rgba(25,15,45,0.9) 100%)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-        }}
-      >
+      <div ref={boardHostRef} className="w-full flex-1 min-h-0 flex items-center justify-center px-2 pb-2">
+        <div 
+          className="relative rounded-2xl overflow-hidden"
+          style={{
+            width: boardRect.width,
+            height: boardRect.height,
+            background: 'linear-gradient(145deg, rgba(0,0,0,0.85) 0%, rgba(15,15,35,0.95) 50%, rgba(25,15,45,0.9) 100%)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
+          }}
+        >
         {/* Background effects */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/8 rounded-full blur-3xl" />
@@ -582,6 +601,7 @@ export const TapSequenceGame = ({
                 tapResult={tapResult}
                 onClick={() => handleOrbTap(orb)}
                 disabled={gameState !== 'playing' || orb.tapped}
+                orbDiameter={orbDiameter}
               />
             );
           })}
@@ -629,8 +649,9 @@ export const TapSequenceGame = ({
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
-      
+
       {/* Instructions - hidden in compact mode */}
       {!compact && (
         <motion.p 

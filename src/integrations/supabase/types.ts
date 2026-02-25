@@ -5174,6 +5174,7 @@ export type Database = {
           daily_quote_push_window: string | null
           email: string | null
           faction: string | null
+          checkin_reminders_enabled: boolean
           habit_reminders_enabled: boolean | null
           id: string
           is_premium: boolean | null
@@ -5235,6 +5236,7 @@ export type Database = {
           daily_quote_push_window?: string | null
           email?: string | null
           faction?: string | null
+          checkin_reminders_enabled?: boolean
           habit_reminders_enabled?: boolean | null
           id: string
           is_premium?: boolean | null
@@ -5296,6 +5298,7 @@ export type Database = {
           daily_quote_push_window?: string | null
           email?: string | null
           faction?: string | null
+          checkin_reminders_enabled?: boolean
           habit_reminders_enabled?: boolean | null
           id?: string
           is_premium?: boolean | null
@@ -5434,38 +5437,74 @@ export type Database = {
       }
       push_notification_queue: {
         Row: {
+          attempt_count: number
           body: string
+          channel: string
+          claimed_at: string | null
+          claimed_by: string | null
           context: Json | null
           created_at: string | null
+          dedupe_key: string
           delivered: boolean | null
           delivered_at: string | null
           id: string
+          last_error: string | null
+          next_retry_at: string | null
           notification_type: string
+          payload: Json
+          priority: number
           scheduled_for: string
+          source_id: string
+          source_table: string
+          status: string
           title: string
           user_id: string
         }
         Insert: {
+          attempt_count?: number
           body: string
+          channel?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
           context?: Json | null
           created_at?: string | null
+          dedupe_key: string
           delivered?: boolean | null
           delivered_at?: string | null
           id?: string
+          last_error?: string | null
+          next_retry_at?: string | null
           notification_type: string
+          payload?: Json
+          priority: number
           scheduled_for: string
+          source_id: string
+          source_table: string
+          status?: string
           title: string
           user_id: string
         }
         Update: {
+          attempt_count?: number
           body?: string
+          channel?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
           context?: Json | null
           created_at?: string | null
+          dedupe_key?: string
           delivered?: boolean | null
           delivered_at?: string | null
           id?: string
+          last_error?: string | null
+          next_retry_at?: string | null
           notification_type?: string
+          payload?: Json
+          priority?: number
           scheduled_for?: string
+          source_id?: string
+          source_table?: string
+          status?: string
           title?: string
           user_id?: string
         }

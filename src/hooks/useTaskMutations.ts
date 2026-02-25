@@ -17,6 +17,8 @@ import {
   normalizeTaskSchedulingUpdate,
 } from "@/utils/taskSchedulingRules";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
+import { useResilience } from "@/contexts/ResilienceContext";
+import { isQueueableWriteError } from "@/utils/networkErrors";
 
 type TaskCategory = 'mind' | 'body' | 'soul';
 const validCategories: TaskCategory[] = ['mind', 'body', 'soul'];
@@ -79,6 +81,57 @@ const firstImageFromAttachments = (attachments?: QuestAttachmentInput[]): string
   return attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null;
 };
 
+interface ToggleTaskVariables {
+  taskId: string;
+  completed: boolean;
+  xpReward: number;
+  forceUndo?: boolean;
+}
+
+interface TaskUpdateInput {
+  task_text?: string;
+  task_date?: string | null;
+  difficulty?: string;
+  scheduled_time?: string | null;
+  estimated_duration?: number | null;
+  recurrence_pattern?: string | null;
+  recurrence_days?: number[];
+  reminder_enabled?: boolean;
+  reminder_minutes_before?: number;
+  category?: string | null;
+  notes?: string | null;
+  image_url?: string | null;
+  location?: string | null;
+  attachments?: QuestAttachmentInput[];
+}
+
+interface TaskUpdateVariables {
+  taskId: string;
+  updates: TaskUpdateInput;
+}
+
+const buildQueuedTogglePayload = (variables: ToggleTaskVariables) => ({
+  taskId: variables.taskId,
+  completed: variables.completed,
+  completedAt: variables.completed ? new Date().toISOString() : null,
+  forceUndo: variables.forceUndo ?? false,
+});
+
+const buildQueuedTaskUpdatePayload = (taskId: string, updates: Record<string, unknown>) => {
+  const queueableUpdates = { ...updates };
+
+  if ("attachments" in queueableUpdates) {
+    const attachments = queueableUpdates.attachments as QuestAttachmentInput[] | undefined;
+    queueableUpdates.image_url = firstImageFromAttachments(attachments) ?? queueableUpdates.image_url ?? null;
+    delete queueableUpdates.attachments;
+  }
+
+  return {
+    taskId,
+    updates: queueableUpdates,
+  };
+};
+
 export function isTaskAttachmentsTableMissingError(error: SupabaseLikeError | null | undefined): boolean {
   if (!error) return false;
 
@@ -111,6 +164,7 @@ export const useTaskMutations = (taskDate: string) => {
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
+  const { shouldQueueWrites, queueTaskAction, reportApiFailure } = useResilience();
 
   const addInProgress = useRef(false);
   const showAttachmentsUnavailableToast = () => {
@@ -188,36 +242,74 @@ export const useTaskMutations = (taskDate: string) => {
       if (addInProgress.current) throw new Error('Please wait...');
       addInProgress.current = true;
 
+      const normalizedScheduling = normalizeTaskSchedulingState({
+        task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
+        scheduled_time: params.scheduledTime || null,
+        habit_source_id: null,
+        source: params.taskDate === null ? 'inbox' : 'manual',
+      });
+      const normalizedAttachments = (params.attachments ?? []).slice(0, 10);
+      const primaryImageUrl = firstImageFromAttachments(normalizedAttachments) ?? params.imageUrl ?? null;
+      const detectedCategory = detectCategory(params.taskText, params.category);
+
+      const queueCreateTask = async () => {
+        const queueId = await queueTaskAction("CREATE_TASK", {
+          task_text: params.taskText,
+          difficulty: params.difficulty,
+          xp_reward: getEffectiveQuestXP(params.difficulty, 1),
+          task_date: normalizedScheduling.task_date,
+          is_main_quest: params.isMainQuest ?? false,
+          scheduled_time: normalizedScheduling.scheduled_time,
+          estimated_duration: params.estimatedDuration || null,
+          recurrence_pattern: params.recurrencePattern || null,
+          recurrence_days: params.recurrenceDays || null,
+          recurrence_end_date: params.recurrenceEndDate || null,
+          reminder_enabled: params.reminderEnabled ?? false,
+          reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+          category: detectedCategory,
+          notes: params.notes || null,
+          contact_id: params.contactId || null,
+          auto_log_interaction: params.autoLogInteraction ?? true,
+          image_url: primaryImageUrl,
+          location: params.location || null,
+          source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
+        });
+
+        return {
+          id: "queued-" + queueId,
+          task_date: normalizedScheduling.task_date,
+          scheduled_time: normalizedScheduling.scheduled_time,
+          task_text: params.taskText,
+          difficulty: params.difficulty,
+          queued: true,
+          attachmentsSkippedDueToSchema: false,
+        };
+      };
+
       try {
         if (!user?.id) throw new Error('User not authenticated');
+        if (shouldQueueWrites) {
+          return queueCreateTask();
+        }
 
-        const normalizedScheduling = normalizeTaskSchedulingState({
-          task_date: params.taskDate !== undefined ? params.taskDate : taskDate,
-          scheduled_time: params.scheduledTime || null,
-          habit_source_id: null,
-          source: params.taskDate === null ? 'inbox' : 'manual',
-        });
         const effectiveDate = normalizedScheduling.task_date;
         let countQuery = supabase
           .from('daily_tasks')
           .select('id')
           .eq('user_id', user.id);
-        
+
         if (effectiveDate === null) {
           countQuery = countQuery.is('task_date', null);
         } else {
           countQuery = countQuery.eq('task_date', effectiveDate);
         }
-        
+
         const { data: existingTasks, error: countError } = await countQuery;
 
         if (countError) throw countError;
 
         const questPosition = (existingTasks?.length || 0) + 1;
         const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
-        const detectedCategory = detectCategory(params.taskText, params.category);
-        const normalizedAttachments = (params.attachments ?? []).slice(0, 10);
-        const primaryImageUrl = firstImageFromAttachments(normalizedAttachments) ?? params.imageUrl ?? null;
 
         const { data, error } = await supabase
           .from('daily_tasks')
@@ -300,6 +392,14 @@ export const useTaskMutations = (taskDate: string) => {
           ...(data ?? {}),
           attachmentsSkippedDueToSchema: attachmentPersistResult.attachmentsSkippedDueToSchema,
         };
+      } catch (error) {
+        if (isQueueableWriteError(error)) {
+          reportApiFailure(error, { source: "task_add" });
+          return queueCreateTask();
+        }
+
+        reportApiFailure(error, { source: "task_add_nonqueueable" });
+        throw error;
       } finally {
         addInProgress.current = false;
       }
@@ -372,6 +472,7 @@ export const useTaskMutations = (taskDate: string) => {
           queryClient.setQueryData(queryKey, data);
         });
       }
+      reportApiFailure(error, { source: "task_add_onError" });
       toast({ title: "Failed to add quest", description: error.message, variant: "destructive" });
     },
     onSettled: () => {
@@ -382,7 +483,15 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-count'] });
     },
     onSuccess: (data) => {
-      toast({ title: "Quest added!" });
+      if ((data as { queued?: boolean } | undefined)?.queued) {
+        toast({
+          title: "Quest queued",
+          description: "We'll sync it as soon as connection is restored.",
+        });
+        return;
+      } else {
+        toast({ title: "Quest added!" });
+      }
       if (data?.attachmentsSkippedDueToSchema) {
         showAttachmentsUnavailableToast();
       }
@@ -408,18 +517,27 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const toggleTask = useMutation({
-    mutationFn: async ({ 
-      taskId, 
-      completed, 
-      xpReward, 
-      forceUndo = false 
-    }: { 
-      taskId: string; 
-      completed: boolean; 
-      xpReward: number; 
-      forceUndo?: boolean;
-    }) => {
+    mutationFn: async (variables: ToggleTaskVariables) => {
+      const { taskId, completed, xpReward, forceUndo = false } = variables;
       if (!user?.id) throw new Error('User not authenticated');
+
+      if (shouldQueueWrites) {
+        await queueTaskAction("COMPLETE_TASK", buildQueuedTogglePayload(variables));
+        return {
+          queued: true,
+          taskId,
+          completed,
+          xpAwarded: 0,
+          toastReason: null,
+          wasAlreadyCompleted: false,
+          isUndo: false,
+          taskText: "Quest",
+          habitSourceId: null,
+          taskDifficulty: null,
+          taskScheduledTime: null,
+          taskCategory: null,
+        };
+      }
 
       const { data: existingTask, error: existingError } = await supabase
         .from('daily_tasks')
@@ -562,9 +680,18 @@ export const useTaskMutations = (taskDate: string) => {
         contact,
       };
     },
-    onSuccess: async ({ completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId, taskDifficulty, taskScheduledTime, taskCategory }) => {
+    onSuccess: async (result: any) => {
+      const { completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId, taskDifficulty, taskScheduledTime, taskCategory } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      if (result?.queued) {
+        toast({
+          title: "Quest update queued",
+          description: "We'll sync this change when connection is restored.",
+        });
+        return;
+      }
 
       // Also invalidate habit-related queries if this was a habit-sourced task
       if (habitSourceId) {
@@ -644,7 +771,19 @@ export const useTaskMutations = (taskDate: string) => {
         });
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables: ToggleTaskVariables) => {
+      if (isQueueableWriteError(error)) {
+        reportApiFailure(error, { source: "task_toggle_onError" });
+        void queueTaskAction("COMPLETE_TASK", buildQueuedTogglePayload(variables));
+
+        toast({
+          title: "Quest update queued",
+          description: "We'll sync this change when connection is restored.",
+        });
+        return;
+      }
+
+      reportApiFailure(error, { source: "task_toggle_onError_nonqueueable" });
       const errorMessage = error.message === 'Please wait...' 
         ? 'Please wait for the previous action to complete'
         : error.message.includes('Failed to fetch') || error.message.includes('Load failed')
@@ -662,6 +801,11 @@ export const useTaskMutations = (taskDate: string) => {
       if (!user?.id) throw new Error('User not authenticated');
       if (!taskId) throw new Error('Invalid task ID');
       
+      if (shouldQueueWrites) {
+        await queueTaskAction("DELETE_TASK", { taskId });
+        return { queued: true };
+      }
+
       const { error } = await supabase
         .from('daily_tasks')
         .delete()
@@ -669,12 +813,29 @@ export const useTaskMutations = (taskDate: string) => {
         .eq('user_id', user.id);
       
       if (error) throw error;
+      return { queued: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+      if ((result as { queued?: boolean } | undefined)?.queued) {
+        toast({
+          title: "Quest deletion queued",
+          description: "We'll sync this deletion when connection is restored.",
+        });
+      }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, taskId) => {
+      if (isQueueableWriteError(error)) {
+        reportApiFailure(error, { source: "task_delete_onError" });
+        void queueTaskAction("DELETE_TASK", { taskId });
+        toast({
+          title: "Quest deletion queued",
+          description: "We'll sync this deletion when connection is restored.",
+        });
+        return;
+      }
+      reportApiFailure(error, { source: "task_delete_onError_nonqueueable" });
       toast({ title: "Failed to delete quest", description: error.message, variant: "destructive" });
     },
   });
@@ -790,25 +951,7 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const updateTask = useMutation({
-    mutationFn: async ({ taskId, updates }: { 
-      taskId: string; 
-      updates: {
-        task_text?: string;
-        task_date?: string | null;
-        difficulty?: string;
-        scheduled_time?: string | null;
-        estimated_duration?: number | null;
-        recurrence_pattern?: string | null;
-        recurrence_days?: number[];
-        reminder_enabled?: boolean;
-        reminder_minutes_before?: number;
-        category?: string | null;
-        notes?: string | null;
-        image_url?: string | null;
-        location?: string | null;
-        attachments?: QuestAttachmentInput[];
-      }
-    }) => {
+    mutationFn: async ({ taskId, updates }: TaskUpdateVariables) => {
       if (!user?.id) throw new Error('User not authenticated');
       let normalizedToInbox = false;
       let strippedScheduledTime = false;
@@ -874,7 +1017,7 @@ export const useTaskMutations = (taskDate: string) => {
         updateData.location = updates.location;
       }
 
-      if (updates.task_date !== undefined || updates.scheduled_time !== undefined) {
+      if (!shouldQueueWrites && (updates.task_date !== undefined || updates.scheduled_time !== undefined)) {
         const existingScheduling = await fetchTaskSchedulingState(taskId);
         const normalizedScheduling = normalizeTaskSchedulingUpdate(existingScheduling, {
           task_date: updates.task_date,
@@ -899,6 +1042,18 @@ export const useTaskMutations = (taskDate: string) => {
           strippedScheduledTime,
           movedFromInboxToScheduled,
           attachmentsSkippedDueToSchema,
+          queued: false,
+        };
+      }
+
+      if (shouldQueueWrites) {
+        await queueTaskAction("UPDATE_TASK", buildQueuedTaskUpdatePayload(taskId, updateData));
+        return {
+          normalizedToInbox,
+          strippedScheduledTime,
+          movedFromInboxToScheduled,
+          attachmentsSkippedDueToSchema,
+          queued: true,
         };
       }
 
@@ -920,11 +1075,20 @@ export const useTaskMutations = (taskDate: string) => {
         strippedScheduledTime,
         movedFromInboxToScheduled,
         attachmentsSkippedDueToSchema,
+        queued: false,
       };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
+
+      if (data?.queued) {
+        toast({
+          title: "Quest update queued",
+          description: "We'll sync this change when connection is restored.",
+        });
+        return;
+      }
 
       if (data?.attachmentsSkippedDueToSchema) {
         showAttachmentsUnavailableToast();
@@ -955,7 +1119,19 @@ export const useTaskMutations = (taskDate: string) => {
         toast({ title: "Quest updated!" });
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables: TaskUpdateVariables) => {
+      if (isQueueableWriteError(error)) {
+        reportApiFailure(error, { source: "task_update_onError" });
+        void queueTaskAction("UPDATE_TASK", buildQueuedTaskUpdatePayload(variables.taskId, variables.updates));
+
+        toast({
+          title: "Quest update queued",
+          description: "We'll sync this change when connection is restored.",
+        });
+        return;
+      }
+
+      reportApiFailure(error, { source: "task_update_onError_nonqueueable" });
       toast({ title: "Failed to update quest", description: error.message, variant: "destructive" });
     },
   });

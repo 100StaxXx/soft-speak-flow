@@ -4,7 +4,9 @@ import {
   Adversary, 
   AdversaryTheme, 
   AdversaryTier, 
+  MiniGameType,
   TriggerType,
+  RESIST_RANDOM_MINIGAME_POOL,
   THEME_MINIGAME_MAP,
   THEME_STAT_MAP,
   TIER_CONFIG,
@@ -206,6 +208,7 @@ export interface BossOverride {
 
 export interface GenerateAdversaryOptions {
   avoidNames?: string[];
+  recentMiniGames?: MiniGameType[];
 }
 
 const getNamePoolForThemeAndTier = (
@@ -269,6 +272,22 @@ const pickDeterministicLore = (
   return templates[templateIndex];
 };
 
+const pickMiniGameForEncounter = (
+  triggerType: TriggerType,
+  theme: AdversaryTheme,
+  recentMiniGames?: MiniGameType[],
+): MiniGameType => {
+  if (triggerType !== 'urge_resist') {
+    return THEME_MINIGAME_MAP[theme];
+  }
+
+  const recentSet = new Set(recentMiniGames ?? []);
+  const candidatePool = RESIST_RANDOM_MINIGAME_POOL.filter((gameType) => !recentSet.has(gameType));
+  const selectionPool = candidatePool.length > 0 ? candidatePool : RESIST_RANDOM_MINIGAME_POOL;
+
+  return randomFrom(selectionPool);
+};
+
 // Generate a complete adversary
 export const generateAdversary = (
   triggerType: TriggerType,
@@ -306,13 +325,14 @@ export const generateAdversary = (
   const lore = pickDeterministicLore(theme, name);
   const essenceName = randomFrom(ESSENCE_NAMES[theme]);
   const essenceDescription = ESSENCE_DESCRIPTIONS[theme];
+  const miniGameType = pickMiniGameForEncounter(triggerType, theme, options?.recentMiniGames);
   
   return {
     name,
     theme,
     tier,
     lore,
-    miniGameType: THEME_MINIGAME_MAP[theme],
+    miniGameType,
     phases: config.phases,
     essenceName,
     essenceDescription,

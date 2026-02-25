@@ -6,6 +6,7 @@ import { useReferrals } from "@/hooks/useReferrals";
 import { toast } from "sonner";
 import { Share as CapacitorShare } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
+import { safeClipboardWrite } from "@/utils/clipboard";
 
 export const ReferralDashboard = memo(() => {
   const { referralStats, availableSkins } = useReferrals();
@@ -75,21 +76,11 @@ export const ReferralDashboard = memo(() => {
     if (!referralStats?.referral_code) return;
     
     try {
-      // FIX: Check if Clipboard API is available
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(referralStats.referral_code);
+      const success = await safeClipboardWrite(referralStats.referral_code);
+      if (success) {
         toast.success("Referral code copied to clipboard!");
       } else {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = referralStats.referral_code;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        toast.success("Referral code copied to clipboard!");
+        toast.error(`Failed to copy. Your code: ${referralStats.referral_code}`);
       }
     } catch (error) {
       console.error("Copy failed:", error);

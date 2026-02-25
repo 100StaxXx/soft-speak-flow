@@ -5,6 +5,7 @@ import { triggerHaptic } from './gameUtils';
 import { playHabitComplete, playXPGain, playMissionComplete } from '@/utils/soundEffects';
 import { Heart } from 'lucide-react';
 import { useMountedRef, useSingleCompletion, useTimerRegistry } from './gameLifecycle';
+import { useMaxAspectRect } from './useMaxAspectRect';
 
 interface Card {
   id: string;
@@ -143,7 +144,7 @@ const CardBack = memo(() => (
 CardBack.displayName = 'CardBack';
 
 // Memoized card face component
-const CardFace = memo(({ symbolIndex }: { symbolIndex: number }) => {
+const CardFace = memo(({ symbolIndex, symbolFontSize }: { symbolIndex: number; symbolFontSize: number }) => {
   const symbol = COSMIC_SYMBOLS[symbolIndex];
   return (
     <div 
@@ -154,7 +155,7 @@ const CardFace = memo(({ symbolIndex }: { symbolIndex: number }) => {
         boxShadow: `0 0 20px ${symbol.color}30, inset 0 0 20px ${symbol.color}10`,
       }}
     >
-      <span className="text-3xl sm:text-4xl filter drop-shadow-lg">{symbol.emoji}</span>
+      <span className="filter drop-shadow-lg leading-none" style={{ fontSize: symbolFontSize }}>{symbol.emoji}</span>
     </div>
   );
 });
@@ -227,6 +228,14 @@ export const GalacticMatchGame = ({
   const phaseRunIdRef = useRef(0);
   
   const config = useMemo(() => getLevelConfig(level, round, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, round, diffConfig]);
+  const { hostRef: boardHostRef, rect: boardRect } = useMaxAspectRect(config.cols, config.rows);
+
+  const symbolFontSize = useMemo(() => {
+    const cellWidth = boardRect.width / config.cols;
+    const cellHeight = boardRect.height / config.rows;
+    const cellSize = Math.min(cellWidth, cellHeight);
+    return Math.max(22, Math.min(56, cellSize * 0.5));
+  }, [boardRect.height, boardRect.width, config.cols, config.rows]);
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -616,10 +625,11 @@ export const GalacticMatchGame = ({
       </div>
 
       {/* Card grid */}
-      <div 
-        className="relative w-full max-w-sm mx-auto"
-        style={{ aspectRatio: `${config.cols}/${config.rows}` }}
-      >
+      <div ref={boardHostRef} className="w-full flex-1 min-h-0 flex items-center justify-center px-2 pb-2">
+        <div 
+          className="relative w-full mx-auto"
+          style={{ width: boardRect.width, height: boardRect.height }}
+        >
         {/* Initial Countdown overlay */}
         <AnimatePresence>
           {phase === 'countdown' && countdown > 0 && (
@@ -842,7 +852,7 @@ export const GalacticMatchGame = ({
                   className="absolute inset-0"
                   style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                 >
-                  <CardFace symbolIndex={card.symbolIndex} />
+                  <CardFace symbolIndex={card.symbolIndex} symbolFontSize={symbolFontSize} />
                 </div>
               </motion.div>
 
@@ -854,6 +864,7 @@ export const GalacticMatchGame = ({
               </AnimatePresence>
             </motion.button>
           ))}
+        </div>
         </div>
       </div>
 

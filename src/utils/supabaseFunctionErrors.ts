@@ -15,8 +15,12 @@ export interface ParsedFunctionInvokeError {
     message?: string;
     error?: string;
     code?: string;
+    upstreamStatus?: number;
+    upstreamError?: string;
   };
   backendMessage?: string;
+  upstreamStatus?: number;
+  upstreamError?: string;
   isOffline: boolean;
   category: FunctionInvokeErrorCategory;
 }
@@ -35,6 +39,10 @@ const NETWORK_ERROR_PATTERNS = [
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function getOfflineState(): boolean {
@@ -126,12 +134,24 @@ export async function parseFunctionInvokeError(
         const payloadMessage = asString(payloadRecord.message);
         const payloadError = asString(payloadRecord.error);
         const payloadCode = asString(payloadRecord.code);
+        const payloadUpstreamStatus =
+          asNumber(payloadRecord.upstream_status) ?? asNumber(payloadRecord.upstreamStatus);
+        const payloadUpstreamError =
+          asString(payloadRecord.upstream_error) ?? asString(payloadRecord.upstreamError);
 
-        if (payloadMessage || payloadError || payloadCode) {
+        if (
+          payloadMessage ||
+          payloadError ||
+          payloadCode ||
+          payloadUpstreamStatus ||
+          payloadUpstreamError
+        ) {
           responsePayload = {
             message: payloadMessage,
             error: payloadError,
             code: payloadCode,
+            upstreamStatus: payloadUpstreamStatus,
+            upstreamError: payloadUpstreamError,
           };
         }
       }
@@ -141,6 +161,8 @@ export async function parseFunctionInvokeError(
   }
 
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
+  const upstreamStatus = responsePayload?.upstreamStatus;
+  const upstreamError = responsePayload?.upstreamError;
   const category = classifyFunctionInvokeError({
     name,
     message,
@@ -156,6 +178,8 @@ export async function parseFunctionInvokeError(
     code,
     responsePayload,
     backendMessage,
+    upstreamStatus,
+    upstreamError,
     isOffline,
     category,
   };
@@ -194,6 +218,53 @@ function isLikelyTechnicalMessage(message: string): boolean {
   );
 }
 
+function extractProviderStatusFromMessage(message?: string): number | undefined {
+  if (!message) return undefined;
+  const match = message.match(/\b([45]\d{2})\b/);
+  if (!match) return undefined;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function mapProviderAudioError(parsed: ParsedFunctionInvokeError): string | null {
+  const errorCode = parsed.code ?? parsed.responsePayload?.code;
+  const isAudioPipelineError =
+    errorCode === "AUDIO_PIPELINE_FAILED" ||
+    errorCode === "AUDIO_GENERATION_FAILED";
+
+  if (!isAudioPipelineError) return null;
+
+  const providerStatus =
+    extractProviderStatusFromMessage(parsed.upstreamError) ??
+    extractProviderStatusFromMessage(parsed.backendMessage) ??
+    parsed.upstreamStatus;
+
+  if (providerStatus === 401 || providerStatus === 403) {
+    return "Voice generation is temporarily unavailable (provider authentication failed). Please try again shortly.";
+  }
+
+  if (providerStatus === 402) {
+    return "Voice generation is temporarily unavailable because provider credits are exhausted.";
+  }
+
+  if (providerStatus === 429) {
+    return "Voice generation is being rate-limited right now. Please wait a minute and try again.";
+  }
+
+  if (typeof providerStatus === "number" && providerStatus >= 500) {
+    return "Voice generation is temporarily unavailable. Please try again in a moment.";
+  }
+
+  if (
+    typeof parsed.upstreamError === "string" &&
+    parsed.upstreamError.toLowerCase().includes("timed out")
+  ) {
+    return "Voice generation timed out. Please try again.";
+  }
+
+  return null;
+}
+
 export function toUserFacingFunctionError(
   parsed: ParsedFunctionInvokeError,
   opts?: { action?: string },
@@ -220,6 +291,11 @@ export function toUserFacingFunctionError(
     parsed.status === 408
   ) {
     return "Our servers are temporarily unavailable. Please try again in a moment.";
+  }
+
+  const providerAudioError = mapProviderAudioError(parsed);
+  if (providerAudioError) {
+    return providerAudioError;
   }
 
   if (typeof parsed.status === "number" && parsed.status >= 500) {

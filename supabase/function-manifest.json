@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-02-22T23:44:54Z",
+  "generatedAt": "2026-02-25T05:30:06Z",
   "frontendInvoked": [
     "adjust-epic-plan",
     "adjust-saved-daily-plan",
@@ -70,10 +70,9 @@
     "transcribe-audio"
   ],
   "scheduled": [
-    "dispatch-daily-pushes",
     "generate-daily-mentor-pep-talks",
-    "retry-missing-pep-talk-transcripts",
-    "schedule-daily-mentor-pushes"
+    "notifications-dispatch-v2",
+    "notifications-enqueue-v2"
   ],
   "allowList": [
     "adjust-epic-plan",
@@ -83,12 +82,16 @@
     "apple-native-auth",
     "apply-epic-adjustments",
     "check-apple-subscription",
+    "check-contact-reminders",
+    "check-habit-reminders",
+    "check-task-reminders",
     "classify-task-intent",
     "create-influencer-code",
     "decompose-task",
     "delete-user",
     "detect-promotion-opportunities",
     "dispatch-daily-pushes",
+    "dispatch-mentor-nudge-pushes",
     "enrich-user-context",
     "generate-activity-comment",
     "generate-adversary-image",
@@ -125,6 +128,8 @@
     "google-calendar-events",
     "google-native-auth",
     "mentor-chat",
+    "notifications-dispatch-v2",
+    "notifications-enqueue-v2",
     "optimize-daily-plan",
     "optimize-weekly-plan",
     "outlook-calendar-auth",

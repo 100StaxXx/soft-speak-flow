@@ -14,6 +14,7 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const internalSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -95,6 +96,9 @@ Deno.serve(async (req) => {
 
             const response = await supabase.functions.invoke('send-apns-notification', {
               body: notificationPayload,
+              headers: internalSecret ? {
+                'x-internal-key': internalSecret,
+              } : undefined,
             });
 
             if (response.error) {

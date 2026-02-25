@@ -55,6 +55,8 @@ jobs:
           check_unauthorized "mentor-chat" '{"message":"hi","mentorName":"Eli","mentorTone":"supportive"}'
           check_unauthorized "generate-daily-plan" '{"energyLevel":"medium","dayType":"workday","focusArea":"progress"}'
           check_unauthorized "verify-admin-access" '{}'
+          check_unauthorized "notifications-enqueue-v2" '{}'
+          check_unauthorized "notifications-dispatch-v2" '{}'
 
       - name: Verify service-auth scheduled endpoint executes
         run: |
@@ -79,5 +81,6 @@ jobs:
             fi
           }
 
-          check_service_function "dispatch-daily-pushes" '{}'
+          check_service_function "notifications-enqueue-v2" '{}'
+          check_service_function "notifications-dispatch-v2" '{}'
           check_service_function "retry-missing-pep-talk-transcripts" '{"mode":"scheduled","limit":5}'

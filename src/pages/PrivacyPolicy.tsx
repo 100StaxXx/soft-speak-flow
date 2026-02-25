@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
               </p>
             </div>
           </CardHeader>
-          <CardContent className="prose dark:prose-invert max-w-none space-y-5 sm:space-y-6 px-4 sm:px-6 pb-6 text-sm sm:text-base">
+          <CardContent className="allow-text-select prose dark:prose-invert max-w-none space-y-5 sm:space-y-6 px-4 sm:px-6 pb-6 text-sm sm:text-base">
             <section className="scroll-mt-20 space-y-3">
               <h2 className="text-lg sm:text-xl font-semibold text-foreground leading-snug">
                 1. Introduction

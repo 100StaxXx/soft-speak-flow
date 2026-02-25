@@ -2,6 +2,10 @@
  * Safe clipboard utilities with fallbacks for insecure contexts
  * Handles HTTP, older browsers, and permission issues
  */
+import { Capacitor } from "@capacitor/core";
+
+const isNativeIOS = (): boolean =>
+  Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
 /**
  * Safely writes text to clipboard with fallbacks
@@ -16,10 +20,20 @@ export const safeClipboardWrite = async (text: string): Promise<boolean> => {
       return true;
     }
     
+    // On native iOS, avoid textarea/select fallback that can trigger edit callouts.
+    if (isNativeIOS()) {
+      return false;
+    }
+
     // Fallback for insecure contexts (HTTP) or older browsers
     return fallbackCopyToClipboard(text);
   } catch (error) {
     console.error('Clipboard API failed:', error);
+
+    // On native iOS, avoid textarea/select fallback that can trigger edit callouts.
+    if (isNativeIOS()) {
+      return false;
+    }
     
     // If clipboard API failed (e.g., permissions denied), try fallback
     return fallbackCopyToClipboard(text);
@@ -77,6 +91,11 @@ export const isClipboardAvailable = (): boolean => {
   // Check modern Clipboard API
   if (navigator.clipboard && navigator.clipboard.writeText) {
     return true;
+  }
+
+  // On native iOS we intentionally disable legacy textarea/select fallback.
+  if (isNativeIOS()) {
+    return false;
   }
   
   // Check if execCommand fallback is available

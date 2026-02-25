@@ -1,0 +1,10 @@
+framework module IONFilesystemLib {
+  umbrella header "IONFilesystemLib-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module IONFilesystemLib.__Swift {
+  exclude header "IONFilesystemLib-Swift.h"
+}

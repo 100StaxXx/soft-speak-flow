@@ -179,6 +179,33 @@ export const PushNotificationSettings = memo(() => {
     }
   };
 
+  const handleToggleCheckInReminders = async (enabled: boolean) => {
+    if (!user) return;
+
+    if (enabled && !pushEnabled) {
+      toast({
+        title: "Enable push notifications first",
+        description: "Please enable browser notifications before activating check-in reminders",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ checkin_reminders_enabled: enabled })
+        .eq("id", user.id);
+
+      if (error) throw error;
+      toast({ title: enabled ? "Check-In Reminders Enabled" : "Check-In Reminders Disabled", description: "Settings updated successfully" });
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      console.error("Error toggling check-in reminders:", error);
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to toggle check-in reminders", variant: "destructive" });
+    }
+  };
+
   const handleUpdateTime = async (field: string, value: string) => {
     if (!user) return;
     try {
@@ -357,6 +384,23 @@ export const PushNotificationSettings = memo(() => {
             <Switch
               checked={profile?.task_reminders_enabled ?? true}
               onCheckedChange={handleToggleTaskReminders}
+              disabled={!pushEnabled}
+            />
+          </div>
+        </div>
+
+        {/* Morning + Evening Check-In Reminders */}
+        <div className="space-y-3 pt-4 border-t border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-foreground font-medium">Check-In Reminders</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Morning and evening reminders at variable times
+              </p>
+            </div>
+            <Switch
+              checked={profile?.checkin_reminders_enabled ?? true}
+              onCheckedChange={handleToggleCheckInReminders}
               disabled={!pushEnabled}
             />
           </div>

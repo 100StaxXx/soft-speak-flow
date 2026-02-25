@@ -1,0 +1,49 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/CapacitorSplashScreen-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/splash-screen/ios/Sources/SplashScreenPlugin/SplashScreen.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreen~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/splash-screen/ios/Sources/SplashScreenPlugin/SplashScreenConfig.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenConfig~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/splash-screen/ios/Sources/SplashScreenPlugin/SplashScreenPlugin.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenPlugin~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/splash-screen/ios/Sources/SplashScreenPlugin/SplashScreenSettings.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/Objects-normal/arm64/SplashScreenSettings~partial.swiftmodule"
+  }
+}

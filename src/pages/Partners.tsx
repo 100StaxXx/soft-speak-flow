@@ -46,7 +46,11 @@ export default function Partners() {
       if (data.error) throw new Error(data.error);
 
       toast.success("Your referral code is ready!");
-      navigate(`/creator/dashboard?code=${data.code}`);
+      const params = new URLSearchParams({ code: data.code });
+      if (data.creator_access_token) {
+        params.set("token", data.creator_access_token);
+      }
+      navigate(`/creator/dashboard?${params.toString()}`);
     } catch (error) {
       console.error("Failed to create code:", error);
       toast.error(

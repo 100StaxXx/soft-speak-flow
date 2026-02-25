@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, MessageSquare, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useResilience } from "@/contexts/ResilienceContext";
+import { isQueueableWriteError } from "@/utils/networkErrors";
 
 interface MentorChatFeedbackProps {
   messageContent: string;
@@ -13,6 +15,7 @@ type FeedbackType = 'positive' | 'negative' | 'too_long' | 'too_short' | 'too_fo
 
 export const MentorChatFeedback = ({ messageContent, onFeedbackSubmitted }: MentorChatFeedbackProps) => {
   const { user } = useAuth();
+  const { queueAction, shouldQueueWrites, reportApiFailure } = useResilience();
   const [expanded, setExpanded] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedType, setSubmittedType] = useState<FeedbackType | null>(null);
@@ -20,18 +23,41 @@ export const MentorChatFeedback = ({ messageContent, onFeedbackSubmitted }: Ment
   const submitFeedback = async (feedbackType: FeedbackType) => {
     if (!user || submitted) return;
 
+    const payload = {
+      message_content: messageContent.slice(0, 500),
+      feedback_type: feedbackType,
+    };
+
+    if (shouldQueueWrites) {
+      await queueAction({
+        actionKind: "MENTOR_FEEDBACK",
+        entityType: "mentor_feedback",
+        payload,
+      });
+      setSubmitted(true);
+      setSubmittedType(feedbackType);
+      onFeedbackSubmitted?.();
+      setTimeout(() => setExpanded(false), 1500);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('mentor_chat_feedback')
-        .insert({
-          user_id: user.id,
-          message_content: messageContent.slice(0, 500), // Truncate for storage
-          feedback_type: feedbackType,
-        });
+        .insert({ user_id: user.id, ...payload });
 
       if (error) {
-        console.error('Failed to submit feedback:', error);
-        return;
+        if (isQueueableWriteError(error)) {
+          await queueAction({
+            actionKind: "MENTOR_FEEDBACK",
+            entityType: "mentor_feedback",
+            payload,
+          });
+        } else {
+          console.error('Failed to submit feedback:', error);
+          reportApiFailure(error, { source: "mentor_feedback_submit" });
+          return;
+        }
       }
 
       setSubmitted(true);
@@ -42,6 +68,17 @@ export const MentorChatFeedback = ({ messageContent, onFeedbackSubmitted }: Ment
       setTimeout(() => setExpanded(false), 1500);
     } catch (error) {
       console.error('Error submitting feedback:', error);
+      reportApiFailure(error, { source: "mentor_feedback_submit_catch" });
+      if (isQueueableWriteError(error)) {
+        await queueAction({
+          actionKind: "MENTOR_FEEDBACK",
+          entityType: "mentor_feedback",
+          payload,
+        });
+        setSubmitted(true);
+        setSubmittedType(feedbackType);
+        onFeedbackSubmitted?.();
+      }
     }
   };
 

@@ -1,0 +1,20 @@
+dependencies: \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/AppCheckCore.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/GACAppCheck.m \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheck.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/PromisesObjC.build/module.modulemap \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/PromisesObjC/Sources/FBLPromises/include/FBLPromises.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckErrors.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckProvider.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckSettings.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckToken.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckTokenDelegate.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckTokenResult.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/Errors/GACAppCheckErrorUtil.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/GACAppCheckLogger+Internal.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Public/AppCheckCore/GACAppCheckLogger.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/Storage/GACAppCheckStorage.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/TokenRefresh/GACAppCheckTokenRefreshResult.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/TokenRefresh/GACAppCheckTokenRefresher.h \
+  /Users/macbookair/Developer/soft-speak-flow/ios/App/Pods/AppCheckCore/AppCheckCore/Sources/Core/TokenRefresh/GACAppCheckTimer.h

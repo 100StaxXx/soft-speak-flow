@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
+import { Capacitor } from "@capacitor/core";
 import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
@@ -49,6 +50,12 @@ const AppWrapper = () => {
 
 // Hide debug indicator once React takes over
 document.getElementById('debug-indicator')?.remove();
+
+// Mark native iOS early so CSS hardening can apply from first render.
+if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
+  document.documentElement.classList.add("platform-native-ios");
+  document.body.classList.add("platform-native-ios");
+}
 
 createRoot(document.getElementById("root")!).render(
   <AppWrapper />

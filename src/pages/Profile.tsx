@@ -234,6 +234,14 @@ const Profile = () => {
 
   const handleDeleteAccount = useCallback(async () => {
     if (!user || isDeletingAccount || !isDeleteConfirmationValid) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast({
+        title: "Connection required",
+        description: "This action requires a live connection. Try again when online.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsDeletingAccount(true);
     try {

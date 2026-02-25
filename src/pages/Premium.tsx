@@ -266,10 +266,7 @@ export default function Premium() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => toast({
-                      title: "Need help?",
-                      description: "Please ensure you're signed in to the App Store and connected to the internet.",
-                    })}
+                    onClick={() => navigate("/support/report")}
                   >
                     Contact support
                   </Button>

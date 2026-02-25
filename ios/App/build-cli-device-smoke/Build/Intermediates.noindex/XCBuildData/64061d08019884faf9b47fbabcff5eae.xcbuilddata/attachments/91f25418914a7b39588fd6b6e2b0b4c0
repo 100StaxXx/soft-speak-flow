@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Products/Debug-iphoneos/Capacitor/Capacitor.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Products/Debug-iphoneos/Capacitor/Capacitor.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "Capacitor-Swift.h",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/Capacitor.build/unextended-interface-header.h",
+    }]
+  }]
+}

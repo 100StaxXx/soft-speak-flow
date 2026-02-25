@@ -3,6 +3,7 @@ import { MiniGameResult } from '@/types/astralEncounters';
 import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useStaticStars } from './gameUtils';
 import { TrackRatingUI } from './TrackRatingUI';
+import { useSingleCompletion, useTimerRegistry } from './gameLifecycle';
 import { useRhythmTrack, RhythmTrack } from '@/hooks/useRhythmTrack';
 import { Moon, Star, Sun, Music, Sparkles } from 'lucide-react';
 
@@ -396,7 +397,9 @@ export const EclipseTimingGame = ({
   isPractice = false,
   compact = false,
 }: EclipseTimingGameProps) => {
-  const [gameState, setGameState] = useState<'loading' | 'countdown' | 'playing' | 'paused' | 'rating' | 'complete'>('loading');
+  const [gameState, setGameState] = useState<'loading' | 'countdown' | 'playing' | 'paused' | 'rating' | 'complete'>(
+    compact ? 'countdown' : 'loading',
+  );
   const [gameStats, setGameStats] = useState<GameStats>(initialGameStats);
   const [visibleNotes, setVisibleNotes] = useState<Note[]>([]);
   const [hitEffects, setHitEffects] = useState<{ id: number; lane: LaneType; result: HitResult }[]>([]);
@@ -419,6 +422,8 @@ export const EclipseTimingGame = ({
   const loadingStartRef = useRef<number>(0);
   
   const stars = useStaticStars(20);
+  const { registerTimeout, registerInterval, clearTimer } = useTimerRegistry();
+  const { completeOnce } = useSingleCompletion(onComplete);
 
   const { isGenerating, userRating, fetchRandomTrack, rateTrack } = useRhythmTrack();
 
@@ -427,13 +432,20 @@ export const EclipseTimingGame = ({
   // Load track and initialize notes
   useEffect(() => {
     const initGame = async () => {
+      if (compact) {
+        notesRef.current = generateFallbackNotes(difficulty);
+        currentTrackRef.current = null;
+        setGameState('countdown');
+        return;
+      }
+
       loadingStartRef.current = Date.now();
       const loadedTrack = await fetchRandomTrack(difficulty);
       
       const transitionToCountdown = () => {
         const loadingDuration = Date.now() - loadingStartRef.current;
         const remainingTime = Math.max(0, MIN_LOADING_TIME_MS - loadingDuration);
-        setTimeout(() => setGameState('countdown'), remainingTime + READY_BUFFER_MS);
+        registerTimeout(() => setGameState('countdown'), remainingTime + READY_BUFFER_MS);
       };
       
       if (loadedTrack) {
@@ -448,7 +460,7 @@ export const EclipseTimingGame = ({
         audio.addEventListener('error', () => {
           notesRef.current = generateFallbackNotes(difficulty);
           transitionToCountdown();
-        });
+        }, { once: true });
         audio.load();
       } else {
         notesRef.current = generateFallbackNotes(difficulty);
@@ -460,7 +472,7 @@ export const EclipseTimingGame = ({
     return () => {
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
-  }, [difficulty, fetchRandomTrack]);
+  }, [compact, difficulty, fetchRandomTrack, registerTimeout]);
 
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
@@ -575,7 +587,7 @@ export const EclipseTimingGame = ({
         });
         setGameStats({ ...finalStats });
         
-        if (currentTrackRef.current && !isPractice) {
+        if (currentTrackRef.current && !isPractice && !compact) {
           setGameState('rating');
         } else {
           setGameState('complete');
@@ -588,7 +600,7 @@ export const EclipseTimingGame = ({
     
     animationFrameRef.current = requestAnimationFrame(gameLoop);
     return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); };
-  }, [gameState, isPractice, onDamage, maxMisses]);
+  }, [compact, gameState, isPractice, onDamage, maxMisses]);
 
   // TIME-BASED hit detection
   const handleLaneTap = useCallback((lane: LaneType, tapTimestamp: number) => {
@@ -596,7 +608,7 @@ export const EclipseTimingGame = ({
     
     // Visual feedback
     setPressedLanes(prev => ({ ...prev, [lane]: true }));
-    setTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 80);
+    registerTimeout(() => setPressedLanes(prev => ({ ...prev, [lane]: false })), 80);
     
     const gameTime = tapTimestamp - gameStartTimeRef.current + AUDIO_LATENCY_OFFSET_MS;
     const notes = notesRef.current;
@@ -642,10 +654,10 @@ export const EclipseTimingGame = ({
     // Hit effect
     const effectId = Date.now();
     setHitEffects(prev => [...prev.slice(-(MAX_HIT_EFFECTS - 1)), { id: effectId, lane, result }]);
-    setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== effectId)), 400);
+    registerTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== effectId)), 400);
     
     triggerHaptic(result === 'perfect' ? 'success' : 'light');
-  }, [gameState]);
+  }, [gameState, registerTimeout]);
 
   // Keyboard controls
   useEffect(() => {
@@ -679,7 +691,7 @@ export const EclipseTimingGame = ({
     const transitionToCountdown = () => {
       const loadingDuration = Date.now() - loadingStartRef.current;
       const remainingTime = Math.max(0, MIN_LOADING_TIME_MS - loadingDuration);
-      setTimeout(() => setGameState('countdown'), remainingTime + READY_BUFFER_MS);
+      registerTimeout(() => setGameState('countdown'), remainingTime + READY_BUFFER_MS);
     };
     
     const loadedTrack = await fetchRandomTrack(difficulty);
@@ -696,22 +708,24 @@ export const EclipseTimingGame = ({
       audio.addEventListener('error', () => {
         notesRef.current = generateFallbackNotes(difficulty);
         transitionToCountdown();
-      });
+      }, { once: true });
       audio.load();
     } else {
       notesRef.current = generateFallbackNotes(difficulty);
       currentTrackRef.current = null;
       transitionToCountdown();
     }
-  }, [difficulty, fetchRandomTrack]);
+  }, [difficulty, fetchRandomTrack, registerTimeout]);
 
   const handleFinish = useCallback(() => setGameState('complete'), []);
 
   useEffect(() => {
     if (gameState === 'complete' && gameResult) {
-      setTimeout(() => onComplete(gameResult), 300);
+      registerTimeout(() => {
+        completeOnce(gameResult);
+      }, 300);
     }
-  }, [gameState, gameResult, onComplete]);
+  }, [gameState, gameResult, registerTimeout, completeOnce]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -732,13 +746,13 @@ export const EclipseTimingGame = ({
     const bpm = currentTrackRef.current.bpm || 120;
     const beatInterval = 60000 / bpm;
     
-    const interval = setInterval(() => {
+    const interval = registerInterval(() => {
       setBeatPulse(true);
-      setTimeout(() => setBeatPulse(false), 80);
+      registerTimeout(() => setBeatPulse(false), 80);
     }, beatInterval);
     
-    return () => clearInterval(interval);
-  }, [gameState]);
+    return () => clearTimer(interval);
+  }, [gameState, registerInterval, registerTimeout, clearTimer]);
 
   const approachingLanes = useMemo(() => {
     const approaching: Record<LaneType, boolean> = { moon: false, star: false, sun: false };

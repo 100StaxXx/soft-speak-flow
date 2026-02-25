@@ -1,0 +1,29 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/CapacitorHaptics-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/CapacitorHaptics-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/CapacitorHaptics-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/CapacitorHaptics-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/CapacitorHaptics-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/haptics/ios/Sources/HapticsPlugin/Haptics.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/Haptics~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/haptics/ios/Sources/HapticsPlugin/HapticsPlugin.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorHaptics.build/Objects-normal/arm64/HapticsPlugin~partial.swiftmodule"
+  }
+}

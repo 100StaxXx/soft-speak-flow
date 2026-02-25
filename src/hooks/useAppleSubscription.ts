@@ -96,6 +96,14 @@ export function useAppleSubscription() {
       });
       return false;
     }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "Connection required",
+        description: "This action requires a live connection. Try again when online.",
+        variant: "destructive",
+      });
+      return false;
+    }
 
     setLoading(true);
     try {
@@ -177,6 +185,14 @@ export function useAppleSubscription() {
       toast({
         title: "Not Available",
         description: "In-App Purchases are only available on iOS devices",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "Connection required",
+        description: "This action requires a live connection. Try again when online.",
         variant: "destructive",
       });
       return;

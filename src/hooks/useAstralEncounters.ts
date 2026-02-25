@@ -40,6 +40,19 @@ export interface EncounterTriggerResult {
 }
 
 const RECENT_ADVERSARY_HISTORY_LIMIT = 10;
+const RECENT_MINIGAME_HISTORY_LIMIT = 2;
+const VALID_MINI_GAME_TYPES = new Set<MiniGameType>([
+  'energy_beam',
+  'tap_sequence',
+  'astral_frequency',
+  'eclipse_timing',
+  'starfall_dodge',
+  'soul_serpent',
+  'orb_match',
+  'galactic_match',
+  'cosmiq_grid',
+  'stellar_flow',
+]);
 
 export const useAstralEncounters = () => {
   const { user } = useAuth();
@@ -159,13 +172,20 @@ export const useAstralEncounters = () => {
             .filter((name): name is string => Boolean(name)),
         ),
       );
+      const recentMiniGames = (encounters ?? [])
+        .map((encounter) => encounter.mini_game_type)
+        .filter((gameType): gameType is MiniGameType => VALID_MINI_GAME_TYPES.has(gameType as MiniGameType))
+        .slice(0, RECENT_MINIGAME_HISTORY_LIMIT);
 
       const adversary = generateAdversary(
         params.triggerType,
         params.epicProgress,
         params.epicCategory,
         undefined,
-        { avoidNames: recentAdversaryNames },
+        {
+          avoidNames: recentAdversaryNames,
+          recentMiniGames,
+        },
       );
 
       const { data, error } = await supabase

@@ -636,14 +636,35 @@ All colors MUST be HSL.
     text-rendering: optimizeLegibility;
   }
     
-  /* Keep text selectable by default for native-feeling interactions */
-  p, span, div, h1, h2, h3, h4, h5, h6, label {
-    -webkit-user-select: text;
-    user-select: text;
+  /* Native iOS hardening: prevent accidental selection/callouts on app chrome. */
+  .platform-native-ios :where(
+    p,
+    span,
+    div,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    label,
+    li
+  ) {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   /* Inputs/selectable fields */
   input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+  }
+
+  /* Explicit opt-in region for long-form copy that should remain selectable. */
+  .allow-text-select,
+  .allow-text-select * {
     -webkit-user-select: text !important;
     user-select: text !important;
     -webkit-touch-callout: default !important;

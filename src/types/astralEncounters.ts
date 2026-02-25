@@ -140,15 +140,23 @@ export interface EncounterPhase {
 
 // Games disabled from encounters (shelved but preserved for future reactivation)
 export const DISABLED_ENCOUNTER_GAMES: MiniGameType[] = [
-  'eclipse_timing', 
-  'stellar_flow',
   'cosmiq_grid',
-  'starfall_dodge', 
-  'soul_serpent',
-  'astral_frequency'
+  'stellar_flow',
 ];
 
-// Theme to mini-game mapping (using only active games: galactic_match, orb_match, tap_sequence, energy_beam)
+// Resist encounters can roll from this full random pool.
+export const RESIST_RANDOM_MINIGAME_POOL: MiniGameType[] = [
+  'energy_beam',
+  'tap_sequence',
+  'orb_match',
+  'galactic_match',
+  'astral_frequency',
+  'eclipse_timing',
+  'starfall_dodge',
+  'soul_serpent',
+];
+
+// Theme to mini-game mapping used for non-resist encounters and boss overrides.
 export const THEME_MINIGAME_MAP: Record<AdversaryTheme, MiniGameType> = {
   distraction: 'tap_sequence',      // Mind - focus challenge
   chaos: 'galactic_match',          // Mind - pattern matching

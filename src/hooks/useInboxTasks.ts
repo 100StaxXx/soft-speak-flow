@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { normalizeTaskSchedulingState } from "@/utils/taskSchedulingRules";
+import { useResilience } from "@/contexts/ResilienceContext";
+import { isQueueableWriteError } from "@/utils/networkErrors";
 
 export const INBOX_TASKS_QUERY_KEY = "inbox-tasks";
 export const INBOX_COUNT_QUERY_KEY = "inbox-count";
@@ -44,6 +46,7 @@ export const fetchInboxCount = async (userId: string) => {
 
 export const useInboxTasks = (options: InboxTasksOptions = {}) => {
   const { user } = useAuth();
+  const { shouldQueueWrites, queueTaskAction, reportApiFailure } = useResilience();
   const queryClient = useQueryClient();
   const { enabled = true } = options;
   const invalidateInboxQueries = useCallback(() => {
@@ -66,12 +69,34 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
 
   const scheduleTask = useMutation({
     mutationFn: async ({ taskId, targetDate }: { taskId: string; targetDate: string }) => {
+      if (shouldQueueWrites) {
+        await queueTaskAction("UPDATE_TASK", {
+          taskId,
+          updates: {
+            task_date: targetDate,
+          },
+        });
+        return { queued: true };
+      }
+
       const { data: task, error: fetchError } = await supabase
         .from("daily_tasks")
         .select("task_date, scheduled_time, habit_source_id, source")
         .eq("id", taskId)
         .maybeSingle();
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        if (isQueueableWriteError(fetchError)) {
+          await queueTaskAction("UPDATE_TASK", {
+            taskId,
+            updates: {
+              task_date: targetDate,
+            },
+          });
+          return { queued: true };
+        }
+        reportApiFailure(fetchError, { source: "inbox_schedule_fetch" });
+        throw fetchError;
+      }
       if (!task) throw new Error("Task not found");
 
       const normalized = normalizeTaskSchedulingState({
@@ -93,12 +118,23 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
         .from("daily_tasks")
         .update(updateData)
         .eq("id", taskId);
-      if (error) throw error;
+      if (error) {
+        if (isQueueableWriteError(error)) {
+          await queueTaskAction("UPDATE_TASK", { taskId, updates: updateData });
+          return { queued: true };
+        }
+        reportApiFailure(error, { source: "inbox_schedule_update" });
+        throw error;
+      }
       return normalized;
     },
     onSuccess: (data) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      if ((data as { queued?: boolean } | undefined)?.queued) {
+        toast("Quest schedule queued. It will sync when connection is restored.");
+        return;
+      }
       if (data?.normalizedToInbox) {
         toast("Regular quests without time stay in Inbox.");
       }
@@ -107,29 +143,68 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
 
   const toggleInboxTask = useMutation({
     mutationFn: async ({ taskId, completed }: { taskId: string; completed: boolean }) => {
+      if (shouldQueueWrites) {
+        await queueTaskAction("COMPLETE_TASK", {
+          taskId,
+          completed,
+          completedAt: completed ? new Date().toISOString() : null,
+        });
+        return { queued: true };
+      }
+
       const { error } = await supabase
         .from("daily_tasks")
         .update({ completed, completed_at: completed ? new Date().toISOString() : null })
         .eq("id", taskId);
-      if (error) throw error;
+      if (error) {
+        if (isQueueableWriteError(error)) {
+          await queueTaskAction("COMPLETE_TASK", {
+            taskId,
+            completed,
+            completedAt: completed ? new Date().toISOString() : null,
+          });
+          return { queued: true };
+        }
+        reportApiFailure(error, { source: "inbox_toggle" });
+        throw error;
+      }
+      return { queued: false };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      if ((data as { queued?: boolean } | undefined)?.queued) {
+        toast("Quest completion queued. It will sync when connection is restored.");
+      }
     },
   });
 
   const deleteInboxTask = useMutation({
     mutationFn: async (taskId: string) => {
+      if (shouldQueueWrites) {
+        await queueTaskAction("DELETE_TASK", { taskId });
+        return { queued: true };
+      }
       const { error } = await supabase
         .from("daily_tasks")
         .delete()
         .eq("id", taskId);
-      if (error) throw error;
+      if (error) {
+        if (isQueueableWriteError(error)) {
+          await queueTaskAction("DELETE_TASK", { taskId });
+          return { queued: true };
+        }
+        reportApiFailure(error, { source: "inbox_delete" });
+        throw error;
+      }
+      return { queued: false };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       invalidateInboxQueries();
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
+      if ((data as { queued?: boolean } | undefined)?.queued) {
+        toast("Quest deletion queued. It will sync when connection is restored.");
+      }
     },
   });
 

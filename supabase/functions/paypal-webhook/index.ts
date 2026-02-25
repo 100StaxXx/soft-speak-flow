@@ -25,6 +25,7 @@ const PAYOUT_EVENTS = {
   ITEM_UNCLAIMED: "PAYMENT.PAYOUTS-ITEM.UNCLAIMED",
   ITEM_RETURNED: "PAYMENT.PAYOUTS-ITEM.RETURNED",
 };
+const WEBHOOK_PROVIDER = "paypal";
 
 /**
  * Verify PayPal webhook signature using PayPal's verification API
@@ -128,6 +129,36 @@ async function verifyPayPalWebhook(
   }
 }
 
+async function registerWebhookEvent(
+  // deno-lint-ignore no-explicit-any
+  supabaseClient: any,
+  eventId: string,
+  eventType: string,
+  // deno-lint-ignore no-explicit-any
+  webhookEvent: any,
+): Promise<{ duplicate: boolean; error: boolean }> {
+  const { error } = await supabaseClient
+    .from("payment_webhook_events")
+    .insert({
+      provider: WEBHOOK_PROVIDER,
+      event_id: eventId,
+      event_type: eventType,
+      payload: webhookEvent,
+      received_at: new Date().toISOString(),
+    });
+
+  if (!error) {
+    return { duplicate: false, error: false };
+  }
+
+  if (error.code === "23505") {
+    return { duplicate: true, error: false };
+  }
+
+  console.error("Failed to register webhook event:", error);
+  return { duplicate: false, error: true };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -183,6 +214,51 @@ serve(async (req) => {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
+      );
+    }
+
+    if (!eventId) {
+      return new Response(
+        JSON.stringify({ error: "Missing webhook event id" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const eventRegistration = await registerWebhookEvent(
+      supabaseClient,
+      eventId,
+      eventType,
+      webhookEvent,
+    );
+
+    if (eventRegistration.error) {
+      // Return 500 so PayPal retries later rather than silently dropping events.
+      return new Response(
+        JSON.stringify({ error: "Failed to register webhook event" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (eventRegistration.duplicate) {
+      console.log(`Skipping duplicate PayPal webhook event: ${eventId}`);
+      return new Response(
+        JSON.stringify({
+          received: true,
+          duplicate: true,
+          event_type: eventType,
+          event_id: eventId,
+          verified: !!webhookId,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
 
@@ -260,6 +336,12 @@ serve(async (req) => {
         }
       }
     }
+
+    await supabaseClient
+      .from("payment_webhook_events")
+      .update({ processed_at: new Date().toISOString() })
+      .eq("provider", WEBHOOK_PROVIDER)
+      .eq("event_id", eventId);
 
     // Return 200 to acknowledge receipt
     return new Response(

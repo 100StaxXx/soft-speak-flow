@@ -476,6 +476,7 @@ export const SoulSerpentGame = ({
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [interpolation, setInterpolation] = useState(0); // 0 to 1 for smooth movement
   
+  const snakeRef = useRef<Position[]>(snake);
   const trailCleanupRef = useRef<NodeJS.Timeout | null>(null);
   const directionRef = useRef<Direction>('right');
   const lastDirectionRef = useRef<Direction>('right'); // Track last applied direction
@@ -485,6 +486,17 @@ export const SoulSerpentGame = ({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const hasCompletedRef = useRef(false);
+
+  const completeGame = useCallback((result: MiniGameResult) => {
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
+    onComplete(result);
+  }, [onComplete]);
+
+  useEffect(() => {
+    snakeRef.current = snake;
+  }, [snake]);
 
   // Dynamic cell size based on viewport
   const cellSize = useMemo(() => getCellSize(), []);
@@ -576,102 +588,105 @@ export const SoulSerpentGame = ({
       setDirection(nextDirection);
     }
 
-    setSnake(prevSnake => {
-      const head = prevSnake[0];
-      const currentDirection = directionRef.current;
-      
-      addTrailParticle(head, prevSnake.length);
-      
-      let newHead: Position;
-      switch (currentDirection) {
-        case 'up':
-          newHead = { x: head.x, y: head.y - 1 };
-          break;
-        case 'down':
-          newHead = { x: head.x, y: head.y + 1 };
-          break;
-        case 'left':
-          newHead = { x: head.x - 1, y: head.y };
-          break;
-        case 'right':
-          newHead = { x: head.x + 1, y: head.y };
-          break;
-        default:
-          newHead = { x: head.x + 1, y: head.y };
+    const prevSnake = snakeRef.current;
+    if (prevSnake.length === 0) return;
+
+    const head = prevSnake[0];
+    const currentDirection = directionRef.current;
+    addTrailParticle(head, prevSnake.length);
+
+    let newHead: Position;
+    switch (currentDirection) {
+      case 'up':
+        newHead = { x: head.x, y: head.y - 1 };
+        break;
+      case 'down':
+        newHead = { x: head.x, y: head.y + 1 };
+        break;
+      case 'left':
+        newHead = { x: head.x - 1, y: head.y };
+        break;
+      case 'right':
+        newHead = { x: head.x + 1, y: head.y };
+        break;
+      default:
+        newHead = { x: head.x + 1, y: head.y };
+    }
+
+    // Wrap-around walls
+    if (newHead.x < 0) newHead.x = GRID_SIZE - 1;
+    if (newHead.x >= GRID_SIZE) newHead.x = 0;
+    if (newHead.y < 0) newHead.y = GRID_SIZE - 1;
+    if (newHead.y >= GRID_SIZE) newHead.y = 0;
+
+    // Self collision = game over (check against body, not including tail that will be removed)
+    const bodyToCheck = prevSnake.slice(0, -1); // Exclude tail since it moves
+    if (bodyToCheck.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+      setGameState('complete');
+      triggerHaptic('error');
+      setShake(true);
+      setTimeout(() => setShake(false), 300);
+
+      // Player takes tier-based collision damage (game ends)
+      onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
+
+      // Calculate result based on score achieved
+      const { accuracy, result } = calculateAccuracy(score);
+
+      completeGame({
+        success: result !== 'fail',
+        accuracy,
+        result,
+        highScoreValue: score,
+        gameStats: {
+          score,
+        },
+      });
+      return;
+    }
+
+    const newSnake = [newHead, ...prevSnake];
+
+    // Check stardust collection
+    if (newHead.x === stardust.x && newHead.y === stardust.y) {
+      const newScore = score + 1;
+
+      // MILESTONE DAMAGE: Deal damage every 5 stardust collected (faster pacing)
+      if (newScore > 0 && newScore % 5 === 0) {
+        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.scoreMilestone, source: 'score_milestone' });
       }
 
-      // Wrap-around walls
-      if (newHead.x < 0) newHead.x = GRID_SIZE - 1;
-      if (newHead.x >= GRID_SIZE) newHead.x = 0;
-      if (newHead.y < 0) newHead.y = GRID_SIZE - 1;
-      if (newHead.y >= GRID_SIZE) newHead.y = 0;
-
-      // Self collision = game over (check against body, not including tail that will be removed)
-      const bodyToCheck = prevSnake.slice(0, -1); // Exclude tail since it moves
-      if (bodyToCheck.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+      // Practice mode: end after collecting 5 stardust
+      if (isPractice && newScore >= 5) {
+        setScore(newScore);
         setGameState('complete');
-        triggerHaptic('error');
-        setShake(true);
-        setTimeout(() => setShake(false), 300);
-        
-        // Player takes tier-based collision damage (game ends)
-        onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
-        
-        // Calculate result based on score achieved
-        const { accuracy, result } = calculateAccuracy(score);
-        
-        onComplete({
-          success: result !== 'fail',
-          accuracy,
-          result,
-          highScoreValue: score,
-          gameStats: {
-            score,
-          },
-        });
-        return prevSnake;
+        completeGame({ success: true, accuracy: 80, result: 'good', highScoreValue: newScore, gameStats: { score: newScore } });
+        setSnake(newSnake);
+        snakeRef.current = newSnake;
+        return;
       }
 
-      const newSnake = [newHead, ...prevSnake];
-
-      // Check stardust collection
-      if (newHead.x === stardust.x && newHead.y === stardust.y) {
-        const newScore = score + 1;
-        
-        // MILESTONE DAMAGE: Deal damage every 5 stardust collected (faster pacing)
-        if (newScore > 0 && newScore % 5 === 0) {
-          onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.soul_serpent.scoreMilestone, source: 'score_milestone' });
-        }
-        
-        // Practice mode: end after collecting 5 stardust
-        if (isPractice && newScore >= 5) {
-          setScore(newScore);
-          setGameState('complete');
-          onComplete({ success: true, accuracy: 80, result: 'good', highScoreValue: newScore, gameStats: { score: newScore } });
-          return newSnake;
-        }
-        
-        setScore(s => {
-          const updated = s + 1;
-          if (updated > highScore) {
-            setHighScore(updated);
-          }
-          return updated;
-        });
-        setStardust(spawnStardust(newSnake));
-        setShowCollect(true);
-        triggerHaptic('medium');
-        setTimeout(() => setShowCollect(false), 300);
-        return newSnake; // Grow snake
+      setScore(newScore);
+      if (newScore > highScore) {
+        setHighScore(newScore);
       }
+      setStardust(spawnStardust(newSnake));
+      setShowCollect(true);
+      triggerHaptic('medium');
+      setTimeout(() => setShowCollect(false), 300);
+      setSnake(newSnake); // Grow snake
+      snakeRef.current = newSnake;
+      setInterpolation(0);
+      return;
+    }
 
-      newSnake.pop(); // Remove tail if no food eaten
-      return newSnake;
-    });
+    newSnake.pop(); // Remove tail if no food eaten
+    setSnake(newSnake);
+    snakeRef.current = newSnake;
     
     // Reset interpolation for smooth animation
     setInterpolation(0);
-  }, [gameState, stardust, score, highScore, spawnStardust, onComplete, addTrailParticle, calculateAccuracy, onDamage, isPractice]);
+  }, [gameState, stardust, score, highScore, spawnStardust, completeGame, addTrailParticle, calculateAccuracy, onDamage, isPractice]);
 
   // Game loop with smooth interpolation
   useEffect(() => {

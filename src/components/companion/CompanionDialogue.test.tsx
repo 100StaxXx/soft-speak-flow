@@ -15,9 +15,13 @@ const mocks = vi.hoisted(() => ({
     isLoading: false,
   },
   companion: {
+    id: "companion-1",
+    current_stage: 4,
     current_image_url: null as string | null,
     cached_creature_name: "Wolf" as string | null,
     spirit_animal: "Wolf",
+    progressToNext: 50,
+    canEvolve: false,
   },
   talkPopup: {
     dismiss: vi.fn(),
@@ -42,7 +46,15 @@ vi.mock("@/hooks/useCompanionDialogue", () => ({
 
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
-    companion: mocks.companion,
+    companion: {
+      id: mocks.companion.id,
+      current_stage: mocks.companion.current_stage,
+      current_image_url: mocks.companion.current_image_url,
+      cached_creature_name: mocks.companion.cached_creature_name,
+      spirit_animal: mocks.companion.spirit_animal,
+    },
+    progressToNext: mocks.companion.progressToNext,
+    canEvolve: mocks.companion.canEvolve,
   }),
 }));
 
@@ -84,9 +96,13 @@ describe("CompanionDialogue", () => {
     mocks.dialogue.lineId = "soft.base_greetings.01";
     mocks.dialogue.dialogueMood = "content";
     mocks.dialogue.isLoading = false;
+    mocks.companion.id = "companion-1";
+    mocks.companion.current_stage = 4;
     mocks.companion.current_image_url = null;
     mocks.companion.cached_creature_name = "Wolf";
     mocks.companion.spirit_animal = "Wolf";
+    mocks.companion.progressToNext = 50;
+    mocks.companion.canEvolve = false;
     mocks.talkPopup.dismiss.mockClear();
     mocks.talkPopup.show.mockClear();
     setReducedMotion(false);
@@ -276,5 +292,39 @@ describe("CompanionDialogue", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /open companion dialogue/i }));
     expect(screen.getByRole("dialog", { name: "Companion" })).toBeInTheDocument();
+  });
+
+  it("shows near-evolution companion line at 97% and mirrors it in modal", () => {
+    mocks.companion.progressToNext = 97;
+    mocks.companion.canEvolve = false;
+
+    render(<CompanionDialogue />);
+
+    const nearLine = screen.getByTestId("companion-near-evolution-line");
+    expect(nearLine).toBeInTheDocument();
+    expect(nearLine.textContent?.length ?? 0).toBeGreaterThan(5);
+
+    fireEvent.click(screen.getByRole("button", { name: /open wolf dialogue/i }));
+    const modalNearLine = screen.getByTestId("companion-near-evolution-line-modal");
+    expect(modalNearLine).toBeInTheDocument();
+    expect(modalNearLine.textContent).toEqual(nearLine.textContent);
+  });
+
+  it("hides near-evolution line below threshold", () => {
+    mocks.companion.progressToNext = 96;
+    mocks.companion.canEvolve = false;
+
+    render(<CompanionDialogue />);
+
+    expect(screen.queryByTestId("companion-near-evolution-line")).not.toBeInTheDocument();
+  });
+
+  it("hides near-evolution line when already evolvable", () => {
+    mocks.companion.progressToNext = 100;
+    mocks.companion.canEvolve = true;
+
+    render(<CompanionDialogue />);
+
+    expect(screen.queryByTestId("companion-near-evolution-line")).not.toBeInTheDocument();
   });
 });

@@ -38,6 +38,12 @@ jobs:
             SUPABASE_URL
             SUPABASE_ANON_KEY
             SUPABASE_SERVICE_ROLE_KEY
+            INTERNAL_FUNCTION_SECRET
+            APNS_KEY_ID
+            APNS_TEAM_ID
+            APNS_BUNDLE_ID
+            APNS_AUTH_KEY
+            APNS_ENVIRONMENT
             OPENAI_API_KEY
             ELEVENLABS_API_KEY
           )

@@ -41,6 +41,10 @@ vi.mock("@/components/QuestAttachmentPicker", () => ({
   ),
 }));
 
+vi.mock("@/components/tasks/ContactPicker", () => ({
+  ContactPicker: () => <div data-testid="contact-picker-mock" />,
+}));
+
 describe("AddQuestSheet", () => {
   const selectedDate = new Date(2026, 0, 15);
 
@@ -387,5 +391,71 @@ describe("AddQuestSheet", () => {
     const payload = onAdd.mock.calls[0][0];
     expect(payload.attachments).toHaveLength(10);
     expect(payload.imageUrl).toBe("https://example.com/file-1.png");
+  });
+
+  it("submits weekdays recurrence with Monday-Friday day indexes", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Weekday quest" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Weekdays" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recurrencePattern: "weekdays",
+        recurrenceDays: [0, 1, 2, 3, 4],
+      }),
+    );
+  });
+
+  it("submits biweekly recurrence with one default selected day", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Biweekly quest" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Every 2 Weeks" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recurrencePattern: "biweekly",
+        recurrenceDays: [3], // 2026-01-15 is Thursday (Mon=0)
+      }),
+    );
   });
 });

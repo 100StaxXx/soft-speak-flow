@@ -51,8 +51,12 @@ function parseUpstreamError(rawBody: string): string | null {
 
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const message = typeof parsed.error === "string"
-      ? parsed.error
+    const message = typeof parsed.upstream_error === "string"
+      ? parsed.upstream_error
+      : typeof parsed.upstreamError === "string"
+        ? parsed.upstreamError
+      : typeof parsed.error === "string"
+        ? parsed.error
       : typeof parsed.message === "string"
         ? parsed.message
         : null;

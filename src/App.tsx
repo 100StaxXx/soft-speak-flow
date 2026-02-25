@@ -43,6 +43,8 @@ import { PostOnboardingMentorGuidanceProvider } from "@/hooks/usePostOnboardingM
 import { MentorGuidanceCard } from "@/components/MentorGuidanceCard";
 import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
+import { ResilienceProvider } from "@/contexts/ResilienceContext";
+import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -83,6 +85,7 @@ const TestDayPlanner = lazy(() => import("./pages/TestDayPlanner"));
 const TestScroll = lazy(() => import("./pages/TestScroll"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const IAPTest = lazy(() => import("./pages/IAPTest"));
+const SupportReport = lazy(() => import("./pages/SupportReport"));
 
 
 // Create query client outside component for better performance and stability
@@ -276,24 +279,26 @@ const AppContent = memo(() => {
   const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
 
   return (
-    <ThemeProvider mentorId={resolvedMentorId}>
-      <ViewModeProvider>
-        <XPProvider>
-          <PostOnboardingMentorGuidanceProvider>
-            <WeeklyRecapProvider>
-              <CompanionPresenceProvider>
-                 <TalkPopupProvider>
-                  <RealtimeSyncProvider>
-                  <AstralEncounterProvider>
-                  <Suspense fallback={<LoadingFallback />}>
-                  <EvolutionAwareContent />
-                  {activeMainTabPath ? (
-                    <ProtectedRoute>
-                      <MainTabsKeepAlive activePath={activeMainTabPath} />
-                    </ProtectedRoute>
-                  ) : (
-                  <AnimatePresence mode="sync" initial={false}>
-                    <Routes location={location} key={location.pathname}>
+    <ResilienceProvider>
+      <ThemeProvider mentorId={resolvedMentorId}>
+        <ResilienceStatusBanner />
+        <ViewModeProvider>
+          <XPProvider>
+            <PostOnboardingMentorGuidanceProvider>
+              <WeeklyRecapProvider>
+                <CompanionPresenceProvider>
+                  <TalkPopupProvider>
+                    <RealtimeSyncProvider>
+                    <AstralEncounterProvider>
+                    <Suspense fallback={<LoadingFallback />}>
+                    <EvolutionAwareContent />
+                    {activeMainTabPath ? (
+                      <ProtectedRoute>
+                        <MainTabsKeepAlive activePath={activeMainTabPath} />
+                      </ProtectedRoute>
+                    ) : (
+                    <AnimatePresence mode="sync" initial={false}>
+                      <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />
                   <Route path="/auth" element={<Auth />} />
@@ -331,27 +336,29 @@ const AppContent = memo(() => {
                   <Route path="/campaigns" element={<Navigate to="/journeys" replace />} />
                   <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
                   <Route path="/iap-test" element={<IAPTest />} />
+                  <Route path="/support/report" element={<ProtectedRoute><SupportReport /></ProtectedRoute>} />
                   <Route path="/guilds" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/test-scroll" element={<TestScroll />} />
                   <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </AnimatePresence>
-                  )}
-                  {showBottomNav && <BottomNav />}
-                  <MentorTutorialLayer />
-                  </Suspense>
-                  </AstralEncounterProvider>
-                  </RealtimeSyncProvider>
-                 </TalkPopupProvider>
-              </CompanionPresenceProvider>
-            </WeeklyRecapProvider>
-          </PostOnboardingMentorGuidanceProvider>
-        </XPProvider>
-      </ViewModeProvider>
-    </ThemeProvider>
+                      </Routes>
+                    </AnimatePresence>
+                    )}
+                    {showBottomNav && <BottomNav />}
+                    <MentorTutorialLayer />
+                    </Suspense>
+                    </AstralEncounterProvider>
+                    </RealtimeSyncProvider>
+                  </TalkPopupProvider>
+                </CompanionPresenceProvider>
+              </WeeklyRecapProvider>
+            </PostOnboardingMentorGuidanceProvider>
+          </XPProvider>
+        </ViewModeProvider>
+      </ThemeProvider>
+    </ResilienceProvider>
   );
 });
 

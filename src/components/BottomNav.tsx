@@ -27,7 +27,7 @@ export const BottomNav = memo(() => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { companion, progressToNext } = useCompanion();
+  const { companion, canEvolve } = useCompanion();
   const { inboxCount } = useInboxCount();
 
   const prefetchJourneysTasks = useCallback(() => {
@@ -170,7 +170,7 @@ export const BottomNav = memo(() => {
                 <div className="relative">
                   <CompanionNavPresence isActive={isActive} />
                   <PawPrint fill="currentColor" className={`h-6 w-6 -rotate-45 transition-colors duration-200 ${isActive ? 'text-stardust-gold' : 'text-muted-foreground'}`} />
-                  {companion && progressToNext > 90 && (
+                  {companion && canEvolve && (
                     <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[9px] bg-stardust-gold text-black animate-pulse">
                       !
                     </Badge>

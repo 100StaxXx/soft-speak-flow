@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { getStageName } from "@/config/companionStages";
 import { useCompanionMemories } from "@/hooks/useCompanionMemories";
+import { isNearEvolution } from "@/lib/companionEvolutionSignals";
 
 interface NextEvolutionPreviewProps {
   currentStage: number;
@@ -33,7 +34,9 @@ export const NextEvolutionPreview = memo(({
   const nextStageName = getStageName(nextStage);
   const xpNeeded = nextEvolutionXP - currentXP;
   const isMaxStage = currentStage >= 20;
-  
+  const canEvolve = xpNeeded <= 0;
+  const nearEvolution = isNearEvolution({ progressToNext: progressPercent, canEvolve });
+
   const { currentBond, isLoading: bondLoading } = useCompanionMemories();
 
   // Calculate bond progress percentage
@@ -82,7 +85,10 @@ export const NextEvolutionPreview = memo(({
         </div>
 
         {/* XP Progress */}
-        <div className="space-y-2">
+        <div
+          data-testid="next-evolution-progress"
+          className={nearEvolution ? "space-y-2 rounded-lg bg-primary/8 p-2 motion-safe:animate-pulse" : "space-y-2"}
+        >
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Progress</span>
             <span className="font-medium text-primary">

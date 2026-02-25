@@ -1,0 +1,11 @@
+framework module CapgoNativePurchases {
+  umbrella header "CapgoNativePurchases-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module CapgoNativePurchases.Swift {
+  header "CapgoNativePurchases-Swift.h"
+  requires objc
+}

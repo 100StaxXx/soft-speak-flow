@@ -44,6 +44,7 @@ export interface Profile {
   // Global notification settings
   habit_reminders_enabled: boolean | null;
   task_reminders_enabled: boolean | null;
+  checkin_reminders_enabled: boolean | null;
   // Quest behavior settings
   completed_tasks_stay_in_place: boolean | null;
 }

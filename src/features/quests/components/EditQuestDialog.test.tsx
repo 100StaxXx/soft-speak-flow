@@ -78,6 +78,13 @@ describe("EditQuestDialog", () => {
     location: null,
   };
 
+  const legacyWeeklyMultiDayTask = {
+    ...legacyTask,
+    id: "task-2",
+    recurrence_pattern: "weekly",
+    recurrence_days: [0, 2, 4],
+  };
+
   it("reopens safely with legacy time values", () => {
     const onOpenChange = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);
@@ -169,6 +176,35 @@ describe("EditQuestDialog", () => {
       "task-1",
       expect.objectContaining({
         scheduled_time: "11:17",
+      }),
+    );
+  });
+
+  it("normalizes legacy weekly multi-day recurrence to custom on save", async () => {
+    const onOpenChange = vi.fn();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EditQuestDialog
+        task={legacyWeeklyMultiDayTask}
+        open
+        onOpenChange={onOpenChange}
+        onSave={onSave}
+        isSaving={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onSave).toHaveBeenCalledWith(
+      "task-2",
+      expect.objectContaining({
+        recurrence_pattern: "custom",
+        recurrence_days: [0, 2, 4],
       }),
     );
   });

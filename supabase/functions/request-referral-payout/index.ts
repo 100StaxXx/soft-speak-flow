@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { verifyCreatorAccessToken } from "../_shared/influencerAuth.ts";
 
 /**
  * Request Referral Payout
@@ -29,16 +30,28 @@ serve(async (req) => {
 
     // Parse request body (optional - can include referral_code for influencers)
     let referralCode: string | null = null;
+    let creatorAccessToken: string | null = null;
     try {
       const body = await req.json();
-      referralCode = body?.referral_code || null;
+      referralCode = body?.referral_code ? String(body.referral_code).trim().toUpperCase() : null;
+      creatorAccessToken = body?.creator_access_token ? String(body.creator_access_token) : null;
     } catch {
       // No body or invalid JSON - that's fine
     }
 
-    // If referral_code is provided, this is an influencer request (no auth needed)
+    // If referral_code is provided, this is an influencer request and requires
+    // a signed creator token proving ownership of the dashboard session.
     if (referralCode) {
-      return await handleInfluencerRequest(supabaseClient, referralCode);
+      if (!creatorAccessToken) {
+        return new Response(JSON.stringify({
+          error: "Missing creator_access_token",
+          code: "MISSING_CREATOR_TOKEN",
+        }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handleInfluencerRequest(supabaseClient, referralCode, creatorAccessToken);
     }
 
     // Otherwise, require user authentication
@@ -76,7 +89,11 @@ serve(async (req) => {
 
 // Handle influencer payout request (using referral code)
 // deno-lint-ignore no-explicit-any
-async function handleInfluencerRequest(supabaseClient: any, referralCode: string) {
+async function handleInfluencerRequest(
+  supabaseClient: any,
+  referralCode: string,
+  creatorAccessToken: string,
+) {
   console.log(`Processing influencer payout request for code: ${referralCode}`);
 
   // Get the referral code details
@@ -94,6 +111,18 @@ async function handleInfluencerRequest(supabaseClient: any, referralCode: string
       code: "INVALID_CODE"
     }), {
       status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const tokenCheck = await verifyCreatorAccessToken(codeData.code, creatorAccessToken);
+  if (!tokenCheck.valid) {
+    console.warn(`Creator token verification failed for code ${referralCode}: ${tokenCheck.reason}`);
+    return new Response(JSON.stringify({
+      error: "Unauthorized creator session",
+      code: "INVALID_CREATOR_TOKEN",
+    }), {
+      status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

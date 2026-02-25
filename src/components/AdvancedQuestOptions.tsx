@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -49,6 +49,11 @@ function formatTime(time24: string): string {
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
+function toAppDayIndex(date: Date): number {
+  const jsDay = date.getDay(); // 0 = Sun, 1 = Mon, ... 6 = Sat
+  return jsDay === 0 ? 6 : jsDay - 1; // 0 = Mon, ... 6 = Sun
+}
+
 export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const { suggestedSlots, getSuggestedSlots, isLoading: isSuggestLoading } = useSmartScheduling();
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -76,7 +81,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const recurrenceOptions = [
     { value: 'none', label: 'None' },
     { value: 'daily', label: 'Daily' },
+    { value: 'weekdays', label: 'Weekdays' },
     { value: 'weekly', label: 'Weekly' },
+    { value: 'biweekly', label: 'Every 2 Weeks' },
+    { value: 'monthly', label: 'Monthly' },
     { value: 'custom', label: 'Custom Days' },
   ];
 
@@ -98,10 +106,55 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
   const suggestions = suggestedSlots.slice(0, 3);
 
+  const selectedAppDay = useMemo(
+    () => toAppDayIndex(props.selectedDate ?? new Date()),
+    [props.selectedDate]
+  );
+
+  const recurrencePatternForEditor = useMemo(() => {
+    if (props.recurrencePattern === "weekly" && props.recurrenceDays.length > 1) {
+      return "custom";
+    }
+    return props.recurrencePattern;
+  }, [props.recurrencePattern, props.recurrenceDays]);
+
+  useEffect(() => {
+    if (props.recurrencePattern === "weekly" && props.recurrenceDays.length > 1) {
+      props.onRecurrencePatternChange("custom");
+    }
+  }, [props.recurrencePattern, props.recurrenceDays, props.onRecurrencePatternChange]);
+
+  useEffect(() => {
+    if ((recurrencePatternForEditor !== "weekly" && recurrencePatternForEditor !== "biweekly")) return;
+    if (props.recurrenceDays.length === 1) return;
+    props.onRecurrenceDaysChange([selectedAppDay]);
+  }, [recurrencePatternForEditor, props.recurrenceDays, props.onRecurrenceDaysChange, selectedAppDay]);
+
   const handleSelectSuggestion = (time: string) => {
     props.onScheduledTimeChange(time);
     setShowSuggestions(false);
   };
+
+  const handleRecurrenceOptionSelect = useCallback((value: string) => {
+    if (value === "none") {
+      props.onRecurrencePatternChange(null);
+      props.onRecurrenceDaysChange([]);
+      setShowRecurrenceOptions(false);
+      return;
+    }
+
+    props.onRecurrencePatternChange(value);
+
+    if (value === "weekdays") {
+      props.onRecurrenceDaysChange([0, 1, 2, 3, 4]);
+    } else if (value === "weekly" || value === "biweekly") {
+      props.onRecurrenceDaysChange([selectedAppDay]);
+    } else if (value === "daily" || value === "monthly") {
+      props.onRecurrenceDaysChange([]);
+    }
+
+    setShowRecurrenceOptions(false);
+  }, [props, selectedAppDay]);
 
   return (
     <div className="space-y-4 border-t pt-4">
@@ -292,7 +345,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
             >
               <span>
-                {recurrenceOptions.find(opt => opt.value === (props.recurrencePattern || 'none'))?.label || "None"}
+                {recurrenceOptions.find(opt => opt.value === (recurrencePatternForEditor || 'none'))?.label || "None"}
               </span>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -303,12 +356,9 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => {
-                      props.onRecurrencePatternChange(option.value === 'none' ? null : option.value);
-                      setShowRecurrenceOptions(false);
-                    }}
+                    onClick={() => handleRecurrenceOptionSelect(option.value)}
                     className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
-                      (props.recurrencePattern || 'none') === option.value ? 'bg-accent' : ''
+                      (recurrencePatternForEditor || 'none') === option.value ? 'bg-accent' : ''
                     }`}
                   >
                     {option.label}
@@ -318,10 +368,11 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             )}
           </div>
           
-          {(props.recurrencePattern === 'custom' || props.recurrencePattern === 'weekly') && (
+          {(recurrencePatternForEditor === 'custom' || recurrencePatternForEditor === 'weekly' || recurrencePatternForEditor === 'biweekly') && (
             <FrequencyPicker
               selectedDays={props.recurrenceDays}
               onDaysChange={props.onRecurrenceDaysChange}
+              selectionMode={recurrencePatternForEditor === 'custom' ? 'multiple' : 'single'}
             />
           )}
         </div>

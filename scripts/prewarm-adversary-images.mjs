@@ -31,6 +31,7 @@ function parseCliArgs(argv) {
     dryRun: false,
     delayMs: 250,
     retries: 2,
+    startCombo: 0,
     maxCombos: 0,
     targetVariants: DEFAULT_TARGET_VARIANTS,
     timeoutMs: REQUEST_TIMEOUT_MS,
@@ -59,6 +60,11 @@ function parseCliArgs(argv) {
       index += 1;
       continue;
     }
+    if (token === "--start-combo" && next) {
+      args.startCombo = Number(next);
+      index += 1;
+      continue;
+    }
     if (token === "--target-variants" && next) {
       args.targetVariants = Number(next);
       index += 1;
@@ -82,6 +88,9 @@ function parseCliArgs(argv) {
   if (!Number.isFinite(args.maxCombos) || args.maxCombos < 0) {
     throw new Error(`Invalid --max-combos value: ${args.maxCombos}`);
   }
+  if (!Number.isFinite(args.startCombo) || args.startCombo < 0) {
+    throw new Error(`Invalid --start-combo value: ${args.startCombo}`);
+  }
   if (!Number.isFinite(args.targetVariants) || args.targetVariants < 1 || args.targetVariants > 5) {
     throw new Error(`Invalid --target-variants value: ${args.targetVariants}`);
   }
@@ -91,6 +100,7 @@ function parseCliArgs(argv) {
 
   args.delayMs = Math.floor(args.delayMs);
   args.retries = Math.floor(args.retries);
+  args.startCombo = Math.floor(args.startCombo);
   args.maxCombos = Math.floor(args.maxCombos);
   args.targetVariants = Math.floor(args.targetVariants);
   args.timeoutMs = Math.floor(args.timeoutMs);
@@ -207,20 +217,30 @@ async function loadExistingVariants({ supabaseUrl, serviceRoleKey, theme, tier, 
   return indexes;
 }
 
-async function invokeTopUp({ supabaseUrl, serviceRoleKey, theme, tier, targetVariants, timeoutMs }) {
+async function invokeTopUp({
+  supabaseUrl,
+  serviceRoleKey,
+  functionAuthKey,
+  theme,
+  tier,
+  targetVariants,
+  variantIndex,
+  timeoutMs,
+}) {
   const endpoint = new URL("/functions/v1/generate-adversary-image", supabaseUrl);
   const response = await fetchWithRetries(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
+      Authorization: `Bearer ${functionAuthKey}`,
     },
     body: JSON.stringify({
       theme,
       tier,
       name: `${toTitleCase(theme)} ${toTitleCase(tier)} Adversary`,
       targetVariants,
+      variantIndex,
     }),
   }, 2, timeoutMs);
 
@@ -248,12 +268,16 @@ async function main() {
     getEnvValue("SUPABASE_URL", dotenvValues) ||
     getEnvValue("VITE_SUPABASE_URL", dotenvValues);
   const serviceRoleKey = getEnvValue("SUPABASE_SERVICE_ROLE_KEY", dotenvValues);
+  const functionAuthKey = getEnvValue("SUPABASE_FUNCTION_AUTH_KEY", dotenvValues) || serviceRoleKey;
 
   if (!supabaseUrl) {
     throw new Error("Missing SUPABASE_URL (or VITE_SUPABASE_URL) in env/.env");
   }
   if (!serviceRoleKey) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY in env/.env");
+  }
+  if (!functionAuthKey) {
+    throw new Error("Missing SUPABASE_FUNCTION_AUTH_KEY (or SUPABASE_SERVICE_ROLE_KEY) in env/.env");
   }
 
   const combos = [];
@@ -263,7 +287,11 @@ async function main() {
     }
   }
 
-  const scopedCombos = args.maxCombos > 0 ? combos.slice(0, args.maxCombos) : combos;
+  const startCombo = Math.min(args.startCombo, combos.length);
+  const endCombo = args.maxCombos > 0
+    ? Math.min(startCombo + args.maxCombos, combos.length)
+    : combos.length;
+  const scopedCombos = combos.slice(startCombo, endCombo);
   const stats = {
     scanned: 0,
     alreadyFull: 0,
@@ -278,9 +306,12 @@ async function main() {
     dryRun: args.dryRun,
     targetVariants: args.targetVariants,
     combos: scopedCombos.length,
+    startCombo,
+    endCombo,
     retries: args.retries,
     delayMs: args.delayMs,
     timeoutMs: args.timeoutMs,
+    usingSeparateFunctionAuthKey: functionAuthKey !== serviceRoleKey,
   });
 
   for (const [comboIndex, combo] of scopedCombos.entries()) {
@@ -294,6 +325,7 @@ async function main() {
         tier,
         timeoutMs: args.timeoutMs,
       });
+      const workingVariants = new Set(before);
 
       const missingBefore = [];
       for (let variant = 0; variant < args.targetVariants; variant += 1) {
@@ -316,56 +348,92 @@ async function main() {
         continue;
       }
 
-      let attempt = 0;
-      let invoked = false;
-      while (attempt <= args.retries && !invoked) {
-        const result = await invokeTopUp({
-          supabaseUrl,
-          serviceRoleKey,
-          theme,
-          tier,
-          targetVariants: args.targetVariants,
-          timeoutMs: args.timeoutMs,
-        });
+      let comboGenerated = 0;
+      let comboFailed = false;
 
-        if (result.ok) {
-          invoked = true;
-          stats.toppedUp += 1;
-          const generatedCount =
-            typeof result.payload?.generatedVariants === "number"
-              ? result.payload.generatedVariants
-              : 0;
-          stats.generatedVariants += generatedCount;
+      for (const desiredVariant of missingBefore) {
+        let attempt = 0;
+        let variantReady = workingVariants.has(desiredVariant);
 
-          console.log(
-            `[${comboIndex + 1}/${scopedCombos.length}] ${theme}/${tier}: top-up ok (${generatedCount} generated)`,
+        while (attempt <= args.retries && !variantReady) {
+          const result = await invokeTopUp({
+            supabaseUrl,
+            serviceRoleKey,
+            functionAuthKey,
+            theme,
+            tier,
+            targetVariants: desiredVariant + 1,
+            variantIndex: desiredVariant,
+            timeoutMs: args.timeoutMs,
+          });
+
+          if (!result.ok) {
+            const canRetry = attempt < args.retries && isRetryableStatus(result.status);
+            console.warn(
+              `[${comboIndex + 1}/${scopedCombos.length}] ${theme}/${tier}: variant ${desiredVariant} failed (status ${result.status})`,
+              result.payload ?? result.body,
+            );
+
+            if (!canRetry) {
+              break;
+            }
+
+            attempt += 1;
+            const backoffMs = args.delayMs * (attempt + 1);
+            await sleep(backoffMs);
+            continue;
+          }
+
+          const refreshed = await loadExistingVariants({
+            supabaseUrl,
+            serviceRoleKey,
+            theme,
+            tier,
+            timeoutMs: args.timeoutMs,
+          });
+          for (const index of refreshed) {
+            workingVariants.add(index);
+          }
+
+          if (workingVariants.has(desiredVariant)) {
+            variantReady = true;
+            comboGenerated += 1;
+            console.log(
+              `[${comboIndex + 1}/${scopedCombos.length}] ${theme}/${tier}: variant ${desiredVariant} ready`,
+            );
+            break;
+          }
+
+          const canRetry = attempt < args.retries;
+          console.warn(
+            `[${comboIndex + 1}/${scopedCombos.length}] ${theme}/${tier}: variant ${desiredVariant} not materialized after invoke`,
           );
-          break;
+          if (!canRetry) {
+            break;
+          }
+
+          attempt += 1;
+          const backoffMs = args.delayMs * (attempt + 1);
+          await sleep(backoffMs);
         }
 
-        const canRetry = attempt < args.retries && isRetryableStatus(result.status);
-        console.warn(
-          `[${comboIndex + 1}/${scopedCombos.length}] ${theme}/${tier}: top-up failed (status ${result.status})`,
-          result.payload ?? result.body,
-        );
-
-        if (!canRetry) {
-          stats.failed += 1;
-          break;
+        if (!workingVariants.has(desiredVariant)) {
+          comboFailed = true;
+          console.warn(
+            `[${comboIndex + 1}/${scopedCombos.length}] ${theme}/${tier}: variant ${desiredVariant} still missing after retries`,
+          );
         }
-
-        attempt += 1;
-        const backoffMs = args.delayMs * (attempt + 1);
-        await sleep(backoffMs);
       }
 
-      const after = await loadExistingVariants({
-        supabaseUrl,
-        serviceRoleKey,
-        theme,
-        tier,
-        timeoutMs: args.timeoutMs,
-      });
+      if (comboGenerated > 0) {
+        stats.toppedUp += 1;
+      }
+      stats.generatedVariants += comboGenerated;
+      if (comboFailed) {
+        stats.failed += 1;
+      }
+
+      const after = workingVariants;
       const missingAfter = [];
       for (let variant = 0; variant < args.targetVariants; variant += 1) {
         if (!after.has(variant)) missingAfter.push(variant);

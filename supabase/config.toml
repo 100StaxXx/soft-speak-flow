@@ -7,7 +7,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.generate-adversary-image]
-verify_jwt = true
+verify_jwt = false
 
 [functions.delete-user]
 verify_jwt = true
@@ -307,4 +307,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.retry-missing-pep-talk-transcripts]
+verify_jwt = false
+
+[functions.notifications-enqueue-v2]
+verify_jwt = false
+
+[functions.notifications-dispatch-v2]
 verify_jwt = false

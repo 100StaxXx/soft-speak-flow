@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
-import { CountdownOverlay, PauseOverlay } from './GameHUD';
+import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic } from './gameUtils';
 
 import { DamageEvent, GAME_DAMAGE_VALUES } from '@/types/battleSystem';
@@ -454,6 +454,7 @@ export const AstralFrequencyGame = ({
   compact = false,
 }: AstralFrequencyGameProps) => {
   const config = DIFFICULTY_CONFIG[difficulty];
+  const hasCompletedRef = useRef(false);
   
   // Game state
   const [gameState, setGameState] = useState<'countdown' | 'playing' | 'paused' | 'complete'>('countdown');
@@ -478,14 +479,40 @@ export const AstralFrequencyGame = ({
   const hasShieldRef = useRef(hasShield);
   const lastSpawnRef = useRef(0);
   const touchStartRef = useRef<{ x: number } | null>(null);
+  const speedRef = useRef(speed);
+  const damageFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Sync refs
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
   useEffect(() => { hasShieldRef.current = hasShield; }, [hasShield]);
+  useEffect(() => { speedRef.current = speed; }, [speed]);
+
+  useEffect(() => {
+    return () => {
+      if (damageFlashTimeoutRef.current) {
+        clearTimeout(damageFlashTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const triggerDamageFlash = useCallback(() => {
+    setShowDamageFlash(true);
+    if (damageFlashTimeoutRef.current) {
+      clearTimeout(damageFlashTimeoutRef.current);
+    }
+    damageFlashTimeoutRef.current = setTimeout(() => {
+      setShowDamageFlash(false);
+      damageFlashTimeoutRef.current = null;
+    }, 200);
+  }, []);
   
   const handleCountdownComplete = useCallback(() => {
     setGameState('playing');
+  }, []);
+
+  const handlePauseToggle = useCallback(() => {
+    setGameState((prev) => (prev === 'playing' ? 'paused' : prev === 'paused' ? 'playing' : prev));
   }, []);
   
   const changeLane = useCallback((direction: -1 | 1) => {
@@ -529,9 +556,8 @@ export const AstralFrequencyGame = ({
         setHasShield(false);
         triggerHaptic('medium');
       } else {
-        // Trigger damage flash animation
-        setShowDamageFlash(true);
-        setTimeout(() => setShowDamageFlash(false), 200);
+        // Trigger damage flash animation without stacking multiple timers.
+        triggerDamageFlash();
         
         // Player takes damage from collision
         onDamage?.({ target: 'player', amount: tierAttackDamage, source: 'collision' });
@@ -560,7 +586,7 @@ export const AstralFrequencyGame = ({
       setHasShield(true);
       triggerHaptic('medium');
     }
-  }, [combo, onDamage, tierAttackDamage]);
+  }, [combo, onDamage, tierAttackDamage, triggerDamageFlash]);
   
   // Game loop - spawn obstacles, update positions, and update distance (NO TIMER)
   useEffect(() => {
@@ -569,7 +595,8 @@ export const AstralFrequencyGame = ({
     const interval = setInterval(() => {
       // Update distance
       setDistance(prev => {
-        const newDistance = prev + speed * 0.1;
+        const currentSpeed = speedRef.current;
+        const newDistance = prev + currentSpeed * 0.1;
         
         // MILESTONE DAMAGE: Deal damage every 100m traveled
         const prevMilestones = Math.floor(prev / 100);
@@ -587,12 +614,17 @@ export const AstralFrequencyGame = ({
       });
       
       // Gradually increase speed - NO LIMIT
-      setSpeed(prev => prev + config.speedIncrement);
+      setSpeed(prev => {
+        const next = prev + config.speedIncrement;
+        speedRef.current = next;
+        return next;
+      });
       
       // Update obstacle positions and spawn new ones
       setObstacles(prev => {
         // Move all obstacles forward
-        const moved = prev.map(o => ({ ...o, z: o.z + speed * 0.15 }));
+        const currentSpeed = speedRef.current;
+        const moved = prev.map(o => ({ ...o, z: o.z + currentSpeed * 0.15 }));
         
         // Filter out obstacles that are too far past player
         const filtered = moved.filter(o => o.z < 15);
@@ -617,11 +649,13 @@ export const AstralFrequencyGame = ({
     }, 100);
     
     return () => clearInterval(interval);
-  }, [gameState, config, speed, isPractice, onDamage]);
+  }, [gameState, config, isPractice, onDamage]);
   
   // Complete game - calculate result based on distance and score
   useEffect(() => {
     if (gameState !== 'complete') return;
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
     
     // Score based on distance traveled + crystals collected
     // Accuracy based on how far they got relative to difficulty
@@ -680,7 +714,21 @@ export const AstralFrequencyGame = ({
       </Canvas>
       
       {/* HUD overlay */}
-      <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} distance={distance} compact={compact} />
+      {compact ? (
+        <GameHUD
+          title="Cosmiq Dash"
+          subtitle={`${Math.floor(distance)}m traversed`}
+          score={score}
+          combo={combo}
+          showCombo={true}
+          primaryStat={{ value: lives, label: 'Lives', color: 'hsl(0, 84%, 60%)' }}
+          isPaused={gameState === 'paused'}
+          onPauseToggle={handlePauseToggle}
+          compact
+        />
+      ) : (
+        <GameUI score={score} lives={lives} combo={combo} hasShield={hasShield} distance={distance} compact={compact} />
+      )}
       
       {/* Controls - positioned at bottom */}
       <LaneControls 

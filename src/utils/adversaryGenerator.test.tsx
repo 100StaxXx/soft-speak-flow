@@ -62,7 +62,7 @@ vi.mock("sonner", () => ({
 import * as adversaryGeneratorModule from "@/utils/adversaryGenerator";
 import { useAstralEncounters } from "@/hooks/useAstralEncounters";
 import { generateAdversary } from "@/utils/adversaryGenerator";
-import type { Adversary } from "@/types/astralEncounters";
+import { RESIST_RANDOM_MINIGAME_POOL, type Adversary } from "@/types/astralEncounters";
 
 const COMMON_DISTRACTION_POOL = [
   "Riftling Wisp",
@@ -83,7 +83,7 @@ const COMMON_DISTRACTION_POOL = [
   "Wandering Phantom",
 ];
 
-const createEncounterRow = (id: string, name: string) => ({
+const createEncounterRow = (id: string, name: string, miniGameType = "tap_sequence") => ({
   id,
   user_id: "user-1",
   companion_id: "companion-1",
@@ -91,7 +91,7 @@ const createEncounterRow = (id: string, name: string) => ({
   adversary_theme: "distraction",
   adversary_tier: "common",
   adversary_lore: "Stored lore",
-  mini_game_type: "tap_sequence",
+  mini_game_type: miniGameType,
   trigger_type: "quest_milestone",
   trigger_source_id: null,
   result: null,
@@ -235,14 +235,59 @@ describe("generateAdversary reusable roster", () => {
       expect(adversary.lore.length).toBeGreaterThan(0);
     });
   });
+
+  it("uses only the resist random mini-game pool for urge_resist encounters", async () => {
+    await withMockedRandom(0, () => {
+      const adversary = generateAdversary("urge_resist", undefined, "distraction");
+
+      expect(RESIST_RANDOM_MINIGAME_POOL).toContain(adversary.miniGameType);
+    });
+  });
+
+  it("avoids the last two mini-games for urge_resist when alternatives exist", async () => {
+    await withMockedRandom(0, () => {
+      const adversary = generateAdversary(
+        "urge_resist",
+        undefined,
+        "distraction",
+        undefined,
+        { recentMiniGames: ["energy_beam", "tap_sequence"] },
+      );
+
+      expect(adversary.miniGameType).toBe("orb_match");
+      expect(adversary.miniGameType).not.toBe("energy_beam");
+      expect(adversary.miniGameType).not.toBe("tap_sequence");
+    });
+  });
+
+  it("falls back to full resist mini-game pool when recent history excludes all options", async () => {
+    await withMockedRandom(0, () => {
+      const adversary = generateAdversary(
+        "urge_resist",
+        undefined,
+        "distraction",
+        undefined,
+        { recentMiniGames: [...RESIST_RANDOM_MINIGAME_POOL] },
+      );
+
+      expect(adversary.miniGameType).toBe("energy_beam");
+      expect(RESIST_RANDOM_MINIGAME_POOL).toContain(adversary.miniGameType);
+    });
+  });
 });
 
 describe("useAstralEncounters roster integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.insertPayload = null;
-    mocks.recentEncounterRows = Array.from({ length: 12 }, (_, index) =>
-      createEncounterRow(`enc-${index + 1}`, `Enemy ${index + 1}`));
+    mocks.recentEncounterRows = [
+      createEncounterRow("enc-1", "Enemy 1", "orb_match"),
+      createEncounterRow("enc-2", "Enemy 2", "energy_beam"),
+      createEncounterRow("enc-3", "Enemy 3", "invalid_mini_game"),
+      ...Array.from({ length: 9 }, (_, index) =>
+        createEncounterRow(`enc-${index + 4}`, `Enemy ${index + 4}`),
+      ),
+    ];
     mocks.fromMock.mockImplementation((table: string) => createFromBuilder(table));
   });
 
@@ -292,6 +337,7 @@ describe("useAstralEncounters roster integration", () => {
         "Enemy 9",
         "Enemy 10",
       ],
+      recentMiniGames: ["orb_match", "energy_beam"],
     });
 
     expect(mocks.insertPayload).toMatchObject({

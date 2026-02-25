@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult } from '@/types/astralEncounters';
-import { CountdownOverlay, PauseOverlay } from './GameHUD';
+import { GameHUD, CountdownOverlay, PauseOverlay } from './GameHUD';
 import { triggerHaptic, useGameLoop, useStaticStars, useParticleSystem } from './gameUtils';
 import { useDeviceOrientation } from '@/hooks/useDeviceOrientation';
 import { lockToLandscape, lockToPortrait } from '@/utils/orientationLock';
@@ -98,6 +98,9 @@ const POWERUP_DURATIONS = {
   magnet: 5000,
   slowmo: 4000,
 };
+
+const OBJECT_RENDER_SYNC_MS = 1000 / 30;
+const HUD_SYNC_MS = 100;
 
 // Memoized star background
 const StarBackground = memo(({ stars }: { stars: ReturnType<typeof useStaticStars> }) => (
@@ -354,7 +357,6 @@ export const StarfallDodgeGame = ({
   
   // Progressive difficulty state
   const [currentSpeed, setCurrentSpeed] = useState(0);
-  const [currentSpawnRate, setCurrentSpawnRate] = useState(0);
   
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const objectsRef = useRef<FallingObject[]>([]);
@@ -370,6 +372,13 @@ export const StarfallDodgeGame = ({
   const hasSlowMoRef = useRef(hasSlowMo);
   const magnetEndTimeRef = useRef(magnetEndTime);
   const slowMoEndTimeRef = useRef(slowMoEndTime);
+  const hasCompletedRef = useRef(false);
+  const currentSpeedRef = useRef(0);
+  const currentSpawnRateRef = useRef(0);
+  const survivalTimeRef = useRef(0);
+  const lastObjectRenderRef = useRef(0);
+  const lastHudSyncRef = useRef(0);
+  const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Smooth player movement interpolation
   const targetPlayerXRef = useRef(50);
@@ -387,11 +396,16 @@ export const StarfallDodgeGame = ({
   useEffect(() => { hasSlowMoRef.current = hasSlowMo; }, [hasSlowMo]);
   useEffect(() => { magnetEndTimeRef.current = magnetEndTime; }, [magnetEndTime]);
   useEffect(() => { slowMoEndTimeRef.current = slowMoEndTime; }, [slowMoEndTime]);
+  useEffect(() => { survivalTimeRef.current = survivalTime; }, [survivalTime]);
+  useEffect(() => { currentSpeedRef.current = currentSpeed; }, [currentSpeed]);
 
   // Lock to landscape on mount, restore portrait on unmount
   useEffect(() => {
     return () => {
       // Restore portrait orientation when leaving the game
+      if (shakeTimerRef.current) {
+        clearTimeout(shakeTimerRef.current);
+      }
       lockToPortrait();
     };
   }, []);
@@ -414,7 +428,11 @@ export const StarfallDodgeGame = ({
   // Initialize progressive difficulty
   useEffect(() => {
     setCurrentSpeed(config.baseSpeed);
-    setCurrentSpawnRate(config.initialSpawnRate);
+    currentSpeedRef.current = config.baseSpeed;
+    currentSpawnRateRef.current = config.initialSpawnRate;
+    survivalTimeRef.current = 0;
+    lastObjectRenderRef.current = 0;
+    lastHudSyncRef.current = 0;
   }, [config]);
 
   // Calculate time left for power-ups
@@ -470,8 +488,23 @@ export const StarfallDodgeGame = ({
     setGameState('playing');
   }, []);
 
+  const handlePauseToggle = useCallback(() => {
+    setGameState((prev) => (prev === 'playing' ? 'paused' : prev === 'paused' ? 'playing' : prev));
+  }, []);
+
+  const triggerShake = useCallback((durationMs: number) => {
+    setShake(true);
+    if (shakeTimerRef.current) {
+      clearTimeout(shakeTimerRef.current);
+    }
+    shakeTimerRef.current = setTimeout(() => {
+      setShake(false);
+      shakeTimerRef.current = null;
+    }, durationMs);
+  }, []);
+
   // Spawn object helper
-  const spawnObject = useCallback((_time: number, playerX: number) => {
+  const spawnObject = useCallback((playerX: number, speed: number) => {
     const rand = Math.random();
     
     // Spawn probabilities (cumulative):
@@ -510,13 +543,13 @@ export const StarfallDodgeGame = ({
       x: 5 + Math.random() * 90,
       y: -5,
       type,
-      speed: currentSpeed * (0.8 + Math.random() * 0.4),
+      speed: speed * (0.8 + Math.random() * 0.4),
       size,
       targetX: type === 'homing_debris' ? playerX : undefined,
     };
     
     objectsRef.current.push(newObj);
-  }, [config.debrisRatio, currentSpeed]);
+  }, [config.debrisRatio]);
 
   // Game loop - ENDLESS with progressive difficulty
   useGameLoop((deltaTime, time) => {
@@ -543,38 +576,32 @@ export const StarfallDodgeGame = ({
       targetPlayerXRef.current = getLandscapePositionFromTilt(6, 1.4);
       smoothPlayerXRef.current += (targetPlayerXRef.current - smoothPlayerXRef.current) * LERP_SPEED;
       currentPlayerX = smoothPlayerXRef.current;
-      setPlayerX(currentPlayerX);
     } else {
       currentPlayerX = playerXRef.current;
     }
 
-    // Update survival time
-    setSurvivalTime(prev => {
-      const newTime = prev + deltaTime / 1000;
-      
-      // MILESTONE DAMAGE: Deal damage every 10 seconds survived
-      const prevMilestones = Math.floor(prev / 10);
-      const newMilestones = Math.floor(newTime / 10);
-      if (newMilestones > prevMilestones) {
-        onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.starfall_dodge.survivalMilestone, source: 'survival_milestone' });
-      }
-      
-      // Practice mode: end after 15 seconds
-      if (isPractice && newTime >= 15) {
-        setGameState('complete');
-      }
-      
-      return newTime;
-    });
+    // Update survival time. deltaTime is already seconds.
+    const prevSurvival = survivalTimeRef.current;
+    const nextSurvival = prevSurvival + deltaTime;
+    survivalTimeRef.current = nextSurvival;
+    const prevMilestones = Math.floor(prevSurvival / 10);
+    const newMilestones = Math.floor(nextSurvival / 10);
+    if (newMilestones > prevMilestones) {
+      onDamage?.({ target: 'adversary', amount: GAME_DAMAGE_VALUES.starfall_dodge.survivalMilestone, source: 'survival_milestone' });
+    }
+    if (isPractice && nextSurvival >= 15) {
+      setGameState('complete');
+    }
 
-    // Progressive difficulty - increase speed and spawn rate over time
-    setCurrentSpeed(prev => Math.min(config.maxSpeed, prev + config.speedIncrease * deltaTime / 1000));
-    setCurrentSpawnRate(prev => Math.max(config.minSpawnRate, prev - config.spawnRateDecrease * deltaTime / 1000));
+    // Progressive difficulty - increase speed and spawn rate over time.
+    // deltaTime is seconds, so no additional scaling is needed.
+    currentSpeedRef.current = Math.min(config.maxSpeed, currentSpeedRef.current + config.speedIncrease * deltaTime);
+    currentSpawnRateRef.current = Math.max(config.minSpawnRate, currentSpawnRateRef.current - config.spawnRateDecrease * deltaTime);
 
     // Spawn objects
-    if (time - lastSpawnRef.current > currentSpawnRate) {
+    if (time - lastSpawnRef.current > currentSpawnRateRef.current) {
       lastSpawnRef.current = time;
-      spawnObject(time, currentPlayerX);
+      spawnObject(currentPlayerX, currentSpeedRef.current);
     }
 
     // Update objects
@@ -641,7 +668,7 @@ export const StarfallDodgeGame = ({
               return false;
               
             case 'powerup_life':
-              setLives(prev => Math.min(prev + 1, 5)); // Max 5 lives
+              setLives(prev => Math.min(prev + 1, 3)); // Keep life cap aligned with displayed HUD hearts
               emitParticles(obj.x, obj.y, '#ec4899', 12);
               triggerHaptic('heavy');
               return false;
@@ -652,8 +679,7 @@ export const StarfallDodgeGame = ({
               emitParticles(obj.x, obj.y, '#f97316', 15);
               triggerHaptic('heavy');
               setLives(0);
-              setShake(true);
-              setTimeout(() => setShake(false), 400);
+              triggerShake(400);
               setGameState('complete');
               return false;
               
@@ -672,8 +698,7 @@ export const StarfallDodgeGame = ({
                   }
                   return newLives;
                 });
-                setShake(true);
-                setTimeout(() => setShake(false), 200);
+                triggerShake(200);
                 emitParticles(obj.x, obj.y, '#ef4444', 8);
                 triggerHaptic('heavy');
               }
@@ -685,17 +710,34 @@ export const StarfallDodgeGame = ({
       return obj.y < 110;
     });
 
-    setObjects([...objectsRef.current]);
+    // Reduce render pressure while keeping motion smooth.
+    if (time - lastObjectRenderRef.current >= OBJECT_RENDER_SYNC_MS) {
+      lastObjectRenderRef.current = time;
+      if (useTilt) {
+        setPlayerX(currentPlayerX);
+      }
+      setObjects([...objectsRef.current]);
+    }
+
+    // HUD values do not need frame-level updates.
+    if (time - lastHudSyncRef.current >= HUD_SYNC_MS) {
+      lastHudSyncRef.current = time;
+      setSurvivalTime(survivalTimeRef.current);
+      setCurrentSpeed(currentSpeedRef.current);
+    }
   }, gameState === 'playing');
 
   // Complete game - calculate result based on survival time and crystals
   useEffect(() => {
     if (gameState !== 'complete') return;
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
     
     // Accuracy based on survival time
+    const finalSurvivalTime = survivalTimeRef.current;
     const timeThresholds = { beginner: 90, easy: 60, medium: 45, hard: 30, master: 20 };
     const threshold = timeThresholds[difficulty];
-    const accuracy = Math.min(100, Math.round((survivalTime / threshold) * 100));
+    const accuracy = Math.min(100, Math.round((finalSurvivalTime / threshold) * 100));
     
     const result: 'perfect' | 'good' | 'fail' = 
       accuracy >= 90 ? 'perfect' : accuracy >= 50 ? 'good' : 'fail';
@@ -705,14 +747,14 @@ export const StarfallDodgeGame = ({
       accuracy: Math.min(100, Math.max(0, accuracy)),
       result,
       usedTiltControls: useTilt,
-      highScoreValue: Math.floor(survivalTime),
+      highScoreValue: Math.floor(finalSurvivalTime),
       gameStats: {
-        time: Math.floor(survivalTime),
+        time: Math.floor(finalSurvivalTime),
         itemsCollected: crystalsCollected,
         livesRemaining: lives,
       },
     });
-  }, [gameState, crystalsCollected, survivalTime, difficulty, onComplete, useTilt, lives]);
+  }, [gameState, crystalsCollected, difficulty, onComplete, useTilt, lives]);
 
   return (
     <div
@@ -742,31 +784,43 @@ export const StarfallDodgeGame = ({
     >
       <StarBackground stars={stars} />
       
-      {/* Game HUD - Landscape optimized, compact mode support */}
+      {/* Game HUD - align compact encounter mode with active game format */}
       {gameState !== 'rotate' && gameState !== 'permission' && (
-        <div className={`absolute top-1 left-0 right-0 z-20 ${compact ? 'px-2' : 'px-4'}`}>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              {!compact && <div className="text-sm font-bold text-white/80">Starfall Dodge</div>}
-              <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
-                <span className={`text-cyan-400 ${compact ? 'text-xs' : 'text-sm'}`}>💎 {crystalsCollected}</span>
+        compact ? (
+          <GameHUD
+            title="Starfall Dodge"
+            subtitle={`${Math.floor(survivalTime)}s survived`}
+            score={crystalsCollected}
+            primaryStat={{ value: lives, label: 'Lives', color: 'hsl(0, 84%, 60%)' }}
+            isPaused={gameState === 'paused'}
+            onPauseToggle={handlePauseToggle}
+            compact
+          />
+        ) : (
+          <div className="absolute top-1 left-0 right-0 z-20 px-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-bold text-white/80">Starfall Dodge</div>
+                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
+                  <span className="text-cyan-400 text-sm">💎 {crystalsCollected}</span>
+                </div>
+                <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
+                  <span className="text-yellow-400 text-sm">⏱️ {Math.floor(survivalTime)}s</span>
+                </div>
               </div>
-              <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-0.5">
-                <span className={`text-yellow-400 ${compact ? 'text-xs' : 'text-sm'}`}>⏱️ {Math.floor(survivalTime)}s</span>
+              <div className="flex items-center gap-2">
+                <ActivePowerupsDisplay
+                  hasShield={hasShield}
+                  hasMagnet={hasMagnet}
+                  hasSlowMo={hasSlowMo}
+                  magnetTimeLeft={magnetTimeLeft}
+                  slowMoTimeLeft={slowMoTimeLeft}
+                />
+                <LivesDisplay lives={lives} maxLives={3} />
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ActivePowerupsDisplay 
-                hasShield={hasShield}
-                hasMagnet={hasMagnet}
-                hasSlowMo={hasSlowMo}
-                magnetTimeLeft={magnetTimeLeft}
-                slowMoTimeLeft={slowMoTimeLeft}
-              />
-              <LivesDisplay lives={lives} maxLives={3} />
             </div>
           </div>
-        </div>
+        )
       )}
       
       {/* Tilt indicator + Speed indicator - landscape position */}

@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Products/Debug-iphoneos/CapacitorSplashScreen/CapacitorSplashScreen.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Products/Debug-iphoneos/CapacitorSplashScreen/CapacitorSplashScreen.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "CapacitorSplashScreen-Swift.h",
+      "external-contents": "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-generic/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorSplashScreen.build/unextended-interface-header.h",
+    }]
+  }]
+}
