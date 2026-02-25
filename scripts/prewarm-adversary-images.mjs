@@ -20,7 +20,7 @@ const ALL_THEMES = [
 
 const ALL_TIERS = ["common", "uncommon", "rare", "epic", "legendary"];
 const DEFAULT_TARGET_VARIANTS = 5;
-const REQUEST_TIMEOUT_MS = 30000;
+const REQUEST_TIMEOUT_MS = 120000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -33,6 +33,7 @@ function parseCliArgs(argv) {
     retries: 2,
     maxCombos: 0,
     targetVariants: DEFAULT_TARGET_VARIANTS,
+    timeoutMs: REQUEST_TIMEOUT_MS,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -63,6 +64,11 @@ function parseCliArgs(argv) {
       index += 1;
       continue;
     }
+    if (token === "--timeout-ms" && next) {
+      args.timeoutMs = Number(next);
+      index += 1;
+      continue;
+    }
 
     throw new Error(`Unknown argument: ${token}`);
   }
@@ -79,11 +85,15 @@ function parseCliArgs(argv) {
   if (!Number.isFinite(args.targetVariants) || args.targetVariants < 1 || args.targetVariants > 5) {
     throw new Error(`Invalid --target-variants value: ${args.targetVariants}`);
   }
+  if (!Number.isFinite(args.timeoutMs) || args.timeoutMs < 1000) {
+    throw new Error(`Invalid --timeout-ms value: ${args.timeoutMs}`);
+  }
 
   args.delayMs = Math.floor(args.delayMs);
   args.retries = Math.floor(args.retries);
   args.maxCombos = Math.floor(args.maxCombos);
   args.targetVariants = Math.floor(args.targetVariants);
+  args.timeoutMs = Math.floor(args.timeoutMs);
 
   return args;
 }
@@ -162,7 +172,7 @@ async function fetchWithRetries(url, options, retries = 2, timeoutMs = REQUEST_T
   }
 }
 
-async function loadExistingVariants({ supabaseUrl, serviceRoleKey, theme, tier }) {
+async function loadExistingVariants({ supabaseUrl, serviceRoleKey, theme, tier, timeoutMs }) {
   const endpoint = new URL("/rest/v1/adversary_images", supabaseUrl);
   endpoint.searchParams.set("select", "variant_index");
   endpoint.searchParams.set("theme", `eq.${theme}`);
@@ -174,7 +184,7 @@ async function loadExistingVariants({ supabaseUrl, serviceRoleKey, theme, tier }
       apikey: serviceRoleKey,
       Authorization: `Bearer ${serviceRoleKey}`,
     },
-  });
+  }, 2, timeoutMs);
 
   const raw = await response.text();
   if (!response.ok) {
@@ -197,7 +207,7 @@ async function loadExistingVariants({ supabaseUrl, serviceRoleKey, theme, tier }
   return indexes;
 }
 
-async function invokeTopUp({ supabaseUrl, serviceRoleKey, theme, tier, targetVariants }) {
+async function invokeTopUp({ supabaseUrl, serviceRoleKey, theme, tier, targetVariants, timeoutMs }) {
   const endpoint = new URL("/functions/v1/generate-adversary-image", supabaseUrl);
   const response = await fetchWithRetries(endpoint, {
     method: "POST",
@@ -212,7 +222,7 @@ async function invokeTopUp({ supabaseUrl, serviceRoleKey, theme, tier, targetVar
       name: `${toTitleCase(theme)} ${toTitleCase(tier)} Adversary`,
       targetVariants,
     }),
-  });
+  }, 2, timeoutMs);
 
   const raw = await response.text();
   let payload = null;
@@ -270,6 +280,7 @@ async function main() {
     combos: scopedCombos.length,
     retries: args.retries,
     delayMs: args.delayMs,
+    timeoutMs: args.timeoutMs,
   });
 
   for (const [comboIndex, combo] of scopedCombos.entries()) {
@@ -281,6 +292,7 @@ async function main() {
         serviceRoleKey,
         theme,
         tier,
+        timeoutMs: args.timeoutMs,
       });
 
       const missingBefore = [];
@@ -313,6 +325,7 @@ async function main() {
           theme,
           tier,
           targetVariants: args.targetVariants,
+          timeoutMs: args.timeoutMs,
         });
 
         if (result.ok) {
@@ -351,6 +364,7 @@ async function main() {
         serviceRoleKey,
         theme,
         tier,
+        timeoutMs: args.timeoutMs,
       });
       const missingAfter = [];
       for (let variant = 0; variant < args.targetVariants; variant += 1) {
