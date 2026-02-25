@@ -64,7 +64,10 @@ export const usePromoCode = () => {
       ) as { data: PromoCodeRpcResult[] | PromoCodeRpcResult | null; error: Error | null };
 
       if (error) {
-        throw new PromoCodeRedeemError("Unable to redeem promo code right now. Please try again.", "unknown");
+        const backendMessage =
+          (error as { message?: string }).message ||
+          "Unable to redeem promo code right now. Please try again.";
+        throw new PromoCodeRedeemError(backendMessage, "unknown");
       }
 
       const result = (Array.isArray(data) ? data[0] : data) as PromoCodeRpcResult | undefined;
