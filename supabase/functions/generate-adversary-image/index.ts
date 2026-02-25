@@ -242,6 +242,9 @@ serve(async (req) => {
     const theme = typeof body?.theme === "string" ? body.theme.trim() : "";
     const tier = typeof body?.tier === "string" ? body.tier.trim() : "";
     const name = typeof body?.name === "string" ? body.name : undefined;
+    const selectionSeed = typeof body?.selectionSeed === "string" && body.selectionSeed.trim().length > 0
+      ? body.selectionSeed.trim()
+      : null;
     const targetVariantsInput = body?.targetVariants;
     const requestedVariant = resolveRequestedVariant(body?.variantIndex);
 
@@ -390,7 +393,7 @@ serve(async (req) => {
     const selectedVariant = pickDeterministicVariant(
       availableVariants,
       requestedVariant,
-      (name?.trim() || `${theme}:${tier}`),
+      (selectionSeed || name?.trim() || `${theme}:${tier}`),
     );
     const wasCached = initiallyCachedVariantIndexes.has(selectedVariant.variant_index);
 

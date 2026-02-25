@@ -193,6 +193,7 @@ describe("useAdversaryImage", () => {
         tier: "common",
         name: "Missing Variant",
         targetVariants: 3,
+        selectionSeed: "enc-a",
       },
     });
 
@@ -238,8 +239,15 @@ describe("useAdversaryImage", () => {
     expect(mocks.invokeMock).not.toHaveBeenCalled();
   });
 
-  it("dedupes background top-up requests per theme+tier in-session", async () => {
+  it("dedupes background top-up requests per theme+tier while request is in flight", async () => {
     mocks.cachedRows = [];
+    let resolveInvoke: ((value: unknown) => void) | null = null;
+    mocks.invokeMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveInvoke = resolve;
+        }),
+    );
 
     const first = renderHook(() =>
       useAdversaryImage({
@@ -271,8 +279,57 @@ describe("useAdversaryImage", () => {
     });
     expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
 
+    resolveInvoke?.({
+      data: { imageUrl: "https://example.com/later-inflight.png" },
+      error: null,
+    });
+
     first.unmount();
     second.unmount();
+  });
+
+  it("retries top-up on subsequent mount when successful top-up still leaves cache incomplete", async () => {
+    mocks.cachedRows = [];
+    mocks.invokeMock.mockResolvedValue({
+      data: { imageUrl: "https://example.com/generated-once.png" },
+      error: null,
+    });
+
+    const first = renderHook(() =>
+      useAdversaryImage({
+        theme: "resist-theme-partial",
+        tier: "common",
+        name: "Partial One",
+        selectionSeed: "partial-1",
+        targetVariants: 3,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(first.result.current.isLoading).toBe(false);
+    });
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
+    });
+
+    first.unmount();
+
+    const second = renderHook(() =>
+      useAdversaryImage({
+        theme: "resist-theme-partial",
+        tier: "common",
+        name: "Partial Two",
+        selectionSeed: "partial-2",
+        targetVariants: 3,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(second.result.current.isLoading).toBe(false);
+    });
+    await waitFor(() => {
+      expect(mocks.invokeMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("retries top-up on subsequent mount after a failed top-up attempt", async () => {

@@ -14,10 +14,10 @@ interface VariantIndexRow {
   variant_index: number;
 }
 
-const DEFAULT_TARGET_VARIANTS = 3;
+const DEFAULT_TARGET_VARIANTS = 5;
 const MAX_TARGET_VARIANTS = 5;
 const MISSING_COLUMN_CODE = '42703';
-const topUpRequestStatus = new Map<string, 'in_flight' | 'success'>();
+const topUpInFlightKeys = new Set<string>();
 const selectedImageCache = new Map<string, string>();
 
 const clampVariants = (value: number | undefined) => {
@@ -152,30 +152,36 @@ export const useAdversaryImage = ({
           setImageUrl(null);
         }
 
-        const existingTopUpStatus = topUpRequestStatus.get(topUpKey);
-        const canTriggerTopUp = existingTopUpStatus !== 'in_flight' && existingTopUpStatus !== 'success';
+        const canTriggerTopUp = !topUpInFlightKeys.has(topUpKey);
 
         if (availableVariantCount < clampedTargetVariants && canTriggerTopUp) {
-          topUpRequestStatus.set(topUpKey, 'in_flight');
+          topUpInFlightKeys.add(topUpKey);
 
           supabase.functions
             .invoke('generate-adversary-image', {
-              body: { theme, tier, name, targetVariants: clampedTargetVariants },
+              body: {
+                theme,
+                tier,
+                name,
+                targetVariants: clampedTargetVariants,
+                selectionSeed: variantSeed,
+              },
             })
             .then(({ data, error: fnError }) => {
               if (fnError) {
                 throw new Error(fnError.message);
               }
 
-              topUpRequestStatus.set(topUpKey, 'success');
               if (isMounted && !selectedImageUrl && typeof data?.imageUrl === 'string') {
                 setImageUrl(data.imageUrl);
                 selectedImageCache.set(selectedImageCacheKey, data.imageUrl);
               }
             })
             .catch((topUpError) => {
-              topUpRequestStatus.delete(topUpKey);
               console.error('Background adversary image top-up failed:', topUpError);
+            })
+            .finally(() => {
+              topUpInFlightKeys.delete(topUpKey);
             });
         }
       } catch (err) {

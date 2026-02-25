@@ -4,18 +4,22 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-const RESIST_THEMES = [
+const ALL_THEMES = [
   "distraction",
-  "laziness",
+  "chaos",
   "stagnation",
+  "laziness",
   "anxiety",
   "overthinking",
   "doubt",
   "fear",
+  "confusion",
+  "vulnerability",
+  "imbalance",
 ];
 
-const RESIST_TIERS = ["common", "uncommon"];
-const DEFAULT_TARGET_VARIANTS = 3;
+const ALL_TIERS = ["common", "uncommon", "rare", "epic", "legendary"];
+const DEFAULT_TARGET_VARIANTS = 5;
 const REQUEST_TIMEOUT_MS = 30000;
 
 function sleep(ms) {
@@ -243,8 +247,8 @@ async function main() {
   }
 
   const combos = [];
-  for (const theme of RESIST_THEMES) {
-    for (const tier of RESIST_TIERS) {
+  for (const theme of ALL_THEMES) {
+    for (const tier of ALL_TIERS) {
       combos.push({ theme, tier });
     }
   }

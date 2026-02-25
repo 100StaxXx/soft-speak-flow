@@ -2,6 +2,7 @@ const HIDDEN_EXACT_PATHS = new Set([
   "/welcome",
   "/terms",
   "/privacy",
+  "/promo-code",
   "/test-scroll",
   "/test-day-planner",
 ]);
@@ -22,4 +23,3 @@ export const shouldShowBottomNav = (
   if (isHiddenPrefixPath(pathname)) return false;
   return true;
 };
-

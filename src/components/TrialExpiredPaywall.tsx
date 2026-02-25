@@ -164,13 +164,13 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
     : {
         title: "Keep Your Journey Going",
         subtitle: "Start your free trial to unlock premium guidance, quests, and companion growth",
-        cta: "Start Free Trial",
+        cta: "Start 7-Day Free Trial",
         legalIntro:
           "No charge today. Your Apple ID account will be charged when the free trial ends unless canceled at least 24 hours before the end of the trial.",
       };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-6 pt-safe pb-safe overflow-y-auto">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
@@ -303,6 +303,18 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
           <RefreshCw className="h-4 w-4 mr-2" />
           Restore Purchases
         </Button>
+
+        <Button
+          variant="outline"
+          onClick={() => navigate("/promo-code")}
+          className="w-full"
+        >
+          Redeem Promo Code
+        </Button>
+
+        <p className="text-xs text-center text-muted-foreground -mt-2">
+          Have a promo code? Redeem it to unlock access.
+        </p>
 
         <p className="text-xs text-center text-muted-foreground leading-relaxed">
           {copy.legalIntro}

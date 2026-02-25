@@ -397,6 +397,23 @@ const Profile = () => {
 
               <SubscriptionManagement />
 
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Gift className="h-4 w-4 text-primary" />
+                    Promo Code
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Have a promo code for app access? Redeem it here.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={() => navigate("/promo-code")} variant="outline" className="w-full">
+                    Redeem Promo Code
+                  </Button>
+                </CardContent>
+              </Card>
+
               {/* Mentor Selection - cleaner */}
               <Card className="border-border/50">
                 <CardHeader className="pb-3">

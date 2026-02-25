@@ -15,16 +15,37 @@ struct SmallWidgetView: View {
     }
     
     private var visibleTasks: [WidgetTask] {
-        Array((entry.data?.tasks ?? []).prefix(3))
+        Array((entry.data?.tasks ?? []).prefix(4))
     }
 
     private var remainingTaskCount: Int {
         max((entry.data?.tasks.count ?? 0) - visibleTasks.count, 0)
     }
+
+    private var progress: Double {
+        guard totalCount > 0 else {
+            return 0
+        }
+        return min(max(Double(completedCount) / Double(totalCount), 0), 1)
+    }
+
+    private var progressPercent: Int {
+        Int((progress * 100).rounded())
+    }
+
+    private var remainingCount: Int {
+        max(totalCount - completedCount, 0)
+    }
+
+    private var progressSummaryText: String {
+        guard totalCount > 0 else {
+            return "No quests tracked"
+        }
+        return "\(completedCount)/\(totalCount) complete"
+    }
     
     var body: some View {
-        VStack(spacing: 6) {
-            // Header with extra top breathing room
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("⚔️")
                     .font(.caption)
@@ -32,25 +53,52 @@ struct SmallWidgetView: View {
                     .font(.caption.bold())
                     .foregroundColor(.cosmicText)
                 Spacer()
+                Text("\(progressPercent)%")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundColor(progress >= 1 ? .cosmicGold : .cosmicText)
             }
-            .padding(.top, 4)
-            
-            Spacer(minLength: 2)
-            
-            // Central progress circle
-            CosmicProgressCircle(
-                completed: completedCount,
-                total: totalCount,
-                showsPercentage: false
-            )
-            .frame(width: 60, height: 60)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Text(progressSummaryText)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.cosmicSecondary)
+
+                    Spacer()
+
+                    if totalCount > 0 {
+                        Text("\(remainingCount) left")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.cosmicSecondary)
+                    }
+                }
+
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.cosmicPurple.opacity(0.22))
+
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: progress >= 1
+                                    ? [.cosmicGold, .cosmicGold.opacity(0.8)]
+                                    : [.cosmicPurple, .cosmicGold],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .scaleEffect(x: progress, y: 1, anchor: .leading)
+                }
+                .frame(height: 6)
+            }
             
             if visibleTasks.isEmpty {
                 Text("No quests today")
                     .font(.caption2)
                     .foregroundColor(.cosmicSecondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     ForEach(visibleTasks, id: \.id) { task in
                         CosmicTaskLinkRow(
                             task: task,
@@ -67,8 +115,6 @@ struct SmallWidgetView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
-            Spacer(minLength: 0)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)

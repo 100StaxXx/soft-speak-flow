@@ -8,9 +8,14 @@ import { TrialExpiredPaywall } from "@/components/TrialExpiredPaywall";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireMentor?: boolean;
+  requireAccess?: boolean;
 }
 
-export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({
+  children,
+  requireMentor: _requireMentor = true,
+  requireAccess = true,
+}: ProtectedRouteProps) => {
   const { user, loading: authLoading, status } = useAuth();
   const { hasAccess, gateReason, loading: accessLoading } = useAccessStatus();
   const navigate = useNavigate();
@@ -66,7 +71,7 @@ export const ProtectedRoute = ({ children, requireMentor: _requireMentor = true 
   if (authStatus === 'unauthenticated' || !user) return null;
 
   // Show hard paywall if no access.
-  if (!hasAccess) {
+  if (requireAccess && !hasAccess) {
     return <TrialExpiredPaywall variant={gateReason === "trial_expired" ? "trial_expired" : "pre_trial_signup"} />;
   }
 

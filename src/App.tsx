@@ -56,6 +56,7 @@ const Preview = lazy(() => import("./pages/Preview"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Premium = lazy(() => import("./pages/Premium"));
 const PepTalkDetail = lazy(() => import("./pages/PepTalkDetail"));
+const PromoCodeRedeem = lazy(() => import("./pages/PromoCodeRedeem"));
 const Admin = lazy(() => import("./pages/Admin"));
 const MentorSelection = lazy(() => import("./pages/MentorSelection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -304,6 +305,7 @@ const AppContent = memo(() => {
                   <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                   
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="/promo-code" element={<ProtectedRoute requireAccess={false}><PromoCodeRedeem /></ProtectedRoute>} />
                   <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
                   <Route path="/premium/success" element={<ProtectedRoute><PremiumSuccess /></ProtectedRoute>} />
                   <Route path="/pep-talk/:id" element={<ProtectedRoute><PepTalkDetail /></ProtectedRoute>} />

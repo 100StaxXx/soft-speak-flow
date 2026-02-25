@@ -224,6 +224,20 @@ export async function fetchSubscriptionForUser(supabase: SupabaseClient, userId:
   return data;
 }
 
+export async function fetchActivePromoAccessForUser(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase
+    .from("promo_code_redemptions")
+    .select("granted_until")
+    .eq("user_id", userId)
+    .gt("granted_until", new Date().toISOString())
+    .order("granted_until", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export function buildSubscriptionResponse(subscription: any) {
   if (!subscription) return { subscribed: false };
   const expiresAt = subscription.current_period_end ? new Date(subscription.current_period_end) : null;
@@ -234,6 +248,18 @@ export function buildSubscriptionResponse(subscription: any) {
     status: subscription.status as SubscriptionStatus,
     plan: subscription.plan as "monthly" | "yearly" | undefined,
     subscription_end: subscription.current_period_end,
+  };
+}
+
+export function buildPromoSubscriptionResponse(grantedUntil: string | Date) {
+  const expiresAt = grantedUntil instanceof Date ? grantedUntil.toISOString() : grantedUntil;
+
+  return {
+    subscribed: true,
+    status: "active" as SubscriptionStatus,
+    plan: "monthly" as const,
+    subscription_end: expiresAt,
+    source: "promo_code",
   };
 }
 

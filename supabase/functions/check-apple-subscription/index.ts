@@ -1,7 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { fetchSubscriptionForUser, buildSubscriptionResponse } from "../_shared/appleSubscriptions.ts";
+import {
+  fetchSubscriptionForUser,
+  buildSubscriptionResponse,
+  fetchActivePromoAccessForUser,
+  buildPromoSubscriptionResponse,
+} from "../_shared/appleSubscriptions.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,7 +34,17 @@ serve(async (req) => {
     }
 
     const subscription = await fetchSubscriptionForUser(supabaseClient, user.id);
-    return jsonResponse(req, buildSubscriptionResponse(subscription));
+    const subscriptionResponse = buildSubscriptionResponse(subscription);
+    if (subscriptionResponse.subscribed) {
+      return jsonResponse(req, subscriptionResponse);
+    }
+
+    const promoAccess = await fetchActivePromoAccessForUser(supabaseClient, user.id);
+    if (promoAccess?.granted_until) {
+      return jsonResponse(req, buildPromoSubscriptionResponse(promoAccess.granted_until));
+    }
+
+    return jsonResponse(req, subscriptionResponse);
   } catch (error) {
     console.error("Error checking subscription:", error);
 

@@ -234,7 +234,7 @@ export const AstralEncounterModal = ({
     tier: adversary?.tier || '',
     name: adversary?.name || '',
     selectionSeed: encounter?.id,
-    targetVariants: 3,
+    targetVariants: 5,
     enabled: !!adversary && open,
   });
 
