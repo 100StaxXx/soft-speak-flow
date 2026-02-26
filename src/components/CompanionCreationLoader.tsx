@@ -20,9 +20,13 @@ const CREATION_TIPS = [
 
 const PROGRESS_UPDATE_INTERVAL_MS = 1_000;
 const LONG_WAIT_THRESHOLD_MS = 90_000;
-const INITIAL_PROGRESS = 3;
+const INITIAL_PROGRESS = 5;
 const FINAL_PROGRESS_CAP = 99;
-const POST_120_SECONDS_PROGRESS_PER_SECOND = 0.08;
+const THIRTY_SECONDS_PROGRESS = 50;
+const SIXTY_SECONDS_PROGRESS = 75;
+const NINETY_SECONDS_PROGRESS = 88;
+const ONE_TWENTY_SECONDS_PROGRESS = 93;
+const POST_120_SECONDS_PROGRESS_PER_SECOND = 0.06;
 
 const lerp = (start: number, end: number, ratio: number): number =>
   start + ((end - start) * ratio);
@@ -31,23 +35,23 @@ export const getCompanionCreationProgress = (elapsedMs: number): number => {
   const elapsedSeconds = Math.max(0, elapsedMs / 1000);
 
   if (elapsedSeconds <= 30) {
-    return lerp(INITIAL_PROGRESS, 32, elapsedSeconds / 30);
+    return lerp(INITIAL_PROGRESS, THIRTY_SECONDS_PROGRESS, elapsedSeconds / 30);
   }
 
   if (elapsedSeconds <= 60) {
-    return lerp(32, 50, (elapsedSeconds - 30) / 30);
+    return lerp(THIRTY_SECONDS_PROGRESS, SIXTY_SECONDS_PROGRESS, (elapsedSeconds - 30) / 30);
   }
 
   if (elapsedSeconds <= 90) {
-    return lerp(50, 64, (elapsedSeconds - 60) / 30);
+    return lerp(SIXTY_SECONDS_PROGRESS, NINETY_SECONDS_PROGRESS, (elapsedSeconds - 60) / 30);
   }
 
   if (elapsedSeconds <= 120) {
-    return lerp(64, 74, (elapsedSeconds - 90) / 30);
+    return lerp(NINETY_SECONDS_PROGRESS, ONE_TWENTY_SECONDS_PROGRESS, (elapsedSeconds - 90) / 30);
   }
 
   const post120Progress =
-    74 + ((elapsedSeconds - 120) * POST_120_SECONDS_PROGRESS_PER_SECOND);
+    ONE_TWENTY_SECONDS_PROGRESS + ((elapsedSeconds - 120) * POST_120_SECONDS_PROGRESS_PER_SECOND);
   return Math.min(post120Progress, FINAL_PROGRESS_CAP);
 };
 

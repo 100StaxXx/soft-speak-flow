@@ -7,8 +7,8 @@ The Apple subscription flow now lives entirely in Supabase Edge Functions. The f
 Add the following secrets to your Supabase project (Project Settings → Secrets or `supabase/config.toml` when testing locally):
 
 - `APPLE_SHARED_SECRET` – The app-specific shared secret from App Store Connect (used for receipt verification).
-- `APPLE_MONTHLY_PRODUCT_IDS` – Comma separated list of monthly product IDs (e.g. `cosmiq_premium_monthly,premium_monthly`).
-- `APPLE_YEARLY_PRODUCT_IDS` – Comma separated list of yearly/annual product IDs (e.g. `cosmiq_premium_yearly,premium_annual`).
+- `APPLE_MONTHLY_PRODUCT_IDS` – Comma separated list of monthly product IDs (e.g. `cosmiq_premium_monthly,com.darrylgraham.revolution.monthly`).
+- `APPLE_YEARLY_PRODUCT_IDS` – Comma separated list of yearly/annual product IDs (e.g. `cosmiq_premium_yearly,com.darrylgraham.revolution.yearly`).
 - `APPLE_MONTHLY_PRICE_CENTS` – (Optional) Override the stored amount for monthly receipts; defaults to `999` ($9.99).
 - `APPLE_YEARLY_PRICE_CENTS` – (Optional) Override the stored amount for yearly receipts; defaults to `5999` ($59.99).
 

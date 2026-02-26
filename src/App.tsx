@@ -24,6 +24,7 @@ import { GlobalEvolutionListener } from "@/components/GlobalEvolutionListener";
 import { RealtimeSyncProvider } from "@/components/RealtimeSyncProvider";
 import { InstallPWA } from "@/components/InstallPWA";
 import { lockToPortrait } from "@/utils/orientationLock";
+import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
 
 
 import { hideSplashScreen } from "@/utils/capacitor";
@@ -381,6 +382,7 @@ const App = () => {
                   <Toaster />
                   <Sonner />
                   <InstallPWA />
+                  <UpdateAvailablePrompt />
                   <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                     <DeepLinkProvider>
                       <ScrollToTop />

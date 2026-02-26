@@ -347,7 +347,7 @@ export const CompanionDisplay = memo(() => {
 
       const resolvedName = await resolveCompanionName({
         companion,
-        fallback: "species",
+        fallback: "companion",
       });
 
       if (!cancelled) {

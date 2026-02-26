@@ -1,10 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { purchaseProduct, restorePurchases, IAP_PRODUCTS, isIAPAvailable, getProducts, IAPProduct, openManageSubscriptions } from '@/utils/appleIAP';
+import {
+  purchaseProduct,
+  restorePurchases,
+  IAP_PRODUCTS,
+  isIAPAvailable,
+  getProducts,
+  IAPProduct,
+  openManageSubscriptions,
+  getAllIAPProductIds,
+  getProductIdsForPlan,
+  resolvePlanFromProductId,
+} from '@/utils/appleIAP';
 import { useToast } from './use-toast';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
+const PRODUCT_IDS = getAllIAPProductIds();
+
+const toProductFetchErrorMessage = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (!message || message === 'undefined' || message === 'null') {
+    return PRODUCT_FETCH_ERROR_MESSAGE;
+  }
+  if (/ios 15/i.test(message)) {
+    return message;
+  }
+  return `${PRODUCT_FETCH_ERROR_MESSAGE} (${message})`;
+};
 
 export function useAppleSubscription() {
   const queryClient = useQueryClient();
@@ -34,13 +57,13 @@ export function useAppleSubscription() {
 
     try {
       console.log('[HOOK DEBUG] About to call getProducts...');
-      const loadedProducts = await getProducts(Object.values(IAP_PRODUCTS));
+      const loadedProducts = await getProducts(PRODUCT_IDS);
       console.log('[HOOK DEBUG] getProducts returned:', loadedProducts.length, 'products');
       console.log('[HOOK DEBUG] Products:', JSON.stringify(loadedProducts));
 
       if (!loadedProducts.length) {
         console.log('[HOOK DEBUG] No products returned, throwing error');
-        throw new Error("No App Store products were returned");
+        throw new Error(`No App Store products were returned for IDs: ${PRODUCT_IDS.join(', ')}`);
       }
 
       setProducts(loadedProducts);
@@ -49,7 +72,7 @@ export function useAppleSubscription() {
     } catch (error) {
       console.error('[HOOK DEBUG] Product load error:', error);
       setProducts([]);
-      setProductError(PRODUCT_FETCH_ERROR_MESSAGE);
+      setProductError(toProductFetchErrorMessage(error));
       return [];
     } finally {
       setProductsLoading(false);
@@ -121,9 +144,11 @@ export function useAppleSubscription() {
 
       console.log('[HOOK DEBUG] Checking productId:', productId);
       console.log('[HOOK DEBUG] Available identifiers:', availableProducts.map(p => p.identifier));
-      const productExists = availableProducts.some((product) => product.identifier === productId);
-      console.log('[HOOK DEBUG] productExists result:', productExists);
-      if (!productExists) {
+      const requestedPlan = resolvePlanFromProductId(productId);
+      const candidateProductIds = requestedPlan ? getProductIdsForPlan(requestedPlan) : [productId];
+      const matchedProduct = availableProducts.find((product) => candidateProductIds.includes(product.identifier));
+      console.log('[HOOK DEBUG] matchedProduct:', matchedProduct?.identifier ?? 'none');
+      if (!matchedProduct) {
         toast({
           title: "Unavailable",
           description: "Selected premium plan is not ready yet. Please try again in a moment.",
@@ -132,7 +157,7 @@ export function useAppleSubscription() {
         return false;
       }
 
-      const purchase = await purchaseProduct(productId);
+      const purchase = await purchaseProduct(matchedProduct.identifier);
       
       console.log('[IAP] Purchase response:', JSON.stringify(purchase, null, 2));
       
@@ -232,7 +257,7 @@ export function useAppleSubscription() {
       
       // Find subscription purchase (contains "premium" in product ID)
       const subscriptionPurchase = sortedPurchases.find(p => 
-        p.productId?.includes('premium')
+        resolvePlanFromProductId(p.productId) !== null
       );
       
       if (!subscriptionPurchase) {

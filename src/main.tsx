@@ -30,15 +30,6 @@ window.addEventListener('unhandledrejection', (event) => {
   logger.error('Unhandled promise rejection:', event.reason);
 });
 
-// Register service worker for PWA - skip on Capacitor native (causes WKWebView crashes)
-if ('serviceWorker' in navigator && !(window as any).Capacitor?.isNativePlatform?.()) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
-      // Silent fail - not critical for app functionality
-    });
-  });
-}
-
 // Wrapper component to handle Capacitor initialization
 const AppWrapper = () => {
   useEffect(() => {

@@ -7,7 +7,7 @@
         "key": "No quests today",
         "location": {
           "startingColumn": 22,
-          "startingLine": 96
+          "startingLine": 88
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "⚔️",
         "location": {
           "startingColumn": 22,
-          "startingLine": 50
+          "startingLine": 45
         }
       },
       {
@@ -23,15 +23,7 @@
         "key": "Today",
         "location": {
           "startingColumn": 22,
-          "startingLine": 52
-        }
-      },
-      {
-        "comment": "",
-        "key": "%lld%%",
-        "location": {
-          "startingColumn": 22,
-          "startingLine": 56
+          "startingLine": 47
         }
       },
       {
@@ -39,7 +31,7 @@
         "key": "%lld left",
         "location": {
           "startingColumn": 30,
-          "startingLine": 70
+          "startingLine": 62
         }
       },
       {
@@ -47,7 +39,7 @@
         "key": "+%lld more",
         "location": {
           "startingColumn": 30,
-          "startingLine": 111
+          "startingLine": 103
         }
       },
       {
@@ -55,7 +47,7 @@
         "key": "⚔️",
         "location": {
           "startingColumn": 26,
-          "startingLine": 142
+          "startingLine": 134
         }
       },
       {
@@ -63,7 +55,7 @@
         "key": "Today's Quests",
         "location": {
           "startingColumn": 26,
-          "startingLine": 144
+          "startingLine": 136
         }
       },
       {
@@ -71,7 +63,7 @@
         "key": "Progress",
         "location": {
           "startingColumn": 26,
-          "startingLine": 174
+          "startingLine": 166
         }
       },
       {
@@ -79,7 +71,7 @@
         "key": "⚔️",
         "location": {
           "startingColumn": 30,
-          "startingLine": 238
+          "startingLine": 230
         }
       },
       {
@@ -87,7 +79,7 @@
         "key": "Daily Quests",
         "location": {
           "startingColumn": 30,
-          "startingLine": 240
+          "startingLine": 232
         }
       },
       {
@@ -95,7 +87,7 @@
         "key": "Progress",
         "location": {
           "startingColumn": 30,
-          "startingLine": 256
+          "startingLine": 248
         }
       },
       {
@@ -103,7 +95,7 @@
         "key": "⭐",
         "location": {
           "startingColumn": 22,
-          "startingLine": 356
+          "startingLine": 348
         }
       },
       {
@@ -111,7 +103,7 @@
         "key": "%lld%%",
         "location": {
           "startingColumn": 22,
-          "startingLine": 456
+          "startingLine": 448
         }
       },
       {
@@ -119,7 +111,7 @@
         "key": "✨",
         "location": {
           "startingColumn": 18,
-          "startingLine": 469
+          "startingLine": 461
         }
       },
       {
@@ -127,7 +119,7 @@
         "key": "No quests today",
         "location": {
           "startingColumn": 18,
-          "startingLine": 471
+          "startingLine": 463
         }
       }
     ]

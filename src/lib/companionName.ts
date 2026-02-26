@@ -40,6 +40,36 @@ const resolveFallbackName = (
   }
 };
 
+const cacheCompanionName = (companionId: string, name: string) => {
+  void supabase
+    .from("user_companion")
+    .update({ cached_creature_name: name })
+    .eq("id", companionId);
+};
+
+const fetchNameForStage = async (companionId: string, stage: number) => {
+  const { data } = await supabase
+    .from("companion_evolution_cards")
+    .select("creature_name")
+    .eq("companion_id", companionId)
+    .eq("evolution_stage", stage)
+    .maybeSingle();
+
+  return normalizeName(data?.creature_name);
+};
+
+const fetchEarliestName = async (companionId: string) => {
+  const { data } = await supabase
+    .from("companion_evolution_cards")
+    .select("creature_name")
+    .eq("companion_id", companionId)
+    .order("evolution_stage", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return normalizeName(data?.creature_name);
+};
+
 export const resolveCompanionName = async ({
   companion,
   overrideName,
@@ -59,20 +89,16 @@ export const resolveCompanionName = async ({
   }
 
   try {
-    const { data } = await supabase
-      .from("companion_evolution_cards")
-      .select("creature_name")
-      .eq("companion_id", companion.id)
-      .eq("evolution_stage", companion.current_stage)
-      .maybeSingle();
+    const stageName = await fetchNameForStage(companion.id, companion.current_stage);
+    if (stageName) {
+      cacheCompanionName(companion.id, stageName);
+      return stageName;
+    }
 
-    const cardName = normalizeName(data?.creature_name);
-    if (cardName) {
-      void supabase
-        .from("user_companion")
-        .update({ cached_creature_name: cardName })
-        .eq("id", companion.id);
-      return cardName;
+    const earliestName = await fetchEarliestName(companion.id);
+    if (earliestName) {
+      cacheCompanionName(companion.id, earliestName);
+      return earliestName;
     }
   } catch (error) {
     console.error("Failed to resolve companion name:", error);

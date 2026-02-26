@@ -609,6 +609,19 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
             return;
           }
           setCompanionAnimal(displayName);
+          void supabase
+            .from("user_companion")
+            .update({ cached_creature_name: displayName })
+            .eq("id", companionId)
+            .then(({ error: cacheError }) => {
+              if (cacheError) {
+                logger.warn("Failed to cache companion display name", {
+                  userId: user.id,
+                  companionId,
+                  error: cacheError.message,
+                });
+              }
+            });
           logger.info("Companion display name hydrated", {
             userId: user.id,
             companionId,

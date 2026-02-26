@@ -1,0 +1,5 @@
+
+module IONFilesystemLib.Swift {
+  header "IONFilesystemLib-Swift.h"
+  requires objc
+}

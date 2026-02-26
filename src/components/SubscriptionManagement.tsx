@@ -6,13 +6,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Loader2, Settings, Bug, RefreshCw } from "lucide-react";
-import { IAP_PRODUCTS } from "@/utils/appleIAP";
+import {
+  getProductForPlan,
+  getPurchaseProductIdForPlan,
+  getProductIdsForPlan,
+} from "@/utils/appleIAP";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type PlanOption = {
   id: 'monthly' | 'yearly';
   label: string;
-  productId: string;
   description: string;
   hint: string;
   fallbackPrice: string;
@@ -51,7 +54,6 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     {
       id: 'monthly',
       label: 'Monthly',
-      productId: IAP_PRODUCTS.MONTHLY,
       description: 'Full access billed every month',
       hint: 'Cancel anytime',
       fallbackPrice: "$9.99",
@@ -60,7 +62,6 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
     {
       id: 'yearly',
       label: 'Yearly',
-      productId: IAP_PRODUCTS.YEARLY,
       description: 'Best value with 7-day trial',
       hint: 'Equivalent to $4.99/month',
       fallbackPrice: "$59.99",
@@ -70,7 +71,8 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
   ] as const;
 
   const selectedPlanOption = planOptions.find((plan) => plan.id === selectedPlan);
-  const selectedProduct = selectedPlanOption ? productMap[selectedPlanOption.productId] : undefined;
+  const selectedProduct = getProductForPlan(selectedPlan, products);
+  const selectedProductId = getPurchaseProductIdForPlan(selectedPlan, products);
 
   const subscriptionStatusText = subscription
     ? `You're on Cosmiq Premium (${plan === 'yearly' ? 'Yearly' : 'Monthly'})`
@@ -92,19 +94,19 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
       : "Renewal date not available yet"
     : "Manage or restore to update your status";
 
-  const getPriceForProduct = (productId: string) => {
-    const product = productMap[productId];
-    if (product?.price) {
-      return product.price;
+  const getPriceForProduct = (planId: PlanOption['id']) => {
+    const product = getProductForPlan(planId, products);
+    if (product?.priceString) {
+      return product.priceString;
     }
-    return productId === IAP_PRODUCTS.YEARLY ? "$59.99" : "$9.99";
+    return planId === 'yearly' ? "$59.99" : "$9.99";
   };
 
-  const canPurchasePlan = (productId: string) => {
+  const canPurchasePlan = (planId: PlanOption['id']) => {
     if (!isAvailable || purchasing || productsLoading) return false;
     if (productError) return false;
     if (!hasLoadedProducts) return false;
-    return Boolean(productMap[productId]);
+    return Boolean(getProductForPlan(planId, products));
   };
 
   if (isLoading) {
@@ -200,8 +202,8 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
                 </div>
                 <div className="border-t border-border/60 pt-2">
                   <p className="text-muted-foreground mb-1">Expected Product IDs:</p>
-                  <p className="break-all">{IAP_PRODUCTS.MONTHLY}</p>
-                  <p className="break-all">{IAP_PRODUCTS.YEARLY}</p>
+                  <p className="break-all">monthly: {getProductIdsForPlan('monthly').join(', ')}</p>
+                  <p className="break-all">yearly: {getProductIdsForPlan('yearly').join(', ')}</p>
                 </div>
                 <div className="border-t border-border/60 pt-2">
                   <p className="text-muted-foreground mb-1">Loaded Products:</p>
@@ -239,7 +241,7 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
 
           <div className="grid gap-4 md:grid-cols-2">
             {planOptions.map((planOption) => {
-              const price = getPriceForProduct(planOption.productId);
+              const price = getPriceForProduct(planOption.id);
               const isSelected = selectedPlan === planOption.id;
 
               const handleSelect = () => setSelectedPlan(planOption.id);
@@ -299,11 +301,11 @@ export const SubscriptionManagement = memo(function SubscriptionManagement() {
           </div>
 
           <Button
-            onClick={() => selectedPlanOption && handlePurchase(selectedPlanOption.productId)}
+            onClick={() => selectedPlanOption && handlePurchase(selectedProductId)}
             disabled={
               !isAvailable ||
               !selectedPlanOption ||
-              !canPurchasePlan(selectedPlanOption.productId)
+              !canPurchasePlan(selectedPlanOption.id)
             }
             className="w-full"
           >

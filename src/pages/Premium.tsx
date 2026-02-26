@@ -7,7 +7,7 @@ import { Crown, Sparkles, Zap, Bell, Download, Check, Moon, RefreshCw, CreditCar
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
 import { useTrialStatus } from "@/hooks/useTrialStatus";
-import { IAP_PRODUCTS } from "@/utils/appleIAP";
+import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,18 +31,13 @@ export default function Premium() {
   const { isInTrial, trialDaysRemaining } = useTrialStatus();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
 
-  const productMap = useMemo(() => {
-    return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
-      acc[product.identifier] = product;
-      return acc;
-    }, {});
-  }, [products]);
-
-  const selectedProductId = selectedPlan === "yearly" 
-    ? IAP_PRODUCTS.YEARLY 
-    : IAP_PRODUCTS.MONTHLY;
-
-  const selectedProduct = productMap[selectedProductId];
+  const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
+  const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
+  const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
+  const selectedProductId = useMemo(
+    () => getPurchaseProductIdForPlan(selectedPlan, products),
+    [selectedPlan, products],
+  );
 
   const handleSubscribe = useCallback(async () => {
     if (!selectedProduct) {
@@ -54,14 +49,11 @@ export default function Premium() {
       return;
     }
 
-    const productId = selectedPlan === "yearly" 
-      ? IAP_PRODUCTS.YEARLY 
-      : IAP_PRODUCTS.MONTHLY;
-    const success = await handlePurchase(productId);
+    const success = await handlePurchase(selectedProductId);
     if (success) {
       navigate('/premium/success');
     }
-  }, [selectedProduct, selectedPlan, handlePurchase, navigate, toast]);
+  }, [selectedProduct, selectedProductId, handlePurchase, navigate, toast]);
 
   const plans = useMemo(() => ({
     monthly: {
@@ -160,7 +152,7 @@ export default function Premium() {
                   {plan}
                 </p>
                 <p className="text-3xl font-bold text-foreground">
-                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.priceString : productMap[IAP_PRODUCTS.MONTHLY]?.priceString) ?? plans[plan].fallbackPrice}
+                  {(plan === "yearly" ? yearlyProduct?.priceString : monthlyProduct?.priceString) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {plans[plan].period}

@@ -28,10 +28,14 @@ describe("resolveCompanionName", () => {
         const chain = {
           select: vi.fn(),
           eq: vi.fn(),
+          order: vi.fn(),
+          limit: vi.fn(),
           maybeSingle: mocks.evolutionMaybeSingle,
         };
         chain.select.mockReturnValue(chain);
         chain.eq.mockReturnValue(chain);
+        chain.order.mockReturnValue(chain);
+        chain.limit.mockReturnValue(chain);
         return chain;
       }
 
@@ -96,6 +100,26 @@ describe("resolveCompanionName", () => {
     expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-3");
   });
 
+  it("falls back to earliest available card name and writes cache", async () => {
+    mocks.evolutionMaybeSingle
+      .mockResolvedValueOnce({ data: null })
+      .mockResolvedValueOnce({ data: { creature_name: "Novaflare" } });
+
+    const value = await resolveCompanionName({
+      companion: {
+        id: "comp-3b",
+        current_stage: 7,
+        cached_creature_name: null,
+        spirit_animal: "eagle",
+      },
+      fallback: "empty",
+    });
+
+    expect(value).toBe("Novaflare");
+    expect(mocks.evolutionMaybeSingle).toHaveBeenCalledTimes(2);
+    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-3b");
+  });
+
   it("supports empty fallback policy", async () => {
     const value = await resolveCompanionName({
       companion: {
@@ -122,5 +146,19 @@ describe("resolveCompanionName", () => {
     });
 
     expect(value).toBe("Snow Fox");
+  });
+
+  it("supports companion fallback policy", async () => {
+    const value = await resolveCompanionName({
+      companion: {
+        id: "comp-6",
+        current_stage: 6,
+        cached_creature_name: null,
+        spirit_animal: "snow fox",
+      },
+      fallback: "companion",
+    });
+
+    expect(value).toBe("Companion");
   });
 });

@@ -57,8 +57,14 @@ function normalizeProductIds(envKey: string, defaults: string[]) {
     .filter(Boolean);
 }
 
-const monthlyProductIds = normalizeProductIds("APPLE_MONTHLY_PRODUCT_IDS", ["cosmiq_premium_monthly"]);
-const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", ["cosmiq_premium_yearly"]);
+const monthlyProductIds = normalizeProductIds("APPLE_MONTHLY_PRODUCT_IDS", [
+  "cosmiq_premium_monthly",
+  "com.darrylgraham.revolution.monthly",
+]);
+const yearlyProductIds = normalizeProductIds("APPLE_YEARLY_PRODUCT_IDS", [
+  "cosmiq_premium_yearly",
+  "com.darrylgraham.revolution.yearly",
+]);
 
 export function resolvePlanFromProduct(productId: string | undefined): "monthly" | "yearly" {
   const normalized = (productId ?? "").toLowerCase();

@@ -3,7 +3,7 @@ import { Crown, Sparkles, MessageCircle, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppleSubscription } from "@/hooks/useAppleSubscription";
-import { IAP_PRODUCTS } from "@/utils/appleIAP";
+import { getProductForPlan, getPurchaseProductIdForPlan } from "@/utils/appleIAP";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -50,18 +50,13 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
   const { signOut } = useAuth();
   const navigate = useNavigate();
 
-  const productMap = useMemo(() => {
-    return products.reduce<Record<string, (typeof products)[number]>>((acc, product) => {
-      acc[product.identifier] = product;
-      return acc;
-    }, {});
-  }, [products]);
-
-  const selectedProductId = selectedPlan === "yearly" 
-    ? IAP_PRODUCTS.YEARLY 
-    : IAP_PRODUCTS.MONTHLY;
-
-  const selectedProduct = productMap[selectedProductId];
+  const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
+  const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
+  const selectedProduct = selectedPlan === "yearly" ? yearlyProduct : monthlyProduct;
+  const selectedProductId = useMemo(
+    () => getPurchaseProductIdForPlan(selectedPlan, products),
+    [selectedPlan, products],
+  );
 
   const handleSubscribe = async () => {
     if (!selectedProduct) {
@@ -73,10 +68,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       return;
     }
 
-    const productId = selectedPlan === "yearly" 
-      ? IAP_PRODUCTS.YEARLY 
-      : IAP_PRODUCTS.MONTHLY;
-    await handlePurchase(productId);
+    await handlePurchase(selectedProductId);
   };
 
   const handleSignOut = async () => {
@@ -208,7 +200,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
                   {plan}
                 </p>
                 <p className="text-2xl font-bold text-foreground">
-                  {(plan === "yearly" ? productMap[IAP_PRODUCTS.YEARLY]?.priceString : productMap[IAP_PRODUCTS.MONTHLY]?.priceString) ?? plans[plan].fallbackPrice}
+                  {(plan === "yearly" ? yearlyProduct?.priceString : monthlyProduct?.priceString) ?? plans[plan].fallbackPrice}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {plans[plan].period}
