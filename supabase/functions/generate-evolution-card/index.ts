@@ -4,6 +4,12 @@ installOpenAICompatibilityShim();
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { calculateBondLevel, calculateEnergyCost, normalizeStats } from "../_shared/cardMath.ts";
+import {
+  buildSpiritLockPromptBlock,
+  buildSpiritLockRetryFeedback,
+  evaluateSpiritLockTextCompliance,
+  resolveCompanionSpiritLockProfile,
+} from "../_shared/companionSpiritLock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,6 +69,33 @@ const synthesizeAssignedCompanionName = (seedInput: string, element: string, spe
       .replace(/[^a-z]/gi, ""),
   );
 };
+
+type EvolutionCardContent = {
+  creature_name: string;
+  traits: string[];
+  story_text: string;
+  lore_seed: string;
+};
+
+const buildMechanicalCardFallback = (
+  creatureName: string,
+  stage: number,
+  species: string,
+  element: string,
+): EvolutionCardContent => ({
+  creature_name: creatureName,
+  traits: [
+    "Metallic Scale Plating",
+    "Articulated Joint Matrix",
+    "Clockwork Gear Halo",
+    "Engineered Energy Core",
+    `Stage ${stage} Precision Protocol`,
+  ],
+  story_text: `${creatureName} enters stage ${stage} with metallic scales and articulated joints tuned for higher output. \
+Clockwork gears cycle in precise rhythm while the engineered energy core channels ${element.toLowerCase()} power through reinforced alloy channels.\n\n\
+Every movement is refined for control and force, proving this ${species} remains a fully mechanical guardian as it evolves.`,
+  lore_seed: `${creatureName}'s core reactor records a hidden protocol that awakens only when its gear lattice reaches perfect resonance.`,
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -146,6 +179,16 @@ serve(async (req) => {
                  stage >= 10 ? 'majestic, powerful, legendary' :
                  stage >= 5 ? 'fierce, loyal, determined' :
                  'curious, cute, eager';
+    const spiritLockProfile = resolveCompanionSpiritLockProfile(species);
+    const spiritLockPromptBlock = spiritLockProfile
+      ? buildSpiritLockPromptBlock(spiritLockProfile, "card")
+      : null;
+
+    console.log("[SpiritLock]", {
+      species,
+      profile_match: spiritLockProfile?.id ?? null,
+      function: "generate-evolution-card",
+    });
 
     // Stage 20 Special: Generate personalized ultimate title
     let finalCreatureName = existingName;
@@ -184,6 +227,9 @@ Generate a card with these exact fields in JSON:
 }
 
 Make it LEGENDARY. ${existingName} is growing stronger.`;
+      if (spiritLockPromptBlock) {
+        aiPrompt = `${aiPrompt}\n\n${spiritLockPromptBlock}\n\nCRITICAL: Use explicitly mechanical descriptions only.`;
+      }
     } else {
       // First evolution - generate a new name
       aiPrompt = `You are a master fantasy creature naming expert. Generate a UNIQUE, ORIGINAL creature name for this companion's FIRST evolution.
@@ -224,6 +270,9 @@ Generate a card with these exact fields in JSON:
 }
 
 Make it LEGENDARY. This is the birth of a companion.`;
+      if (spiritLockPromptBlock) {
+        aiPrompt = `${aiPrompt}\n\n${spiritLockPromptBlock}\n\nCRITICAL: Use explicitly mechanical descriptions only.`;
+      }
     }
 
     let cardData;
@@ -238,55 +287,156 @@ Make it LEGENDARY. This is the birth of a companion.`;
       };
       console.log('Using pre-generated Stage 20 card data');
     } else {
-      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: 'You are a creative card game designer. Always respond with valid JSON only.' },
-            { role: 'user', content: aiPrompt }
-          ],
-        }),
-      });
-
-      if (!aiResponse.ok) {
-        throw new Error(`AI generation failed: ${aiResponse.status}`);
-      }
-
-      const aiData = await aiResponse.json();
-      const content = aiData.choices[0].message.content;
-      
-      // Parse JSON from AI response with robust handling
-      try {
-        let jsonString = content;
-        
-        // Extract from markdown code blocks if present
-        const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (codeBlockMatch) {
-          jsonString = codeBlockMatch[1];
-        }
-        
-        // Extract JSON object
-        const jsonObjectMatch = jsonString.match(/\{[\s\S]*\}/);
-        if (jsonObjectMatch) {
-          jsonString = jsonObjectMatch[0];
-        }
-        
-        // Fix unescaped newlines within JSON string values
-        // This handles AI responses with literal line breaks in story text
-        jsonString = jsonString.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match: string) => {
-          return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+      const generateCardDataFromPrompt = async (prompt: string): Promise<EvolutionCardContent> => {
+        const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are a creative card game designer. Always respond with valid JSON only.' },
+              { role: 'user', content: prompt },
+            ],
+          }),
         });
-        
-        cardData = JSON.parse(jsonString);
-      } catch (e) {
-        console.error('Failed to parse AI response:', content);
-        console.error('Parse error:', e);
-        throw new Error('AI response was not valid JSON');
+
+        if (!aiResponse.ok) {
+          throw new Error(`AI generation failed: ${aiResponse.status}`);
+        }
+
+        const aiData = await aiResponse.json();
+        const content = aiData.choices?.[0]?.message?.content;
+        if (typeof content !== "string" || content.trim().length === 0) {
+          throw new Error("AI response was empty");
+        }
+
+        try {
+          let jsonString = content;
+
+          const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (codeBlockMatch) {
+            jsonString = codeBlockMatch[1];
+          }
+
+          const jsonObjectMatch = jsonString.match(/\{[\s\S]*\}/);
+          if (jsonObjectMatch) {
+            jsonString = jsonObjectMatch[0];
+          }
+
+          jsonString = jsonString.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match: string) => {
+            return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+          });
+
+          return JSON.parse(jsonString) as EvolutionCardContent;
+        } catch (error) {
+          console.error('Failed to parse AI response:', content);
+          console.error('Parse error:', error);
+          throw new Error('AI response was not valid JSON');
+        }
+      };
+
+      cardData = await generateCardDataFromPrompt(aiPrompt);
+
+      if (spiritLockProfile) {
+        const contentForCompliance = [
+          ...(Array.isArray(cardData?.traits) ? cardData.traits : []),
+          cardData?.story_text ?? "",
+          cardData?.lore_seed ?? "",
+        ].join(" ");
+
+        let compliance = evaluateSpiritLockTextCompliance(contentForCompliance, spiritLockProfile);
+        console.log("[SpiritLock]", {
+          species,
+          profile_match: spiritLockProfile.id,
+          function: "generate-evolution-card",
+          phase: "first_pass",
+          compliant: compliance.isCompliant,
+          violations: compliance.violations,
+        });
+
+        if (!compliance.isCompliant) {
+          const retryPrompt = `${aiPrompt}\n\n${buildSpiritLockRetryFeedback(spiritLockProfile, compliance)}`;
+          console.log("[SpiritLock]", {
+            species,
+            profile_match: spiritLockProfile.id,
+            function: "generate-evolution-card",
+            phase: "retry_start",
+          });
+
+          try {
+            const retriedCardData = await generateCardDataFromPrompt(retryPrompt);
+            const retryContent = [
+              ...(Array.isArray(retriedCardData?.traits) ? retriedCardData.traits : []),
+              retriedCardData?.story_text ?? "",
+              retriedCardData?.lore_seed ?? "",
+            ].join(" ");
+            compliance = evaluateSpiritLockTextCompliance(retryContent, spiritLockProfile);
+
+            console.log("[SpiritLock]", {
+              species,
+              profile_match: spiritLockProfile.id,
+              function: "generate-evolution-card",
+              phase: "retry_result",
+              compliant: compliance.isCompliant,
+              violations: compliance.violations,
+            });
+
+            if (compliance.isCompliant) {
+              cardData = retriedCardData;
+            } else {
+              const fallbackName = normalizeName(retriedCardData.creature_name)
+                || normalizeName(existingName)
+                || synthesizeAssignedCompanionName(
+                  `${companionId}:${user.id}:${stage}:spirit-lock-fallback`,
+                  element,
+                  species,
+                );
+              cardData = buildMechanicalCardFallback(fallbackName, stage, species, element);
+            }
+          } catch (retryError) {
+            console.error("[SpiritLock] retry failed, using deterministic fallback", retryError);
+            const fallbackName = normalizeName(cardData?.creature_name)
+              || normalizeName(existingName)
+              || synthesizeAssignedCompanionName(
+                `${companionId}:${user.id}:${stage}:spirit-lock-fallback`,
+                element,
+                species,
+              );
+            cardData = buildMechanicalCardFallback(fallbackName, stage, species, element);
+          }
+        }
+      }
+    }
+
+    if (spiritLockProfile) {
+      const finalCompliance = evaluateSpiritLockTextCompliance(
+        [
+          ...(Array.isArray(cardData?.traits) ? cardData.traits : []),
+          cardData?.story_text ?? "",
+          cardData?.lore_seed ?? "",
+        ].join(" "),
+        spiritLockProfile,
+      );
+
+      if (!finalCompliance.isCompliant) {
+        console.log("[SpiritLock]", {
+          species,
+          profile_match: spiritLockProfile.id,
+          function: "generate-evolution-card",
+          phase: "final_guardrail_fallback",
+          violations: finalCompliance.violations,
+        });
+        const fallbackName = normalizeName(cardData?.creature_name)
+          || normalizeName(existingName)
+          || synthesizeAssignedCompanionName(
+            `${companionId}:${user.id}:${stage}:final-guardrail`,
+            element,
+            species,
+          );
+        cardData = buildMechanicalCardFallback(fallbackName, stage, species, element);
       }
     }
 

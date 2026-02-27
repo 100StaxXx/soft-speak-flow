@@ -11,6 +11,25 @@ const isFinitePositive = (value: number): boolean => Number.isFinite(value) && v
 
 const roundSize = (value: number): number => Math.round(value * 100) / 100;
 
+const parsePxValue = (value: string): number => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+export const computeContentBoxAvailableSize = (
+  availableWidth: number,
+  availableHeight: number,
+  paddings: Pick<CSSStyleDeclaration, 'paddingLeft' | 'paddingRight' | 'paddingTop' | 'paddingBottom'>,
+): AspectRect => {
+  const horizontalPadding = parsePxValue(paddings.paddingLeft) + parsePxValue(paddings.paddingRight);
+  const verticalPadding = parsePxValue(paddings.paddingTop) + parsePxValue(paddings.paddingBottom);
+
+  return {
+    width: Math.max(0, roundSize(availableWidth - horizontalPadding)),
+    height: Math.max(0, roundSize(availableHeight - verticalPadding)),
+  };
+};
+
 const getFallbackRect = (aspectWidth: number, aspectHeight: number): AspectRect => {
   const normalizedAspectWidth = isFinitePositive(aspectWidth) ? aspectWidth : 1;
   const normalizedAspectHeight = isFinitePositive(aspectHeight) ? aspectHeight : 1;
@@ -75,7 +94,14 @@ export const useMaxAspectRect = (aspectWidth: number, aspectHeight: number) => {
     }
 
     const { width, height } = hostElement.getBoundingClientRect();
-    const nextRect = computeLargestAspectRect(width, height, aspectWidth, aspectHeight);
+    const computedStyle = window.getComputedStyle(hostElement);
+    const contentBox = computeContentBoxAvailableSize(width, height, computedStyle);
+    const nextRect = computeLargestAspectRect(
+      contentBox.width,
+      contentBox.height,
+      aspectWidth,
+      aspectHeight,
+    );
     setRect((previous) =>
       previous.width === nextRect.width && previous.height === nextRect.height ? previous : nextRect,
     );

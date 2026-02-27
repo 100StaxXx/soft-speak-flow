@@ -12,6 +12,11 @@ import {
   buildStageOnePalette,
   formatStageOnePaletteInstructions,
 } from "../_shared/stage1Palette.ts";
+import {
+  buildSpiritLockPromptBlock,
+  buildSpiritLockRetryFeedback,
+  resolveCompanionSpiritLockProfile,
+} from "../_shared/companionSpiritLock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -167,6 +172,15 @@ GRANDIOSE MANDATE: Push creative boundaries. Make this LARGER THAN LIFE. A livin
 an entity that births universes. This is the pinnacle - absolute divine manifestation.
 
 Maintain the SOUL of the species while achieving cosmiq transcendence.`;
+
+const stripOrganicPromptLanguageForMechanicalCompanion = (prompt: string): string =>
+  prompt
+    .replace(/\bflesh\b/gi, "engineered chassis")
+    .replace(/\bfleshy\b/gi, "engineered")
+    .replace(/\bskin\b/gi, "alloy plating")
+    .replace(/\bfur\b/gi, "plating")
+    .replace(/\btissue\b/gi, "internal systems")
+    .replace(/\bmuscle\b/gi, "mechanical drive");
 
 
 serve(async (req) => {
@@ -332,6 +346,17 @@ serve(async (req) => {
 
     const nextStage = currentStage + 1;
     console.log("Evolution triggered! Moving to stage:", nextStage);
+    const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
+    const spiritLockPromptBlock = spiritLockProfile
+      ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
+      : null;
+    console.log("[SpiritLock]", {
+      species: companion.spirit_animal,
+      profile_match: spiritLockProfile?.id ?? null,
+      function: "generate-companion-evolution",
+      stage_from: currentStage,
+      stage_to: nextStage,
+    });
 
     // Stage 0 = egg destiny preview, Stage 1 = hatchling emerging
     let userPrompt: string;
@@ -807,51 +832,201 @@ Generate a LEGENDARY evolution that maintains core identity while adding mythic 
 Generate an ULTIMATE COSMIQ EVOLUTION that achieves grandiose divinity while maintaining species essence.`}`;
     }
 
+    if (spiritLockPromptBlock) {
+      userPrompt = stripOrganicPromptLanguageForMechanicalCompanion(userPrompt);
+      userPrompt = `${userPrompt}\n\n${spiritLockPromptBlock}\nCRITICAL: This companion must remain mechanically engineered. Reject organic traits and reinforce all required mechanical anchors.`;
+    }
+
     console.log("Generating evolution image...");
 
     // 6. Generate new evolution image with Nano Banana
     // Stage 0 remains user-only; Stage 1 and above use a system prompt.
     const shouldUseSystemPrompt = nextStage !== 0;
-    
-    const imageResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: shouldUseSystemPrompt ? [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: userPrompt
-          }
-        ] : [
-          {
-            role: "user",
-            content: userPrompt
-          }
-        ],
-        modalities: ["image", "text"],
-        image_size: imageSize,
-      })
-    });
 
-    if (!imageResponse.ok) {
-      const errorText = await imageResponse.text();
-      console.error("Image generation failed:", imageResponse.status, errorText);
-      throw new Error(`Image generation failed: ${errorText}`);
-    }
+    const generateEvolutionImage = async (prompt: string): Promise<string> => {
+      const imageResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openAIApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: shouldUseSystemPrompt ? [
+            {
+              role: "system",
+              content: systemPrompt
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ] : [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          modalities: ["image", "text"],
+          image_size: imageSize,
+        })
+      });
 
-    const imageData = await imageResponse.json();
-    const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        console.error("Image generation failed:", imageResponse.status, errorText);
+        throw new Error(`Image generation failed: ${errorText}`);
+      }
 
-    if (!base64Image) {
-      throw new Error("No image returned from AI");
+      const imageData = await imageResponse.json();
+      const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!generatedImage) {
+        throw new Error("No image returned from AI");
+      }
+
+      return generatedImage;
+    };
+
+    const evaluateSpiritLockImage = async (imageDataUrl: string) => {
+      if (!spiritLockProfile) {
+        return {
+          isCompliant: true,
+          forbiddenHits: [] as string[],
+          missingAnchors: [] as string[],
+          matchedAnchors: [] as string[],
+          violations: [] as string[],
+        };
+      }
+
+      const complianceResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openAIApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `Validate whether this image preserves the Mechanical Dragon spirit-lock.
+Return JSON only:
+{
+  "compliant": boolean,
+  "forbidden_terms": string[],
+  "missing_anchors": string[],
+  "notes": string
+}
+
+Rules:
+- Required anchors: metallic scales, articulated joints, gear/clockwork motifs, engineered energy core.
+- Forbidden drift: flesh, skin, fur, tissue, muscle, blood, biological descriptors.
+- If any forbidden drift or missing anchor exists, compliant must be false.`,
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: imageDataUrl
+                  }
+                }
+              ]
+            }
+          ],
+        }),
+      });
+
+      if (!complianceResponse.ok) {
+        const fallbackError = await complianceResponse.text();
+        throw new Error(`Spirit-lock validation failed: ${fallbackError}`);
+      }
+
+      const complianceData = await complianceResponse.json();
+      const content = complianceData.choices?.[0]?.message?.content ?? "";
+      const textPayload = typeof content === "string" ? content : JSON.stringify(content);
+      const jsonMatch = textPayload.match(/\{[\s\S]*\}/);
+      let parsed: Record<string, unknown> = {};
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (_parseError) {
+          parsed = {
+            compliant: false,
+            forbidden_terms: [],
+            missing_anchors: ["validator_parse_error"],
+            notes: "validator_response_parse_error",
+          };
+        }
+      }
+      const forbiddenHits = Array.isArray(parsed.forbidden_terms)
+        ? parsed.forbidden_terms.map((value: unknown) => String(value))
+        : [];
+      const missingAnchors = Array.isArray(parsed.missing_anchors)
+        ? parsed.missing_anchors.map((value: unknown) => String(value))
+        : [];
+
+      const complianceFromVision = {
+        isCompliant: parsed.compliant === true && forbiddenHits.length === 0 && missingAnchors.length === 0,
+        forbiddenHits,
+        missingAnchors,
+        matchedAnchors: [] as string[],
+        violations: [] as string[],
+      };
+
+      return {
+        ...complianceFromVision,
+        violations: !complianceFromVision.isCompliant
+          ? [
+            ...(forbiddenHits.length > 0 ? [`Forbidden terms found: ${forbiddenHits.join(", ")}`] : []),
+            ...(missingAnchors.length > 0 ? [`Missing required anchors: ${missingAnchors.join(", ")}`] : []),
+          ]
+          : [],
+      };
+    };
+
+    let base64Image = await generateEvolutionImage(userPrompt);
+
+    if (spiritLockProfile) {
+      let compliance = await evaluateSpiritLockImage(base64Image);
+      console.log("[SpiritLock]", {
+        species: companion.spirit_animal,
+        profile_match: spiritLockProfile.id,
+        function: "generate-companion-evolution",
+        stage_to: nextStage,
+        phase: "first_pass",
+        compliant: compliance.isCompliant,
+        violations: compliance.violations,
+      });
+
+      if (!compliance.isCompliant) {
+        const retryPrompt = `${userPrompt}\n\n${buildSpiritLockRetryFeedback(spiritLockProfile, compliance)}`;
+        console.log("[SpiritLock]", {
+          species: companion.spirit_animal,
+          profile_match: spiritLockProfile.id,
+          function: "generate-companion-evolution",
+          stage_to: nextStage,
+          phase: "retry_start",
+          violations: compliance.violations,
+        });
+        base64Image = await generateEvolutionImage(retryPrompt);
+        compliance = await evaluateSpiritLockImage(base64Image);
+        console.log("[SpiritLock]", {
+          species: companion.spirit_animal,
+          profile_match: spiritLockProfile.id,
+          function: "generate-companion-evolution",
+          stage_to: nextStage,
+          phase: "retry_result",
+          compliant: compliance.isCompliant,
+          violations: compliance.violations,
+        });
+
+        if (!compliance.isCompliant) {
+          throw new Error(`Spirit-lock compliance failed after retry: ${compliance.violations.join("; ") || "unknown drift"}`);
+        }
+      }
     }
 
     console.log("Image generated successfully");

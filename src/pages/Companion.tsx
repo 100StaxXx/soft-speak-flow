@@ -5,8 +5,7 @@ import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, BookOpen, MapPin, Package, Sparkles, Timer, Settings } from "lucide-react";
-import { CollectionTab } from "@/components/companion/CollectionTab";
+import { TrendingUp, BookOpen, MapPin, Sparkles, Timer, Settings } from "lucide-react";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -38,14 +37,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
-type CompanionTab = "overview" | "focus" | "stories" | "postcards" | "collection";
+type CompanionTab = "overview" | "focus" | "stories" | "postcards";
 
 const COMPANION_TAB_KEYS: CompanionTab[] = [
   "overview",
   "focus",
   "stories",
   "postcards",
-  "collection",
 ];
 
 const INITIAL_MOUNTED_TABS: Record<CompanionTab, boolean> = {
@@ -53,7 +51,6 @@ const INITIAL_MOUNTED_TABS: Record<CompanionTab, boolean> = {
   focus: false,
   stories: false,
   postcards: false,
-  collection: false,
 };
 
 const isCompanionTab = (tab: string): tab is CompanionTab =>
@@ -323,7 +320,7 @@ const Companion = () => {
     // Loading or loaded content with tabs
     return (
       <Tabs value={activeTab} onValueChange={handleTabChange} className="container pb-6">
-        <TabsList className="grid w-full grid-cols-5 bg-card/80 backdrop-blur-md border border-border/60">
+        <TabsList className="grid w-full grid-cols-4 bg-card/80 backdrop-blur-md border border-border/60">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -349,10 +346,6 @@ const Companion = () => {
           >
             <MapPin className="h-4 w-4" />
             <span className="hidden sm:inline">Postcards</span>
-          </TabsTrigger>
-          <TabsTrigger value="collection" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            <span className="hidden sm:inline">Collection</span>
           </TabsTrigger>
         </TabsList>
 
@@ -405,10 +398,6 @@ const Companion = () => {
                     <LazyCompanionPostcards />
                   </Suspense>
                 )}
-              </TabsContent>
-
-              <TabsContent value="collection" forceMount className="data-[state=inactive]:hidden">
-                {mountedTabs.collection && <CollectionTab />}
               </TabsContent>
             </motion.div>
           )}

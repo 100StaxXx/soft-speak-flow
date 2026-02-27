@@ -569,8 +569,9 @@ All colors MUST be HSL.
     --mentor-bold: 340 80% 50%;        /* magenta */
     --mentor-serene: 200 60% 55%;      /* blue */
 
-    /* Shared layout token for fixed bottom navigation clearance */
+    /* Shared layout tokens for fixed bottom navigation clearance */
     --bottom-nav-safe-offset: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+    --bottom-nav-runtime-offset: var(--bottom-nav-safe-offset);
 
     /* Canonical safe area inset tokens */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);

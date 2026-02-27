@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { PawPrint, User, Compass, Inbox } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
@@ -24,11 +24,46 @@ import {
 type PrefetchTarget = "mentor" | "inbox" | "journeys" | "companion";
 
 export const BottomNav = memo(() => {
+  const navRef = useRef<HTMLElement | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { profile } = useProfile();
   const { companion, canEvolve } = useCompanion();
   const { inboxCount } = useInboxCount();
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const navElement = navRef.current;
+    if (!navElement) return;
+
+    const rootStyle = document.documentElement.style;
+    const updateRuntimeOffset = () => {
+      const navHeight = Math.max(0, Math.round(navElement.getBoundingClientRect().height));
+      rootStyle.setProperty("--bottom-nav-runtime-offset", `${navHeight}px`);
+    };
+
+    updateRuntimeOffset();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(updateRuntimeOffset);
+      resizeObserver.observe(navElement);
+    } else {
+      window.addEventListener("resize", updateRuntimeOffset);
+      window.addEventListener("orientationchange", updateRuntimeOffset);
+    }
+
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      } else {
+        window.removeEventListener("resize", updateRuntimeOffset);
+        window.removeEventListener("orientationchange", updateRuntimeOffset);
+      }
+      rootStyle.removeProperty("--bottom-nav-runtime-offset");
+    };
+  }, []);
 
   const prefetchJourneysTasks = useCallback(() => {
     if (!user?.id) return;
@@ -73,6 +108,7 @@ export const BottomNav = memo(() => {
   return (
     <>
       <nav
+        ref={navRef}
         className="fixed bottom-0 left-0 right-0 cosmiq-glass-nav z-50 border-t border-border/40 transition-transform duration-200"
         role="navigation"
         aria-label="Main navigation"

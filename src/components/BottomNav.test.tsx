@@ -152,4 +152,27 @@ describe("BottomNav", () => {
 
     expect(screen.getByText("!")).toBeInTheDocument();
   });
+
+  it("sets runtime bottom nav offset token and cleans it up on unmount", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      () =>
+        ({
+          x: 0,
+          y: 0,
+          top: 0,
+          right: 390,
+          bottom: 88,
+          left: 0,
+          width: 390,
+          height: 88,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    );
+
+    const { unmount } = renderBottomNav("/mentor");
+    expect(document.documentElement.style.getPropertyValue("--bottom-nav-runtime-offset")).toBe("88px");
+
+    unmount();
+    expect(document.documentElement.style.getPropertyValue("--bottom-nav-runtime-offset")).toBe("");
+  });
 });

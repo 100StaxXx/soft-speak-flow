@@ -9,6 +9,10 @@ import {
   isCompanionFastPathEligible,
   resolveCompanionImageSizeForUser,
 } from "../_shared/companionImagePolicy.ts";
+import {
+  buildSpiritLockPromptBlock,
+  resolveCompanionSpiritLockProfile,
+} from "../_shared/companionSpiritLock.ts";
 
 // ============================================================================
 // CATEGORY DEFAULTS - Shared anatomy for creature categories
@@ -86,6 +90,7 @@ const CREATURE_DATA: Record<string, { cat: string; baby: string; adult: string; 
   
   // === DRAGONS & REPTILES ===
   "Dragon": { cat: "dragon", baby: "small cute dragon with oversized head, tiny wing nubs, stubby tail", adult: "4 legs + 2 wings (6 limbs), scales, horns, powerful tail, fire breath, majestic wingspan", notes: "Western dragon: 4 legs + 2 wings = 6 limbs, scales, horns on head, long neck", ref: "Western dragon" },
+  "Mechanical Dragon": { cat: "dragon", baby: "tiny clockwork dragon hatchling, metallic scales, visible miniature gears, glowing core, articulated wing struts", adult: "engineered dragon with metallic scales, articulated joints, gear-driven wings, reactor core, reinforced alloy tail", notes: "MUST remain fully mechanical: metallic scales, articulated joints, visible gears/clockwork motifs, engineered energy core", prohibited: "flesh, skin, fur, biological tissue, organic anatomy, blood, muscles", ref: "clockwork mechanical dragon" },
   "Wyvern": { cat: "dragon", baby: "small wyvern with oversized wings that serve as front limbs, 2 back legs", adult: "2 back legs ONLY, wings ARE the front limbs (like a bat), barbed tail", notes: "ONLY 2 legs + 2 wings (4 limbs), wings double as front limbs", prohibited: "4 legs, front legs separate from wings", limbs: 2, body: "biped-winged", ref: "wyvern" },
   "Hydra": { cat: "dragon", baby: "small serpentine creature with 2-3 small heads, scales", adult: "MULTIPLE serpentine heads (5-9) on long necks from one body, reptilian, no wings", notes: "MULTIPLE HEADS on long serpentine necks, regenerating heads in myth", prohibited: "wings, single head, fur", wings: false, body: "quadruped-multihead", ref: "Greek Hydra" },
   "Basilisk": { cat: "reptile", baby: "small serpent with crown-like crest on head, scales, deadly eyes", adult: "massive serpent with crown/crest, deadly gaze, iridescent scales, no limbs", notes: "King of serpents - crown-like crest, deadly gaze, serpentine body NO legs", prohibited: "legs, chicken features", limbs: 0, body: "serpent", ref: "basilisk serpent" },
@@ -255,17 +260,29 @@ const STAGE_NAMES: Record<number, string> = {
   19: "Primordial Form", 20: "Origin Form"
 };
 
-function generateStagePrompt(stage: number, spirit: string, element: string, color: string): string {
+function generateStagePrompt(
+  stage: number,
+  spirit: string,
+  element: string,
+  color: string,
+  materialMode: "organic" | "mechanical" = "organic",
+): string {
   const category = getStageCategory(stage);
   const name = STAGE_NAMES[stage] || `Stage ${stage}`;
   const agingData = AGING_DATA[stage];
+  const coatLabel = materialMode === "mechanical" ? "Plating" : "Fur/Coat";
+  const coatDescription = materialMode === "mechanical"
+    ? ((agingData?.fur || 80) < 50
+      ? `${agingData?.fur || 80}% - plating segments still locking into place`
+      : "100% - full alloy plating online")
+    : describeAgingParam('fur', agingData?.fur || 80);
   
   const templates: Record<StageCategory, () => string> = {
     egg: () => stage === 0 
       ? `A mystical egg floating in gentle ${element} energy.\n\nEGG APPEARANCE:\n- Smooth opalescent surface with subtle iridescent shimmer\n- ${color} undertones glowing softly throughout shell\n- Semi-translucent crystalline quality\n- Size of a large ostrich egg\n\nSILHOUETTE WITHIN:\n- Deep inside, a DARK SHADOWY SILHOUETTE of a powerful, mature ${spirit} is barely visible\n- Just a dark featureless shadow - mysterious and intriguing\n\nENVIRONMENT:\n- Floating in soft ${element} energy particles\n- Gentle magical glow surrounding the egg`
       : `The same mystical egg now with luminous cracks spreading across its surface.\n\nCRACKING EGG:\n- Same egg from Stage 0, but now with glowing cracks spreading\n- ${color} light emanating from fractures\n- ${element} energy leaking through the cracks\n- Shell beginning to fragment but not yet broken\n\nSILHOUETTE WITHIN:\n- Through the cracks, the shadowy silhouette of the ULTIMATE form of a ${spirit} is MORE visible\n- Still a dark, featureless shadow but now stirring slightly`,
     
-    baby: () => `A TINY ${spirit} baby at ${name} stage.\n\n━━━ SIZE ━━━\n- ${agingData?.size || '15%'} of adult size - very small\n\n━━━ BABY APPEARANCE ━━━\n- Body: ${describeAgingParam('body', agingData?.body || 85)}\n- Eyes: ${describeAgingParam('eyes', agingData?.eyes || 100)}\n- Limbs: ${describeAgingParam('limbs', agingData?.limbs || 20)}\n- Mobility: ${describeAgingParam('mobility', agingData?.mobility || 10)}\n- Fur/Coat: ${describeAgingParam('fur', agingData?.fur || 80)}\n\n━━━ COLORS ━━━\n- ${color} in soft, muted, newborn tones\n\n━━━ EXPRESSION ━━━\n- Completely helpless, vulnerable, precious, pure innocence\n\nREAL-WORLD COMPARISON: A young puppy/kitten - clearly a baby.`,
+    baby: () => `A TINY ${spirit} baby at ${name} stage.\n\n━━━ SIZE ━━━\n- ${agingData?.size || '15%'} of adult size - very small\n\n━━━ BABY APPEARANCE ━━━\n- Body: ${describeAgingParam('body', agingData?.body || 85)}\n- Eyes: ${describeAgingParam('eyes', agingData?.eyes || 100)}\n- Limbs: ${describeAgingParam('limbs', agingData?.limbs || 20)}\n- Mobility: ${describeAgingParam('mobility', agingData?.mobility || 10)}\n- ${coatLabel}: ${coatDescription}\n\n━━━ COLORS ━━━\n- ${color} in soft, muted, newborn tones\n\n━━━ EXPRESSION ━━━\n- Completely helpless, vulnerable, precious, pure innocence\n\nREAL-WORLD COMPARISON: A young puppy/kitten - clearly a baby.`,
     
     adolescent: () => `A young adolescent ${spirit} in ${name} stage.\n\n━━━ SIZE ━━━\n- ${agingData?.size || '50%'} of adult size\n\n━━━ ADOLESCENT FEATURES ━━━\n- Body: ${describeAgingParam('body', agingData?.body || 45)}\n- Limbs: ${describeAgingParam('limbs', agingData?.limbs || 75)}\n- Muscle: ${describeAgingParam('muscle', agingData?.muscle || 40)}\n- Wings: ${describeAgingParam('wings', agingData?.wings || 60)}\n- Elemental: ${describeAgingParam('element', agingData?.element || 30)}\n\n━━━ COLORS ━━━\n- ${color} fully vibrant now\n- Adult color pattern established\n\nEXPRESSION: Growing confidence, eager, adventurous.`,
     
@@ -443,7 +460,7 @@ function generateCharacterDNA(spiritAnimal: string, element: string, favoriteCol
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ Primary Color: ${favoriteColor.padEnd(59)}║
 ║ Eye Color: ${(eyeColor || favoriteColor).padEnd(63)}║
-║ Fur/Scale Color: ${(furColor || favoriteColor).padEnd(56)}║
+║ Surface Color: ${(furColor || favoriteColor).padEnd(58)}║
 ║ Element: ${element} (ambient effects ONLY, NOT body color)${' '.repeat(Math.max(0, 32 - element.length))}║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ ${isBabyStage ? 'BABY' : 'ADULT'} FEATURES: ${(isBabyStage ? anatomy.babyFeatures : anatomy.adultFeatures).substring(0, 60).padEnd(60)}║
@@ -553,6 +570,18 @@ serve(async (req) => {
     const anatomy = getCreatureAnatomy(spiritAnimal);
     const stageName = STAGE_NAMES[stage as number];
     if (!stageName) throw new Error(`Invalid stage: ${stage}`);
+    const spiritLockProfile = resolveCompanionSpiritLockProfile(spiritAnimal);
+    const spiritLockPromptBlock = spiritLockProfile
+      ? buildSpiritLockPromptBlock(spiritLockProfile, "image")
+      : "";
+    const spiritLockActive = Boolean(spiritLockProfile);
+    console.log("[SpiritLock]", {
+      species: spiritAnimal,
+      profile_match: spiritLockProfile?.id ?? null,
+      function: "generate-companion-image",
+      stage,
+    });
+
     const normalizedFlowType = normalizeFlowType(flowType);
     const fastPathEligible = isCompanionFastPathEligible(user.id);
     const imageSize = resolveCompanionImageSizeForUser(user.id, image_size);
@@ -747,7 +776,16 @@ serve(async (req) => {
     const negativePrompts = getNegativePrompts(stage, spiritAnimal);
     const storyToneStyle = getStoryToneModifiers(normalizeStoryTone(storyTone));
     const elementOverlay = getElementOverlay(element);
-    const stagePrompt = generateStagePrompt(stage, spiritAnimal, element, favoriteColor);
+    const stagePrompt = generateStagePrompt(
+      stage,
+      spiritAnimal,
+      element,
+      favoriteColor,
+      spiritLockActive ? "mechanical" : "organic",
+    );
+    const spiritLockPromptAddendum = spiritLockPromptBlock
+      ? `\n━━━ SPIRIT LOCK ━━━\n${spiritLockPromptBlock}\n`
+      : "";
 
     const retryEnforcement = retryAttempt > 0 ? `\n━━━ RETRY (Attempt ${retryAttempt}) ━━━\nCRITICAL - Previous had errors:\n- EXACTLY ${anatomy.limbCount} limbs\n- ${anatomy.hasWings ? 'Include wings' : 'NO WINGS'}\n- SINGLE HEAD ONLY\n- Reference: ${anatomy.realWorldRef}` : '';
 
@@ -755,7 +793,7 @@ serve(async (req) => {
 
     if (stage === 0 || stage === 1) {
       // Egg stages
-      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}\n\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere, slightly brighter exposure with lifted midtones and readable highlights, with a very subtle creature-collecting game illustration charm (not chibi). Use a varied multi-color palette; keep ${favoriteColor} clearly visible as the identity anchor while allowing secondary/tertiary accents; avoid monochrome single-hue output.`;
+      fullPrompt = `STYLIZED FANTASY ART - Digital painting:\n\n${stagePrompt}\n\n${characterDNA}\n${storyToneStyle}\n${elementOverlay}${spiritLockPromptAddendum}\nRENDERING: Stylized digital fantasy art, painterly, rich colors, magical atmosphere, slightly brighter exposure with lifted midtones and readable highlights, with a very subtle creature-collecting game illustration charm (not chibi). Use a varied multi-color palette; keep ${favoriteColor} clearly visible as the identity anchor while allowing secondary/tertiary accents; avoid monochrome single-hue output.`;
 
     } else if (extractedMetadata && stage >= 2 && stage <= 14) {
       // Text-to-image with extracted visual metadata from previous stage
@@ -808,6 +846,7 @@ ${stagePrompt}
 
 ${storyToneStyle}
 ${elementOverlay}
+${spiritLockPromptAddendum}
 ${retryEnforcement}
 ${negativePrompts}
 
@@ -843,6 +882,7 @@ ${stagePrompt}
 
 ${storyToneStyle}
 ${elementOverlay}
+${spiritLockPromptAddendum}
 ${retryEnforcement}
 ${negativePrompts}
 
@@ -881,6 +921,8 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       limbCount: number; 
       speciesFidelity: number; 
       colorMatch: number;
+      materialFidelity?: number;
+      materialIssues?: string[];
       issues: string[];
       shouldRetry: boolean;
     } | null = null;
@@ -889,7 +931,7 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
       console.log(`Calling AI for T2I generation (stage ${stage}, attempt ${currentAttempt + 1}/${MAX_INTERNAL_RETRIES + 1}, ${extractedMetadata ? 'with metadata' : 'no metadata'})...`);
 
       const messageContent = currentAttempt > 0 
-        ? `${fullPrompt}\n\n━━━ QUALITY RETRY #${currentAttempt} ━━━\nPrevious attempt had issues: ${qualityScore?.issues?.join(', ') || 'low quality'}\nPAY EXTRA ATTENTION to anatomical correctness. Ensure EXACTLY ${anatomy.limbCount} limbs.`
+        ? `${fullPrompt}\n\n━━━ QUALITY RETRY #${currentAttempt} ━━━\nPrevious attempt had issues: ${qualityScore?.issues?.join(', ') || 'low quality'}${spiritLockActive ? `\nSpirit-lock material issues: ${qualityScore?.materialIssues?.join(', ') || 'material drift detected'}` : ''}\nPAY EXTRA ATTENTION to anatomical correctness. Ensure EXACTLY ${anatomy.limbCount} limbs.${spiritLockActive ? '\nKeep Mechanical Dragon identity strictly mechanical.' : ''}`
         : fullPrompt;
 
       let aiResponse;
@@ -998,7 +1040,9 @@ Slightly brighter exposure with lifted midtones and clearer highlights for reada
                 speciesFidelityScore: { type: "number", description: "Score 0-100: How well does this look like the intended species?" },
                 colorMatchScore: { type: "number", description: "Score 0-100: How well do the colors match the expected palette?" },
                 anatomyIssues: { type: "array", items: { type: "string" }, description: "List any anatomical issues (extra limbs, wrong body parts, mutations)" },
-                overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" }
+                overallQuality: { type: "number", description: "Overall quality score 0-100 considering all factors" },
+                materialFidelityScore: { type: "number", description: "Score 0-100: For mechanical species, how well the output preserves mechanical identity (metallic scales, articulated joints, gear motifs, engineered energy core)." },
+                materialIssues: { type: "array", items: { type: "string" }, description: "List spirit-lock issues such as organic drift, missing mechanical anchors, or biological textures." }
               },
               required: ["limbCountScore", "actualLimbCount", "speciesFidelityScore", "colorMatchScore", "anatomyIssues", "overallQuality"],
               additionalProperties: false
@@ -1016,6 +1060,10 @@ Expected characteristics:
 - Primary color should be: ${favoriteColor}
 - Color variety is allowed: ${favoriteColor} must remain clearly visible as the anchor, while secondary/tertiary accent colors are acceptable
 ${extractedMetadata ? `- Reference eye color: ${extractedMetadata.hexEyeColor}` : ''}
+${spiritLockActive ? `- SPIRIT LOCK: Mechanical Dragon must remain mechanical.
+- Required anchors: metallic scales, articulated joints, gear/clockwork motifs, engineered energy core.
+- Forbidden drift: flesh, skin, fur, tissue, muscles, blood, or biological descriptors.
+- For this profile, provide materialFidelityScore and materialIssues explicitly.` : ''}
 
 Score each aspect from 0-100 and list any issues.`;
 
@@ -1049,15 +1097,38 @@ Score each aspect from 0-100 and list any issues.`;
           
           if (toolCall?.function?.arguments) {
             const scores = JSON.parse(toolCall.function.arguments);
+            const materialFidelity = typeof scores.materialFidelityScore === "number"
+              ? scores.materialFidelityScore
+              : undefined;
+            const materialIssues = Array.isArray(scores.materialIssues)
+              ? scores.materialIssues
+              : [];
+            const materialRetryRequired = spiritLockActive
+              ? (typeof materialFidelity === "number" ? materialFidelity < 70 : true) || materialIssues.length > 0
+              : false;
             qualityScore = {
               overall: scores.overallQuality || 0,
               limbCount: scores.limbCountScore || 0,
               speciesFidelity: scores.speciesFidelityScore || 0,
               colorMatch: scores.colorMatchScore || 0,
+              materialFidelity,
+              materialIssues,
               issues: scores.anatomyIssues || [],
-              shouldRetry: scores.overallQuality < 60 || scores.limbCountScore < 50
+              shouldRetry: scores.overallQuality < 60 || scores.limbCountScore < 50 || materialRetryRequired
             };
             console.log("Quality analysis:", qualityScore);
+            if (spiritLockActive) {
+              console.log("[SpiritLock]", {
+                species: spiritAnimal,
+                profile_match: spiritLockProfile?.id ?? null,
+                function: "generate-companion-image",
+                stage,
+                phase: currentAttempt === 0 ? "first_pass" : "retry_pass",
+                material_fidelity: materialFidelity ?? null,
+                material_issues: materialIssues,
+                retry_required: materialRetryRequired,
+              });
+            }
           }
         }
       } catch (qualityError) {

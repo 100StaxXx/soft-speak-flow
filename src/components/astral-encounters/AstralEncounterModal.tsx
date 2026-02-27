@@ -471,7 +471,7 @@ export const AstralEncounterModal = ({
       {open && needsFullscreen && (
         <div
           className="fixed top-0 left-0 right-0 z-[100] overflow-hidden bg-background"
-          style={{ bottom: 'var(--bottom-nav-safe-offset)' }}
+          style={{ bottom: 'var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset))' }}
         >
           {/* Practice mode in fullscreen */}
           {phase === 'practice' && (

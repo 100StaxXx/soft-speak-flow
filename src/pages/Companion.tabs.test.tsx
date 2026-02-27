@@ -202,10 +202,6 @@ vi.mock("@/components/companion/MemoryWhisper", () => ({
   MemoryWhisper: () => null,
 }));
 
-vi.mock("@/components/companion/CollectionTab", () => ({
-  CollectionTab: () => <div data-testid="collection-tab">Collection content</div>,
-}));
-
 vi.mock("@/components/companion/FocusTab", async () => {
   const React = await import("react");
   return {
@@ -256,6 +252,11 @@ describe("Companion tabs performance behavior", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("does not render collection in top-level companion tabs", () => {
+    renderCompanion();
+    expect(screen.queryByRole("tab", { name: /collection/i })).not.toBeInTheDocument();
   });
 
   it("keeps focus tab content mounted after first visit", async () => {

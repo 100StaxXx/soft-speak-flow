@@ -6,6 +6,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkRateLimit, createRateLimitResponse } from "../_shared/rateLimiter.ts";
 import { OutputValidator } from "../_shared/outputValidator.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import {
+  buildSpiritLockPromptBlock,
+  buildSpiritLockRetryFeedback,
+  evaluateSpiritLockTextCompliance,
+  resolveCompanionSpiritLockProfile,
+} from "../_shared/companionSpiritLock.ts";
 
 // Helper function to convert hex colors to descriptive names
 function getColorName(color: string): string {
@@ -304,6 +310,17 @@ serve(async (req) => {
     }
 
     const speciesTraits = SPECIES_TRAITS[companion.spirit_animal] || `A ${companion.spirit_animal.toLowerCase()} with its natural anatomical structure and movement patterns`;
+    const spiritLockProfile = resolveCompanionSpiritLockProfile(companion.spirit_animal);
+    const spiritLockPromptBlock = spiritLockProfile
+      ? buildSpiritLockPromptBlock(spiritLockProfile, "story")
+      : null;
+
+    console.log("[SpiritLock]", {
+      species: companion.spirit_animal,
+      profile_match: spiritLockProfile?.id ?? null,
+      function: "generate-companion-story",
+      stage,
+    });
 
     // Build the V2 story generation prompt
     const storyPrompt = `You are STORY ENGINE V2 — a refined mythic adventure generator that produces a single chapter of a personalized hero journey for the user and their evolving creature companion.
@@ -389,6 +406,7 @@ WRITING RULES:
 • Avoid repetition across stages
 • Use vivid but controlled sensory imagery
 • Maintain continuity through Memory Notes
+${spiritLockPromptBlock ? `• SPIRIT LOCK (MANDATORY):\n${spiritLockPromptBlock.replace(/\n/g, '\n  ')}` : ''}
 
 CRITICAL: Respond ONLY in valid JSON format:
 {
@@ -409,54 +427,6 @@ CRITICAL: Respond ONLY in valid JSON format:
 
 Generate now:`;
 
-    // Call OpenAI
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
-
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are STORY ENGINE V2, a master mythic storyteller. You create personalized hero journeys that maintain perfect continuity, anatomical accuracy, and emotional resonance. Always respond with valid JSON only. Never alter creature biology.'
-          },
-          {
-            role: 'user',
-            content: storyPrompt
-          }
-        ],
-        temperature: 0.85,
-        max_tokens: 1200,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const error = await aiResponse.text();
-      console.error('AI API error:', error);
-      throw new Error(`AI generation failed: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const generatedText = aiData.choices[0].message.content;
-
-    // Parse the JSON response
-    let storyData;
-    try {
-      // Clean the response if it has markdown code blocks
-      const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      storyData = JSON.parse(cleanedText);
-    } catch (e) {
-      console.error('Failed to parse AI response:', generatedText);
-      throw new Error('Failed to parse story data');
-    }
-
-    // Validate story data using OutputValidator
     const validator = new OutputValidator({
       outputFormat: 'json',
       requiredFields: [
@@ -473,45 +443,175 @@ Generate now:`;
       toneMarkers: ['epic', 'mythic', 'adventure', 'bond', 'journey']
     });
 
-    // Validate required fields
-    if (!storyData.chapter_title || !storyData.intro_line || !storyData.main_story || 
-        !storyData.bond_moment || !storyData.life_lesson || !storyData.next_hook) {
-      throw new Error('Invalid story data: missing required fields');
+    // Call OpenAI
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+
+    const generateStoryPayload = async (prompt: string) => {
+      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are STORY ENGINE V2, a master mythic storyteller. You create personalized hero journeys that maintain perfect continuity, anatomical accuracy, and emotional resonance. Always respond with valid JSON only. Never alter creature biology.'
+            },
+            {
+              role: 'user',
+              content: prompt,
+            }
+          ],
+          temperature: 0.85,
+          max_tokens: 1200,
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const error = await aiResponse.text();
+        console.error('AI API error:', error);
+        throw new Error(`AI generation failed: ${aiResponse.status}`);
+      }
+
+      const aiData = await aiResponse.json();
+      const generatedText = aiData.choices?.[0]?.message?.content;
+      if (typeof generatedText !== "string" || generatedText.trim().length === 0) {
+        throw new Error('Failed to parse story data');
+      }
+
+      let parsedData;
+      try {
+        const cleanedText = generatedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        parsedData = JSON.parse(cleanedText);
+      } catch (_error) {
+        console.error('Failed to parse AI response:', generatedText);
+        throw new Error('Failed to parse story data');
+      }
+
+      if (!parsedData.chapter_title || !parsedData.intro_line || !parsedData.main_story ||
+          !parsedData.bond_moment || !parsedData.life_lesson || !parsedData.next_hook) {
+        throw new Error('Invalid story data: missing required fields');
+      }
+
+      const mainStoryLength = (parsedData.main_story || '').length;
+      if (mainStoryLength < 100) {
+        console.warn(`Story too short: ${mainStoryLength} chars`);
+        throw new Error('Generated story is too short. Please try again.');
+      }
+      if (mainStoryLength > 1500) {
+        console.warn(`Story too long: ${mainStoryLength} chars`);
+        throw new Error('Generated story is too long. Please try again.');
+      }
+
+      const validationResult = validator.validate(parsedData);
+      if (!validationResult.isValid) {
+        console.error('Story validation failed:', validationResult.errors);
+        throw new Error('Generated story does not meet quality standards');
+      }
+
+      if (validationResult.warnings.length > 0) {
+        console.warn('Story validation warnings:', validationResult.warnings);
+      }
+
+      const loreExpansion = Array.isArray(parsedData.lore_expansion)
+        ? parsedData.lore_expansion.map((item: string) => sanitizeHexCodes(item))
+        : [];
+
+      return {
+        chapter_title: sanitizeHexCodes(parsedData.chapter_title),
+        intro_line: sanitizeHexCodes(parsedData.intro_line),
+        main_story: sanitizeHexCodes(parsedData.main_story),
+        bond_moment: sanitizeHexCodes(parsedData.bond_moment),
+        life_lesson: sanitizeHexCodes(parsedData.life_lesson),
+        lore_expansion: loreExpansion,
+        next_hook: sanitizeHexCodes(parsedData.next_hook),
+      };
+    };
+
+    const buildMechanicalStoryFallback = () => ({
+      chapter_title: `Clockwork Ascension - Stage ${stage}`,
+      intro_line: `${companion.spirit_animal} stabilizes its alloy frame and locks into a higher precision cadence.`,
+      main_story: `${userName} stands beside ${companion.spirit_animal} as metallic scales settle into a reinforced lattice. Articulated joints calibrate in sequence, each movement aligned to mission-grade control. Gears spin in visible clockwork arcs around the chassis while an engineered energy core pulses with controlled ${companion.core_element.toLowerCase()} output. Their progress is not random; every cycle is measured, every upgrade earned through discipline.\n\nThe moment mirrors ${userGoal}: steady commitment compounding into undeniable strength. Together, they convert effort into exacting momentum and prepare for the next threshold.`,
+      bond_moment: `${userName} places a hand on the armored frame, and the core responds with a synchronized pulse.`,
+      life_lesson: `Consistency is engineered one precise action at a time. Reliable systems are built, not wished into existence.`,
+      lore_expansion: [
+        "World Truth: The strongest guardians are forged through calibrated repetition.",
+        "Historical Reference: Ancient forge archives describe dragons that stored memory in rotating gear halos.",
+        "Foreshadowing Seed: A sealed protocol in the core awakens when all four mechanical anchors align.",
+      ],
+      next_hook: `A new resonance begins inside the reactor, signaling the next upgrade path.`,
+    });
+
+    let storyData = await generateStoryPayload(storyPrompt);
+
+    if (spiritLockProfile) {
+      const serializeStoryForCompliance = (value: typeof storyData): string =>
+        [
+          value.chapter_title,
+          value.intro_line,
+          value.main_story,
+          value.bond_moment,
+          value.life_lesson,
+          ...(Array.isArray(value.lore_expansion) ? value.lore_expansion : []),
+          value.next_hook,
+        ].join(" ");
+
+      let compliance = evaluateSpiritLockTextCompliance(
+        serializeStoryForCompliance(storyData),
+        spiritLockProfile,
+      );
+
+      console.log("[SpiritLock]", {
+        species: companion.spirit_animal,
+        profile_match: spiritLockProfile.id,
+        function: "generate-companion-story",
+        stage,
+        phase: "first_pass",
+        compliant: compliance.isCompliant,
+        violations: compliance.violations,
+      });
+
+      if (!compliance.isCompliant) {
+        const retryPrompt = `${storyPrompt}\n\n${buildSpiritLockRetryFeedback(spiritLockProfile, compliance)}\nReturn complete JSON in the same schema.`;
+        console.log("[SpiritLock]", {
+          species: companion.spirit_animal,
+          profile_match: spiritLockProfile.id,
+          function: "generate-companion-story",
+          stage,
+          phase: "retry_start",
+        });
+
+        try {
+          const retriedStoryData = await generateStoryPayload(retryPrompt);
+          compliance = evaluateSpiritLockTextCompliance(
+            serializeStoryForCompliance(retriedStoryData),
+            spiritLockProfile,
+          );
+
+          console.log("[SpiritLock]", {
+            species: companion.spirit_animal,
+            profile_match: spiritLockProfile.id,
+            function: "generate-companion-story",
+            stage,
+            phase: "retry_result",
+            compliant: compliance.isCompliant,
+            violations: compliance.violations,
+          });
+
+          storyData = compliance.isCompliant ? retriedStoryData : buildMechanicalStoryFallback();
+        } catch (retryError) {
+          console.error("[SpiritLock] story retry failed, applying deterministic fallback", retryError);
+          storyData = buildMechanicalStoryFallback();
+        }
+      }
     }
 
-    // Validate main story length (80-150 words approximately = 400-900 chars)
-    const mainStoryLength = (storyData.main_story || '').length;
-    if (mainStoryLength < 100) {
-      console.warn(`Story too short: ${mainStoryLength} chars`);
-      throw new Error('Generated story is too short. Please try again.');
-    }
-    if (mainStoryLength > 1500) {
-      console.warn(`Story too long: ${mainStoryLength} chars`);
-      throw new Error('Generated story is too long. Please try again.');
-    }
-
-    // Run validation checks
-    const validationResult = validator.validate(storyData);
-    if (!validationResult.isValid) {
-      console.error('Story validation failed:', validationResult.errors);
-      throw new Error('Generated story does not meet quality standards');
-    }
-    
-    if (validationResult.warnings.length > 0) {
-      console.warn('Story validation warnings:', validationResult.warnings);
-    }
-
-    // Failsafe: Sanitize any hex codes that slipped through AI generation
-    storyData.chapter_title = sanitizeHexCodes(storyData.chapter_title);
-    storyData.intro_line = sanitizeHexCodes(storyData.intro_line);
-    storyData.main_story = sanitizeHexCodes(storyData.main_story);
-    storyData.bond_moment = sanitizeHexCodes(storyData.bond_moment);
-    storyData.life_lesson = sanitizeHexCodes(storyData.life_lesson);
-    storyData.next_hook = sanitizeHexCodes(storyData.next_hook);
-
-    // Ensure lore_expansion is an array and sanitize it
-    const loreExpansion = Array.isArray(storyData.lore_expansion) 
-      ? storyData.lore_expansion.map((item: string) => sanitizeHexCodes(item))
+    const loreExpansion = Array.isArray(storyData.lore_expansion)
+      ? storyData.lore_expansion
       : [];
 
     // Save to database

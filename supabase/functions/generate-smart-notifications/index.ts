@@ -3,6 +3,12 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  buildSpiritLockPromptBlock,
+  buildSpiritLockRetryFeedback,
+  evaluateSpiritLockTextCompliance,
+  resolveCompanionSpiritLockProfile,
+} from "../_shared/companionSpiritLock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -146,6 +152,18 @@ const generateNotificationContent = async (
   const companionTitleName = assignedCompanionName || 'Your companion';
   const companionReference = assignedCompanionName || 'your companion';
   const companionSpecies = context.companion?.spiritAnimal || 'companion';
+  const spiritLockProfile = resolveCompanionSpiritLockProfile(companionSpecies);
+  const spiritLockPromptBlock = spiritLockProfile
+    ? buildSpiritLockPromptBlock(spiritLockProfile, "notification")
+    : null;
+  const spiritLockFallbackBody = "My metallic scales hum in sync with my articulated joints. The core reactor is stable and waiting for our next mission.";
+
+  console.log("[SpiritLock]", {
+    species: companionSpecies,
+    profile_match: spiritLockProfile?.id ?? null,
+    function: "generate-smart-notifications",
+    notificationType,
+  });
   
   // Build system prompt based on notification type
   let systemPrompt = '';
@@ -157,6 +175,9 @@ Voice style: ${voiceTemplate.voiceStyle}
 You speak in first person as the companion, directly to your human.
 Keep messages SHORT (1-2 sentences max). Be warm but authentic to your personality.
 Never use emojis in the message body. Never start with "Hey" or generic greetings.`;
+    if (spiritLockPromptBlock) {
+      systemPrompt += `\n${spiritLockPromptBlock}\nCRITICAL: Do not use any organic body language. Keep diction explicitly mechanical.`;
+    }
   }
   
   switch (notificationType) {
@@ -301,28 +322,74 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
   }
   
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        max_tokens: 150,
-      }),
-    });
+    const generateMessageBody = async (prompt: string): Promise<string> => {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt },
+          ],
+          max_tokens: 150,
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`AI API error: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`AI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content?.trim() || '';
+    };
+
+    let messageBody = await generateMessageBody(userPrompt);
+
+    if (spiritLockProfile) {
+      let compliance = evaluateSpiritLockTextCompliance(messageBody, spiritLockProfile);
+      console.log("[SpiritLock]", {
+        species: companionSpecies,
+        profile_match: spiritLockProfile.id,
+        function: "generate-smart-notifications",
+        notificationType,
+        phase: "first_pass",
+        compliant: compliance.isCompliant,
+        violations: compliance.violations,
+      });
+
+      if (!compliance.isCompliant) {
+        const retryPrompt = `${userPrompt}\n\n${buildSpiritLockRetryFeedback(spiritLockProfile, compliance)}`;
+        console.log("[SpiritLock]", {
+          species: companionSpecies,
+          profile_match: spiritLockProfile.id,
+          function: "generate-smart-notifications",
+          notificationType,
+          phase: "retry_start",
+        });
+
+        try {
+          const retriedBody = await generateMessageBody(retryPrompt);
+          compliance = evaluateSpiritLockTextCompliance(retriedBody, spiritLockProfile);
+          console.log("[SpiritLock]", {
+            species: companionSpecies,
+            profile_match: spiritLockProfile.id,
+            function: "generate-smart-notifications",
+            notificationType,
+            phase: "retry_result",
+            compliant: compliance.isCompliant,
+            violations: compliance.violations,
+          });
+          messageBody = compliance.isCompliant ? retriedBody : spiritLockFallbackBody;
+        } catch (retryError) {
+          console.error("[SpiritLock] notification retry failed, using deterministic fallback", retryError);
+          messageBody = spiritLockFallbackBody;
+        }
+      }
     }
-
-    const data = await response.json();
-    const messageBody = data.choices?.[0]?.message?.content?.trim() || '';
     
     // Generate title based on notification type
     const inactiveDaysForTitle = context.companion?.inactiveDays || 0;
@@ -364,16 +431,21 @@ Make the companion feel cosmically attuned, sharing this celestial wisdom as a g
         : voiceTemplate.encouragementTemplates;
       
       const randomTemplate = templates[Math.floor(Math.random() * templates.length)] || "I'm here for you.";
+      const fallbackBody = spiritLockProfile
+        ? evaluateSpiritLockTextCompliance(randomTemplate, spiritLockProfile).isCompliant
+          ? randomTemplate
+          : spiritLockFallbackBody
+        : randomTemplate;
       
       return {
         title: `From ${companionReference}`,
-        body: randomTemplate,
+        body: fallbackBody,
       };
     }
     
     return {
       title: 'Your companion',
-      body: "I'm thinking of you today.",
+      body: spiritLockProfile ? spiritLockFallbackBody : "I'm thinking of you today.",
     };
   }
 };

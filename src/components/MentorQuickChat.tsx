@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,11 +21,14 @@ const ROTATING_QUESTIONS = [
   "Give me the hard truth",
 ];
 
+const TOUCH_TAP_MAX_MOVEMENT_PX = 12;
+
 export const MentorQuickChat = memo(() => {
   const navigate = useNavigate();
   const personality = useMentorPersonality();
   const [currentQuestions, setCurrentQuestions] = useState<string[]>([]);
   const [customQuestion, setCustomQuestion] = useState("");
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     // Select 3 random questions on mount
@@ -35,6 +38,26 @@ export const MentorQuickChat = memo(() => {
 
   const handleQuestionClick = (question: string) => {
     navigate("/mentor-chat", { state: { initialMessage: question } });
+  };
+
+  const handleQuestionPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "touch" || e.pointerType === "pen") {
+      touchStartRef.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    touchStartRef.current = null;
+  };
+
+  const handleQuestionPointerUp = (question: string, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "touch" || e.pointerType === "pen") {
+      const start = touchStartRef.current;
+      touchStartRef.current = null;
+      if (!start) return;
+      const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+      if (moved > TOUCH_TAP_MAX_MOVEMENT_PX) return;
+    }
+
+    handleQuestionClick(question);
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {
@@ -65,8 +88,18 @@ export const MentorQuickChat = memo(() => {
           {currentQuestions.map((question, index) => (
             <button
               key={index}
-              onClick={() => handleQuestionClick(question)}
+              type="button"
+              onPointerDown={handleQuestionPointerDown}
+              onPointerUp={(e) => handleQuestionPointerUp(question, e)}
+              onPointerCancel={() => {
+                touchStartRef.current = null;
+              }}
+              onClick={(e) => {
+                // Preserve keyboard activation while avoiding duplicate pointer navigation.
+                if (e.detail === 0) handleQuestionClick(question);
+              }}
               className="group relative w-full text-center px-6 py-4 rounded-full bg-white/[0.03] backdrop-blur-xl hover:bg-white/[0.06] border border-white/[0.08] hover:border-primary/30 transition-all text-sm font-medium text-foreground hover:scale-[1.02] active:scale-[0.98]"
+              style={{ touchAction: "pan-y" }}
             >
               <span className="relative">{question}</span>
             </button>
