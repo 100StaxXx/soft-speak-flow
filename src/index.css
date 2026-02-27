@@ -626,6 +626,7 @@ All colors MUST be HSL.
   body,
   #root {
     min-height: 100%;
+    overflow-x: hidden;
   }
 
   body {
@@ -634,6 +635,7 @@ All colors MUST be HSL.
     transition: background-color 0.3s ease, color 0.3s ease;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overscroll-behavior-x: none;
   }
     
   /* Native iOS hardening: prevent accidental selection/callouts on app chrome. */

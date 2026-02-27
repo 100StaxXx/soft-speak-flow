@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -57,6 +57,8 @@ function toAppDayIndex(date: Date): number {
 export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const { suggestedSlots, getSuggestedSlots, isLoading: isSuggestLoading } = useSmartScheduling();
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [customReminderInput, setCustomReminderInput] = useState("");
+  const [isEditingCustomReminder, setIsEditingCustomReminder] = useState(false);
 
   const durationOptions = [
     { value: 15, label: "15 min" },
@@ -75,6 +77,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     { value: 60, label: "1 hour before" },
     { value: 120, label: "2 hours before" },
     { value: 1440, label: "1 day before" },
+    { value: 2880, label: "2 days before" },
     { value: 10080, label: "1 week before" },
   ];
 
@@ -91,6 +94,23 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const [showDurationOptions, setShowDurationOptions] = useState(false);
   const [showRecurrenceOptions, setShowRecurrenceOptions] = useState(false);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
+
+  const hasPresetReminder = reminderOptions.some((option) => option.value === props.reminderMinutesBefore);
+  const reminderTriggerLabel = hasPresetReminder
+    ? reminderOptions.find((option) => option.value === props.reminderMinutesBefore)?.label
+    : `${props.reminderMinutesBefore} minutes before (Custom)`;
+
+  useEffect(() => {
+    if (!showReminderOptions) {
+      setIsEditingCustomReminder(false);
+      return;
+    }
+
+    if (!hasPresetReminder && props.reminderMinutesBefore > 0) {
+      setCustomReminderInput(String(props.reminderMinutesBefore));
+      setIsEditingCustomReminder(true);
+    }
+  }, [hasPresetReminder, props.reminderMinutesBefore, showReminderOptions]);
 
   const handleSuggestClick = async () => {
     if (!props.selectedDate) return;
@@ -155,6 +175,21 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
     setShowRecurrenceOptions(false);
   }, [props, selectedAppDay]);
+
+  const applyCustomReminder = useCallback(() => {
+    const minutes = Number.parseInt(customReminderInput, 10);
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+
+    props.onReminderMinutesBeforeChange(minutes);
+    setShowReminderOptions(false);
+    setIsEditingCustomReminder(false);
+  }, [customReminderInput, props]);
+
+  const handleCustomReminderKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    applyCustomReminder();
+  }, [applyCustomReminder]);
 
   return (
     <div className="space-y-4 border-t pt-4">
@@ -294,20 +329,24 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           </p>
         
           {props.reminderEnabled && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowReminderOptions(!showReminderOptions)}
-                className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+            <Popover open={showReminderOptions} onOpenChange={setShowReminderOptions}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+                >
+                  <span>{reminderTriggerLabel || "Select time"}</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </PopoverTrigger>
+
+              <PopoverContent
+                align="start"
+                side="bottom"
+                sideOffset={6}
+                className="w-[min(24rem,var(--radix-popover-trigger-width))] p-1"
               >
-                <span>
-                  {reminderOptions.find(opt => opt.value === props.reminderMinutesBefore)?.label || "Select time"}
-                </span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              </button>
-              
-              {showReminderOptions && (
-                <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto">
                   {reminderOptions.map((option) => (
                     <button
                       key={option.value}
@@ -315,17 +354,62 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                       onClick={() => {
                         props.onReminderMinutesBeforeChange(option.value);
                         setShowReminderOptions(false);
+                        setIsEditingCustomReminder(false);
                       }}
-                      className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
+                      className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors rounded-md ${
                         props.reminderMinutesBefore === option.value ? 'bg-accent' : ''
                       }`}
                     >
                       {option.label}
                     </button>
                   ))}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingCustomReminder(true);
+                      setCustomReminderInput(
+                        hasPresetReminder ? "" : String(props.reminderMinutesBefore || "")
+                      );
+                    }}
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors rounded-md ${
+                      !hasPresetReminder ? 'bg-accent' : ''
+                    }`}
+                  >
+                    Custom
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {isEditingCustomReminder && (
+                  <div className="border-t border-border/60 mt-1 pt-3 px-2 pb-2 space-y-2">
+                    <Label htmlFor="custom-reminder-minutes" className="text-xs font-medium text-muted-foreground">
+                      Minutes before
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="custom-reminder-minutes"
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={customReminderInput}
+                        onChange={(event) => setCustomReminderInput(event.target.value)}
+                        onKeyDown={handleCustomReminderKeyDown}
+                        placeholder="e.g. 180"
+                        className="h-10 text-sm"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={applyCustomReminder}
+                        disabled={!customReminderInput.trim() || Number.parseInt(customReminderInput, 10) <= 0}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       )}

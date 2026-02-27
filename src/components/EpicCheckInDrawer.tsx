@@ -19,6 +19,7 @@ import { playStrikethrough } from "@/utils/soundEffects";
 import { useHabitSurfacing } from "@/hooks/useHabitSurfacing";
 import { useTaskMutations } from "@/hooks/useTaskMutations";
  import { useLivingCompanionSafe } from "@/hooks/useLivingCompanion";
+import { getClampedMonthDays, isHabitScheduledForDate } from "@/utils/habitSchedule";
 interface Habit {
   id: string;
   title: string;
@@ -27,6 +28,7 @@ interface Habit {
   frequency?: string;
   estimated_minutes?: number | null;
   custom_days?: number[] | null;
+  custom_month_days?: number[] | null;
   preferred_time?: string | null;
   category?: 'mind' | 'body' | 'soul' | null;
 }
@@ -34,36 +36,47 @@ interface Habit {
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 // Format days for display - show day chips or readable text
-const formatDaysDisplay = (frequency: string | undefined, days: number[] | null | undefined): { type: 'text' | 'chips', value: string | number[] } => {
-  if (frequency === 'daily' || !days || days.length === 0 || days.length === 7) {
+const formatDaysDisplay = (
+  frequency: string | undefined,
+  days: number[] | null | undefined,
+  monthDays: number[] | null | undefined,
+): { type: 'text' | 'chips', value: string | number[] } => {
+  if (frequency === 'daily' || ((!days || days.length === 0) && (!monthDays || monthDays.length === 0)) || days?.length === 7) {
     return { type: 'text', value: 'Daily' };
   }
+  if (frequency === 'monthly') {
+    return { type: 'text', value: `Monthly • ${monthDays?.join(', ') || '1'}` };
+  }
+  if (frequency === 'custom' && monthDays && monthDays.length > 0) {
+    return { type: 'text', value: `Custom (M) • ${monthDays.join(', ')}` };
+  }
   // Check for weekdays
-  if (days.length === 5 && [0,1,2,3,4].every(d => days.includes(d))) {
+  if (days && days.length === 5 && [0,1,2,3,4].every(d => days.includes(d))) {
     return { type: 'text', value: 'Weekdays' };
   }
   // Show chips for custom days
-  return { type: 'chips', value: days };
+  return { type: 'chips', value: days || [] };
 };
 
-// Check if a habit is scheduled for today based on frequency and custom_days
+// Check if a habit is scheduled for today based on frequency and saved schedule data
 const isScheduledForToday = (habit: Habit): boolean => {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
   // Convert JS day (0=Sunday) to our system (0=Monday)
   const ourDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  
-  // Daily habits are always scheduled
-  if (habit.frequency === 'daily' || !habit.custom_days || habit.custom_days.length === 0) {
-    return true;
-  }
-  
-  // Custom frequency - check if today is in custom_days
-  return habit.custom_days.includes(ourDayIndex);
+
+  return isHabitScheduledForDate(habit, today, ourDayIndex);
 };
 
 // Get next scheduled day name for upcoming habits
-const getNextScheduledDay = (days: number[]): string => {
+const getNextScheduledDay = (days: number[], monthDays: number[] = []): string => {
+  if (monthDays.length > 0) {
+    const today = new Date();
+    const currentDate = today.getDate();
+    const clampedMonthDays = getClampedMonthDays(monthDays, today);
+    const nextDay = clampedMonthDays.find(day => day > currentDate) ?? clampedMonthDays[0];
+    return `${nextDay}`;
+  }
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const today = new Date();
   const currentDay = today.getDay() === 0 ? 6 : today.getDay() - 1;
@@ -194,6 +207,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
       preferred_time: habit.preferred_time,
       category: habit.category,
       custom_days: habit.custom_days,
+      custom_month_days: habit.custom_month_days,
     });
   };
 
@@ -510,7 +524,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                         <div className="flex flex-wrap items-center gap-3 pt-2">
                           {/* Day schedule display */}
                           {(() => {
-                            const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days);
+                            const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days, habit.custom_month_days);
                             return (
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <Calendar className="w-3.5 h-3.5 text-celestial-blue" />
@@ -709,9 +723,9 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                 {habit.title}
                               </span>
                               {/* Day badge showing when scheduled */}
-                              {habit.custom_days && habit.custom_days.length > 0 && (
+                              {((habit.custom_days && habit.custom_days.length > 0) || (habit.custom_month_days && habit.custom_month_days.length > 0)) && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                                  {getNextScheduledDay(habit.custom_days)}
+                                  {getNextScheduledDay(habit.custom_days || [], habit.custom_month_days || [])}
                                 </span>
                               )}
                               {hasDetails && (
@@ -756,7 +770,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                 <div className="flex flex-wrap items-center gap-3 pt-2">
                                   {/* Day schedule display for upcoming */}
                                   {(() => {
-                                    const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days);
+                                    const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days, habit.custom_month_days);
                                     return (
                                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                         <Calendar className="w-3.5 h-3.5 text-amber-500" />

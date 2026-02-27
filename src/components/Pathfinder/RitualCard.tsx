@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
-import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency } from './FrequencyPresets';
+import { FrequencyPresets, formatDaysShort, getDefaultDaysForFrequency, getDefaultMonthDays } from './FrequencyPresets';
+import { formatScheduleLabel, inferCustomPeriod } from '@/utils/habitSchedule';
 
 interface RitualCardProps {
   ritual: JourneyRitual;
@@ -33,15 +34,6 @@ const difficultyColors = {
   easy: 'bg-green-500/10 text-green-500 border-green-500/30',
   medium: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
   hard: 'bg-red-500/10 text-red-500 border-red-500/30',
-};
-
-const frequencyLabels: Record<string, string> = {
-  daily: 'Daily',
-  weekdays: 'Weekdays',
-  '5x_week': '5x/week',
-  '3x_week': '3x/week',
-  weekly: 'Weekly',
-  custom: 'Custom',
 };
 
 export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete, isEditing: initialEditing = false }: RitualCardProps) {
@@ -58,8 +50,24 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
     setIsEditing(false);
   };
 
-  const handleFrequencyChange = (frequency: JourneyRitual['frequency'], days: number[]) => {
-    setEditedRitual({ ...editedRitual, frequency, customDays: days });
+  const handleFrequencyChange = ({
+    frequency,
+    customDays,
+    customMonthDays,
+    customPeriod,
+  }: {
+    frequency: 'daily' | '5x_week' | 'weekly' | 'monthly' | 'custom';
+    customDays: number[];
+    customMonthDays: number[];
+    customPeriod: 'week' | 'month';
+  }) => {
+    setEditedRitual({
+      ...editedRitual,
+      frequency,
+      customDays,
+      customMonthDays,
+      customPeriod,
+    });
   };
 
   if (isEditing) {
@@ -85,8 +93,14 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
 
         {/* Frequency Presets */}
         <FrequencyPresets
-          frequency={editedRitual.frequency === '3x_week' ? 'custom' : editedRitual.frequency as 'daily' | '5x_week' | 'weekly' | 'custom'}
+          frequency={editedRitual.frequency === '3x_week' ? 'custom' : editedRitual.frequency as 'daily' | '5x_week' | 'weekly' | 'monthly' | 'custom'}
           customDays={editedRitual.customDays || getDefaultDaysForFrequency(editedRitual.frequency)}
+          customMonthDays={editedRitual.customMonthDays || getDefaultMonthDays(editedRitual.frequency)}
+          customPeriod={editedRitual.customPeriod ?? inferCustomPeriod({
+            frequency: editedRitual.frequency,
+            custom_days: editedRitual.customDays,
+            custom_month_days: editedRitual.customMonthDays,
+          })}
           onFrequencyChange={handleFrequencyChange}
         />
 
@@ -140,7 +154,12 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
   }
 
   // Get display days
-  const displayDays = formatDaysShort(ritual.customDays || []);
+  const customPeriod = ritual.customPeriod ?? inferCustomPeriod({
+    frequency: ritual.frequency,
+    custom_days: ritual.customDays,
+    custom_month_days: ritual.customMonthDays,
+  });
+  const displayDays = formatDaysShort(ritual.customDays || [], ritual.customMonthDays || [], customPeriod);
 
   return (
     <motion.div
@@ -160,7 +179,12 @@ export const RitualCard = memo(function RitualCard({ ritual, onUpdate, onDelete,
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{frequencyLabels[ritual.frequency]}</span>
+          <span>{formatScheduleLabel({
+            frequency: ritual.frequency,
+            custom_days: ritual.customDays,
+            custom_month_days: ritual.customMonthDays,
+            customPeriod: customPeriod,
+          })}</span>
           {displayDays && ritual.frequency !== 'daily' && (
             <>
               <span className="text-[10px] opacity-70">({displayDays})</span>

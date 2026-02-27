@@ -58,6 +58,8 @@ export const fetchCompanion = async (userId: string): Promise<Companion | null> 
     .from("user_companion")
     .select("*")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error) throw error;

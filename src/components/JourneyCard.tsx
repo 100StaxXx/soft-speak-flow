@@ -53,6 +53,7 @@ interface Journey {
       frequency?: string;
       estimated_minutes?: number;
       custom_days?: number[] | null;
+      custom_month_days?: number[] | null;
     };
   }>;
 }
@@ -314,6 +315,7 @@ export const JourneyCard = memo(function JourneyCard({ journey, onComplete, onAb
                   frequency: eh.habits?.frequency,
                   estimated_minutes: eh.habits?.estimated_minutes,
                   custom_days: eh.habits?.custom_days,
+                  custom_month_days: eh.habits?.custom_month_days,
                 }))}
               isActive={isActive}
               showAdjustPlan={isActive}

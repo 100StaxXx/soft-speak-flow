@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddQuestSheet, type AddQuestData } from "./AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
@@ -155,6 +155,35 @@ describe("AddQuestSheet", () => {
     });
 
     expect(createButton).toBeEnabled();
+  });
+
+  it("closes the date picker after selecting a new date", async () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    const dateTrigger = screen.getByRole("button", { name: "Jan 15" });
+    fireEvent.click(dateTrigger);
+
+    const calendarGrid = screen.getByRole("grid");
+    const nextDayButton = within(calendarGrid)
+      .getAllByRole("gridcell")
+      .find((button) => button.textContent === "16");
+
+    expect(nextDayButton).toBeTruthy();
+    fireEvent.click(nextDayButton!);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+    });
+
+    expect(dateTrigger).toHaveAttribute("data-state", "closed");
+    expect(dateTrigger).not.toHaveTextContent("Jan 15");
   });
 
   it("shows full-day half-hour quick-pick times in the time picker", () => {

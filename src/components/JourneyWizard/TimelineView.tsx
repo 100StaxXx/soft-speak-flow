@@ -11,7 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 import { cn, formatDisplayLabel } from '@/lib/utils';
-import type { JourneyPhase, JourneyMilestone, JourneyRitual, FeasibilityAssessment } from '@/hooks/useJourneySchedule';
+import type { JourneyPhase, JourneyMilestone, JourneyRitual, FeasibilityAssessment, JourneyExecutionModel } from '@/hooks/useJourneySchedule';
 import { PhaseCard } from './PhaseCard';
 
 interface TimelineViewProps {
@@ -25,6 +25,7 @@ interface TimelineViewProps {
   onMilestoneDateChange?: (milestoneId: string, newDate: string) => void;
   postcardCount?: number;
   maxPostcards?: number;
+  executionModel?: JourneyExecutionModel;
 }
 
 export function TimelineView({
@@ -38,6 +39,7 @@ export function TimelineView({
   onMilestoneDateChange,
   postcardCount = 0,
   maxPostcards = 7,
+  executionModel = 'sequential',
 }: TimelineViewProps) {
   const sortedPhases = useMemo(() => 
     [...phases].sort((a, b) => a.phaseOrder - b.phaseOrder),
@@ -97,6 +99,12 @@ export function TimelineView({
           <span>{postcardCount}/{maxPostcards} celebration milestones</span>
         </div>
       </div>
+
+      {executionModel === 'overlap_early' && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+          This plan starts the real work early and keeps momentum going throughout.
+        </div>
+      )}
 
       {/* Timeline Phases */}
       <div className="space-y-4">

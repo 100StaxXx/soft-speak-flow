@@ -27,6 +27,8 @@ serve(async (req) => {
       .from('user_companion')
       .select('id')
       .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (compErr) throw compErr;
 

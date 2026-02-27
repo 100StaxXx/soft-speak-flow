@@ -258,6 +258,187 @@ describe("useWidgetSync", () => {
     });
   });
 
+  it("orders widget quests by scheduled time with unscheduled quests last", async () => {
+    const today = localDateString();
+    const tasks: DailyTask[] = [
+      makeTask({
+        id: "quest-unscheduled",
+        task_text: "Inbox cleanup",
+        scheduled_time: null,
+      }),
+      makeTask({
+        id: "quest-late",
+        task_text: "Afternoon review",
+        scheduled_time: "16:30",
+      }),
+      makeTask({
+        id: "quest-early",
+        task_text: "Morning focus",
+        scheduled_time: "08:15",
+      }),
+      makeTask({
+        id: "quest-mid",
+        task_text: "Standup prep",
+        scheduled_time: "09:45",
+      }),
+    ];
+
+    renderHook(() => useWidgetSync(tasks, today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tasks: [
+          expect.objectContaining({ id: "quest-early", scheduledTime: "08:15" }),
+          expect.objectContaining({ id: "quest-mid", scheduledTime: "09:45" }),
+          expect.objectContaining({ id: "quest-late", scheduledTime: "16:30" }),
+          expect.objectContaining({ id: "quest-unscheduled", scheduledTime: null }),
+        ],
+      }),
+    );
+  });
+
+  it("preserves relative order for equal scheduled times and unscheduled quests", async () => {
+    const today = localDateString();
+    const tasks: DailyTask[] = [
+      makeTask({
+        id: "quest-same-a",
+        task_text: "Same time A",
+        scheduled_time: "09:00",
+      }),
+      makeTask({
+        id: "quest-unscheduled-a",
+        task_text: "Anytime A",
+        scheduled_time: null,
+      }),
+      makeTask({
+        id: "quest-same-b",
+        task_text: "Same time B",
+        scheduled_time: "09:00",
+      }),
+      makeTask({
+        id: "quest-unscheduled-b",
+        task_text: "Anytime B",
+        scheduled_time: null,
+      }),
+    ];
+
+    renderHook(() => useWidgetSync(tasks, today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tasks: [
+          expect.objectContaining({ id: "quest-same-a" }),
+          expect.objectContaining({ id: "quest-same-b" }),
+          expect.objectContaining({ id: "quest-unscheduled-a" }),
+          expect.objectContaining({ id: "quest-unscheduled-b" }),
+        ],
+      }),
+    );
+  });
+
+  it("applies the 10-item widget limit after sorting quests", async () => {
+    const today = localDateString();
+    const tasks: DailyTask[] = [
+      makeTask({ id: "quest-unscheduled-1", task_text: "Unscheduled 1", scheduled_time: null }),
+      makeTask({ id: "quest-unscheduled-2", task_text: "Unscheduled 2", scheduled_time: null }),
+      makeTask({ id: "quest-1300", task_text: "1:00 PM", scheduled_time: "13:00" }),
+      makeTask({ id: "quest-0900", task_text: "9:00 AM", scheduled_time: "09:00" }),
+      makeTask({ id: "quest-1500", task_text: "3:00 PM", scheduled_time: "15:00" }),
+      makeTask({ id: "quest-0830", task_text: "8:30 AM", scheduled_time: "08:30" }),
+      makeTask({ id: "quest-1100", task_text: "11:00 AM", scheduled_time: "11:00" }),
+      makeTask({ id: "quest-1000", task_text: "10:00 AM", scheduled_time: "10:00" }),
+      makeTask({ id: "quest-1630", task_text: "4:30 PM", scheduled_time: "16:30" }),
+      makeTask({ id: "quest-1200", task_text: "12:00 PM", scheduled_time: "12:00" }),
+      makeTask({ id: "quest-1400", task_text: "2:00 PM", scheduled_time: "14:00" }),
+      makeTask({ id: "quest-1700", task_text: "5:00 PM", scheduled_time: "17:00" }),
+    ];
+
+    renderHook(() => useWidgetSync(tasks, today));
+    await flushEffects();
+
+    const payload = mocks.updateWidgetDataMock.mock.calls[0]?.[0];
+    expect(payload.tasks).toHaveLength(10);
+    expect(payload.tasks.map((task: { id: string }) => task.id)).toEqual([
+      "quest-0830",
+      "quest-0900",
+      "quest-1000",
+      "quest-1100",
+      "quest-1200",
+      "quest-1300",
+      "quest-1400",
+      "quest-1500",
+      "quest-1630",
+      "quest-1700",
+    ]);
+  });
+
+  it("keeps rituals out of the widget list while preserving ritual counts", async () => {
+    const today = localDateString();
+    const tasks: DailyTask[] = [
+      makeTask({
+        id: "ritual-1",
+        task_text: "Morning ritual",
+        completed: true,
+        habit_source_id: "habit-1",
+        scheduled_time: "07:00",
+      }),
+      makeTask({
+        id: "quest-1",
+        task_text: "Deep work",
+        scheduled_time: "09:00",
+        habit_source_id: null,
+      }),
+      makeTask({
+        id: "ritual-2",
+        task_text: "Evening ritual",
+        completed: false,
+        habit_source_id: "habit-2",
+        scheduled_time: null,
+      }),
+      makeTask({
+        id: "quest-2",
+        task_text: "Inbox zero",
+        scheduled_time: null,
+        habit_source_id: null,
+      }),
+    ];
+
+    renderHook(() => useWidgetSync(tasks, today));
+    await flushEffects();
+
+    expect(mocks.updateWidgetDataMock).toHaveBeenCalledWith({
+      tasks: [
+        {
+          id: "quest-1",
+          text: "Deep work",
+          completed: false,
+          xpReward: 50,
+          isMainQuest: false,
+          category: "mindset",
+          section: "morning",
+          scheduledTime: "09:00",
+        },
+        {
+          id: "quest-2",
+          text: "Inbox zero",
+          completed: false,
+          xpReward: 50,
+          isMainQuest: false,
+          category: "mindset",
+          section: "unscheduled",
+          scheduledTime: null,
+        },
+      ],
+      completedCount: 0,
+      totalCount: 2,
+      ritualCount: 2,
+      ritualCompleted: 1,
+      date: today,
+    });
+  });
+
   it("skips syncing when the selected date is not today", async () => {
     renderHook(() => useWidgetSync([makeTask()], "2026-02-11"));
     await flushEffects();

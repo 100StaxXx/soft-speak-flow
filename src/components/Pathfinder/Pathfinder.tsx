@@ -38,7 +38,6 @@ import { useJourneySchedule, type JourneyRitual } from '@/hooks/useJourneySchedu
 import { useIntentClassifier } from '@/hooks/useIntentClassifier';
 import { RitualEditor } from './RitualEditor';
 import { PostcardPreview } from './PostcardPreview';
-import { getDefaultDaysForFrequency } from './FrequencyPresets';
 import { CapacityWarningBanner } from '@/components/CapacityWarningBanner';
 import { themeColors } from './StoryStep';
 import { EpicClarificationFlow } from '@/features/tasks/components/EpicClarificationFlow';
@@ -49,6 +48,7 @@ import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { EPIC_XP_REWARDS } from '@/config/xpRewards';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 import type { ClarifyingQuestion } from '@/hooks/useIntentClassifier';
+import { getDefaultMonthDaysForFrequency, getDefaultWeekdaysForFrequency } from '@/utils/habitSchedule';
 
 // Default clarification questions when AI doesn't provide any
 const DEFAULT_CLARIFICATION_QUESTIONS: ClarifyingQuestion[] = [
@@ -90,6 +90,7 @@ interface PathfinderProps {
       difficulty: string;
       frequency: string;
       custom_days: number[];
+      custom_month_days?: number[];
       estimated_minutes?: number;
     }>;
     milestones?: Array<{
@@ -208,10 +209,11 @@ export function Pathfinder({
       setThemeColor(selectedTemplate.theme_color || themeColors[0].id);
       
       // Map frequency to valid database values
-      const mapFrequency = (freq: string): 'daily' | '5x_week' | '3x_week' | 'custom' => {
+      const mapFrequency = (freq: string): 'daily' | '5x_week' | '3x_week' | 'monthly' | 'custom' => {
         if (freq === 'daily') return 'daily';
         if (freq === '5x_week') return '5x_week';
         if (freq === '3x_week') return '3x_week';
+        if (freq === 'monthly') return 'monthly';
         if (freq === 'weekly') return '3x_week'; // Map weekly to 3x for backwards compat
         return 'custom';
       };
@@ -263,6 +265,9 @@ export function Pathfinder({
           type: 'habit' as const,
           difficulty: r.difficulty,
           frequency: r.frequency,
+          customDays: r.customDays,
+          customMonthDays: r.customMonthDays,
+          customPeriod: r.customPeriod,
           estimatedMinutes: r.estimatedMinutes,
           isSelected: true,
         }));
@@ -435,7 +440,8 @@ export function Pathfinder({
       description: h.description,
       difficulty: h.difficulty,
       frequency: h.frequency || 'daily',
-      custom_days: h.customDays || getDefaultDaysForFrequency(h.frequency || 'daily'),
+      custom_days: h.customDays || getDefaultWeekdaysForFrequency(h.frequency || 'daily'),
+      custom_month_days: h.customMonthDays || getDefaultMonthDaysForFrequency(h.frequency || 'daily'),
       estimated_minutes: h.estimatedMinutes,
     }));
 
@@ -710,6 +716,7 @@ export function Pathfinder({
                       milestones={schedule.milestones}
                       rituals={schedule.rituals}
                       weeklyHoursEstimate={schedule.weeklyHoursEstimate}
+                      executionModel={schedule.executionModel}
                       deadline={format(deadline!, 'yyyy-MM-dd')}
                       onMilestoneToggle={toggleMilestone}
                       onMilestoneDateChange={updateMilestoneDate}

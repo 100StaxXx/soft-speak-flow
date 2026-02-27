@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => {
   const updateEqMock = vi.fn();
   const deleteMock = vi.fn();
   const deleteEqMock = vi.fn();
+  const queueTaskActionMock = vi.fn();
+  const reportApiFailureMock = vi.fn();
 
   return {
     fromMock,
@@ -26,6 +28,8 @@ const mocks = vi.hoisted(() => {
     updateEqMock,
     deleteMock,
     deleteEqMock,
+    queueTaskActionMock,
+    reportApiFailureMock,
   };
 });
 
@@ -39,6 +43,14 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (...args: unknown[]) => mocks.fromMock(...args),
   },
+}));
+
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    shouldQueueWrites: false,
+    queueTaskAction: mocks.queueTaskActionMock,
+    reportApiFailure: mocks.reportApiFailureMock,
+  }),
 }));
 
 import {

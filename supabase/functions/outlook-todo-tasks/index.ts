@@ -12,9 +12,9 @@ const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.Rea
 type SyncMode = "send_only" | "full_sync";
 
 type Action =
-  | "createLinkedEvent"
-  | "updateLinkedEvent"
-  | "deleteLinkedEvent"
+  | "createLinkedTask"
+  | "updateLinkedTask"
+  | "deleteLinkedTask"
   | "syncLinkedChanges";
 
 interface CalendarConnection {
@@ -24,8 +24,7 @@ interface CalendarConnection {
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
-  calendar_id: string | null;
-  primary_calendar_id: string | null;
+  primary_task_list_id: string | null;
   sync_mode: SyncMode;
 }
 
@@ -36,6 +35,7 @@ interface DailyTask {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration: number | null;
+  difficulty: string | null;
   reminder_enabled: boolean | null;
   reminder_minutes_before: number | null;
   recurrence_pattern: string | null;
@@ -44,6 +44,37 @@ interface DailyTask {
   location: string | null;
   notes: string | null;
 }
+
+interface SubtaskRow {
+  id: string;
+  title: string;
+  completed: boolean;
+  sort_order: number;
+}
+
+interface OutlookTaskLink {
+  id: string;
+  task_id: string;
+  user_id: string;
+  connection_id: string;
+  provider: "outlook";
+  external_task_list_id: string;
+  external_task_id: string;
+  sync_mode: SyncMode;
+  last_app_sync_at: string | null;
+}
+
+const APP_DAY_TO_GRAPH_DAY = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+const GRAPH_DAY_TO_APP_DAY: Record<string, number> = {
+  monday: 0,
+  tuesday: 1,
+  wednesday: 2,
+  thursday: 3,
+  friday: 4,
+  saturday: 5,
+  sunday: 6,
+};
+const WEEKDAY_APP_DAYS = [0, 1, 2, 3, 4];
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -54,12 +85,12 @@ const jsonResponse = (body: unknown, status = 200) =>
 function normalizeAction(raw: string | undefined): Action | null {
   if (!raw) return null;
   const map: Record<string, Action> = {
-    createLinkedEvent: "createLinkedEvent",
-    create_linked_event: "createLinkedEvent",
-    updateLinkedEvent: "updateLinkedEvent",
-    update_linked_event: "updateLinkedEvent",
-    deleteLinkedEvent: "deleteLinkedEvent",
-    delete_linked_event: "deleteLinkedEvent",
+    createLinkedTask: "createLinkedTask",
+    create_linked_task: "createLinkedTask",
+    updateLinkedTask: "updateLinkedTask",
+    update_linked_task: "updateLinkedTask",
+    deleteLinkedTask: "deleteLinkedTask",
+    delete_linked_task: "deleteLinkedTask",
     syncLinkedChanges: "syncLinkedChanges",
     sync_linked_changes: "syncLinkedChanges",
   };
@@ -144,6 +175,17 @@ async function refreshAccessTokenIfNeeded(
   return tokens.access_token as string;
 }
 
+function toGraphDateTime(date: Date): string {
+  return date.toISOString().replace("Z", "");
+}
+
+function toDateTimeTimeZone(date: Date) {
+  return {
+    dateTime: toGraphDateTime(date),
+    timeZone: "UTC",
+  };
+}
+
 function buildTimedDate(taskDate: string, hhmm: string): Date {
   const [h, m] = hhmm.split(":").map(Number);
   const base = new Date(`${taskDate}T00:00:00`);
@@ -151,45 +193,8 @@ function buildTimedDate(taskDate: string, hhmm: string): Date {
   return base;
 }
 
-function getTaskEventWindow(task: DailyTask, fallbackDurationMinutes = 30): {
-  isAllDay: boolean;
-  start: Date;
-  end: Date;
-} {
-  if (!task.task_date) {
-    throw new Error("Task must have a date before sending to calendar");
-  }
-
-  if (!task.scheduled_time) {
-    const start = new Date(`${task.task_date}T00:00:00`);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    return { isAllDay: true, start, end };
-  }
-
-  const start = buildTimedDate(task.task_date, task.scheduled_time);
-  const minutes = task.estimated_duration && task.estimated_duration > 0
-    ? task.estimated_duration
-    : fallbackDurationMinutes;
-
-  const end = new Date(start.getTime() + minutes * 60_000);
-  return { isAllDay: false, start, end };
-}
-
-const APP_DAY_TO_GRAPH_DAY = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
-const GRAPH_DAY_TO_APP_DAY: Record<string, number> = {
-  monday: 0,
-  tuesday: 1,
-  wednesday: 2,
-  thursday: 3,
-  friday: 4,
-  saturday: 5,
-  sunday: 6,
-};
-const WEEKDAY_APP_DAYS = [0, 1, 2, 3, 4];
-
 function toAppDayIndex(date: Date): number {
-  const jsDay = date.getDay(); // 0=Sunday, 1=Monday, ...
+  const jsDay = date.getDay();
   return jsDay === 0 ? 6 : jsDay - 1;
 }
 
@@ -285,8 +290,8 @@ function toOutlookRecurrence(task: DailyTask): Record<string, unknown> | undefin
   };
 }
 
-function toTaskRecurrenceFields(event: Record<string, any>) {
-  const recurrence = event.recurrence as Record<string, any> | undefined;
+function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
+  const recurrence = remoteTask.recurrence as Record<string, any> | undefined;
   const empty = {
     recurrence_pattern: null,
     recurrence_days: null,
@@ -342,79 +347,124 @@ function toTaskRecurrenceFields(event: Record<string, any>) {
   return empty;
 }
 
-function toOutlookEventPayload(task: DailyTask, override: Record<string, unknown> = {}) {
-  const window = getTaskEventWindow(task);
+function getTaskStartDate(task: DailyTask): Date | null {
+  if (!task.task_date || !task.scheduled_time) return null;
+  return buildTimedDate(task.task_date, task.scheduled_time);
+}
 
-  const subject = (override.title as string | undefined) ?? task.task_text;
+function getTaskDueDate(task: DailyTask): Date | null {
+  if (!task.task_date) return null;
+
+  if (task.scheduled_time) {
+    const start = buildTimedDate(task.task_date, task.scheduled_time);
+    const minutes = task.estimated_duration && task.estimated_duration > 0 ? task.estimated_duration : 30;
+    return new Date(start.getTime() + minutes * 60_000);
+  }
+
+  return new Date(`${task.task_date}T23:59:00`);
+}
+
+function getReminderDate(task: DailyTask, start: Date | null, due: Date | null): Date | null {
+  if (!task.reminder_enabled) return null;
+
+  const anchor = start ?? due;
+  if (!anchor) return null;
+
+  const reminderMinutes = task.reminder_minutes_before && task.reminder_minutes_before > 0
+    ? task.reminder_minutes_before
+    : 15;
+  return new Date(anchor.getTime() - reminderMinutes * 60_000);
+}
+
+function difficultyToImportance(difficulty: string | null): "low" | "normal" | "high" {
+  if (difficulty === "easy") return "low";
+  if (difficulty === "hard") return "high";
+  return "normal";
+}
+
+function importanceToDifficulty(importance: string | null | undefined): "easy" | "medium" | "hard" {
+  if (importance === "low") return "easy";
+  if (importance === "high") return "hard";
+  return "medium";
+}
+
+function toOutlookTodoPayload(task: DailyTask, override: Record<string, unknown> = {}) {
+  const start = getTaskStartDate(task);
+  const due = getTaskDueDate(task);
+  const reminderDate = getReminderDate(task, start, due);
+
+  const title = (override.title as string | undefined) ?? task.task_text;
   const bodyText = (override.description as string | undefined) ?? task.notes ?? "";
-  const location = (override.location as string | undefined) ?? task.location ?? "";
-  const recurrence = toOutlookRecurrence(task);
-  const reminderEnabled = Boolean(task.reminder_enabled);
-  const reminderMinutesBefore =
-    task.reminder_minutes_before && task.reminder_minutes_before > 0 ? task.reminder_minutes_before : 15;
 
   return {
-    subject,
+    title,
     body: {
-      contentType: "text",
       content: bodyText,
+      contentType: "text",
     },
-    start: {
-      dateTime: window.start.toISOString(),
-      timeZone: "UTC",
-    },
-    end: {
-      dateTime: window.end.toISOString(),
-      timeZone: "UTC",
-    },
-    isAllDay: window.isAllDay,
-    isReminderOn: reminderEnabled,
-    reminderMinutesBeforeStart: reminderEnabled ? reminderMinutesBefore : undefined,
-    recurrence,
-    location: location ? { displayName: location } : undefined,
+    importance: difficultyToImportance(task.difficulty),
+    startDateTime: start ? toDateTimeTimeZone(start) : undefined,
+    dueDateTime: due ? toDateTimeTimeZone(due) : undefined,
+    isReminderOn: Boolean(reminderDate),
+    reminderDateTime: reminderDate ? toDateTimeTimeZone(reminderDate) : undefined,
+    recurrence: toOutlookRecurrence(task),
   };
 }
 
-function mapOutlookEventToTaskUpdate(event: Record<string, any>): Partial<DailyTask> {
-  const title = (event.subject as string | undefined) ?? "(No title)";
-  const location = (event.location?.displayName as string | undefined) ?? null;
-  const notes = (event.body?.content as string | undefined) ?? null;
+function parseDateTime(dateTimeObj: Record<string, any> | undefined): Date | null {
+  if (!dateTimeObj?.dateTime) return null;
+  const raw = String(dateTimeObj.dateTime);
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw}Z`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
-  const startIso = String(event.start?.dateTime || "");
-  const endIso = String(event.end?.dateTime || "");
-  const isAllDay = Boolean(event.isAllDay);
+function mapOutlookTaskToTaskUpdate(remoteTask: Record<string, any>): Partial<DailyTask> {
+  const title = (remoteTask.title as string | undefined) ?? "(No title)";
+  const notes = (remoteTask.body?.content as string | undefined) ?? null;
+  const difficulty = importanceToDifficulty(remoteTask.importance as string | undefined);
 
-  if (!startIso) {
-    return { task_text: title, location, notes };
+  const startObj = remoteTask.startDateTime as Record<string, any> | undefined;
+  const dueObj = remoteTask.dueDateTime as Record<string, any> | undefined;
+  const startDate = parseDateTime(startObj);
+  const dueDate = parseDateTime(dueObj);
+
+  const taskDateSource = dueObj?.dateTime ? String(dueObj.dateTime) : startObj?.dateTime ? String(startObj.dateTime) : "";
+  const taskDate = taskDateSource ? taskDateSource.slice(0, 10) : null;
+  const scheduledTime = startObj?.dateTime ? String(startObj.dateTime).slice(11, 16) : null;
+
+  let estimatedDuration: number | null = null;
+  if (startDate && dueDate) {
+    estimatedDuration = Math.max(1, Math.round((dueDate.getTime() - startDate.getTime()) / 60_000));
+  } else if (scheduledTime) {
+    estimatedDuration = 30;
   }
 
-  const taskDate = startIso.slice(0, 10);
-  const scheduledTime = isAllDay ? null : startIso.slice(11, 16);
-
-  let estimatedDuration = 1440;
-  if (!isAllDay && endIso) {
-    const start = new Date(startIso);
-    const end = new Date(endIso);
-    estimatedDuration = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60_000));
+  const reminderEnabled = Boolean(remoteTask.isReminderOn);
+  const reminderDate = parseDateTime(remoteTask.reminderDateTime as Record<string, any> | undefined);
+  const reminderAnchor = startDate ?? dueDate;
+  let reminderMinutesBefore: number | null = null;
+  if (reminderEnabled) {
+    if (reminderDate && reminderAnchor) {
+      reminderMinutesBefore = Math.max(1, Math.round((reminderAnchor.getTime() - reminderDate.getTime()) / 60_000));
+    } else {
+      reminderMinutesBefore = 15;
+    }
   }
-  const reminderEnabled = Boolean(event.isReminderOn);
-  const reminderMinutesRaw = Number(event.reminderMinutesBeforeStart);
-  const reminderMinutesBefore = reminderEnabled
-    ? (Number.isFinite(reminderMinutesRaw) && reminderMinutesRaw > 0 ? reminderMinutesRaw : 15)
-    : null;
-  const recurrenceFields = toTaskRecurrenceFields(event);
+
+  const recurrenceFields = toTaskRecurrenceFields(remoteTask);
 
   return {
     task_text: title,
     task_date: taskDate,
     scheduled_time: scheduledTime,
     estimated_duration: estimatedDuration,
+    difficulty,
     reminder_enabled: reminderEnabled,
     reminder_minutes_before: reminderMinutesBefore,
     recurrence_pattern: recurrenceFields.recurrence_pattern,
     recurrence_days: recurrenceFields.recurrence_days,
     recurrence_end_date: recurrenceFields.recurrence_end_date,
-    location,
     notes,
   };
 }
@@ -436,11 +486,16 @@ async function outlookApi(
 
   if (!resp.ok) {
     const details = await resp.text();
-    throw new Error(`Outlook Calendar API ${method} ${path} failed: ${details}`);
+    throw new Error(`Outlook To Do API ${method} ${path} failed (${resp.status}): ${details}`);
   }
 
   if (resp.status === 204) return null;
   return await resp.json();
+}
+
+function isOutlookNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  return message.includes("(404)") || message.includes("erroritemnotfound") || message.includes("not found");
 }
 
 async function getTaskById(
@@ -451,7 +506,7 @@ async function getTaskById(
   const { data, error } = await supabase
     .from("daily_tasks")
     .select(
-      "id, user_id, task_text, task_date, scheduled_time, estimated_duration, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_days, recurrence_end_date, location, notes",
+      "id, user_id, task_text, task_date, scheduled_time, estimated_duration, difficulty, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_days, recurrence_end_date, location, notes",
     )
     .eq("id", taskId)
     .eq("user_id", userId)
@@ -462,6 +517,55 @@ async function getTaskById(
   }
 
   return data as DailyTask;
+}
+
+async function getTaskSubtasks(
+  supabase: any,
+  userId: string,
+  taskId: string,
+): Promise<SubtaskRow[]> {
+  const { data, error } = await supabase
+    .from("subtasks")
+    .select("id, title, completed, sort_order")
+    .eq("user_id", userId)
+    .eq("task_id", taskId)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return (data || []) as SubtaskRow[];
+}
+
+async function replaceSubtasksFromChecklist(
+  supabase: any,
+  userId: string,
+  taskId: string,
+  checklistItems: Array<{ displayName: string; isChecked: boolean }>,
+) {
+  const { error: deleteError } = await supabase
+    .from("subtasks")
+    .delete()
+    .eq("user_id", userId)
+    .eq("task_id", taskId);
+  if (deleteError) throw deleteError;
+
+  if (checklistItems.length === 0) return;
+
+  const rows = checklistItems
+    .map((item, index) => ({
+      task_id: taskId,
+      user_id: userId,
+      title: item.displayName || "Untitled",
+      completed: item.isChecked,
+      sort_order: index,
+    }))
+    .filter((row) => row.title.trim().length > 0);
+
+  if (rows.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from("subtasks")
+    .insert(rows);
+  if (insertError) throw insertError;
 }
 
 async function getOutlookConnection(
@@ -476,10 +580,84 @@ async function getOutlookConnection(
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("No Outlook Calendar connection found");
+    throw new Error("No Outlook connection found");
   }
 
   return data as CalendarConnection;
+}
+
+async function getDefaultTaskListId(accessToken: string): Promise<string | null> {
+  const payload = await outlookApi(accessToken, "/me/todo/lists?$select=id,displayName,wellknownListName", "GET");
+  const lists = Array.isArray(payload?.value) ? payload.value : [];
+  const defaultList = lists.find((item: Record<string, unknown>) =>
+    String(item.wellknownListName || "").toLowerCase() === "defaultlist"
+  ) ?? lists[0];
+
+  return defaultList?.id ? String(defaultList.id) : null;
+}
+
+async function listChecklistItems(
+  accessToken: string,
+  taskListId: string,
+  externalTaskId: string,
+): Promise<Array<{ id: string; displayName: string; isChecked: boolean }>> {
+  const payload = await outlookApi(
+    accessToken,
+    `/me/todo/lists/${encodeURIComponent(taskListId)}/tasks/${encodeURIComponent(externalTaskId)}/checklistItems?$select=id,displayName,isChecked`,
+    "GET",
+  );
+  const items = Array.isArray(payload?.value) ? payload.value : [];
+  return items.map((item: Record<string, unknown>) => ({
+    id: String(item.id || ""),
+    displayName: String(item.displayName || "Untitled"),
+    isChecked: Boolean(item.isChecked),
+  }));
+}
+
+async function syncChecklistItemsFromSubtasks(
+  supabase: any,
+  accessToken: string,
+  userId: string,
+  taskId: string,
+  taskListId: string,
+  externalTaskId: string,
+) {
+  const subtasks = await getTaskSubtasks(supabase, userId, taskId);
+  const existing = await listChecklistItems(accessToken, taskListId, externalTaskId).catch(() => []);
+
+  for (const item of existing) {
+    try {
+      await outlookApi(
+        accessToken,
+        `/me/todo/lists/${encodeURIComponent(taskListId)}/tasks/${encodeURIComponent(externalTaskId)}/checklistItems/${encodeURIComponent(item.id)}`,
+        "DELETE",
+      );
+    } catch {
+      // Best-effort cleanup.
+    }
+  }
+
+  for (const subtask of subtasks) {
+    const created = await outlookApi(
+      accessToken,
+      `/me/todo/lists/${encodeURIComponent(taskListId)}/tasks/${encodeURIComponent(externalTaskId)}/checklistItems`,
+      "POST",
+      { displayName: subtask.title },
+    );
+
+    if (subtask.completed) {
+      try {
+        await outlookApi(
+          accessToken,
+          `/me/todo/lists/${encodeURIComponent(taskListId)}/tasks/${encodeURIComponent(externalTaskId)}/checklistItems/${encodeURIComponent(String(created.id))}`,
+          "PATCH",
+          { isChecked: true },
+        );
+      } catch {
+        // Best-effort completion state sync.
+      }
+    }
+  }
 }
 
 Deno.serve(async (req) => {
@@ -494,7 +672,7 @@ Deno.serve(async (req) => {
     const clientSecret = Deno.env.get("OUTLOOK_CLIENT_SECRET");
 
     if (!clientId || !clientSecret) {
-      return jsonResponse({ error: "Outlook Calendar integration not configured" }, 500);
+      return jsonResponse({ error: "Outlook To Do integration not configured" }, 500);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -510,47 +688,44 @@ Deno.serve(async (req) => {
     const connection = await getOutlookConnection(supabase, userId);
     const accessToken = await refreshAccessTokenIfNeeded(supabase, connection, clientId, clientSecret);
 
-    if (action === "createLinkedEvent") {
+    if (action === "createLinkedTask") {
       const taskId = (body?.taskId || body?.task_id) as string | undefined;
-      if (!taskId) {
-        return jsonResponse({ error: "taskId is required" }, 400);
-      }
+      if (!taskId) return jsonResponse({ error: "taskId is required" }, 400);
 
       const task = await getTaskById(supabase, userId, taskId);
       const syncMode = normalizeSyncMode(body?.syncMode ?? body?.sync_mode ?? connection.sync_mode);
-      const externalCalendarId =
-        (body?.calendarId || body?.calendar_id) as string | undefined ||
-        connection.primary_calendar_id ||
-        connection.calendar_id;
+      const externalTaskListId =
+        (body?.taskListId || body?.task_list_id) as string | undefined ||
+        connection.primary_task_list_id ||
+        await getDefaultTaskListId(accessToken);
 
-      if (!externalCalendarId) {
-        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
+      if (!externalTaskListId) {
+        return jsonResponse({ error: "No Outlook task list selected" }, 400);
       }
 
-      const eventPayload = toOutlookEventPayload(task, {
+      const payload = toOutlookTodoPayload(task, {
         title: body?.title,
         description: body?.description,
-        location: body?.location,
       });
 
-      const event = await outlookApi(
+      const remoteTask = await outlookApi(
         accessToken,
-        `/me/calendars/${encodeURIComponent(externalCalendarId)}/events`,
+        `/me/todo/lists/${encodeURIComponent(externalTaskListId)}/tasks`,
         "POST",
-        eventPayload,
+        payload,
       );
 
       const nowIso = new Date().toISOString();
       const { error: linkError } = await supabase
-        .from("quest_calendar_links")
+        .from("quest_outlook_task_links")
         .upsert(
           {
             user_id: userId,
             task_id: task.id,
             connection_id: connection.id,
             provider: "outlook",
-            external_calendar_id: externalCalendarId,
-            external_event_id: event.id,
+            external_task_list_id: externalTaskListId,
+            external_task_id: remoteTask.id,
             sync_mode: syncMode,
             last_app_sync_at: nowIso,
             last_provider_sync_at: nowIso,
@@ -560,32 +735,39 @@ Deno.serve(async (req) => {
         );
 
       if (linkError) {
-        return jsonResponse({ error: "Failed to persist task link", details: linkError.message }, 500);
+        return jsonResponse({ error: "Failed to persist Outlook To Do link", details: linkError.message }, 500);
       }
+
+      await syncChecklistItemsFromSubtasks(
+        supabase,
+        accessToken,
+        userId,
+        task.id,
+        externalTaskListId,
+        String(remoteTask.id),
+      );
 
       return jsonResponse({
         success: true,
-        event,
+        task: remoteTask,
         link: {
           taskId: task.id,
           connectionId: connection.id,
-          externalEventId: event.id,
-          externalCalendarId,
+          externalTaskListId,
+          externalTaskId: remoteTask.id,
           syncMode,
         },
       });
     }
 
-    if (action === "updateLinkedEvent") {
+    if (action === "updateLinkedTask") {
       const taskId = (body?.taskId || body?.task_id) as string | undefined;
-      if (!taskId) {
-        return jsonResponse({ error: "taskId is required" }, 400);
-      }
+      if (!taskId) return jsonResponse({ error: "taskId is required" }, 400);
 
       const task = await getTaskById(supabase, userId, taskId);
 
       const { data: link, error: linkError } = await supabase
-        .from("quest_calendar_links")
+        .from("quest_outlook_task_links")
         .select("*")
         .eq("user_id", userId)
         .eq("task_id", taskId)
@@ -593,77 +775,75 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (linkError || !link) {
-        return jsonResponse({ error: "No linked Outlook calendar event found for task" }, 404);
+        return jsonResponse({ error: "No linked Outlook To Do task found for quest" }, 404);
       }
 
-      const externalCalendarId =
-        ((body?.calendarId || body?.calendar_id) as string | undefined) ||
-        link.external_calendar_id ||
-        connection.primary_calendar_id ||
-        connection.calendar_id;
-
-      if (!externalCalendarId) {
-        return jsonResponse({ error: "No primary Outlook calendar selected" }, 400);
+      const externalTaskListId = link.external_task_list_id || connection.primary_task_list_id;
+      if (!externalTaskListId) {
+        return jsonResponse({ error: "No Outlook task list selected" }, 400);
       }
 
-      const eventPayload = toOutlookEventPayload(task, {
+      const payload = toOutlookTodoPayload(task, {
         title: body?.title,
         description: body?.description,
-        location: body?.location,
       });
 
-      const event = await outlookApi(
+      const remoteTask = await outlookApi(
         accessToken,
-        `/me/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+        `/me/todo/lists/${encodeURIComponent(externalTaskListId)}/tasks/${encodeURIComponent(link.external_task_id)}`,
         "PATCH",
-        eventPayload,
+        payload,
       );
 
       const nowIso = new Date().toISOString();
       await supabase
-        .from("quest_calendar_links")
+        .from("quest_outlook_task_links")
         .update({
-          external_calendar_id: externalCalendarId,
           last_app_sync_at: nowIso,
           updated_at: nowIso,
         })
         .eq("id", link.id);
 
-      return jsonResponse({ success: true, event });
+      await syncChecklistItemsFromSubtasks(
+        supabase,
+        accessToken,
+        userId,
+        taskId,
+        externalTaskListId,
+        link.external_task_id,
+      );
+
+      return jsonResponse({ success: true, task: remoteTask });
     }
 
-    if (action === "deleteLinkedEvent") {
+    if (action === "deleteLinkedTask") {
       const taskId = (body?.taskId || body?.task_id) as string | undefined;
-      if (!taskId) {
-        return jsonResponse({ error: "taskId is required" }, 400);
-      }
+      if (!taskId) return jsonResponse({ error: "taskId is required" }, 400);
 
       const { data: links, error: linksError } = await supabase
-        .from("quest_calendar_links")
+        .from("quest_outlook_task_links")
         .select("*")
         .eq("user_id", userId)
         .eq("task_id", taskId)
         .eq("provider", "outlook");
 
       if (linksError) {
-        return jsonResponse({ error: "Failed to fetch linked event", details: linksError.message }, 500);
+        return jsonResponse({ error: "Failed to fetch linked Outlook tasks", details: linksError.message }, 500);
       }
 
-      for (const link of links ?? []) {
-        const externalCalendarId = link.external_calendar_id || connection.primary_calendar_id || connection.calendar_id;
-        if (!externalCalendarId) continue;
-
+      for (const rawLink of links ?? []) {
+        const link = rawLink as OutlookTaskLink;
         try {
           await outlookApi(
             accessToken,
-            `/me/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+            `/me/todo/lists/${encodeURIComponent(link.external_task_list_id)}/tasks/${encodeURIComponent(link.external_task_id)}`,
             "DELETE",
           );
         } catch {
           // Best-effort delete.
         }
 
-        await supabase.from("quest_calendar_links").delete().eq("id", link.id);
+        await supabase.from("quest_outlook_task_links").delete().eq("id", link.id);
       }
 
       return jsonResponse({ success: true, deletedLinks: (links ?? []).length });
@@ -671,7 +851,7 @@ Deno.serve(async (req) => {
 
     if (action === "syncLinkedChanges") {
       const { data: links, error: linksError } = await supabase
-        .from("quest_calendar_links")
+        .from("quest_outlook_task_links")
         .select("*")
         .eq("user_id", userId)
         .eq("provider", "outlook");
@@ -682,20 +862,19 @@ Deno.serve(async (req) => {
 
       let synced = 0;
       let pulledProviderChanges = 0;
-      let removedCancelled = 0;
+      let removedMissing = 0;
 
-      for (const link of links ?? []) {
-        const externalCalendarId = link.external_calendar_id || connection.primary_calendar_id || connection.calendar_id;
-        if (!externalCalendarId) continue;
+      for (const rawLink of links ?? []) {
+        const link = rawLink as OutlookTaskLink;
 
         try {
-          const event = await outlookApi(
+          const remoteTask = await outlookApi(
             accessToken,
-            `/me/calendars/${encodeURIComponent(externalCalendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+            `/me/todo/lists/${encodeURIComponent(link.external_task_list_id)}/tasks/${encodeURIComponent(link.external_task_id)}`,
             "GET",
           );
 
-          const providerUpdatedAt = event?.lastModifiedDateTime ? new Date(event.lastModifiedDateTime) : null;
+          const providerUpdatedAt = remoteTask?.lastModifiedDateTime ? new Date(remoteTask.lastModifiedDateTime) : null;
           const appSyncedAt = link.last_app_sync_at ? new Date(link.last_app_sync_at) : null;
 
           const providerWins =
@@ -705,15 +884,8 @@ Deno.serve(async (req) => {
               ? true
               : providerUpdatedAt.getTime() >= appSyncedAt.getTime();
 
-          if (event?.isCancelled === true) {
-            await supabase.from("daily_tasks").delete().eq("id", link.task_id).eq("user_id", userId);
-            await supabase.from("quest_calendar_links").delete().eq("id", link.id);
-            removedCancelled += 1;
-            continue;
-          }
-
           if (normalizeSyncMode(link.sync_mode) === "full_sync" && providerWins) {
-            const taskPatch = mapOutlookEventToTaskUpdate(event);
+            const taskPatch = mapOutlookTaskToTaskUpdate(remoteTask);
             await supabase
               .from("daily_tasks")
               .update({
@@ -721,23 +893,35 @@ Deno.serve(async (req) => {
                 task_date: taskPatch.task_date,
                 scheduled_time: taskPatch.scheduled_time,
                 estimated_duration: taskPatch.estimated_duration,
+                difficulty: taskPatch.difficulty,
                 reminder_enabled: taskPatch.reminder_enabled,
                 reminder_minutes_before: taskPatch.reminder_minutes_before,
                 recurrence_pattern: taskPatch.recurrence_pattern,
                 recurrence_days: taskPatch.recurrence_days,
                 recurrence_end_date: taskPatch.recurrence_end_date,
                 is_recurring: Boolean(taskPatch.recurrence_pattern),
-                location: taskPatch.location,
                 notes: taskPatch.notes,
               })
               .eq("id", link.task_id)
               .eq("user_id", userId);
 
+            const checklistItems = await listChecklistItems(
+              accessToken,
+              link.external_task_list_id,
+              link.external_task_id,
+            );
+            await replaceSubtasksFromChecklist(
+              supabase,
+              userId,
+              link.task_id,
+              checklistItems.map((item) => ({ displayName: item.displayName, isChecked: item.isChecked })),
+            );
+
             pulledProviderChanges += 1;
           }
 
           await supabase
-            .from("quest_calendar_links")
+            .from("quest_outlook_task_links")
             .update({
               last_provider_sync_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -745,8 +929,13 @@ Deno.serve(async (req) => {
             .eq("id", link.id);
 
           synced += 1;
-        } catch {
-          await supabase.from("quest_calendar_links").delete().eq("id", link.id);
+        } catch (error) {
+          if (isOutlookNotFoundError(error)) {
+            await supabase.from("quest_outlook_task_links").delete().eq("id", link.id);
+            removedMissing += 1;
+            continue;
+          }
+          throw error;
         }
       }
 
@@ -754,7 +943,7 @@ Deno.serve(async (req) => {
         success: true,
         linksChecked: synced,
         pulledProviderChanges,
-        removedCancelled,
+        removedMissing,
       });
     }
 

@@ -13,6 +13,7 @@ export interface Habit {
   title: string;
   frequency: string;
   custom_days: number[] | null;
+  custom_month_days: number[] | null;
   difficulty: string | null;
   category: HabitCategory | null;
   is_active: boolean | null;

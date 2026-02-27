@@ -8,6 +8,7 @@ interface Habit {
   difficulty: string;
   frequency: string;
   custom_days: number[];
+  custom_month_days?: number[] | null;
   preferred_time?: string;
   reminder_enabled?: boolean;
   reminder_minutes_before?: number;
@@ -31,9 +32,19 @@ const formatTime = (time: string) => {
 };
 
 // Format days for display - show day chips or readable text
-const formatDaysDisplay = (frequency: string, days: number[]): { type: 'text' | 'chips', value: string | number[] } => {
-  if (frequency === 'daily' || (!days || days.length === 0) || days.length === 7) {
+const formatDaysDisplay = (
+  frequency: string,
+  days: number[],
+  monthDays?: number[] | null,
+): { type: 'text' | 'chips', value: string | number[] } => {
+  if (frequency === 'daily' || ((!days || days.length === 0) && (!monthDays || monthDays.length === 0)) || days.length === 7) {
     return { type: 'text', value: 'Daily' };
+  }
+  if (frequency === 'monthly') {
+    return { type: 'text', value: `Monthly • ${monthDays?.join(', ') || '1'}` };
+  }
+  if (frequency === 'custom' && monthDays && monthDays.length > 0) {
+    return { type: 'text', value: `Custom (M) • ${monthDays.join(', ')}` };
   }
   // Check for weekdays
   if (days.length === 5 && [0,1,2,3,4].every(d => days.includes(d))) {
@@ -49,7 +60,7 @@ export const EpicHabitList = memo(({ habits, onRemove, onEdit }: EpicHabitListPr
   return (
     <div className="space-y-2">
       {habits.map((habit, index) => {
-        const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days);
+        const daysDisplay = formatDaysDisplay(habit.frequency, habit.custom_days, habit.custom_month_days);
         
         return (
           <div key={index} className="flex items-center justify-between p-3 bg-accent/20 rounded-lg">

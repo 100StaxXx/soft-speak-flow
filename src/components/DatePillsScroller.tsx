@@ -23,7 +23,6 @@ interface DatePillsScrollerProps {
 const EDGE_THRESHOLD_PX = 80;
 const DEFAULT_EXTENSION_CHUNK = 14;
 const CENTER_RETRY_ATTEMPTS = 8;
-const SCROLL_IDLE_DELAY_MS = 3000;
 const PROGRAMMATIC_SCROLL_GUARD_MS = 500;
 
 const triggerHaptic = async (style: ImpactStyle) => {
@@ -60,7 +59,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   const pendingCenterAfterExpansionRef = useRef(false);
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollResetTimeoutRef = useRef<number | null>(null);
-  const scrollIdleTimeoutRef = useRef<number | null>(null);
 
   const [rangeStart, setRangeStart] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).start);
   const [rangeEnd, setRangeEnd] = useState<Date>(() => getInitialRange(selectedDate, daysToShow).end);
@@ -164,12 +162,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     programmaticScrollResetTimeoutRef.current = null;
   }, []);
 
-  const clearScrollIdleTimeout = useCallback(() => {
-    if (scrollIdleTimeoutRef.current === null) return;
-    window.clearTimeout(scrollIdleTimeoutRef.current);
-    scrollIdleTimeoutRef.current = null;
-  }, []);
-
   const requestCenterSelectedDate = useCallback(() => {
     setCenterRequestVersion((currentVersion) => currentVersion + 1);
   }, []);
@@ -185,21 +177,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
     }, PROGRAMMATIC_SCROLL_GUARD_MS);
   }, [clearProgrammaticScrollResetTimeout]);
 
-  const scheduleCenterAfterScrollIdle = useCallback(() => {
-    if (!isActive) return;
-
-    if (typeof window === "undefined") {
-      requestCenterSelectedDate();
-      return;
-    }
-
-    clearScrollIdleTimeout();
-    scrollIdleTimeoutRef.current = window.setTimeout(() => {
-      scrollIdleTimeoutRef.current = null;
-      requestCenterSelectedDate();
-    }, SCROLL_IDLE_DELAY_MS);
-  }, [clearScrollIdleTimeout, isActive, requestCenterSelectedDate]);
-
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -208,10 +185,6 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         pendingCenterAfterExpansionRef.current = true;
       }
       return;
-    }
-
-    if (!isProgrammaticScrollRef.current) {
-      scheduleCenterAfterScrollIdle();
     }
 
     const { scrollLeft, clientWidth, scrollWidth } = container;
@@ -232,7 +205,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
       pendingCenterAfterExpansionRef.current = true;
       setRangeEnd((currentEnd) => addDays(currentEnd, extensionChunk));
     }
-  }, [extensionChunk, scheduleCenterAfterScrollIdle]);
+  }, [extensionChunk]);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -268,7 +241,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
 
   useLayoutEffect(() => {
     recalculateEdgeSpacers();
-  }, [dates, selectedDate, isActive, recalculateEdgeSpacers]);
+  }, [dates, isActive, recalculateEdgeSpacers, selectedDateKey]);
 
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return;
@@ -286,19 +259,13 @@ export const DatePillsScroller = memo(function DatePillsScroller({
   }, [recalculateEdgeSpacers]);
 
   useEffect(() => {
-    if (isActive) return;
-    clearScrollIdleTimeout();
-  }, [clearScrollIdleTimeout, isActive]);
-
-  useEffect(() => {
     return () => {
-      clearScrollIdleTimeout();
       clearProgrammaticScrollResetTimeout();
       isProgrammaticScrollRef.current = false;
     };
-  }, [clearProgrammaticScrollResetTimeout, clearScrollIdleTimeout]);
+  }, [clearProgrammaticScrollResetTimeout]);
 
-  // Keep selected date centered after selected-date changes and scroll-idle events.
+  // Keep selected date centered after selected-date and activation changes.
   useLayoutEffect(() => {
     if (!isActive) return;
 
@@ -375,7 +342,7 @@ export const DatePillsScroller = memo(function DatePillsScroller({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [calculateEdgeSpacerWidth, centerRequestVersion, dates, edgeSpacerWidth, getSelectedPillElement, isActive, markProgrammaticScroll, prefersReducedMotion, selectedDate]);
+  }, [calculateEdgeSpacerWidth, centerRequestVersion, dates, edgeSpacerWidth, getSelectedPillElement, isActive, markProgrammaticScroll, prefersReducedMotion, selectedDateKey]);
 
   return (
     <div

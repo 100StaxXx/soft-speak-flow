@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { StoryTypeSlug } from '@/types/narrativeTypes';
 
+export type JourneyExecutionModel = 'sequential' | 'overlap_early';
+
 export interface JourneyPhase {
   id: string;
   name: string;
@@ -26,8 +28,10 @@ export interface JourneyRitual {
   id: string;
   title: string;
   description: string;
-  frequency: 'daily' | '5x_week' | '3x_week' | 'weekly' | 'custom';
+  frequency: 'daily' | '5x_week' | '3x_week' | 'weekly' | 'monthly' | 'custom';
   customDays?: number[]; // 0-6 representing Mon-Sun
+  customMonthDays?: number[]; // 1-31 representing days of the month
+  customPeriod?: 'week' | 'month';
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedMinutes?: number;
 }
@@ -48,6 +52,8 @@ export interface JourneySchedule {
   suggestedChapterCount: number;
   suggestedStoryType?: StoryTypeSlug;
   suggestedThemeColor?: string;
+  executionModel: JourneyExecutionModel;
+  planningStyleReason?: string;
 }
 
 interface GenerateScheduleParams {

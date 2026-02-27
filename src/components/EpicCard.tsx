@@ -81,6 +81,7 @@ interface Epic {
       frequency?: string;
       estimated_minutes?: number;
       custom_days?: number[] | null;
+      custom_month_days?: number[] | null;
     };
   }>;
 }
@@ -340,6 +341,7 @@ export const EpicCard = ({ epic, onComplete, onAbandon }: EpicCardProps) => {
                 frequency: eh.habits?.frequency,
                 estimated_minutes: eh.habits?.estimated_minutes,
                 custom_days: eh.habits?.custom_days,
+                custom_month_days: eh.habits?.custom_month_days,
               }))}
             isActive={isActive}
             onAdjustPlan={() => setShowAdjustDialog(true)}

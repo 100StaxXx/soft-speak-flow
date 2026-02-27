@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     current_image_url: string | null;
     cached_creature_name?: string | null;
     spirit_animal: string;
+    core_element?: string | null;
   } | null,
   from: vi.fn(),
   evolutionMaybeSingle: vi.fn(),
@@ -72,10 +73,14 @@ describe("TalkPopupContext", () => {
         const chain = {
           select: vi.fn(),
           eq: vi.fn(),
+          order: vi.fn(),
+          limit: vi.fn(),
           maybeSingle: mocks.evolutionMaybeSingle,
         };
         chain.select.mockReturnValue(chain);
         chain.eq.mockReturnValue(chain);
+        chain.order.mockReturnValue(chain);
+        chain.limit.mockReturnValue(chain);
         return chain;
       }
 
@@ -142,13 +147,14 @@ describe("TalkPopupContext", () => {
     expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-2");
   });
 
-  it("returns empty name when no creature name is available and never falls back to species", async () => {
+  it("assigns a proper name when no creature name is available and never falls back to species", async () => {
     mocks.companion = {
       id: "comp-3",
       current_stage: 1,
       current_image_url: null,
       cached_creature_name: null,
       spirit_animal: "eagle",
+      core_element: "air",
     };
     mocks.evolutionMaybeSingle.mockResolvedValue({ data: null });
 
@@ -162,7 +168,9 @@ describe("TalkPopupContext", () => {
       expect(screen.getByTestId("popup-props")).toHaveAttribute("data-visible", "true");
     });
 
-    expect(screen.getByTestId("popup-props")).toHaveAttribute("data-name", "");
+    const resolvedName = screen.getByTestId("popup-props").getAttribute("data-name");
+    expect(resolvedName).toBeTruthy();
+    expect(resolvedName).not.toBe("eagle");
   });
 
   it("respects explicit caller-provided companionName override", async () => {

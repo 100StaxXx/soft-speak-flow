@@ -16,11 +16,12 @@ const normalizeDifficulty = (value: string): 'easy' | 'medium' | 'hard' => {
 };
 
 // Helper to normalize frequency values to valid database enum
-const normalizeFrequency = (value: string): 'daily' | '5x_week' | '3x_week' | 'custom' => {
+const normalizeFrequency = (value: string): 'daily' | '5x_week' | '3x_week' | 'monthly' | 'custom' => {
   const lower = value?.toLowerCase()?.trim()?.replace(/\s+/g, '_') || 'daily';
   if (['daily', 'everyday', 'every_day', '7x_week', '7x'].includes(lower)) return 'daily';
   if (['5x_week', '5x', 'weekdays', 'five_times', '5_times'].includes(lower)) return '5x_week';
   if (['3x_week', '3x', 'three_times', '3_times', 'thrice'].includes(lower)) return '3x_week';
+  if (['monthly', 'month', 'every_month'].includes(lower)) return 'monthly';
   if (['weekly', 'biweekly', 'twice', '2x', '2x_week', 'once', '1x', 'custom', 'twice_daily'].includes(lower)) return 'custom';
   return 'daily';
 };
@@ -58,6 +59,7 @@ interface CreatedHabit {
   difficulty: string;
   frequency: string;
   custom_days: number[] | null;
+  custom_month_days: number[] | null;
 }
 
 // Type for epic record
@@ -167,7 +169,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
           *,
           epic_habits(
             habit_id,
-            habits(id, title, difficulty, description, frequency, estimated_minutes, custom_days, preferred_time, category)
+            habits(id, title, difficulty, description, frequency, estimated_minutes, custom_days, custom_month_days, preferred_time, category)
           )
         `)
         .eq("user_id", user.id)
@@ -200,6 +202,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         difficulty: string;
         frequency: string;
         custom_days: number[];
+        custom_month_days?: number[];
         preferred_time?: string;
         reminder_enabled?: boolean;
         reminder_minutes_before?: number;
@@ -262,11 +265,15 @@ export const useEpics = (options: EpicsOptions = {}) => {
               const normalizedFreq = normalizeFrequency(habit.frequency);
               // Ensure custom_days has a default for non-daily frequencies
               let customDays = habit.custom_days?.length > 0 ? habit.custom_days : null;
+              let customMonthDays = habit.custom_month_days?.length ? habit.custom_month_days : null;
               if (!customDays && normalizedFreq !== 'daily') {
                 // Set default days based on frequency
                 if (normalizedFreq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
                 else if (normalizedFreq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
                 else if (normalizedFreq === 'custom') customDays = [0]; // Default Monday
+              }
+              if (!customMonthDays && normalizedFreq === 'monthly') {
+                customMonthDays = [1];
               }
               return {
                 user_id: currentUserId,
@@ -275,6 +282,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
                 difficulty: normalizeDifficulty(habit.difficulty),
                 frequency: normalizedFreq,
                 custom_days: customDays,
+                custom_month_days: customMonthDays,
                 preferred_time: habit.preferred_time || null,
                 reminder_enabled: habit.reminder_enabled || false,
                 reminder_minutes_before: habit.reminder_minutes_before || 15,
@@ -532,6 +540,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
+      queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       window.dispatchEvent(new CustomEvent("campaign-created"));
       toast.success("Campaign created! 🎯", {

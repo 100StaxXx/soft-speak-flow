@@ -99,8 +99,9 @@ const Journeys = () => {
   } = useStreakAtRisk();
 
   const syncSelectedDateToTodayIfStale = useCallback(() => {
+    if (showAddSheet) return;
     setSelectedDate((currentDate) => getTodayIfDateStale(currentDate));
-  }, []);
+  }, [showAddSheet]);
 
   useEffect(() => {
     if (isTabActive && !previousIsTabActiveRef.current) {
@@ -232,6 +233,7 @@ const Journeys = () => {
   
   // Auto-surface habits and spawn recurring tasks (with ref to prevent infinite loop)
   const hasSurfacedRef = useRef(false);
+  const lastSurfacedHabitCountRef = useRef(0);
   const hasSpawnedRecurringRef = useRef(false);
   const dateKeyRef = useRef(format(selectedDate, 'yyyy-MM-dd'));
 
@@ -243,12 +245,25 @@ const Journeys = () => {
     if (dateKeyRef.current !== currentDateKey) {
       dateKeyRef.current = currentDateKey;
       hasSurfacedRef.current = false;
+      lastSurfacedHabitCountRef.current = 0;
       hasSpawnedRecurringRef.current = false;
     }
     
-    // Surface habits once per date
-    if (unsurfacedEpicHabitsCount > 0 && !hasSurfacedRef.current) {
+    if (unsurfacedEpicHabitsCount === 0) {
+      hasSurfacedRef.current = false;
+      lastSurfacedHabitCountRef.current = 0;
+    }
+
+    // Surface habits when a date first loads and again if new habits appear later that same day.
+    if (
+      unsurfacedEpicHabitsCount > 0 &&
+      (
+        !hasSurfacedRef.current ||
+        unsurfacedEpicHabitsCount > lastSurfacedHabitCountRef.current
+      )
+    ) {
       hasSurfacedRef.current = true;
+      lastSurfacedHabitCountRef.current = unsurfacedEpicHabitsCount;
       surfaceAllEpicHabits();
     }
     
@@ -291,7 +306,7 @@ const Journeys = () => {
       // Fetch habit data to get frequency and custom_days (source of truth)
       const { data: habit } = await supabase
         .from('habits')
-        .select('frequency, custom_days, description')
+        .select('frequency, custom_days, custom_month_days, description')
         .eq('id', task.habit_source_id)
         .maybeSingle();
       
@@ -304,6 +319,7 @@ const Journeys = () => {
         difficulty: task.difficulty || 'medium',
         frequency: habit?.frequency || 'daily',
         custom_days: habit?.custom_days || [],
+        custom_month_days: habit?.custom_month_days || [],
         estimated_minutes: task.estimated_duration,
         preferred_time: task.scheduled_time,
         category: task.category as 'mind' | 'body' | 'soul' | null,

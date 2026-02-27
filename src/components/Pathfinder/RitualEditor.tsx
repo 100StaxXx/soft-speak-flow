@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { RitualCard } from './RitualCard';
 import { cn } from '@/lib/utils';
 import type { JourneyRitual } from '@/hooks/useJourneySchedule';
+import { estimateOccurrencesPerWeek } from '@/utils/habitSchedule';
 
 interface RitualEditorProps {
   rituals: JourneyRitual[];
@@ -28,14 +29,12 @@ export function RitualEditor({
   const weeklyMinutes = useMemo(() => {
     return rituals.reduce((total, ritual) => {
       const minutes = ritual.estimatedMinutes || 15;
-      const multiplierMap: Record<string, number> = {
-        daily: 7,
-        '5x_week': 5,
-        '3x_week': 3,
-        weekly: 1, // backwards compat
-        custom: 3, // default assumption
-      };
-      const multiplier = multiplierMap[ritual.frequency] || 3;
+      const multiplier = estimateOccurrencesPerWeek({
+        frequency: ritual.frequency,
+        custom_days: ritual.customDays,
+        custom_month_days: ritual.customMonthDays,
+        customPeriod: ritual.customPeriod,
+      });
       return total + (minutes * multiplier);
     }, 0);
   }, [rituals]);

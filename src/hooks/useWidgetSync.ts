@@ -58,12 +58,13 @@ export const useWidgetSync = (
     // Separate quests and rituals
     const quests = tasks.filter(task => !task.habit_source_id);
     const rituals = tasks.filter(task => !!task.habit_source_id);
+    const sortedQuests = sortQuestsForWidget(quests);
 
     const completedCount = quests.filter(t => !!t.completed).length;
     const ritualCompleted = rituals.filter(t => !!t.completed).length;
 
     // Map quests to widget format (limit to 10 for performance)
-    const widgetTasks: WidgetTask[] = quests.slice(0, 10).map(task => ({
+    const widgetTasks: WidgetTask[] = sortedQuests.slice(0, 10).map(task => ({
       id: task.id,
       text: task.task_text,
       completed: task.completed ?? false,
@@ -229,6 +230,35 @@ function getSection(scheduledTime: string | null): string {
   if (hour < 12) return 'morning';
   if (hour < 17) return 'afternoon';
   return 'evening';
+}
+
+function sortQuestsForWidget(quests: DailyTask[]): DailyTask[] {
+  return quests
+    .map((task, index) => ({ task, index }))
+    .sort((left, right) => {
+      const leftScheduled = !!left.task.scheduled_time;
+      const rightScheduled = !!right.task.scheduled_time;
+
+      if (leftScheduled && rightScheduled) {
+        const byTime = (left.task.scheduled_time ?? '').localeCompare(right.task.scheduled_time ?? '');
+        if (byTime !== 0) {
+          return byTime;
+        }
+
+        return left.index - right.index;
+      }
+
+      if (leftScheduled) {
+        return -1;
+      }
+
+      if (rightScheduled) {
+        return 1;
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ task }) => task);
 }
 
 function getLocalDateString(date = new Date()): string {

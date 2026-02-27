@@ -24,7 +24,7 @@ export default function SharedEpics() {
         .select(`
           *,
           epic_habits(
-            habit:habits(id, title, difficulty, frequency, custom_days)
+            habit:habits(id, title, difficulty, frequency, custom_days, custom_month_days)
           )
         `)
         .eq('is_public', true)
@@ -66,7 +66,7 @@ export default function SharedEpics() {
         .select(`
           *,
           epic_habits(
-            habit:habits(id, title, difficulty, frequency, custom_days)
+            habit:habits(id, title, difficulty, frequency, custom_days, custom_month_days)
           )
         `)
         .eq('id', epicId)
@@ -100,12 +100,13 @@ export default function SharedEpics() {
 
       // Copy habits to user's account and link to the ORIGINAL epic
       if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habit: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
+        const habitsToCreate = epic.epic_habits.map((eh: { habit: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null; custom_month_days?: number[] | null } }) => ({
           user_id: user.id,
           title: eh.habit.title,
           difficulty: eh.habit.difficulty,
           frequency: eh.habit.frequency || 'daily',
           custom_days: eh.habit.custom_days || null,
+          custom_month_days: eh.habit.custom_month_days || null,
         }));
 
         const { data: newHabits, error: habitsError } = await supabase

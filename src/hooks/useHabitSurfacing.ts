@@ -2,8 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { parseISO } from 'date-fns';
 import { categorizeQuest } from '@/utils/questCategorization';
 import { getEffectiveMissionDate, getEffectiveDayOfWeek } from '@/utils/timezone';
+import { isHabitScheduledForDate } from '@/utils/habitSchedule';
 
 export interface SurfacedHabit {
   id: string;
@@ -19,53 +21,14 @@ export interface SurfacedHabit {
   is_completed: boolean;
   category: string | null;
   custom_days: number[] | null;
+  custom_month_days: number[] | null;
 }
 
 /**
  * Determine if a habit should surface today based on its frequency
  */
-function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number): boolean {
-  const frequency = habit.frequency?.toLowerCase();
-  
-  // Database convention: 0=Mon, 1=Tue, ..., 6=Sun
-  switch (frequency) {
-    case 'daily':
-      return true;
-      
-    case 'weekly':
-      // If custom_days is set, check if today is in the list
-      if (habit.custom_days && habit.custom_days.length > 0) {
-        return habit.custom_days.includes(dayOfWeek);
-      }
-      // Default: surface on Mondays (0) for weekly habits without specific days
-      return dayOfWeek === 0;
-      
-    case 'weekdays':
-    case '5x_week':
-      // Monday (0) through Friday (4)
-      return dayOfWeek >= 0 && dayOfWeek <= 4;
-      
-    case 'weekends':
-      // Saturday (5) and Sunday (6)
-      return dayOfWeek === 5 || dayOfWeek === 6;
-      
-    case '3x_week':
-      // Monday (0), Wednesday (2), Friday (4)
-      if (habit.custom_days && habit.custom_days.length > 0) {
-        return habit.custom_days.includes(dayOfWeek);
-      }
-      return [0, 2, 4].includes(dayOfWeek);
-      
-    case 'custom':
-      if (habit.custom_days && habit.custom_days.length > 0) {
-        return habit.custom_days.includes(dayOfWeek);
-      }
-      return false;
-      
-    default:
-      // Default to daily if frequency is unknown
-      return true;
-  }
+function shouldSurfaceToday(habit: SurfacedHabit, dayOfWeek: number, targetDate: Date): boolean {
+  return isHabitScheduledForDate(habit, targetDate, dayOfWeek);
 }
 
 export function useHabitSurfacing(_selectedDate?: Date) {
@@ -78,6 +41,7 @@ export function useHabitSurfacing(_selectedDate?: Date) {
   const jsDay = getEffectiveDayOfWeek();
   // Convert to our convention: 0=Mon, 1=Tue, ..., 6=Sun
   const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1;
+  const effectiveDate = parseISO(taskDate);
   // Fetch habits that should be surfaced as tasks today
   const { data: surfacedHabits, isLoading, error } = useQuery({
     queryKey: ['habit-surfacing', user?.id, taskDate],
@@ -97,6 +61,7 @@ export function useHabitSurfacing(_selectedDate?: Date) {
           estimated_minutes,
           preferred_time,
           custom_days,
+          custom_month_days,
           epic_habits(epic_id, epics(id, title, status))
         `)
         .eq('user_id', user.id)
@@ -148,6 +113,7 @@ export function useHabitSurfacing(_selectedDate?: Date) {
             is_completed: existingTask?.completed || false,
             category: categorizeQuest(habit.title),
             custom_days: habit.custom_days || null,
+            custom_month_days: habit.custom_month_days || null,
           };
         });
 
@@ -205,7 +171,7 @@ export function useHabitSurfacing(_selectedDate?: Date) {
       // 1. Don't already have a task for today
       // 2. Should surface based on their frequency
       const habitsToSurface = surfacedHabits?.filter(
-        h => !h.task_id && shouldSurfaceToday(h, dayOfWeek)
+        h => !h.task_id && shouldSurfaceToday(h, dayOfWeek, effectiveDate)
       ) || [];
 
       console.log('[Habit Surfacing] Habits to surface:', habitsToSurface.length, habitsToSurface);
@@ -275,7 +241,7 @@ export function useHabitSurfacing(_selectedDate?: Date) {
 
   // Count habits that should surface today but haven't yet
   const unsurfacedCount = surfacedHabits?.filter(
-    h => !h.task_id && shouldSurfaceToday(h, dayOfWeek)
+    h => !h.task_id && shouldSurfaceToday(h, dayOfWeek, effectiveDate)
   ).length || 0;
 
   return {

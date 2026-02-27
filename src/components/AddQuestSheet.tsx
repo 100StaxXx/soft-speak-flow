@@ -99,6 +99,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [taskDate, setTaskDate] = useState<string | null>(format(selectedDate, "yyyy-MM-dd"));
   const [showDurationChips, setShowDurationChips] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [customDurationInput, setCustomDurationInput] = useState("");
   const [sendToCalendar, setSendToCalendar] = useState(false);
@@ -144,6 +145,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setContactId(null);
       setAutoLogInteraction(true);
       setShowDurationChips(false);
+      setShowDatePicker(false);
       setShowTimePicker(false);
       setSubtasks([]);
       setSendToCalendar(false);
@@ -383,7 +385,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="px-4 py-4 space-y-3">
             {/* Duration Row (tappable, expands to chips) */}
             <button
@@ -457,7 +459,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             {/* Date & Time Chips side by side */}
             <div className="flex gap-2">
               {/* Date Chip */}
-              <Popover>
+              <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
                 <PopoverTrigger asChild>
                   <button className={cn(
                     "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
@@ -473,7 +475,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   <Calendar
                     mode="single"
                     selected={dateObj}
-                    onSelect={(date) => setTaskDate(date ? format(date, "yyyy-MM-dd") : null)}
+                    onSelect={(date) => {
+                      setTaskDate(date ? format(date, "yyyy-MM-dd") : null);
+                      if (date) {
+                        setShowDatePicker(false);
+                      }
+                    }}
                     className="pointer-events-auto"
                   />
                 </PopoverContent>

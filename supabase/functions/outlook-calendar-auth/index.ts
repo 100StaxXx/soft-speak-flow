@@ -10,8 +10,9 @@ const MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0
 const MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 const MICROSOFT_ME_URL = "https://graph.microsoft.com/v1.0/me";
 const MICROSOFT_CALENDARS_URL = "https://graph.microsoft.com/v1.0/me/calendars?$select=id,name,isDefaultCalendar";
+const MICROSOFT_TASK_LISTS_URL = "https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName,wellknownListName";
 
-const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite"].join(" ");
+const SCOPES = ["offline_access", "User.Read", "Calendars.ReadWrite", "Tasks.ReadWrite"].join(" ");
 
 type SyncMode = "send_only" | "full_sync";
 
@@ -20,7 +21,9 @@ type Action =
   | "exchangeCode"
   | "status"
   | "listCalendars"
+  | "listTaskLists"
   | "setPrimaryCalendar"
+  | "setPrimaryTaskList"
   | "setSyncMode"
   | "disconnect"
   | "refreshToken";
@@ -41,8 +44,12 @@ function normalizeAction(raw: string | undefined): Action | null {
     status: "status",
     listCalendars: "listCalendars",
     list_calendars: "listCalendars",
+    listTaskLists: "listTaskLists",
+    list_task_lists: "listTaskLists",
     setPrimaryCalendar: "setPrimaryCalendar",
     set_primary_calendar: "setPrimaryCalendar",
+    setPrimaryTaskList: "setPrimaryTaskList",
+    set_primary_task_list: "setPrimaryTaskList",
     setSyncMode: "setSyncMode",
     set_sync_mode: "setSyncMode",
     disconnect: "disconnect",
@@ -170,6 +177,28 @@ async function listOutlookCalendars(accessToken: string): Promise<Array<{ id: st
   }));
 }
 
+async function listOutlookTaskLists(
+  accessToken: string,
+): Promise<Array<{ id: string; name: string; isDefaultTaskList: boolean }>> {
+  const resp = await fetch(MICROSOFT_TASK_LISTS_URL, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!resp.ok) {
+    const details = await resp.text();
+    throw new Error(`Failed to list Outlook task lists: ${details}`);
+  }
+
+  const payload = await resp.json();
+  const items = Array.isArray(payload.value) ? payload.value : [];
+
+  return items.map((item: Record<string, unknown>) => ({
+    id: String(item.id || ""),
+    name: String(item.displayName || "Untitled list"),
+    isDefaultTaskList: String(item.wellknownListName || "").toLowerCase() === "defaultlist",
+  }));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -294,6 +323,13 @@ Deno.serve(async (req) => {
 
       const calendars = await listOutlookCalendars(accessToken);
       const primary = calendars.find((c) => c.isDefaultCalendar) ?? calendars[0] ?? null;
+      let taskLists: Array<{ id: string; name: string; isDefaultTaskList: boolean }> = [];
+      try {
+        taskLists = await listOutlookTaskLists(accessToken);
+      } catch {
+        taskLists = [];
+      }
+      const primaryTaskList = taskLists.find((list) => list.isDefaultTaskList) ?? taskLists[0] ?? null;
 
       const { data: existing } = await supabase
         .from("user_calendar_connections")
@@ -315,6 +351,8 @@ Deno.serve(async (req) => {
             calendar_email: calendarEmail,
             primary_calendar_id: primary?.id ?? null,
             primary_calendar_name: primary?.name ?? null,
+            primary_task_list_id: primaryTaskList?.id ?? null,
+            primary_task_list_name: primaryTaskList?.name ?? null,
             sync_enabled: true,
             sync_mode: requestedSyncMode,
             platform: "web",
@@ -322,7 +360,9 @@ Deno.serve(async (req) => {
           },
           { onConflict: "user_id,provider" },
         )
-        .select("id, provider, calendar_email, primary_calendar_id, primary_calendar_name, sync_mode, sync_enabled, platform")
+        .select(
+          "id, provider, calendar_email, primary_calendar_id, primary_calendar_name, primary_task_list_id, primary_task_list_name, sync_mode, sync_enabled, platform",
+        )
         .single();
 
       if (upsertError) {
@@ -333,6 +373,7 @@ Deno.serve(async (req) => {
         success: true,
         connection,
         calendars,
+        taskLists,
         calendarEmail,
       });
     }
@@ -361,6 +402,8 @@ Deno.serve(async (req) => {
         calendarEmail: connection?.calendar_email ?? null,
         primaryCalendarId: connection?.primary_calendar_id ?? null,
         primaryCalendarName: connection?.primary_calendar_name ?? null,
+        primaryTaskListId: connection?.primary_task_list_id ?? null,
+        primaryTaskListName: connection?.primary_task_list_name ?? null,
         syncEnabled: connection?.sync_enabled ?? false,
         syncMode: connection?.sync_mode ?? "send_only",
         lastSyncedAt: connection?.last_synced_at ?? null,
@@ -411,6 +454,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ calendars });
     }
 
+    if (action === "listTaskLists") {
+      const taskLists = await listOutlookTaskLists(accessToken);
+      return jsonResponse({ taskLists });
+    }
+
     if (action === "setPrimaryCalendar") {
       const calendarId = (body?.calendarId || body?.calendar_id) as string | undefined;
       const calendarName = (body?.calendarName || body?.calendar_name) as string | undefined;
@@ -440,6 +488,36 @@ Deno.serve(async (req) => {
       }
 
       return jsonResponse({ success: true, primaryCalendarId: calendarId, primaryCalendarName: resolvedName });
+    }
+
+    if (action === "setPrimaryTaskList") {
+      const taskListId = (body?.taskListId || body?.task_list_id) as string | undefined;
+      const taskListName = (body?.taskListName || body?.task_list_name) as string | undefined;
+
+      if (!taskListId) {
+        return jsonResponse({ error: "taskListId is required" }, 400);
+      }
+
+      let resolvedName = taskListName ?? null;
+      if (!resolvedName) {
+        const taskLists = await listOutlookTaskLists(accessToken);
+        resolvedName = taskLists.find((list) => list.id === taskListId)?.name ?? taskListId;
+      }
+
+      const { error } = await supabase
+        .from("user_calendar_connections")
+        .update({
+          primary_task_list_id: taskListId,
+          primary_task_list_name: resolvedName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", connection.id);
+
+      if (error) {
+        return jsonResponse({ error: "Failed to set primary task list", details: error.message }, 500);
+      }
+
+      return jsonResponse({ success: true, primaryTaskListId: taskListId, primaryTaskListName: resolvedName });
     }
 
     return jsonResponse({ error: "Unsupported action" }, 400);

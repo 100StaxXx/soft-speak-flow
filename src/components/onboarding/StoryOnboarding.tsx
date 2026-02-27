@@ -22,6 +22,7 @@ import { generateMentorExplanation, type MentorExplanation } from "@/utils/mento
 import { useCompanion } from "@/hooks/useCompanion";
 import { pollWithDeadline } from "@/utils/asyncTimeout";
 import { logger } from "@/utils/logger";
+import { isAssignedCompanionName, resolveCompanionName } from "@/lib/companionName";
 import {
   filterMentorsByEnergyPreference,
   type EnergyPreference,
@@ -225,10 +226,14 @@ export const StoryOnboarding = () => {
     }));
   }, []);
 
-  const waitForCompanionDisplayName = async (companionId: string) => {
+  const waitForCompanionDisplayName = async (
+    companionId: string,
+    spiritAnimal: string,
+    coreElement: string,
+  ) => {
     await new Promise((resolve) => setTimeout(resolve, DISPLAY_NAME_INITIAL_DELAY_MS));
 
-    return pollWithDeadline<string>({
+    const polledName = await pollWithDeadline<string>({
       deadlineMs: DISPLAY_NAME_DEADLINE_MS,
       intervalMs: DISPLAY_NAME_INTERVAL_MS,
       task: async () => {
@@ -244,7 +249,9 @@ export const StoryOnboarding = () => {
           throw error;
         }
 
-        return data?.creature_name ?? null;
+        return isAssignedCompanionName(data?.creature_name, spiritAnimal)
+          ? data?.creature_name ?? null
+          : null;
       },
       onPollError: (error) => {
         logger.warn("Companion display name poll failed", {
@@ -252,6 +259,21 @@ export const StoryOnboarding = () => {
           error: error instanceof Error ? error.message : String(error),
         });
       },
+    });
+
+    if (polledName) {
+      return polledName;
+    }
+
+    return resolveCompanionName({
+      companion: {
+        id: companionId,
+        current_stage: 0,
+        cached_creature_name: null,
+        spirit_animal: spiritAnimal,
+        core_element: coreElement,
+      },
+      fallback: "companion",
     });
   };
 
@@ -599,7 +621,11 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
       });
 
       // Non-blocking display name hydration.
-      void waitForCompanionDisplayName(companionId)
+      void waitForCompanionDisplayName(
+        companionId,
+        preferences.spiritAnimal,
+        preferences.coreElement,
+      )
         .then((displayName) => {
           if (!displayName) {
             logger.warn("Companion display name not ready before deadline", {
@@ -680,6 +706,8 @@ const handleFactionComplete = async (selectedFaction: FactionType) => {
               .from("user_companion")
               .select("id, spirit_animal")
               .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
               .maybeSingle();
 
             if (fetchError) {

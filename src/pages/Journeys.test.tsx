@@ -26,6 +26,14 @@ describe("journeysDateSync", () => {
     expect(synced).toBe(selectedDate);
   });
 
+  it("keeps future selected date unchanged", () => {
+    const selectedDate = new Date("2026-02-15T08:00:00.000Z");
+    const now = new Date("2026-02-13T18:00:00.000Z");
+
+    const synced = getTodayIfDateStale(selectedDate, now);
+    expect(synced).toBe(selectedDate);
+  });
+
   it("keeps same-day selections even when timestamps differ", () => {
     const selectedDate = new Date(2026, 1, 13, 0, 5, 0, 0);
     const now = new Date(2026, 1, 13, 23, 59, 0, 0);

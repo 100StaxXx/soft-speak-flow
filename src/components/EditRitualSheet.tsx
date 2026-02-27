@@ -32,6 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { ParsedTask } from "@/features/tasks/hooks";
+import { inferCustomPeriod } from "@/utils/habitSchedule";
 
 type HabitCategory = 'mind' | 'body' | 'soul';
 type Difficulty = 'easy' | 'medium' | 'hard';
@@ -55,6 +56,7 @@ export interface RitualData {
   preferred_time?: string | null;
   category?: HabitCategory | null;
   custom_days?: number[] | null;
+  custom_month_days?: number[] | null;
   // Task-specific fields (for instance)
   recurrence_pattern?: string | null;
   recurrence_days?: number[] | null;
@@ -98,6 +100,8 @@ export const EditRitualSheet = memo(function EditRitualSheet({
   const [category, setCategory] = useState<HabitCategory>("soul");
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [recurrenceMonthDays, setRecurrenceMonthDays] = useState<number[]>([]);
+  const [customPeriod, setCustomPeriod] = useState<'week' | 'month'>('week');
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -116,6 +120,12 @@ export const EditRitualSheet = memo(function EditRitualSheet({
       setCategory((ritual.category as HabitCategory) || "soul");
       setRecurrencePattern(ritual.recurrence_pattern || null);
       setRecurrenceDays(ritual.recurrence_days || ritual.custom_days || []);
+      setRecurrenceMonthDays(ritual.custom_month_days || []);
+      setCustomPeriod(inferCustomPeriod({
+        frequency: ritual.frequency,
+        custom_days: ritual.custom_days,
+        custom_month_days: ritual.custom_month_days,
+      }));
       setReminderEnabled(ritual.reminder_enabled || false);
       setReminderMinutesBefore(ritual.reminder_minutes_before || 15);
       // Auto-expand advanced if any advanced fields are set
@@ -183,6 +193,7 @@ export const EditRitualSheet = memo(function EditRitualSheet({
         preferred_time: preferredTime || null,
         category,
         custom_days: recurrenceDays.length > 0 ? recurrenceDays : null,
+        custom_month_days: recurrenceMonthDays.length > 0 ? recurrenceMonthDays : null,
       };
 
       const taskUpdates = {
@@ -331,11 +342,15 @@ export const EditRitualSheet = memo(function EditRitualSheet({
             
             {/* Frequency with day picker */}
             <FrequencyPresets
-              frequency={frequency === '3x_week' ? 'custom' : frequency as 'daily' | '5x_week' | 'weekly' | 'custom'}
+              frequency={frequency === '3x_week' ? 'custom' : frequency as 'daily' | '5x_week' | 'weekly' | 'monthly' | 'custom'}
               customDays={recurrenceDays}
-              onFrequencyChange={(newFreq, newDays) => {
+              customMonthDays={recurrenceMonthDays}
+              customPeriod={customPeriod}
+              onFrequencyChange={({ frequency: newFreq, customDays, customMonthDays, customPeriod: nextCustomPeriod }) => {
                 setFrequency(newFreq);
-                setRecurrenceDays(newDays);
+                setRecurrenceDays(customDays);
+                setRecurrenceMonthDays(customMonthDays);
+                setCustomPeriod(nextCustomPeriod);
               }}
             />
 

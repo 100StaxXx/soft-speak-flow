@@ -7,8 +7,10 @@ export interface EpicSuggestion {
   title: string;
   type: 'habit' | 'milestone';
   description: string;
-  frequency?: 'daily' | '5x_week' | '3x_week' | 'custom';
+  frequency?: 'daily' | '5x_week' | '3x_week' | 'monthly' | 'custom';
   customDays?: number[];
+  customMonthDays?: number[];
+  customPeriod?: 'week' | 'month';
   difficulty: 'easy' | 'medium' | 'hard';
   suggestedWeek?: number;
   category?: string;

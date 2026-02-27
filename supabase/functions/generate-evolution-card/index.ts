@@ -10,6 +10,60 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const normalizeName = (value: string | null | undefined) =>
+  typeof value === "string" ? value.trim() : "";
+
+const normalizeComparable = (value: string | null | undefined) =>
+  normalizeName(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+const RESERVED_NAMES = new Set(["", "companion", "your companion", "unknown"]);
+
+const NAME_PREFIXES: Record<string, readonly string[]> = {
+  fire: ["sol", "pyra", "igni", "kae", "ember"],
+  water: ["aqua", "mar", "thal", "nera", "sere"],
+  earth: ["gaia", "bryn", "terra", "mora", "verd"],
+  air: ["aero", "zeph", "lyra", "cael", "syl"],
+  light: ["luma", "heli", "auri", "cira", "sera"],
+  shadow: ["nyx", "umbra", "vela", "mora", "shade"],
+  void: ["vora", "noxa", "zael", "xyra", "khae"],
+  electric: ["vol", "zira", "tesa", "arca", "rael"],
+  cosmic: ["nova", "astra", "oria", "cela", "vexa"],
+  default: ["kae", "lyra", "sera", "nova", "aeri"],
+};
+
+const NAME_MIDDLES = ["l", "r", "v", "th", "n", "s"];
+const NAME_SUFFIXES = ["a", "is", "or", "en", "yn", "el", "ia", "eth"];
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+const hashSeed = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+};
+
+const isAssignedCompanionName = (value: string | null | undefined, species: string) => {
+  const normalized = normalizeComparable(value);
+  if (RESERVED_NAMES.has(normalized)) return false;
+  return normalized !== normalizeComparable(species);
+};
+
+const synthesizeAssignedCompanionName = (seedInput: string, element: string, species: string) => {
+  const normalizedElement = normalizeComparable(element) || "default";
+  const prefixPool = NAME_PREFIXES[normalizedElement] ?? NAME_PREFIXES.default;
+  const seed = hashSeed(`${seedInput}:${normalizedElement}:${normalizeComparable(species)}`);
+  const prefix = prefixPool[seed % prefixPool.length] ?? NAME_PREFIXES.default[0];
+  const middle = NAME_MIDDLES[Math.floor(seed / 7) % NAME_MIDDLES.length] ?? "";
+  const suffix = NAME_SUFFIXES[Math.floor(seed / 17) % NAME_SUFFIXES.length] ?? "a";
+  return capitalize(
+    `${prefix}${middle}${suffix}`
+      .replace(/(.)\1{2,}/g, "$1$1")
+      .replace(/[^a-z]/gi, ""),
+  );
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -185,23 +239,23 @@ Make it LEGENDARY. This is the birth of a companion.`;
       console.log('Using pre-generated Stage 20 card data');
     } else {
       const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are a creative card game designer. Always respond with valid JSON only.' },
-          { role: 'user', content: aiPrompt }
-        ],
-      }),
-    });
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: 'You are a creative card game designer. Always respond with valid JSON only.' },
+            { role: 'user', content: aiPrompt }
+          ],
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      throw new Error(`AI generation failed: ${aiResponse.status}`);
-    }
+      if (!aiResponse.ok) {
+        throw new Error(`AI generation failed: ${aiResponse.status}`);
+      }
 
       const aiData = await aiResponse.json();
       const content = aiData.choices[0].message.content;
@@ -234,6 +288,22 @@ Make it LEGENDARY. This is the birth of a companion.`;
         console.error('Parse error:', e);
         throw new Error('AI response was not valid JSON');
       }
+    }
+
+    if (!isAssignedCompanionName(cardData?.creature_name, species)) {
+      const fallbackName = synthesizeAssignedCompanionName(
+        `${companionId}:${user.id}:${stage}`,
+        element,
+        species,
+      );
+      console.warn("Replacing invalid creature name with synthesized fallback", {
+        invalidName: cardData?.creature_name ?? null,
+        fallbackName,
+        companionId,
+        stage,
+        species,
+      });
+      cardData.creature_name = fallbackName;
     }
 
     // Calculate bond level based on user attributes

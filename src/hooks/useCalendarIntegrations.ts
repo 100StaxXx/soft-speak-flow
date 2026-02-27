@@ -15,6 +15,8 @@ export interface ConnectedCalendar {
   calendar_email: string | null;
   primary_calendar_id: string | null;
   primary_calendar_name: string | null;
+  primary_task_list_id: string | null;
+  primary_task_list_name: string | null;
   sync_mode: CalendarSyncMode;
   sync_enabled: boolean | null;
   platform: 'web' | 'ios';
@@ -29,6 +31,12 @@ interface CalendarUserSettings {
 }
 
 interface ProviderCalendarOption {
+  id: string;
+  name: string;
+  isPrimary?: boolean;
+}
+
+interface ProviderTaskListOption {
   id: string;
   name: string;
   isPrimary?: boolean;
@@ -103,7 +111,9 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
 
       const { data, error } = await supabase
         .from('user_calendar_connections')
-        .select('id, provider, calendar_email, primary_calendar_id, primary_calendar_name, sync_mode, sync_enabled, platform, last_synced_at')
+        .select(
+          'id, provider, calendar_email, primary_calendar_id, primary_calendar_name, primary_task_list_id, primary_task_list_name, sync_mode, sync_enabled, platform, last_synced_at',
+        )
         .eq('user_id', user.id)
         .eq('sync_enabled', true)
         .order('created_at', { ascending: true });
@@ -132,6 +142,7 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
       queryClient.invalidateQueries({ queryKey: ['calendar-user-settings'] }),
       queryClient.invalidateQueries({ queryKey: ['calendar-connections'] }),
       queryClient.invalidateQueries({ queryKey: ['quest-calendar-links'] }),
+      queryClient.invalidateQueries({ queryKey: ['quest-outlook-task-links'] }),
     ]);
   };
 
@@ -360,6 +371,60 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     onSuccess: invalidate,
   });
 
+  const listProviderTaskLists = useMutation({
+    mutationFn: async (provider: Extract<CalendarProvider, 'outlook'>): Promise<ProviderTaskListOption[]> => {
+      const fn = providerToFunction(provider);
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: { action: 'listTaskLists' },
+      });
+
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'list task lists',
+          error,
+        });
+      }
+
+      const taskLists = Array.isArray(data?.taskLists)
+        ? data.taskLists
+        : Array.isArray(data?.task_lists)
+          ? data.task_lists
+          : [];
+
+      return taskLists.map((taskList: Record<string, unknown>) => ({
+        id: String(taskList.id),
+        name: String(taskList.displayName || taskList.name || taskList.id),
+        isPrimary: Boolean(taskList.isDefaultTaskList || taskList.isPrimary),
+      }));
+    },
+  });
+
+  const setPrimaryTaskList = useMutation({
+    mutationFn: async ({ taskListId, taskListName }: { taskListId: string; taskListName?: string }) => {
+      if (!taskListId) throw new Error('taskListId is required');
+
+      const provider: Extract<CalendarProvider, 'outlook'> = 'outlook';
+      const fn = providerToFunction(provider);
+      const { error } = await supabase.functions.invoke(fn, {
+        body: {
+          action: 'setPrimaryTaskList',
+          taskListId,
+          taskListName,
+        },
+      });
+
+      if (error) {
+        throw await toCalendarInvokeError({
+          provider,
+          action: 'set a primary task list',
+          error,
+        });
+      }
+    },
+    onSuccess: invalidate,
+  });
+
   const connectAppleNative = useMutation({
     mutationFn: async ({ syncMode = 'send_only' as CalendarSyncMode } = {}) => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -419,6 +484,8 @@ export function useCalendarIntegrations(options: CalendarIntegrationsOptions = {
     setProviderSyncMode,
     listProviderCalendars,
     setPrimaryCalendar,
+    listProviderTaskLists,
+    setPrimaryTaskList,
     connectAppleNative,
   };
 }

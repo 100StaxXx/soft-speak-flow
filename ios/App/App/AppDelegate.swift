@@ -7,6 +7,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Disable iOS "Shake to Undo" so menu screens do not surface "Undo Typing".
+        application.applicationSupportsShakeToEdit = false
         return true
     }
 

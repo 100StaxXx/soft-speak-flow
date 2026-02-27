@@ -270,6 +270,8 @@ serve(async (req) => {
       .from("user_companion")
       .select("*")
       .eq("user_id", resolvedUserId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (companionError) {

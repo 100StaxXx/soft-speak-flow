@@ -40,10 +40,10 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
       const code = inviteCode.trim().toUpperCase().replace('EPIC-', '');
       const fullCode = `EPIC-${code}`;
 
-      // Look up the epic by invite code (include frequency, custom_days, and story_type for difficulty)
+      // Look up the epic by invite code (include frequency and schedule data for copied rituals)
       const { data: epic, error: epicError } = await supabase
         .from('epics')
-        .select('*, epic_story_types(slug), epic_habits(habit_id, habits(id, title, difficulty, frequency, custom_days))')
+        .select('*, epic_story_types(slug), epic_habits(habit_id, habits(id, title, difficulty, frequency, custom_days, custom_month_days))')
         .eq('invite_code', fullCode)
         .eq('is_public', true)
         .maybeSingle();
@@ -111,12 +111,13 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
 
       // Copy all habits to user's account.
       if (epic.epic_habits && epic.epic_habits.length > 0) {
-        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null } }) => ({
+        const habitsToCreate = epic.epic_habits.map((eh: { habits: { title: string; difficulty: string; frequency?: string; custom_days?: number[] | null; custom_month_days?: number[] | null } }) => ({
           user_id: user.user.id,
           title: eh.habits.title,
           difficulty: eh.habits.difficulty,
           frequency: eh.habits.frequency || 'daily',
           custom_days: eh.habits.custom_days || null,
+          custom_month_days: eh.habits.custom_month_days || null,
         }));
 
         const { data: newHabits, error: habitsError } = await supabase

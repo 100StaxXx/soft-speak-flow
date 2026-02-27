@@ -3,6 +3,13 @@ installOpenAICompatibilityShim();
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireRequestAuth } from "../_shared/auth.ts";
+import {
+  createFallbackScheduleParts,
+  enforceExecutionModelSemantics,
+  getExecutionModelInstructions,
+  inferExecutionModel,
+  type ExecutionModel,
+} from "./planner.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,6 +99,8 @@ interface ScheduleResponse {
   suggestedChapterCount: number; // AI-determined optimal number of chapters/postcards
   suggestedStoryType: StoryTypeSlug;
   suggestedThemeColor: ThemeColorId;
+  executionModel: ExecutionModel;
+  planningStyleReason?: string;
 }
 
 serve(async (req) => {
@@ -150,6 +159,13 @@ ${Object.entries(clarificationAnswers)
 `;
     }
 
+    const planningShape = inferExecutionModel({
+      goal,
+      epicContext,
+      timelineContext,
+      clarificationAnswers,
+    });
+
     // Build timeline context prompt
     let timelineContextPrompt = '';
     if (timelineContext && timelineContext.trim()) {
@@ -162,6 +178,7 @@ Consider this when planning - it may include:
 - Time constraints or availability limitations (adjust pacing accordingly)
 - Dependencies or prerequisites they're waiting on
 - Equipment or resources they have or need
+- Existing systems, scripts, lists, or momentum they can reuse
 
 Adjust the timeline based on this context.
 `;
@@ -217,10 +234,7 @@ POSTCARD MILESTONE GUIDELINES:
 - Minimum 3 chapters (for short/simple goals), maximum 7 (for long/complex goals)
 - Each should have isPostcardMilestone: true and a unique milestonePercent
 
-For each phase, work backwards from the deadline:
-- Final Phase: Polish and prepare (last 10-15% of time)
-- Middle Phases: Core work and practice
-- First Phase: Foundation and setup (first 15-20% of time)
+${getExecutionModelInstructions(planningShape.executionModel)}
 
 Milestones should have actual dates, not just weeks. Spread them across phases.
 
@@ -267,7 +281,9 @@ CRITICAL: Return ONLY valid JSON with this exact structure:
   "weeklyHoursEstimate": <number>,
   "suggestedChapterCount": <number between 3-7 - must match the count of postcard milestones>,
   "suggestedStoryType": "treasure_hunt" | "mystery" | "pilgrimage" | "heroes_journey" | "rescue_mission" | "exploration",
-  "suggestedThemeColor": "heroic" | "warrior" | "mystic" | "nature" | "solar"
+  "suggestedThemeColor": "heroic" | "warrior" | "mystic" | "nature" | "solar",
+  "executionModel": "sequential" | "overlap_early",
+  "planningStyleReason": "parallelizable_goal" | "deadline_driven_linear_goal" | "fallback_default"
 }`;
 
     const today = new Date().toISOString().split('T')[0];
@@ -279,6 +295,7 @@ Today's date: ${today}
 Deadline: ${deadline} (${daysAvailable} days from now)
 ${clarificationContext}
 ${epicContext ? `Context type: ${epicContext}` : ''}
+Expected planning shape: ${planningShape.executionModel}
 ${timelineContextPrompt}
 ${adjustmentContext}
 
@@ -290,7 +307,8 @@ Generate a phased schedule working backwards from the deadline. Make sure:
 5. Spread milestones across phases with real dates
 6. Rituals are realistic for the available time
 7. suggestedChapterCount matches the exact count of milestones with isPostcardMilestone: true
-${timelineContext ? '8. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
+8. executionModel matches the kind of work: use overlap_early for repeatable goals where setup and action can run together, otherwise use sequential
+${timelineContext ? '9. Adjust the schedule based on the user\'s context (existing skills, constraints, etc.)' : ''}`;
 
     console.log('Generating journey schedule for goal:', goal, 'deadline:', deadline, 'days:', daysAvailable, 'context:', timelineContext);
 
@@ -372,6 +390,21 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
           difficulty: normalizeDifficulty(r.difficulty),
         };
       });
+
+      schedule.executionModel = schedule.executionModel === 'overlap_early' || schedule.executionModel === 'sequential'
+        ? schedule.executionModel
+        : planningShape.executionModel;
+      schedule.planningStyleReason = schedule.planningStyleReason || planningShape.planningStyleReason;
+
+      const semanticallyEnforced = enforceExecutionModelSemantics({
+        executionModel: schedule.executionModel,
+        phases: schedule.phases,
+        milestones: schedule.milestones,
+        now,
+        daysAvailable,
+      });
+      schedule.phases = semanticallyEnforced.phases;
+      schedule.milestones = semanticallyEnforced.milestones;
       
       // Ensure suggestedChapterCount matches actual postcard milestone count
       const postcardCount = schedule.milestones.filter(m => m.isPostcardMilestone).length;
@@ -399,48 +432,8 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
       
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError, content);
-      
-      // Calculate fallback chapter count based on timeline
-      let fallbackChapterCount = 5;
-      if (daysAvailable <= 14) fallbackChapterCount = 3;
-      else if (daysAvailable <= 30) fallbackChapterCount = 4;
-      else if (daysAvailable <= 60) fallbackChapterCount = 5;
-      else fallbackChapterCount = 6;
-      
-      // Provide fallback schedule with correct number of chapters
-      const phaseLength = Math.floor(daysAvailable / 3);
-      const phase1End = new Date(now.getTime() + phaseLength * 24 * 60 * 60 * 1000);
-      const phase2End = new Date(now.getTime() + phaseLength * 2 * 24 * 60 * 60 * 1000);
-      
-      // Generate milestones based on fallback chapter count
-      const fallbackMilestones: JourneyMilestone[] = [];
-      for (let i = 0; i < fallbackChapterCount; i++) {
-        const percent = Math.round(((i + 1) / fallbackChapterCount) * 100);
-        const dayOffset = Math.floor((daysAvailable * percent) / 100);
-        const targetDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-        
-        let phaseOrder = 1;
-        let phaseName = 'Foundation';
-        if (percent > 66) {
-          phaseOrder = 3;
-          phaseName = 'Final Push';
-        } else if (percent > 33) {
-          phaseOrder = 2;
-          phaseName = 'Core Work';
-        }
-        
-        fallbackMilestones.push({
-          id: `milestone-${Date.now()}-${i}`,
-          title: i === fallbackChapterCount - 1 ? 'Goal achieved!' : `Chapter ${i + 1} milestone`,
-          description: i === fallbackChapterCount - 1 ? 'Successfully complete your goal' : `Complete ${percent}% of your journey`,
-          targetDate: targetDate.toISOString().split('T')[0],
-          phaseOrder,
-          phaseName,
-          isPostcardMilestone: true,
-          milestonePercent: percent,
-        });
-      }
-      
+      const fallback = createFallbackScheduleParts(planningShape.executionModel, now, deadline, daysAvailable);
+
       schedule = {
         feasibilityAssessment: {
           daysAvailable,
@@ -448,55 +441,15 @@ ${timelineContext ? '8. Adjust the schedule based on the user\'s context (existi
           feasibility: 'achievable',
           message: `You have ${daysAvailable} days to achieve your goal. Let's create a solid plan!`,
         },
-        phases: [
-          {
-            id: `phase-${Date.now()}-1`,
-            name: 'Foundation',
-            description: 'Build the groundwork for your goal',
-            startDate: today,
-            endDate: phase1End.toISOString().split('T')[0],
-            phaseOrder: 1,
-          },
-          {
-            id: `phase-${Date.now()}-2`,
-            name: 'Core Work',
-            description: 'Main effort and practice',
-            startDate: phase1End.toISOString().split('T')[0],
-            endDate: phase2End.toISOString().split('T')[0],
-            phaseOrder: 2,
-          },
-          {
-            id: `phase-${Date.now()}-3`,
-            name: 'Final Push',
-            description: 'Polish and complete your goal',
-            startDate: phase2End.toISOString().split('T')[0],
-            endDate: deadline,
-            phaseOrder: 3,
-          },
-        ],
-        milestones: fallbackMilestones,
-        rituals: [
-          {
-            id: `ritual-${Date.now()}-1`,
-            title: 'Daily progress action',
-            description: 'Take one concrete step toward your goal',
-            frequency: 'daily',
-            difficulty: 'medium',
-            estimatedMinutes: 30,
-          },
-          {
-            id: `ritual-${Date.now()}-2`,
-            title: 'Weekly review',
-            description: 'Review progress and plan the next week',
-            frequency: 'custom',
-            difficulty: 'easy',
-            estimatedMinutes: 20,
-          },
-        ],
+        phases: fallback.phases,
+        milestones: fallback.milestones,
+        rituals: fallback.rituals,
         weeklyHoursEstimate: 5,
-        suggestedChapterCount: fallbackChapterCount,
+        suggestedChapterCount: fallback.suggestedChapterCount,
         suggestedStoryType: 'heroes_journey',
         suggestedThemeColor: 'heroic',
+        executionModel: planningShape.executionModel,
+        planningStyleReason: 'fallback_default',
       };
     }
 

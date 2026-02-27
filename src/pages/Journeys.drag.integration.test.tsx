@@ -94,6 +94,17 @@ vi.mock("@/components/DatePillsScroller", () => ({
         >
           set-stale-day
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 3);
+            futureDate.setHours(12, 0, 0, 0);
+            onDateSelect(futureDate);
+          }}
+        >
+          set-future-day
+        </button>
       </div>
     );
   },
@@ -626,6 +637,43 @@ describe("Journeys row drag integration", () => {
     expect(mocks.syncProviderPullMutate).not.toHaveBeenCalled();
   });
 
+  it("surfaces newly added campaign rituals when the unsurfaced count grows on the same date", async () => {
+    mocks.unsurfacedEpicHabitsCount = 1;
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.surfaceAllEpicHabits).toHaveBeenCalledTimes(1);
+    });
+
+    mocks.unsurfacedEpicHabitsCount = 3;
+
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.surfaceAllEpicHabits).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("processes deep-linked task edit flow when journeys tab is active", async () => {
     mocks.pendingTaskId = "task-1";
 
@@ -809,6 +857,46 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       const refreshedDate = new Date(screen.getByTestId("selected-date-iso").textContent as string);
       expect(isSameDay(refreshedDate, new Date())).toBe(true);
+    });
+  });
+
+  it("keeps future selected date on app foreground visibility sync", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-date-iso").textContent).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "set-future-day" }));
+
+    let futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+    await waitFor(() => {
+      futureDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      const futureDate = new Date(futureDateIso);
+      expect(futureDate.getTime()).toBeGreaterThan(Date.now());
+      expect(isSameDay(futureDate, new Date())).toBe(false);
+    });
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await waitFor(() => {
+      const refreshedDateIso = screen.getByTestId("selected-date-iso").textContent as string;
+      expect(refreshedDateIso).toBe(futureDateIso);
     });
   });
 });

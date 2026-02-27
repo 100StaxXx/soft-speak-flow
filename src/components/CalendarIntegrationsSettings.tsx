@@ -41,6 +41,8 @@ export function CalendarIntegrationsSettings() {
     setProviderSyncMode,
     listProviderCalendars,
     setPrimaryCalendar,
+    listProviderTaskLists,
+    setPrimaryTaskList,
     connectAppleNative,
     canConnectAppleNative,
     appleNativeUnavailableReason,
@@ -49,6 +51,9 @@ export function CalendarIntegrationsSettings() {
   const { syncProviderPull } = useQuestCalendarSync();
 
   const [calendarOptionsByProvider, setCalendarOptionsByProvider] = useState<
+    Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
+  >({});
+  const [taskListOptionsByProvider, setTaskListOptionsByProvider] = useState<
     Partial<Record<CalendarProvider, Array<{ id: string; name: string }>>>
   >({});
   const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
@@ -185,6 +190,22 @@ export function CalendarIntegrationsSettings() {
     }
   };
 
+  const handleLoadTaskLists = async () => {
+    try {
+      const taskLists = await listProviderTaskLists.mutateAsync('outlook');
+      setTaskListOptionsByProvider((prev) => ({
+        ...prev,
+        outlook: taskLists.map((taskList) => ({ id: taskList.id, name: taskList.name })),
+      }));
+    } catch (err) {
+      toast({
+        title: 'Failed loading Outlook task lists',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const toggleVisibility = async () => {
     try {
       await upsertSettings.mutateAsync({ integration_visible: !integrationVisible });
@@ -254,6 +275,9 @@ export function CalendarIntegrationsSettings() {
         {visibleProviders.map((provider) => {
           const connection = connectedByProvider[provider.key];
           const calendars = calendarOptionsByProvider[provider.key] || [];
+          const taskLists = provider.key === 'outlook'
+            ? taskListOptionsByProvider.outlook || []
+            : [];
 
           return (
             <div key={provider.key} className="rounded-lg border border-border/60 p-3 space-y-3">
@@ -356,6 +380,13 @@ export function CalendarIntegrationsSettings() {
                       Load Calendars
                     </Button>
 
+                    {provider.key === 'outlook' && (
+                      <Button size="sm" variant="outline" onClick={() => void handleLoadTaskLists()}>
+                        <RefreshCcw className="h-4 w-4 mr-2" />
+                        Load To Do Lists
+                      </Button>
+                    )}
+
                     {provider.key !== 'apple' && (
                       <Button
                         size="sm"
@@ -395,6 +426,35 @@ export function CalendarIntegrationsSettings() {
                         {calendars.map((calendar) => (
                           <SelectItem key={calendar.id} value={calendar.id}>
                             {calendar.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {provider.key === 'outlook' && taskLists.length > 0 && (
+                    <Select
+                      value={connection.primary_task_list_id || ''}
+                      onValueChange={(value) => {
+                        const selected = taskLists.find((taskList) => taskList.id === value);
+                        void setPrimaryTaskList
+                          .mutateAsync({ taskListId: value, taskListName: selected?.name })
+                          .catch((err) => {
+                            toast({
+                              title: 'Failed setting primary task list',
+                              description: err instanceof Error ? err.message : 'Unknown error',
+                              variant: 'destructive',
+                            });
+                          });
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Primary Microsoft To Do list" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {taskLists.map((taskList) => (
+                          <SelectItem key={taskList.id} value={taskList.id}>
+                            {taskList.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

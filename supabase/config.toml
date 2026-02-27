@@ -216,6 +216,9 @@ verify_jwt = true
 [functions.outlook-calendar-events]
 verify_jwt = true
 
+[functions.outlook-todo-tasks]
+verify_jwt = true
+
 [functions.spawn-guild-boss]
 verify_jwt = true
 

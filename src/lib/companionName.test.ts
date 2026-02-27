@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resolveCompanionName } from "@/lib/companionName";
+import { isAssignedCompanionName, resolveCompanionName } from "@/lib/companionName";
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
@@ -120,7 +120,7 @@ describe("resolveCompanionName", () => {
     expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-3b");
   });
 
-  it("supports empty fallback policy", async () => {
+  it("assigns a stable proper name instead of returning an empty fallback when no valid name exists", async () => {
     const value = await resolveCompanionName({
       companion: {
         id: "comp-4",
@@ -131,10 +131,12 @@ describe("resolveCompanionName", () => {
       fallback: "empty",
     });
 
-    expect(value).toBe("");
+    expect(value).not.toBe("");
+    expect(value).not.toBe("Companion");
+    expect(value).not.toBe("Eagle");
   });
 
-  it("supports species fallback policy with capitalization", async () => {
+  it("prefers an assigned proper name over the species fallback", async () => {
     const value = await resolveCompanionName({
       companion: {
         id: "comp-5",
@@ -145,10 +147,11 @@ describe("resolveCompanionName", () => {
       fallback: "species",
     });
 
-    expect(value).toBe("Snow Fox");
+    expect(value).not.toBe("Snow Fox");
+    expect(value).not.toBe("");
   });
 
-  it("supports companion fallback policy", async () => {
+  it("prefers an assigned proper name over the generic companion fallback", async () => {
     const value = await resolveCompanionName({
       companion: {
         id: "comp-6",
@@ -159,6 +162,52 @@ describe("resolveCompanionName", () => {
       fallback: "companion",
     });
 
-    expect(value).toBe("Companion");
+    expect(value).not.toBe("Companion");
+    expect(value).not.toBe("");
+  });
+
+  it("rejects species labels as assigned names", () => {
+    expect(isAssignedCompanionName("Mechanical Dragon", "Mechanical Dragon")).toBe(false);
+    expect(isAssignedCompanionName("Companion", "Mechanical Dragon")).toBe(false);
+    expect(isAssignedCompanionName("Zephyra", "Mechanical Dragon")).toBe(true);
+  });
+
+  it("synthesizes and caches a stable proper name when cached name is just the species", async () => {
+    const value = await resolveCompanionName({
+      companion: {
+        id: "comp-7",
+        current_stage: 0,
+        cached_creature_name: "Mechanical Dragon",
+        spirit_animal: "Mechanical Dragon",
+        core_element: "water",
+      },
+      fallback: "companion",
+    });
+
+    expect(value).not.toBe("Mechanical Dragon");
+    expect(value).not.toBe("Companion");
+    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-7");
+  });
+
+  it("ignores invalid card names that mirror the species and synthesizes a proper name", async () => {
+    mocks.evolutionMaybeSingle
+      .mockResolvedValueOnce({ data: { creature_name: "Mechanical Dragon" } })
+      .mockResolvedValueOnce({ data: { creature_name: "Mechanical Dragon" } });
+
+    const value = await resolveCompanionName({
+      companion: {
+        id: "comp-8",
+        current_stage: 0,
+        cached_creature_name: null,
+        spirit_animal: "Mechanical Dragon",
+        core_element: "water",
+      },
+      fallback: "companion",
+    });
+
+    expect(value).not.toBe("Mechanical Dragon");
+    expect(value).not.toBe("Companion");
+    expect(mocks.evolutionMaybeSingle).toHaveBeenCalledTimes(2);
+    expect(mocks.updateEq).toHaveBeenCalledWith("id", "comp-8");
   });
 });

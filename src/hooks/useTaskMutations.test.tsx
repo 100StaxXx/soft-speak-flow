@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => {
   const updateDisciplineFromRitualMock = vi.fn();
   const trackTaskCreationMock = vi.fn();
   const trackTaskCompletionMock = vi.fn();
+  const queueTaskActionMock = vi.fn();
+  const reportApiFailureMock = vi.fn();
 
   const dailyTasksCountExecuteMock = vi.fn();
   const dailyTasksInsertSingleMock = vi.fn();
@@ -29,6 +31,8 @@ const mocks = vi.hoisted(() => {
     updateDisciplineFromRitualMock,
     trackTaskCreationMock,
     trackTaskCompletionMock,
+    queueTaskActionMock,
+    reportApiFailureMock,
     dailyTasksCountExecuteMock,
     dailyTasksInsertSingleMock,
     dailyTasksDeleteExecuteMock,
@@ -86,6 +90,14 @@ vi.mock("@/hooks/useSchedulingLearner", () => ({
   useSchedulingLearner: () => ({
     trackTaskCompletion: mocks.trackTaskCompletionMock,
     trackTaskCreation: mocks.trackTaskCreationMock,
+  }),
+}));
+
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    shouldQueueWrites: false,
+    queueTaskAction: mocks.queueTaskActionMock,
+    reportApiFailure: mocks.reportApiFailureMock,
   }),
 }));
 

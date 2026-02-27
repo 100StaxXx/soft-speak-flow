@@ -43,6 +43,34 @@ function RecurrenceHarness({ selectedDate }: { selectedDate?: Date }) {
   );
 }
 
+function ReminderHarness() {
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
+
+  return (
+    <div>
+      <AdvancedQuestOptions
+        scheduledTime="09:00"
+        onScheduledTimeChange={vi.fn()}
+        estimatedDuration={30}
+        onEstimatedDurationChange={vi.fn()}
+        recurrencePattern={null}
+        onRecurrencePatternChange={vi.fn()}
+        recurrenceDays={[]}
+        onRecurrenceDaysChange={vi.fn()}
+        reminderEnabled
+        onReminderEnabledChange={vi.fn()}
+        reminderMinutesBefore={reminderMinutesBefore}
+        onReminderMinutesBeforeChange={setReminderMinutesBefore}
+        moreInformation={null}
+        onMoreInformationChange={vi.fn()}
+        location={null}
+        onLocationChange={vi.fn()}
+      />
+      <div data-testid="reminder-state">{reminderMinutesBefore}</div>
+    </div>
+  );
+}
+
 describe("AdvancedQuestOptions recurrence", () => {
   it("renders expanded recurrence options", () => {
     render(<RecurrenceHarness selectedDate={new Date(2026, 0, 12)} />);
@@ -101,5 +129,31 @@ describe("AdvancedQuestOptions recurrence", () => {
     await waitFor(() => {
       expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0,2");
     });
+  });
+});
+
+describe("AdvancedQuestOptions reminder picker", () => {
+  it("shows 2 days and custom reminder options", () => {
+    render(<ReminderHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "15 minutes before" }));
+
+    expect(screen.getByRole("button", { name: "2 days before" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Custom" })).toBeInTheDocument();
+  });
+
+  it("applies a custom reminder value", async () => {
+    render(<ReminderHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "15 minutes before" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.change(screen.getByLabelText("Minutes before"), { target: { value: "180" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("reminder-state")).toHaveTextContent("180");
+    });
+
+    expect(screen.getByRole("button", { name: /180 minutes before \(Custom\)/i })).toBeInTheDocument();
   });
 });

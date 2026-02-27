@@ -28,7 +28,7 @@ const JoinEpic = () => {
           *,
           epic_habits(
             habit_id,
-            habits(id, title, difficulty, frequency, custom_days)
+            habits(id, title, difficulty, frequency, custom_days, custom_month_days)
           )
         `)
         .eq("invite_code", code)
@@ -109,6 +109,7 @@ const JoinEpic = () => {
               difficulty: eh.habits.difficulty,
               frequency: eh.habits.frequency || "daily",
               custom_days: eh.habits.custom_days || null,
+              custom_month_days: eh.habits.custom_month_days || null,
             }))
           )
           .select();

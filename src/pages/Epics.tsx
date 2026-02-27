@@ -52,6 +52,7 @@ const Epics = () => {
       difficulty: string;
       frequency: string;
       custom_days: number[];
+      custom_month_days?: number[];
     }>;
   }) => {
     createEpic(data);
