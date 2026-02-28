@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { getAuthRedirectPath, ensureProfile } from "@/utils/authRedirect";
+import { getAuthRedirectPath, getProfileAwareAuthFallbackPath, ensureProfile } from "@/utils/authRedirect";
 import { logger } from "@/utils/logger";
 import { getRedirectUrlWithPath, getRedirectUrl } from '@/utils/redirectUrl';
 import { signinBackground } from "@/assets/backgrounds";
@@ -157,15 +157,27 @@ const Auth = () => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const deadlineTask = new Promise<"deadline">((resolve) => {
       timeoutId = setTimeout(() => {
-        logger.warn(`[Auth ${source}] TIMEOUT after ${POST_AUTH_NAVIGATION_TIMEOUT_MS}ms - hard fallback`);
+        logger.warn(`[Auth ${source}] TIMEOUT after ${POST_AUTH_NAVIGATION_TIMEOUT_MS}ms - resolving profile-aware fallback path`);
         toast({
           title: "Taking longer than expected",
           description: "Redirecting you now...",
         });
 
-        finalizeNavigation(POST_AUTH_DEFAULT_PATH, "deadline");
-        emitTimeoutTelemetry();
-        resolve("deadline");
+        void Promise.resolve((async () => {
+          let fallbackPath = POST_AUTH_DEFAULT_PATH;
+
+          try {
+            const fallbackStartTime = Date.now();
+            fallbackPath = await getProfileAwareAuthFallbackPath(session.user.id);
+            logger.info(`[Auth ${source}] Profile-aware timeout fallback resolved to "${fallbackPath}" in ${Date.now() - fallbackStartTime}ms`);
+          } catch (error) {
+            logger.warn(`[Auth ${source}] Profile-aware timeout fallback failed, defaulting to ${POST_AUTH_DEFAULT_PATH}`, { error });
+          }
+
+          finalizeNavigation(fallbackPath, "deadline-profile-aware");
+          emitTimeoutTelemetry();
+          resolve("deadline");
+        })());
       }, POST_AUTH_NAVIGATION_TIMEOUT_MS);
     });
 

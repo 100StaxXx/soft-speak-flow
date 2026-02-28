@@ -44,7 +44,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { useEpics } from "./useEpics";
+import { normalizeCreateCampaignError, useEpics } from "./useEpics";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -85,5 +85,23 @@ describe("useEpics", () => {
 
     expect(result.current.epics).toEqual([]);
     expect(mocks.fromMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeCreateCampaignError", () => {
+  it("prioritizes legacy active habit limit errors over generic habit creation failures", () => {
+    const result = normalizeCreateCampaignError(
+      "Failed to create habits: Maximum active habit limit reached (limit: 2)"
+    );
+
+    expect(result.title).toBe("Too many active rituals");
+  });
+
+  it("returns a dedicated message for missing month-schedule schema fields", () => {
+    const result = normalizeCreateCampaignError(
+      'Failed to create habits: column "custom_month_days" of relation "habits" does not exist'
+    );
+
+    expect(result.title).toBe("Campaign setup update needed");
   });
 });

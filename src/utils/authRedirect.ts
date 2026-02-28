@@ -55,6 +55,19 @@ const resolveReturningUserPath = async (userId: string): Promise<string> => {
 };
 
 /**
+ * Fast fallback path resolution for timeout/race scenarios.
+ * Existing users (onboarding completed) should land on /tasks.
+ */
+export const getProfileAwareAuthFallbackPath = async (userId: string): Promise<string> => {
+  try {
+    return await resolveReturningUserPath(userId);
+  } catch (error) {
+    logger.warn("[getProfileAwareAuthFallbackPath] Fallback resolution failed, defaulting to /onboarding", { error });
+    return DEFAULT_AUTH_REDIRECT_PATH;
+  }
+};
+
+/**
  * Centralized auth redirect logic
  * Determines where to send users based on their auth and profile state
  */
@@ -75,7 +88,7 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
 
     if (error) {
       logger.warn("[getAuthRedirectPath] Profile fetch error, checking if returning user", { error: error.message });
-      return await resolveReturningUserPath(userId);
+      return await getProfileAwareAuthFallbackPath(userId);
     }
 
     const resolvedMentorId = getResolvedMentorId(profile);
@@ -146,7 +159,7 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
     return RETURNING_USER_REDIRECT_PATH;
   } catch (error) {
     logger.error("[getAuthRedirectPath] Error, checking if returning user", { error });
-    return await resolveReturningUserPath(userId);
+    return await getProfileAwareAuthFallbackPath(userId);
   }
 };
 

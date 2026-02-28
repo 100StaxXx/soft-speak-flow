@@ -108,7 +108,17 @@ const toErrorHaystack = (error: unknown): string => {
   return '';
 };
 
-const normalizeCreateCampaignError = (error: unknown): { title: string; description?: string } => {
+const isLegacyMonthSchemaError = (error: unknown): boolean => {
+  const haystack = toErrorHaystack(error);
+
+  return (
+    haystack.includes('custom_month_days') ||
+    (haystack.includes('habits_frequency_check') && haystack.includes('monthly')) ||
+    (haystack.includes('frequency') && haystack.includes('monthly') && haystack.includes('check'))
+  );
+};
+
+export const normalizeCreateCampaignError = (error: unknown): { title: string; description?: string } => {
   const haystack = toErrorHaystack(error);
 
   if (
@@ -129,17 +139,24 @@ const normalizeCreateCampaignError = (error: unknown): { title: string; descript
     };
   }
 
-  if (haystack.includes('failed to create habits') || haystack.includes('no habits were created')) {
-    return {
-      title: 'Failed to create campaign',
-      description: "We couldn't save your rituals. Please review your plan and try again.",
-    };
-  }
-
   if (haystack.includes('maximum active habit limit reached')) {
     return {
       title: 'Too many active rituals',
       description: 'Your account hit a legacy ritual limit. Update your app data and try creating this campaign again.',
+    };
+  }
+
+  if (isLegacyMonthSchemaError(error)) {
+    return {
+      title: 'Campaign setup update needed',
+      description: 'Your planner data is missing a recent ritual scheduling update. Please try again shortly.',
+    };
+  }
+
+  if (haystack.includes('failed to create habits') || haystack.includes('no habits were created')) {
+    return {
+      title: 'Failed to create campaign',
+      description: "We couldn't save your rituals. Please review your plan and try again.",
     };
   }
 
@@ -257,40 +274,65 @@ export const useEpics = (options: EpicsOptions = {}) => {
           throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
         }
 
+        const buildHabitInsertRows = (legacyMonthSchema = false) =>
+          epicData.habits.map(habit => {
+            let normalizedFreq = normalizeFrequency(habit.frequency);
+            // Ensure custom_days has a default for non-daily frequencies
+            let customDays = habit.custom_days?.length > 0 ? habit.custom_days : null;
+            let customMonthDays = habit.custom_month_days?.length ? habit.custom_month_days : null;
+            if (!customDays && normalizedFreq !== 'daily') {
+              // Set default days based on frequency
+              if (normalizedFreq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
+              else if (normalizedFreq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
+              else if (normalizedFreq === 'custom') customDays = [0]; // Default Monday
+            }
+            if (!customMonthDays && normalizedFreq === 'monthly') {
+              customMonthDays = [1];
+            }
+
+            // Legacy environments might not support monthly frequency or custom_month_days yet.
+            if (legacyMonthSchema) {
+              if (normalizedFreq === 'monthly') {
+                normalizedFreq = 'custom';
+                customDays = customDays?.length ? customDays : [0];
+              } else if (normalizedFreq === 'custom' && !customDays?.length) {
+                customDays = [0];
+              }
+              customMonthDays = null;
+            }
+
+            const baseHabit = {
+              user_id: currentUserId,
+              title: habit.title,
+              description: habit.description || null,
+              difficulty: normalizeDifficulty(habit.difficulty),
+              frequency: normalizedFreq,
+              custom_days: customDays,
+              preferred_time: habit.preferred_time || null,
+              reminder_enabled: habit.reminder_enabled || false,
+              reminder_minutes_before: habit.reminder_minutes_before || 15,
+              estimated_minutes: habit.estimated_minutes || null,
+            };
+
+            if (legacyMonthSchema) return baseHabit;
+            return { ...baseHabit, custom_month_days: customMonthDays };
+          });
+
         // Create habits first with normalized values
-        const { data: habits, error: habitError } = await supabase
+        let { data: habits, error: habitError } = await supabase
           .from("habits")
-          .insert(
-            epicData.habits.map(habit => {
-              const normalizedFreq = normalizeFrequency(habit.frequency);
-              // Ensure custom_days has a default for non-daily frequencies
-              let customDays = habit.custom_days?.length > 0 ? habit.custom_days : null;
-              let customMonthDays = habit.custom_month_days?.length ? habit.custom_month_days : null;
-              if (!customDays && normalizedFreq !== 'daily') {
-                // Set default days based on frequency
-                if (normalizedFreq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
-                else if (normalizedFreq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
-                else if (normalizedFreq === 'custom') customDays = [0]; // Default Monday
-              }
-              if (!customMonthDays && normalizedFreq === 'monthly') {
-                customMonthDays = [1];
-              }
-              return {
-                user_id: currentUserId,
-                title: habit.title,
-                description: habit.description || null,
-                difficulty: normalizeDifficulty(habit.difficulty),
-                frequency: normalizedFreq,
-                custom_days: customDays,
-                custom_month_days: customMonthDays,
-                preferred_time: habit.preferred_time || null,
-                reminder_enabled: habit.reminder_enabled || false,
-                reminder_minutes_before: habit.reminder_minutes_before || 15,
-                estimated_minutes: habit.estimated_minutes || null,
-              };
-            })
-          )
+          .insert(buildHabitInsertRows(false))
           .select();
+
+        if (habitError && isLegacyMonthSchemaError(habitError)) {
+          console.warn("[Campaign Creation] Retrying habits insert with legacy month-schema compatibility mode.");
+          const retryResult = await supabase
+            .from("habits")
+            .insert(buildHabitInsertRows(true))
+            .select();
+          habits = retryResult.data;
+          habitError = retryResult.error;
+        }
 
         if (habitError) {
           console.error("Failed to create habits:", habitError);

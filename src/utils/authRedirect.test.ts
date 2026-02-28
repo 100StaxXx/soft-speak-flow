@@ -35,7 +35,7 @@ vi.mock("./logger", () => ({
   },
 }));
 
-import { getAuthRedirectPath } from "./authRedirect";
+import { getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
 
 describe("getAuthRedirectPath", () => {
   beforeEach(() => {
@@ -161,5 +161,49 @@ describe("getAuthRedirectPath", () => {
 
     await expect(firstPathPromise).resolves.toBe("/onboarding");
     await expect(secondPathPromise).resolves.toBe("/onboarding");
+  });
+});
+
+describe("getProfileAwareAuthFallbackPath", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns /tasks for existing users", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: { onboarding_completed: true },
+      error: null,
+    });
+
+    await expect(getProfileAwareAuthFallbackPath("returning-user")).resolves.toBe("/tasks");
+  });
+
+  it("returns /onboarding for incomplete users", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: { onboarding_completed: false },
+      error: null,
+    });
+
+    await expect(getProfileAwareAuthFallbackPath("new-user")).resolves.toBe("/onboarding");
+  });
+
+  it("returns /onboarding when fallback lookup times out", async () => {
+    vi.useFakeTimers();
+    mocks.maybeSingleMock.mockImplementationOnce(() => new Promise(() => {}));
+
+    const fallbackPath = getProfileAwareAuthFallbackPath("timeout-user");
+    await vi.advanceTimersByTimeAsync(2001);
+
+    await expect(fallbackPath).resolves.toBe("/onboarding");
+  });
+
+  it("returns /onboarding when fallback lookup throws", async () => {
+    mocks.maybeSingleMock.mockRejectedValueOnce(new Error("profile unavailable"));
+
+    await expect(getProfileAwareAuthFallbackPath("error-user")).resolves.toBe("/onboarding");
   });
 });
