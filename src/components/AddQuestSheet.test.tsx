@@ -65,7 +65,10 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes")).toBeInTheDocument();
+    expect(screen.getByText("Step 1 · Name your quest")).toBeInTheDocument();
+    expect(screen.getByText("Step 2 · Pick a time")).toBeInTheDocument();
+    expect(screen.getByText("Step 3 · Add quest")).toBeInTheDocument();
     expect(screen.getByText("30 min")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
@@ -83,7 +86,7 @@ describe("AddQuestSheet", () => {
         />
       );
 
-      const titleInput = screen.getByPlaceholderText("Quest Title");
+      const titleInput = screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes");
       expect(titleInput).not.toHaveFocus();
 
       act(() => {
@@ -114,7 +117,7 @@ describe("AddQuestSheet", () => {
     expect(screen.getByText("Max 2 active")).toBeInTheDocument();
   });
 
-  it("keeps Create Quest disabled until title and time are both set", () => {
+  it("keeps Add Quest disabled until title and time are both set", () => {
     render(
       <AddQuestSheet
         open
@@ -124,15 +127,20 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    const createButton = screen.getByRole("button", { name: "Create Quest" });
+    const createButton = screen.getByRole("button", { name: "Add Quest" });
     expect(createButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Plan sprint tasks" },
     });
     expect(createButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    expect(createButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Custom quest time"), {
+      target: { value: "10:15" },
+    });
     expect(createButton).toBeEnabled();
   });
 
@@ -147,14 +155,28 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    const createButton = screen.getByRole("button", { name: "Create Quest" });
+    const createButton = screen.getByRole("button", { name: "Add Quest" });
     expect(createButton).toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Morning planning" },
     });
 
     expect(createButton).toBeEnabled();
+  });
+
+  it("applies suggestion chip text to the quest title input", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "10-minute inbox cleanup" }));
+    expect(screen.getByDisplayValue("10-minute inbox cleanup")).toBeInTheDocument();
   });
 
   it("closes the date picker after selecting a new date", async () => {
@@ -203,6 +225,51 @@ describe("AddQuestSheet", () => {
     expect(screen.getByText("11:30 PM")).toBeInTheDocument();
   });
 
+  it("keeps time picker scrolling local and does not call scrollIntoView", () => {
+    vi.useFakeTimers();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoViewMock = vi.fn();
+
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: scrollIntoViewMock,
+    });
+
+    try {
+      render(
+        <AddQuestSheet
+          open
+          onOpenChange={vi.fn()}
+          selectedDate={selectedDate}
+          onAdd={vi.fn().mockResolvedValue(undefined)}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Time" }));
+      fireEvent.change(screen.getByLabelText("Custom quest time"), {
+        target: { value: "11:17" },
+      });
+
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          writable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as HTMLElement & { scrollIntoView?: unknown }).scrollIntoView;
+      }
+      vi.useRealTimers();
+    }
+  });
+
   it("submits custom manual time values outside quick-pick increments", async () => {
     const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
       .mockResolvedValue(undefined);
@@ -216,14 +283,16 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Custom time quest" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
-    fireEvent.change(screen.getByLabelText("Custom quest time"), {
+    const customTimeInput = screen.getByLabelText("Custom quest time");
+    expect(customTimeInput).toHaveClass("text-base");
+    fireEvent.change(customTimeInput, {
       target: { value: "11:17" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -248,7 +317,7 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Triage inbox" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
@@ -268,7 +337,7 @@ describe("AddQuestSheet", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("submits scheduled quest payload when Create Quest is tapped", async () => {
+  it("submits scheduled quest payload when Add Quest is tapped", async () => {
     const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
       .mockResolvedValue(undefined);
     const onOpenChange = vi.fn();
@@ -283,10 +352,10 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Review roadmap" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -372,19 +441,20 @@ describe("AddQuestSheet", () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-sheet-opened" }));
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Evented quest" },
     });
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-title-entered" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    expect(dispatchSpy).not.toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
     fireEvent.change(screen.getByLabelText("Custom quest time"), {
       target: { value: "10:15" },
     });
 
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -407,11 +477,11 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Quest with files" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Attach 10" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -435,13 +505,13 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Weekday quest" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
     fireEvent.click(screen.getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Weekdays" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);
@@ -468,13 +538,13 @@ describe("AddQuestSheet", () => {
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
       target: { value: "Biweekly quest" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
     fireEvent.click(screen.getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Every 2 Weeks" }));
-    fireEvent.click(screen.getByRole("button", { name: "Create Quest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
 
     await waitFor(() => {
       expect(onAdd).toHaveBeenCalledTimes(1);

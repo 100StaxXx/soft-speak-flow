@@ -5,8 +5,59 @@ import { useToast } from "./use-toast";
 import { useXPRewards } from "./useXPRewards";
 import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getEffectiveMissionDate } from "@/utils/timezone";
+import {
+  isRetriableFunctionInvokeError,
+  parseFunctionInvokeError,
+  toUserFacingFunctionError,
+} from "@/utils/supabaseFunctionErrors";
+
+const MAX_MISSION_QUERY_RETRIES = 2;
+
+type MissionTheme = { name: string; emoji: string };
+
+type MissionGenerationMeta = {
+  source?: "ai" | "fallback";
+  degraded?: boolean;
+  reason?: string;
+};
+
+type MissionGenerationResponse = {
+  missions?: unknown[];
+  generated?: boolean;
+  theme?: MissionTheme;
+  meta?: MissionGenerationMeta;
+};
+
+type MissionQueryError = Error & {
+  retriable?: boolean;
+};
+
+const makeMissionQueryError = (message: string, retriable: boolean): MissionQueryError => {
+  const error = new Error(message) as MissionQueryError;
+  error.retriable = retriable;
+  return error;
+};
+
+const isRetriableMissionDataError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const status = (error as { status?: unknown }).status;
+  if (status === 408) return true;
+  if (typeof status === "number" && status >= 500) return true;
+  const message = String((error as { message?: unknown }).message ?? "");
+  return /timeout|timed out|network|connection|fetch/i.test(message);
+};
+
+const shouldRetryMissionQuery = (failureCount: number, error: unknown) => {
+  const retriable = Boolean((error as MissionQueryError)?.retriable);
+  return retriable && failureCount < MAX_MISSION_QUERY_RETRIES;
+};
+
+const getMissionRetryDelayMs = (attemptIndex: number) => {
+  if (import.meta.env.MODE === "test") return 0;
+  return Math.min(500 * 2 ** attemptIndex, 3000);
+};
 
 export const useDailyMissions = () => {
   const { user } = useAuth();
@@ -17,7 +68,21 @@ export const useDailyMissions = () => {
   const today = getEffectiveMissionDate(); // Uses 2 AM reset in user's timezone
   const [generationErrorMessage, setGenerationErrorMessage] = useState<string | null>(null);
 
-  const [missionTheme, setMissionTheme] = useState<{ name: string; emoji: string } | null>(null);
+  const [missionTheme, setMissionTheme] = useState<MissionTheme | null>(null);
+  const lastErrorToastKeyRef = useRef<string | null>(null);
+  const lastFallbackToastKeyRef = useRef<string | null>(null);
+
+  const maybeToastFallbackInfo = (meta?: MissionGenerationMeta) => {
+    if (!meta?.degraded || meta.source !== "fallback" || !user?.id) return;
+    const reason = meta.reason ?? "fallback";
+    const fallbackKey = `${user.id}:${today}:${reason}`;
+    if (lastFallbackToastKeyRef.current === fallbackKey) return;
+    lastFallbackToastKeyRef.current = fallbackKey;
+    toast({
+      title: "Backup missions loaded",
+      description: "Daily missions are available using backup generation while live generation recovers.",
+    });
+  };
 
   const { data: missions, isLoading, error } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
@@ -34,7 +99,10 @@ export const useDailyMissions = () => {
         .eq('mission_date', today);
 
       if (existingError) {
-        throw existingError;
+        throw makeMissionQueryError(
+          "Unable to load daily missions right now. Please try again in a moment.",
+          isRetriableMissionDataError(existingError),
+        );
       }
 
       // If no missions exist, generate them server-side
@@ -45,21 +113,25 @@ export const useDailyMissions = () => {
 
         if (generationError) {
           console.error('Mission generation failed:', generationError);
-          const message = generationError.message || 'Unable to refresh missions right now.';
+          const parsedError = await parseFunctionInvokeError(generationError);
+          const message = toUserFacingFunctionError(parsedError, { action: "refresh your missions" });
           setGenerationErrorMessage(message);
-          throw new Error(message);
+          throw makeMissionQueryError(message, isRetriableFunctionInvokeError(generationError));
         }
-        
-        const newMissions = generated?.missions || [];
+
+        const generationPayload = (generated ?? {}) as MissionGenerationResponse;
+        maybeToastFallbackInfo(generationPayload.meta);
+
+        const newMissions = generationPayload.missions || [];
         if (newMissions.length === 0) {
           const message = 'No missions available right now. Please try again soon.';
           setGenerationErrorMessage(message);
-          throw new Error(message);
+          throw makeMissionQueryError(message, false);
         }
         
         // Capture theme from edge function response
-        if (generated?.theme) {
-          setMissionTheme(generated.theme);
+        if (generationPayload.theme) {
+          setMissionTheme(generationPayload.theme);
         }
         
         return newMissions;
@@ -71,18 +143,31 @@ export const useDailyMissions = () => {
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes - missions are daily, don't change often
     refetchOnWindowFocus: false,
+    retry: shouldRetryMissionQuery,
+    retryDelay: getMissionRetryDelayMs,
   });
 
   // Handle errors with useEffect instead of deprecated onError
   useEffect(() => {
     if (error) {
+      const title = generationErrorMessage ? "Mission refresh failed" : "Unable to load daily missions";
+      const description = generationErrorMessage || error.message;
+      const toastKey = `${user?.id ?? "anon"}:${today}:${title}:${description}`;
+      if (lastErrorToastKeyRef.current === toastKey) return;
+      lastErrorToastKeyRef.current = toastKey;
       toast({
-        title: generationErrorMessage ? "Mission refresh failed" : "Unable to load daily missions",
-        description: generationErrorMessage || error.message,
+        title,
+        description,
         variant: "destructive",
       });
     }
-  }, [error, generationErrorMessage, toast]);
+  }, [error, generationErrorMessage, toast, user?.id, today]);
+
+  useEffect(() => {
+    if (!error) {
+      lastErrorToastKeyRef.current = null;
+    }
+  }, [error, user?.id, today]);
 
   const regenerateMissions = useMutation({
     mutationFn: async () => {
@@ -94,12 +179,16 @@ export const useDailyMissions = () => {
       });
 
       if (error) {
-        const message = error.message || 'Unable to refresh missions right now.';
+        const parsedError = await parseFunctionInvokeError(error);
+        const message = toUserFacingFunctionError(parsedError, { action: "refresh your missions" });
         setGenerationErrorMessage(message);
         throw new Error(message);
       }
 
-      const newMissions = generated?.missions || [];
+      const generationPayload = (generated ?? {}) as MissionGenerationResponse;
+      maybeToastFallbackInfo(generationPayload.meta);
+
+      const newMissions = generationPayload.missions || [];
       if (newMissions.length === 0) {
         const message = 'No missions were ready. Please try again soon.';
         setGenerationErrorMessage(message);

@@ -85,6 +85,9 @@ export const useCompanionRegenerate = () => {
         .from("user_companion")
         .update({
           current_image_url: imageUrl,
+          dormant_image_url: null,
+          neglected_image_url: null,
+          scarred_image_url: null,
           image_regenerations_used: regenerationsUsed + 1,
         })
         .eq("id", companion.id)
@@ -108,13 +111,72 @@ export const useCompanionRegenerate = () => {
 
       return { 
         imageUrl, 
+        imageRegenerationsUsed: totalUsed,
         regenerationsRemaining: Math.max(0, MAX_REGENERATIONS - totalUsed),
         validationPassed,
         retryCount
       };
     },
     onSuccess: (data) => {
+      queryClient.setQueriesData(
+        { queryKey: ["companion"] },
+        (cachedCompanion: unknown) => {
+          if (!cachedCompanion || typeof cachedCompanion !== "object") return cachedCompanion;
+          return {
+            ...(cachedCompanion as Record<string, unknown>),
+            current_image_url: data.imageUrl,
+            dormant_image_url: null,
+            neglected_image_url: null,
+            scarred_image_url: null,
+            image_regenerations_used: data.imageRegenerationsUsed,
+            updated_at: new Date().toISOString(),
+          };
+        },
+      );
+
+      queryClient.setQueriesData(
+        { queryKey: ["companion-health"] },
+        (cachedHealth: unknown) => {
+          if (!cachedHealth || typeof cachedHealth !== "object") return cachedHealth;
+          return {
+            ...(cachedHealth as Record<string, unknown>),
+            current_image_url: data.imageUrl,
+            neglected_image_url: null,
+          };
+        },
+      );
+
+      queryClient.setQueriesData(
+        { queryKey: ["community-members"] },
+        (cachedMembers: unknown) => {
+          if (!Array.isArray(cachedMembers) || !user?.id) return cachedMembers;
+
+          return cachedMembers.map((member) => {
+            if (!member || typeof member !== "object") return member;
+
+            const typedMember = member as {
+              user_id?: string;
+              companion?: Record<string, unknown> | null;
+            };
+
+            if (typedMember.user_id !== user.id || !typedMember.companion) {
+              return member;
+            }
+
+            return {
+              ...typedMember,
+              companion: {
+                ...typedMember.companion,
+                current_image_url: data.imageUrl,
+              },
+            };
+          });
+        },
+      );
+
       queryClient.invalidateQueries({ queryKey: ["companion"] });
+      queryClient.invalidateQueries({ queryKey: ["companion-health"] });
+      queryClient.invalidateQueries({ queryKey: ["community-members"] });
       if (data.validationPassed) {
         toast.success(`New look unlocked! ${data.regenerationsRemaining} look refresh${data.regenerationsRemaining === 1 ? '' : 'es'} remaining.`);
       } else {

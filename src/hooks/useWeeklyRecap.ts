@@ -6,6 +6,10 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useWeeklyRecapContext } from "@/contexts/WeeklyRecapContext";
 import { format } from "date-fns";
 import { safeLocalStorage } from "@/utils/storage";
+import {
+  getLegacyWeeklyRecapDismissedKey,
+  getWeeklyRecapDismissedKey,
+} from "@/utils/accountLocalState";
 
 export interface WeeklyRecap {
   id: string;
@@ -139,16 +143,22 @@ export const useWeeklyRecap = () => {
 
   // Auto-open modal on Sunday if recap exists and not viewed
   useEffect(() => {
-    if (isSunday && currentRecap && !currentRecap.viewed_at && !isLoading) {
+    if (isSunday && currentRecap && !currentRecap.viewed_at && !isLoading && user?.id) {
       // Check localStorage to prevent showing multiple times per session
-      const dismissedKey = `recap-dismissed-${currentRecap.week_start_date}`;
+      const dismissedKey = getWeeklyRecapDismissedKey(user.id, currentRecap.week_start_date);
+      const legacyDismissedKey = getLegacyWeeklyRecapDismissedKey(currentRecap.week_start_date);
       const dismissed = safeLocalStorage.getItem(dismissedKey);
+      const legacyDismissed = safeLocalStorage.getItem(legacyDismissedKey);
       
-      if (!dismissed) {
+      if (!dismissed && !legacyDismissed) {
         contextOpenRecap(currentRecap);
+      } else if (!dismissed && legacyDismissed) {
+        // One-time migration from legacy unscoped recap dismissal key.
+        safeLocalStorage.setItem(dismissedKey, legacyDismissed);
+        safeLocalStorage.removeItem(legacyDismissedKey);
       }
     }
-  }, [isSunday, currentRecap, isLoading, contextOpenRecap]);
+  }, [isSunday, currentRecap, isLoading, contextOpenRecap, user?.id]);
 
   // Auto-generate recap on Sunday if it doesn't exist AND user has activity
   useEffect(() => {
@@ -183,10 +193,12 @@ export const useWeeklyRecap = () => {
   };
 
   const closeRecap = () => {
-    if (selectedRecap) {
+    if (selectedRecap && user?.id) {
       // Mark dismissed in localStorage
-      const dismissedKey = `recap-dismissed-${selectedRecap.week_start_date}`;
+      const dismissedKey = getWeeklyRecapDismissedKey(user.id, selectedRecap.week_start_date);
+      const legacyDismissedKey = getLegacyWeeklyRecapDismissedKey(selectedRecap.week_start_date);
       safeLocalStorage.setItem(dismissedKey, "true");
+      safeLocalStorage.removeItem(legacyDismissedKey);
       
       // Mark as viewed if not already
       if (!selectedRecap.viewed_at) {

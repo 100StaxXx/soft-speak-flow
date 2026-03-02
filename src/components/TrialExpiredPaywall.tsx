@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Crown, Sparkles, MessageCircle, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,8 +48,9 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
     hasLoadedProducts,
   } = useAppleSubscription();
   const { toast } = useToast();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const monthlyProduct = useMemo(() => getProductForPlan("monthly", products), [products]);
   const yearlyProduct = useMemo(() => getProductForPlan("yearly", products), [products]);
@@ -99,33 +101,49 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
 
     setIsDeleting(true);
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!currentSession?.access_token) {
-        throw new Error("No active session");
+      if (!user?.id) {
+        throw new Error("Session expired. Please sign in again.");
       }
 
-      const { error } = await supabase.functions.invoke("delete-user", {
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
+      const { warnings } = await deleteCurrentAccount({
+        queryClient,
+        userId: user.id,
+        signOut,
       });
 
-      if (error) throw error;
-
-      await signOut();
-      navigate("/auth");
+      navigate("/auth", {
+        replace: true,
+        state: { message: "Your account has been deleted." },
+      });
       toast({
         title: "Account deleted",
-        description: "Your account has been permanently deleted.",
+        description:
+          warnings.length > 0
+            ? "Your account was deleted. Some media cleanup tasks will finish in the background."
+            : "Your account has been permanently deleted.",
       });
     } catch (error) {
       console.error("Delete account error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete account. Please try again.",
-        variant: "destructive",
-      });
+
+      if (isAccountDeletionAuthError(error)) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again to continue.",
+          variant: "destructive",
+        });
+        try {
+          await signOut();
+        } catch (signOutError) {
+          console.warn("Sign out after deletion auth error failed:", signOutError);
+        }
+        navigate("/auth", { replace: true });
+      } else {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to delete account. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);

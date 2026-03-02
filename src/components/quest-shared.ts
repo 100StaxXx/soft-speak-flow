@@ -44,6 +44,25 @@ export function getNextHalfHourTime(baseDate: Date = new Date()): string {
   return `${String(rounded.getHours()).padStart(2, "0")}:${String(rounded.getMinutes()).padStart(2, "0")}`;
 }
 
+export function centerSelectedTimeInWheel(
+  wheelElement: HTMLDivElement | null,
+  selectedTime: string | null,
+  behavior: ScrollBehavior = "smooth",
+): void {
+  if (!wheelElement || !selectedTime) return;
+
+  const selectedSlot = wheelElement.querySelector<HTMLButtonElement>(`[data-time-slot="${selectedTime}"]`);
+  if (!selectedSlot) return;
+
+  const containerHeight = wheelElement.clientHeight;
+  const slotCenter = selectedSlot.offsetTop + selectedSlot.offsetHeight / 2;
+  const targetTop = slotCenter - containerHeight / 2;
+  const maxTop = Math.max(0, wheelElement.scrollHeight - containerHeight);
+  const clampedTop = Math.min(Math.max(0, targetTop), maxTop);
+
+  wheelElement.scrollTo({ top: clampedTop, behavior });
+}
+
 export const TIME_SLOTS = generateTimeSlots();
 
 export const DURATION_OPTIONS = [

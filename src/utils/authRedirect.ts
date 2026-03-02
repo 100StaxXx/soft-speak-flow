@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import {
   getOnboardingMentorId,
   getResolvedMentorId,
@@ -13,6 +14,60 @@ const HARD_FALLBACK_TIMEOUT_MS = 8000;
 const PROFILE_MUTATION_TIMEOUT_MS = 3000;
 const DEFAULT_AUTH_REDIRECT_PATH = "/onboarding";
 const RETURNING_USER_REDIRECT_PATH = "/tasks";
+
+const buildDefaultProfilePayload = (
+  userId: string,
+  email: string | null,
+  timezone: string,
+): Database["public"]["Tables"]["profiles"]["Insert"] => ({
+  id: userId,
+  email: email ?? null,
+  timezone,
+  is_premium: false,
+  preferences: {},
+  selected_mentor_id: null,
+  onboarding_completed: false,
+  onboarding_step: "questionnaire",
+  onboarding_data: {},
+  daily_push_enabled: true,
+  daily_push_window: null,
+  daily_push_time: null,
+  daily_quote_push_enabled: true,
+  daily_quote_push_window: null,
+  daily_quote_push_time: null,
+  habit_reminders_enabled: true,
+  task_reminders_enabled: true,
+  checkin_reminders_enabled: true,
+  completed_tasks_stay_in_place: true,
+  current_habit_streak: 0,
+  longest_habit_streak: 0,
+  total_quests_completed: 0,
+  last_encounter_quest_count: 0,
+  next_encounter_quest_count: null,
+  last_weekly_encounter: null,
+  streak_at_risk: false,
+  streak_at_risk_since: null,
+  streak_freezes_available: 1,
+  last_streak_freeze_used: null,
+  astral_encounters_enabled: true,
+  stat_mode: "casual",
+  stats_enabled: true,
+  life_status: "active",
+  life_status_set_at: null,
+  life_status_expires_at: null,
+  trial_started_at: null,
+  trial_ends_at: null,
+  subscription_status: null,
+  subscription_started_at: null,
+  subscription_expires_at: null,
+  stripe_customer_id: null,
+  paypal_email: null,
+  referral_code: null,
+  referral_count: 0,
+  referred_by: null,
+  referred_by_code: null,
+  faction: null,
+});
 
 /**
  * Helper to wrap a promise with a timeout
@@ -206,14 +261,11 @@ export const ensureProfile = async (userId: string, email: string | null): Promi
     if (!existing) {
       // Create new profile with user's timezone
       logger.debug("[ensureProfile] Creating new profile...");
+      const profileDefaults = buildDefaultProfilePayload(userId, email, userTimezone);
       const { error } = await withTimeout(
         () =>
           supabase.from("profiles").upsert(
-            {
-              id: userId,
-              email: email ?? null,
-              timezone: userTimezone,
-            },
+            profileDefaults,
             {
               onConflict: "id",
             },

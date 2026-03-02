@@ -4,6 +4,7 @@ DO $$
 DECLARE
   v_user_id uuid := gen_random_uuid();
   v_epic_id uuid;
+  v_invite_code text := 'SMOKE-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
   v_habit_ids uuid[];
   v_habit_count integer;
   v_link_count integer;
@@ -29,10 +30,16 @@ BEGIN
   )
   SELECT
     array_agg(id),
-    count(*),
-    max(custom_month_days) FILTER (WHERE frequency = 'monthly')
-  INTO v_habit_ids, v_habit_count, v_monthly_days
+    count(*)
+  INTO v_habit_ids, v_habit_count
   FROM inserted;
+
+  SELECT h.custom_month_days
+  INTO v_monthly_days
+  FROM public.habits h
+  WHERE h.id = ANY (v_habit_ids)
+    AND h.frequency = 'monthly'
+  LIMIT 1;
 
   IF v_habit_count <> 5 THEN
     RAISE EXCEPTION 'Smoke test failed: expected 5 inserted habits, got %', v_habit_count;
@@ -59,7 +66,7 @@ BEGIN
     30,
     true,
     300,
-    'SMOKE-' || substr(replace(v_epic_id::text, '-', ''), 1, 8),
+    v_invite_code,
     'heroic'
   )
   RETURNING id INTO v_epic_id;

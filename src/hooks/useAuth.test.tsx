@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => {
   const getSessionMock = vi.fn();
   const onAuthStateChangeMock = vi.fn();
   const signOutMock = vi.fn();
-  const removeAllChannelsMock = vi.fn();
   const unsubscribeMock = vi.fn();
   const profileUpdateEqMock = vi.fn().mockResolvedValue({ error: null });
   const fromMock = vi.fn(() => ({
@@ -16,16 +15,15 @@ const mocks = vi.hoisted(() => {
       eq: profileUpdateEqMock,
     })),
   }));
-  const removeSessionItemMock = vi.fn();
+  const clearAuthScopedClientStateMock = vi.fn().mockResolvedValue(undefined);
 
   return {
     getSessionMock,
     onAuthStateChangeMock,
     signOutMock,
-    removeAllChannelsMock,
     unsubscribeMock,
     fromMock,
-    removeSessionItemMock,
+    clearAuthScopedClientStateMock,
   };
 });
 
@@ -37,7 +35,6 @@ vi.mock("@/integrations/supabase/client", () => ({
       signOut: mocks.signOutMock,
     },
     from: mocks.fromMock,
-    removeAllChannels: mocks.removeAllChannelsMock,
   },
 }));
 
@@ -57,13 +54,13 @@ vi.mock("@/utils/timezone", () => ({
   getUserTimezone: () => "UTC",
 }));
 
-vi.mock("@/utils/storage", () => ({
-  safeSessionStorage: {
-    removeItem: mocks.removeSessionItemMock,
-  },
+vi.mock("@/services/authScopedClientState", () => ({
+  clearAuthScopedClientState: mocks.clearAuthScopedClientStateMock,
 }));
 
 import { AuthProvider, useAuth } from "./useAuth";
+
+let authStateChangeCallback: ((event: string, session: Session | null) => void) | null = null;
 
 const createWrapper = (queryClient?: QueryClient) => {
   const client =
@@ -84,10 +81,13 @@ const createWrapper = (queryClient?: QueryClient) => {
 describe("useAuth provider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.onAuthStateChangeMock.mockImplementation(() => ({
+    authStateChangeCallback = null;
+    mocks.onAuthStateChangeMock.mockImplementation((callback: (event: string, session: Session | null) => void) => {
+      authStateChangeCallback = callback;
+      return {
       data: { subscription: { unsubscribe: mocks.unsubscribeMock } },
-    }));
-    mocks.removeAllChannelsMock.mockResolvedValue([]);
+      };
+    });
     mocks.signOutMock.mockResolvedValue(undefined);
   });
 
@@ -211,8 +211,6 @@ describe("useAuth provider", () => {
         queries: { retry: false },
       },
     });
-    const clearSpy = vi.spyOn(queryClient, "clear");
-
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(queryClient),
     });
@@ -235,8 +233,32 @@ describe("useAuth provider", () => {
       await firstSignOut!;
     });
 
-    expect(clearSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.removeAllChannelsMock).toHaveBeenCalledTimes(1);
-    expect(mocks.removeSessionItemMock).toHaveBeenCalledWith("initialRouteRedirected");
+    expect(mocks.clearAuthScopedClientStateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears auth-scoped state when the authenticated user switches", async () => {
+    const initialSession = { user: { id: "user-1", email: "first@example.com" } } as Session;
+    const switchedSession = { user: { id: "user-2", email: "second@example.com" } } as Session;
+
+    mocks.getSessionMock.mockResolvedValueOnce({ data: { session: initialSession }, error: null });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.user?.id).toBe("user-1"));
+
+    await act(async () => {
+      authStateChangeCallback?.("SIGNED_IN", switchedSession);
+    });
+
+    expect(mocks.clearAuthScopedClientStateMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        previousUserId: "user-1",
+        clearLegacyLocalState: true,
+      }),
+    );
+    expect(result.current.user?.id).toBe("user-2");
   });
 });

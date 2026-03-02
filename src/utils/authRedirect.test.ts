@@ -4,17 +4,20 @@ const mocks = vi.hoisted(() => {
   const maybeSingleMock = vi.fn();
   const updateEqMock = vi.fn(() => Promise.resolve({ error: null }));
   const updateMock = vi.fn(() => ({ eq: updateEqMock }));
+  const upsertMock = vi.fn(() => Promise.resolve({ error: null }));
   const selectEqMock = vi.fn(() => ({ maybeSingle: maybeSingleMock }));
   const selectMock = vi.fn(() => ({ eq: selectEqMock }));
   const fromMock = vi.fn(() => ({
     select: selectMock,
     update: updateMock,
+    upsert: upsertMock,
   }));
 
   return {
     maybeSingleMock,
     updateEqMock,
     updateMock,
+    upsertMock,
     selectEqMock,
     selectMock,
     fromMock,
@@ -35,7 +38,7 @@ vi.mock("./logger", () => ({
   },
 }));
 
-import { getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
+import { ensureProfile, getAuthRedirectPath, getProfileAwareAuthFallbackPath } from "./authRedirect";
 
 describe("getAuthRedirectPath", () => {
   beforeEach(() => {
@@ -205,5 +208,49 @@ describe("getProfileAwareAuthFallbackPath", () => {
     mocks.maybeSingleMock.mockRejectedValueOnce(new Error("profile unavailable"));
 
     await expect(getProfileAwareAuthFallbackPath("error-user")).resolves.toBe("/onboarding");
+  });
+});
+
+describe("ensureProfile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates a full default profile payload when the profile is missing", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    await ensureProfile("profile-missing-user", "new@example.com");
+
+    expect(mocks.upsertMock).toHaveBeenCalledTimes(1);
+    const firstCall = mocks.upsertMock.mock.calls.at(0);
+    expect(firstCall).toBeDefined();
+
+    const payload = firstCall?.[0] as Record<string, unknown>;
+    const options = firstCall?.[1];
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        id: "profile-missing-user",
+        email: "new@example.com",
+        onboarding_completed: false,
+        onboarding_step: "questionnaire",
+        onboarding_data: {},
+        daily_push_enabled: true,
+        daily_quote_push_enabled: true,
+        habit_reminders_enabled: true,
+        task_reminders_enabled: true,
+        checkin_reminders_enabled: true,
+        completed_tasks_stay_in_place: true,
+        streak_freezes_available: 1,
+        stat_mode: "casual",
+        stats_enabled: true,
+        life_status: "active",
+      }),
+    );
+    expect(typeof payload.timezone).toBe("string");
+    expect(options).toEqual({ onConflict: "id" });
   });
 });

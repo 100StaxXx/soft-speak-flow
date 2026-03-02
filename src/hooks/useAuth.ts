@@ -14,7 +14,7 @@ import { Capacitor } from "@capacitor/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { safeSessionStorage } from "@/utils/storage";
+import { clearAuthScopedClientState } from "@/services/authScopedClientState";
 import { getUserTimezone } from "@/utils/timezone";
 
 const SESSION_RETRY_DELAYS_MS = [0, 250, 750, 1500] as const;
@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const signOutInFlightRef = useRef<Promise<void> | null>(null);
   const lastResumeRefreshRef = useRef(0);
+  const activeUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -56,6 +57,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  useEffect(() => {
+    activeUserIdRef.current = session?.user?.id ?? null;
+  }, [session?.user?.id]);
 
   const applySessionState = useCallback((nextSession: Session | null, nextStatus?: AuthStatus) => {
     setSession(nextSession);
@@ -82,15 +87,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     ]);
   }, [queryClient]);
 
-  const clearAuthScopedState = useCallback(async () => {
-    queryClient.clear();
-    safeSessionStorage.removeItem("initialRouteRedirected");
-    try {
-      await supabase.removeAllChannels();
-    } catch (error) {
-      console.error("Failed to remove realtime channels:", error);
-    }
-  }, [queryClient]);
+  const clearAuthScopedState = useCallback(
+    async (previousUserId?: string | null) => {
+      await clearAuthScopedClientState(queryClient, {
+        previousUserId,
+        clearLegacyLocalState: true,
+      });
+    },
+    [queryClient],
+  );
 
   const refreshSession = useCallback(async () => {
     if (refreshInFlightRef.current) {
@@ -176,7 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOutError = error;
       }
 
-      await clearAuthScopedState();
+      await clearAuthScopedState(sessionRef.current?.user?.id ?? null);
       applySessionState(null, "unauthenticated");
 
       if (signOutError) {
@@ -199,7 +204,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      const previousUserId = activeUserIdRef.current;
+      const nextUserId = nextSession?.user?.id ?? null;
+      const userChanged = Boolean(previousUserId && nextUserId && previousUserId !== nextUserId);
+
       applySessionState(nextSession, nextSession?.user ? "authenticated" : "unauthenticated");
+      activeUserIdRef.current = nextUserId;
 
       if (
         nextSession?.user &&
@@ -217,7 +227,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (event === "SIGNED_OUT") {
-        void clearAuthScopedState();
+        void clearAuthScopedState(previousUserId);
+      } else if (userChanged) {
+        void clearAuthScopedState(previousUserId);
       }
     });
 

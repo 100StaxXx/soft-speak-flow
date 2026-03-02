@@ -1,7 +1,11 @@
-import { useState, useCallback, useEffect } from 'react';
-import { safeLocalStorage } from '@/utils/storage';
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  ENCOUNTER_PASSES_LEGACY_KEY,
+  getEncounterPassesStorageKey,
+} from "@/utils/accountLocalState";
+import { safeLocalStorage } from "@/utils/storage";
 
-const STORAGE_KEY = 'encounter_passes';
 const PROMPT_THRESHOLD = 3;
 
 interface PassData {
@@ -10,12 +14,13 @@ interface PassData {
 }
 
 const getTodayKey = (): string => {
-  return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  return new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-const getStoredData = (): PassData | null => {
-  const stored = safeLocalStorage.getItem(STORAGE_KEY);
+const getStoredData = (storageKey: string): PassData | null => {
+  const stored = safeLocalStorage.getItem(storageKey);
   if (!stored) return null;
+
   try {
     return JSON.parse(stored) as PassData;
   } catch {
@@ -23,34 +28,57 @@ const getStoredData = (): PassData | null => {
   }
 };
 
-const setStoredData = (data: PassData): void => {
-  safeLocalStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+const setStoredData = (storageKey: string, data: PassData): void => {
+  safeLocalStorage.setItem(storageKey, JSON.stringify(data));
 };
 
 export const useEncounterPasses = () => {
+  const { user } = useAuth();
   const [passCount, setPassCount] = useState(0);
+
+  const userStorageKey = useMemo(
+    () => (user?.id ? getEncounterPassesStorageKey(user.id) : null),
+    [user?.id],
+  );
 
   // Initialize and check for day rollover
   useEffect(() => {
     const today = getTodayKey();
-    const stored = getStoredData();
-    
-    if (stored && stored.date === today) {
-      setPassCount(stored.count);
-    } else {
-      // New day - reset count
-      setStoredData({ date: today, count: 0 });
+
+    if (!userStorageKey) {
       setPassCount(0);
+      return;
     }
-  }, []);
+
+    const scopedStored = getStoredData(userStorageKey);
+
+    if (scopedStored) {
+      const scopedCount = scopedStored.date === today ? scopedStored.count : 0;
+      setStoredData(userStorageKey, { date: today, count: scopedCount });
+      setPassCount(scopedCount);
+      return;
+    }
+
+    // Legacy migration for pre-user-scoped storage.
+    const legacyStored = getStoredData(ENCOUNTER_PASSES_LEGACY_KEY);
+    const migratedCount = legacyStored?.date === today ? legacyStored.count : 0;
+
+    setStoredData(userStorageKey, { date: today, count: migratedCount });
+    setPassCount(migratedCount);
+    safeLocalStorage.removeItem(ENCOUNTER_PASSES_LEGACY_KEY);
+  }, [userStorageKey]);
 
   const recordPass = useCallback(() => {
+    if (!userStorageKey) {
+      return passCount;
+    }
+
     const today = getTodayKey();
     const newCount = passCount + 1;
-    setStoredData({ date: today, count: newCount });
+    setStoredData(userStorageKey, { date: today, count: newCount });
     setPassCount(newCount);
     return newCount;
-  }, [passCount]);
+  }, [passCount, userStorageKey]);
 
   const shouldPromptDisable = passCount >= PROMPT_THRESHOLD;
 

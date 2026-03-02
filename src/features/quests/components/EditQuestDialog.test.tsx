@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EditQuestDialog } from "./EditQuestDialog";
 
@@ -163,7 +163,9 @@ describe("EditQuestDialog", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "9:30 AM" }));
-    fireEvent.change(screen.getByLabelText("Custom quest time"), {
+    const customTimeInput = screen.getByLabelText("Custom quest time");
+    expect(customTimeInput).toHaveClass("text-base");
+    fireEvent.change(customTimeInput, {
       target: { value: "11:17" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
@@ -178,6 +180,52 @@ describe("EditQuestDialog", () => {
         scheduled_time: "11:17",
       }),
     );
+  });
+
+  it("keeps time picker scrolling local and does not call scrollIntoView", () => {
+    vi.useFakeTimers();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoViewMock = vi.fn();
+
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: scrollIntoViewMock,
+    });
+
+    try {
+      render(
+        <EditQuestDialog
+          task={legacyTask}
+          open
+          onOpenChange={vi.fn()}
+          onSave={vi.fn().mockResolvedValue(undefined)}
+          isSaving={false}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "9:30 AM" }));
+      fireEvent.change(screen.getByLabelText("Custom quest time"), {
+        target: { value: "11:17" },
+      });
+
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          writable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as HTMLElement & { scrollIntoView?: unknown }).scrollIntoView;
+      }
+      vi.useRealTimers();
+    }
   });
 
   it("normalizes legacy weekly multi-day recurrence to custom on save", async () => {

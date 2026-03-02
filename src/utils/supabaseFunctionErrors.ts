@@ -15,10 +15,12 @@ export interface ParsedFunctionInvokeError {
     message?: string;
     error?: string;
     code?: string;
+    retryAfterSeconds?: number;
     upstreamStatus?: number;
     upstreamError?: string;
   };
   backendMessage?: string;
+  retryAfterSeconds?: number;
   upstreamStatus?: number;
   upstreamError?: string;
   isOffline: boolean;
@@ -134,6 +136,8 @@ export async function parseFunctionInvokeError(
         const payloadMessage = asString(payloadRecord.message);
         const payloadError = asString(payloadRecord.error);
         const payloadCode = asString(payloadRecord.code);
+        const payloadRetryAfterSeconds =
+          asNumber(payloadRecord.retry_after_seconds) ?? asNumber(payloadRecord.retryAfterSeconds);
         const payloadUpstreamStatus =
           asNumber(payloadRecord.upstream_status) ?? asNumber(payloadRecord.upstreamStatus);
         const payloadUpstreamError =
@@ -143,6 +147,7 @@ export async function parseFunctionInvokeError(
           payloadMessage ||
           payloadError ||
           payloadCode ||
+          payloadRetryAfterSeconds ||
           payloadUpstreamStatus ||
           payloadUpstreamError
         ) {
@@ -150,6 +155,7 @@ export async function parseFunctionInvokeError(
             message: payloadMessage,
             error: payloadError,
             code: payloadCode,
+            retryAfterSeconds: payloadRetryAfterSeconds,
             upstreamStatus: payloadUpstreamStatus,
             upstreamError: payloadUpstreamError,
           };
@@ -161,6 +167,7 @@ export async function parseFunctionInvokeError(
   }
 
   const backendMessage = responsePayload?.message ?? responsePayload?.error;
+  const retryAfterSeconds = responsePayload?.retryAfterSeconds;
   const upstreamStatus = responsePayload?.upstreamStatus;
   const upstreamError = responsePayload?.upstreamError;
   const category = classifyFunctionInvokeError({
@@ -178,6 +185,7 @@ export async function parseFunctionInvokeError(
     code,
     responsePayload,
     backendMessage,
+    retryAfterSeconds,
     upstreamStatus,
     upstreamError,
     isOffline,
@@ -282,6 +290,9 @@ export function toUserFacingFunctionError(
   if (parsed.category === "rate_limit") {
     return (
       parsed.backendMessage ??
+      (typeof parsed.retryAfterSeconds === "number"
+        ? `You're making requests too quickly. Please wait about ${parsed.retryAfterSeconds} seconds and try again.`
+        : undefined) ??
       "You're making requests too quickly. Please wait a moment and try again."
     );
   }

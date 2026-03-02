@@ -33,6 +33,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { PageInfoButton } from "@/components/PageInfoButton";
 import { PageInfoModal } from "@/components/PageInfoModal";
 import { applyMentorChange } from "@/pages/profileMentorChange";
+import { deleteCurrentAccount, isAccountDeletionAuthError } from "@/services/accountDeletion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -245,46 +246,39 @@ const Profile = () => {
 
     setIsDeletingAccount(true);
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError || !session?.access_token) {
-        throw new Error("Session expired. Please sign in again.");
-      }
-
-      const { error } = await supabase.functions.invoke("delete-user", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+      const { warnings } = await deleteCurrentAccount({
+        queryClient,
+        userId: user.id,
+        signOut,
       });
-      if (error) {
-        throw new Error(error.message || "Unable to delete account");
-      }
 
-      queryClient.clear();
       setShowDeleteDialog(false);
       setDeleteConfirmationText("");
       toast({
         title: "Account deleted",
-        description: "Your account and saved progress have been permanently removed.",
+        description:
+          warnings.length > 0
+            ? "Your account was deleted. Some media cleanup tasks will finish in the background."
+            : "Your account and saved progress have been permanently removed.",
       });
 
-      await signOut();
       navigate("/auth", {
         replace: true,
         state: { message: "Your account has been deleted." },
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Something went wrong deleting your account.";
-      if (errorMessage.toLowerCase().includes("jwt") || errorMessage.toLowerCase().includes("token")) {
+      if (isAccountDeletionAuthError(error)) {
         toast({
           title: "Session expired",
           description: "Please sign in again to continue.",
           variant: "destructive",
         });
-        await signOut();
+        try {
+          await signOut();
+        } catch (signOutError) {
+          console.warn("Sign out after deletion auth error failed:", signOutError);
+        }
         navigate("/auth", { replace: true });
       } else {
         toast({

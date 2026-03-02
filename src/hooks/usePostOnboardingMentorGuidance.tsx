@@ -581,14 +581,14 @@ export const getMentorInstructionLines = (
     }
 
     if (currentSubstep === "enter_title") {
-      return ["Enter your quest title."];
+      return ["Name your quest. Try something specific like 'Review roadmap for 30 minutes.'"];
     }
 
     if (currentSubstep === "select_time") {
-      return ["Set a time."];
+      return ["Pick a time."];
     }
 
-    return ["Tap Create Quest."];
+    return ["Tap Add Quest."];
   }
 
   if (currentStep === "morning_checkin") {
@@ -633,17 +633,17 @@ const getMilestoneDialogue = (
       };
     case "enter_title":
       return {
-        text: "Enter your quest title.",
-        support: "Name it clearly so future-you knows exactly what to do.",
+        text: "Name your quest.",
+        support: "Try something specific like 'Review roadmap for 30 minutes.'",
       };
     case "select_time":
       return {
-        text: "Set a time.",
-        support: "Scheduled quests get completed.",
+        text: "Pick a time.",
+        support: "Scroll the wheel or type one in. Scheduled quests get completed.",
       };
     case "submit_create_quest":
       return {
-        text: "Tap Create Quest.",
+        text: "Tap Add Quest.",
         support: "Your first mission is now live.",
       };
     case "open_companion_tab":

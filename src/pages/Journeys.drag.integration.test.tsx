@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   unsurfacedEpicHabitsCount: 0,
   pendingRecurringCount: 0,
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
+  epicsLoading: false,
   lastDatePillSelectedDate: null as Date | null,
   dailyTasks: [] as Array<{
     id: string;
@@ -213,6 +214,7 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
     epics: [],
+    isLoading: mocks.epicsLoading,
     createEpic: mocks.createEpic,
     isCreating: false,
   }),

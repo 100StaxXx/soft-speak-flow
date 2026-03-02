@@ -104,7 +104,7 @@ export const CompanionDisplay = memo(() => {
   } = useCompanion();
   const { unlockedSkins } = useReferrals();
   const { health, needsWelcomeBack } = useCompanionHealth();
-  const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount } = useCompanionRegenerate();
+  const { regenerate, isRegenerating, maxRegenerations, generationPhase, retryCount, resetProgress } = useCompanionRegenerate();
   const { equippedRewards } = useEpicRewards();
   useEvolution();
   
@@ -166,9 +166,10 @@ export const CompanionDisplay = memo(() => {
     isLongPressing.current = false;
     longPressTimer.current = setTimeout(() => {
       isLongPressing.current = true;
+      resetProgress();
       setShowRegenerateDialog(true);
     }, LONG_PRESS_DURATION_MS);
-  }, [companion, isRegenerating, regenerationsRemaining]);
+  }, [companion, isRegenerating, regenerationsRemaining, resetProgress]);
   
   const handlePressEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -209,8 +210,13 @@ export const CompanionDisplay = memo(() => {
       eye_color: companion.eye_color,
       fur_color: companion.fur_color,
     });
-    setShowRegenerateDialog(false);
   }, [companion, regenerate]);
+
+  const handleRegenerateDialogClose = useCallback(() => {
+    if (isRegenerating) return;
+    setShowRegenerateDialog(false);
+    resetProgress();
+  }, [isRegenerating, resetProgress]);
 
   // Get equipped skin and calculate styles
   const equippedSkin = useMemo(() => {
@@ -470,6 +476,16 @@ export const CompanionDisplay = memo(() => {
               {/* Twinkling star particles around companion */}
               <div className={`absolute inset-0 rounded-2xl ${!prefersReducedMotion ? 'star-shimmer' : ''}`} aria-hidden="true" />
               <div className={`absolute inset-0 bg-gradient-to-br from-nebula-pink/30 to-celestial-blue/30 rounded-2xl blur-xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`} aria-hidden="true" />
+              {isRegenerating && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/50 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Refreshing companion look">
+                  <div className="rounded-full border border-primary/35 bg-card/80 px-4 py-2 text-xs font-medium text-foreground shadow-lg">
+                    <span className="inline-flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
+                      Refreshing look...
+                    </span>
+                  </div>
+                </div>
+              )}
               {!imageLoaded && !imageError && (
                 <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading companion image">
                   <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
@@ -620,7 +636,7 @@ export const CompanionDisplay = memo(() => {
       {/* Hidden Regenerate Dialog */}
       <CompanionRegenerateDialog
         isOpen={showRegenerateDialog}
-        onClose={() => setShowRegenerateDialog(false)}
+        onClose={handleRegenerateDialogClose}
         onConfirm={handleRegenerateConfirm}
         isRegenerating={isRegenerating}
         regenerationsRemaining={regenerationsRemaining}

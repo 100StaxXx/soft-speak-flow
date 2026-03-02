@@ -162,8 +162,10 @@ describe("getMentorInstructionLines", () => {
       "Tap the + in the bottom right"
     );
     expect(getMentorInstructionLines("create_quest", "enter_title")[0]).toContain(
-      "Enter your quest title"
+      "Name your quest"
     );
+    expect(getMentorInstructionLines("create_quest", "select_time")[0]).toContain("Pick a time");
+    expect(getMentorInstructionLines("create_quest", "submit_create_quest")[0]).toContain("Tap Add Quest");
     expect(getMentorInstructionLines("morning_checkin", null)[0]).toContain("Open Mentor");
     expect(getMentorInstructionLines("companion_tab_intro", null)[0]).toContain("Companion Tab");
     expect(getMentorInstructionLines("evolve_companion", null)[0]).toContain("Tap Evolve to ascend");

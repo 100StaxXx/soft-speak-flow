@@ -8,6 +8,7 @@ export interface RateLimitConfig {
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
+  limit: number;
   resetAt: Date;
 }
 
@@ -42,6 +43,7 @@ export async function checkRateLimit(
       return {
         allowed: true,
         remaining: config.maxCalls,
+        limit: config.maxCalls,
         resetAt
       };
     }
@@ -52,6 +54,7 @@ export async function checkRateLimit(
     return {
       allowed: callCount < config.maxCalls,
       remaining,
+      limit: config.maxCalls,
       resetAt
     };
   } catch (error) {
@@ -60,6 +63,7 @@ export async function checkRateLimit(
     return {
       allowed: true,
       remaining: config.maxCalls,
+      limit: config.maxCalls,
       resetAt
     };
   }
@@ -85,6 +89,7 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'generate-lesson': { maxCalls: 10, windowHours: 24 },
   
   // Light operations
+  'daily_missions': { maxCalls: 10, windowHours: 24 },
   'daily-missions': { maxCalls: 10, windowHours: 24 },
   'check-in-response': { maxCalls: 20, windowHours: 24 },
   'mentor-chat': { maxCalls: 50, windowHours: 24 },
@@ -100,6 +105,7 @@ export function createRateLimitResponse(result: RateLimitResult, corsHeaders: Re
       error: 'Rate limit exceeded',
       message: `You've reached the limit for this action. Please try again later.`,
       remaining: result.remaining,
+      limit: result.limit,
       resetAt: result.resetAt.toISOString(),
     }),
     {
@@ -108,7 +114,7 @@ export function createRateLimitResponse(result: RateLimitResult, corsHeaders: Re
         ...corsHeaders,
         'Content-Type': 'application/json',
         'Retry-After': '3600', // 1 hour
-        'X-RateLimit-Limit': '20',
+        'X-RateLimit-Limit': String(result.limit),
         'X-RateLimit-Remaining': String(result.remaining),
         'X-RateLimit-Reset': result.resetAt.toISOString(),
       }

@@ -204,6 +204,7 @@ interface TodaysAgendaProps {
       };
     }>;
   }>;
+  isCampaignsLoading?: boolean;
   onDeleteQuest?: (taskId: string) => void;
   onMoveQuestToNextDay?: (taskId: string) => void;
   onUpdateScheduledTime?: (taskId: string, newTime: string) => void;
@@ -212,6 +213,8 @@ interface TodaysAgendaProps {
   hasCalendarLink?: (taskId: string) => boolean;
   onTimelineDragPreviewTimeChange?: (time: string | null) => void;
 }
+
+type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
 
 // Helper to format time in 12-hour format
 const formatTime = (time: string) => {
@@ -574,6 +577,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   calendarMilestones = [],
   onDateSelect,
   activeEpics = [],
+  isCampaignsLoading = false,
   onDeleteQuest,
   onMoveQuestToNextDay,
   onUpdateScheduledTime,
@@ -1337,57 +1341,52 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     ? timelineConflictMap.get(draggedScheduledTask.id)?.size ?? 0
     : 0;
 
-  // Group rituals by campaign
-  const campaignRitualGroups = useMemo(() => {
-    const groups: Array<{
-      epicId: string;
-      title: string;
-      progress: number;
-      daysLeft: number | null;
-      rituals: Task[];
-      completedCount: number;
-      epic: typeof activeEpics[0];
-    }> = [];
+  const activeEpicsById = useMemo(() => {
+    const map = new Map<string, ActiveEpic>();
+    for (const epic of activeEpics) {
+      map.set(epic.id, epic);
+    }
+    return map;
+  }, [activeEpics]);
 
-    const ritualsByEpic = new Map<string, Task[]>();
+  // Group rituals by campaign, using task-level fallback data until epics hydrate.
+  const campaignRitualGroups = useMemo(() => {
+    const ritualsByEpic = new Map<string, { title: string; rituals: Task[] }>();
+
     for (const task of ritualTasks) {
       const epicId = task.epic_id;
       if (!epicId) continue;
-      if (!ritualsByEpic.has(epicId)) ritualsByEpic.set(epicId, []);
-      ritualsByEpic.get(epicId)!.push(task);
-    }
 
-    for (const epic of activeEpics) {
-      const rituals = ritualsByEpic.get(epic.id);
-      if (!rituals || rituals.length === 0) continue;
-      groups.push({
-        epicId: epic.id,
-        title: epic.title,
-        progress: Math.round(epic.progress_percentage ?? 0),
-        daysLeft: getDaysLeft(epic.end_date),
-        rituals,
-        completedCount: rituals.filter(r => !!r.completed).length,
-        epic,
+      const fallbackTitle = task.epic_title?.trim() || "Campaign";
+      const existingGroup = ritualsByEpic.get(epicId);
+      if (existingGroup) {
+        existingGroup.rituals.push(task);
+        if (existingGroup.title === "Campaign" && fallbackTitle !== "Campaign") {
+          existingGroup.title = fallbackTitle;
+        }
+        continue;
+      }
+
+      ritualsByEpic.set(epicId, {
+        title: fallbackTitle,
+        rituals: [task],
       });
     }
 
-    return groups;
-  }, [ritualTasks, activeEpics]);
-
-  // Keep expanded campaigns in sync when new epics appear
-  useEffect(() => {
-    setExpandedCampaigns(prev => {
-      const next = new Set(prev);
-      let changed = false;
-      for (const epic of activeEpics) {
-        if (!next.has(epic.id)) {
-          next.add(epic.id);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
+    return Array.from(ritualsByEpic.entries()).map(([epicId, group]) => {
+      const epic = activeEpicsById.get(epicId) ?? null;
+      return {
+        epicId,
+        title: epic?.title || group.title || "Campaign",
+        progress: epic ? Math.round(epic.progress_percentage ?? 0) : null,
+        daysLeft: epic ? getDaysLeft(epic.end_date) : null,
+        rituals: group.rituals,
+        completedCount: group.rituals.filter((ritual) => !!ritual.completed).length,
+        epic,
+        isHydrated: !!epic,
+      };
     });
-  }, [activeEpics]);
+  }, [ritualTasks, activeEpicsById]);
 
   const toggleCampaignExpanded = useCallback((epicId: string) => {
     setExpandedCampaigns(prev => {
@@ -2215,29 +2214,38 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             </div>
 
             <div className="space-y-2">
-              {campaignRitualGroups.map(group => {
+              {campaignRitualGroups.map((group) => {
                 const isCampaignExpanded = expandedCampaigns.has(group.epicId);
                 return (
                   <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
                     {/* Campaign Header */}
                     <div className="flex items-center gap-2 px-3 py-2.5">
-                      <JourneyPathDrawer epic={{
-                        id: group.epic.id,
-                        title: group.epic.title,
-                        description: group.epic.description ?? undefined,
-                        progress_percentage: group.epic.progress_percentage ?? 0,
-                        target_days: group.epic.target_days,
-                        start_date: group.epic.start_date,
-                        end_date: group.epic.end_date,
-                        epic_habits: group.epic.epic_habits,
-                      }}>
-                        <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
+                      {group.epic && group.isHydrated ? (
+                        <JourneyPathDrawer epic={{
+                          id: group.epic.id,
+                          title: group.epic.title,
+                          description: group.epic.description ?? undefined,
+                          progress_percentage: group.epic.progress_percentage ?? 0,
+                          target_days: group.epic.target_days,
+                          start_date: group.epic.start_date,
+                          end_date: group.epic.end_date,
+                          epic_habits: group.epic.epic_habits,
+                        }}>
+                          <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
+                            <Target className="w-4 h-4 text-primary shrink-0" />
+                            <span className="text-sm font-medium truncate">{group.title}</span>
+                          </button>
+                        </JourneyPathDrawer>
+                      ) : (
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <Target className="w-4 h-4 text-primary shrink-0" />
                           <span className="text-sm font-medium truncate">{group.title}</span>
-                        </button>
-                      </JourneyPathDrawer>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                        {group.progress !== null && (
+                          <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                        )}
                         {group.daysLeft !== null && (
                           <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
                         )}
@@ -2263,7 +2271,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     {/* Collapsible Rituals */}
                     {isCampaignExpanded && (
                       <div className="border-t border-border/20 px-2 pb-1">
-                        {group.rituals.map(task => {
+                        {group.rituals.map((task) => {
                           const isThisDragging = timelineDrag.draggingTaskId === task.id;
                           const isAnyDragging = timelineDrag.isDragging;
                           const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
@@ -2291,10 +2299,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
         )}
 
+        {isCampaignsLoading && campaignRitualGroups.length === 0 && (
+          <div className="mt-4 pt-3 border-t border-border/20">
+            <p className="text-xs text-muted-foreground">Loading campaigns...</p>
+          </div>
+        )}
+
         {/* Campaign Strip (for epics with no rituals today) */}
-        {activeEpics && activeEpics.length > 0 && ritualTasks.length === 0 && (
+        {activeEpics && activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
           <div className="mt-4 pt-3 border-t border-border/20 space-y-2">
-            {activeEpics.map(epic => {
+            {activeEpics.map((epic) => {
               const progress = Math.round(epic.progress_percentage ?? 0);
               const daysLeft = getDaysLeft(epic.end_date);
               return (

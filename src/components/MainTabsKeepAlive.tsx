@@ -14,6 +14,11 @@ import {
   fetchDailyTasks,
   getDailyTasksQueryKey,
 } from "@/hooks/useTasksQuery";
+import {
+  EPICS_QUERY_STALE_TIME,
+  fetchEpics,
+  getEpicsQueryKey,
+} from "@/hooks/epicsQuery";
 
 type MainTabPath = "/mentor" | "/inbox" | "/journeys" | "/companion";
 
@@ -60,9 +65,20 @@ export const MainTabsKeepAlive = memo(({ activePath }: { activePath: MainTabPath
     }).catch(() => undefined);
   }, [queryClient, user?.id]);
 
+  const prefetchEpics = useCallback(() => {
+    if (!user?.id) return;
+
+    void queryClient.prefetchQuery({
+      queryKey: getEpicsQueryKey(user.id),
+      queryFn: () => fetchEpics(user.id),
+      staleTime: EPICS_QUERY_STALE_TIME,
+    }).catch(() => undefined);
+  }, [queryClient, user?.id]);
+
   useEffect(() => {
     prefetchJourneysTasks();
-  }, [prefetchJourneysTasks]);
+    prefetchEpics();
+  }, [prefetchJourneysTasks, prefetchEpics]);
 
   useEffect(() => {
     setMountedTabs((previous) =>

@@ -61,16 +61,22 @@ interface AddQuestSheetProps {
 import {
   DIFFICULTY_COLORS,
   DifficultyIconMap,
+  centerSelectedTimeInWheel,
   formatTime12,
   TIME_SLOTS,
   DURATION_OPTIONS,
-  getNextHalfHourTime,
 } from "@/components/quest-shared";
 
 const DifficultyIcon = ({ difficulty }: { difficulty: "easy" | "medium" | "hard" }) => {
   const Icon = DifficultyIconMap[difficulty];
   return <Icon className="h-5 w-5" />;
 };
+
+const QUEST_TITLE_SUGGESTIONS = [
+  "Review roadmap for 30 minutes",
+  "10-minute inbox cleanup",
+  "Walk outside for 20 minutes",
+];
 
 export const AddQuestSheet = memo(function AddQuestSheet({
   open,
@@ -120,7 +126,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   );
 
   const timeWheelRef = useRef<HTMLDivElement>(null);
-  const selectedTimeRef = useRef<HTMLButtonElement>(null);
   const subtaskInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const hasEmittedTitleEnteredRef = useRef(false);
 
@@ -158,11 +163,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   // Auto-scroll time wheel
   useEffect(() => {
-    if (showTimePicker && selectedTimeRef.current) {
-      setTimeout(() => {
-        selectedTimeRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-      }, 150);
-    }
+    if (!showTimePicker || !scheduledTime) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      centerSelectedTimeInWheel(timeWheelRef.current, scheduledTime, "smooth");
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [showTimePicker, scheduledTime]);
 
   const endTime = useMemo(() => {
@@ -173,6 +180,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   }, [scheduledTime, estimatedDuration]);
 
   const isCustomDuration = estimatedDuration !== null && !DURATION_OPTIONS.some(o => o.value === estimatedDuration);
+  const trimmedTaskText = taskText.trim();
 
   const durationLabel = useMemo(() => {
     if (!estimatedDuration) return "No duration";
@@ -195,7 +203,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const dateObj = taskDate ? new Date(taskDate + "T00:00:00") : selectedDate;
 
   const hasDateAndTime = !!taskDate && !!scheduledTime;
-  const canCreateTask = !!taskText.trim() && hasDateAndTime;
+  const canCreateTask = !!trimmedTaskText && hasDateAndTime;
+  const reviewDateLabel = taskDate ? format(dateObj, "EEE, MMM d") : "Inbox";
+  const reviewTimeLabel = scheduledTime ? formatTime12(scheduledTime) : "Select a time";
+  const reviewTitle = trimmedTaskText || "Name your quest";
 
   // --- Subtask helpers ---
   const handleSubtaskChange = useCallback((index: number, value: string) => {
@@ -349,15 +360,34 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <div className="flex flex-col items-center text-center pt-2 text-white">
             <DifficultyIcon difficulty={difficulty} />
             <p className="text-sm opacity-80 mt-1.5">New Quest</p>
-            <Input
-              data-tour="add-quest-title-input"
-              placeholder="Quest Title"
-              value={taskText}
-              onChange={(e) => setTaskText(e.target.value)}
-              disabled={isAdding}
-              className="mt-2 text-center text-lg font-bold bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/30 h-11"
-            />
-            <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
+            <div className="mt-3 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-3 py-3 text-left">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80">
+                Step 1 · Name your quest
+              </p>
+              <Input
+                data-tour="add-quest-title-input"
+                placeholder="e.g., Review roadmap for 30 minutes"
+                value={taskText}
+                onChange={(e) => setTaskText(e.target.value)}
+                disabled={isAdding}
+                className="mt-2 text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-11"
+              />
+              <p className="mt-1 text-[11px] text-white/75">Try a specific action and duration.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {QUEST_TITLE_SUGGESTIONS.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => setTaskText(suggestion)}
+                    disabled={isAdding}
+                    className="rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85 transition-colors hover:bg-white/20 disabled:opacity-50"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-white/70 text-xs mt-2">{summaryLine}</p>
           </div>
 
           {/* Compact Difficulty Selector */}
@@ -387,6 +417,15 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="px-4 py-4 space-y-3">
+            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Step 2 · Pick a time
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose when you want to do it. You can scroll the wheel or type a custom time.
+              </p>
+            </div>
+
             {/* Duration Row (tappable, expands to chips) */}
             <button
               onClick={() => setShowDurationChips(!showDurationChips)}
@@ -489,9 +528,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               {/* Time Chip */}
               <button
                 onClick={() => {
-                  if (!scheduledTime) {
-                    setScheduledTime(getNextHalfHourTime());
-                  }
                   setShowTimePicker(!showTimePicker);
                 }}
                 data-tour="add-quest-time-chip"
@@ -517,7 +553,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   step={60}
                   value={scheduledTime || ""}
                   onChange={(event) => setScheduledTime(event.target.value || null)}
-                  className="h-10"
+                  className="h-10 text-base"
                 />
                 <div
                   ref={timeWheelRef}
@@ -537,7 +573,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                         <button
                           key={slot}
                           data-tour="add-quest-time-slot"
-                          ref={isSelected ? selectedTimeRef : undefined}
+                          data-time-slot={slot}
                           onClick={() => setScheduledTime(slot)}
                           className={cn(
                             "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",
@@ -689,6 +725,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         </div>
 
         <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
+          <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Step 3 · Add quest
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
+            </p>
+          </div>
           {canShowCalendarSendOption && (
             <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
               <div className="text-xs text-muted-foreground">
@@ -706,7 +750,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               canCreateTask ? cn(colors.pill, "hover:opacity-90") : ""
             )}
           >
-            {isAdding ? "Creating..." : "Create Quest"}
+            {isAdding ? "Adding..." : "Add Quest"}
           </Button>
           <Button
             variant="outline"

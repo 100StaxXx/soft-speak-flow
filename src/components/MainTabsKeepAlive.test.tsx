@@ -133,6 +133,19 @@ describe("MainTabsKeepAlive", () => {
     expect(screen.getByTestId("inbox-visibility")).toHaveTextContent("active");
   });
 
+  it("prefetches journeys tasks and epics on mount", () => {
+    render(<MainTabsKeepAlive activePath="/mentor" />);
+
+    expect(mocks.prefetchQuery).toHaveBeenCalledTimes(2);
+    const queryKeys = mocks.prefetchQuery.mock.calls.map(([config]) => config.queryKey);
+    expect(queryKeys).toEqual(
+      expect.arrayContaining([
+        ["epics", "user-1"],
+      ]),
+    );
+    expect(queryKeys.some((key) => Array.isArray(key) && key[0] === "daily-tasks")).toBe(true);
+  });
+
   it("preserves tab state and avoids remounting visited tabs", () => {
     const { rerender } = render(<MainTabsKeepAlive activePath="/mentor" />);
 

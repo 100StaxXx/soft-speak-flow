@@ -163,7 +163,7 @@ const Journeys = () => {
   const { trackDailyPlanOutcome } = useAIInteractionTracker();
   
   // Epics for plan my day questions and campaign strip
-  const { epics, createEpic, isCreating: isCreatingCampaign } = useEpics({ enabled: isTabActive });
+  const { epics, isLoading: epicsLoading, createEpic, isCreating: isCreatingCampaign } = useEpics({ enabled: isTabActive });
   const activeEpics = useMemo(() =>
     epics?.filter(e => e.status === 'active').slice(0, 5) || [],
     [epics]
@@ -809,6 +809,7 @@ const Journeys = () => {
             calendarMilestones={[]}
             onDateSelect={setSelectedDate}
             activeEpics={activeEpics}
+            isCampaignsLoading={epicsLoading}
             onDeleteQuest={handleSwipeDeleteQuest}
             onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
             hasCalendarLink={hasLinkedEvent}

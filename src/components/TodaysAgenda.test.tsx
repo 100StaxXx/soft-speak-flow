@@ -338,6 +338,207 @@ describe("TodaysAgenda subtasks", () => {
   });
 });
 
+describe("TodaysAgenda campaign visibility", () => {
+  it("renders campaign ritual groups collapsed by default and lets users toggle them", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { container } = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Morning journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByText("Campaigns")).toBeInTheDocument();
+    expect(screen.getByText("Fallback Campaign")).toBeInTheDocument();
+    expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
+
+    const expandChevron = container.querySelector("svg.lucide-chevron-down");
+    expect(expandChevron).toBeTruthy();
+    const expandButton = expandChevron?.closest("button");
+    expect(expandButton).toBeTruthy();
+
+    fireEvent.click(expandButton!);
+    expect(await screen.findByText("Morning journal")).toBeInTheDocument();
+
+    const collapseChevron = container.querySelector("svg.lucide-chevron-up");
+    expect(collapseChevron).toBeTruthy();
+    const collapseButton = collapseChevron?.closest("button");
+    expect(collapseButton).toBeTruthy();
+
+    fireEvent.click(collapseButton!);
+    await waitFor(() => {
+      expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps newly added campaign groups collapsed by default", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const view = render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Morning journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
+
+    view.rerender(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-1",
+            task_text: "Morning journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+          {
+            id: "ritual-2",
+            task_text: "Evening stretch",
+            completed: false,
+            xp_reward: 12,
+            habit_source_id: "habit-2",
+            epic_id: "epic-2",
+            epic_title: "New Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+        activeEpics={[]}
+      />,
+    );
+
+    expect(screen.getByText("New Campaign")).toBeInTheDocument();
+    expect(screen.queryByText("Morning journal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Evening stretch")).not.toBeInTheDocument();
+  });
+
+  it("shows campaign strip when rituals exist but none are campaign-linked", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "ritual-standalone",
+            task_text: "Hydrate",
+            completed: false,
+            xp_reward: 12,
+            habit_source_id: "habit-standalone",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[
+          {
+            id: "epic-1",
+            title: "Hydrated Epic",
+            description: "desc",
+            progress_percentage: 32,
+            target_days: 30,
+            start_date: "2026-02-01",
+            end_date: "2026-03-02",
+            epic_habits: [],
+          },
+        ]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
+    expect(screen.getByText("Hydrated Epic")).toBeInTheDocument();
+  });
+
+  it("renders campaign loading placeholder while campaigns are still fetching", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "quest-1",
+            task_text: "Read chapter",
+            completed: false,
+            xp_reward: 18,
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+        activeEpics={[]}
+        isCampaignsLoading
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByText("Loading campaigns...")).toBeInTheDocument();
+  });
+});
+
 describe("TodaysAgenda attachments", () => {
   beforeEach(() => {
     vi.clearAllMocks();

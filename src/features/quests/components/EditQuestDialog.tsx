@@ -24,6 +24,7 @@ import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import {
+  centerSelectedTimeInWheel,
   DIFFICULTY_COLORS,
   formatTime12,
   TIME_SLOTS,
@@ -119,7 +120,6 @@ export function EditQuestDialog({
   const [newSubtaskText, setNewSubtaskText] = useState("");
 
   const timeWheelRef = useRef<HTMLDivElement>(null);
-  const selectedTimeRef = useRef<HTMLButtonElement>(null);
 
   const { subtasks, addSubtask, toggleSubtask, deleteSubtask } = useSubtasks(task?.id ?? null);
 
@@ -181,11 +181,13 @@ export function EditQuestDialog({
 
   // Auto-scroll time wheel
   useEffect(() => {
-    if (showTimePicker && selectedTimeRef.current) {
-      setTimeout(() => {
-        selectedTimeRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-      }, 150);
-    }
+    if (!showTimePicker || !scheduledTime) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      centerSelectedTimeInWheel(timeWheelRef.current, scheduledTime, "smooth");
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [showTimePicker, scheduledTime]);
 
   const endTime = useMemo(() => {
@@ -441,7 +443,7 @@ export function EditQuestDialog({
                   step={60}
                   value={scheduledTime || ""}
                   onChange={(event) => setScheduledTime(event.target.value || null)}
-                  className="h-10"
+                  className="h-10 text-base"
                 />
                 <div
                   ref={timeWheelRef}
@@ -460,7 +462,7 @@ export function EditQuestDialog({
                       return (
                         <button
                           key={slot}
-                          ref={isSelected ? selectedTimeRef : undefined}
+                          data-time-slot={slot}
                           onClick={() => setScheduledTime(slot)}
                           className={cn(
                             "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",

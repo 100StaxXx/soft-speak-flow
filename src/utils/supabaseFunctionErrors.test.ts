@@ -53,6 +53,28 @@ describe("supabaseFunctionErrors", () => {
     expect(parsed.backendMessage).toBe("Too many requests");
   });
 
+  it("parses retryAfterSeconds for rate-limited responses", async () => {
+    const response = new Response(
+      JSON.stringify({
+        error: "Rate limit exceeded",
+        retryAfterSeconds: 45,
+      }),
+      {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+    const parsed = await parseFunctionInvokeError({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: response,
+    });
+
+    expect(parsed.retryAfterSeconds).toBe(45);
+    expect(parsed.responsePayload?.retryAfterSeconds).toBe(45);
+  });
+
   it("parses upstream provider status fields from function payload", async () => {
     const response = new Response(
       JSON.stringify({
@@ -162,6 +184,11 @@ describe("supabaseFunctionErrors", () => {
       category: "unknown",
       isOffline: false,
     };
+    const rateLimitWithRetryHint: ParsedFunctionInvokeError = {
+      category: "rate_limit",
+      isOffline: false,
+      retryAfterSeconds: 30,
+    };
 
     expect(
       toUserFacingFunctionError(networkParsed, { action: "evolve your companion" }),
@@ -174,6 +201,7 @@ describe("supabaseFunctionErrors", () => {
     expect(toUserFacingFunctionError(serverParsedWithMessage)).toBe("No themes configured for mentor: solace");
     expect(toUserFacingFunctionError(audioProviderAuthError)).toContain("provider authentication failed");
     expect(toUserFacingFunctionError(audioProviderCreditsError)).toContain("credits are exhausted");
+    expect(toUserFacingFunctionError(rateLimitWithRetryHint)).toContain("30 seconds");
     expect(
       toUserFacingFunctionError(unknownParsed, { action: "evolve your companion" }),
     ).toBe("Unable to evolve your companion. Please try again.");

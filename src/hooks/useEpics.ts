@@ -6,6 +6,7 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
+import { EPICS_QUERY_STALE_TIME, fetchEpics, getEpicsQueryKey } from "@/hooks/epicsQuery";
 
 // Helper to normalize difficulty values to valid database enum
 const normalizeDifficulty = (value: string): 'easy' | 'medium' | 'hard' => {
@@ -175,31 +176,15 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
   // Fetch all epics for the user
   const { data: epics, isLoading, error: epicsError } = useQuery({
-    queryKey: ["epics", user?.id],
+    queryKey: getEpicsQueryKey(user?.id),
     queryFn: async () => {
       // Double-check user exists (defensive - enabled should prevent this)
       if (!user?.id) return [];
-      
-      const { data, error } = await supabase
-        .from("epics")
-        .select(`
-          *,
-          epic_habits(
-            habit_id,
-            habits(id, title, difficulty, description, frequency, estimated_minutes, custom_days, custom_month_days, preferred_time, category)
-          )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error('Failed to fetch epics:', error);
-        throw error;
-      }
-      return data || [];
+      return fetchEpics(user.id);
     },
     enabled: enabled && !!user?.id,
-    staleTime: 3 * 60 * 1000, // 3 minutes - epics don't change frequently
+    staleTime: EPICS_QUERY_STALE_TIME,
     refetchOnWindowFocus: false,
     retry: 2, // Retry failed requests up to 2 times
   });

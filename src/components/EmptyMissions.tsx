@@ -34,7 +34,7 @@ export const EmptyMissions = ({ onRetry, isRetrying, errorMessage }: EmptyMissio
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Sparkles className="h-3 w-3" />
-          <span>New missions arrive at midnight</span>
+          <span>New missions arrive at 2 AM (local time)</span>
         </div>
         {errorMessage && (
           <p className="text-xs text-destructive mt-2">
