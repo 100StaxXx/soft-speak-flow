@@ -13,6 +13,7 @@ import {
   getProductIdsForPlan,
   resolvePlanFromProductId,
 } from '@/utils/appleIAP';
+import { parseFunctionInvokeError } from '@/utils/supabaseFunctionErrors';
 import { useToast } from './use-toast';
 
 const PRODUCT_FETCH_ERROR_MESSAGE = "Premium subscriptions are temporarily unavailable. Please try again later.";
@@ -177,7 +178,10 @@ export function useAppleSubscription() {
       }
       
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: transactionId ? { transactionId } : { receipt },
+        body: {
+          transactionId: transactionId ?? null,
+          receipt: receipt ?? null,
+        },
       });
 
       if (error) throw error;
@@ -193,7 +197,8 @@ export function useAppleSubscription() {
       return true;
     } catch (error) {
       console.error('Purchase error:', error);
-      const errorMessage = error instanceof Error ? error.message : "Please try again";
+      const parsed = await parseFunctionInvokeError(error);
+      const errorMessage = parsed.backendMessage || parsed.message || "Please try again";
       toast({
         title: "Purchase Failed",
         description: errorMessage,
@@ -278,7 +283,10 @@ export function useAppleSubscription() {
 
       // Verify with backend - prefer transactionId for modern API
       const { error } = await supabase.functions.invoke('verify-apple-receipt', {
-        body: transactionId ? { transactionId } : { receipt },
+        body: {
+          transactionId: transactionId ?? null,
+          receipt: receipt ?? null,
+        },
       });
 
       if (error) {
@@ -294,7 +302,8 @@ export function useAppleSubscription() {
       });
     } catch (error) {
       console.error('Restore error:', error);
-      const errorMessage = error instanceof Error ? error.message : "Please try again";
+      const parsed = await parseFunctionInvokeError(error);
+      const errorMessage = parsed.backendMessage || parsed.message || "Please try again";
       toast({
         title: "Restore Failed",
         description: errorMessage,

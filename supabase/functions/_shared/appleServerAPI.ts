@@ -56,12 +56,14 @@ function base64UrlDecode(str: string): Uint8Array {
  */
 async function createAppleJWT(): Promise<string> {
   const keyId = Deno.env.get("APPLE_KEY_ID");
-  const issuerId = Deno.env.get("APPLE_TEAM_ID"); // Issuer ID is the Team ID for App Store Server API
+  // App Store Server API requires the App Store Connect Issuer ID (UUID).
+  // Keep APPLE_TEAM_ID as a legacy fallback for older environments.
+  const issuerId = Deno.env.get("APPLE_ISSUER_ID") ?? Deno.env.get("APPLE_TEAM_ID");
   const privateKeyPem = Deno.env.get("APPLE_PRIVATE_KEY");
   const bundleId = Deno.env.get("APPLE_IOS_BUNDLE_ID");
 
   if (!keyId || !issuerId || !privateKeyPem || !bundleId) {
-    throw new Error("Missing Apple API configuration: APPLE_KEY_ID, APPLE_TEAM_ID, APPLE_PRIVATE_KEY, or APPLE_IOS_BUNDLE_ID");
+    throw new Error("Missing Apple API configuration: APPLE_KEY_ID, APPLE_ISSUER_ID (or APPLE_TEAM_ID), APPLE_PRIVATE_KEY, or APPLE_IOS_BUNDLE_ID");
   }
 
   const now = Math.floor(Date.now() / 1000);

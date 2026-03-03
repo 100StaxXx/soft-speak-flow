@@ -58,41 +58,49 @@ serve(async (req) => {
     const transactionId = body?.transactionId as string | undefined;
     const receipt = body?.receipt as string | undefined;
 
-    // Prefer StoreKit 2 transaction verification
+    // Prefer StoreKit 2 transaction verification, but fall back to legacy receipt verification
+    // when App Store Server API verification fails and a receipt is available.
     if (transactionId) {
-      console.log(`[verify-apple-receipt] Using App Store Server API v2 for transaction: ${transactionId}`);
-      
-      const { transactionInfo, environment } = await verifyTransaction(transactionId);
-      
-      const plan = resolvePlanFromProduct(transactionInfo.productId);
-      const expiresAt = transactionInfo.expiresDate 
-        ? new Date(transactionInfo.expiresDate) 
-        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days if no expiry
-      const purchaseDate = new Date(transactionInfo.purchaseDate);
-      const cancellationDate = transactionInfo.revocationDate 
-        ? new Date(transactionInfo.revocationDate) 
-        : undefined;
+      try {
+        console.log(`[verify-apple-receipt] Using App Store Server API v2 for transaction: ${transactionId}`);
 
-      const subscription = await upsertSubscription(serviceClient, {
-        userId: user.id,
-        transactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
-        productId: transactionInfo.productId,
-        plan,
-        expiresAt,
-        purchaseDate,
-        cancellationDate,
-        environment,
-        source: "receipt",
-      });
+        const { transactionInfo, environment } = await verifyTransaction(transactionId);
 
-      console.log(`[verify-apple-receipt] Subscription verified via API v2: ${subscription?.id}`);
+        const plan = resolvePlanFromProduct(transactionInfo.productId);
+        const expiresAt = transactionInfo.expiresDate
+          ? new Date(transactionInfo.expiresDate)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Default 30 days if no expiry
+        const purchaseDate = new Date(transactionInfo.purchaseDate);
+        const cancellationDate = transactionInfo.revocationDate
+          ? new Date(transactionInfo.revocationDate)
+          : undefined;
 
-      return jsonResponse(req, {
-        success: true,
-        environment,
-        verificationMethod: "app_store_server_api_v2",
-        subscription: buildSubscriptionResponse(subscription),
-      });
+        const subscription = await upsertSubscription(serviceClient, {
+          userId: user.id,
+          transactionId: transactionInfo.originalTransactionId || transactionInfo.transactionId,
+          productId: transactionInfo.productId,
+          plan,
+          expiresAt,
+          purchaseDate,
+          cancellationDate,
+          environment,
+          source: "receipt",
+        });
+
+        console.log(`[verify-apple-receipt] Subscription verified via API v2: ${subscription?.id}`);
+
+        return jsonResponse(req, {
+          success: true,
+          environment,
+          verificationMethod: "app_store_server_api_v2",
+          subscription: buildSubscriptionResponse(subscription),
+        });
+      } catch (txError) {
+        if (!receipt) {
+          throw txError;
+        }
+        console.warn("[verify-apple-receipt] App Store Server API v2 verification failed; falling back to legacy receipt verification:", txError);
+      }
     }
 
     // Fallback to legacy receipt verification
