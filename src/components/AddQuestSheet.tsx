@@ -51,6 +51,7 @@ interface AddQuestSheetProps {
   onOpenChange: (open: boolean) => void;
   selectedDate: Date;
   prefilledTime?: string | null;
+  autoFillTimeOnFirstTap?: boolean;
   onAdd: (data: AddQuestData) => Promise<void>;
   isAdding?: boolean;
   onCreateCampaign?: () => void;
@@ -65,6 +66,7 @@ import {
   formatTime12,
   TIME_SLOTS,
   DURATION_OPTIONS,
+  getNextHalfHourTime,
 } from "@/components/quest-shared";
 
 const DifficultyIcon = ({ difficulty }: { difficulty: "easy" | "medium" | "hard" }) => {
@@ -83,6 +85,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   onOpenChange,
   selectedDate,
   prefilledTime,
+  autoFillTimeOnFirstTap = false,
   onAdd,
   isAdding = false,
   onCreateCampaign,
@@ -528,6 +531,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               {/* Time Chip */}
               <button
                 onClick={() => {
+                  if (!showTimePicker && autoFillTimeOnFirstTap && !scheduledTime) {
+                    setScheduledTime(getNextHalfHourTime());
+                  }
                   setShowTimePicker(!showTimePicker);
                 }}
                 data-tour="add-quest-time-chip"

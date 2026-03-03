@@ -50,6 +50,7 @@ import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
+import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
 import { formatTime12 } from "@/components/quest-shared";
@@ -82,6 +83,10 @@ const Journeys = () => {
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
   const previousIsTabActiveRef = useRef(isTabActive);
+  const { isActive: tutorialActive, currentStep: tutorialStep, currentSubstep: tutorialSubstep } =
+    usePostOnboardingMentorGuidance();
+  const shouldAutoFillTutorialTime =
+    tutorialActive && tutorialStep === "create_quest" && tutorialSubstep === "select_time";
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -836,6 +841,7 @@ const Journeys = () => {
           onAdd={handleAddQuest}
           isAdding={isAdding}
           prefilledTime={prefilledTime}
+          autoFillTimeOnFirstTap={shouldAutoFillTutorialTime}
           onCreateCampaign={() => setShowPathfinder(true)}
         />
         

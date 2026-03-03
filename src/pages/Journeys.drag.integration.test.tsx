@@ -37,6 +37,12 @@ const mocks = vi.hoisted(() => ({
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
   epicsLoading: false,
   lastDatePillSelectedDate: null as Date | null,
+  lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean },
+  tutorialGuidance: {
+    isActive: false,
+    currentStep: null as string | null,
+    currentSubstep: null as string | null,
+  },
   dailyTasks: [] as Array<{
     id: string;
     task_text: string;
@@ -112,7 +118,14 @@ vi.mock("@/components/DatePillsScroller", () => ({
 }));
 
 vi.mock("@/components/AddQuestSheet", () => ({
-  AddQuestSheet: () => null,
+  AddQuestSheet: (props: { autoFillTimeOnFirstTap?: boolean }) => {
+    mocks.lastAddQuestSheetProps = props;
+    return null;
+  },
+}));
+
+vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
+  usePostOnboardingMentorGuidance: () => mocks.tutorialGuidance,
 }));
 
 vi.mock("@/components/PageInfoButton", () => ({
@@ -379,6 +392,12 @@ describe("Journeys row drag integration", () => {
     mocks.pendingRecurringCount = 0;
     mocks.calendarConnections = [];
     mocks.lastDatePillSelectedDate = null;
+    mocks.lastAddQuestSheetProps = null;
+    mocks.tutorialGuidance = {
+      isActive: false,
+      currentStep: null,
+      currentSubstep: null,
+    };
     mocks.dailyTasks = [
       {
         id: "task-1",
@@ -400,6 +419,56 @@ describe("Journeys row drag integration", () => {
       configurable: true,
       value: { height: 720 },
     });
+  });
+
+  it("passes tutorial auto-fill as false outside the create quest time substep", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps).not.toBeNull();
+    });
+    expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(false);
+  });
+
+  it("passes tutorial auto-fill as true during create quest select_time", async () => {
+    mocks.tutorialGuidance = {
+      isActive: true,
+      currentStep: "create_quest",
+      currentSubstep: "select_time",
+    };
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps).not.toBeNull();
+    });
+    expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(true);
   });
 
   it("reschedules a quest from the timeline row drag path on /journeys", async () => {

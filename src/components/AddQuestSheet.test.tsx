@@ -144,6 +144,35 @@ describe("AddQuestSheet", () => {
     expect(createButton).toBeEnabled();
   });
 
+  it("auto-fills time on first tap when tutorial auto-fill is enabled", async () => {
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        autoFillTimeOnFirstTap
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes"), {
+      target: { value: "Tutorial quest" },
+    });
+
+    const createButton = screen.getByRole("button", { name: "Add Quest" });
+    expect(createButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+
+    await waitFor(() => {
+      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "add-quest-time-selected" }));
+    });
+    expect(createButton).toBeEnabled();
+    dispatchSpy.mockRestore();
+  });
+
   it("supports prefilledTime and enables create once title is entered", () => {
     render(
       <AddQuestSheet
