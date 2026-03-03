@@ -77,6 +77,10 @@ const InboxPage = memo(function InboxPage() {
       return;
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+      if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+        return;
+      }
       if (message.includes("NO_CALENDAR_CONNECTION")) {
         routeToCalendarPreferences();
         return;
@@ -115,6 +119,10 @@ const InboxPage = memo(function InboxPage() {
           return;
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+            toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+            return;
+          }
           if (message.includes("NO_CALENDAR_CONNECTION")) {
             routeToCalendarPreferences();
             return;
@@ -146,7 +154,12 @@ const InboxPage = memo(function InboxPage() {
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
     await updateTask({ taskId, updates });
-    await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {
+    await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+        return;
+      }
       toast.error("Saved quest, but failed to sync linked calendar event");
     });
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
@@ -176,6 +189,8 @@ const InboxPage = memo(function InboxPage() {
       estimatedDuration: data.estimatedDuration,
       recurrencePattern: data.recurrencePattern,
       recurrenceDays: data.recurrenceDays,
+      recurrenceMonthDays: data.recurrenceMonthDays,
+      recurrenceCustomPeriod: data.recurrenceCustomPeriod,
       reminderEnabled: data.reminderEnabled,
       reminderMinutesBefore: data.reminderMinutesBefore,
       notes: data.moreInformation,

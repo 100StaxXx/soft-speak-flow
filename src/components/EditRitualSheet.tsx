@@ -403,6 +403,8 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                     estimatedDuration={estimatedMinutes}
                     recurrencePattern={recurrencePattern}
                     recurrenceDays={recurrenceDays}
+                    recurrenceMonthDays={recurrenceMonthDays}
+                    recurrenceCustomPeriod={null}
                     reminderEnabled={reminderEnabled}
                     reminderMinutesBefore={reminderMinutesBefore}
                     moreInformation={null}
@@ -410,6 +412,8 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                     onEstimatedDurationChange={setEstimatedMinutes}
                     onRecurrencePatternChange={setRecurrencePattern}
                     onRecurrenceDaysChange={setRecurrenceDays}
+                    onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                    onRecurrenceCustomPeriodChange={() => {}}
                     onReminderEnabledChange={setReminderEnabled}
                     onReminderMinutesBeforeChange={setReminderMinutesBefore}
                     onMoreInformationChange={() => {}}

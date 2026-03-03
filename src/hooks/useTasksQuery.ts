@@ -25,6 +25,8 @@ export interface DailyTask {
   estimated_duration: number | null;
   recurrence_pattern: string | null;
   recurrence_days: number[] | null;
+  recurrence_month_days: number[] | null;
+  recurrence_custom_period: "week" | "month" | null;
   is_recurring: boolean | null;
   reminder_enabled: boolean | null;
   reminder_minutes_before: number | null;

@@ -201,6 +201,42 @@ describe("useQuestCalendarSync", () => {
     expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
   });
 
+  it("throws MULTI_DAY_MONTHLY_UNSUPPORTED for month-based recurrence with multiple days", async () => {
+    mocks.dailyTaskSingleMock.mockResolvedValueOnce({
+      data: {
+        id: "task-monthly-1",
+        task_text: "Monthly multi-day quest",
+        task_date: "2026-02-12",
+        scheduled_time: "09:00",
+        estimated_duration: 30,
+        recurrence_pattern: "monthly",
+        recurrence_days: [],
+        recurrence_month_days: [1, 15],
+        recurrence_custom_period: null,
+        location: null,
+        notes: null,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    let thrown: unknown;
+    await act(async () => {
+      try {
+        await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-monthly-1" });
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain("MULTI_DAY_MONTHLY_UNSUPPORTED");
+    expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
+  });
+
   it("falls back to a connected provider when default provider is stale", async () => {
     mocks.useCalendarIntegrationsMock.mockReturnValue({
       connections: [

@@ -52,6 +52,8 @@ export interface AddTaskParams {
   estimatedDuration?: number | null;
   recurrencePattern?: string | null;
   recurrenceDays?: number[] | null;
+  recurrenceMonthDays?: number[] | null;
+  recurrenceCustomPeriod?: "week" | "month" | null;
   recurrenceEndDate?: string | null;
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
@@ -96,6 +98,8 @@ interface TaskUpdateInput {
   estimated_duration?: number | null;
   recurrence_pattern?: string | null;
   recurrence_days?: number[];
+  recurrence_month_days?: number[];
+  recurrence_custom_period?: "week" | "month" | null;
   reminder_enabled?: boolean;
   reminder_minutes_before?: number;
   category?: string | null;
@@ -263,6 +267,8 @@ export const useTaskMutations = (taskDate: string) => {
           estimated_duration: params.estimatedDuration || null,
           recurrence_pattern: params.recurrencePattern || null,
           recurrence_days: params.recurrenceDays || null,
+          recurrence_month_days: params.recurrenceMonthDays || null,
+          recurrence_custom_period: params.recurrenceCustomPeriod || null,
           recurrence_end_date: params.recurrenceEndDate || null,
           reminder_enabled: params.reminderEnabled ?? false,
           reminder_minutes_before: params.reminderMinutesBefore ?? 15,
@@ -324,6 +330,8 @@ export const useTaskMutations = (taskDate: string) => {
             estimated_duration: params.estimatedDuration || null,
             recurrence_pattern: params.recurrencePattern || null,
             recurrence_days: params.recurrenceDays || null,
+            recurrence_month_days: params.recurrenceMonthDays || null,
+            recurrence_custom_period: params.recurrenceCustomPeriod || null,
             recurrence_end_date: params.recurrenceEndDate || null,
             is_recurring: !!params.recurrencePattern,
             reminder_enabled: params.reminderEnabled ?? false,
@@ -440,6 +448,8 @@ export const useTaskMutations = (taskDate: string) => {
         is_recurring: !!params.recurrencePattern,
         recurrence_pattern: params.recurrencePattern || null,
         recurrence_days: params.recurrenceDays || null,
+        recurrence_month_days: params.recurrenceMonthDays || null,
+        recurrence_custom_period: params.recurrenceCustomPeriod || null,
         reminder_enabled: params.reminderEnabled ?? false,
         reminder_minutes_before: params.reminderMinutesBefore ?? 15,
         reminder_sent: false,
@@ -859,6 +869,8 @@ export const useTaskMutations = (taskDate: string) => {
       is_recurring?: boolean;
       recurrence_pattern?: string | null;
       recurrence_days?: number[] | null;
+      recurrence_month_days?: number[] | null;
+      recurrence_custom_period?: "week" | "month" | null;
       reminder_enabled?: boolean;
       reminder_minutes_before?: number | null;
       source?: string | null;
@@ -892,6 +904,8 @@ export const useTaskMutations = (taskDate: string) => {
           is_recurring: taskData.is_recurring ?? false,
           recurrence_pattern: taskData.recurrence_pattern,
           recurrence_days: taskData.recurrence_days,
+          recurrence_month_days: taskData.recurrence_month_days,
+          recurrence_custom_period: taskData.recurrence_custom_period,
           reminder_enabled: taskData.reminder_enabled ?? false,
           reminder_minutes_before: taskData.reminder_minutes_before,
           source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
@@ -981,6 +995,12 @@ export const useTaskMutations = (taskDate: string) => {
       }
       if (updates.recurrence_days !== undefined) {
         updateData.recurrence_days = updates.recurrence_days;
+      }
+      if (updates.recurrence_month_days !== undefined) {
+        updateData.recurrence_month_days = updates.recurrence_month_days;
+      }
+      if (updates.recurrence_custom_period !== undefined) {
+        updateData.recurrence_custom_period = updates.recurrence_custom_period;
       }
       if (updates.reminder_enabled !== undefined) {
         updateData.reminder_enabled = updates.reminder_enabled;

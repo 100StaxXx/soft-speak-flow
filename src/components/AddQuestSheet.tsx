@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { format, isToday, addMinutes } from "date-fns";
-import { Sliders, CalendarIcon, Inbox, Map, X, Zap, Flame, Mountain, Clock, ChevronRight, Trash2, Users } from "lucide-react";
+import { Sliders, CalendarIcon, Inbox, Map, X, Zap, Flame, Mountain, Clock, ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
-import { ContactPicker } from "@/components/tasks/ContactPicker";
 import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -33,6 +32,8 @@ export interface AddQuestData {
   estimatedDuration: number | null;
   recurrencePattern: string | null;
   recurrenceDays: number[];
+  recurrenceMonthDays: number[];
+  recurrenceCustomPeriod: "week" | "month" | null;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
   moreInformation: string | null;
@@ -74,18 +75,44 @@ const DifficultyIcon = ({ difficulty }: { difficulty: "easy" | "medium" | "hard"
   return <Icon className="h-5 w-5" />;
 };
 
-const QUEST_TITLE_SUGGESTIONS = [
-  "Review roadmap for 30 minutes",
-  "10-minute inbox cleanup",
-  "Walk outside for 20 minutes",
-];
+const MINUTES_PER_DAY = 24 * 60;
+
+const parseTimeToMinutes = (time: string): number | null => {
+  const match = time.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours * 60 + minutes;
+};
+
+const snapTimeToClosestSlot = (time: string | null): string | null => {
+  if (!time) return null;
+  const targetMinutes = parseTimeToMinutes(time);
+  if (targetMinutes === null) return time;
+
+  let closestSlot = TIME_SLOTS[0] ?? time;
+  let closestDiff = Number.POSITIVE_INFINITY;
+
+  for (const slot of TIME_SLOTS) {
+    const slotMinutes = parseTimeToMinutes(slot);
+    if (slotMinutes === null) continue;
+    const directDiff = Math.abs(slotMinutes - targetMinutes);
+    const wrapDiff = MINUTES_PER_DAY - directDiff;
+    const diff = Math.min(directDiff, wrapDiff);
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closestSlot = slot;
+    }
+  }
+
+  return closestSlot;
+};
 
 export const AddQuestSheet = memo(function AddQuestSheet({
   open,
   onOpenChange,
   selectedDate,
   prefilledTime,
-  autoFillTimeOnFirstTap = false,
   onAdd,
   isAdding = false,
   onCreateCampaign,
@@ -99,12 +126,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(30);
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [recurrenceMonthDays, setRecurrenceMonthDays] = useState<number[]>([]);
+  const [recurrenceCustomPeriod, setRecurrenceCustomPeriod] = useState<"week" | "month" | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
   const [location, setLocation] = useState<string | null>(null);
-  const [contactId, setContactId] = useState<string | null>(null);
-  const [autoLogInteraction, setAutoLogInteraction] = useState(true);
   const [taskDate, setTaskDate] = useState<string | null>(format(selectedDate, "yyyy-MM-dd"));
   const [showDurationChips, setShowDurationChips] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -146,12 +173,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setEstimatedDuration(30);
       setRecurrencePattern(null);
       setRecurrenceDays([]);
+      setRecurrenceMonthDays([]);
+      setRecurrenceCustomPeriod(null);
       setReminderEnabled(false);
       setReminderMinutesBefore(15);
       setMoreInformation(null);
       setLocation(null);
-      setContactId(null);
-      setAutoLogInteraction(true);
       setShowDurationChips(false);
       setShowDatePicker(false);
       setShowTimePicker(false);
@@ -267,21 +294,27 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const handleSubmit = useCallback(async () => {
     if (!taskText.trim()) return;
+    const snappedScheduledTime = snapTimeToClosestSlot(scheduledTime);
+    if (snappedScheduledTime !== scheduledTime) {
+      setScheduledTime(snappedScheduledTime);
+    }
     window.dispatchEvent(new CustomEvent("add-quest-create-attempted"));
     await onAdd({
       text: taskText,
       taskDate,
       difficulty,
-      scheduledTime,
+      scheduledTime: snappedScheduledTime,
       estimatedDuration,
       recurrencePattern,
       recurrenceDays,
+      recurrenceMonthDays,
+      recurrenceCustomPeriod,
       reminderEnabled,
       reminderMinutesBefore,
       moreInformation,
       location,
-      contactId,
-      autoLogInteraction,
+      contactId: null,
+      autoLogInteraction: true,
       sendToInbox: false,
       sendToCalendar: sendToCalendar && canShowCalendarSendOption,
       subtasks: subtasks.filter(s => s.trim()),
@@ -289,7 +322,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       attachments,
     });
     onOpenChange(false);
-  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onAdd, onOpenChange]);
+  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onAdd, onOpenChange]);
 
   const handleAddToInbox = useCallback(async () => {
     if (!taskText.trim()) return;
@@ -301,12 +334,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       estimatedDuration,
       recurrencePattern,
       recurrenceDays,
+      recurrenceMonthDays,
+      recurrenceCustomPeriod,
       reminderEnabled,
       reminderMinutesBefore,
       moreInformation,
       location,
-      contactId,
-      autoLogInteraction,
+      contactId: null,
+      autoLogInteraction: true,
       sendToInbox: true,
       sendToCalendar: false,
       subtasks: subtasks.filter(s => s.trim()),
@@ -314,7 +349,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       attachments,
     });
     onOpenChange(false);
-  }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, location, contactId, autoLogInteraction, subtasks, attachments, onAdd, onOpenChange]);
+  }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, subtasks, attachments, onAdd, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -366,26 +401,12 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <div className="mt-3 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-3 py-3 text-left">
               <Input
                 data-tour="add-quest-title-input"
-                placeholder="e.g., Review roadmap for 30 minutes"
+                placeholder="Quest Title"
                 value={taskText}
                 onChange={(e) => setTaskText(e.target.value)}
                 disabled={isAdding}
                 className="mt-2 text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-11"
               />
-              <p className="mt-1 text-[11px] text-white/75">Try a specific action and duration.</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {QUEST_TITLE_SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => setTaskText(suggestion)}
-                    disabled={isAdding}
-                    className="rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85 transition-colors hover:bg-white/20 disabled:opacity-50"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
             </div>
             <p className="text-white/70 text-xs mt-2">{summaryLine}</p>
           </div>
@@ -519,7 +540,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               {/* Time Chip */}
               <button
                 onClick={() => {
-                  if (!showTimePicker && autoFillTimeOnFirstTap && !scheduledTime) {
+                  if (!showTimePicker && !scheduledTime) {
                     setScheduledTime(getNextHalfHourTime());
                   }
                   setShowTimePicker(!showTimePicker);
@@ -547,6 +568,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   step={60}
                   value={scheduledTime || ""}
                   onChange={(event) => setScheduledTime(event.target.value || null)}
+                  onBlur={() => {
+                    setScheduledTime((current) => snapTimeToClosestSlot(current));
+                  }}
                   className="h-10 text-base"
                 />
                 <div
@@ -663,50 +687,29 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
               <CollapsibleContent>
                 <div className="mt-3 space-y-4">
-                  {/* Contact Linking */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Users className="w-4 h-4" />
-                      <span>Link to Contact</span>
-                    </div>
-                    <ContactPicker
-                      value={contactId}
-                      onChange={setContactId}
-                      placeholder="Select a contact..."
-                    />
-                    {contactId && (
-                      <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
-                        <Label htmlFor="auto-log-add" className="text-sm cursor-pointer">
-                          Log as interaction when completed
-                        </Label>
-                        <Switch
-                          id="auto-log-add"
-                          checked={autoLogInteraction}
-                          onCheckedChange={setAutoLogInteraction}
-                        />
-                      </div>
-                    )}
-                  </div>
-
                   {/* Recurrence, Reminders, Location (no duplicated fields) */}
                   <AdvancedQuestOptions
                     scheduledTime={scheduledTime}
                     estimatedDuration={estimatedDuration}
                     recurrencePattern={recurrencePattern}
                     recurrenceDays={recurrenceDays}
+                    recurrenceMonthDays={recurrenceMonthDays}
+                    recurrenceCustomPeriod={recurrenceCustomPeriod}
                     reminderEnabled={reminderEnabled}
                     reminderMinutesBefore={reminderMinutesBefore}
                     onScheduledTimeChange={setScheduledTime}
                     onEstimatedDurationChange={setEstimatedDuration}
                     onRecurrencePatternChange={setRecurrencePattern}
                     onRecurrenceDaysChange={setRecurrenceDays}
+                    onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                    onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
                     onReminderEnabledChange={setReminderEnabled}
                     onReminderMinutesBeforeChange={setReminderMinutesBefore}
                     moreInformation={moreInformation}
                     onMoreInformationChange={setMoreInformation}
                     location={location}
                     onLocationChange={setLocation}
-                    selectedDate={selectedDate}
+                    selectedDate={dateObj}
                     taskDifficulty={difficulty}
                     hideScheduledTime
                     hideDuration

@@ -2252,6 +2252,8 @@ export type Database = {
           parent_template_id: string | null
           priority: string | null
           recurrence_days: number[] | null
+          recurrence_month_days: number[] | null
+          recurrence_custom_period: string | null
           recurrence_end_date: string | null
           recurrence_pattern: string | null
           reminder_enabled: boolean | null
@@ -2294,6 +2296,8 @@ export type Database = {
           parent_template_id?: string | null
           priority?: string | null
           recurrence_days?: number[] | null
+          recurrence_month_days?: number[] | null
+          recurrence_custom_period?: string | null
           recurrence_end_date?: string | null
           recurrence_pattern?: string | null
           reminder_enabled?: boolean | null
@@ -2336,6 +2340,8 @@ export type Database = {
           parent_template_id?: string | null
           priority?: string | null
           recurrence_days?: number[] | null
+          recurrence_month_days?: number[] | null
+          recurrence_custom_period?: string | null
           recurrence_end_date?: string | null
           recurrence_pattern?: string | null
           reminder_enabled?: boolean | null

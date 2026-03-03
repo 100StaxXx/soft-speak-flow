@@ -11,11 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, AlertTriangle, Repeat, Bell, Check, X, Users, CalendarOff } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Timer, Zap, Flame, Mountain, AlertTriangle, Repeat, Bell, Check, X, CalendarOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParsedTask } from '../hooks/useNaturalLanguageParser';
 import { format, parseISO } from 'date-fns';
-import { ContactPicker } from '@/components/tasks/ContactPicker';
 import { QuestAttachmentPicker } from '@/components/QuestAttachmentPicker';
 import {
   Select,
@@ -74,6 +73,13 @@ const reminderOptions = [
   { value: 10080, label: '1 week before' },
 ];
 
+const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTH_DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
+
+function toAppDayIndex(jsDay: number): number {
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
 export function TaskAdvancedEditSheet({
   open,
   onOpenChange,
@@ -81,6 +87,13 @@ export function TaskAdvancedEditSheet({
   onSave,
   onCancel,
 }: TaskAdvancedEditSheetProps) {
+  const parsedReferenceDate = parsed.scheduledDate
+    ? new Date(`${parsed.scheduledDate}T00:00:00`)
+    : new Date();
+  const safeReferenceDate = Number.isNaN(parsedReferenceDate.getTime()) ? new Date() : parsedReferenceDate;
+  const defaultWeekday = toAppDayIndex(safeReferenceDate.getDay());
+  const defaultMonthDay = Math.min(31, Math.max(1, safeReferenceDate.getDate()));
+
   const [text, setText] = useState(parsed.text);
   const [scheduledDate, setScheduledDate] = useState(parsed.scheduledDate || '');
   const [scheduledTime, setScheduledTime] = useState(parsed.scheduledTime || '');
@@ -91,14 +104,30 @@ export function TaskAdvancedEditSheet({
   const [reminderEnabled, setReminderEnabled] = useState(parsed.reminderEnabled || false);
   const [reminderMinutes, setReminderMinutes] = useState(parsed.reminderMinutesBefore || 15);
   const [recurrencePattern, setRecurrencePattern] = useState(parsed.recurrencePattern || '');
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>(() => {
+    const parsedDays = parsed.recurrenceDays ?? parsed.customDays ?? [];
+    if (parsedDays.length > 0) return parsedDays;
+    if (parsed.recurrencePattern === 'weekdays') return [0, 1, 2, 3, 4];
+    if (parsed.recurrencePattern === 'weekly' || parsed.recurrencePattern === 'biweekly' || parsed.recurrencePattern === 'custom') {
+      return [defaultWeekday];
+    }
+    return [];
+  });
+  const [recurrenceMonthDays, setRecurrenceMonthDays] = useState<number[]>(() => {
+    const parsedMonthDays = parsed.recurrenceMonthDays ?? [];
+    if (parsedMonthDays.length > 0) return parsedMonthDays;
+    if (parsed.recurrencePattern === 'monthly' || (parsed.recurrencePattern === 'custom' && parsed.recurrenceCustomPeriod === 'month')) {
+      return [defaultMonthDay];
+    }
+    return [];
+  });
+  const [recurrenceCustomPeriod, setRecurrenceCustomPeriod] = useState<'week' | 'month'>(parsed.recurrenceCustomPeriod ?? 'week');
   const [recurrenceEndType, setRecurrenceEndType] = useState<'never' | 'on_date'>(
     parsed.recurrenceEndDate ? 'on_date' : 'never'
   );
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>(
     parsed.recurrenceEndDate ? parseISO(parsed.recurrenceEndDate) : undefined
   );
-  const [contactId, setContactId] = useState<string | null>(parsed.contactId || null);
-  const [autoLogInteraction, setAutoLogInteraction] = useState(parsed.autoLogInteraction ?? true);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>(
     parsed.attachments?.length
       ? parsed.attachments
@@ -117,10 +146,41 @@ export function TaskAdvancedEditSheet({
   
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
+
+  const getReferenceDate = () => {
+    if (scheduledDate) {
+      const parsedDate = new Date(`${scheduledDate}T00:00:00`);
+      if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
+    }
+    return new Date();
+  };
+
+  const getDefaultRecurrenceWeekday = () => toAppDayIndex(getReferenceDate().getDay());
+  const getDefaultRecurrenceMonthDay = () => Math.min(31, Math.max(1, getReferenceDate().getDate()));
+  const isCustomWeek = recurrencePattern === 'custom' && recurrenceCustomPeriod === 'week';
+  const isCustomMonth = recurrencePattern === 'custom' && recurrenceCustomPeriod === 'month';
   
   // Reset end date when recurrence is cleared
   const handleRecurrenceChange = (pattern: string) => {
     setRecurrencePattern(pattern);
+    if (pattern === 'weekdays') {
+      setRecurrenceDays([0, 1, 2, 3, 4]);
+      setRecurrenceCustomPeriod('week');
+    } else if (pattern === 'weekly' || pattern === 'biweekly') {
+      setRecurrenceDays((prev) => prev.length > 0 ? [prev[0]] : [getDefaultRecurrenceWeekday()]);
+      setRecurrenceCustomPeriod('week');
+    } else if (pattern === 'monthly') {
+      setRecurrenceMonthDays((prev) => prev.length > 0 ? prev : [getDefaultRecurrenceMonthDay()]);
+      setRecurrenceCustomPeriod('month');
+    } else if (pattern === 'custom') {
+      if (recurrenceCustomPeriod === 'month') {
+        setRecurrenceMonthDays((prev) => prev.length > 0 ? prev : [getDefaultRecurrenceMonthDay()]);
+      } else {
+        setRecurrenceDays((prev) => prev.length > 0 ? prev : [getDefaultRecurrenceWeekday()]);
+        setRecurrenceCustomPeriod('week');
+      }
+    }
+
     if (!pattern) {
       setRecurrenceEndType('never');
       setRecurrenceEndDate(undefined);
@@ -136,7 +196,53 @@ export function TaskAdvancedEditSheet({
     }
   };
 
+  const handleCustomPeriodChange = (period: 'week' | 'month') => {
+    setRecurrenceCustomPeriod(period);
+    if (period === 'week') {
+      setRecurrenceDays((prev) => prev.length > 0 ? prev : [getDefaultRecurrenceWeekday()]);
+    } else {
+      setRecurrenceMonthDays((prev) => prev.length > 0 ? prev : [getDefaultRecurrenceMonthDay()]);
+    }
+  };
+
+  const toggleRecurrenceDay = (day: number) => {
+    const singleSelection = recurrencePattern === 'weekly' || recurrencePattern === 'biweekly';
+    if (singleSelection) {
+      setRecurrenceDays([day]);
+      return;
+    }
+
+    setRecurrenceDays((prev) => {
+      const isSelected = prev.includes(day);
+      if (isSelected && prev.length === 1) return prev;
+      const next = isSelected ? prev.filter((value) => value !== day) : [...prev, day];
+      return next.sort((a, b) => a - b);
+    });
+  };
+
+  const toggleRecurrenceMonthDay = (dayOfMonth: number) => {
+    setRecurrenceMonthDays((prev) => {
+      const isSelected = prev.includes(dayOfMonth);
+      if (isSelected && prev.length === 1) return prev;
+      const next = isSelected ? prev.filter((value) => value !== dayOfMonth) : [...prev, dayOfMonth];
+      return next.sort((a, b) => a - b);
+    });
+  };
+
   const handleSave = () => {
+    const normalizedRecurrenceDays =
+      recurrencePattern === 'weekdays'
+        ? [0, 1, 2, 3, 4]
+        : recurrencePattern === 'weekly' || recurrencePattern === 'biweekly'
+          ? recurrenceDays.slice(0, 1)
+          : isCustomWeek
+            ? recurrenceDays
+            : [];
+    const normalizedRecurrenceMonthDays =
+      recurrencePattern === 'monthly' || isCustomMonth
+        ? recurrenceMonthDays
+        : [];
+
     const updated: ParsedTask = {
       ...parsed,
       text: text.trim() || parsed.text,
@@ -149,11 +255,14 @@ export function TaskAdvancedEditSheet({
       reminderEnabled,
       reminderMinutesBefore: reminderEnabled ? reminderMinutes : null,
       recurrencePattern: recurrencePattern || null,
+      recurrenceDays: normalizedRecurrenceDays,
+      recurrenceMonthDays: normalizedRecurrenceMonthDays,
+      recurrenceCustomPeriod: recurrencePattern === 'custom' ? recurrenceCustomPeriod : null,
       recurrenceEndDate: recurrenceEndType === 'on_date' && recurrenceEndDate 
         ? format(recurrenceEndDate, 'yyyy-MM-dd') 
         : null,
-      contactId,
-      autoLogInteraction,
+      contactId: parsed.contactId,
+      autoLogInteraction: parsed.autoLogInteraction ?? true,
       imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       attachments,
     };
@@ -355,17 +464,87 @@ export function TaskAdvancedEditSheet({
               Recurrence
             </Label>
             <div className="flex gap-2 flex-wrap">
-              {['', 'daily', 'weekly', 'weekdays'].map(pattern => (
+              {['', 'daily', 'weekdays', 'weekly', 'biweekly', 'monthly', 'custom'].map(pattern => (
                 <Button
                   key={pattern || 'none'}
                   variant={recurrencePattern === pattern ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleRecurrenceChange(pattern)}
                 >
-                  {pattern === '' ? 'None' : pattern.charAt(0).toUpperCase() + pattern.slice(1)}
+                  {pattern === ''
+                    ? 'None'
+                    : pattern === 'biweekly'
+                      ? 'Every 2 Weeks'
+                      : pattern === 'custom'
+                        ? 'Custom Days'
+                        : pattern.charAt(0).toUpperCase() + pattern.slice(1)}
                 </Button>
               ))}
             </div>
+
+            {(recurrencePattern === 'weekly' || recurrencePattern === 'biweekly' || isCustomWeek) && (
+              <div className="grid grid-cols-7 gap-1.5">
+                {WEEKDAY_SHORT.map((label, index) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => toggleRecurrenceDay(index)}
+                    className={cn(
+                      "h-8 rounded-md border text-xs font-medium transition-colors",
+                      recurrenceDays.includes(index)
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "bg-background border-border hover:bg-muted/60"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {recurrencePattern === 'custom' && (
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={recurrenceCustomPeriod === 'week' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleCustomPeriodChange('week')}
+                >
+                  Week
+                </Button>
+                <Button
+                  type="button"
+                  variant={recurrenceCustomPeriod === 'month' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleCustomPeriodChange('month')}
+                >
+                  Month
+                </Button>
+              </div>
+            )}
+
+            {(recurrencePattern === 'monthly' || isCustomMonth) && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-7 gap-1.5">
+                  {MONTH_DAYS.map((dayOfMonth) => (
+                    <button
+                      key={dayOfMonth}
+                      type="button"
+                      onClick={() => toggleRecurrenceMonthDay(dayOfMonth)}
+                      className={cn(
+                        "h-8 rounded-md border text-xs font-medium transition-colors",
+                        recurrenceMonthDays.includes(dayOfMonth)
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "bg-background border-border hover:bg-muted/60"
+                      )}
+                    >
+                      {dayOfMonth}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Short months run on the last valid day.</p>
+              </div>
+            )}
             
             {/* End Date - only shown when recurrence is active */}
             {recurrencePattern && (
@@ -435,30 +614,6 @@ export function TaskAdvancedEditSheet({
               attachments={attachments}
               onAttachmentsChange={setAttachments}
             />
-          </div>
-
-          {/* Contact Link */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-emerald-500" />
-              Link to Contact
-            </Label>
-            <ContactPicker
-              value={contactId}
-              onChange={setContactId}
-              placeholder="Select a contact..."
-            />
-            {contactId && (
-              <div className="flex items-center justify-between mt-2">
-                <Label className="text-sm text-muted-foreground">
-                  Log as interaction when completed
-                </Label>
-                <Switch
-                  checked={autoLogInteraction}
-                  onCheckedChange={setAutoLogInteraction}
-                />
-              </div>
-            )}
           </div>
         </div>
 

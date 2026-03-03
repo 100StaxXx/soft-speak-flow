@@ -14,6 +14,8 @@ vi.mock("@/hooks/useSmartScheduling", () => ({
 function RecurrenceHarness({ selectedDate }: { selectedDate?: Date }) {
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [recurrenceMonthDays, setRecurrenceMonthDays] = useState<number[]>([]);
+  const [recurrenceCustomPeriod, setRecurrenceCustomPeriod] = useState<"week" | "month" | null>(null);
 
   return (
     <div>
@@ -26,6 +28,10 @@ function RecurrenceHarness({ selectedDate }: { selectedDate?: Date }) {
         onRecurrencePatternChange={setRecurrencePattern}
         recurrenceDays={recurrenceDays}
         onRecurrenceDaysChange={setRecurrenceDays}
+        recurrenceMonthDays={recurrenceMonthDays}
+        onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+        recurrenceCustomPeriod={recurrenceCustomPeriod}
+        onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
         reminderEnabled={false}
         onReminderEnabledChange={vi.fn()}
         reminderMinutesBefore={15}
@@ -37,7 +43,7 @@ function RecurrenceHarness({ selectedDate }: { selectedDate?: Date }) {
         selectedDate={selectedDate}
       />
       <div data-testid="recurrence-state">
-        {recurrencePattern ?? "none"}|{recurrenceDays.join(",")}
+        {recurrencePattern ?? "none"}|{recurrenceDays.join(",")}|{recurrenceMonthDays.join(",")}|{recurrenceCustomPeriod ?? "none"}
       </div>
     </div>
   );
@@ -57,6 +63,10 @@ function ReminderHarness() {
         onRecurrencePatternChange={vi.fn()}
         recurrenceDays={[]}
         onRecurrenceDaysChange={vi.fn()}
+        recurrenceMonthDays={[]}
+        onRecurrenceMonthDaysChange={vi.fn()}
+        recurrenceCustomPeriod={null}
+        onRecurrenceCustomPeriodChange={vi.fn()}
         reminderEnabled
         onReminderEnabledChange={vi.fn()}
         reminderMinutesBefore={reminderMinutesBefore}
@@ -128,6 +138,62 @@ describe("AdvancedQuestOptions recurrence", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0,2");
+    });
+  });
+
+  it("supports monthly multi-day selection", async () => {
+    render(<RecurrenceHarness selectedDate={new Date(2026, 0, 1)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Monthly" }));
+    fireEvent.click(screen.getByRole("button", { name: "15" }));
+    fireEvent.click(screen.getByRole("button", { name: "31" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recurrence-state")).toHaveTextContent("monthly||1,15,31");
+    });
+  });
+
+  it("supports custom month selection and keeps each period selection", async () => {
+    render(<RecurrenceHarness selectedDate={new Date(2026, 0, 12)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom Days" }));
+    fireEvent.click(screen.getByRole("button", { name: "Wed" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0,2||week");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+    fireEvent.click(screen.getByRole("button", { name: "24" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0,2|12,24|month");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Week" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0,2|12,24|week");
+    });
+  });
+
+  it("keeps at least one selected day in active custom mode", async () => {
+    render(<RecurrenceHarness selectedDate={new Date(2026, 0, 12)} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom Days" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mon" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0||week");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+    fireEvent.click(screen.getByRole("button", { name: "12" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0|12|month");
     });
   });
 });

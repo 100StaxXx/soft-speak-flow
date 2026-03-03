@@ -45,6 +45,10 @@ interface TaskLite {
   task_date: string | null;
   scheduled_time: string | null;
   estimated_duration: number | null;
+  recurrence_pattern: string | null;
+  recurrence_days: number[] | null;
+  recurrence_month_days: number[] | null;
+  recurrence_custom_period: "week" | "month" | null;
   location: string | null;
   notes: string | null;
 }
@@ -77,6 +81,22 @@ function toIsoRange(task: TaskLite) {
     startDate: start.toISOString(),
     endDate: end.toISOString(),
   };
+}
+
+function enforceCalendarRecurrenceSupport(task: TaskLite) {
+  const recurrencePattern = task.recurrence_pattern?.toLowerCase() ?? null;
+  const recurrenceMonthDays = Array.isArray(task.recurrence_month_days)
+    ? Array.from(new Set(task.recurrence_month_days)).sort((a, b) => a - b)
+    : [];
+  const recurrenceCustomPeriod = task.recurrence_custom_period ?? 'week';
+
+  const isMonthBased =
+    recurrencePattern === 'monthly'
+    || (recurrencePattern === 'custom' && recurrenceCustomPeriod === 'month');
+
+  if (isMonthBased && recurrenceMonthDays.length > 1) {
+    throw new Error('MULTI_DAY_MONTHLY_UNSUPPORTED');
+  }
 }
 
 export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
@@ -164,7 +184,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
     if (!user?.id) throw new Error('User not authenticated');
     const { data, error } = await supabase
       .from('daily_tasks')
-      .select('id, task_text, task_date, scheduled_time, estimated_duration, location, notes')
+      .select('id, task_text, task_date, scheduled_time, estimated_duration, recurrence_pattern, recurrence_days, recurrence_month_days, recurrence_custom_period, location, notes')
       .eq('id', taskId)
       .eq('user_id', user.id)
       .single();
@@ -205,6 +225,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
       }
 
       const task = await fetchTask(taskId);
+      enforceCalendarRecurrenceSupport(task);
       const existingCalendarLink = (linksByTask.get(taskId) || []).find((link) => link.provider === provider);
       const existingOutlookTaskLink = (outlookTaskLinksByTask.get(taskId) || []).find((link) => link.provider === 'outlook');
       const shouldRouteOutlookToTodo = provider === 'outlook' && (!task.task_date || !task.scheduled_time);
@@ -311,6 +332,7 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
       if (taskLinks.length === 0 && outlookLinks.length === 0) return;
 
       const task = await fetchTask(taskId);
+      enforceCalendarRecurrenceSupport(task);
 
       if (task.task_date && task.scheduled_time) {
         for (const link of taskLinks) {

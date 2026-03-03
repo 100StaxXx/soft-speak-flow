@@ -50,6 +50,8 @@ interface Task {
   estimated_duration?: number | null;
   recurrence_pattern?: string | null;
   recurrence_days?: number[] | null;
+  recurrence_month_days?: number[] | null;
+  recurrence_custom_period?: "week" | "month" | null;
   reminder_enabled?: boolean | null;
   reminder_minutes_before?: number | null;
   category?: string | null;
@@ -72,6 +74,8 @@ interface EditQuestDialogProps {
     estimated_duration: number | null;
     recurrence_pattern: string | null;
     recurrence_days: number[];
+    recurrence_month_days: number[];
+    recurrence_custom_period: "week" | "month" | null;
     reminder_enabled: boolean;
     reminder_minutes_before: number;
     notes: string | null;
@@ -107,6 +111,8 @@ export function EditQuestDialog({
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(30);
   const [recurrencePattern, setRecurrencePattern] = useState<string | null>(null);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [recurrenceMonthDays, setRecurrenceMonthDays] = useState<number[]>([]);
+  const [recurrenceCustomPeriod, setRecurrenceCustomPeriod] = useState<"week" | "month" | null>(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
   const [moreInformation, setMoreInformation] = useState<string | null>(null);
@@ -132,11 +138,26 @@ export function EditQuestDialog({
       setScheduledTime(normalizeScheduledTime(task.scheduled_time));
       setEstimatedDuration(task.estimated_duration ?? 30);
       const normalizedRecurrenceDays = Array.isArray(task.recurrence_days) ? task.recurrence_days : [];
+      const normalizedRecurrenceMonthDays = Array.isArray(task.recurrence_month_days) ? task.recurrence_month_days : [];
+      const fallbackMonthDay = task.task_date ? new Date(`${normalizeTaskDate(task.task_date) ?? "2000-01-01"}T00:00:00`).getDate() : 1;
+      const normalizedCustomPeriod = task.recurrence_pattern === "custom"
+        ? (task.recurrence_custom_period ?? "week")
+        : (task.recurrence_custom_period ?? null);
       const normalizedRecurrencePattern = task.recurrence_pattern === "weekly" && normalizedRecurrenceDays.length > 1
         ? "custom"
         : (task.recurrence_pattern || null);
       setRecurrencePattern(normalizedRecurrencePattern);
       setRecurrenceDays(normalizedRecurrenceDays);
+      setRecurrenceMonthDays(
+        normalizedRecurrencePattern === "monthly" && normalizedRecurrenceMonthDays.length === 0
+          ? [fallbackMonthDay]
+          : normalizedRecurrenceMonthDays
+      );
+      setRecurrenceCustomPeriod(
+        normalizedRecurrencePattern === "custom"
+          ? normalizedCustomPeriod
+          : null
+      );
       setReminderEnabled(Boolean(task.reminder_enabled));
       setReminderMinutesBefore(
         typeof task.reminder_minutes_before === "number" && task.reminder_minutes_before > 0
@@ -231,6 +252,8 @@ export function EditQuestDialog({
       estimated_duration: estimatedDuration,
       recurrence_pattern: recurrencePattern,
       recurrence_days: Array.isArray(recurrenceDays) ? recurrenceDays : [],
+      recurrence_month_days: Array.isArray(recurrenceMonthDays) ? recurrenceMonthDays : [],
+      recurrence_custom_period: recurrencePattern === "custom" ? (recurrenceCustomPeriod ?? "week") : null,
       reminder_enabled: reminderEnabled,
       reminder_minutes_before: Number.isFinite(reminderMinutesBefore) && reminderMinutesBefore > 0 ? reminderMinutesBefore : 15,
       notes: moreInformation,
@@ -240,7 +263,7 @@ export function EditQuestDialog({
       attachments,
     });
     onOpenChange(false);
-  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, reminderEnabled, reminderMinutesBefore, moreInformation, attachments, location, onSave, onOpenChange]);
+  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, attachments, location, onSave, onOpenChange]);
 
   const handleDelete = async () => {
     if (!task || !onDelete) return;
@@ -561,12 +584,16 @@ export function EditQuestDialog({
                     estimatedDuration={estimatedDuration}
                     recurrencePattern={recurrencePattern}
                     recurrenceDays={recurrenceDays}
+                    recurrenceMonthDays={recurrenceMonthDays}
+                    recurrenceCustomPeriod={recurrenceCustomPeriod}
                     reminderEnabled={reminderEnabled}
                     reminderMinutesBefore={reminderMinutesBefore}
                     onScheduledTimeChange={setScheduledTime}
                     onEstimatedDurationChange={setEstimatedDuration}
                     onRecurrencePatternChange={setRecurrencePattern}
                     onRecurrenceDaysChange={setRecurrenceDays}
+                    onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                    onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
                     onReminderEnabledChange={setReminderEnabled}
                     onReminderMinutesBeforeChange={setReminderMinutesBefore}
                     moreInformation={moreInformation}

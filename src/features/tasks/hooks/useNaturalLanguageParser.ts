@@ -9,6 +9,9 @@ export interface ParsedTask {
   scheduledDate: string | null;
   estimatedDuration: number | null;
   recurrencePattern: string | null;
+  recurrenceDays: number[];
+  recurrenceMonthDays: number[];
+  recurrenceCustomPeriod: 'week' | 'month' | null;
   recurrenceEndDate: string | null;
   priority: 'low' | 'medium' | 'high' | 'urgent' | null;
   context: string | null;
@@ -472,6 +475,9 @@ export function parseNaturalLanguage(input: string): ParsedTask {
     scheduledDate: null,
     estimatedDuration: null,
     recurrencePattern: null,
+    recurrenceDays: [],
+    recurrenceMonthDays: [],
+    recurrenceCustomPeriod: null,
     recurrenceEndDate: null,
     priority: null,
     context: null,

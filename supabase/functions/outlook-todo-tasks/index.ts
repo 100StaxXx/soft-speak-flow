@@ -40,6 +40,8 @@ interface DailyTask {
   reminder_minutes_before: number | null;
   recurrence_pattern: string | null;
   recurrence_days: number[] | null;
+  recurrence_month_days: number[] | null;
+  recurrence_custom_period: "week" | "month" | null;
   recurrence_end_date: string | null;
   location: string | null;
   notes: string | null;
@@ -230,6 +232,26 @@ function resolveRecurrenceDays(task: DailyTask): number[] {
   return [];
 }
 
+function normalizeMonthDays(days: number[] | null | undefined): number[] {
+  if (!Array.isArray(days)) return [];
+  const mapped = days
+    .map((day) => Number(day))
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 31) as number[];
+  return Array.from(new Set(mapped)).sort((a, b) => a - b);
+}
+
+function resolveMonthDays(task: DailyTask): number[] {
+  const explicitMonthDays = normalizeMonthDays(task.recurrence_month_days);
+  if (explicitMonthDays.length > 0) return explicitMonthDays;
+
+  const fallbackDay = Number(task.task_date?.slice(8, 10));
+  if (Number.isInteger(fallbackDay) && fallbackDay >= 1 && fallbackDay <= 31) {
+    return [fallbackDay];
+  }
+
+  return [];
+}
+
 function toOutlookRecurrence(task: DailyTask): Record<string, unknown> | undefined {
   if (!task.task_date || !task.recurrence_pattern) return undefined;
 
@@ -257,13 +279,28 @@ function toOutlookRecurrence(task: DailyTask): Record<string, unknown> | undefin
       daysOfWeek: toGraphDaysFromAppDays(resolveRecurrenceDays(task).slice(0, 1)),
     };
   } else if (pattern === "custom") {
-    recurrencePattern = {
-      type: "weekly",
-      interval: 1,
-      daysOfWeek: toGraphDaysFromAppDays(resolveRecurrenceDays(task)),
-    };
+    const customPeriod = task.recurrence_custom_period ?? "week";
+    if (customPeriod === "month") {
+      const monthDays = resolveMonthDays(task);
+      if (monthDays.length > 1) throw new Error("MULTI_DAY_MONTHLY_UNSUPPORTED");
+      if (monthDays.length === 1) {
+        recurrencePattern = {
+          type: "absoluteMonthly",
+          interval: 1,
+          dayOfMonth: monthDays[0],
+        };
+      }
+    } else {
+      recurrencePattern = {
+        type: "weekly",
+        interval: 1,
+        daysOfWeek: toGraphDaysFromAppDays(resolveRecurrenceDays(task)),
+      };
+    }
   } else if (pattern === "monthly") {
-    const dayOfMonth = Math.min(31, Math.max(1, Number(task.task_date.slice(8, 10))));
+    const monthDays = resolveMonthDays(task);
+    if (monthDays.length > 1) throw new Error("MULTI_DAY_MONTHLY_UNSUPPORTED");
+    const dayOfMonth = monthDays[0] ?? Math.min(31, Math.max(1, Number(task.task_date.slice(8, 10))));
     recurrencePattern = {
       type: "absoluteMonthly",
       interval: 1,
@@ -295,6 +332,8 @@ function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
   const empty = {
     recurrence_pattern: null,
     recurrence_days: null,
+    recurrence_month_days: null,
+    recurrence_custom_period: null,
     recurrence_end_date: null,
     is_recurring: false,
   };
@@ -311,6 +350,8 @@ function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
     return {
       recurrence_pattern: "daily",
       recurrence_days: [],
+      recurrence_month_days: [],
+      recurrence_custom_period: null,
       recurrence_end_date: range.type === "endDate" ? String(range.endDate || "").slice(0, 10) || null : null,
       is_recurring: true,
     };
@@ -330,15 +371,21 @@ function toTaskRecurrenceFields(remoteTask: Record<string, any>) {
     return {
       recurrence_pattern: mappedPattern,
       recurrence_days: sortedDays,
+      recurrence_month_days: [],
+      recurrence_custom_period: mappedPattern === "custom" ? "week" : null,
       recurrence_end_date: range.type === "endDate" ? String(range.endDate || "").slice(0, 10) || null : null,
       is_recurring: true,
     };
   }
 
   if (patternType === "absolutemonthly" || patternType === "relativemonthly") {
+    const dayOfMonth = Number(pattern.dayOfMonth);
+    const normalizedDay = Number.isFinite(dayOfMonth) ? Math.min(31, Math.max(1, dayOfMonth)) : null;
     return {
       recurrence_pattern: "monthly",
       recurrence_days: [],
+      recurrence_month_days: normalizedDay ? [normalizedDay] : [],
+      recurrence_custom_period: null,
       recurrence_end_date: range.type === "endDate" ? String(range.endDate || "").slice(0, 10) || null : null,
       is_recurring: true,
     };
@@ -464,6 +511,8 @@ function mapOutlookTaskToTaskUpdate(remoteTask: Record<string, any>): Partial<Da
     reminder_minutes_before: reminderMinutesBefore,
     recurrence_pattern: recurrenceFields.recurrence_pattern,
     recurrence_days: recurrenceFields.recurrence_days,
+    recurrence_month_days: recurrenceFields.recurrence_month_days,
+    recurrence_custom_period: recurrenceFields.recurrence_custom_period,
     recurrence_end_date: recurrenceFields.recurrence_end_date,
     notes,
   };
@@ -506,7 +555,7 @@ async function getTaskById(
   const { data, error } = await supabase
     .from("daily_tasks")
     .select(
-      "id, user_id, task_text, task_date, scheduled_time, estimated_duration, difficulty, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_days, recurrence_end_date, location, notes",
+      "id, user_id, task_text, task_date, scheduled_time, estimated_duration, difficulty, reminder_enabled, reminder_minutes_before, recurrence_pattern, recurrence_days, recurrence_month_days, recurrence_custom_period, recurrence_end_date, location, notes",
     )
     .eq("id", taskId)
     .eq("user_id", userId)
@@ -898,6 +947,8 @@ Deno.serve(async (req) => {
                 reminder_minutes_before: taskPatch.reminder_minutes_before,
                 recurrence_pattern: taskPatch.recurrence_pattern,
                 recurrence_days: taskPatch.recurrence_days,
+                recurrence_month_days: taskPatch.recurrence_month_days,
+                recurrence_custom_period: taskPatch.recurrence_custom_period,
                 recurrence_end_date: taskPatch.recurrence_end_date,
                 is_recurring: Boolean(taskPatch.recurrence_pattern),
                 notes: taskPatch.notes,
@@ -950,7 +1001,11 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Unsupported action" }, 400);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status = message.toLowerCase().includes("unauthorized") ? 401 : 500;
+    const status = message.toLowerCase().includes("unauthorized")
+      ? 401
+      : message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")
+        ? 400
+        : 500;
     return jsonResponse({ error: message }, status);
   }
 });

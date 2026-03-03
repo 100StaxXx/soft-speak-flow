@@ -12,6 +12,7 @@ import {
   startOfDay,
 } from 'date-fns';
 import { toast } from 'sonner';
+import { getClampedMonthDays } from '@/utils/habitSchedule';
 
 export interface RecurringTask {
   id: string;
@@ -24,6 +25,8 @@ export interface RecurringTask {
   category: string | null;
   recurrence_pattern: string | null;
   recurrence_days: number[] | null;
+  recurrence_month_days: number[] | null;
+  recurrence_custom_period: "week" | "month" | null;
   recurrence_end_date: string | null;
   xp_reward: number;
   epic_id: string | null;
@@ -62,6 +65,8 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
           category,
           recurrence_pattern,
           recurrence_days,
+          recurrence_month_days,
+          recurrence_custom_period,
           recurrence_end_date,
           xp_reward,
           epic_id,
@@ -215,18 +220,35 @@ export function shouldSpawnToday(
     }
 
     case 'monthly': {
+      const configuredMonthDays = getClampedMonthDays(template.recurrence_month_days, targetDate);
+      if (configuredMonthDays.length > 0) {
+        return configuredMonthDays.includes(targetDate.getDate());
+      }
+
       if (!anchorDate) return false;
       const desiredDayOfMonth = anchorDate.getDate();
       const runDayOfMonth = Math.min(desiredDayOfMonth, lastDayOfMonth(targetDate).getDate());
       return targetDate.getDate() === runDayOfMonth;
     }
 
-    case 'custom':
-      // Use recurrence_days array
+    case 'custom': {
+      const customPeriod = template.recurrence_custom_period ?? 'week';
+      if (customPeriod === 'month') {
+        const configuredMonthDays = getClampedMonthDays(template.recurrence_month_days, targetDate);
+        if (configuredMonthDays.length > 0) {
+          return configuredMonthDays.includes(targetDate.getDate());
+        }
+        if (!anchorDate) return false;
+        const fallbackDay = Math.min(anchorDate.getDate(), lastDayOfMonth(targetDate).getDate());
+        return targetDate.getDate() === fallbackDay;
+      }
+
+      // Use recurrence_days array for custom weekly behavior (legacy default).
       if (template.recurrence_days && template.recurrence_days.length > 0) {
         return template.recurrence_days.includes(appDayOfWeek);
       }
       return false;
+    }
 
     default:
       // Handle patterns like 'every_2_days', 'twice_daily', etc.

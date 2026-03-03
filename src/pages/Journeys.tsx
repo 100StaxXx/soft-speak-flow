@@ -217,6 +217,8 @@ const Journeys = () => {
     estimated_duration?: number | null;
     recurrence_pattern?: string | null;
     recurrence_days?: number[] | null;
+    recurrence_month_days?: number[] | null;
+    recurrence_custom_period?: "week" | "month" | null;
     reminder_enabled?: boolean | null;
     reminder_minutes_before?: number | null;
     category?: string | null;
@@ -298,6 +300,8 @@ const Journeys = () => {
     estimated_duration?: number | null;
     recurrence_pattern?: string | null;
     recurrence_days?: number[] | null;
+    recurrence_month_days?: number[] | null;
+    recurrence_custom_period?: "week" | "month" | null;
     reminder_enabled?: boolean | null;
     reminder_minutes_before?: number | null;
     category?: string | null;
@@ -330,6 +334,8 @@ const Journeys = () => {
         category: task.category as 'mind' | 'body' | 'soul' | null,
         recurrence_pattern: task.recurrence_pattern,
         recurrence_days: task.recurrence_days,
+        recurrence_month_days: task.recurrence_month_days,
+        recurrence_custom_period: task.recurrence_custom_period,
         reminder_enabled: task.reminder_enabled,
         reminder_minutes_before: task.reminder_minutes_before,
       });
@@ -412,6 +418,10 @@ const Journeys = () => {
       return;
     } catch (error) {
       let message = error instanceof Error ? error.message : "Failed to send quest to calendar";
+      if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+        return;
+      }
       if (message.includes("NO_CALENDAR_CONNECTION")) {
         routeToCalendarPreferences();
         return;
@@ -450,6 +460,10 @@ const Journeys = () => {
           return;
         } catch (retryError) {
           message = retryError instanceof Error ? retryError.message : "Failed to send quest to calendar";
+          if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+            toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+            return;
+          }
           if (message.includes("NO_CALENDAR_CONNECTION")) {
             routeToCalendarPreferences();
             return;
@@ -499,6 +513,8 @@ const Journeys = () => {
       location: data.location,
       contactId: data.contactId,
       autoLogInteraction: data.autoLogInteraction,
+      recurrenceMonthDays: data.recurrenceMonthDays,
+      recurrenceCustomPeriod: data.recurrenceCustomPeriod,
       subtasks: data.subtasks,
       imageUrl: data.imageUrl,
       attachments: data.attachments,
@@ -549,6 +565,8 @@ const Journeys = () => {
     estimated_duration: number | null;
     recurrence_pattern: string | null;
     recurrence_days: number[];
+    recurrence_month_days: number[];
+    recurrence_custom_period: "week" | "month" | null;
     reminder_enabled: boolean;
     reminder_minutes_before: number;
     notes: string | null;
@@ -558,7 +576,12 @@ const Journeys = () => {
     attachments?: QuestAttachmentInput[];
   }) => {
     await updateTask({ taskId, updates });
-    await syncTaskUpdate.mutateAsync({ taskId }).catch(() => {
+    await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+        return;
+      }
       toast.error("Saved quest, but failed to sync linked calendar event");
     });
     setEditingTask(null);
@@ -642,6 +665,8 @@ const Journeys = () => {
       is_recurring: taskToDelete.is_recurring,
       recurrence_pattern: taskToDelete.recurrence_pattern,
       recurrence_days: taskToDelete.recurrence_days,
+      recurrence_month_days: taskToDelete.recurrence_month_days,
+      recurrence_custom_period: taskToDelete.recurrence_custom_period,
       reminder_enabled: taskToDelete.reminder_enabled,
       reminder_minutes_before: taskToDelete.reminder_minutes_before,
     };
@@ -821,7 +846,17 @@ const Journeys = () => {
             onMoveQuestToNextDay={handleSwipeMoveToNextDay}
             onUpdateScheduledTime={(taskId, newTime) => {
               updateTask({ taskId, updates: { scheduled_time: newTime } });
-              syncTaskUpdate.mutate({ taskId });
+              syncTaskUpdate.mutate(
+                { taskId },
+                {
+                  onError: (error) => {
+                    const message = error instanceof Error ? error.message : "";
+                    if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+                      toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+                    }
+                  },
+                },
+              );
             }}
             onTimeSlotLongPress={(date, time) => {
               setSelectedDate(date);

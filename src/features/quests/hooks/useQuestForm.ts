@@ -10,6 +10,8 @@ const initialFormState: QuestFormState = {
   estimatedDuration: null,
   recurrencePattern: null,
   recurrenceDays: [],
+  recurrenceMonthDays: [],
+  recurrenceCustomPeriod: null,
   recurrenceEndDate: null,
   reminderEnabled: false,
   reminderMinutesBefore: 15,
@@ -47,6 +49,14 @@ export function useQuestForm(selectedDate: Date) {
     setFormState(prev => ({ ...prev, recurrenceDays: days }));
   }, []);
 
+  const setRecurrenceMonthDays = useCallback((days: number[]) => {
+    setFormState(prev => ({ ...prev, recurrenceMonthDays: days }));
+  }, []);
+
+  const setRecurrenceCustomPeriod = useCallback((period: "week" | "month" | null) => {
+    setFormState(prev => ({ ...prev, recurrenceCustomPeriod: period }));
+  }, []);
+
   const setRecurrenceEndDate = useCallback((date: string | null) => {
     setFormState(prev => ({ ...prev, recurrenceEndDate: date }));
   }, []);
@@ -72,6 +82,8 @@ export function useQuestForm(selectedDate: Date) {
       estimatedDuration: formState.estimatedDuration,
       recurrencePattern: formState.recurrencePattern,
       recurrenceDays: formState.recurrenceDays,
+      recurrenceMonthDays: formState.recurrenceMonthDays,
+      recurrenceCustomPeriod: formState.recurrenceCustomPeriod,
       recurrenceEndDate: formState.recurrenceEndDate,
       reminderEnabled: formState.reminderEnabled,
       reminderMinutesBefore: formState.reminderMinutesBefore,
@@ -92,6 +104,8 @@ export function useQuestForm(selectedDate: Date) {
     setEstimatedDuration,
     setRecurrencePattern,
     setRecurrenceDays,
+    setRecurrenceMonthDays,
+    setRecurrenceCustomPeriod,
     setRecurrenceEndDate,
     setReminderEnabled,
     setReminderMinutesBefore,

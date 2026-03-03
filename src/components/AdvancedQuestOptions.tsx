@@ -22,6 +22,10 @@ interface AdvancedQuestOptionsProps {
   onRecurrencePatternChange: (pattern: string | null) => void;
   recurrenceDays: number[];
   onRecurrenceDaysChange: (days: number[]) => void;
+  recurrenceMonthDays: number[];
+  onRecurrenceMonthDaysChange: (days: number[]) => void;
+  recurrenceCustomPeriod: "week" | "month" | null;
+  onRecurrenceCustomPeriodChange: (period: "week" | "month" | null) => void;
   reminderEnabled: boolean;
   onReminderEnabledChange: (enabled: boolean) => void;
   reminderMinutesBefore: number;
@@ -81,6 +85,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     { value: 10080, label: "1 week before" },
   ];
 
+  const monthDays = useMemo(() => Array.from({ length: 31 }, (_, index) => index + 1), []);
   const recurrenceOptions = [
     { value: 'none', label: 'None' },
     { value: 'daily', label: 'Daily' },
@@ -130,6 +135,18 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     () => toAppDayIndex(props.selectedDate ?? new Date()),
     [props.selectedDate]
   );
+  const selectedMonthDay = useMemo(
+    () => {
+      const day = (props.selectedDate ?? new Date()).getDate();
+      return Math.min(31, Math.max(1, day));
+    },
+    [props.selectedDate]
+  );
+
+  const resolvedCustomPeriod = useMemo<"week" | "month">(() => {
+    if (props.recurrenceCustomPeriod === "month") return "month";
+    return "week";
+  }, [props.recurrenceCustomPeriod]);
 
   const recurrencePatternForEditor = useMemo(() => {
     if (props.recurrencePattern === "weekly" && props.recurrenceDays.length > 1) {
@@ -141,14 +158,49 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   useEffect(() => {
     if (props.recurrencePattern === "weekly" && props.recurrenceDays.length > 1) {
       props.onRecurrencePatternChange("custom");
+      props.onRecurrenceCustomPeriodChange("week");
     }
-  }, [props.recurrencePattern, props.recurrenceDays, props.onRecurrencePatternChange]);
+  }, [props.recurrencePattern, props.recurrenceDays, props.onRecurrencePatternChange, props.onRecurrenceCustomPeriodChange]);
 
   useEffect(() => {
     if ((recurrencePatternForEditor !== "weekly" && recurrencePatternForEditor !== "biweekly")) return;
     if (props.recurrenceDays.length === 1) return;
     props.onRecurrenceDaysChange([selectedAppDay]);
   }, [recurrencePatternForEditor, props.recurrenceDays, props.onRecurrenceDaysChange, selectedAppDay]);
+
+  useEffect(() => {
+    if (recurrencePatternForEditor !== "monthly") return;
+    if (props.recurrenceMonthDays.length > 0) return;
+    props.onRecurrenceMonthDaysChange([selectedMonthDay]);
+  }, [recurrencePatternForEditor, props.recurrenceMonthDays, props.onRecurrenceMonthDaysChange, selectedMonthDay]);
+
+  useEffect(() => {
+    if (recurrencePatternForEditor !== "custom") return;
+    if (props.recurrenceCustomPeriod !== "week" && props.recurrenceCustomPeriod !== "month") {
+      props.onRecurrenceCustomPeriodChange("week");
+      return;
+    }
+
+    if (resolvedCustomPeriod === "week" && props.recurrenceDays.length === 0) {
+      props.onRecurrenceDaysChange([selectedAppDay]);
+      return;
+    }
+
+    if (resolvedCustomPeriod === "month" && props.recurrenceMonthDays.length === 0) {
+      props.onRecurrenceMonthDaysChange([selectedMonthDay]);
+    }
+  }, [
+    recurrencePatternForEditor,
+    resolvedCustomPeriod,
+    props.recurrenceCustomPeriod,
+    props.recurrenceDays,
+    props.recurrenceMonthDays,
+    props.onRecurrenceCustomPeriodChange,
+    props.onRecurrenceDaysChange,
+    props.onRecurrenceMonthDaysChange,
+    selectedAppDay,
+    selectedMonthDay,
+  ]);
 
   const handleSelectSuggestion = (time: string) => {
     props.onScheduledTimeChange(time);
@@ -159,6 +211,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     if (value === "none") {
       props.onRecurrencePatternChange(null);
       props.onRecurrenceDaysChange([]);
+      props.onRecurrenceMonthDaysChange([]);
+      props.onRecurrenceCustomPeriodChange(null);
       setShowRecurrenceOptions(false);
       return;
     }
@@ -167,14 +221,60 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
     if (value === "weekdays") {
       props.onRecurrenceDaysChange([0, 1, 2, 3, 4]);
+      props.onRecurrenceMonthDaysChange([]);
+      props.onRecurrenceCustomPeriodChange(null);
     } else if (value === "weekly" || value === "biweekly") {
       props.onRecurrenceDaysChange([selectedAppDay]);
-    } else if (value === "daily" || value === "monthly") {
+      props.onRecurrenceMonthDaysChange([]);
+      props.onRecurrenceCustomPeriodChange(null);
+    } else if (value === "monthly") {
       props.onRecurrenceDaysChange([]);
+      props.onRecurrenceMonthDaysChange(
+        props.recurrenceMonthDays.length > 0 ? props.recurrenceMonthDays : [selectedMonthDay]
+      );
+      props.onRecurrenceCustomPeriodChange(null);
+    } else if (value === "daily") {
+      props.onRecurrenceDaysChange([]);
+      props.onRecurrenceMonthDaysChange([]);
+      props.onRecurrenceCustomPeriodChange(null);
+    } else if (value === "custom") {
+      const period = props.recurrenceCustomPeriod ?? "week";
+      props.onRecurrenceCustomPeriodChange(period);
+      if (period === "week" && props.recurrenceDays.length === 0) {
+        props.onRecurrenceDaysChange([selectedAppDay]);
+      }
+      if (period === "month" && props.recurrenceMonthDays.length === 0) {
+        props.onRecurrenceMonthDaysChange([selectedMonthDay]);
+      }
     }
 
     setShowRecurrenceOptions(false);
-  }, [props, selectedAppDay]);
+  }, [props, selectedAppDay, selectedMonthDay]);
+
+  const handleCustomPeriodChange = useCallback((period: "week" | "month") => {
+    props.onRecurrenceCustomPeriodChange(period);
+    if (period === "week" && props.recurrenceDays.length === 0) {
+      props.onRecurrenceDaysChange([selectedAppDay]);
+    }
+    if (period === "month" && props.recurrenceMonthDays.length === 0) {
+      props.onRecurrenceMonthDaysChange([selectedMonthDay]);
+    }
+  }, [props, selectedAppDay, selectedMonthDay]);
+
+  const handleRecurrenceDaysChange = useCallback((days: number[]) => {
+    if (days.length === 0) return;
+    props.onRecurrenceDaysChange(Array.from(new Set(days)).sort((a, b) => a - b));
+  }, [props]);
+
+  const toggleMonthDay = useCallback((dayOfMonth: number) => {
+    const isSelected = props.recurrenceMonthDays.includes(dayOfMonth);
+    if (isSelected && props.recurrenceMonthDays.length === 1) return;
+
+    const nextDays = isSelected
+      ? props.recurrenceMonthDays.filter((day) => day !== dayOfMonth)
+      : [...props.recurrenceMonthDays, dayOfMonth].sort((a, b) => a - b);
+    props.onRecurrenceMonthDaysChange(nextDays);
+  }, [props]);
 
   const applyCustomReminder = useCallback(() => {
     const minutes = Number.parseInt(customReminderInput, 10);
@@ -452,12 +552,59 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             )}
           </div>
           
-          {(recurrencePatternForEditor === 'custom' || recurrencePatternForEditor === 'weekly' || recurrencePatternForEditor === 'biweekly') && (
+          {recurrencePatternForEditor === 'custom' && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={resolvedCustomPeriod === "week" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleCustomPeriodChange("week")}
+              >
+                Week
+              </Button>
+              <Button
+                type="button"
+                variant={resolvedCustomPeriod === "month" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleCustomPeriodChange("month")}
+              >
+                Month
+              </Button>
+            </div>
+          )}
+
+          {(recurrencePatternForEditor === 'weekly'
+            || recurrencePatternForEditor === 'biweekly'
+            || (recurrencePatternForEditor === 'custom' && resolvedCustomPeriod === 'week')) && (
             <FrequencyPicker
               selectedDays={props.recurrenceDays}
-              onDaysChange={props.onRecurrenceDaysChange}
+              onDaysChange={handleRecurrenceDaysChange}
               selectionMode={recurrencePatternForEditor === 'custom' ? 'multiple' : 'single'}
             />
+          )}
+
+          {(recurrencePatternForEditor === "monthly" || (recurrencePatternForEditor === "custom" && resolvedCustomPeriod === "month")) && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-7 gap-1.5">
+                {monthDays.map((dayOfMonth) => (
+                  <button
+                    key={dayOfMonth}
+                    type="button"
+                    onClick={() => toggleMonthDay(dayOfMonth)}
+                    className={`h-8 rounded-md text-xs font-medium border transition-colors ${
+                      props.recurrenceMonthDays.includes(dayOfMonth)
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "bg-background border-border hover:bg-accent"
+                    }`}
+                  >
+                    {dayOfMonth}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Short months run on the last valid day.
+              </p>
+            </div>
           )}
         </div>
       )}

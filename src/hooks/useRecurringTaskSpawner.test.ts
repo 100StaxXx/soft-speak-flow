@@ -13,6 +13,8 @@ function buildTemplate(overrides: Partial<RecurringTask>): RecurringTask {
     category: null,
     recurrence_pattern: "daily",
     recurrence_days: null,
+    recurrence_month_days: null,
+    recurrence_custom_period: null,
     recurrence_end_date: null,
     xp_reward: 50,
     epic_id: null,
@@ -82,5 +84,31 @@ describe("useRecurringTaskSpawner recurrence matching", () => {
 
     expect(shouldSpawnToday(template, 5, new Date("2026-02-28T09:00:00.000Z"))).toBe(true);
     expect(shouldSpawnToday(template, 4, new Date("2026-02-27T09:00:00.000Z"))).toBe(false);
+  });
+
+  it("matches monthly with multiple configured month days", () => {
+    const template = buildTemplate({
+      recurrence_pattern: "monthly",
+      recurrence_month_days: [1, 15, 31],
+      task_date: "2026-01-01",
+    });
+
+    expect(shouldSpawnToday(template, 6, new Date("2026-02-01T09:00:00.000Z"))).toBe(true);
+    expect(shouldSpawnToday(template, 6, new Date("2026-02-15T09:00:00.000Z"))).toBe(true);
+    expect(shouldSpawnToday(template, 5, new Date("2026-02-28T09:00:00.000Z"))).toBe(true); // clamped 31
+    expect(shouldSpawnToday(template, 4, new Date("2026-02-27T09:00:00.000Z"))).toBe(false);
+  });
+
+  it("matches custom month recurrence using configured month days", () => {
+    const template = buildTemplate({
+      recurrence_pattern: "custom",
+      recurrence_custom_period: "month",
+      recurrence_month_days: [5, 20],
+      task_date: "2026-01-05",
+    });
+
+    expect(shouldSpawnToday(template, 3, new Date("2026-02-05T09:00:00.000Z"))).toBe(true);
+    expect(shouldSpawnToday(template, 4, new Date("2026-02-20T09:00:00.000Z"))).toBe(true);
+    expect(shouldSpawnToday(template, 0, new Date("2026-02-09T09:00:00.000Z"))).toBe(false);
   });
 });
