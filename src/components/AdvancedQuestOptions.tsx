@@ -43,6 +43,8 @@ interface AdvancedQuestOptionsProps {
   hideScheduledTime?: boolean;
   hideDuration?: boolean;
   hideMoreInformation?: boolean;
+  hideReminder?: boolean;
+  hideLocation?: boolean;
 }
 
 // Helper to format 24h time to 12h
@@ -412,7 +414,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       )}
 
       {/* Reminder Section - Only show if scheduled time is set */}
-      {props.scheduledTime && (
+      {!props.hideReminder && props.scheduledTime && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -610,18 +612,20 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
       )}
 
       {/* Location */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Location</Label>
+      {!props.hideLocation && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Location</Label>
+          </div>
+          <Input
+            value={props.location || ''}
+            onChange={(e) => props.onLocationChange(e.target.value || null)}
+            placeholder="Where will this happen? (optional)"
+            className="bg-muted/30 border-border/50"
+          />
         </div>
-        <Input
-          value={props.location || ''}
-          onChange={(e) => props.onLocationChange(e.target.value || null)}
-          placeholder="Where will this happen? (optional)"
-          className="bg-muted/30 border-border/50"
-        />
-      </div>
+      )}
 
       {/* More Information */}
       {!props.hideMoreInformation && (

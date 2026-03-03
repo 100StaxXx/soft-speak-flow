@@ -74,7 +74,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 
-  it("renders Advanced Settings above Photo / Files", () => {
+  it("renders Advanced Settings below Photo / Files", () => {
     render(
       <AddQuestSheet
         open
@@ -87,7 +87,7 @@ describe("AddQuestSheet", () => {
     const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
     const photoFilesLabel = screen.getByText("Photo / Files");
     const relation = advancedTrigger.compareDocumentPosition(photoFilesLabel);
-    expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it("only shows Early Reminder after a time is selected", () => {
@@ -563,7 +563,6 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Weekday quest" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
     fireEvent.click(screen.getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Weekdays" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
@@ -596,7 +595,6 @@ describe("AddQuestSheet", () => {
     fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
       target: { value: "Biweekly quest" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
     fireEvent.click(screen.getByRole("button", { name: "None" }));
     fireEvent.click(screen.getByRole("button", { name: "Every 2 Weeks" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));

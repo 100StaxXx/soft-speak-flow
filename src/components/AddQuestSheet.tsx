@@ -660,6 +660,47 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               />
             </div>
 
+            {/* Recurrence (always visible) */}
+            <div className="px-1">
+              <AdvancedQuestOptions
+                scheduledTime={scheduledTime}
+                estimatedDuration={estimatedDuration}
+                recurrencePattern={recurrencePattern}
+                recurrenceDays={recurrenceDays}
+                recurrenceMonthDays={recurrenceMonthDays}
+                recurrenceCustomPeriod={recurrenceCustomPeriod}
+                reminderEnabled={reminderEnabled}
+                reminderMinutesBefore={reminderMinutesBefore}
+                onScheduledTimeChange={setScheduledTime}
+                onEstimatedDurationChange={setEstimatedDuration}
+                onRecurrencePatternChange={setRecurrencePattern}
+                onRecurrenceDaysChange={setRecurrenceDays}
+                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                onReminderEnabledChange={setReminderEnabled}
+                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                moreInformation={moreInformation}
+                onMoreInformationChange={setMoreInformation}
+                location={location}
+                onLocationChange={setLocation}
+                selectedDate={dateObj}
+                taskDifficulty={difficulty}
+                hideScheduledTime
+                hideDuration
+                hideMoreInformation
+                hideReminder
+                hideLocation
+              />
+            </div>
+
+            <div className="space-y-2 px-1">
+              <Label className="text-sm font-medium text-muted-foreground">Photo / Files</Label>
+              <QuestAttachmentPicker
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+              />
+            </div>
+
             {/* Advanced Settings (collapsible) */}
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
@@ -678,7 +719,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
               <CollapsibleContent>
                 <div className="mt-3 space-y-4">
-                  {/* Recurrence, Reminders, Location (no duplicated fields) */}
+                  {/* Reminders + Location */}
                   <AdvancedQuestOptions
                     scheduledTime={scheduledTime}
                     estimatedDuration={estimatedDuration}
@@ -705,18 +746,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     hideScheduledTime
                     hideDuration
                     hideMoreInformation
+                    hideRecurrence
                   />
                 </div>
               </CollapsibleContent>
             </Collapsible>
-
-            <div className="space-y-2 px-1">
-              <Label className="text-sm font-medium text-muted-foreground">Photo / Files</Label>
-              <QuestAttachmentPicker
-                attachments={attachments}
-                onAttachmentsChange={setAttachments}
-              />
-            </div>
           </div>
         </div>
 
