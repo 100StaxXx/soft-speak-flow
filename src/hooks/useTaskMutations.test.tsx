@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
   const reportApiFailureMock = vi.fn();
 
   const dailyTasksCountExecuteMock = vi.fn();
+  const dailyTasksInsertMock = vi.fn();
   const dailyTasksInsertSingleMock = vi.fn();
   const dailyTasksDeleteExecuteMock = vi.fn();
   const dailyTasksFetchSchedulingSingleMock = vi.fn();
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => {
     queueTaskActionMock,
     reportApiFailureMock,
     dailyTasksCountExecuteMock,
+    dailyTasksInsertMock,
     dailyTasksInsertSingleMock,
     dailyTasksDeleteExecuteMock,
     dailyTasksFetchSchedulingSingleMock,
@@ -135,6 +137,13 @@ const taskAttachmentsMissingTableError = {
   hint: null,
 };
 
+const dailyTasksRecurrenceColumnsMissingError = {
+  code: "PGRST204",
+  message: "Could not find the 'recurrence_custom_period' column of 'daily_tasks' in the schema cache",
+  details: null,
+  hint: null,
+};
+
 describe("isTaskAttachmentsTableMissingError", () => {
   it("returns true for missing task_attachments schema-cache errors", () => {
     expect(isTaskAttachmentsTableMissingError(taskAttachmentsMissingTableError)).toBe(true);
@@ -189,6 +198,11 @@ describe("useTaskMutations attachment handling", () => {
     mocks.dailyTasksUpdateExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsDeleteExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({ error: null });
+    mocks.dailyTasksInsertMock.mockImplementation(() => ({
+      select: vi.fn(() => ({
+        single: mocks.dailyTasksInsertSingleMock,
+      })),
+    }));
 
     mocks.dailyTasksUpdateMock.mockReturnValue({
       eq: vi.fn(() => ({
@@ -217,11 +231,7 @@ describe("useTaskMutations attachment handling", () => {
               })),
             };
           }),
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: mocks.dailyTasksInsertSingleMock,
-            })),
-          })),
+          insert: mocks.dailyTasksInsertMock,
           delete: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: mocks.dailyTasksDeleteExecuteMock,
@@ -296,6 +306,81 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
   });
 
+  it("retries basic custom-week creation without month recurrence columns when schema lags", async () => {
+    mocks.dailyTasksInsertSingleMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: dailyTasksRecurrenceColumnsMissingError,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "task-retry-1",
+          user_id: "user-1",
+          task_text: "Custom week quest",
+          difficulty: "medium",
+          task_date: "2026-02-20",
+          scheduled_time: "13:00",
+          category: "mind",
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    const createdTask = await result.current.addTask({
+      taskText: "Custom week quest",
+      difficulty: "medium",
+      taskDate: "2026-02-20",
+      recurrencePattern: "custom",
+      recurrenceDays: [1],
+      recurrenceCustomPeriod: "week",
+    });
+
+    expect(createdTask?.id).toBe("task-retry-1");
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledTimes(2);
+    expect(mocks.dailyTasksInsertMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        recurrence_pattern: "custom",
+        recurrence_custom_period: "week",
+      }),
+    );
+    expect(mocks.dailyTasksInsertMock.mock.calls[1]?.[0]).toEqual(
+      expect.not.objectContaining({
+        recurrence_custom_period: expect.anything(),
+        recurrence_month_days: expect.anything(),
+      }),
+    );
+  });
+
+  it("blocks month-based recurrence creation when required recurrence columns are unavailable", async () => {
+    mocks.dailyTasksInsertSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: dailyTasksRecurrenceColumnsMissingError,
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.addTask({
+        taskText: "Monthly quest",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        recurrencePattern: "custom",
+        recurrenceCustomPeriod: "month",
+        recurrenceMonthDays: [5],
+      }),
+    ).rejects.toMatchObject({
+      message: "Monthly recurrence is temporarily unavailable until backend update completes.",
+    });
+
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
+  });
+
   it("fails quest creation and rolls back when attachment persistence has non-schema errors", async () => {
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({
       error: {
@@ -348,6 +433,83 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.dailyTasksUpdateExecuteMock).toHaveBeenCalledTimes(1);
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest updated!" }));
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
+  });
+
+  it("retries non-month recurrence updates when recurrence columns are unavailable", async () => {
+    mocks.dailyTasksUpdateExecuteMock
+      .mockResolvedValueOnce({ error: dailyTasksRecurrenceColumnsMissingError })
+      .mockResolvedValueOnce({ error: null });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.updateTask({
+      taskId: "task-1",
+      updates: {
+        recurrence_pattern: "custom",
+        recurrence_days: [1, 3],
+        recurrence_custom_period: "week",
+      },
+    });
+
+    expect(mocks.dailyTasksUpdateMock).toHaveBeenCalledTimes(2);
+    expect(mocks.dailyTasksUpdateMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        recurrence_pattern: "custom",
+        recurrence_custom_period: "week",
+      }),
+    );
+    expect(mocks.dailyTasksUpdateMock.mock.calls[1]?.[0]).toEqual(
+      expect.not.objectContaining({
+        recurrence_custom_period: expect.anything(),
+        recurrence_month_days: expect.anything(),
+      }),
+    );
+  });
+
+  it("retries restore for non-month recurrence when recurrence columns are unavailable", async () => {
+    mocks.dailyTasksInsertSingleMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: dailyTasksRecurrenceColumnsMissingError,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "task-restore-1",
+          user_id: "user-1",
+          task_text: "Restored quest",
+          task_date: "2026-02-20",
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    const restored = await result.current.restoreTask({
+      task_text: "Restored quest",
+      task_date: "2026-02-20",
+      recurrence_pattern: "custom",
+      recurrence_days: [0, 2],
+      recurrence_custom_period: "week",
+    });
+
+    expect(restored?.id).toBe("task-restore-1");
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledTimes(2);
+    expect(mocks.dailyTasksInsertMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        recurrence_pattern: "custom",
+        recurrence_custom_period: "week",
+      }),
+    );
+    expect(mocks.dailyTasksInsertMock.mock.calls[1]?.[0]).toEqual(
+      expect.not.objectContaining({
+        recurrence_custom_period: expect.anything(),
+        recurrence_month_days: expect.anything(),
+      }),
+    );
   });
 
   it("moves timed inbox updates into quests with today's date", async () => {

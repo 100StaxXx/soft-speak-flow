@@ -34,6 +34,69 @@ export interface RecurringTask {
   reminder_minutes_before: number | null;
 }
 
+type SupabaseLikeError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+const RECURRING_TEMPLATE_SELECT_WITH_MONTH_RECURRENCE = `
+  id,
+  task_text,
+  difficulty,
+  task_date,
+  created_at,
+  scheduled_time,
+  estimated_duration,
+  category,
+  recurrence_pattern,
+  recurrence_days,
+  recurrence_month_days,
+  recurrence_custom_period,
+  recurrence_end_date,
+  xp_reward,
+  epic_id,
+  reminder_enabled,
+  reminder_minutes_before
+`;
+const RECURRING_TEMPLATE_SELECT_LEGACY_RECURRENCE = `
+  id,
+  task_text,
+  difficulty,
+  task_date,
+  created_at,
+  scheduled_time,
+  estimated_duration,
+  category,
+  recurrence_pattern,
+  recurrence_days,
+  recurrence_end_date,
+  xp_reward,
+  epic_id,
+  reminder_enabled,
+  reminder_minutes_before
+`;
+
+function isDailyTasksRecurrenceColumnsMissingError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? '').toUpperCase();
+  const haystack = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  const mentionsRecurrenceColumns = haystack.includes('recurrence_custom_period') || haystack.includes('recurrence_month_days');
+
+  if (code === '42703' && mentionsRecurrenceColumns) return true;
+
+  return mentionsRecurrenceColumns
+    && (
+      code.startsWith('PGRST')
+      || haystack.includes('schema cache')
+      || haystack.includes('does not exist')
+      || haystack.includes('could not find the')
+      || haystack.includes('column')
+    );
+}
+
 /**
  * Hook to spawn recurring tasks for the current day
  * Handles daily, weekly, and custom recurrence patterns
@@ -51,31 +114,25 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Get all recurring task templates (original tasks with is_recurring = true)
-      const { data: templates, error: templatesError } = await supabase
+      const fetchTemplates = (selectClause: string) => supabase
         .from('daily_tasks')
-        .select(`
-          id,
-          task_text,
-          difficulty,
-          task_date,
-          created_at,
-          scheduled_time,
-          estimated_duration,
-          category,
-          recurrence_pattern,
-          recurrence_days,
-          recurrence_month_days,
-          recurrence_custom_period,
-          recurrence_end_date,
-          xp_reward,
-          epic_id,
-          reminder_enabled,
-          reminder_minutes_before
-        `)
+        .select(selectClause)
         .eq('user_id', user.id)
         .eq('is_recurring', true)
         .not('recurrence_pattern', 'is', null);
+
+      // Get all recurring task templates (original tasks with is_recurring = true)
+      let { data: templates, error: templatesError } = await fetchTemplates(RECURRING_TEMPLATE_SELECT_WITH_MONTH_RECURRENCE);
+
+      if (isDailyTasksRecurrenceColumnsMissingError(templatesError)) {
+        const fallback = await fetchTemplates(RECURRING_TEMPLATE_SELECT_LEGACY_RECURRENCE);
+        templates = (fallback.data || []).map((template) => ({
+          ...template,
+          recurrence_month_days: null,
+          recurrence_custom_period: null,
+        }));
+        templatesError = fallback.error;
+      }
 
       if (templatesError) throw templatesError;
 

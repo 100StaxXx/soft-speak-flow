@@ -36,6 +36,54 @@ interface QueueActionInput {
   payload: Record<string, unknown>;
 }
 
+type SupabaseLikeError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+const MONTHLY_RECURRENCE_SCHEMA_MESSAGE = "Monthly recurrence is temporarily unavailable until backend update completes.";
+
+function isDailyTasksRecurrenceColumnsMissingError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? "").toUpperCase();
+  const haystack = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`.toLowerCase();
+  const mentionsRecurrenceColumns = haystack.includes("recurrence_custom_period") || haystack.includes("recurrence_month_days");
+
+  if (code === "42703" && mentionsRecurrenceColumns) return true;
+
+  return mentionsRecurrenceColumns
+    && (
+      code.startsWith("PGRST")
+      || haystack.includes("schema cache")
+      || haystack.includes("does not exist")
+      || haystack.includes("could not find the")
+      || haystack.includes("column")
+    );
+}
+
+function isMonthBasedRecurrencePayload(payload: Record<string, unknown>): boolean {
+  const recurrencePattern = typeof payload.recurrence_pattern === "string"
+    ? payload.recurrence_pattern.toLowerCase()
+    : null;
+  const recurrenceCustomPeriod = typeof payload.recurrence_custom_period === "string"
+    ? payload.recurrence_custom_period.toLowerCase()
+    : null;
+  const recurrenceMonthDays = Array.isArray(payload.recurrence_month_days) ? payload.recurrence_month_days : [];
+
+  return recurrencePattern === "monthly"
+    || (recurrencePattern === "custom" && (recurrenceCustomPeriod === "month" || recurrenceMonthDays.length > 0));
+}
+
+function stripUnsupportedRecurrenceColumns(payload: Record<string, unknown>): Record<string, unknown> {
+  const nextPayload = { ...payload };
+  delete nextPayload.recurrence_month_days;
+  delete nextPayload.recurrence_custom_period;
+  return nextPayload;
+}
+
 async function executeQueuedAction(userId: string, action: QueuedAction): Promise<void> {
   switch (action.action_kind) {
     case "TASK_COMPLETE": {
@@ -102,11 +150,28 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         return;
       }
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from("daily_tasks")
         .update(safeUpdates)
         .eq("id", taskId)
         .eq("user_id", userId);
+
+      if (isDailyTasksRecurrenceColumnsMissingError(error)) {
+        if (isMonthBasedRecurrencePayload(safeUpdates)) {
+          throw new Error(MONTHLY_RECURRENCE_SCHEMA_MESSAGE);
+        }
+
+        const fallbackUpdates = stripUnsupportedRecurrenceColumns(safeUpdates);
+        if (Object.keys(fallbackUpdates).length === 0) {
+          return;
+        }
+
+        ({ error } = await supabase
+          .from("daily_tasks")
+          .update(fallbackUpdates)
+          .eq("id", taskId)
+          .eq("user_id", userId));
+      }
 
       if (error) throw error;
       return;

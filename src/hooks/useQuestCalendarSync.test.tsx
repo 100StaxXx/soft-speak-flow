@@ -90,6 +90,13 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import { useQuestCalendarSync } from "./useQuestCalendarSync";
 
+const recurrenceColumnsMissingError = {
+  code: "PGRST204",
+  message: "Could not find the 'recurrence_custom_period' column of 'daily_tasks' in the schema cache",
+  details: null,
+  hint: null,
+};
+
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -167,6 +174,45 @@ describe("useQuestCalendarSync", () => {
     expect(thrown).toBeInstanceOf(Error);
     expect((thrown as Error).message).toContain("TASK_DATE_REQUIRED");
     expect(mocks.functionsInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to legacy task select when recurrence columns are missing", async () => {
+    mocks.dailyTaskSingleMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: recurrenceColumnsMissingError,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "task-fallback-1",
+          task_text: "Legacy schema quest",
+          task_date: "2026-02-12",
+          scheduled_time: "09:00",
+          estimated_duration: 30,
+          recurrence_pattern: "weekly",
+          recurrence_days: [1],
+          location: null,
+          notes: null,
+        },
+        error: null,
+      });
+
+    const { result } = renderHook(() => useQuestCalendarSync(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.sendTaskToCalendar.mutateAsync({ taskId: "task-fallback-1" });
+    });
+
+    expect(mocks.dailyTaskSingleMock).toHaveBeenCalledTimes(2);
+    expect(mocks.functionsInvokeMock).toHaveBeenCalledWith("google-calendar-events", {
+      body: {
+        action: "createLinkedEvent",
+        taskId: "task-fallback-1",
+        syncMode: "send_only",
+      },
+    });
   });
 
   it("throws SCHEDULED_TIME_REQUIRED when sending a task with date but no time", async () => {

@@ -57,6 +57,35 @@ interface QuestCalendarSyncOptions {
   enabled?: boolean;
 }
 
+type SupabaseLikeError = {
+  code?: string | null;
+  message?: string | null;
+  details?: string | null;
+  hint?: string | null;
+};
+
+const TASK_SELECT_WITH_MONTH_RECURRENCE = 'id, task_text, task_date, scheduled_time, estimated_duration, recurrence_pattern, recurrence_days, recurrence_month_days, recurrence_custom_period, location, notes';
+const TASK_SELECT_LEGACY_RECURRENCE = 'id, task_text, task_date, scheduled_time, estimated_duration, recurrence_pattern, recurrence_days, location, notes';
+
+function isDailyTasksRecurrenceColumnsMissingError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? '').toUpperCase();
+  const haystack = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  const mentionsRecurrenceColumns = haystack.includes('recurrence_custom_period') || haystack.includes('recurrence_month_days');
+
+  if (code === '42703' && mentionsRecurrenceColumns) return true;
+
+  return mentionsRecurrenceColumns
+    && (
+      code.startsWith('PGRST')
+      || haystack.includes('schema cache')
+      || haystack.includes('does not exist')
+      || haystack.includes('could not find the')
+      || haystack.includes('column')
+    );
+}
+
 function toIsoRange(task: TaskLite) {
   if (!task.task_date) {
     throw new Error('TASK_DATE_REQUIRED');
@@ -182,12 +211,23 @@ export function useQuestCalendarSync(options: QuestCalendarSyncOptions = {}) {
 
   const fetchTask = async (taskId: string): Promise<TaskLite> => {
     if (!user?.id) throw new Error('User not authenticated');
-    const { data, error } = await supabase
+    const queryTask = (selectClause: string) => supabase
       .from('daily_tasks')
-      .select('id, task_text, task_date, scheduled_time, estimated_duration, recurrence_pattern, recurrence_days, recurrence_month_days, recurrence_custom_period, location, notes')
+      .select(selectClause)
       .eq('id', taskId)
       .eq('user_id', user.id)
       .single();
+    let { data, error } = await queryTask(TASK_SELECT_WITH_MONTH_RECURRENCE);
+
+    if (isDailyTasksRecurrenceColumnsMissingError(error)) {
+      const fallback = await queryTask(TASK_SELECT_LEGACY_RECURRENCE);
+      data = fallback.data ? {
+        ...(fallback.data as Record<string, unknown>),
+        recurrence_month_days: null,
+        recurrence_custom_period: null,
+      } : null;
+      error = fallback.error;
+    }
 
     if (error || !data) throw new Error('Task not found');
     return data as TaskLite;

@@ -114,6 +114,24 @@ interface TaskUpdateVariables {
   updates: TaskUpdateInput;
 }
 
+type RecurrenceCustomPeriod = "week" | "month";
+
+interface RecurrenceWriteInput {
+  recurrencePattern?: string | null;
+  recurrenceDays?: number[] | null;
+  recurrenceMonthDays?: number[] | null;
+  recurrenceCustomPeriod?: RecurrenceCustomPeriod | null;
+  recurrenceEndDate?: string | null;
+}
+
+interface RecurrenceWriteResult {
+  fields: Record<string, unknown>;
+  hasRecurrence: boolean;
+  isMonthBased: boolean;
+}
+
+const MONTHLY_RECURRENCE_SCHEMA_MESSAGE = "Monthly recurrence is temporarily unavailable until backend update completes.";
+
 const buildQueuedTogglePayload = (variables: ToggleTaskVariables) => ({
   taskId: variables.taskId,
   completed: variables.completed,
@@ -153,6 +171,100 @@ export function isTaskAttachmentsTableMissingError(error: SupabaseLikeError | nu
       || haystack.includes('could not find the table')
       || haystack.includes('relation')
     );
+}
+
+function isDailyTasksRecurrenceColumnsMissingError(error: SupabaseLikeError | null | undefined): boolean {
+  if (!error) return false;
+
+  const code = (error.code ?? '').toUpperCase();
+  const haystack = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase();
+  const mentionsRecurrenceColumns = haystack.includes('recurrence_custom_period') || haystack.includes('recurrence_month_days');
+
+  if (code === '42703' && mentionsRecurrenceColumns) return true;
+
+  return mentionsRecurrenceColumns
+    && (
+      code.startsWith('PGRST')
+      || haystack.includes('schema cache')
+      || haystack.includes('does not exist')
+      || haystack.includes('could not find the')
+      || haystack.includes('column')
+    );
+}
+
+function normalizeRecurrencePattern(pattern: string | null | undefined): string | null {
+  if (!pattern) return null;
+  const trimmedPattern = pattern.trim();
+  return trimmedPattern.length > 0 ? trimmedPattern : null;
+}
+
+function isMonthBasedRecurrencePayload(payload: Record<string, unknown>): boolean {
+  const recurrencePattern = typeof payload.recurrence_pattern === 'string'
+    ? payload.recurrence_pattern.toLowerCase()
+    : null;
+  const recurrenceCustomPeriod = typeof payload.recurrence_custom_period === 'string'
+    ? payload.recurrence_custom_period.toLowerCase()
+    : null;
+  const recurrenceMonthDays = Array.isArray(payload.recurrence_month_days) ? payload.recurrence_month_days : [];
+
+  return recurrencePattern === 'monthly'
+    || (recurrencePattern === 'custom' && (recurrenceCustomPeriod === 'month' || recurrenceMonthDays.length > 0));
+}
+
+function stripUnsupportedRecurrenceColumns(payload: Record<string, unknown>): Record<string, unknown> {
+  const nextPayload = { ...payload };
+  delete nextPayload.recurrence_month_days;
+  delete nextPayload.recurrence_custom_period;
+  return nextPayload;
+}
+
+function buildRecurrenceWriteFields(input: RecurrenceWriteInput): RecurrenceWriteResult {
+  const recurrencePattern = normalizeRecurrencePattern(input.recurrencePattern);
+  const recurrenceCustomPeriod = recurrencePattern === 'custom'
+    ? (input.recurrenceCustomPeriod ?? 'week')
+    : null;
+  const isMonthBased = recurrencePattern === 'monthly'
+    || (recurrencePattern === 'custom' && recurrenceCustomPeriod === 'month');
+  const fields: Record<string, unknown> = {
+    recurrence_pattern: recurrencePattern,
+    recurrence_days: input.recurrenceDays ?? null,
+  };
+
+  if (isMonthBased) {
+    fields.recurrence_month_days = input.recurrenceMonthDays ?? null;
+  }
+
+  if (recurrencePattern === 'custom') {
+    fields.recurrence_custom_period = recurrenceCustomPeriod;
+  }
+
+  if (input.recurrenceEndDate !== undefined) {
+    fields.recurrence_end_date = input.recurrenceEndDate ?? null;
+  }
+
+  return {
+    fields,
+    hasRecurrence: recurrencePattern !== null,
+    isMonthBased,
+  };
+}
+
+async function runDailyTaskWriteWithRecurrenceFallback<T>(
+  payload: Record<string, unknown>,
+  write: (nextPayload: Record<string, unknown>) => Promise<{ data: T | null; error: SupabaseLikeError | null }>,
+): Promise<{ data: T | null; error: SupabaseLikeError | null; fallbackUsed: boolean }> {
+  let result = await write(payload);
+  if (!isDailyTasksRecurrenceColumnsMissingError(result.error)) {
+    return { ...result, fallbackUsed: false };
+  }
+
+  if (isMonthBasedRecurrencePayload(payload)) {
+    throw new Error(MONTHLY_RECURRENCE_SCHEMA_MESSAGE);
+  }
+
+  const fallbackPayload = stripUnsupportedRecurrenceColumns(payload);
+  result = await write(fallbackPayload);
+  return { ...result, fallbackUsed: true };
 }
 
 const emptyAttachmentPersistResult = (): TaskAttachmentPersistResult => ({
@@ -255,6 +367,13 @@ export const useTaskMutations = (taskDate: string) => {
       const normalizedAttachments = (params.attachments ?? []).slice(0, 10);
       const primaryImageUrl = firstImageFromAttachments(normalizedAttachments) ?? params.imageUrl ?? null;
       const detectedCategory = detectCategory(params.taskText, params.category);
+      const recurrenceWrite = buildRecurrenceWriteFields({
+        recurrencePattern: params.recurrencePattern,
+        recurrenceDays: params.recurrenceDays,
+        recurrenceMonthDays: params.recurrenceMonthDays,
+        recurrenceCustomPeriod: params.recurrenceCustomPeriod,
+        recurrenceEndDate: params.recurrenceEndDate,
+      });
 
       const queueCreateTask = async () => {
         const queueId = await queueTaskAction("CREATE_TASK", {
@@ -265,11 +384,8 @@ export const useTaskMutations = (taskDate: string) => {
           is_main_quest: params.isMainQuest ?? false,
           scheduled_time: normalizedScheduling.scheduled_time,
           estimated_duration: params.estimatedDuration || null,
-          recurrence_pattern: params.recurrencePattern || null,
-          recurrence_days: params.recurrenceDays || null,
-          recurrence_month_days: params.recurrenceMonthDays || null,
-          recurrence_custom_period: params.recurrenceCustomPeriod || null,
-          recurrence_end_date: params.recurrenceEndDate || null,
+          ...recurrenceWrite.fields,
+          is_recurring: recurrenceWrite.hasRecurrence,
           reminder_enabled: params.reminderEnabled ?? false,
           reminder_minutes_before: params.reminderMinutesBefore ?? 15,
           category: detectedCategory,
@@ -317,36 +433,41 @@ export const useTaskMutations = (taskDate: string) => {
         const questPosition = (existingTasks?.length || 0) + 1;
         const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
 
-        const { data, error } = await supabase
-          .from('daily_tasks')
-          .insert({
-            user_id: user.id,
-            task_text: params.taskText,
-            difficulty: params.difficulty,
-            xp_reward: xpReward,
-            task_date: normalizedScheduling.task_date,
-            is_main_quest: params.isMainQuest ?? false,
-            scheduled_time: normalizedScheduling.scheduled_time,
-            estimated_duration: params.estimatedDuration || null,
-            recurrence_pattern: params.recurrencePattern || null,
-            recurrence_days: params.recurrenceDays || null,
-            recurrence_month_days: params.recurrenceMonthDays || null,
-            recurrence_custom_period: params.recurrenceCustomPeriod || null,
-            recurrence_end_date: params.recurrenceEndDate || null,
-            is_recurring: !!params.recurrencePattern,
-            reminder_enabled: params.reminderEnabled ?? false,
-            reminder_minutes_before: params.reminderMinutesBefore ?? 15,
-            category: detectedCategory,
-            is_bonus: false,
-            notes: params.notes || null,
-            contact_id: params.contactId || null,
-            auto_log_interaction: params.autoLogInteraction ?? true,
-            image_url: primaryImageUrl,
-            location: params.location || null,
-            source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
-          })
-          .select()
-          .single();
+        const insertPayload = {
+          user_id: user.id,
+          task_text: params.taskText,
+          difficulty: params.difficulty,
+          xp_reward: xpReward,
+          task_date: normalizedScheduling.task_date,
+          is_main_quest: params.isMainQuest ?? false,
+          scheduled_time: normalizedScheduling.scheduled_time,
+          estimated_duration: params.estimatedDuration || null,
+          ...recurrenceWrite.fields,
+          is_recurring: recurrenceWrite.hasRecurrence,
+          reminder_enabled: params.reminderEnabled ?? false,
+          reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+          category: detectedCategory,
+          is_bonus: false,
+          notes: params.notes || null,
+          contact_id: params.contactId || null,
+          auto_log_interaction: params.autoLogInteraction ?? true,
+          image_url: primaryImageUrl,
+          location: params.location || null,
+          source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
+        };
+
+        const { data, error, fallbackUsed } = await runDailyTaskWriteWithRecurrenceFallback(
+          insertPayload,
+          (nextPayload) => supabase
+            .from('daily_tasks')
+            .insert(nextPayload)
+            .select()
+            .single(),
+        );
+
+        if (fallbackUsed) {
+          console.warn('daily_tasks insert retried without month recurrence columns due to schema drift');
+        }
 
         if (error) {
           if (error.message?.includes('MAX_TASKS_REACHED') || error.message?.includes('Maximum quest limit')) {
@@ -427,6 +548,13 @@ export const useTaskMutations = (taskDate: string) => {
         habit_source_id: null,
         source: params.taskDate === null ? 'inbox' : 'manual',
       });
+      const recurrenceWrite = buildRecurrenceWriteFields({
+        recurrencePattern: params.recurrencePattern,
+        recurrenceDays: params.recurrenceDays,
+        recurrenceMonthDays: params.recurrenceMonthDays,
+        recurrenceCustomPeriod: params.recurrenceCustomPeriod,
+        recurrenceEndDate: params.recurrenceEndDate,
+      });
 
       // Create optimistic task with all required fields
       const primaryImageUrl = firstImageFromAttachments(params.attachments) ?? params.imageUrl ?? null;
@@ -445,11 +573,11 @@ export const useTaskMutations = (taskDate: string) => {
         created_at: new Date().toISOString(),
         category: detectCategory(params.taskText, params.category),
         is_bonus: false,
-        is_recurring: !!params.recurrencePattern,
-        recurrence_pattern: params.recurrencePattern || null,
-        recurrence_days: params.recurrenceDays || null,
-        recurrence_month_days: params.recurrenceMonthDays || null,
-        recurrence_custom_period: params.recurrenceCustomPeriod || null,
+        is_recurring: recurrenceWrite.hasRecurrence,
+        recurrence_pattern: recurrenceWrite.fields.recurrence_pattern as string | null,
+        recurrence_days: recurrenceWrite.fields.recurrence_days as number[] | null,
+        recurrence_month_days: (recurrenceWrite.fields.recurrence_month_days as number[] | null | undefined) ?? null,
+        recurrence_custom_period: (recurrenceWrite.fields.recurrence_custom_period as RecurrenceCustomPeriod | null | undefined) ?? null,
         reminder_enabled: params.reminderEnabled ?? false,
         reminder_minutes_before: params.reminderMinutesBefore ?? 15,
         reminder_sent: false,
@@ -871,6 +999,7 @@ export const useTaskMutations = (taskDate: string) => {
       recurrence_days?: number[] | null;
       recurrence_month_days?: number[] | null;
       recurrence_custom_period?: "week" | "month" | null;
+      recurrence_end_date?: string | null;
       reminder_enabled?: boolean;
       reminder_minutes_before?: number | null;
       source?: string | null;
@@ -883,35 +1012,47 @@ export const useTaskMutations = (taskDate: string) => {
         habit_source_id: taskData.habit_source_id ?? null,
         source: taskData.source ?? null,
       });
+      const recurrenceWrite = buildRecurrenceWriteFields({
+        recurrencePattern: taskData.recurrence_pattern,
+        recurrenceDays: taskData.recurrence_days,
+        recurrenceMonthDays: taskData.recurrence_month_days,
+        recurrenceCustomPeriod: taskData.recurrence_custom_period,
+        recurrenceEndDate: taskData.recurrence_end_date,
+      });
+      const insertPayload = {
+        user_id: user.id,
+        task_text: taskData.task_text,
+        task_date: normalizedScheduling.task_date,
+        xp_reward: taskData.xp_reward ?? 10,
+        difficulty: taskData.difficulty ?? 'medium',
+        scheduled_time: normalizedScheduling.scheduled_time,
+        estimated_duration: taskData.estimated_duration,
+        is_main_quest: taskData.is_main_quest ?? false,
+        epic_id: taskData.epic_id,
+        sort_order: taskData.sort_order,
+        notes: taskData.notes,
+        priority: taskData.priority,
+        category: taskData.category,
+        habit_source_id: taskData.habit_source_id,
+        is_recurring: taskData.is_recurring ?? recurrenceWrite.hasRecurrence,
+        ...recurrenceWrite.fields,
+        reminder_enabled: taskData.reminder_enabled ?? false,
+        reminder_minutes_before: taskData.reminder_minutes_before,
+        source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
+      };
       
-      const { data, error } = await supabase
-        .from('daily_tasks')
-        .insert({
-          user_id: user.id,
-          task_text: taskData.task_text,
-          task_date: normalizedScheduling.task_date,
-          xp_reward: taskData.xp_reward ?? 10,
-          difficulty: taskData.difficulty ?? 'medium',
-          scheduled_time: normalizedScheduling.scheduled_time,
-          estimated_duration: taskData.estimated_duration,
-          is_main_quest: taskData.is_main_quest ?? false,
-          epic_id: taskData.epic_id,
-          sort_order: taskData.sort_order,
-          notes: taskData.notes,
-          priority: taskData.priority,
-          category: taskData.category,
-          habit_source_id: taskData.habit_source_id,
-          is_recurring: taskData.is_recurring ?? false,
-          recurrence_pattern: taskData.recurrence_pattern,
-          recurrence_days: taskData.recurrence_days,
-          recurrence_month_days: taskData.recurrence_month_days,
-          recurrence_custom_period: taskData.recurrence_custom_period,
-          reminder_enabled: taskData.reminder_enabled ?? false,
-          reminder_minutes_before: taskData.reminder_minutes_before,
-          source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
-        })
-        .select()
-        .single();
+      const { data, error, fallbackUsed } = await runDailyTaskWriteWithRecurrenceFallback(
+        insertPayload,
+        (nextPayload) => supabase
+          .from('daily_tasks')
+          .insert(nextPayload)
+          .select()
+          .single(),
+      );
+
+      if (fallbackUsed) {
+        console.warn('daily_tasks restore retried without month recurrence columns due to schema drift');
+      }
       
       if (error) throw error;
       return data;
@@ -1077,11 +1218,18 @@ export const useTaskMutations = (taskDate: string) => {
         };
       }
 
-      const { error } = await supabase
-        .from('daily_tasks')
-        .update(updateData)
-        .eq('id', taskId)
-        .eq('user_id', user.id);
+      const { error, fallbackUsed } = await runDailyTaskWriteWithRecurrenceFallback(
+        updateData,
+        (nextPayload) => supabase
+          .from('daily_tasks')
+          .update(nextPayload)
+          .eq('id', taskId)
+          .eq('user_id', user.id),
+      );
+
+      if (fallbackUsed) {
+        console.warn('daily_tasks update retried without month recurrence columns due to schema drift');
+      }
 
       if (error) throw error;
 
