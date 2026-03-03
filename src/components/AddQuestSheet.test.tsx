@@ -62,6 +62,7 @@ describe("AddQuestSheet", () => {
     );
 
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
+    expect(screen.queryByText("New Quest")).not.toBeInTheDocument();
     expect(screen.queryByText("Step 1 · Name your quest")).not.toBeInTheDocument();
     expect(screen.queryByText("Step 2 · Pick a time")).not.toBeInTheDocument();
     expect(screen.queryByText("Step 3 · Add quest")).not.toBeInTheDocument();
@@ -71,6 +72,39 @@ describe("AddQuestSheet", () => {
     expect(screen.getByRole("button", { name: "Add to Inbox instead" })).toBeInTheDocument();
     expect(screen.queryByText("Link to Contact")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
+  });
+
+  it("renders Advanced Settings above Photo / Files", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
+    const photoFilesLabel = screen.getByText("Photo / Files");
+    const relation = advancedTrigger.compareDocumentPosition(photoFilesLabel);
+    expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("only shows Early Reminder after a time is selected", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
+    expect(screen.queryByText("Early Reminder")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Time" }));
+    expect(screen.getByText("Early Reminder")).toBeInTheDocument();
   });
 
   it("does not auto-focus the title on open and still allows manual focus", () => {

@@ -386,7 +386,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         <SheetDescription className="sr-only">
           Create a new quest with schedule, subtasks, and optional details.
         </SheetDescription>
-        <div className={cn("relative px-5 pt-4 pb-5 flex-shrink-0", colors.bg)}>
+        <div className={cn("relative px-4 pt-2.5 pb-3 flex-shrink-0", colors.bg)}>
           <button
             onClick={() => requestOpenChange(false)}
             className="absolute top-3 right-3 p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white z-10"
@@ -395,24 +395,23 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <X className="h-4 w-4" />
           </button>
 
-          <div className="flex flex-col items-center text-center pt-2 text-white">
+          <div className="flex flex-col items-center text-center pt-1 text-white">
             <DifficultyIcon difficulty={difficulty} />
-            <p className="text-sm opacity-80 mt-1.5">New Quest</p>
-            <div className="mt-3 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-3 py-3 text-left">
+            <div className="mt-2 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-2.5 py-2 text-left">
               <Input
                 data-tour="add-quest-title-input"
                 placeholder="Quest Title"
                 value={taskText}
                 onChange={(e) => setTaskText(e.target.value)}
                 disabled={isAdding}
-                className="mt-2 text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-11"
+                className="text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-10"
               />
             </div>
-            <p className="text-white/70 text-xs mt-2">{summaryLine}</p>
+            <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
           </div>
 
           {/* Compact Difficulty Selector */}
-          <div className="flex justify-center gap-3 mt-3">
+          <div className="flex justify-center gap-2 mt-2">
             {([
               { value: "easy" as const, icon: Zap, label: "Easy" },
               { value: "medium" as const, icon: Flame, label: "Medium" },
@@ -422,14 +421,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 key={value}
                 onClick={() => setDifficulty(value)}
                 className={cn(
-                  "w-14 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all border-2",
+                  "w-12 h-10 rounded-xl flex flex-col items-center justify-center gap-0 transition-all border-2",
                   difficulty === value
-                    ? "bg-white/30 border-white scale-110"
+                    ? "bg-white/30 border-white scale-105"
                     : "bg-white/10 border-transparent hover:bg-white/20"
                 )}
               >
-                <Icon className="h-4 w-4 text-white" />
-                <span className="text-[10px] font-medium text-white/80 leading-none">{label}</span>
+                <Icon className="h-3.5 w-3.5 text-white" />
+                <span className="text-[9px] font-medium text-white/80 leading-none">{label}</span>
               </button>
             ))}
           </div>
@@ -661,14 +660,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               />
             </div>
 
-            <div className="space-y-2 px-1">
-              <Label className="text-sm font-medium text-muted-foreground">Photo / Files</Label>
-              <QuestAttachmentPicker
-                attachments={attachments}
-                onAttachmentsChange={setAttachments}
-              />
-            </div>
-
             {/* Advanced Settings (collapsible) */}
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
@@ -718,6 +709,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 </div>
               </CollapsibleContent>
             </Collapsible>
+
+            <div className="space-y-2 px-1">
+              <Label className="text-sm font-medium text-muted-foreground">Photo / Files</Label>
+              <QuestAttachmentPicker
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+              />
+            </div>
           </div>
         </div>
 
