@@ -55,7 +55,7 @@ describe("AddQuestSheet", () => {
     mocks.connections = [];
   });
 
-  it("renders title and scheduling controls on one screen and no Next button", () => {
+  it("renders simplified add quest controls without step instructions", () => {
     render(
       <AddQuestSheet
         open
@@ -66,11 +66,13 @@ describe("AddQuestSheet", () => {
     );
 
     expect(screen.getByPlaceholderText("e.g., Review roadmap for 30 minutes")).toBeInTheDocument();
-    expect(screen.getByText("Step 1 · Name your quest")).toBeInTheDocument();
-    expect(screen.getByText("Step 2 · Pick a time")).toBeInTheDocument();
-    expect(screen.getByText("Step 3 · Add quest")).toBeInTheDocument();
+    expect(screen.queryByText("Step 1 · Name your quest")).not.toBeInTheDocument();
+    expect(screen.queryByText("Step 2 · Pick a time")).not.toBeInTheDocument();
+    expect(screen.queryByText("Step 3 · Add quest")).not.toBeInTheDocument();
     expect(screen.getByText("30 min")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Quest" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to Inbox instead" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 

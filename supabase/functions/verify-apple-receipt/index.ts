@@ -146,8 +146,12 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error verifying receipt:", error);
 
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    let errorMessage = error instanceof Error ? error.message : "Unknown error";
     let statusCode = 500;
+
+    if (errorMessage.includes("Apple API error: 401")) {
+      errorMessage = "Apple API authentication failed (401). Verify APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY, and APPLE_IOS_BUNDLE_ID.";
+    }
 
     if (errorMessage === "Unauthorized") {
       statusCode = 401;

@@ -180,7 +180,7 @@ export const TrialExpiredPaywall = ({ variant = "pre_trial_signup" }: TrialExpir
       };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-6 pt-safe pb-safe overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-start px-6 pt-safe pb-[var(--bottom-nav-runtime-offset,var(--bottom-nav-safe-offset))] overflow-y-auto">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">

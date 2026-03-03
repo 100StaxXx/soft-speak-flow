@@ -6,6 +6,10 @@ The Apple subscription flow now lives entirely in Supabase Edge Functions. The f
 
 Add the following secrets to your Supabase project (Project Settings → Secrets or `supabase/config.toml` when testing locally):
 
+- `APPLE_ISSUER_ID` – App Store Connect Issuer ID (UUID) used for App Store Server API JWT auth.
+- `APPLE_KEY_ID` – Key ID for your App Store Server API key.
+- `APPLE_PRIVATE_KEY` – The full `.p8` private key content (including BEGIN/END lines).
+- `APPLE_IOS_BUNDLE_ID` – Your iOS bundle ID (must match App Store app and StoreKit transaction payload).
 - `APPLE_SHARED_SECRET` – The app-specific shared secret from App Store Connect (used for receipt verification).
 - `APPLE_MONTHLY_PRODUCT_IDS` – Comma separated list of monthly product IDs (e.g. `cosmiq_premium_monthly,com.darrylgraham.revolution.monthly`).
 - `APPLE_YEARLY_PRODUCT_IDS` – Comma separated list of yearly/annual product IDs (e.g. `cosmiq_premium_yearly,com.darrylgraham.revolution.yearly`).

@@ -52,14 +52,16 @@ export default function AccountDeletionHelp() {
     <div className="relative min-h-screen pb-nav-safe bg-background text-foreground">
       <StarfieldBackground />
       <div className="relative z-10 max-w-4xl mx-auto px-4 py-12 space-y-8">
-        <Button
-          variant="ghost"
-          className="flex items-center gap-2"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
+        <div className="pt-safe-top">
+          <Button
+            variant="ghost"
+            className="flex items-center gap-2"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
 
         <div className="space-y-4">
           <h1 className="text-4xl font-bold">Delete your Cosmiq account</h1>

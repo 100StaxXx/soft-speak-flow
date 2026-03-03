@@ -364,9 +364,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <DifficultyIcon difficulty={difficulty} />
             <p className="text-sm opacity-80 mt-1.5">New Quest</p>
             <div className="mt-3 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-3 py-3 text-left">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80">
-                Step 1 · Name your quest
-              </p>
               <Input
                 data-tour="add-quest-title-input"
                 placeholder="e.g., Review roadmap for 30 minutes"
@@ -420,15 +417,6 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="px-4 py-4 space-y-3">
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Step 2 · Pick a time
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Choose when you want to do it. You can scroll the wheel or type a custom time.
-              </p>
-            </div>
-
             {/* Duration Row (tappable, expands to chips) */}
             <button
               onClick={() => setShowDurationChips(!showDurationChips)}
@@ -732,10 +720,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
         <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
           <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Step 3 · Add quest
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
             </p>
           </div>

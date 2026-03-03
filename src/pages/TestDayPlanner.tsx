@@ -10,10 +10,12 @@ export default function TestDayPlanner() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-md mx-auto space-y-6">
-        <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Link>
+        <div className="pt-safe-top">
+          <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Link>
+        </div>
         
         <div className="text-center space-y-4">
           <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">

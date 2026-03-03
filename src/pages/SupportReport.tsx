@@ -168,10 +168,12 @@ export default function SupportReport() {
       <StarfieldBackground />
       <div className="relative z-10 min-h-screen pb-nav-safe">
         <div className="mx-auto max-w-3xl px-4 py-8">
-          <Button variant="ghost" className="mb-4" onClick={() => navigate(-1)}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+          <div className="pt-safe-top">
+            <Button variant="ghost" className="mb-4" onClick={() => navigate(-1)}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          </div>
 
           <Card>
             <CardHeader>

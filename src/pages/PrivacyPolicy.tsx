@@ -9,15 +9,17 @@ export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 md:p-8 pb-safe">
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mb-2 sm:mb-4"
-          aria-label="Go back to previous page"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
-          Back
-        </Button>
+        <div className="pt-safe-top">
+          <Button
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="mb-2 sm:mb-4"
+            aria-label="Go back to previous page"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+            Back
+          </Button>
+        </div>
 
         <Card className="shadow-sm">
           <CardHeader className="space-y-3 px-4 sm:px-6 py-4 sm:py-6">
