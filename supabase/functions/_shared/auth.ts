@@ -24,13 +24,8 @@ export async function requireRequestAuth(
   corsHeaders: HeadersInit,
 ): Promise<RequestAuth | Response> {
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
-    return jsonResponse(401, "Missing or invalid Authorization header", corsHeaders);
-  }
-
-  const token = authHeader.slice(7).trim();
-  if (!token) {
-    return jsonResponse(401, "Missing bearer token", corsHeaders);
+  if (!authHeader) {
+    return jsonResponse(401, "Missing Authorization header", corsHeaders);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -41,16 +36,35 @@ export async function requireRequestAuth(
     return jsonResponse(500, "Auth configuration missing", corsHeaders);
   }
 
+  const trimmedAuthHeader = authHeader.trim();
+
+  // Allow trusted server-to-server calls authenticated with the service key
+  // even if they do not include a Bearer prefix.
+  if (supabaseServiceRoleKey && trimmedAuthHeader === supabaseServiceRoleKey) {
+    return { userId: "service_role", isServiceRole: true };
+  }
+
+  if (!trimmedAuthHeader.toLowerCase().startsWith("bearer ")) {
+    return jsonResponse(401, "Missing or invalid Authorization header", corsHeaders);
+  }
+
+  const token = trimmedAuthHeader.slice(7).trim();
+  if (!token) {
+    return jsonResponse(401, "Missing bearer token", corsHeaders);
+  }
+
   // Allow trusted server-to-server calls authenticated with the service key.
   if (supabaseServiceRoleKey && token === supabaseServiceRoleKey) {
     return { userId: "service_role", isServiceRole: true };
   }
 
+  const bearerAuthHeader = `Bearer ${token}`;
+
   const authClient = createClient(
     supabaseUrl,
     supabaseAnonKey,
     {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: bearerAuthHeader } },
       auth: {
         persistSession: false,
         autoRefreshToken: false,
