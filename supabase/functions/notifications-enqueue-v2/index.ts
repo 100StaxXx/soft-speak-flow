@@ -46,11 +46,143 @@ interface CompanionRow {
   inactive_days: number | null;
 }
 
-function toScheduledDateTime(taskDate: string | null, scheduledTime: string | null): Date | null {
-  if (!taskDate || !scheduledTime) return null;
-  const timePart = scheduledTime.split(".")[0];
-  const value = new Date(`${taskDate}T${timePart}Z`);
-  return Number.isNaN(value.getTime()) ? null : value;
+const timezoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+interface DateParts {
+  year: number;
+  month: number;
+  day: number;
+}
+
+interface TimeParts {
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+function parseDateParts(taskDate: string | null): DateParts | null {
+  if (!taskDate) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(taskDate.trim());
+  if (!match) return null;
+
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+
+  return { year, month, day };
+}
+
+function parseTimeParts(scheduledTime: string | null): TimeParts | null {
+  if (!scheduledTime) return null;
+  const [timePart] = scheduledTime.split(".");
+  const pieces = timePart.split(":");
+  if (pieces.length < 2) return null;
+
+  const hour = Number.parseInt(pieces[0], 10);
+  const minute = Number.parseInt(pieces[1], 10);
+  const second = pieces.length > 2 ? Number.parseInt(pieces[2], 10) : 0;
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || !Number.isFinite(second)) {
+    return null;
+  }
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+    return null;
+  }
+
+  return { hour, minute, second };
+}
+
+function getTimezoneFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = timezoneFormatterCache.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    });
+    timezoneFormatterCache.set(timezone, formatter);
+  }
+  return formatter;
+}
+
+function timezoneOffsetMs(utcGuessMs: number, timezone: string): number | null {
+  const formatter = getTimezoneFormatter(timezone);
+  const parts = formatter.formatToParts(new Date(utcGuessMs));
+  const map = new Map(parts.map((part) => [part.type, part.value]));
+
+  const year = Number.parseInt(map.get("year") ?? "", 10);
+  const month = Number.parseInt(map.get("month") ?? "", 10);
+  const day = Number.parseInt(map.get("day") ?? "", 10);
+  const hour = Number.parseInt(map.get("hour") ?? "", 10);
+  const minute = Number.parseInt(map.get("minute") ?? "", 10);
+  const second = Number.parseInt(map.get("second") ?? "", 10);
+
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute) ||
+    !Number.isFinite(second)
+  ) {
+    return null;
+  }
+
+  const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  return localAsUtc - utcGuessMs;
+}
+
+function toScheduledDateTime(
+  taskDate: string | null,
+  scheduledTime: string | null,
+  timezoneRaw: string | null | undefined,
+): Date | null {
+  const dateParts = parseDateParts(taskDate);
+  const timeParts = parseTimeParts(scheduledTime);
+  if (!dateParts || !timeParts) return null;
+
+  const timezone = normalizeTimezone(timezoneRaw);
+  const baselineUtc = Date.UTC(
+    dateParts.year,
+    dateParts.month - 1,
+    dateParts.day,
+    timeParts.hour,
+    timeParts.minute,
+    timeParts.second,
+  );
+
+  let utcGuess = baselineUtc;
+  for (let i = 0; i < 4; i += 1) {
+    const offsetMs = timezoneOffsetMs(utcGuess, timezone);
+    if (offsetMs === null) return null;
+    const nextGuess = baselineUtc - offsetMs;
+    if (Math.abs(nextGuess - utcGuess) < 1000) {
+      utcGuess = nextGuess;
+      break;
+    }
+    utcGuess = nextGuess;
+  }
+
+  const value = new Date(utcGuess);
+  if (Number.isNaN(value.getTime())) return null;
+
+  const local = getLocalDateTimeParts(value, timezone);
+  const expectedDate = `${String(dateParts.year).padStart(4, "0")}-${String(dateParts.month).padStart(2, "0")}-${String(dateParts.day).padStart(2, "0")}`;
+  if (local.localDate !== expectedDate || local.hour !== timeParts.hour || local.minute !== timeParts.minute) {
+    // Skip impossible local times (e.g. DST spring-forward gaps).
+    return null;
+  }
+
+  return value;
 }
 
 function toCompanionMap(rows: CompanionRow[] | null): Map<string, CompanionNotificationContext> {
@@ -139,6 +271,8 @@ serve(async (req) => {
     const now = new Date();
     const nowIso = now.toISOString();
     const todayIso = nowIso.slice(0, 10);
+    const yesterdayIso = new Date(now.getTime() - 24 * 60 * 60_000).toISOString().slice(0, 10);
+    const tomorrowIso = new Date(now.getTime() + 24 * 60 * 60_000).toISOString().slice(0, 10);
 
     const inserts: QueueInsertRow[] = [];
 
@@ -195,7 +329,7 @@ serve(async (req) => {
     const { data: taskCandidates, error: taskError } = await supabase
       .from("daily_tasks")
       .select("id, user_id, task_text, xp_reward, task_date, scheduled_time, start_notification_sent, reminder_enabled, reminder_sent, reminder_minutes_before, completed")
-      .eq("task_date", todayIso)
+      .in("task_date", [yesterdayIso, todayIso, tomorrowIso])
       .eq("completed", false)
       .not("scheduled_time", "is", null)
       .limit(maxTask);
@@ -206,17 +340,19 @@ serve(async (req) => {
     const taskProfiles = taskUserIds.length > 0
       ? (await supabase
         .from("profiles")
-        .select("id, task_reminders_enabled")
-        .in("id", taskUserIds)).data as Pick<ProfileRow, "id" | "task_reminders_enabled">[] | null
+        .select("id, timezone, task_reminders_enabled")
+        .in("id", taskUserIds)).data as Pick<ProfileRow, "id" | "timezone" | "task_reminders_enabled">[] | null
       : [];
-    const taskReminderEnabledByUser = new Map((taskProfiles ?? []).map((row) => [row.id, row.task_reminders_enabled !== false]));
+    const taskProfileByUser = new Map((taskProfiles ?? []).map((row) => [row.id, row]));
 
     for (const task of taskCandidates ?? []) {
-      const scheduledAt = toScheduledDateTime(task.task_date, task.scheduled_time);
+      const profile = taskProfileByUser.get(task.user_id);
+      const timezone = normalizeTimezone(profile?.timezone);
+      const scheduledAt = toScheduledDateTime(task.task_date, task.scheduled_time, timezone);
       if (!scheduledAt) continue;
       if (scheduledAt > now) continue;
 
-      const remindersEnabled = taskReminderEnabledByUser.get(task.user_id) ?? true;
+      const remindersEnabled = profile?.task_reminders_enabled !== false;
 
       if (!task.start_notification_sent && remindersEnabled) {
         inserts.push(rowForQueue({

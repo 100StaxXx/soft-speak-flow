@@ -243,12 +243,14 @@ const AppContent = memo(() => {
     return () => window.removeEventListener('deep-link-navigation', handler as EventListener);
   }, [navigate]);
   
-  // Initialize native push on login
+  const pushUserId = session?.user?.id ?? null;
+
+  // Initialize native push once per authenticated user ID
   useEffect(() => {
-    if (session?.user) {
+    if (pushUserId) {
       try {
         if (isNativePushSupported()) {
-          initializeNativePush(session.user.id).catch(err => {
+          initializeNativePush(pushUserId).catch(err => {
             logger.error('Failed to initialize native push:', err);
           });
         }
@@ -256,7 +258,7 @@ const AppContent = memo(() => {
         logger.log('Native push initialization skipped:', error);
       }
     }
-  }, [session]);
+  }, [pushUserId]);
   
   // Hide splash screen once profile data is loaded (or failed to load)
   useEffect(() => {

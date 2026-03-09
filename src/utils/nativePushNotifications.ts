@@ -4,9 +4,16 @@
  */
 
 import { PushNotifications } from '@capacitor/push-notifications';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { isNativeIOSHandheld } from '@/utils/platformTargets';
+
+let currentPushUserId: string | null = null;
+let initializedUserId: string | null = null;
+let initializationPromise: Promise<void> | null = null;
+let listenerHandles: PluginListenerHandle[] = [];
+let listenersBound = false;
 
 /**
  * Check if native push notifications are supported
@@ -15,7 +22,7 @@ export function isNativePushSupported(): boolean {
   try {
     const isNative = Capacitor.isNativePlatform();
     const platform = Capacitor.getPlatform();
-    const isSupported = isNative && platform === 'ios';
+    const isSupported = isNativeIOSHandheld();
     
     // Log for debugging in Xcode console
     console.log('[NativePush] Platform check:', { isNative, platform, isSupported });
@@ -47,12 +54,77 @@ export async function getPermissionStatus(): Promise<string> {
   }
 }
 
+async function bindPushListenersOnce(): Promise<void> {
+  if (listenersBound) return;
+
+  const handles: PluginListenerHandle[] = [];
+
+  handles.push(await PushNotifications.addListener('registration', async (token) => {
+    console.log('[NativePush] ✅ REGISTRATION SUCCESS');
+    console.log('[NativePush] Device token received');
+    logger.log('Push registration success');
+
+    if (!currentPushUserId) {
+      console.log('[NativePush] Skipping token save because no active user is set');
+      return;
+    }
+
+    try {
+      await saveDeviceToken(currentPushUserId, token.value);
+      console.log('[NativePush] Token saved to database successfully');
+    } catch (saveError) {
+      console.log('[NativePush] ❌ Failed to save token:', saveError);
+    }
+  }));
+
+  handles.push(await PushNotifications.addListener('registrationError', (error) => {
+    console.log('[NativePush] ❌ REGISTRATION ERROR');
+    console.log('[NativePush] Error details:', JSON.stringify(error));
+    logger.error('Push registration error:', error);
+  }));
+
+  handles.push(await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    console.log('[NativePush] Notification received:', notification);
+    logger.log('Push notification received:', notification);
+  }));
+
+  handles.push(await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+    console.log('[NativePush] Notification action performed:', notification);
+    logger.log('Push notification action performed:', notification);
+    const data = notification.notification.data;
+    if (data?.url) {
+      window.dispatchEvent(new CustomEvent('native-push-navigation', { detail: data.url }));
+    }
+  }));
+
+  listenerHandles = handles;
+  listenersBound = true;
+}
+
+async function removePushListeners(): Promise<void> {
+  if (listenerHandles.length === 0) return;
+
+  const handles = listenerHandles;
+  listenerHandles = [];
+  listenersBound = false;
+
+  for (const handle of handles) {
+    try {
+      await handle.remove();
+    } catch (error) {
+      console.log('[NativePush] Error removing listener:', error);
+    }
+  }
+}
+
 /**
  * Initialize native push notifications
  */
 export async function initializeNativePush(userId: string): Promise<void> {
   console.log('[NativePush] ========== INIT START ==========');
   console.log('[NativePush] User ID:', userId);
+
+  currentPushUserId = userId;
   
   if (!isNativePushSupported()) {
     console.log('[NativePush] Not supported on this platform, aborting');
@@ -60,76 +132,51 @@ export async function initializeNativePush(userId: string): Promise<void> {
     return;
   }
 
-  try {
-    console.log('[NativePush] Step 1: Requesting permissions...');
-    
-    // Request permission
-    const permission = await PushNotifications.requestPermissions();
-    
-    console.log('[NativePush] Permission result:', permission);
-    console.log('[NativePush] Permission receive status:', permission.receive);
-    
-    if (permission.receive !== 'granted') {
-      console.log('[NativePush] Permission DENIED - user did not grant access');
-      logger.log('Push notification permission denied');
-      throw new Error('Push notification permission denied. Please enable in Settings.');
-    }
-
-    console.log('[NativePush] Step 2: Permission granted, registering with APNs...');
-
-    // Register with Apple Push Notification service
-    await PushNotifications.register();
-    
-    console.log('[NativePush] Step 3: Registration initiated, setting up listeners...');
-
-    // Listen for registration success
-    await PushNotifications.addListener('registration', async (token) => {
-      console.log('[NativePush] ✅ REGISTRATION SUCCESS');
-      console.log('[NativePush] Device token received');
-      logger.log('Push registration success');
-      
-      // Save device token to database
-      try {
-        await saveDeviceToken(userId, token.value);
-        console.log('[NativePush] Token saved to database successfully');
-      } catch (saveError) {
-        console.log('[NativePush] ❌ Failed to save token:', saveError);
-      }
-    });
-
-    // Listen for registration errors
-    await PushNotifications.addListener('registrationError', (error) => {
-      console.log('[NativePush] ❌ REGISTRATION ERROR');
-      console.log('[NativePush] Error details:', JSON.stringify(error));
-      logger.error('Push registration error:', error);
-    });
-
-    // Listen for push notifications received
-    await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('[NativePush] Notification received:', notification);
-      logger.log('Push notification received:', notification);
-      // Notification is displayed automatically by iOS
-    });
-
-    // Listen for push notification actions
-    await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-      console.log('[NativePush] Notification action performed:', notification);
-      logger.log('Push notification action performed:', notification);
-      // Handle notification tap - navigate to appropriate screen
-      const data = notification.notification.data;
-      if (data?.url) {
-        window.dispatchEvent(new CustomEvent('native-push-navigation', { detail: data.url }));
-      }
-    });
-
-    console.log('[NativePush] ========== INIT COMPLETE ==========');
-
-  } catch (error) {
-    console.log('[NativePush] ❌ INIT FAILED');
-    console.log('[NativePush] Error:', error);
-    logger.error('Error initializing native push:', error);
-    throw error;
+  if (initializedUserId === userId && listenersBound) {
+    console.log('[NativePush] Already initialized for current user, skipping duplicate setup');
+    return;
   }
+
+  if (initializationPromise) {
+    console.log('[NativePush] Initialization already in progress, waiting...');
+    await initializationPromise;
+    return;
+  }
+
+  initializationPromise = (async () => {
+    try {
+      console.log('[NativePush] Step 1: Requesting permissions...');
+
+      const permission = await PushNotifications.requestPermissions();
+
+      console.log('[NativePush] Permission result:', permission);
+      console.log('[NativePush] Permission receive status:', permission.receive);
+
+      if (permission.receive !== 'granted') {
+        console.log('[NativePush] Permission DENIED - user did not grant access');
+        logger.log('Push notification permission denied');
+        throw new Error('Push notification permission denied. Please enable in Settings.');
+      }
+
+      console.log('[NativePush] Step 2: Binding listeners...');
+      await bindPushListenersOnce();
+
+      console.log('[NativePush] Step 3: Registering with APNs...');
+      await PushNotifications.register();
+
+      initializedUserId = userId;
+      console.log('[NativePush] ========== INIT COMPLETE ==========');
+    } catch (error) {
+      console.log('[NativePush] ❌ INIT FAILED');
+      console.log('[NativePush] Error:', error);
+      logger.error('Error initializing native push:', error);
+      throw error;
+    } finally {
+      initializationPromise = null;
+    }
+  })();
+
+  await initializationPromise;
 }
 
 /**
@@ -178,8 +225,15 @@ export async function unregisterNativePush(userId: string): Promise<void> {
   }
 
   try {
-    // Remove all listeners
-    await PushNotifications.removeAllListeners();
+    if (initializationPromise) {
+      try {
+        await initializationPromise;
+      } catch {
+        // Keep going so we can still clean up listeners/token rows.
+      }
+    }
+
+    await removePushListeners();
     
     // Get current device token before unregistering
     const deliveredNotifications = await PushNotifications.getDeliveredNotifications();
@@ -197,6 +251,13 @@ export async function unregisterNativePush(userId: string): Promise<void> {
       logger.error('Error deleting device token:', error);
     } else {
       console.log('[NativePush] Token deleted from database');
+    }
+
+    if (initializedUserId === userId) {
+      initializedUserId = null;
+    }
+    if (currentPushUserId === userId) {
+      currentPushUserId = null;
     }
 
   } catch (error) {
