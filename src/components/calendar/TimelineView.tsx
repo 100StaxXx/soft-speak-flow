@@ -142,6 +142,8 @@ export function TimelineView({
             <div className="py-4" ref={timelineDragContainerRef}>
               {scheduledTasks.map((task) => {
                 const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
+                const isThisEngaged = isThisDragging || isThisLongPressed;
                 const isAnyDragging = timelineDrag.isDragging;
 
                 return (
@@ -153,6 +155,7 @@ export function TimelineView({
                   )}
                   style={{
                     y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                    touchAction: isThisEngaged ? "none" : "pan-y",
                     opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
                     pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
                   }}

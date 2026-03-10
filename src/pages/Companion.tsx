@@ -5,7 +5,8 @@ import { XPBreakdown } from "@/components/XPBreakdown";
 import { DailyMissions } from "@/components/DailyMissions";
 import { PageTransition } from "@/components/PageTransition";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, BookOpen, MapPin, Sparkles, Timer, Settings } from "lucide-react";
+import { TrendingUp, BookOpen, Package, Sparkles, Timer, Settings } from "lucide-react";
+import { CollectionTab } from "@/components/companion/CollectionTab";
 import { FocusTab } from "@/components/companion/FocusTab";
 import { MemoryWhisper } from "@/components/companion/MemoryWhisper";
 import { useCompanion } from "@/hooks/useCompanion";
@@ -37,20 +38,20 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 
-type CompanionTab = "overview" | "focus" | "stories" | "postcards";
+type CompanionTab = "overview" | "focus" | "stories" | "collection";
 
 const COMPANION_TAB_KEYS: CompanionTab[] = [
   "overview",
   "focus",
   "stories",
-  "postcards",
+  "collection",
 ];
 
 const INITIAL_MOUNTED_TABS: Record<CompanionTab, boolean> = {
   overview: true,
   focus: false,
   stories: false,
-  postcards: false,
+  collection: false,
 };
 
 const isCompanionTab = (tab: string): tab is CompanionTab =>
@@ -104,7 +105,6 @@ const loadCompanionPostcards = () =>
   }));
 
 const LazyCompanionStoryJournal = lazy(loadCompanionStoryJournal);
-const LazyCompanionPostcards = lazy(loadCompanionPostcards);
 
 // Tab content loading fallback
 const TabLoadingFallback = () => (
@@ -197,7 +197,7 @@ const Companion = () => {
     void prefetchStories();
   }, [isTabActive, prefetchStories]);
 
-  const handlePostcardsTriggerPrefetch = useCallback(() => {
+  const handleCollectionTriggerPrefetch = useCallback(() => {
     if (!isTabActive) return;
     void prefetchPostcards();
   }, [isTabActive, prefetchPostcards]);
@@ -217,7 +217,7 @@ const Companion = () => {
 
       if (value === "stories") {
         void prefetchStories();
-      } else if (value === "postcards") {
+      } else if (value === "collection") {
         void prefetchPostcards();
       }
     },
@@ -339,13 +339,13 @@ const Companion = () => {
             <span className="hidden sm:inline">Stories</span>
           </TabsTrigger>
           <TabsTrigger
-            value="postcards"
+            value="collection"
             className="flex items-center gap-2"
-            onPointerDown={handlePostcardsTriggerPrefetch}
-            onFocus={handlePostcardsTriggerPrefetch}
+            onPointerDown={handleCollectionTriggerPrefetch}
+            onFocus={handleCollectionTriggerPrefetch}
           >
-            <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Postcards</span>
+            <Package className="h-4 w-4" />
+            <span className="hidden sm:inline">Collection</span>
           </TabsTrigger>
         </TabsList>
 
@@ -392,12 +392,8 @@ const Companion = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="postcards" forceMount className="data-[state=inactive]:hidden">
-                {mountedTabs.postcards && (
-                  <Suspense fallback={<TabLoadingFallback />}>
-                    <LazyCompanionPostcards />
-                  </Suspense>
-                )}
+              <TabsContent value="collection" forceMount className="data-[state=inactive]:hidden">
+                {mountedTabs.collection && <CollectionTab />}
               </TabsContent>
             </motion.div>
           )}

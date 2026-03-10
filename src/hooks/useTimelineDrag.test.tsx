@@ -88,6 +88,7 @@ const dispatchTouchMove = (clientY: number) => {
   const event = new Event("touchmove", { cancelable: true }) as TouchEvent;
   Object.defineProperty(event, "touches", { value: [{ clientY }] });
   window.dispatchEvent(event);
+  return event;
 };
 
 const dispatchTouchEnd = () => {
@@ -313,6 +314,89 @@ describe("useTimelineDrag", () => {
 
     expect(result.current.draggingTaskId).toBeNull();
     expect(result.current.previewTime).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("does not lock touch scroll before hold is satisfied in longPressThenMove policy", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-scroll-unlocked", "09:00");
+    let moveEvent: TouchEvent | null = null;
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      moveEvent = dispatchTouchMove(123);
+      dispatchTouchEnd();
+    });
+
+    expect(moveEvent?.defaultPrevented).toBe(false);
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("locks touch scroll after hold is satisfied before drag activation", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-scroll-locked", "09:00");
+    let moveEvent: TouchEvent | null = null;
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      vi.advanceTimersByTime(500);
+      moveEvent = dispatchTouchMove(123);
+      dispatchTouchEnd();
+    });
+
+    expect(moveEvent?.defaultPrevented).toBe(true);
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("clears long-press touch engagement on touchend when drag never activates", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-hold-release", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(result.current.longPressTaskId).toBe("task-touch-hold-release");
+
+    act(() => {
+      dispatchTouchEnd();
+    });
+
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(result.current.draggingTaskId).toBeNull();
     expect(onDrop).not.toHaveBeenCalled();
   });
 

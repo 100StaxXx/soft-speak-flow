@@ -1,17 +1,17 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Award, Sparkles, Gift } from "lucide-react";
+import { Award, Gift, MapPin } from "lucide-react";
 import { BadgesCollectionPanel } from "@/components/BadgesCollectionPanel";
-import { EvolutionCardGallery } from "@/components/EvolutionCardGallery";
+import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { RewardInventory } from "@/components/RewardInventory";
 
-type CollectionSection = "badges" | "cards" | "loot";
+type CollectionSection = "badges" | "postcards" | "loot";
 
-const COLLECTION_SECTIONS: CollectionSection[] = ["badges", "cards", "loot"];
+const COLLECTION_SECTIONS: CollectionSection[] = ["badges", "postcards", "loot"];
 
 const INITIAL_MOUNTED_SECTIONS: Record<CollectionSection, boolean> = {
   badges: true,
-  cards: false,
+  postcards: false,
   loot: false,
 };
 
@@ -54,11 +54,11 @@ export const CollectionTab = memo(() => {
 
     if (idleWindow.requestIdleCallback) {
       idleHandle = idleWindow.requestIdleCallback(() => {
-        setMountedSections({ badges: true, cards: true, loot: true });
+        setMountedSections({ badges: true, postcards: true, loot: true });
       }, { timeout: 1200 });
     } else {
       timeoutId = window.setTimeout(() => {
-        setMountedSections({ badges: true, cards: true, loot: true });
+        setMountedSections({ badges: true, postcards: true, loot: true });
       }, 400);
     }
 
@@ -80,9 +80,9 @@ export const CollectionTab = memo(() => {
             <Award className="h-4 w-4" />
             <span className="hidden sm:inline">Badges</span>
           </TabsTrigger>
-          <TabsTrigger value="cards" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            <span className="hidden sm:inline">Cards</span>
+          <TabsTrigger value="postcards" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            <span className="hidden sm:inline">Postcards</span>
           </TabsTrigger>
           <TabsTrigger value="loot" className="flex items-center gap-2">
             <Gift className="h-4 w-4" />
@@ -94,8 +94,8 @@ export const CollectionTab = memo(() => {
           {mountedSections.badges && <BadgesCollectionPanel />}
         </TabsContent>
 
-        <TabsContent value="cards" forceMount className="mt-4 data-[state=inactive]:hidden">
-          {mountedSections.cards && <EvolutionCardGallery />}
+        <TabsContent value="postcards" forceMount className="mt-4 data-[state=inactive]:hidden">
+          {mountedSections.postcards && <CompanionPostcards />}
         </TabsContent>
 
         <TabsContent value="loot" forceMount className="mt-4 data-[state=inactive]:hidden">

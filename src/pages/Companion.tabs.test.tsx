@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   user: { id: "user-1" },
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   focusMountCount: 0,
+  collectionMountCount: 0,
   navigate: vi.fn(),
   isTabActive: true,
   useCompanionCalls: [] as Array<Record<string, unknown> | undefined>,
@@ -224,6 +225,28 @@ vi.mock("@/components/companion/FocusTab", async () => {
   };
 });
 
+vi.mock("@/components/companion/CollectionTab", async () => {
+  const React = await import("react");
+  return {
+    CollectionTab: () => {
+      const [mode, setMode] = React.useState("badges");
+
+      React.useEffect(() => {
+        mocks.collectionMountCount += 1;
+      }, []);
+
+      return (
+        <div>
+          <div data-testid="collection-mode">{mode}</div>
+          <button onClick={() => setMode((previous) => (previous === "badges" ? "loot" : "badges"))}>
+            Toggle Collection Mode
+          </button>
+        </div>
+      );
+    },
+  };
+});
+
 import Companion from "@/pages/Companion";
 
 const renderCompanion = (isTabActive = true) =>
@@ -245,6 +268,7 @@ describe("Companion tabs performance behavior", () => {
     mocks.user = { id: "user-1" };
     mocks.prefetchQuery.mockClear();
     mocks.focusMountCount = 0;
+    mocks.collectionMountCount = 0;
     mocks.navigate.mockClear();
     mocks.isTabActive = true;
     mocks.useCompanionCalls = [];
@@ -254,9 +278,29 @@ describe("Companion tabs performance behavior", () => {
     vi.useRealTimers();
   });
 
-  it("does not render collection in top-level companion tabs", () => {
+  it("renders collection in top-level companion tabs", () => {
     renderCompanion();
-    expect(screen.queryByRole("tab", { name: /collection/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /collection/i })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /postcards/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps collection tab content mounted after first visit", async () => {
+    renderCompanion();
+
+    fireEvent.click(screen.getByRole("tab", { name: /collection/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("collection-mode")).toBeInTheDocument();
+    });
+    expect(mocks.collectionMountCount).toBe(1);
+
+    fireEvent.click(screen.getByText("Toggle Collection Mode"));
+    expect(screen.getByTestId("collection-mode")).toHaveTextContent("loot");
+
+    fireEvent.click(screen.getByRole("tab", { name: /overview/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /collection/i }));
+
+    expect(screen.getByTestId("collection-mode")).toHaveTextContent("loot");
+    expect(mocks.collectionMountCount).toBe(1);
   });
 
   it("keeps focus tab content mounted after first visit", async () => {
@@ -294,7 +338,7 @@ describe("Companion tabs performance behavior", () => {
     expect(mocks.focusMountCount).toBe(1);
   });
 
-  it("prefetches resources on idle and on stories/postcards trigger interactions", async () => {
+  it("prefetches resources on idle and on stories/collection trigger interactions", async () => {
     const originalRequestIdle = (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback;
     const originalCancelIdle = (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback;
     (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback = undefined;
@@ -323,7 +367,7 @@ describe("Companion tabs performance behavior", () => {
         expect(mocks.prefetchQuery).toHaveBeenCalledTimes(3);
       }, { timeout: 1500 });
 
-      fireEvent.pointerDown(screen.getByRole("tab", { name: /postcards/i }));
+      fireEvent.pointerDown(screen.getByRole("tab", { name: /collection/i }));
       await waitFor(() => {
         expect(mocks.prefetchQuery).toHaveBeenCalledTimes(4);
       }, { timeout: 1500 });

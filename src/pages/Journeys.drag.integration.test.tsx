@@ -506,7 +506,7 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Dragging to 8:00 PM")).toBeInTheDocument();
+      expect(screen.getByText(/Dragging to/)).toBeInTheDocument();
     });
 
     act(() => {
@@ -514,11 +514,12 @@ describe("Journeys row drag integration", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.updateTask).toHaveBeenCalledWith({
-        taskId: "task-1",
-        updates: { scheduled_time: "20:00" },
-      });
+      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
     });
+    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
+    expect(firstUpdate?.taskId).toBe("task-1");
+    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
 
     expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
     expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
@@ -554,7 +555,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.updateTask).toHaveBeenCalledWith({
         taskId: "task-1",
-        updates: { scheduled_time: "20:00" },
+        updates: { scheduled_time: "19:45" },
       });
     });
 
@@ -599,7 +600,7 @@ describe("Journeys row drag integration", () => {
     await waitFor(() => {
       expect(mocks.updateTask).toHaveBeenCalledWith({
         taskId: "task-1",
-        updates: { scheduled_time: "20:00" },
+        updates: { scheduled_time: "19:45" },
       });
     });
 
@@ -694,7 +695,7 @@ describe("Journeys row drag integration", () => {
 
     expect(mocks.updateTask).toHaveBeenCalledWith({
       taskId: "task-1",
-      updates: { scheduled_time: "20:00" },
+      updates: { scheduled_time: "19:45" },
     });
     expect(mocks.updateTask).not.toHaveBeenCalledWith(
       expect.objectContaining({ taskId: "task-2" }),

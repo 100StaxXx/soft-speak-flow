@@ -555,8 +555,18 @@ export function useTimelineDrag({
       const touchMove = (e: TouchEvent) => {
         const touch = e.touches[0];
         if (!touch) return;
+        const pendingDrag = pendingDragRef.current;
+        const isHeldBeforeActivation = !draggingTaskIdRef.current
+          && !!pendingDrag
+          && pendingDrag.requiresLongPressBeforeMove
+          && pendingDrag.longPressSatisfied;
         const isActive = maybeActivateDrag(touch.clientY);
-        if (!isActive) return;
+        if (!isActive) {
+          if (isHeldBeforeActivation) {
+            e.preventDefault();
+          }
+          return;
+        }
         e.preventDefault();
         queueMove(touch.clientY);
       };

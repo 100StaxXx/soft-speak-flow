@@ -56,6 +56,7 @@ const mocks = vi.hoisted(() => {
   }));
   const timelineDragState = {
     draggingTaskId: null as string | null,
+    longPressTaskId: null as string | null,
     isDragging: false,
     justDroppedId: null as string | null,
     dragOffsetY: dragOffsetMotionValue,
@@ -265,6 +266,7 @@ describe("TodaysAgenda subtasks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.longPressTaskId = null;
     mocks.timelineDragState.isDragging = false;
     mocks.timelineDragState.justDroppedId = null;
     mocks.dragOffsetMotionValue.set(0);
@@ -559,6 +561,7 @@ describe("TodaysAgenda attachments", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.longPressTaskId = null;
     mocks.timelineDragState.isDragging = false;
     mocks.timelineDragState.justDroppedId = null;
     mocks.dragOffsetMotionValue.set(0);
@@ -793,6 +796,7 @@ describe("TodaysAgenda combo feedback", () => {
 describe("TodaysAgenda scheduled timeline behavior", () => {
   beforeEach(() => {
     mocks.timelineDragState.draggingTaskId = null;
+    mocks.timelineDragState.longPressTaskId = null;
     mocks.timelineDragState.isDragging = false;
     mocks.timelineDragState.justDroppedId = null;
     mocks.dragOffsetMotionValue.set(0);
@@ -1157,6 +1161,58 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
     expect(mocks.handleTouchStartCaptureSpy).not.toHaveBeenCalled();
     expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
+  });
+
+  it("locks scheduled row touch action while long-pressed and restores when released", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const props = {
+      tasks: [
+        {
+          id: "task-scheduled-1",
+          task_text: "Morning focus",
+          completed: false,
+          xp_reward: 25,
+          scheduled_time: "08:00",
+        },
+      ],
+      onToggle: vi.fn(),
+      onAddQuest: vi.fn(),
+      completedCount: 0,
+      totalCount: 1,
+    };
+
+    const renderAgenda = () => (
+      <TodaysAgenda
+        {...props}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+      />
+    );
+
+    const { rerender } = render(
+      renderAgenda(),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const getScheduledRowWrapper = () => {
+      const row = screen.getByTestId("timeline-row-task-scheduled-1");
+      return row.parentElement as HTMLElement;
+    };
+
+    expect(getScheduledRowWrapper().style.touchAction).toBe("pan-y");
+
+    mocks.timelineDragState.longPressTaskId = "task-scheduled-1";
+    rerender(renderAgenda());
+    expect(getScheduledRowWrapper().style.touchAction).toBe("none");
+
+    mocks.timelineDragState.longPressTaskId = null;
+    rerender(renderAgenda());
+    expect(getScheduledRowWrapper().style.touchAction).toBe("pan-y");
   });
 
   it("shows compact overlap copy for conflicting tasks", () => {
@@ -1580,7 +1636,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(draggedRowInList).toHaveStyle({ opacity: "0" });
   });
 
-  it("accelerates top edge-hold cadence as overshoot increases", () => {
+  it("requires top overshoot beyond the neutral zone before edge-hold starts, then accelerates by tier", () => {
     vi.useFakeTimers();
     const setIntervalSpy = vi.spyOn(window, "setInterval");
     const queryClient = new QueryClient({
@@ -1613,36 +1669,52 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    act(() => {
-      vi.advanceTimersByTime(180);
-    });
-    expect(screen.getByTestId("timeline-drag-overlay")).toBeInTheDocument();
-    const edgeHoldDelaysAfterActivation = setIntervalSpy.mock.calls
+    const edgeHoldDelays = () => setIntervalSpy.mock.calls
       .map(([, delay]) => delay)
       .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
-    expect(edgeHoldDelaysAfterActivation).toContain(180);
+
+    act(() => {
+      vi.advanceTimersByTime(260);
+    });
+    expect(screen.getByTestId("timeline-drag-overlay")).toBeInTheDocument();
+    expect(edgeHoldDelays()).not.toContain(180);
+    expect(mocks.nudgeByFineStepMock).not.toHaveBeenCalled();
+
+    act(() => {
+      mocks.dragOffsetMotionValue.set(-8);
+      vi.advanceTimersByTime(260);
+    });
+    expect(edgeHoldDelays()).not.toContain(180);
+    expect(mocks.nudgeByFineStepMock).not.toHaveBeenCalled();
+
+    act(() => {
+      mocks.dragOffsetMotionValue.set(-20);
+      vi.advanceTimersByTime(190);
+    });
+    expect(edgeHoldDelays()).toContain(180);
+
+    const callsBeforeNearTier = mocks.nudgeByFineStepMock.mock.calls.length;
+    act(() => {
+      vi.advanceTimersByTime(190);
+    });
+    const callsAfterNearTier = mocks.nudgeByFineStepMock.mock.calls.length;
+    expect(callsAfterNearTier - callsBeforeNearTier).toBeGreaterThanOrEqual(1);
 
     const callsBeforeMediumTier = mocks.nudgeByFineStepMock.mock.calls.length;
     act(() => {
-      mocks.dragOffsetMotionValue.set(-40);
+      mocks.dragOffsetMotionValue.set(-80);
       vi.advanceTimersByTime(150);
     });
-    const edgeHoldDelaysAfterMediumTier = setIntervalSpy.mock.calls
-      .map(([, delay]) => delay)
-      .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
-    expect(edgeHoldDelaysAfterMediumTier).toContain(140);
+    expect(edgeHoldDelays()).toContain(140);
     const callsAfterMediumTier = mocks.nudgeByFineStepMock.mock.calls.length;
     expect(callsAfterMediumTier - callsBeforeMediumTier).toBeGreaterThanOrEqual(1);
 
     const callsBeforeHighTier = mocks.nudgeByFineStepMock.mock.calls.length;
     act(() => {
-      mocks.dragOffsetMotionValue.set(-120);
+      mocks.dragOffsetMotionValue.set(-140);
       vi.advanceTimersByTime(110);
     });
-    const edgeHoldDelaysAfterHighTier = setIntervalSpy.mock.calls
-      .map(([, delay]) => delay)
-      .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
-    expect(edgeHoldDelaysAfterHighTier).toContain(100);
+    expect(edgeHoldDelays()).toContain(100);
     const callsAfterHighTier = mocks.nudgeByFineStepMock.mock.calls.length;
     expect(callsAfterHighTier - callsBeforeHighTier).toBeGreaterThanOrEqual(2);
 
@@ -1651,10 +1723,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       mocks.dragOffsetMotionValue.set(-220);
       vi.advanceTimersByTime(85);
     });
-    const edgeHoldDelaysAfterExtremeTier = setIntervalSpy.mock.calls
-      .map(([, delay]) => delay)
-      .filter((delay): delay is number => typeof delay === "number" && delay < 1000);
-    expect(edgeHoldDelaysAfterExtremeTier).toContain(75);
+    expect(edgeHoldDelays()).toContain(75);
     const callsAfterExtremeTier = mocks.nudgeByFineStepMock.mock.calls.length;
     expect(callsAfterExtremeTier - callsBeforeExtremeTier).toBeGreaterThanOrEqual(3);
     expect(mocks.nudgeByFineStepMock.mock.calls.every(([direction]) => direction === -1)).toBe(true);
@@ -1700,8 +1769,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       );
 
       act(() => {
-        mocks.dragEdgeMotionValue.set(-40);
-        mocks.dragOffsetMotionValue.set(-40);
+        mocks.dragEdgeMotionValue.set(-80);
+        mocks.dragOffsetMotionValue.set(-80);
         vi.advanceTimersByTime(330);
       });
       const edgeHoldDelaysAtFixedEdge = setIntervalSpy.mock.calls
@@ -1725,7 +1794,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
       const callsBeforeEdgeMove = mocks.nudgeByFineStepMock.mock.calls.length;
       act(() => {
-        mocks.dragEdgeMotionValue.set(-120);
+        mocks.dragEdgeMotionValue.set(-140);
         vi.advanceTimersByTime(120);
       });
       const edgeHoldDelaysAfterEdgeMove = setIntervalSpy.mock.calls

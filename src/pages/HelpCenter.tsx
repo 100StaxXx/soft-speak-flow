@@ -88,7 +88,7 @@ const HelpCenter = () => {
         },
         {
           title: "Postcards & Stories",
-          content: "As your companion evolves, it unlocks postcards—illustrated snapshots of your journey together. These chronicle your growth milestones and create a visual diary of your transformation. View your postcards on the Companion page under the Postcards tab."
+          content: "As your companion evolves, it unlocks postcards—illustrated snapshots of your journey together. These chronicle your growth milestones and create a visual diary of your transformation. View your postcards on the Companion page under the Collection tab."
         },
         {
           title: "Resetting Your Companion",

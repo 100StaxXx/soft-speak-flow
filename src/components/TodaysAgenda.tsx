@@ -239,6 +239,7 @@ const DRAG_OVERLAY_BOTTOM_PADDING_PX = 10;
 const DRAG_OVERLAY_NAV_GAP_PX = 4;
 const EDGE_HOLD_ACTIVATION_MS = 180;
 const EDGE_HOLD_PIN_THRESHOLD_PX = 0.5;
+const EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX = 24;
 const EDGE_HOLD_NEAR_MAX_OVERSHOOT_PX = 24;
 const EDGE_HOLD_MEDIUM_MAX_OVERSHOOT_PX = 72;
 const EDGE_HOLD_HIGH_MAX_OVERSHOOT_PX = 140;
@@ -1079,12 +1080,24 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
       const clampedEdgeOffset = Math.max(minOffset, Math.min(maxOffset, rawEdgeOffsetY));
       const clampDeltaEdge = rawEdgeOffsetY - clampedEdgeOffset;
-      const pinnedDirection: -1 | 0 | 1 = clampDeltaEdge > EDGE_HOLD_PIN_THRESHOLD_PX
+      const topPinActivationOvershootPx = EDGE_HOLD_PIN_THRESHOLD_PX + EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX;
+      const bottomOvershootPx = clampDeltaEdge > EDGE_HOLD_PIN_THRESHOLD_PX
+        ? clampDeltaEdge
+        : 0;
+      const topOvershootPx = clampDeltaEdge < -topPinActivationOvershootPx
+        ? Math.abs(clampDeltaEdge) - EDGE_HOLD_TOP_NEUTRAL_OVERSHOOT_PX
+        : 0;
+      const pinnedDirection: -1 | 0 | 1 = bottomOvershootPx > 0
         ? 1
-        : clampDeltaEdge < -EDGE_HOLD_PIN_THRESHOLD_PX
+        : topOvershootPx > 0
           ? -1
           : 0;
-      const edgeHoldProfile = resolveEdgeHoldProfile(Math.abs(clampDeltaEdge));
+      const effectiveOvershootPx = pinnedDirection === 1
+        ? bottomOvershootPx
+        : pinnedDirection === -1
+          ? topOvershootPx
+          : 0;
+      const edgeHoldProfile = resolveEdgeHoldProfile(effectiveOvershootPx);
       syncEdgeHoldState(pinnedDirection, edgeHoldProfile);
     };
 
@@ -2168,7 +2181,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       WebkitUserSelect: 'none',
                       userSelect: 'none',
                       WebkitTouchCallout: 'none',
-                      touchAction: isThisDragging && !usesOverlayPlaceholder ? 'none' : 'pan-y',
+                      touchAction: isThisEngaged ? 'none' : 'pan-y',
                       pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
                       opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
                       boxShadow: isThisEngaged && !usesOverlayPlaceholder

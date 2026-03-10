@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   badgesMountCount: 0,
-  cardsMountCount: 0,
+  postcardsMountCount: 0,
   lootMountCount: 0,
 }));
 
@@ -102,20 +102,20 @@ vi.mock("@/components/BadgesCollectionPanel", async () => {
   };
 });
 
-vi.mock("@/components/EvolutionCardGallery", async () => {
+vi.mock("@/components/companion/CompanionPostcards", async () => {
   const React = await import("react");
   return {
-    EvolutionCardGallery: () => {
+    CompanionPostcards: () => {
       const [count, setCount] = React.useState(0);
 
       React.useEffect(() => {
-        mocks.cardsMountCount += 1;
+        mocks.postcardsMountCount += 1;
       }, []);
 
       return (
         <div>
-          <div data-testid="cards-count">Cards count {count}</div>
-          <button onClick={() => setCount((previous) => previous + 1)}>Cards increment</button>
+          <div data-testid="postcards-count">Postcards count {count}</div>
+          <button onClick={() => setCount((previous) => previous + 1)}>Postcards increment</button>
         </div>
       );
     },
@@ -147,7 +147,7 @@ import { CollectionTab } from "@/components/companion/CollectionTab";
 describe("CollectionTab mount persistence", () => {
   beforeEach(() => {
     mocks.badgesMountCount = 0;
-    mocks.cardsMountCount = 0;
+    mocks.postcardsMountCount = 0;
     mocks.lootMountCount = 0;
   });
 
@@ -155,18 +155,18 @@ describe("CollectionTab mount persistence", () => {
     vi.useRealTimers();
   });
 
-  it("keeps badges/cards/loot panels mounted after first visit", async () => {
+  it("keeps badges/postcards/loot panels mounted after first visit", async () => {
     render(<CollectionTab />);
 
     expect(mocks.badgesMountCount).toBe(1);
-    expect(mocks.cardsMountCount).toBe(0);
+    expect(mocks.postcardsMountCount).toBe(0);
     expect(mocks.lootMountCount).toBe(0);
 
-    fireEvent.click(screen.getByRole("tab", { name: /cards/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("cards-count")).toBeInTheDocument();
+      expect(screen.getByTestId("postcards-count")).toBeInTheDocument();
     });
-    expect(mocks.cardsMountCount).toBe(1);
+    expect(mocks.postcardsMountCount).toBe(1);
 
     fireEvent.click(screen.getByRole("tab", { name: /loot/i }));
     await waitFor(() => {
@@ -175,33 +175,33 @@ describe("CollectionTab mount persistence", () => {
     expect(mocks.lootMountCount).toBe(1);
 
     fireEvent.click(screen.getByRole("tab", { name: /badges/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /cards/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
     fireEvent.click(screen.getByRole("tab", { name: /loot/i }));
 
     expect(mocks.badgesMountCount).toBe(1);
-    expect(mocks.cardsMountCount).toBe(1);
+    expect(mocks.postcardsMountCount).toBe(1);
     expect(mocks.lootMountCount).toBe(1);
   });
 
   it("preserves section-local state when switching between collection tabs", async () => {
     render(<CollectionTab />);
 
-    fireEvent.click(screen.getByRole("tab", { name: /cards/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("cards-count")).toHaveTextContent("Cards count 0");
+      expect(screen.getByTestId("postcards-count")).toHaveTextContent("Postcards count 0");
     });
 
-    fireEvent.click(screen.getByText("Cards increment"));
-    expect(screen.getByTestId("cards-count")).toHaveTextContent("Cards count 1");
+    fireEvent.click(screen.getByText("Postcards increment"));
+    expect(screen.getByTestId("postcards-count")).toHaveTextContent("Postcards count 1");
 
     fireEvent.click(screen.getByRole("tab", { name: /badges/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /cards/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /postcards/i }));
 
-    expect(screen.getByTestId("cards-count")).toHaveTextContent("Cards count 1");
-    expect(mocks.cardsMountCount).toBe(1);
+    expect(screen.getByTestId("postcards-count")).toHaveTextContent("Postcards count 1");
+    expect(mocks.postcardsMountCount).toBe(1);
   });
 
-  it("prewarms cards and loot panels on idle after collection tab mounts", async () => {
+  it("prewarms postcards and loot panels on idle after collection tab mounts", async () => {
     const originalRequestIdle = (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback;
     const originalCancelIdle = (window as Window & { cancelIdleCallback?: unknown }).cancelIdleCallback;
     (window as Window & { requestIdleCallback?: unknown }).requestIdleCallback = undefined;
@@ -210,11 +210,11 @@ describe("CollectionTab mount persistence", () => {
     try {
       render(<CollectionTab />);
 
-      expect(mocks.cardsMountCount).toBe(0);
+      expect(mocks.postcardsMountCount).toBe(0);
       expect(mocks.lootMountCount).toBe(0);
 
       await waitFor(() => {
-        expect(mocks.cardsMountCount).toBe(1);
+        expect(mocks.postcardsMountCount).toBe(1);
         expect(mocks.lootMountCount).toBe(1);
       }, { timeout: 1500 });
     } finally {

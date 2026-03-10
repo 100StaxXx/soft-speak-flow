@@ -93,12 +93,12 @@ describe("TimelineView drag integration", () => {
     act(() => {
       fireEvent(dragRow, createPointerDownEvent(100));
 
-      dispatchPointerMove(120); // +20px => shared profile preview/drop +20m
+      dispatchPointerMove(120); // +20px with post-activation deadzone => +5m
       window.dispatchEvent(new Event("pointerup"));
     });
 
     await waitFor(() => {
-      expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:20");
+      expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:05");
     });
   });
 
@@ -171,11 +171,45 @@ describe("TimelineView drag integration", () => {
     act(() => {
       fireEvent.touchStart(dragRow, { touches: [{ clientX: 0, clientY: 100 }] });
       vi.advanceTimersByTime(500);
-      dispatchTouchMove(130);
+      dispatchTouchMove(140);
       vi.advanceTimersByTime(16);
       dispatchTouchEnd();
     });
-    expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:30");
+    expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:10");
 
+  });
+
+  it("locks row touch action during hold", () => {
+    vi.useFakeTimers();
+    const onTaskReschedule = vi.fn();
+
+    render(
+      <TimelineView
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={vi.fn()}
+        tasks={[baseTask()]}
+        onTaskReschedule={onTaskReschedule}
+      />,
+    );
+
+    const getRowWrapper = () => {
+      const taskText = screen.getByText("Focus block");
+      const cardRoot = taskText.closest("div.flex.items-center.gap-4.py-3.cursor-pointer.transition-all.select-none") as HTMLElement;
+      return cardRoot.parentElement as HTMLElement;
+    };
+
+    expect(getRowWrapper().style.touchAction).toBe("pan-y");
+
+    act(() => {
+      const dragRow = screen.getByText("Focus block");
+      fireEvent.touchStart(dragRow, { touches: [{ clientX: 0, clientY: 100 }] });
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(getRowWrapper().style.touchAction).toBe("none");
+
+    act(() => {
+      dispatchTouchEnd();
+    });
   });
 });
