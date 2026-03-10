@@ -30,6 +30,7 @@ import {
   CalendarPlus,
   CalendarArrowUp,
   Trash2,
+  GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,7 +52,7 @@ import { MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { useProfile } from "@/hooks/useProfile";
 import { playStrikethrough } from "@/utils/soundEffects";
 
-import { type DragHandleProps } from "./DraggableTaskList";
+import { type DragHandleProps as ListDragHandleProps } from "./DraggableTaskList";
 import { MarqueeText } from "@/components/ui/marquee-text";
 import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
@@ -212,6 +213,16 @@ interface TodaysAgendaProps {
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
   onTimelineDragPreviewTimeChange?: (time: string | null) => void;
+}
+
+interface TimelineRescheduleHandleProps {
+  onPointerDown?: React.PointerEventHandler<HTMLElement>;
+  onPointerDownCapture?: React.PointerEventHandler<HTMLElement>;
+  onTouchStart?: React.TouchEventHandler<HTMLElement>;
+  onTouchStartCapture?: React.TouchEventHandler<HTMLElement>;
+  onTouchMove?: React.TouchEventHandler<HTMLElement>;
+  onTouchEnd?: React.TouchEventHandler<HTMLElement>;
+  onTouchCancel?: React.TouchEventHandler<HTMLElement>;
 }
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
@@ -815,6 +826,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     containerRef: timelineDragContainerRef,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     touchActivationThresholdPx: 24,
+    touchActivationPolicy: "longPressThenMove",
     onDrop: (taskId, newTime) => {
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
@@ -1482,7 +1494,12 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     }
   };
 
-  const renderTaskItem = useCallback((task: Task, dragProps?: DragHandleProps, overlapCount = 0) => {
+  const renderTaskItem = useCallback((
+    task: Task,
+    dragProps?: ListDragHandleProps,
+    overlapCount = 0,
+    timelineDragHandleProps?: TimelineRescheduleHandleProps,
+  ) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
     const effectiveTaskXP = task.is_main_quest
@@ -1504,6 +1521,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       task.estimated_duration ||
       (task.is_recurring && task.recurrence_pattern)
     );
+    const showTimelineDragHandle = !!timelineDragHandleProps && !isComplete && !!task.scheduled_time;
     
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -1660,6 +1678,23 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
           
           <div className="flex items-center gap-2">
+            {showTimelineDragHandle && (
+              <button
+                data-interactive="true"
+                type="button"
+                aria-label="Drag to reschedule"
+                title="Drag to reschedule"
+                className={cn(
+                  "h-9 w-9 -m-1.5 rounded-md flex items-center justify-center touch-none",
+                  isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground",
+                )}
+                style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
+                onClick={(event) => event.stopPropagation()}
+                {...timelineDragHandleProps}
+              >
+                <GripVertical className="w-4 h-4" />
+              </button>
+            )}
             {/* Quest action menu */}
             {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
               <DropdownMenu>
@@ -2061,7 +2096,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               <div>
                 <div
                   ref={setScheduledPaneNode}
-                  className="overflow-y-auto overscroll-contain pr-1"
+                  className="overflow-y-auto overflow-x-hidden overscroll-contain pr-1"
                   style={scheduledPaneMaxHeightPx ? { maxHeight: `${scheduledPaneMaxHeightPx}px` } : undefined}
                   data-testid="scheduled-timeline-pane"
                 >
@@ -2134,7 +2169,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
                       : 0;
                     const baseTimelineRowDragProps = task.scheduled_time && !task.completed
-                      ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
+                      ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
                       : undefined;
                     const timelineRowDragProps = baseTimelineRowDragProps
                       ? {
@@ -2185,13 +2220,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         laneCount={laneCount}
                         overlapCount={rowFlow?.overlapCount}
                         className={cn(
-                          isRowDraggable && !isThisDragging && "cursor-grab active:cursor-grabbing",
-                          isThisDragging && "cursor-grabbing",
+                          isRowDraggable && "cursor-default",
                         )}
                         data-testid={`timeline-row-${task.id}`}
-                        {...timelineRowDragProps}
                       >
-                        {renderTaskItem(task, undefined, overlapCount)}
+                        {renderTaskItem(task, undefined, overlapCount, timelineRowDragProps)}
                       </TimelineTaskRow>
                     );
 
@@ -2224,8 +2257,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         data-timeline-lane={laneIndex}
                         data-timeline-lane-count={laneCount}
                         data-timeline-overlap={rowFlow?.overlapCount}
+                        data-timeline-shift-px={laneOffsetPx}
                         style={{
                           ...rowStyle,
+                          maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
                           x: laneOffsetPx,
                           y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
                         }}

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CalendarTask } from "@/types/quest";
 
 vi.mock("@/hooks/useAutoscroll", () => ({
@@ -53,6 +53,16 @@ const dispatchPointerMove = (clientY: number) => {
   window.dispatchEvent(event);
 };
 
+const dispatchTouchMove = (clientY: number) => {
+  const event = new Event("touchmove", { cancelable: true }) as TouchEvent;
+  Object.defineProperty(event, "touches", { value: [{ clientY }] });
+  window.dispatchEvent(event);
+};
+
+const dispatchTouchEnd = () => {
+  window.dispatchEvent(new Event("touchend"));
+};
+
 const createPointerDownEvent = (clientY: number) => {
   const event = new Event("pointerdown", { bubbles: true, cancelable: true }) as PointerEvent;
   Object.defineProperty(event, "pointerType", { value: "mouse" });
@@ -62,6 +72,10 @@ const createPointerDownEvent = (clientY: number) => {
 };
 
 describe("TimelineView drag integration", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("reschedules using shared adaptive drag snapping", async () => {
     const onTaskReschedule = vi.fn();
 
@@ -131,5 +145,37 @@ describe("TimelineView drag integration", () => {
     });
 
     expect(onTaskReschedule).not.toHaveBeenCalled();
+  });
+
+  it("requires touch hold before handle drag reschedules", () => {
+    vi.useFakeTimers();
+    const onTaskReschedule = vi.fn();
+
+    render(
+      <TimelineView
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onDateSelect={vi.fn()}
+        tasks={[baseTask()]}
+        onTaskReschedule={onTaskReschedule}
+      />,
+    );
+
+    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    act(() => {
+      fireEvent.touchStart(dragHandle, { touches: [{ clientX: 0, clientY: 100 }] });
+      dispatchTouchMove(130);
+      dispatchTouchEnd();
+    });
+    expect(onTaskReschedule).not.toHaveBeenCalled();
+
+    act(() => {
+      fireEvent.touchStart(dragHandle, { touches: [{ clientX: 0, clientY: 100 }] });
+      vi.advanceTimersByTime(500);
+      dispatchTouchMove(130);
+      vi.advanceTimersByTime(16);
+      dispatchTouchEnd();
+    });
+    expect(onTaskReschedule).toHaveBeenCalledWith("task-1", "09:30");
+
   });
 });

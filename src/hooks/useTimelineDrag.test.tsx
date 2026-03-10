@@ -291,6 +291,60 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-touch-at-threshold", "09:25");
   });
 
+  it("does not activate touch drag before hold when longPressThenMove policy is enabled", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-long-press-blocked", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(140);
+      dispatchTouchEnd();
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(result.current.previewTime).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("activates touch drag after hold and threshold movement when longPressThenMove policy is enabled", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-long-press-active", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      vi.advanceTimersByTime(500);
+      dispatchTouchMove(124);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-touch-long-press-active");
+
+    act(() => {
+      dispatchTouchEnd();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-long-press-active", "09:25");
+  });
+
   it("applies touch threshold to pointer events with pointerType touch", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
@@ -319,6 +373,39 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-touch-pointer-threshold", "09:25");
+  });
+
+  it("requires hold before pointerType touch drag activation in longPressThenMove policy", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const rowProps = result.current.getRowDragProps("task-touch-pointer-long-press", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(100, undefined, "touch"));
+      dispatchPointerMove(130);
+    });
+    expect(result.current.draggingTaskId).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+      dispatchPointerMove(130);
+    });
+    expect(result.current.draggingTaskId).toBe("task-touch-pointer-long-press");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-pointer-long-press", "09:30");
   });
 
   it("keeps mouse activation threshold unchanged when touch threshold is stricter", () => {

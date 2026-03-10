@@ -18,8 +18,10 @@ import {
 const DROP_BOUNCE_MS = 300;
 const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
 const DEFAULT_ACTIVATION_THRESHOLD_PX = 8;
-const LONG_PRESS_FEEDBACK_MS = 500;
+const DEFAULT_TOUCH_LONG_PRESS_MS = 500;
 const POINTER_NUDGE_RELEASE_DEADZONE_PX = 2;
+
+type TouchActivationPolicy = "threshold" | "longPressThenMove";
 
 const triggerHaptic = async (style: ImpactStyle) => {
   try {
@@ -35,6 +37,8 @@ interface UseTimelineDragOptions {
   snapConfig?: Partial<AdaptiveSnapConfig>;
   activationThresholdPx?: number;
   touchActivationThresholdPx?: number;
+  touchActivationPolicy?: TouchActivationPolicy;
+  touchLongPressMs?: number;
 }
 
 interface DragHandleProps {
@@ -67,6 +71,8 @@ interface PendingDragCandidate {
   scheduledTime: string;
   startY: number;
   activationSource: "pointer" | "touch";
+  requiresLongPressBeforeMove: boolean;
+  longPressSatisfied: boolean;
 }
 
 type MoveSource = "pointer" | "scroll";
@@ -118,6 +124,8 @@ export function useTimelineDrag({
   snapConfig,
   activationThresholdPx = DEFAULT_ACTIVATION_THRESHOLD_PX,
   touchActivationThresholdPx,
+  touchActivationPolicy = "threshold",
+  touchLongPressMs = DEFAULT_TOUCH_LONG_PRESS_MS,
 }: UseTimelineDragOptions) {
   const resolvedSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(snapConfig), [snapConfig]);
   const resolvedActivationThresholdPx = Math.max(0, activationThresholdPx);
@@ -125,6 +133,7 @@ export function useTimelineDrag({
     0,
     touchActivationThresholdPx ?? activationThresholdPx,
   );
+  const resolvedTouchLongPressMs = Math.max(0, touchLongPressMs);
 
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [longPressTaskId, setLongPressTaskId] = useState<string | null>(null);
@@ -399,6 +408,9 @@ export function useTimelineDrag({
       const activationThresholdPx = pendingDrag.activationSource === "touch"
         ? resolvedTouchActivationThresholdPx
         : resolvedActivationThresholdPx;
+      if (pendingDrag.requiresLongPressBeforeMove && !pendingDrag.longPressSatisfied) {
+        return false;
+      }
       if (movementY < activationThresholdPx) {
         return false;
       }
@@ -481,13 +493,21 @@ export function useTimelineDrag({
         scheduledTime,
         startY: safeStartY,
         activationSource,
+        requiresLongPressBeforeMove:
+          activationSource === "touch" && touchActivationPolicy === "longPressThenMove",
+        longPressSatisfied: false,
       };
       longPressFeedbackTimerRef.current = setTimeout(() => {
         if (draggingTaskIdRef.current) return;
-        if (pendingDragRef.current?.taskId !== taskId) return;
+        const pendingDrag = pendingDragRef.current;
+        if (!pendingDrag || pendingDrag.taskId !== taskId) return;
+        pendingDragRef.current = {
+          ...pendingDrag,
+          longPressSatisfied: true,
+        };
         setLongPressTaskId(taskId);
         void triggerHaptic(ImpactStyle.Medium);
-      }, LONG_PRESS_FEEDBACK_MS);
+      }, resolvedTouchLongPressMs);
       lastPointerClientYRef.current = safeStartY;
       nudgeOffsetMinutesRef.current = 0;
       dragMovedRef.current = false;
@@ -557,6 +577,8 @@ export function useTimelineDrag({
       maybeActivateDrag,
       queueMove,
       removeWindowListeners,
+      resolvedTouchLongPressMs,
+      touchActivationPolicy,
     ],
   );
 

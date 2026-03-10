@@ -33,6 +33,8 @@ const mocks = vi.hoisted(() => {
   const dragEdgeMotionValue = createMotionValueMock(0);
   const subtaskEqMock = vi.fn();
   const subtaskUpdateMock = vi.fn();
+  const handlePointerDownCaptureSpy = vi.fn();
+  const handleTouchStartCaptureSpy = vi.fn();
   const handlePointerDownSpy = vi.fn();
   const handleTouchStartSpy = vi.fn();
   const rowPointerDownCaptureSpy = vi.fn();
@@ -41,7 +43,9 @@ const mocks = vi.hoisted(() => {
   const rowTouchStartSpy = vi.fn();
   const nudgeByFineStepMock = vi.fn(() => true);
   const getDragHandlePropsMock = vi.fn(() => ({
+    onPointerDownCapture: handlePointerDownCaptureSpy,
     onPointerDown: handlePointerDownSpy,
+    onTouchStartCapture: handleTouchStartCaptureSpy,
     onTouchStart: handleTouchStartSpy,
   }));
   const getRowDragPropsMock = vi.fn(() => ({
@@ -72,6 +76,8 @@ const mocks = vi.hoisted(() => {
   return {
     subtaskEqMock,
     subtaskUpdateMock,
+    handlePointerDownCaptureSpy,
+    handleTouchStartCaptureSpy,
     handlePointerDownSpy,
     handleTouchStartSpy,
     rowPointerDownCaptureSpy,
@@ -267,6 +273,8 @@ describe("TodaysAgenda subtasks", () => {
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
+    mocks.handlePointerDownCaptureSpy.mockClear();
+    mocks.handleTouchStartCaptureSpy.mockClear();
     mocks.handlePointerDownSpy.mockClear();
     mocks.handleTouchStartSpy.mockClear();
     mocks.rowPointerDownCaptureSpy.mockClear();
@@ -559,6 +567,8 @@ describe("TodaysAgenda attachments", () => {
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
+    mocks.handlePointerDownCaptureSpy.mockClear();
+    mocks.handleTouchStartCaptureSpy.mockClear();
     mocks.handlePointerDownSpy.mockClear();
     mocks.handleTouchStartSpy.mockClear();
     mocks.rowPointerDownCaptureSpy.mockClear();
@@ -791,6 +801,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.timelineDragState.previewTime = undefined;
     mocks.timelineDragState.snapMode = "coarse";
     mocks.timelineDragState.zoomRail = null;
+    mocks.handlePointerDownCaptureSpy.mockClear();
+    mocks.handleTouchStartCaptureSpy.mockClear();
     mocks.handlePointerDownSpy.mockClear();
     mocks.handleTouchStartSpy.mockClear();
     mocks.rowPointerDownCaptureSpy.mockClear();
@@ -951,8 +963,10 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     );
 
     expect(screen.queryByText("Scheduled")).not.toBeInTheDocument();
-    expect(screen.getByTestId("scheduled-timeline-pane")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
+    const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+    expect(scheduledPane).toBeInTheDocument();
+    expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
+    expect(screen.getByRole("button", { name: /drag to reschedule/i })).toBeInTheDocument();
   });
 
   it("keeps quests timeline scheduled-only and excludes unscheduled quests", () => {
@@ -997,7 +1011,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
   });
 
-  it("uses row drag wiring for scheduled quests", () => {
+  it("uses drag handle wiring for scheduled quests", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1025,11 +1039,85 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(mocks.getRowDragPropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
-    expect(mocks.getDragHandlePropsMock).not.toHaveBeenCalled();
+    expect(mocks.getDragHandlePropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
+    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
   });
 
-  it("forwards pointer down from timeline row to drag handler", () => {
+  it("forwards pointer down from drag handle to drag handler", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    fireEvent.pointerDown(dragHandle, { pointerType: "mouse", button: 0, clientY: 100 });
+
+    expect(mocks.handlePointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.handlePointerDownSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+  });
+
+  it("forwards touch start from drag handle to drag handler", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    fireEvent.touchStart(dragHandle, { touches: [{ clientX: 0, clientY: 100 }] });
+
+    expect(mocks.handleTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.handleTouchStartSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowTouchStartCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.rowTouchStartSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not forward row pointer and touch starts to drag handlers", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1059,44 +1147,16 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
 
     const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
-
-    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("forwards touch start from timeline row to drag handler", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <TodaysAgenda
-        tasks={[
-          {
-            id: "task-scheduled-1",
-            task_text: "Morning focus",
-            completed: false,
-            xp_reward: 25,
-            scheduled_time: "08:00",
-          },
-        ]}
-        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
-        onToggle={vi.fn()}
-        onAddQuest={vi.fn()}
-        completedCount={0}
-        totalCount={1}
-      />,
-      { wrapper: createWrapper(queryClient) },
-    );
-
-    const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
-    expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.handleTouchStartCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.rowTouchStartCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.rowTouchStartSpy).not.toHaveBeenCalled();
   });
 
   it("shows compact overlap copy for conflicting tasks", () => {
@@ -1308,6 +1368,51 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(firstRow).toHaveAttribute("data-timeline-overlap", "1");
     expect(secondRow).toHaveAttribute("data-timeline-lane", "1");
     expect(secondRow).toHaveAttribute("data-timeline-overlap", "1");
+  });
+
+  it("bounds shifted overlap rows so lane offsets do not create horizontal overflow", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "09:00",
+            estimated_duration: 60,
+          },
+          {
+            id: "task-scheduled-2",
+            task_text: "Standup",
+            completed: false,
+            xp_reward: 15,
+            scheduled_time: "09:30",
+            estimated_duration: 30,
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const shiftedRowWrapper = screen.getByTestId("timeline-row-task-scheduled-2").parentElement;
+    expect(shiftedRowWrapper).toBeTruthy();
+
+    const shiftPx = Number(shiftedRowWrapper?.getAttribute("data-timeline-shift-px") ?? "0");
+    expect(shiftPx).toBeGreaterThan(0);
+    expect(shiftedRowWrapper).toHaveStyle({ maxWidth: `calc(100% - ${shiftPx}px)` });
   });
 
   it("does not render side duration indicators for scheduled rows", () => {
