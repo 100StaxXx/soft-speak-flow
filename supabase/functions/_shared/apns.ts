@@ -103,24 +103,14 @@ function classifyAPNSError(status: number, reason: string | null): Pick<APNSDeli
   return { terminal: status < 500, shouldDeleteToken: false };
 }
 
-export async function sendAPNSNotification(
+async function sendWithEnvironment(
+  config: APNSConfig,
+  environment: "sandbox" | "production",
   deviceToken: string,
   payload: APNSNotificationPayload,
 ): Promise<APNSDeliveryResult> {
-  if (!isValidDeviceToken(deviceToken)) {
-    return {
-      success: false,
-      status: 400,
-      reason: "InvalidDeviceToken",
-      terminal: true,
-      shouldDeleteToken: true,
-      rawResponse: null,
-    };
-  }
-
-  const config = readAPNSConfig();
   const jwt = await generateAPNsJWT(config);
-  const host = config.environment === "production" ? "api.push.apple.com" : "api.sandbox.push.apple.com";
+  const host = environment === "production" ? "api.push.apple.com" : "api.sandbox.push.apple.com";
   const url = `https://${host}/3/device/${deviceToken}`;
 
   const body = {
@@ -180,4 +170,39 @@ export async function sendAPNSNotification(
     shouldDeleteToken: classification.shouldDeleteToken,
     rawResponse: raw || null,
   };
+}
+
+export async function sendAPNSNotification(
+  deviceToken: string,
+  payload: APNSNotificationPayload,
+): Promise<APNSDeliveryResult> {
+  if (!isValidDeviceToken(deviceToken)) {
+    return {
+      success: false,
+      status: 400,
+      reason: "InvalidDeviceToken",
+      terminal: true,
+      shouldDeleteToken: true,
+      rawResponse: null,
+    };
+  }
+
+  const config = readAPNSConfig();
+  const primary = await sendWithEnvironment(config, config.environment, deviceToken, payload);
+
+  // Support both debug (sandbox) and production tokens without manual secret flips.
+  if (
+    !primary.success &&
+    (primary.reason === "BadDeviceToken" || primary.reason === "DeviceTokenNotForTopic")
+  ) {
+    const fallbackEnvironment: "sandbox" | "production" =
+      config.environment === "production" ? "sandbox" : "production";
+    const fallback = await sendWithEnvironment(config, fallbackEnvironment, deviceToken, payload);
+    if (fallback.success) {
+      return { ...fallback, reason: `fallback:${fallbackEnvironment}` };
+    }
+    return fallback;
+  }
+
+  return primary;
 }
