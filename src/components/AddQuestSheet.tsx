@@ -138,6 +138,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [customDurationInput, setCustomDurationInput] = useState("");
+  const [isEditingCustomDuration, setIsEditingCustomDuration] = useState(false);
   const [sendToCalendar, setSendToCalendar] = useState(false);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
 
@@ -183,6 +184,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setShowDatePicker(false);
       setShowTimePicker(false);
       setSubtasks([]);
+      setCustomDurationInput("");
+      setIsEditingCustomDuration(false);
       setSendToCalendar(false);
       setAttachments([]);
       hasEmittedTitleEnteredRef.current = false;
@@ -209,7 +212,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     return format(addMinutes(base, estimatedDuration), "HH:mm");
   }, [scheduledTime, estimatedDuration]);
 
-  const isCustomDuration = estimatedDuration !== null && !DURATION_OPTIONS.some(o => o.value === estimatedDuration);
+  const hasNonPresetDuration = estimatedDuration !== null && !DURATION_OPTIONS.some((o) => o.value === estimatedDuration);
+  const showCustomDurationInput = isEditingCustomDuration || hasNonPresetDuration;
+  const customDurationFieldValue = !isEditingCustomDuration
+    && hasNonPresetDuration
+    && customDurationInput.trim().length === 0
+    && estimatedDuration !== null
+    ? String(estimatedDuration)
+    : customDurationInput;
   const trimmedTaskText = taskText.trim();
 
   const durationLabel = useMemo(() => {
@@ -454,8 +464,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <div className="flex gap-2 flex-wrap">
                   {DURATION_OPTIONS.map((opt) => {
                     const isSelected = opt.value === -1
-                      ? isCustomDuration
-                      : estimatedDuration === opt.value;
+                      ? showCustomDurationInput
+                      : !showCustomDurationInput && estimatedDuration === opt.value;
                     return (
                       <button
                         key={opt.value}
@@ -463,9 +473,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                           if (opt.value === -1) {
                             setCustomDurationInput("");
                             setEstimatedDuration(null);
+                            setIsEditingCustomDuration(true);
                           } else {
                             setCustomDurationInput("");
                             setEstimatedDuration(opt.value);
+                            setIsEditingCustomDuration(false);
                           }
                         }}
                         className={cn(
@@ -480,13 +492,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     );
                   })}
                 </div>
-                {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
+                {showCustomDurationInput && (
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
                       inputMode="numeric"
                       placeholder="Minutes"
-                      value={customDurationInput}
+                      value={customDurationFieldValue}
                       onChange={(e) => {
                         const val = e.target.value;
                         setCustomDurationInput(val);

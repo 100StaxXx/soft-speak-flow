@@ -235,6 +235,81 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: "Review roadmap for 30 minutes" })).not.toBeInTheDocument();
   });
 
+  it("keeps custom duration input open while typing preset-matching values", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "30 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+
+    const durationInput = screen.getByPlaceholderText("Minutes");
+    fireEvent.change(durationInput, { target: { value: "1" } });
+
+    expect(screen.getByPlaceholderText("Minutes")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Minutes")).toHaveValue(1);
+  });
+
+  it("closes custom duration input when a preset chip is selected", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "30 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    fireEvent.change(screen.getByPlaceholderText("Minutes"), { target: { value: "17" } });
+    fireEvent.click(screen.getByRole("button", { name: "1m" }));
+
+    expect(screen.queryByPlaceholderText("Minutes")).not.toBeInTheDocument();
+  });
+
+  it("resets custom duration mode after close and reopen", () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "30 min" }));
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
+    expect(screen.getByPlaceholderText("Minutes")).toBeInTheDocument();
+
+    rerender(
+      <AddQuestSheet
+        open={false}
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+      />
+    );
+    rerender(
+      <AddQuestSheet
+        open
+        onOpenChange={onOpenChange}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "30 min" }));
+    expect(screen.queryByPlaceholderText("Minutes")).not.toBeInTheDocument();
+  });
+
   it("closes the date picker after selecting a new date", async () => {
     render(
       <AddQuestSheet
