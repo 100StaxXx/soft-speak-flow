@@ -34,6 +34,7 @@ interface UseTimelineDragOptions {
   onDrop: (taskId: string, newTime: string) => void;
   snapConfig?: Partial<AdaptiveSnapConfig>;
   activationThresholdPx?: number;
+  touchActivationThresholdPx?: number;
 }
 
 interface DragHandleProps {
@@ -65,6 +66,7 @@ interface PendingDragCandidate {
   taskId: string;
   scheduledTime: string;
   startY: number;
+  activationSource: "pointer" | "touch";
 }
 
 type MoveSource = "pointer" | "scroll";
@@ -115,9 +117,14 @@ export function useTimelineDrag({
   onDrop,
   snapConfig,
   activationThresholdPx = DEFAULT_ACTIVATION_THRESHOLD_PX,
+  touchActivationThresholdPx,
 }: UseTimelineDragOptions) {
   const resolvedSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(snapConfig), [snapConfig]);
   const resolvedActivationThresholdPx = Math.max(0, activationThresholdPx);
+  const resolvedTouchActivationThresholdPx = Math.max(
+    0,
+    touchActivationThresholdPx ?? activationThresholdPx,
+  );
 
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [longPressTaskId, setLongPressTaskId] = useState<string | null>(null);
@@ -270,18 +277,30 @@ export function useTimelineDrag({
   );
 
   const clearQueuedMove = useCallback(() => {
-    if (queuedMoveFrameRef.current !== null && typeof window !== "undefined") {
+    if (
+      queuedMoveFrameRef.current !== null &&
+      typeof window !== "undefined" &&
+      typeof window.cancelAnimationFrame === "function"
+    ) {
       window.cancelAnimationFrame(queuedMoveFrameRef.current);
+      queuedMoveFrameRef.current = null;
+    } else if (queuedMoveFrameRef.current !== null) {
       queuedMoveFrameRef.current = null;
     }
     queuedMoveClientYRef.current = null;
   }, []);
 
   const flushQueuedMove = useCallback(
-    (options?: HandleMoveOptions) => {
+      (options?: HandleMoveOptions) => {
       const queuedClientY = queuedMoveClientYRef.current;
-      if (queuedMoveFrameRef.current !== null && typeof window !== "undefined") {
+      if (
+        queuedMoveFrameRef.current !== null &&
+        typeof window !== "undefined" &&
+        typeof window.cancelAnimationFrame === "function"
+      ) {
         window.cancelAnimationFrame(queuedMoveFrameRef.current);
+        queuedMoveFrameRef.current = null;
+      } else if (queuedMoveFrameRef.current !== null) {
         queuedMoveFrameRef.current = null;
       }
       if (queuedClientY === null) return;
@@ -343,7 +362,6 @@ export function useTimelineDrag({
 
       pendingDragRef.current = null;
       clearLongPressFeedbackTimer();
-      setLongPressTaskId(null);
       draggingTaskIdRef.current = pendingDrag.taskId;
       originalTimeRef.current = normalizedStartTime;
       originalMinutesRef.current = startMinute;
@@ -360,7 +378,6 @@ export function useTimelineDrag({
       );
 
       setDraggingTaskId(pendingDrag.taskId);
-      setPreviewTime(normalizedStartTime);
       dragOffsetY.set(0);
       dragEdgeOffsetY.set(0);
       setSnapMode("coarse");
@@ -379,14 +396,17 @@ export function useTimelineDrag({
       const safeClientY = Number.isFinite(clientY) ? clientY : pendingDrag.startY;
       lastPointerClientYRef.current = safeClientY;
       const movementY = Math.abs(safeClientY - pendingDrag.startY);
-      if (movementY < resolvedActivationThresholdPx) {
+      const activationThresholdPx = pendingDrag.activationSource === "touch"
+        ? resolvedTouchActivationThresholdPx
+        : resolvedActivationThresholdPx;
+      if (movementY < activationThresholdPx) {
         return false;
       }
 
       activateDrag(pendingDrag);
       return true;
     },
-    [activateDrag, resolvedActivationThresholdPx],
+    [activateDrag, resolvedActivationThresholdPx, resolvedTouchActivationThresholdPx],
   );
 
   const finishDrag = useCallback(() => {
@@ -442,7 +462,13 @@ export function useTimelineDrag({
   ]);
 
   const startPendingDrag = useCallback(
-    (taskId: string, scheduledTime: string, startY: number, inputSource: "pointer" | "touch") => {
+    (
+      taskId: string,
+      scheduledTime: string,
+      startY: number,
+      listenerSource: "pointer" | "touch",
+      activationSource: "pointer" | "touch" = listenerSource,
+    ) => {
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
 
       removeWindowListeners();
@@ -454,6 +480,7 @@ export function useTimelineDrag({
         taskId,
         scheduledTime,
         startY: safeStartY,
+        activationSource,
       };
       longPressFeedbackTimerRef.current = setTimeout(() => {
         if (draggingTaskIdRef.current) return;
@@ -507,7 +534,7 @@ export function useTimelineDrag({
 
       windowListenersRef.current = {};
 
-      if (inputSource === "touch") {
+      if (listenerSource === "touch") {
         windowListenersRef.current.touchmove = touchMove;
         windowListenersRef.current.touchend = touchEnd;
         windowListenersRef.current.touchcancel = touchEnd;
@@ -567,7 +594,8 @@ export function useTimelineDrag({
       if (isInteractiveEventTarget(e.target)) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
-      startPendingDrag(taskId, scheduledTime, e.clientY, "pointer");
+      const activationSource = e.pointerType === "touch" ? "touch" : "pointer";
+      startPendingDrag(taskId, scheduledTime, e.clientY, "pointer", activationSource);
     },
     [isInteractiveEventTarget, startPendingDrag],
   );

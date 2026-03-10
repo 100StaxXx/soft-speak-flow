@@ -59,6 +59,14 @@ import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const isQueuedTaskMutationResult = (
+  value: unknown,
+): value is { queued: true } => (
+  typeof value === "object"
+  && value !== null
+  && "queued" in value
+  && (value as { queued?: boolean }).queued === true
+);
 
 interface CreatedCampaignData {
   title: string;
@@ -83,6 +91,7 @@ const Journeys = () => {
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
   const previousIsTabActiveRef = useRef(isTabActive);
+  const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const { isActive: tutorialActive, currentStep: tutorialStep, currentSubstep: tutorialSubstep } =
     usePostOnboardingMentorGuidance();
   const shouldAutoFillTutorialTime =
@@ -575,16 +584,52 @@ const Journeys = () => {
     location: string | null;
     attachments?: QuestAttachmentInput[];
   }) => {
-    await updateTask({ taskId, updates });
-    await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
-      const message = error instanceof Error ? error.message : "";
-      if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
-        return;
-      }
-      toast.error("Saved quest, but failed to sync linked calendar event");
-    });
+    const updateResult = await updateTask({ taskId, updates });
+    if (!isQueuedTaskMutationResult(updateResult)) {
+      await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+          toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+          return;
+        }
+        toast.error("Saved quest, but failed to sync linked calendar event");
+      });
+    }
     setEditingTask(null);
+  }, [updateTask, syncTaskUpdate]);
+
+  const handleTimelineScheduledTimeUpdate = useCallback((taskId: string, newTime: string) => {
+    const previousTaskUpdate = scheduledTimeUpdateQueueRef.current.get(taskId) ?? Promise.resolve();
+    let nextTaskUpdate: Promise<void>;
+
+    nextTaskUpdate = previousTaskUpdate
+      .catch(() => undefined)
+      .then(async () => {
+        const updateResult = await updateTask({ taskId, updates: { scheduled_time: newTime } });
+        if (isQueuedTaskMutationResult(updateResult)) {
+          return;
+        }
+
+        await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
+          const message = error instanceof Error ? error.message : "";
+          if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+            toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+          }
+        });
+      })
+      .catch((error) => {
+        logger.warn("Failed to update quest scheduled time from timeline drag", {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        if (scheduledTimeUpdateQueueRef.current.get(taskId) === nextTaskUpdate) {
+          scheduledTimeUpdateQueueRef.current.delete(taskId);
+        }
+      });
+
+    scheduledTimeUpdateQueueRef.current.set(taskId, nextTaskUpdate);
   }, [updateTask, syncTaskUpdate]);
 
   const handleDeleteQuest = useCallback(async (taskId: string, isAIGenerated?: boolean) => {
@@ -844,20 +889,7 @@ const Journeys = () => {
             onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
             hasCalendarLink={hasLinkedEvent}
             onMoveQuestToNextDay={handleSwipeMoveToNextDay}
-            onUpdateScheduledTime={(taskId, newTime) => {
-              updateTask({ taskId, updates: { scheduled_time: newTime } });
-              syncTaskUpdate.mutate(
-                { taskId },
-                {
-                  onError: (error) => {
-                    const message = error instanceof Error ? error.message : "";
-                    if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-                      toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
-                    }
-                  },
-                },
-              );
-            }}
+            onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
             onTimeSlotLongPress={(date, time) => {
               setSelectedDate(date);
               setPrefilledTime(time);

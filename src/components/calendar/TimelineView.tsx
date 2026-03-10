@@ -65,6 +65,7 @@ export function TimelineView({
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+    touchActivationThresholdPx: 24,
     onDrop: (taskId, newTime) => {
       onTaskReschedule?.(taskId, newTime);
     },

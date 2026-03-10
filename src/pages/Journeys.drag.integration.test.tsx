@@ -381,6 +381,16 @@ const createPointerDownEvent = (clientY: number) => {
   return event;
 };
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
 import Journeys from "./Journeys";
 
 describe("Journeys row drag integration", () => {
@@ -510,8 +520,94 @@ describe("Journeys row drag integration", () => {
       });
     });
 
-    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
     expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+  });
+
+  it("waits for the local scheduled-time update before syncing calendar", async () => {
+    const deferredUpdate = createDeferred<{ queued?: boolean }>();
+    mocks.updateTask.mockImplementationOnce(() => deferredUpdate.promise);
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const row = await screen.findByTestId("timeline-row-task-1");
+
+    act(() => {
+      fireEvent(row, createPointerDownEvent(100));
+      dispatchPointerMove(820);
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledWith({
+        taskId: "task-1",
+        updates: { scheduled_time: "20:00" },
+      });
+    });
+
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      deferredUpdate.resolve({ queued: false });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
+    });
+  });
+
+  it("skips calendar sync after drag when the local update is queued", async () => {
+    mocks.updateTask.mockResolvedValueOnce({ queued: true });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const row = await screen.findByTestId("timeline-row-task-1");
+
+    act(() => {
+      fireEvent(row, createPointerDownEvent(100));
+      dispatchPointerMove(820);
+      window.dispatchEvent(new Event("pointerup"));
+    });
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledWith({
+        taskId: "task-1",
+        updates: { scheduled_time: "20:00" },
+      });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("does not reschedule when row is clicked without drag movement", async () => {
@@ -538,7 +634,7 @@ describe("Journeys row drag integration", () => {
     });
 
     expect(mocks.updateTask).not.toHaveBeenCalled();
-    expect(mocks.syncTaskUpdateMutate).not.toHaveBeenCalled();
+    expect(mocks.syncTaskUpdateMutateAsync).not.toHaveBeenCalled();
   });
 
   it("updates only the dragged quest once when multiple quests are present", async () => {
@@ -603,8 +699,8 @@ describe("Journeys row drag integration", () => {
     expect(mocks.updateTask).not.toHaveBeenCalledWith(
       expect.objectContaining({ taskId: "task-2" }),
     );
-    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledTimes(1);
-    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
   });
 
   it("clamps far-below drag movement to end-of-day and still updates only the dragged quest", async () => {
@@ -669,8 +765,8 @@ describe("Journeys row drag integration", () => {
     expect(mocks.updateTask).not.toHaveBeenCalledWith(
       expect.objectContaining({ taskId: "task-2" }),
     );
-    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledTimes(1);
-    expect(mocks.syncTaskUpdateMutate).toHaveBeenCalledWith({ taskId: "task-1" });
+    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
   });
 
   it("skips polling and auto-surface side effects while tab is inactive", async () => {

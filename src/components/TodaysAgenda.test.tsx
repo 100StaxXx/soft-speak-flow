@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => {
   const subtaskUpdateMock = vi.fn();
   const handlePointerDownSpy = vi.fn();
   const handleTouchStartSpy = vi.fn();
+  const rowPointerDownCaptureSpy = vi.fn();
+  const rowTouchStartCaptureSpy = vi.fn();
   const rowPointerDownSpy = vi.fn();
   const rowTouchStartSpy = vi.fn();
   const nudgeByFineStepMock = vi.fn(() => true);
@@ -43,7 +45,9 @@ const mocks = vi.hoisted(() => {
     onTouchStart: handleTouchStartSpy,
   }));
   const getRowDragPropsMock = vi.fn(() => ({
+    onPointerDownCapture: rowPointerDownCaptureSpy,
     onPointerDown: rowPointerDownSpy,
+    onTouchStartCapture: rowTouchStartCaptureSpy,
     onTouchStart: rowTouchStartSpy,
   }));
   const timelineDragState = {
@@ -70,6 +74,8 @@ const mocks = vi.hoisted(() => {
     subtaskUpdateMock,
     handlePointerDownSpy,
     handleTouchStartSpy,
+    rowPointerDownCaptureSpy,
+    rowTouchStartCaptureSpy,
     rowPointerDownSpy,
     rowTouchStartSpy,
     nudgeByFineStepMock,
@@ -263,6 +269,8 @@ describe("TodaysAgenda subtasks", () => {
     mocks.timelineDragState.zoomRail = null;
     mocks.handlePointerDownSpy.mockClear();
     mocks.handleTouchStartSpy.mockClear();
+    mocks.rowPointerDownCaptureSpy.mockClear();
+    mocks.rowTouchStartCaptureSpy.mockClear();
     mocks.rowPointerDownSpy.mockClear();
     mocks.rowTouchStartSpy.mockClear();
     mocks.nudgeByFineStepMock.mockReset();
@@ -553,6 +561,8 @@ describe("TodaysAgenda attachments", () => {
     mocks.timelineDragState.zoomRail = null;
     mocks.handlePointerDownSpy.mockClear();
     mocks.handleTouchStartSpy.mockClear();
+    mocks.rowPointerDownCaptureSpy.mockClear();
+    mocks.rowTouchStartCaptureSpy.mockClear();
     mocks.rowPointerDownSpy.mockClear();
     mocks.rowTouchStartSpy.mockClear();
     mocks.nudgeByFineStepMock.mockReset();
@@ -783,6 +793,8 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     mocks.timelineDragState.zoomRail = null;
     mocks.handlePointerDownSpy.mockClear();
     mocks.handleTouchStartSpy.mockClear();
+    mocks.rowPointerDownCaptureSpy.mockClear();
+    mocks.rowTouchStartCaptureSpy.mockClear();
     mocks.rowPointerDownSpy.mockClear();
     mocks.rowTouchStartSpy.mockClear();
     mocks.nudgeByFineStepMock.mockReset();
@@ -1048,6 +1060,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
 
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -1082,6 +1095,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const row = screen.getByTestId("timeline-row-task-scheduled-1");
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
+    expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
     expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
   });
 

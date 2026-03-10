@@ -25,6 +25,14 @@ import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const isQueuedTaskMutationResult = (
+  value: unknown,
+): value is { queued: true } => (
+  typeof value === "object"
+  && value !== null
+  && "queued" in value
+  && (value as { queued?: boolean }).queued === true
+);
 
 const InboxPage = memo(function InboxPage() {
   const prefersReducedMotion = useReducedMotion();
@@ -153,15 +161,17 @@ const InboxPage = memo(function InboxPage() {
   }, [calendarConnections.length, navigate, sendTaskToCalendar]);
 
   const handleSaveEdit = useCallback(async (taskId: string, updates: any) => {
-    await updateTask({ taskId, updates });
-    await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
-      const message = error instanceof Error ? error.message : "";
-      if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
-        toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
-        return;
-      }
-      toast.error("Saved quest, but failed to sync linked calendar event");
-    });
+    const updateResult = await updateTask({ taskId, updates });
+    if (!isQueuedTaskMutationResult(updateResult)) {
+      await syncTaskUpdate.mutateAsync({ taskId }).catch((error) => {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("MULTI_DAY_MONTHLY_UNSUPPORTED")) {
+          toast.error("Calendar sync doesn't support multi-day monthly recurrence yet.");
+          return;
+        }
+        toast.error("Saved quest, but failed to sync linked calendar event");
+      });
+    }
     queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
     queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
     setEditingTask(null);

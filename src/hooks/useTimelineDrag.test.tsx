@@ -241,6 +241,107 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-touch-pointer", "09:20");
   });
 
+  it("does not activate touch drag when movement stays below configured touch threshold", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-below-threshold", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(123);
+      dispatchTouchEnd();
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(result.current.previewTime).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("activates touch drag when movement reaches configured touch threshold", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-at-threshold", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(124);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-touch-at-threshold");
+    expect(result.current.previewTime).toBe("09:25");
+
+    act(() => {
+      dispatchTouchEnd();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-at-threshold", "09:25");
+  });
+
+  it("applies touch threshold to pointer events with pointerType touch", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+      }),
+    );
+
+    const rowProps = result.current.getRowDragProps("task-touch-pointer-threshold", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(100, undefined, "touch"));
+      dispatchPointerMove(120);
+    });
+    expect(result.current.draggingTaskId).toBeNull();
+
+    act(() => {
+      dispatchPointerMove(124);
+    });
+    expect(result.current.draggingTaskId).toBe("task-touch-pointer-threshold");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-pointer-threshold", "09:25");
+  });
+
+  it("keeps mouse activation threshold unchanged when touch threshold is stricter", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-mouse-regression", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100, undefined, "mouse"));
+      dispatchPointerMove(120);
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-mouse-regression", "09:20");
+  });
+
   it("keeps coarse mode even when precision settings are provided", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
@@ -436,6 +537,79 @@ describe("useTimelineDrag", () => {
     expect(mocks.hapticImpactMock).toHaveBeenCalledWith({ style: "MEDIUM" });
   });
 
+  it("keeps long-press engagement visible during activation after hold and clears on release", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const handleProps = result.current.getDragHandleProps("task-held-drag", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(result.current.longPressTaskId).toBe("task-held-drag");
+    expect(result.current.draggingTaskId).toBeNull();
+
+    act(() => {
+      dispatchPointerMove(120);
+      vi.advanceTimersByTime(16);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-held-drag");
+    expect(result.current.longPressTaskId).toBe("task-held-drag");
+    expect(result.current.previewTime).toBe("09:10");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(onDrop).toHaveBeenCalledWith("task-held-drag", "09:10");
+    expect(mocks.hapticImpactMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not set preview time until queued move flushes after activation", () => {
+    const queuedFrames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      queuedFrames.push(callback);
+      return queuedFrames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-queued-preview", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(120);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-queued-preview");
+    expect(result.current.previewTime).toBeNull();
+    expect(queuedFrames.length).toBe(1);
+
+    act(() => {
+      const queuedFrame = queuedFrames.shift();
+      queuedFrame?.(0);
+    });
+
+    expect(result.current.previewTime).toBe("09:20");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-queued-preview", "09:20");
+  });
+
   it("activates drag on touch after threshold and supports quick touch drag/drop", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
@@ -548,7 +722,7 @@ describe("useTimelineDrag", () => {
       upperClamp.onPointerDown(createPointerDownEvent(100));
       dispatchPointerMove(400);
     });
-    expect(result.current.previewTime).toBe("23:59");
+    expect(result.current.previewTime).toBeNull();
     expect(result.current.dragOffsetY.get()).toBe(0);
     expect(result.current.dragVisualOffsetY.get()).toBe(0);
     expect(result.current.dragEdgeOffsetY.get()).toBe(0);
@@ -562,7 +736,7 @@ describe("useTimelineDrag", () => {
       lowerClamp.onPointerDown(createPointerDownEvent(100));
       dispatchPointerMove(-300);
     });
-    expect(result.current.previewTime).toBe("00:00");
+    expect(result.current.previewTime).toBeNull();
     expect(result.current.dragOffsetY.get()).toBe(0);
     expect(result.current.dragVisualOffsetY.get()).toBe(0);
     expect(result.current.dragEdgeOffsetY.get()).toBe(0);
@@ -715,7 +889,7 @@ describe("useTimelineDrag", () => {
     });
 
     expect(nudged).toBe(false);
-    expect(result.current.previewTime).toBe("23:59");
+    expect(result.current.previewTime).toBeNull();
     expect(result.current.dragOffsetY.get()).toBe(0);
 
     act(() => {
@@ -733,7 +907,7 @@ describe("useTimelineDrag", () => {
     });
 
     expect(nudged).toBe(false);
-    expect(result.current.previewTime).toBe("00:00");
+    expect(result.current.previewTime).toBeNull();
     expect(result.current.dragOffsetY.get()).toBe(0);
 
     act(() => {
