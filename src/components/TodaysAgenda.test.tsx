@@ -934,7 +934,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(windowScrollToSpy.mock.calls.length + elementScrollToSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
-  it("renders timeline without scheduled category header text and includes drag handle affordance", () => {
+  it("renders timeline without scheduled category header text and without a visible drag handle", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -966,7 +966,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
     expect(scheduledPane).toBeInTheDocument();
     expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
-    expect(screen.getByRole("button", { name: /drag to reschedule/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
   });
 
   it("keeps quests timeline scheduled-only and excludes unscheduled quests", () => {

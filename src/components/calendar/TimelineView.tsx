@@ -67,6 +67,7 @@ export function TimelineView({
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     touchActivationThresholdPx: 24,
     touchActivationPolicy: "longPressThenMove",
+    postActivationDeadzonePx: 8,
     onDrop: (taskId, newTime) => {
       onTaskReschedule?.(taskId, newTime);
     },

@@ -19,6 +19,7 @@ import { resolveDragStartIntent } from "@/hooks/dragStartIntent";
 const DROP_BOUNCE_MS = 300;
 const DEFAULT_ACTIVATION_THRESHOLD_PX = 8;
 const DEFAULT_TOUCH_LONG_PRESS_MS = 500;
+const DEFAULT_POST_ACTIVATION_DEADZONE_PX = 0;
 const POINTER_NUDGE_RELEASE_DEADZONE_PX = 2;
 const TIMELINE_RESCHEDULE_DRAG_HANDLE_ID = "reschedule";
 
@@ -40,6 +41,7 @@ interface UseTimelineDragOptions {
   touchActivationThresholdPx?: number;
   touchActivationPolicy?: TouchActivationPolicy;
   touchLongPressMs?: number;
+  postActivationDeadzonePx?: number;
 }
 
 interface DragHandleProps {
@@ -127,6 +129,7 @@ export function useTimelineDrag({
   touchActivationThresholdPx,
   touchActivationPolicy = "threshold",
   touchLongPressMs = DEFAULT_TOUCH_LONG_PRESS_MS,
+  postActivationDeadzonePx = DEFAULT_POST_ACTIVATION_DEADZONE_PX,
 }: UseTimelineDragOptions) {
   const resolvedSnapConfig = useMemo(() => resolveAdaptiveSnapConfig(snapConfig), [snapConfig]);
   const resolvedActivationThresholdPx = Math.max(0, activationThresholdPx);
@@ -135,6 +138,7 @@ export function useTimelineDrag({
     touchActivationThresholdPx ?? activationThresholdPx,
   );
   const resolvedTouchLongPressMs = Math.max(0, touchLongPressMs);
+  const resolvedPostActivationDeadzonePx = Math.max(0, postActivationDeadzonePx);
 
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [longPressTaskId, setLongPressTaskId] = useState<string | null>(null);
@@ -167,6 +171,7 @@ export function useTimelineDrag({
   const lastPointerClientYRef = useRef(0);
   const queuedMoveClientYRef = useRef<number | null>(null);
   const queuedMoveFrameRef = useRef<number | null>(null);
+  const activeDragDeadzonePxRef = useRef(0);
 
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
@@ -262,7 +267,10 @@ export function useTimelineDrag({
       const scrollDelta = getScrollOffset(scrollContextRef.current) - dragStartScrollOffsetRef.current;
       const effectiveClientY = safeClientY + scrollDelta;
       const deltaY = effectiveClientY - dragStartYRef.current;
-      const rawMinute = originalMinutesRef.current + (deltaY / runtimeScaleRef.current.coarsePixelsPerMinute);
+      const activeDeadzonePx = Math.max(0, activeDragDeadzonePxRef.current);
+      const effectiveDeltaYMagnitude = Math.max(0, Math.abs(deltaY) - activeDeadzonePx);
+      const effectiveDeltaY = Math.sign(deltaY) * effectiveDeltaYMagnitude;
+      const rawMinute = originalMinutesRef.current + (effectiveDeltaY / runtimeScaleRef.current.coarsePixelsPerMinute);
       const pointerMinute = clampMinuteToRange(rawMinute, resolvedSnapConfig);
 
       let nextNudgeOffsetMinutes = nudgeOffsetMinutesRef.current;
@@ -363,7 +371,7 @@ export function useTimelineDrag({
   }, [containerRef, handleMove]);
 
   const activateDrag = useCallback(
-    (pendingDrag: PendingDragCandidate) => {
+    (pendingDrag: PendingDragCandidate, inputActivationThresholdPx: number) => {
       if (draggingTaskIdRef.current) return;
 
       const safeStartY = Number.isFinite(pendingDrag.startY) ? pendingDrag.startY : 0;
@@ -382,6 +390,9 @@ export function useTimelineDrag({
       dragStartYRef.current = safeStartY;
       lastPointerClientYRef.current = safeStartY;
       dragMovedRef.current = false;
+      activeDragDeadzonePxRef.current = resolvedPostActivationDeadzonePx > 0
+        ? Math.max(0, inputActivationThresholdPx + resolvedPostActivationDeadzonePx)
+        : 0;
       runtimeScaleRef.current = buildAdaptiveSnapRuntimeScale(
         resolvedSnapConfig,
         getViewportHeight(),
@@ -394,7 +405,14 @@ export function useTimelineDrag({
       setZoomRail(null);
       attachActiveScrollListener();
     },
-    [attachActiveScrollListener, clearLongPressFeedbackTimer, dragEdgeOffsetY, dragOffsetY, resolvedSnapConfig],
+    [
+      attachActiveScrollListener,
+      clearLongPressFeedbackTimer,
+      dragEdgeOffsetY,
+      dragOffsetY,
+      resolvedPostActivationDeadzonePx,
+      resolvedSnapConfig,
+    ],
   );
 
   const maybeActivateDrag = useCallback(
@@ -416,7 +434,7 @@ export function useTimelineDrag({
         return false;
       }
 
-      activateDrag(pendingDrag);
+      activateDrag(pendingDrag, activationThresholdPx);
       return true;
     },
     [activateDrag, resolvedActivationThresholdPx, resolvedTouchActivationThresholdPx],
@@ -459,6 +477,7 @@ export function useTimelineDrag({
     pointerMinutesRef.current = originalMinutesRef.current;
     nudgeOffsetMinutesRef.current = 0;
     dragMovedRef.current = false;
+    activeDragDeadzonePxRef.current = 0;
     resetSnapState();
   }, [
     clearLongPressFeedbackTimer,
@@ -512,6 +531,7 @@ export function useTimelineDrag({
       lastPointerClientYRef.current = safeStartY;
       nudgeOffsetMinutesRef.current = 0;
       dragMovedRef.current = false;
+      activeDragDeadzonePxRef.current = 0;
 
       const pointerMove = (e: PointerEvent) => {
         const isActive = maybeActivateDrag(e.clientY);
@@ -528,6 +548,7 @@ export function useTimelineDrag({
         setLongPressTaskId(null);
         pointerMinutesRef.current = originalMinutesRef.current;
         nudgeOffsetMinutesRef.current = 0;
+        activeDragDeadzonePxRef.current = 0;
         clearQueuedMove();
         removeWindowListeners();
       };
@@ -549,6 +570,7 @@ export function useTimelineDrag({
         setLongPressTaskId(null);
         pointerMinutesRef.current = originalMinutesRef.current;
         nudgeOffsetMinutesRef.current = 0;
+        activeDragDeadzonePxRef.current = 0;
         clearQueuedMove();
         removeWindowListeners();
       };
@@ -678,6 +700,7 @@ export function useTimelineDrag({
       pendingDragRef.current = null;
       pointerMinutesRef.current = originalMinutesRef.current;
       nudgeOffsetMinutesRef.current = 0;
+      activeDragDeadzonePxRef.current = 0;
       stopScroll();
     };
   }, [clearDropResetTimer, clearLongPressFeedbackTimer, clearQueuedMove, removeWindowListeners, stopScroll]);

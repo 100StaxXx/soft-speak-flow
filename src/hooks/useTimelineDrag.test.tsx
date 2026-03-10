@@ -429,6 +429,155 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-mouse-regression", "09:20");
   });
 
+  it("keeps pointer drag anchored within activation plus deadzone movement", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        activationThresholdPx: 8,
+        postActivationDeadzonePx: 8,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-pointer-deadzone-hold", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(116);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-pointer-deadzone-hold");
+    expect(result.current.previewTime).toBeNull();
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("updates pointer drag time after moving beyond activation plus deadzone", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        activationThresholdPx: 8,
+        postActivationDeadzonePx: 8,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-pointer-deadzone-release", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(124);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-pointer-deadzone-release");
+    expect(result.current.previewTime).toBe("09:10");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-pointer-deadzone-release", "09:10");
+  });
+
+  it("keeps touch drag anchored within touch threshold plus deadzone movement", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        postActivationDeadzonePx: 8,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-deadzone-hold", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(132);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-touch-deadzone-hold");
+    expect(result.current.previewTime).toBeNull();
+
+    act(() => {
+      dispatchTouchEnd();
+    });
+
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("updates touch drag time after moving beyond touch threshold plus deadzone", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        postActivationDeadzonePx: 8,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-touch-deadzone-release", "09:00");
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100));
+      dispatchTouchMove(140);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-touch-deadzone-release");
+    expect(result.current.previewTime).toBe("09:10");
+
+    act(() => {
+      dispatchTouchEnd();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-deadzone-release", "09:10");
+  });
+
+  it("keeps nudge and drop haptics working when deadzone is configured", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        activationThresholdPx: 8,
+        postActivationDeadzonePx: 8,
+      }),
+    );
+
+    const handleProps = result.current.getDragHandleProps("task-deadzone-nudge", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(116);
+    });
+
+    expect(result.current.previewTime).toBeNull();
+
+    let nudged = false;
+    act(() => {
+      nudged = result.current.nudgeByFineStep(1);
+    });
+
+    expect(nudged).toBe(true);
+    expect(result.current.previewTime).toBe("09:05");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-deadzone-nudge", "09:05");
+    expect(mocks.hapticImpactMock).toHaveBeenCalledTimes(1);
+    expect(mocks.hapticImpactMock).toHaveBeenCalledWith({ style: "MEDIUM" });
+  });
+
   it("keeps coarse mode even when precision settings are provided", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
@@ -864,6 +1013,61 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-pane-scroll", "10:10");
+    document.body.removeChild(scrollPane);
+  });
+
+  it("keeps pointer drag working in a scrollable pane when deadzone is configured", () => {
+    const onDrop = vi.fn();
+    const scrollPane = document.createElement("div");
+    scrollPane.style.overflowY = "auto";
+    Object.defineProperty(scrollPane, "clientHeight", { configurable: true, value: 300 });
+    Object.defineProperty(scrollPane, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(scrollPane, "scrollTop", { configurable: true, writable: true, value: 0 });
+    scrollPane.getBoundingClientRect = () => ({
+      top: 100,
+      bottom: 400,
+      left: 0,
+      right: 320,
+      width: 320,
+      height: 300,
+      x: 0,
+      y: 100,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+    const container = document.createElement("div");
+    scrollPane.appendChild(container);
+    document.body.appendChild(scrollPane);
+
+    const localContainerRef = { current: container } as React.RefObject<HTMLElement>;
+    const { result } = renderHook(() => useTimelineDrag({
+      containerRef: localContainerRef,
+      onDrop,
+      snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      activationThresholdPx: 8,
+      postActivationDeadzonePx: 8,
+    }));
+
+    const handleProps = result.current.getDragHandleProps("task-pane-scroll-deadzone", "09:00");
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(395));
+      dispatchPointerMove(415);
+    });
+
+    expect(result.current.previewTime).toBe("09:05");
+
+    act(() => {
+      scrollPane.scrollTop = 120;
+      scrollPane.dispatchEvent(new Event("scroll"));
+    });
+
+    expect(result.current.previewTime).toBe("11:05");
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-pane-scroll-deadzone", "11:05");
     document.body.removeChild(scrollPane);
   });
 

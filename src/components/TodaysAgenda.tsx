@@ -30,7 +30,6 @@ import {
   CalendarPlus,
   CalendarArrowUp,
   Trash2,
-  GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -213,16 +212,6 @@ interface TodaysAgendaProps {
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
   onTimelineDragPreviewTimeChange?: (time: string | null) => void;
-}
-
-interface TimelineRescheduleHandleProps {
-  onPointerDown?: React.PointerEventHandler<HTMLElement>;
-  onPointerDownCapture?: (event: React.PointerEvent<HTMLElement>) => void;
-  onTouchStart?: React.TouchEventHandler<HTMLElement>;
-  onTouchStartCapture?: (event: React.TouchEvent<HTMLElement>) => void;
-  onTouchMove?: React.TouchEventHandler<HTMLElement>;
-  onTouchEnd?: React.TouchEventHandler<HTMLElement>;
-  onTouchCancel?: React.TouchEventHandler<HTMLElement>;
 }
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
@@ -827,6 +816,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     touchActivationThresholdPx: 24,
     touchActivationPolicy: "longPressThenMove",
+    postActivationDeadzonePx: 8,
     onDrop: (taskId, newTime) => {
       const overlapCount = getTaskConflictSetForTask(taskId, draggableTimelineItems, { [taskId]: newTime }).size;
       onUpdateScheduledTime?.(taskId, newTime);
@@ -1498,7 +1488,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     task: Task,
     dragProps?: ListDragHandleProps,
     overlapCount = 0,
-    timelineDragHandleProps?: TimelineRescheduleHandleProps,
   ) => {
     const isComplete = !!task.completed || optimisticCompleted.has(task.id);
     const isRitual = !!task.habit_source_id;
@@ -1521,7 +1510,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       task.estimated_duration ||
       (task.is_recurring && task.recurrence_pattern)
     );
-    const showTimelineDragHandle = !!timelineDragHandleProps && !isComplete && !!task.scheduled_time;
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       // Don't allow clicks while dragging or during long press
@@ -1678,25 +1666,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           </div>
           
           <div className="flex items-center gap-2">
-            {showTimelineDragHandle && (
-              <button
-                data-interactive="true"
-                data-tap-control="true"
-                data-drag-handle="reschedule"
-                type="button"
-                aria-label="Drag to reschedule"
-                title="Drag to reschedule"
-                className={cn(
-                  "h-9 w-9 -m-1.5 rounded-md flex items-center justify-center touch-none",
-                  isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground",
-                )}
-                style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
-                onClick={(event) => event.stopPropagation()}
-                {...timelineDragHandleProps}
-              >
-                <GripVertical className="w-4 h-4" />
-              </button>
-            )}
             {/* Quest action menu */}
             {!isComplete && !isDragging && !isActivated && (onEditQuest || onSendToCalendar || onDeleteQuest || onMoveQuestToNextDay) && (
               <DropdownMenu>
@@ -2228,7 +2197,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         )}
                         data-testid={`timeline-row-${task.id}`}
                       >
-                        {renderTaskItem(task, undefined, overlapCount, timelineRowDragProps)}
+                        {renderTaskItem(task, undefined, overlapCount)}
                       </TimelineTaskRow>
                     );
 
