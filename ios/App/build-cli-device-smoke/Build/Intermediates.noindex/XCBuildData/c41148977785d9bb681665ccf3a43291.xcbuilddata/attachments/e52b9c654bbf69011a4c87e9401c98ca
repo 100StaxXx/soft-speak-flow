@@ -1,0 +1,39 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidgetExtension-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidgetExtension-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidgetExtension-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidgetExtension-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidgetExtension-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/CosmiqWidget/CosmiqWidget.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/CosmiqWidget~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/CosmiqWidget/WidgetData.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetData~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/ios/CosmiqWidget/WidgetViews.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.dia",
+    "index-unit-output-path" : "/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/App.build/Debug-iphoneos/CosmiqWidgetExtension.build/Objects-normal/arm64/WidgetViews~partial.swiftmodule"
+  }
+}

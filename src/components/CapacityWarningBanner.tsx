@@ -44,7 +44,7 @@ export const CapacityWarningBanner = memo(function CapacityWarningBanner({
             {isOverloaded 
               ? "You seem overloaded. Consider simplifying current habits first."
               : isAtEpicLimit 
-                ? "You have 2 active campaigns. Complete one before starting another."
+                ? "You have 3 active campaigns. Complete one before starting another."
                 : suggestedWorkload === 'light'
                   ? "Consider a lighter workload today."
                   : null

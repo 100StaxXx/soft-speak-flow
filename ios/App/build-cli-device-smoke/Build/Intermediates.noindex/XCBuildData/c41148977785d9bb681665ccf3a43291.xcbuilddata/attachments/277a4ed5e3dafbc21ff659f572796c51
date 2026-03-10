@@ -1,0 +1,4 @@
+
+module IONFilesystemLib.__Swift {
+  exclude header "IONFilesystemLib-Swift.h"
+}

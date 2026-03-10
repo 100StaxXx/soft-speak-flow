@@ -227,7 +227,7 @@ serve(async (req) => {
     const recentAbandonedEpics = recentEpics.filter(e => e.status === 'abandoned').length;
 
     // Determine capacity signals
-    const MAX_ACTIVE_EPICS = 2;
+    const MAX_ACTIVE_EPICS = 3;
     const MAX_ACTIVE_HABITS = 10;
     const atEpicLimit = activeEpics.length >= MAX_ACTIVE_EPICS;
     const overloaded = activeHabits.length >= MAX_ACTIVE_HABITS || weekCompletionRate < 50;

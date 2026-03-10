@@ -1,0 +1,5 @@
+
+module CapacitorCommunityContacts.Swift {
+  header "CapacitorCommunityContacts-Swift.h"
+  requires objc
+}

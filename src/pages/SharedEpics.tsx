@@ -9,7 +9,7 @@ import { Share2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 
-const MAX_EPICS = 2;
+const MAX_EPICS = 3;
 
 export default function SharedEpics() {
   const { user } = useAuth();

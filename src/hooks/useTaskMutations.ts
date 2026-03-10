@@ -469,12 +469,7 @@ export const useTaskMutations = (taskDate: string) => {
           console.warn('daily_tasks insert retried without month recurrence columns due to schema drift');
         }
 
-        if (error) {
-          if (error.message?.includes('MAX_TASKS_REACHED') || error.message?.includes('Maximum quest limit')) {
-            throw new Error('Maximum quest limit reached for today');
-          }
-          throw error;
-        }
+        if (error) throw error;
 
         let attachmentPersistResult = emptyAttachmentPersistResult();
         if (data?.id) {

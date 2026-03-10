@@ -1,0 +1,5 @@
+
+module CapacitorPushNotifications.Swift {
+  header "CapacitorPushNotifications-Swift.h"
+  requires objc
+}

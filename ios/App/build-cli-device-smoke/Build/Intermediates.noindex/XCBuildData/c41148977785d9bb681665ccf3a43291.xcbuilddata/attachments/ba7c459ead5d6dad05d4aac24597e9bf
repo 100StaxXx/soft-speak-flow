@@ -1,0 +1,4 @@
+
+module CapacitorCamera.__Swift {
+  exclude header "CapacitorCamera-Swift.h"
+}

@@ -381,6 +381,34 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
   });
 
+  it("surfaces backend quest-limit errors without rewriting the message", async () => {
+    mocks.dailyTasksInsertSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "P0001",
+        message: "Maximum quest limit reached for this date (limit: 10)",
+        details: null,
+        hint: null,
+      },
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.addTask({
+        taskText: "Another quest",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      }),
+    ).rejects.toMatchObject({
+      message: "Maximum quest limit reached for this date (limit: 10)",
+    });
+
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
+  });
+
   it("fails quest creation and rolls back when attachment persistence has non-schema errors", async () => {
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({
       error: {

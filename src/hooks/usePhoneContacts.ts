@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { ContactInsert } from './useContacts';
+import { isNativeIOSHandheld } from '@/utils/platformTargets';
 
 // Local type definitions to avoid importing from the native plugin
 type ContactsPermissionStatus = 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale';
@@ -32,7 +32,7 @@ export function usePhoneContacts(): UsePhoneContactsReturn {
   const [error, setError] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<ContactsPermissionStatus | null>(null);
 
-  const isNative = Capacitor.isNativePlatform();
+  const isNative = isNativeIOSHandheld();
 
   const checkPermission = useCallback(async (): Promise<ContactsPermissionStatus> => {
     if (!isNative) {

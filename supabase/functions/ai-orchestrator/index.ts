@@ -173,7 +173,7 @@ serve(async (req) => {
             
             // If suggesting an epic but at limit, add warning
             if (detectedIntent === 'epic' && enrichedContext.atEpicLimit) {
-              (aiResponse as any).warning = 'You already have 2 active epics. Consider completing one before starting another.';
+              (aiResponse as any).warning = 'You already have 3 active epics. Consider completing one before starting another.';
             }
           }
         } else {

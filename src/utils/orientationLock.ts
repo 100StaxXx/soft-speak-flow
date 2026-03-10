@@ -1,9 +1,9 @@
 import { ScreenOrientation } from '@capacitor/screen-orientation';
-import { Capacitor } from '@capacitor/core';
+import { isNativeIOSHandheld } from '@/utils/platformTargets';
 
 export const lockToPortrait = async () => {
   // Only lock orientation on native platforms
-  if (Capacitor.isNativePlatform()) {
+  if (isNativeIOSHandheld()) {
     try {
       await ScreenOrientation.lock({ orientation: 'portrait' });
       console.log('Orientation locked to portrait');
@@ -15,7 +15,7 @@ export const lockToPortrait = async () => {
 
 export const lockToLandscape = async () => {
   // Lock to landscape for games that need horizontal orientation
-  if (Capacitor.isNativePlatform()) {
+  if (isNativeIOSHandheld()) {
     try {
       await ScreenOrientation.lock({ orientation: 'landscape' });
       console.log('Orientation locked to landscape');
@@ -26,7 +26,7 @@ export const lockToLandscape = async () => {
 };
 
 export const unlockOrientation = async () => {
-  if (Capacitor.isNativePlatform()) {
+  if (isNativeIOSHandheld()) {
     try {
       await ScreenOrientation.unlock();
       console.log('Orientation unlocked');

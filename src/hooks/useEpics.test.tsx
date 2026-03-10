@@ -89,6 +89,13 @@ describe("useEpics", () => {
 });
 
 describe("normalizeCreateCampaignError", () => {
+  it("returns campaign-limit messaging for 3-active-epics backend errors", () => {
+    const result = normalizeCreateCampaignError("User can only have 3 active epics at a time");
+
+    expect(result.title).toBe("Campaign limit reached");
+    expect(result.description).toContain("3 active campaigns");
+  });
+
   it("prioritizes legacy active habit limit errors over generic habit creation failures", () => {
     const result = normalizeCreateCampaignError(
       "Failed to create habits: Maximum active habit limit reached (limit: 2)"

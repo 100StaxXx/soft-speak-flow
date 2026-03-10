@@ -49,7 +49,7 @@ const JoinEpic = () => {
     enabled: !!code,
   });
 
-  const MAX_EPICS = 2;
+  const MAX_EPICS = 3;
 
   // Join epic mutation
   const joinEpic = useMutation({

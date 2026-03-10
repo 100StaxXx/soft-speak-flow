@@ -1,0 +1,99 @@
+{
+  "" : {
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.dia",
+    "emit-module-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary-emit-module.dia",
+    "pch" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CapacitorFilesystem-primary.swiftdeps"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/CAPPluginCall+Accelerators.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/CAPPluginCall+Accelerators~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemConstants.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemConstants~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemError.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemError~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemLocationResolver.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemLocationResolver~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemOperation.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperation~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemOperationExecutor.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemOperationExecutor~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/FilesystemPlugin.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/FilesystemPlugin~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/IONFileStructures+Converters.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/IONFileStructures+Converters~partial.swiftmodule"
+  },
+  "/Users/macbookair/Developer/soft-speak-flow/node_modules/@capacitor/filesystem/ios/Sources/FilesystemPlugin/LegacyFilesystemImplementation.swift" : {
+    "const-values" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.swiftconstvalues",
+    "dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.d",
+    "diagnostics" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.o",
+    "llvm-bc" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.bc",
+    "object" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.o",
+    "swift-dependencies" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation.swiftdeps",
+    "swiftmodule" : "/Users/macbookair/Developer/soft-speak-flow/ios/App/build-cli-device-smoke/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/CapacitorFilesystem.build/Objects-normal/arm64/LegacyFilesystemImplementation~partial.swiftmodule"
+  }
+}

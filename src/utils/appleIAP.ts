@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
+import { isNativeIOSHandheld } from '@/utils/platformTargets';
 
 // Type definitions for IAP plugin responses
 export interface IAPPurchase {
@@ -73,7 +74,7 @@ export const getPurchaseProductIdForPlan = (plan: IAPPlan, products: IAPProduct[
 
 // Check if IAP is available (iOS native only)
 export const isIAPAvailable = (): boolean => {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  return isNativeIOSHandheld();
 };
 
 const extractErrorMessage = (error: unknown): string => {

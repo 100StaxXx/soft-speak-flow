@@ -79,7 +79,7 @@ interface EpicsOptions {
   enabled?: boolean;
 }
 
-const ACTIVE_CAMPAIGN_LIMIT = 2;
+const ACTIVE_CAMPAIGN_LIMIT = 3;
 const CAMPAIGN_LIMIT_REACHED_MESSAGE =
   `You can only have ${ACTIVE_CAMPAIGN_LIMIT} active campaigns at a time. Complete or abandon one before creating another.`;
 
@@ -123,7 +123,7 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
   const haystack = toErrorHaystack(error);
 
   if (
-    haystack.includes('2 active epics') ||
+    haystack.includes('3 active epics') ||
     haystack.includes('active epics at a time') ||
     haystack.includes('active campaigns at a time')
   ) {

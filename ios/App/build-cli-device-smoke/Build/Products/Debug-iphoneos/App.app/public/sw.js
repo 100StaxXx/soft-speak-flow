@@ -84,9 +84,6 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "splash.png",
     "revision": "072c44dc2ab519d7457d5482661cd12b"
   }, {
-    "url": "registerSW.js",
-    "revision": "1872c500de691dce40960bb85481de07"
-  }, {
     "url": "placeholder.svg",
     "revision": "35707bd9960ba5281c72af927b79291f"
   }, {
@@ -100,7 +97,7 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "revision": "4b36a0bd32f754944f4bef4f6cb2ccb5"
   }, {
     "url": "index.html",
-    "revision": "fde9b924aea2e1c42031e82644ddaeb7"
+    "revision": "f847e6bcb3b062c0bbca5c3f771ed3a9"
   }, {
     "url": "icon-512.svg",
     "revision": "8afc6c93daaf8b6d10008d8dbfe29b88"
@@ -114,13 +111,13 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "favicon.ico",
     "revision": "566e64364d6957715dc11845f4800700"
   }, {
-    "url": "assets/vendor-DK8VKJIv.js",
+    "url": "assets/vendor-CrXQnHL9.js",
     "revision": null
   }, {
-    "url": "assets/useMaxAspectRect-BoDFlwNt.js",
+    "url": "assets/useMaxAspectRect-Cz_XyjEL.js",
     "revision": null
   }, {
-    "url": "assets/useFirstTimeModal-CJe3iQV7.js",
+    "url": "assets/useFirstTimeModal-Dpd4t_GY.js",
     "revision": null
   }, {
     "url": "assets/three-vendor-qI8GXUTd.js",
@@ -150,22 +147,22 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "assets/reign-sage-BMXLfbvn.png",
     "revision": null
   }, {
-    "url": "assets/redirectUrl-BrdfvnoF.js",
+    "url": "assets/redirectUrl-D2xhE5yI.js",
     "revision": null
   }, {
-    "url": "assets/nativeNavigation-Cw_epy89.js",
+    "url": "assets/nativeNavigation-D_l-9aJ6.js",
     "revision": null
   }, {
-    "url": "assets/index-vNUnYBjj.js",
+    "url": "assets/index-W6jwXPTJ.js",
     "revision": null
   }, {
-    "url": "assets/index-BKSsHUuc.css",
+    "url": "assets/index-Csv2tzJX.css",
     "revision": null
   }, {
-    "url": "assets/gameUtils-CBfv9FnM.js",
+    "url": "assets/gameUtils-DPczs1Ku.js",
     "revision": null
   }, {
-    "url": "assets/gameLifecycle-CMc-cG6H.js",
+    "url": "assets/gameLifecycle-DCcgis9g.js",
     "revision": null
   }, {
     "url": "assets/faction-void-DRHp89tK.png",
@@ -177,7 +174,7 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "assets/faction-starfall-DRC6ijyK.png",
     "revision": null
   }, {
-    "url": "assets/date-vendor-BRrA_NVo.js",
+    "url": "assets/date-vendor-DexVHnQI.js",
     "revision": null
   }, {
     "url": "assets/darius-sage-_fXpdXxS.png",
@@ -216,7 +213,7 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "assets/cosmic-galaxy-portal-BwQM7UKU.png",
     "revision": null
   }, {
-    "url": "assets/clipboard-3OJHfwXT.js",
+    "url": "assets/clipboard-BF0gtW6R.js",
     "revision": null
   }, {
     "url": "assets/carmen-sage-Cli-2dqJ.png",
@@ -225,7 +222,7 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "assets/carmen-sage-CZySZiFo.js",
     "revision": null
   }, {
-    "url": "assets/authRedirect-CNOm6dF3.js",
+    "url": "assets/authRedirect-kundLsJB.js",
     "revision": null
   }, {
     "url": "assets/atlas-sage-CL7hL_Ez.js",
@@ -234,169 +231,169 @@ define(['./workbox-2203335d'], (function (workbox) { 'use strict';
     "url": "assets/atlas-sage-C-Vf6gdz.png",
     "revision": null
   }, {
-    "url": "assets/alert-CSmvq9VB.js",
+    "url": "assets/alert-BqbHsc9A.js",
     "revision": null
   }, {
-    "url": "assets/WidgetDataWeb-8xljeQLN.js",
+    "url": "assets/WidgetDataWeb-DinWjqLG.js",
     "revision": null
   }, {
-    "url": "assets/Welcome-ao5GqiCW.js",
+    "url": "assets/Welcome-CZnDUyhv.js",
     "revision": null
   }, {
-    "url": "assets/TestScroll-DfMeuAn2.js",
+    "url": "assets/TestScroll-pX3yXkBT.js",
     "revision": null
   }, {
-    "url": "assets/TestDayPlanner-o7wCqj5Y.js",
+    "url": "assets/TestDayPlanner-eIqCkjLC.js",
     "revision": null
   }, {
-    "url": "assets/TermsOfService-C-QMkV-s.js",
+    "url": "assets/TermsOfService-BAib0mgY.js",
     "revision": null
   }, {
-    "url": "assets/TapSequenceGame-Y_mi02ZY.js",
+    "url": "assets/TapSequenceGame-D6EDCnZT.js",
     "revision": null
   }, {
-    "url": "assets/SupportReport-DF6AIZ2o.js",
+    "url": "assets/SupportReport-BhyeA0OP.js",
     "revision": null
   }, {
-    "url": "assets/StaticBackgroundImage-DYm4uelU.js",
+    "url": "assets/StaticBackgroundImage-CkUyj47r.js",
     "revision": null
   }, {
-    "url": "assets/StarfallDodgeGame-ssuF2kJe.js",
+    "url": "assets/StarfallDodgeGame-BBL2VCEI.js",
     "revision": null
   }, {
-    "url": "assets/SoulSerpentGame-80vRXiPh.js",
+    "url": "assets/SoulSerpentGame-ZgHzV6GL.js",
     "revision": null
   }, {
-    "url": "assets/SharedEpics-tC-ZIcqD.js",
+    "url": "assets/SharedEpics-Bfp8iXkc.js",
     "revision": null
   }, {
-    "url": "assets/Search-B1sWCGDb.js",
+    "url": "assets/Search-DKFH56OS.js",
     "revision": null
   }, {
-    "url": "assets/ResetPassword-DwQ8jTyx.js",
+    "url": "assets/ResetPassword-DqaiyCKX.js",
     "revision": null
   }, {
-    "url": "assets/Reflection-UCSAjkj9.js",
+    "url": "assets/Reflection-jxP2gsbV.js",
     "revision": null
   }, {
-    "url": "assets/Recaps-DBRIU8br.js",
+    "url": "assets/Recaps-UIOmY-a7.js",
     "revision": null
   }, {
-    "url": "assets/QuoteCard-Cm3HBnaL.js",
+    "url": "assets/QuoteCard-R5dC2EL5.js",
     "revision": null
   }, {
-    "url": "assets/PromoCodeRedeem-Pw6hMTxk.js",
+    "url": "assets/PromoCodeRedeem-H_HFGblT.js",
     "revision": null
   }, {
-    "url": "assets/Profile-C_Hsi-pK.js",
+    "url": "assets/Profile-CVEhcY_B.js",
     "revision": null
   }, {
-    "url": "assets/PrivacyPolicy-wKBegAdL.js",
+    "url": "assets/PrivacyPolicy-BBiSfqzC.js",
     "revision": null
   }, {
-    "url": "assets/Preview-U93ZkXyR.js",
+    "url": "assets/Preview-y9XZtGCc.js",
     "revision": null
   }, {
-    "url": "assets/PremiumSuccess-DAlAis3E.js",
+    "url": "assets/PremiumSuccess-BML-hhwN.js",
     "revision": null
   }, {
-    "url": "assets/Premium-CF5-6AqT.js",
+    "url": "assets/Premium-DT4DKu_Q.js",
     "revision": null
   }, {
-    "url": "assets/PepTalks-CNZFjcAs.js",
+    "url": "assets/PepTalks-CEvhTUEs.js",
     "revision": null
   }, {
-    "url": "assets/PepTalkDetail-C2NlybG_.js",
+    "url": "assets/PepTalkDetail-Dq_St_uX.js",
     "revision": null
   }, {
-    "url": "assets/PepTalkCard-Bf2ZIl8x.js",
+    "url": "assets/PepTalkCard-DzUcacEF.js",
     "revision": null
   }, {
-    "url": "assets/Partners-DBc-P0Ar.js",
+    "url": "assets/Partners-DU28wNip.js",
     "revision": null
   }, {
-    "url": "assets/OrbMatchGame-5RJgDfJp.js",
+    "url": "assets/OrbMatchGame-DYE6WzqL.js",
     "revision": null
   }, {
-    "url": "assets/Onboarding-DovSRxEd.js",
+    "url": "assets/Onboarding-CFBKKqag.js",
     "revision": null
   }, {
-    "url": "assets/NotFound-DuyunY91.js",
+    "url": "assets/NotFound-C-hggjAI.js",
     "revision": null
   }, {
-    "url": "assets/NativeCalendarWeb-Cz8pElqg.js",
+    "url": "assets/NativeCalendarWeb-DeK_ZkaD.js",
     "revision": null
   }, {
-    "url": "assets/MentorSelection-DVZkmn5N.js",
+    "url": "assets/MentorSelection-Cq03nhoP.js",
     "revision": null
   }, {
-    "url": "assets/MentorGrid-DSyXDvnP.js",
+    "url": "assets/MentorGrid-C-oMpuhd.js",
     "revision": null
   }, {
-    "url": "assets/MentorChat-4J7eyygm.js",
+    "url": "assets/MentorChat-DnBulvn-.js",
     "revision": null
   }, {
-    "url": "assets/Library-BjID8b-5.js",
+    "url": "assets/Library-SZMn6fHz.js",
     "revision": null
   }, {
-    "url": "assets/JoinEpic-S6OTtz2E.js",
+    "url": "assets/JoinEpic-Bflcnevx.js",
     "revision": null
   }, {
-    "url": "assets/InfluencerDashboard-RKD2R17e.js",
+    "url": "assets/InfluencerDashboard-FkGK1LWx.js",
     "revision": null
   }, {
-    "url": "assets/IAPTest-CIiYsZFB.js",
+    "url": "assets/IAPTest-C6vUWTib.js",
     "revision": null
   }, {
-    "url": "assets/Home-C8MlTeIW.js",
+    "url": "assets/Home-Cqsmo72x.js",
     "revision": null
   }, {
-    "url": "assets/HelpCenter-5zRnk6B8.js",
+    "url": "assets/HelpCenter-DMmbIp_-.js",
     "revision": null
   }, {
-    "url": "assets/GalacticMatchGame-CX74TnbQ.js",
+    "url": "assets/GalacticMatchGame-C3GgBPOQ.js",
     "revision": null
   }, {
-    "url": "assets/Epics-C9QLI4HE.js",
+    "url": "assets/Epics-Dum-hE0U.js",
     "revision": null
   }, {
-    "url": "assets/EnergyBeamGame-DOxMRCf9.js",
+    "url": "assets/EnergyBeamGame-BMDCbvjD.js",
     "revision": null
   }, {
-    "url": "assets/EclipseTimingGame-D4la_ig9.js",
+    "url": "assets/EclipseTimingGame-CVRvcQiV.js",
     "revision": null
   }, {
-    "url": "assets/Creator-CF03iclo.js",
+    "url": "assets/Creator-CZf-JGcE.js",
     "revision": null
   }, {
-    "url": "assets/Contacts-DmlfAl8q.js",
+    "url": "assets/Contacts-dAWGkpb_.js",
     "revision": null
   }, {
-    "url": "assets/CompanionStoryJournal-CYdEackS.js",
+    "url": "assets/CompanionStoryJournal-DiM24uds.js",
     "revision": null
   }, {
-    "url": "assets/CompanionPostcards-DSPFFCea.js",
+    "url": "assets/CompanionPostcards-BY4SDnW8.js",
     "revision": null
   }, {
-    "url": "assets/CompanionPersonalization-ib8qH5vS.js",
+    "url": "assets/CompanionPersonalization-DPFuz-zI.js",
     "revision": null
   }, {
-    "url": "assets/Challenges-Bd-ZKO6N.js",
+    "url": "assets/Challenges-Doa73l2O.js",
     "revision": null
   }, {
-    "url": "assets/CalendarOAuthCallback-B3iqrPzA.js",
+    "url": "assets/CalendarOAuthCallback-DXEOLvcU.js",
     "revision": null
   }, {
-    "url": "assets/Auth-DO_x6Z6p.js",
+    "url": "assets/Auth-CM8U1YiM.js",
     "revision": null
   }, {
-    "url": "assets/AstralFrequencyGame-CRA64nE1.js",
+    "url": "assets/AstralFrequencyGame-DLeYbqnU.js",
     "revision": null
   }, {
-    "url": "assets/Admin-cFATfUA6.js",
+    "url": "assets/Admin-WcEx_e7N.js",
     "revision": null
   }, {
-    "url": "assets/AccountDeletionHelp-BaOsrkpW.js",
+    "url": "assets/AccountDeletionHelp-MBb3uhGx.js",
     "revision": null
   }, {
     "url": "favicon.ico",

@@ -17,7 +17,7 @@ export const JoinEpicDialog = memo(function JoinEpicDialog({ open, onOpenChange 
   const [isLoading, setIsLoading] = useState(false);
   const [epicLimitReached, setEpicLimitReached] = useState(false);
   const queryClient = useQueryClient();
-  const MAX_EPICS = 2;
+  const MAX_EPICS = 3;
 
   // Reset state when dialog opens
   useEffect(() => {

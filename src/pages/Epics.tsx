@@ -39,7 +39,7 @@ const Epics = () => {
     updateEpicStatus,
   } = useEpics();
 
-  const MAX_EPICS = 2;
+  const MAX_EPICS = 3;
   const hasReachedLimit = activeEpics.length >= MAX_EPICS;
 
   const handleCreateEpic = (data: {
