@@ -357,6 +357,50 @@ describe("TodaysAgenda subtasks", () => {
 });
 
 describe("TodaysAgenda campaign visibility", () => {
+  it("renders campaigns inside the scheduled timeline pane when scheduled rows exist", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "quest-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 20,
+            scheduled_time: "08:00",
+          },
+          {
+            id: "ritual-1",
+            task_text: "Daily journal",
+            completed: false,
+            xp_reward: 15,
+            habit_source_id: "habit-1",
+            epic_id: "epic-1",
+            epic_title: "Fallback Campaign",
+          },
+        ]}
+        selectedDate={new Date("2026-02-14T16:34:00")}
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={2}
+        activeEpics={[]}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+    expect(within(scheduledPane).getByText("Campaigns")).toBeInTheDocument();
+    expect(within(scheduledPane).getByText("Fallback Campaign")).toBeInTheDocument();
+    expect(screen.getAllByText("Campaigns")).toHaveLength(1);
+  });
+
   it("renders campaign ritual groups collapsed by default and lets users toggle them", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {

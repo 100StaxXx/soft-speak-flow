@@ -1437,6 +1437,151 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     });
   }, []);
 
+  const hasScheduledTimelineRows = timelineRows.length > 0;
+  const renderCampaignSection = () => (
+    <>
+      {/* Campaign Dropdown Folders with Rituals */}
+      {campaignRitualGroups.length > 0 && (
+        <div className="mt-6 pt-4 border-t border-border/30">
+          {/* Campaigns divider */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-9 flex-shrink-0" />
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <Target className="h-3 w-3" />
+              Campaigns
+            </div>
+            <div className="flex-1 border-t border-dashed border-border/40" />
+          </div>
+
+          <div className="space-y-2">
+            {campaignRitualGroups.map((group) => {
+              const isCampaignExpanded = expandedCampaigns.has(group.epicId);
+              return (
+                <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
+                  {/* Campaign Header */}
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    {group.epic && group.isHydrated ? (
+                      <JourneyPathDrawer epic={{
+                        id: group.epic.id,
+                        title: group.epic.title,
+                        description: group.epic.description ?? undefined,
+                        progress_percentage: group.epic.progress_percentage ?? 0,
+                        target_days: group.epic.target_days,
+                        start_date: group.epic.start_date,
+                        end_date: group.epic.end_date,
+                        epic_habits: group.epic.epic_habits,
+                      }}>
+                        <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
+                          <Target className="w-4 h-4 text-primary shrink-0" />
+                          <span className="text-sm font-medium truncate">{group.title}</span>
+                        </button>
+                      </JourneyPathDrawer>
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Target className="w-4 h-4 text-primary shrink-0" />
+                        <span className="text-sm font-medium truncate">{group.title}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {group.progress !== null && (
+                        <span className="text-primary font-bold text-xs">{group.progress}%</span>
+                      )}
+                      {group.daysLeft !== null && (
+                        <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
+                      )}
+                      <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                        {group.completedCount}/{group.rituals.length}
+                      </Badge>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCampaignExpanded(group.epicId);
+                        }}
+                        className="p-1 -m-1 focus:outline-none"
+                      >
+                        {isCampaignExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Collapsible Rituals */}
+                  {isCampaignExpanded && (
+                    <div className="border-t border-border/20 px-2 pb-1">
+                      {group.rituals.map((task) => {
+                        const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                        const isAnyDragging = timelineDrag.isDragging;
+                        const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+
+                        return (
+                          <motion.div
+                            key={task.id}
+                            className={cn("relative", isThisDragging && "z-50")}
+                            style={{
+                              y: isThisDragging ? timelineDrag.dragOffsetY : 0,
+                              pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
+                              opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
+                            }}
+                          >
+                            {renderTaskItem(task, undefined, overlapCount)}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {isCampaignsLoading && campaignRitualGroups.length === 0 && (
+        <div className="mt-4 pt-3 border-t border-border/20">
+          <p className="text-xs text-muted-foreground">Loading campaigns...</p>
+        </div>
+      )}
+
+      {/* Campaign Strip (for epics with no rituals today) */}
+      {activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
+        <div className="mt-4 pt-3 border-t border-border/20 space-y-2">
+          {activeEpics.map((epic) => {
+            const progress = Math.round(epic.progress_percentage ?? 0);
+            const daysLeft = getDaysLeft(epic.end_date);
+            return (
+              <JourneyPathDrawer key={epic.id} epic={{
+                id: epic.id,
+                title: epic.title,
+                description: epic.description ?? undefined,
+                progress_percentage: epic.progress_percentage ?? 0,
+                target_days: epic.target_days,
+                start_date: epic.start_date,
+                end_date: epic.end_date,
+                epic_habits: epic.epic_habits,
+              }}>
+                <button className="w-full text-left focus:outline-none">
+                  <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-muted/30 border border-border/30 bg-card/30">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Target className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
+                      <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
+                      {daysLeft !== null && (
+                        <span className="text-muted-foreground text-xs shrink-0">· {daysLeft}d</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              </JourneyPathDrawer>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
 
 
   
@@ -2256,6 +2401,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       </motion.div>
                     );
                   })}
+                  {renderCampaignSection()}
                 </div>
               </div>
             )}
@@ -2263,146 +2409,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         )}
 
         {/* Inbox section removed - now has its own tab */}
-
-        {/* Campaign Dropdown Folders with Rituals */}
-        {campaignRitualGroups.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-border/30">
-            {/* Campaigns divider */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-9 flex-shrink-0" />
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                <Target className="h-3 w-3" />
-                Campaigns
-              </div>
-              <div className="flex-1 border-t border-dashed border-border/40" />
-            </div>
-
-            <div className="space-y-2">
-              {campaignRitualGroups.map((group) => {
-                const isCampaignExpanded = expandedCampaigns.has(group.epicId);
-                return (
-                  <div key={group.epicId} className="rounded-xl border border-border/30 bg-card/30 overflow-hidden">
-                    {/* Campaign Header */}
-                    <div className="flex items-center gap-2 px-3 py-2.5">
-                      {group.epic && group.isHydrated ? (
-                        <JourneyPathDrawer epic={{
-                          id: group.epic.id,
-                          title: group.epic.title,
-                          description: group.epic.description ?? undefined,
-                          progress_percentage: group.epic.progress_percentage ?? 0,
-                          target_days: group.epic.target_days,
-                          start_date: group.epic.start_date,
-                          end_date: group.epic.end_date,
-                          epic_habits: group.epic.epic_habits,
-                        }}>
-                          <button className="flex items-center gap-2 min-w-0 flex-1 text-left focus:outline-none">
-                            <Target className="w-4 h-4 text-primary shrink-0" />
-                            <span className="text-sm font-medium truncate">{group.title}</span>
-                          </button>
-                        </JourneyPathDrawer>
-                      ) : (
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <Target className="w-4 h-4 text-primary shrink-0" />
-                          <span className="text-sm font-medium truncate">{group.title}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {group.progress !== null && (
-                          <span className="text-primary font-bold text-xs">{group.progress}%</span>
-                        )}
-                        {group.daysLeft !== null && (
-                          <span className="text-muted-foreground text-xs">{group.daysLeft}d</span>
-                        )}
-                        <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                          {group.completedCount}/{group.rituals.length}
-                        </Badge>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleCampaignExpanded(group.epicId);
-                          }}
-                          className="p-1 -m-1 focus:outline-none"
-                        >
-                          {isCampaignExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Collapsible Rituals */}
-                    {isCampaignExpanded && (
-                      <div className="border-t border-border/20 px-2 pb-1">
-                        {group.rituals.map((task) => {
-                          const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                          const isAnyDragging = timelineDrag.isDragging;
-                          const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
-
-                          return (
-                            <motion.div
-                              key={task.id}
-                              className={cn("relative", isThisDragging && "z-50")}
-                              style={{
-                                y: isThisDragging ? timelineDrag.dragOffsetY : 0,
-                                pointerEvents: isAnyDragging && !isThisDragging ? "none" : "auto",
-                                opacity: isAnyDragging && !isThisDragging ? 0.7 : 1,
-                              }}
-                            >
-                              {renderTaskItem(task, undefined, overlapCount)}
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {isCampaignsLoading && campaignRitualGroups.length === 0 && (
-          <div className="mt-4 pt-3 border-t border-border/20">
-            <p className="text-xs text-muted-foreground">Loading campaigns...</p>
-          </div>
-        )}
-
-        {/* Campaign Strip (for epics with no rituals today) */}
-        {activeEpics && activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
-          <div className="mt-4 pt-3 border-t border-border/20 space-y-2">
-            {activeEpics.map((epic) => {
-              const progress = Math.round(epic.progress_percentage ?? 0);
-              const daysLeft = getDaysLeft(epic.end_date);
-              return (
-                <JourneyPathDrawer key={epic.id} epic={{
-                  id: epic.id,
-                  title: epic.title,
-                  description: epic.description ?? undefined,
-                  progress_percentage: epic.progress_percentage ?? 0,
-                  target_days: epic.target_days,
-                  start_date: epic.start_date,
-                  end_date: epic.end_date,
-                  epic_habits: epic.epic_habits,
-                }}>
-                  <button className="w-full text-left focus:outline-none">
-                    <div className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-muted/30 border border-border/30 bg-card/30">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Target className="w-4 h-4 text-primary shrink-0" />
-                        <span className="text-sm font-medium truncate max-w-[140px]">{epic.title}</span>
-                        <span className="text-primary font-bold text-xs shrink-0">{progress}%</span>
-                        {daysLeft !== null && (
-                          <span className="text-muted-foreground text-xs shrink-0">· {daysLeft}d</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                </JourneyPathDrawer>
-              );
-            })}
-          </div>
-        )}
+        {!hasScheduledTimelineRows && renderCampaignSection()}
       </div>
 
       {shouldRenderDragOverlay && draggedScheduledTask && dragOverlaySnapshot && typeof document !== "undefined"
