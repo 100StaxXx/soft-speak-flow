@@ -234,4 +234,82 @@ describe("useDailyMissions", () => {
     const backupToasts = mocks.toast.mock.calls.filter((call) => call[0]?.title === "Backup missions loaded");
     expect(backupToasts).toHaveLength(1);
   });
+
+  it("falls back to generation when the initial daily mission read fails non-retriably", async () => {
+    const fallbackMissions = [
+      makeMission("f1", "connection"),
+      makeMission("f2", "quick_win"),
+      makeMission("f3", "identity"),
+    ];
+
+    mocks.existingMissionResponses.push({
+      data: null,
+      error: {
+        code: "22007",
+        message: 'invalid input syntax for type date: "03/02/2026"',
+      },
+    });
+    mocks.invoke.mockResolvedValue({
+      data: {
+        missions: fallbackMissions,
+        generated: true,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useDailyMissions(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.missions).toHaveLength(3);
+    });
+
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    const destructiveToasts = mocks.toast.mock.calls.filter((call) => call[0]?.variant === "destructive");
+    expect(destructiveToasts).toHaveLength(0);
+  });
+
+  it("shows parsed generation error when read fallback also fails", async () => {
+    mocks.existingMissionResponses.push({
+      data: null,
+      error: {
+        code: "22007",
+        message: 'invalid input syntax for type date: "03/02/2026"',
+      },
+    });
+    mocks.invoke.mockResolvedValue({
+      data: null,
+      error: {
+        name: "FunctionsHttpError",
+        message: "Edge Function returned a non-2xx status code",
+        context: new Response(
+          JSON.stringify({
+            error: "Mission generation input is invalid.",
+            code: "MISSION_INPUT_INVALID",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      },
+    });
+
+    const { result } = renderHook(() => useDailyMissions(), {
+      wrapper: createHookWrapper(),
+    });
+
+    await waitFor(() => {
+      const destructiveToasts = mocks.toast.mock.calls.filter((call) => call[0]?.variant === "destructive");
+      expect(destructiveToasts).toHaveLength(1);
+    });
+
+    const firstToast = mocks.toast.mock.calls[0]?.[0] as { title?: string; description?: string; variant?: string };
+    expect(firstToast.title).toBe("Mission refresh failed");
+    expect(firstToast.variant).toBe("destructive");
+    expect(firstToast.description).toContain("Mission generation input is invalid.");
+    expect(result.current.generationErrorMessage).toBe("Mission generation input is invalid.");
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+  });
 });
