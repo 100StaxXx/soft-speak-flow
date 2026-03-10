@@ -36,6 +36,12 @@ interface DeliveryBudgetState {
   lastSentAt: Date | null;
 }
 
+interface DeviceTokenRow {
+  id: string;
+  device_token: string;
+  updated_at: string | null;
+}
+
 const TERMINAL_NO_DEVICE_ERROR = "no_device_tokens";
 
 function toDateOrNull(value: string | null | undefined): Date | null {
@@ -239,6 +245,7 @@ serve(async (req) => {
     const rolloutPercent = Math.max(0, Math.min(100, parseIntEnv("NOTIFICATIONS_V2_ROLLOUT_PERCENT", 0)));
     const maxAttempts = Math.max(1, parseIntEnv("NOTIFICATIONS_V2_MAX_ATTEMPTS", 5));
     const batchSize = Math.max(1, parseIntEnv("NOTIFICATIONS_V2_DISPATCH_BATCH_SIZE", 100));
+    const tokenFanoutMode = (Deno.env.get("NOTIFICATIONS_V2_TOKEN_FANOUT") ?? "latest").toLowerCase();
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const workerId = crypto.randomUUID();
@@ -348,9 +355,10 @@ serve(async (req) => {
 
       const { data: deviceTokens, error: tokenError } = await supabase
         .from("push_device_tokens")
-        .select("id, device_token")
+        .select("id, device_token, updated_at")
         .eq("user_id", row.user_id)
-        .eq("platform", "ios");
+        .eq("platform", "ios")
+        .order("updated_at", { ascending: false });
 
       if (tokenError) {
         const nextRetryAt = addMinutes(now, getRetryDelayMinutes(attemptCount));
@@ -384,8 +392,12 @@ serve(async (req) => {
       let transientFailure = false;
       let terminalReason: string | null = null;
       const tokenIdsToDelete: string[] = [];
+      const orderedTokens = (deviceTokens as DeviceTokenRow[]).slice();
+      const tokensToAttempt = tokenFanoutMode === "all"
+        ? orderedTokens
+        : orderedTokens.slice(0, 1);
 
-      for (const token of deviceTokens) {
+      for (const token of tokensToAttempt) {
         try {
           const sendResult = await sendAPNSNotification(token.device_token, {
             title: row.title,
@@ -476,6 +488,7 @@ serve(async (req) => {
         skipped_budget: skippedBudget,
         skipped_rollout: skippedRollout,
         shadowed,
+        token_fanout_mode: tokenFanoutMode,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

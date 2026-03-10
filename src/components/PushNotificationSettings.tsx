@@ -17,7 +17,8 @@ import {
   initializeNativePush, 
   unregisterNativePush,
   hasActiveNativePushSubscription,
-  debugTestRegistration
+  debugTestRegistration,
+  getNativePushTokenDebugSnapshot
 } from "@/utils/nativePushNotifications";
 
 const timeOptions = [
@@ -430,6 +431,9 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     isSupported: boolean;
     permissionStatus: string;
     hasToken: boolean;
+    tokenCount: number;
+    latestTokenUpdatedAt: string | null;
+    latestTokenPreview: string | null;
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -440,8 +444,29 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     setIsLoading(true);
     try {
       const info = await debugTestRegistration(userId || '');
-      const hasToken = userId ? await hasActiveNativePushSubscription(userId) : false;
-      setDebugInfo({ ...info, hasToken });
+      if (!userId) {
+        setDebugInfo({
+          ...info,
+          hasToken: false,
+          tokenCount: 0,
+          latestTokenUpdatedAt: null,
+          latestTokenPreview: null,
+        });
+        return;
+      }
+
+      const [hasToken, tokenSnapshot] = await Promise.all([
+        hasActiveNativePushSubscription(userId),
+        getNativePushTokenDebugSnapshot(userId),
+      ]);
+
+      setDebugInfo({
+        ...info,
+        hasToken,
+        tokenCount: tokenSnapshot.tokenCount,
+        latestTokenUpdatedAt: tokenSnapshot.latestUpdatedAt,
+        latestTokenPreview: tokenSnapshot.latestTokenPreview,
+      });
     } catch (error) {
       console.error('Debug info error:', error);
     } finally {
@@ -541,6 +566,22 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                 <span className="text-muted-foreground">Token in DB:</span>
                 <span className="text-foreground">{debugInfo.hasToken ? 'Yes' : 'No'}</span>
               </div>
+              <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground">iOS Tokens:</span>
+                <span className="text-foreground">{debugInfo.tokenCount}</span>
+              </div>
+              {debugInfo.latestTokenUpdatedAt && (
+                <div className="flex items-center gap-2 col-span-2">
+                  <span className="text-muted-foreground">Latest Token Updated:</span>
+                  <span className="text-foreground font-mono text-xs">{new Date(debugInfo.latestTokenUpdatedAt).toLocaleString()}</span>
+                </div>
+              )}
+              {debugInfo.latestTokenPreview && (
+                <div className="flex items-center gap-2 col-span-2">
+                  <span className="text-muted-foreground">Latest Token:</span>
+                  <span className="text-foreground font-mono text-xs">{debugInfo.latestTokenPreview}</span>
+                </div>
+              )}
             </div>
             
             {debugInfo.error && (

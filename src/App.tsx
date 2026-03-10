@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { useEffect, Suspense, lazy, memo, useState } from "react";
+import { useEffect, Suspense, lazy, memo, useRef, useState } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { TimeProvider } from "@/contexts/TimeContext";
@@ -28,7 +28,7 @@ import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
 
 
 import { hideSplashScreen } from "@/utils/capacitor";
-import { initializeNativePush, isNativePushSupported } from "@/utils/nativePushNotifications";
+import { initializeNativePush, isNativePushSupported, unregisterNativePush } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
@@ -187,6 +187,7 @@ const AppContent = memo(() => {
   const { session, status } = useAuth();
   const [splashHidden, setSplashHidden] = useState(false);
   const [recoveryChecked, setRecoveryChecked] = useState(false);
+  const previousPushUserIdRef = useRef<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -245,19 +246,46 @@ const AppContent = memo(() => {
   
   const pushUserId = session?.user?.id ?? null;
 
-  // Initialize native push once per authenticated user ID
+  // Initialize native push for the current user and clean up on account changes/sign-out.
   useEffect(() => {
-    if (pushUserId) {
+    let cancelled = false;
+
+    const syncNativePush = async () => {
+      const previousUserId = previousPushUserIdRef.current;
+
       try {
-        if (isNativePushSupported()) {
-          initializeNativePush(pushUserId).catch(err => {
+        if (!isNativePushSupported()) {
+          if (!cancelled) {
+            previousPushUserIdRef.current = pushUserId;
+          }
+          return;
+        }
+
+        if (previousUserId && previousUserId !== pushUserId) {
+          await unregisterNativePush(previousUserId).catch((err) => {
+            logger.error('Failed to unregister native push for previous user:', err);
+          });
+        }
+
+        if (pushUserId) {
+          await initializeNativePush(pushUserId).catch((err) => {
             logger.error('Failed to initialize native push:', err);
           });
         }
       } catch (error) {
-        logger.log('Native push initialization skipped:', error);
+        logger.log('Native push synchronization skipped:', error);
+      } finally {
+        if (!cancelled) {
+          previousPushUserIdRef.current = pushUserId;
+        }
       }
-    }
+    };
+
+    void syncNativePush();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pushUserId]);
   
   // Hide splash screen once profile data is loaded (or failed to load)

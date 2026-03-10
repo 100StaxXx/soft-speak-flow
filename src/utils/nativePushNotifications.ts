@@ -15,6 +15,12 @@ let initializationPromise: Promise<void> | null = null;
 let listenerHandles: PluginListenerHandle[] = [];
 let listenersBound = false;
 
+export interface NativePushTokenDebugSnapshot {
+  tokenCount: number;
+  latestUpdatedAt: string | null;
+  latestTokenPreview: string | null;
+}
+
 /**
  * Check if native push notifications are supported
  */
@@ -133,7 +139,8 @@ export async function initializeNativePush(userId: string): Promise<void> {
   }
 
   if (initializedUserId === userId && listenersBound) {
-    console.log('[NativePush] Already initialized for current user, skipping duplicate setup');
+    console.log('[NativePush] Already initialized for current user, refreshing APNs registration');
+    await PushNotifications.register();
     return;
   }
 
@@ -177,6 +184,43 @@ export async function initializeNativePush(userId: string): Promise<void> {
   })();
 
   await initializationPromise;
+}
+
+/**
+ * Return token inventory details for on-device diagnostics.
+ */
+export async function getNativePushTokenDebugSnapshot(userId: string): Promise<NativePushTokenDebugSnapshot> {
+  try {
+    const { data, error } = await supabase
+      .from('push_device_tokens')
+      .select('device_token,updated_at')
+      .eq('user_id', userId)
+      .eq('platform', 'ios')
+      .order('updated_at', { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    const tokens = data ?? [];
+    const latest = tokens[0];
+    const latestToken = latest?.device_token;
+    const preview = typeof latestToken === 'string' && latestToken.length >= 12
+      ? `${latestToken.slice(0, 8)}...${latestToken.slice(-4)}`
+      : null;
+
+    return {
+      tokenCount: tokens.length,
+      latestUpdatedAt: latest?.updated_at ?? null,
+      latestTokenPreview: preview,
+    };
+  } catch (error) {
+    console.log('[NativePush] Failed to load token snapshot:', error);
+    return {
+      tokenCount: 0,
+      latestUpdatedAt: null,
+      latestTokenPreview: null,
+    };
+  }
 }
 
 /**
