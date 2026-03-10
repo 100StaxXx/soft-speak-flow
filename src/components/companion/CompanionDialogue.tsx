@@ -111,6 +111,7 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
     dialogueMood,
     isLoading,
     lineId,
+    refreshDialogue,
   } = useCompanionDialogue();
 
   const { companion, progressToNext, canEvolve } = useCompanion();
@@ -157,8 +158,9 @@ export const CompanionDialogue = memo(({ className, companionName }: CompanionDi
   }, [dismissTalkPopup]);
 
   const openDialogueModal = useCallback(() => {
+    refreshDialogue?.("idle", true);
     handleDialogOpenChange(true);
-  }, [handleDialogOpenChange]);
+  }, [handleDialogOpenChange, refreshDialogue]);
 
   const handleTriggerKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;

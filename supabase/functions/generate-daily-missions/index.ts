@@ -156,6 +156,24 @@ const FALLBACK_MISSIONS: Record<string, string[]> = {
 // Timezone utility - calculate effective date with 2 AM reset
 const RESET_HOUR = 2;
 
+function formatDateForTimezone(date: Date, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timezone,
+  });
+
+  const parts = formatter.formatToParts(date);
+  const map = new Map(parts.map((part) => [part.type, part.value]));
+
+  const year = map.get("year") ?? "1970";
+  const month = map.get("month") ?? "01";
+  const day = map.get("day") ?? "01";
+
+  return `${year}-${month}-${day}`;
+}
+
 export function normalizeTimezone(timezone: string | null | undefined): string {
   if (!timezone) return "UTC";
 
@@ -180,20 +198,13 @@ export function getEffectiveMissionDate(userTimezone: string): string {
     10,
   );
 
-  const dateFormatter = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: tz,
-  });
-
   if (localHour < RESET_HOUR) {
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    return dateFormatter.format(yesterday);
+    return formatDateForTimezone(yesterday, tz);
   }
 
-  return dateFormatter.format(now);
+  return formatDateForTimezone(now, tz);
 }
 
 export function getEffectiveDayOfWeek(userTimezone: string): number {

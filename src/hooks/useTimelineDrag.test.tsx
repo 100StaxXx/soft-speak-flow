@@ -95,6 +95,12 @@ const dispatchTouchEnd = () => {
   window.dispatchEvent(new Event("touchend"));
 };
 
+const resetTimelineDragScrollLock = () => {
+  document.documentElement.classList.remove("timeline-drag-scroll-locked");
+  document.body.classList.remove("timeline-drag-scroll-locked");
+  delete (window as Window & { __timelineDragScrollLockCount?: number }).__timelineDragScrollLockCount;
+};
+
 describe("useTimelineDrag", () => {
   const containerRef = { current: document.createElement("div") } as React.RefObject<HTMLElement>;
 
@@ -114,11 +120,22 @@ describe("useTimelineDrag", () => {
       configurable: true,
       value: { height: 720 },
     });
+    Object.defineProperty(window.navigator, "maxTouchPoints", {
+      configurable: true,
+      value: 0,
+    });
+    Object.defineProperty(window, "ontouchstart", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    resetTimelineDragScrollLock();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    resetTimelineDragScrollLock();
   });
 
   it("activates drag after crossing threshold, previews in 5-minute increments, and uses drop-only haptics", () => {
@@ -222,7 +239,7 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-capture-bubble", "09:20");
   });
 
-  it("starts drag from touch pointerdown events", () => {
+  it("starts drag from touch pointerdown events when touch events are unavailable", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
       useTimelineDrag({
@@ -240,6 +257,53 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-touch-pointer", "09:20");
+  });
+
+  it("ignores touch pointerdown on touch-enabled devices and continues via touch events", () => {
+    vi.useFakeTimers();
+    Object.defineProperty(window.navigator, "maxTouchPoints", {
+      configurable: true,
+      value: 5,
+    });
+
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        touchActivationThresholdPx: 24,
+        touchActivationPolicy: "longPressThenMove",
+      }),
+    );
+
+    const rowProps = result.current.getRowDragProps("task-touch-events-priority", "09:00");
+    let moveEvent: TouchEvent | null = null;
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(100, undefined, "touch"));
+      dispatchPointerMove(140);
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+
+    act(() => {
+      rowProps.onTouchStart(createTouchEvent(100));
+      vi.advanceTimersByTime(500);
+      moveEvent = dispatchTouchMove(124);
+    });
+
+    expect(moveEvent?.defaultPrevented).toBe(true);
+    expect(result.current.draggingTaskId).toBe("task-touch-events-priority");
+    expect(document.documentElement.classList.contains("timeline-drag-scroll-locked")).toBe(true);
+    expect(document.body.classList.contains("timeline-drag-scroll-locked")).toBe(true);
+
+    act(() => {
+      dispatchTouchEnd();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-events-priority", "09:25");
+    expect(document.documentElement.classList.contains("timeline-drag-scroll-locked")).toBe(false);
+    expect(document.body.classList.contains("timeline-drag-scroll-locked")).toBe(false);
   });
 
   it("does not activate touch drag when movement stays below configured touch threshold", () => {
@@ -429,7 +493,7 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-touch-long-press-active", "09:25");
   });
 
-  it("applies touch threshold to pointer events with pointerType touch", () => {
+  it("applies touch threshold to pointer events with pointerType touch in pointer-only fallback mode", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
       useTimelineDrag({
@@ -459,7 +523,7 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-touch-pointer-threshold", "09:25");
   });
 
-  it("requires hold before pointerType touch drag activation in longPressThenMove policy", () => {
+  it("requires hold before pointerType touch drag activation in pointer-only fallback mode", () => {
     vi.useFakeTimers();
     const onDrop = vi.fn();
     const { result } = renderHook(() =>

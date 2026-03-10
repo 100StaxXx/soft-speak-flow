@@ -4,6 +4,12 @@
 
 const RESET_HOUR = 2; // Reset at 2 AM local time
 
+type DateParts = {
+  year: string;
+  month: string;
+  day: string;
+};
+
 /**
  * Get the effective mission date based on user timezone.
  * If current time is before 2 AM, returns yesterday's date.
@@ -73,13 +79,25 @@ export function getEffectiveDayOfWeek(userTimezone?: string): number {
  * Format a date as YYYY-MM-DD in the specified timezone
  */
 function formatDateForTimezone(date: Date, timezone: string): string {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
+  const formatter = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     timeZone: timezone
   });
-  return formatter.format(date);
+
+  const parts = formatter.formatToParts(date);
+  const dateParts = parts.reduce<DateParts>(
+    (acc, part) => {
+      if (part.type === 'year') acc.year = part.value;
+      if (part.type === 'month') acc.month = part.value;
+      if (part.type === 'day') acc.day = part.value;
+      return acc;
+    },
+    { year: '1970', month: '01', day: '01' }
+  );
+
+  return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
 }
 
 /**

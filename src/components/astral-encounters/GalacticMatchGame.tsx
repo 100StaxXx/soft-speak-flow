@@ -194,6 +194,15 @@ MatchEffect.displayName = 'MatchEffect';
 
 type GamePhase = 'countdown' | 'revealing' | 'hiding' | 'playing' | 'levelComplete' | 'gameOver';
 
+interface LevelCompleteSnapshot {
+  token: number;
+  level: number;
+  round: number;
+  pairs: number;
+  combo: number;
+  scoreWithBonus: number;
+}
+
 export const GalacticMatchGame = ({
   companionStats: _companionStats,
   onComplete,
@@ -225,7 +234,8 @@ export const GalacticMatchGame = ({
   const [revealCountdown, setRevealCountdown] = useState(0);
   const [mistakesThisLevel, setMistakesThisLevel] = useState(0);
   const phaseRef = useRef<GamePhase>('countdown');
-  const phaseRunIdRef = useRef(0);
+  const levelCompleteTokenRef = useRef(0);
+  const pendingLevelCompleteRef = useRef<LevelCompleteSnapshot | null>(null);
   
   const config = useMemo(() => getLevelConfig(level, round, diffConfig.startPairs, diffConfig.revealTimeMultiplier), [level, round, diffConfig]);
   const { hostRef: boardHostRef, rect: boardRect } = useMaxAspectRect(config.cols, config.rows);
@@ -239,7 +249,9 @@ export const GalacticMatchGame = ({
 
   useEffect(() => {
     phaseRef.current = phase;
-    phaseRunIdRef.current += 1;
+    if (phase !== 'levelComplete') {
+      pendingLevelCompleteRef.current = null;
+    }
   }, [phase]);
 
   // Initialize/shuffle cards for current level
@@ -263,6 +275,73 @@ export const GalacticMatchGame = ({
     setMatchedPairs(0);
     setCombo(0);
   }, [config.pairs, level]);
+
+  const advanceFromLevelComplete = useCallback((snapshot: LevelCompleteSnapshot) => {
+    if (!mountedRef.current || phaseRef.current !== 'levelComplete') return;
+
+    const pending = pendingLevelCompleteRef.current;
+    if (!pending || pending.token !== snapshot.token) return;
+
+    // Invalidate token immediately to avoid timer+button double-advance races.
+    pendingLevelCompleteRef.current = null;
+
+    // In practice mode, end after completing 2 levels
+    if (isPractice && snapshot.level >= 2) {
+      completeOnce({
+        success: true,
+        accuracy: 100,
+        result: 'good',
+        highScoreValue: snapshot.level,
+        gameStats: {
+          level: snapshot.level,
+          score: snapshot.scoreWithBonus,
+          maxCombo: snapshot.combo,
+        },
+      });
+      return;
+    }
+
+    // Determine if we should repeat this pair count or advance
+    const shouldRepeat = snapshot.pairs >= 3 && snapshot.round === 1;
+    const nextLevel = snapshot.level + 1;
+    const nextRound = shouldRepeat ? 2 : 1;
+    const nextConfig = getLevelConfig(
+      nextLevel,
+      nextRound,
+      diffConfig.startPairs,
+      diffConfig.revealTimeMultiplier,
+    );
+
+    // Generate new shuffled cards for next level, starting flipped for memorization
+    const symbolIndices = Array.from({ length: nextConfig.pairs }, (_, i) => i % COSMIC_SYMBOLS.length);
+    const cardPairs = [...symbolIndices, ...symbolIndices];
+    for (let i = cardPairs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cardPairs[i], cardPairs[j]] = [cardPairs[j], cardPairs[i]];
+    }
+
+    setCards(cardPairs.map((symbolIndex, i) => ({
+      id: `card-${nextLevel}-${i}`,
+      symbolIndex,
+      isFlipped: true, // Start flipped for memorization
+      isMatched: false,
+    })));
+    setFlippedCards([]);
+    setMatchedPairs(0);
+    setMistakesThisLevel(0);
+    setCombo(0);
+
+    setLevel(nextLevel);
+    setRound(nextRound);
+    setPhase('revealing');
+    setRevealCountdown(Math.ceil(nextConfig.revealTime));
+  }, [completeOnce, diffConfig.revealTimeMultiplier, diffConfig.startPairs, isPractice, mountedRef]);
+
+  const handleContinueFromLevelComplete = useCallback(() => {
+    const pending = pendingLevelCompleteRef.current;
+    if (!pending) return;
+    advanceFromLevelComplete(pending);
+  }, [advanceFromLevelComplete]);
 
   // Initialize cards only for first level (subsequent levels handled by phase transitions)
   useEffect(() => {
@@ -336,73 +415,24 @@ export const GalacticMatchGame = ({
       const levelBonus = 15 * level;
       const scoreWithBonus = score + levelBonus;
       setScore(scoreWithBonus);
+
+      const snapshot: LevelCompleteSnapshot = {
+        token: levelCompleteTokenRef.current + 1,
+        level,
+        round,
+        pairs: config.pairs,
+        combo,
+        scoreWithBonus,
+      };
+      levelCompleteTokenRef.current = snapshot.token;
+      pendingLevelCompleteRef.current = snapshot;
       
       // Move to next level/round after delay
-      const levelCompleteRunId = phaseRunIdRef.current;
       registerTimeout(() => {
-        if (!mountedRef.current || phaseRef.current !== 'levelComplete' || levelCompleteRunId !== phaseRunIdRef.current) return;
-        // In practice mode, end after completing 2 levels
-        if (isPractice && level >= 2) {
-          completeOnce({ 
-            success: true, 
-            accuracy: 100, 
-            result: 'good',
-            highScoreValue: level,
-            gameStats: {
-              level,
-              score: scoreWithBonus,
-              maxCombo: combo,
-            },
-          });
-          return;
-        }
-        
-        // Determine if we should repeat this pair count or advance
-        const currentPairs = config.pairs;
-        const shouldRepeat = currentPairs >= 3 && round === 1;
-        
-        let nextLevel: number;
-        let nextRound: number;
-        let nextConfig;
-        
-        if (shouldRepeat) {
-          // Same pair count, round 2
-          nextLevel = level + 1;
-          nextRound = 2;
-          nextConfig = getLevelConfig(nextLevel, nextRound, diffConfig.startPairs, diffConfig.revealTimeMultiplier);
-        } else {
-          // Move to next pair count, round 1
-          nextLevel = level + 1;
-          nextRound = 1;
-          nextConfig = getLevelConfig(nextLevel, nextRound, diffConfig.startPairs, diffConfig.revealTimeMultiplier);
-        }
-        
-        // Generate new shuffled cards for next level, starting flipped for memorization
-        const symbolIndices = Array.from({ length: nextConfig.pairs }, (_, i) => i % COSMIC_SYMBOLS.length);
-        const cardPairs = [...symbolIndices, ...symbolIndices];
-        for (let i = cardPairs.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [cardPairs[i], cardPairs[j]] = [cardPairs[j], cardPairs[i]];
-        }
-        
-        setCards(cardPairs.map((symbolIndex, i) => ({
-          id: `card-${nextLevel}-${i}`,
-          symbolIndex,
-          isFlipped: true, // Start flipped for memorization
-          isMatched: false,
-        })));
-        setFlippedCards([]);
-        setMatchedPairs(0);
-        setMistakesThisLevel(0);
-        setCombo(0);
-        
-        setLevel(nextLevel);
-        setRound(nextRound);
-        setPhase('revealing');
-        setRevealCountdown(Math.ceil(nextConfig.revealTime));
+        advanceFromLevelComplete(snapshot);
       }, 1500);
     }
-  }, [matchedPairs, config.pairs, phase, level, round, isPractice, mistakesThisLevel, onDamage, diffConfig, score, combo, registerTimeout, mountedRef, completeOnce]);
+  }, [matchedPairs, config.pairs, phase, level, round, mistakesThisLevel, onDamage, score, combo, registerTimeout, advanceFromLevelComplete]);
 
   // Handle game over
   useEffect(() => {
@@ -716,6 +746,13 @@ export const GalacticMatchGame = ({
                 </motion.div>
                 <div className="text-2xl font-bold text-primary">Level {level} Complete!</div>
                 <div className="text-sm text-muted-foreground mt-1">+{15 * level} bonus points</div>
+                <button
+                  type="button"
+                  onClick={handleContinueFromLevelComplete}
+                  className="mt-4 px-4 py-1.5 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  Continue
+                </button>
               </motion.div>
             </motion.div>
           )}

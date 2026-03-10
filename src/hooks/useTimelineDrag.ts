@@ -22,6 +22,8 @@ const DEFAULT_TOUCH_LONG_PRESS_MS = 500;
 const DEFAULT_POST_ACTIVATION_DEADZONE_PX = 0;
 const POINTER_NUDGE_RELEASE_DEADZONE_PX = 2;
 const TIMELINE_RESCHEDULE_DRAG_HANDLE_ID = "reschedule";
+const TIMELINE_DRAG_SCROLL_LOCK_CLASS = "timeline-drag-scroll-locked";
+const TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY = "__timelineDragScrollLockCount";
 
 type TouchActivationPolicy = "threshold" | "longPressThenMove";
 
@@ -119,6 +121,45 @@ const getScrollOffset = (context: ScrollContext): number => {
     return Number.isFinite(window.scrollY) ? window.scrollY : window.pageYOffset;
   }
   return context.element.scrollTop;
+};
+
+const hasTouchEventSupport = () => {
+  if (typeof window === "undefined") return false;
+  const navigator = window.navigator as Navigator & { msMaxTouchPoints?: number };
+  return (
+    (navigator.maxTouchPoints ?? 0) > 0
+    || (navigator.msMaxTouchPoints ?? 0) > 0
+    || typeof window.ontouchstart !== "undefined"
+  );
+};
+
+const applyTimelineDragScrollLock = () => {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  const scopedWindow = window as Window & { [TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY]?: number };
+  const nextCount = (scopedWindow[TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY] ?? 0) + 1;
+  scopedWindow[TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY] = nextCount;
+  if (nextCount !== 1) return;
+
+  document.documentElement.classList.add(TIMELINE_DRAG_SCROLL_LOCK_CLASS);
+  document.body.classList.add(TIMELINE_DRAG_SCROLL_LOCK_CLASS);
+};
+
+const releaseTimelineDragScrollLock = () => {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  const scopedWindow = window as Window & { [TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY]?: number };
+  const currentCount = scopedWindow[TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY] ?? 0;
+  const nextCount = Math.max(0, currentCount - 1);
+
+  if (nextCount === 0) {
+    delete scopedWindow[TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY];
+    document.documentElement.classList.remove(TIMELINE_DRAG_SCROLL_LOCK_CLASS);
+    document.body.classList.remove(TIMELINE_DRAG_SCROLL_LOCK_CLASS);
+    return;
+  }
+
+  scopedWindow[TIMELINE_DRAG_SCROLL_LOCK_COUNT_KEY] = nextCount;
 };
 
 export function useTimelineDrag({
@@ -647,6 +688,7 @@ export function useTimelineDrag({
       if (e.defaultPrevented) return;
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
       if (shouldIgnoreDragStartTarget(e.target)) return;
+      if (e.pointerType === "touch" && hasTouchEventSupport()) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
       const activationSource = e.pointerType === "touch" ? "touch" : "pointer";
@@ -700,6 +742,14 @@ export function useTimelineDrag({
     }),
     [handlePointerDown, handleTouchStart, noopTouchEnd, noopTouchMove],
   );
+
+  useEffect(() => {
+    if (draggingTaskId === null && longPressTaskId === null) return;
+    applyTimelineDragScrollLock();
+    return () => {
+      releaseTimelineDragScrollLock();
+    };
+  }, [draggingTaskId, longPressTaskId]);
 
   useEffect(() => {
     return () => {

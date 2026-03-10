@@ -30,14 +30,55 @@ type DialogueEventState = {
   lineId: string;
 };
 
-const DEFAULT_DIALOGUE_EVENT: DialogueEventState = {
-  greeting: DEFAULT_GREETING,
-  shimmerType: "none",
-  microTitle: null,
-  outcomeTag: "basic_checkin",
-  tonePack: "soft",
-  bucketKey: "base_greetings",
-  lineId: "soft.base_greetings.00",
+const DIALOGUE_FALLBACK_LINE_ID = "soft.base_greetings.00";
+
+const toDialogueEventState = (selected: {
+  greeting: string;
+  shimmerType: CompanionShimmerType;
+  microTitle: string | null;
+  outcomeTag: DialogueOutcomeTag;
+  tonePack: CompanionDialogueTonePack;
+  bucketKey: CompanionDialogueBucketKey;
+  lineId: string;
+}): DialogueEventState => ({
+  greeting: selected.greeting,
+  shimmerType: selected.shimmerType,
+  microTitle: selected.microTitle,
+  outcomeTag: selected.outcomeTag,
+  tonePack: selected.tonePack,
+  bucketKey: selected.bucketKey,
+  lineId: selected.lineId,
+});
+
+const createBootstrapDialogueEvent = (): DialogueEventState => {
+  try {
+    const selected = selectCompanionDialogueEvent({
+      userId: null,
+      dialogueMood: "content",
+      overallCare: 0.5,
+      hasDormancyWarning: false,
+      inactiveDays: 0,
+      progressToNext: 0,
+      xpToNext: Number.MAX_SAFE_INTEGER,
+      voiceStyle: "",
+      needsClarity: false,
+      triggerSource: "idle",
+      forceBaseFallback: true,
+      now: new Date(),
+      seedKey: `bootstrap-${Math.floor(Date.now() / MIN_DIALOGUE_REFRESH_INTERVAL_MS)}`,
+    });
+    return toDialogueEventState(selected);
+  } catch {
+    return {
+      greeting: DEFAULT_GREETING,
+      shimmerType: "none",
+      microTitle: null,
+      outcomeTag: "basic_checkin",
+      tonePack: "soft",
+      bucketKey: "base_greetings",
+      lineId: DIALOGUE_FALLBACK_LINE_ID,
+    };
+  }
 };
 
 interface VoiceTemplate {
@@ -124,7 +165,7 @@ export function useCompanionDialogue() {
     [spiritAnimal],
   );
 
-  const [dialogueEvent, setDialogueEvent] = useState<DialogueEventState>(DEFAULT_DIALOGUE_EVENT);
+  const [dialogueEvent, setDialogueEvent] = useState<DialogueEventState>(() => createBootstrapDialogueEvent());
   const lastRefreshAtRef = useRef(0);
   const queuedTriggerRef = useRef<DialogueTriggerSource>("idle");
   const pendingTimerRef = useRef<number | null>(null);
@@ -170,21 +211,17 @@ export function useCompanionDialogue() {
 
   const runRefreshNow = useCallback(
     (triggerSource: DialogueTriggerSource) => {
-      const selected = selectCompanionDialogueEvent({
-        ...selectionContextBase,
-        triggerSource,
-        now: new Date(),
-      });
-
-      setDialogueEvent({
-        greeting: selected.greeting,
-        shimmerType: selected.shimmerType,
-        microTitle: selected.microTitle,
-        outcomeTag: selected.outcomeTag,
-        tonePack: selected.tonePack,
-        bucketKey: selected.bucketKey,
-        lineId: selected.lineId,
-      });
+      try {
+        const selected = selectCompanionDialogueEvent({
+          ...selectionContextBase,
+          triggerSource,
+          now: new Date(),
+        });
+        setDialogueEvent(toDialogueEventState(selected));
+      } catch (error) {
+        console.error("Failed to refresh companion dialogue event:", error);
+        setDialogueEvent(createBootstrapDialogueEvent());
+      }
 
       lastRefreshAtRef.current = Date.now();
     },
@@ -292,6 +329,10 @@ export function useCompanionDialogue() {
     return pickRandom(voiceTemplate.encouragement_templates, "encouragement");
   }, [voiceTemplate, pickRandom]);
 
+  const refreshDialogue = useCallback((triggerSource: DialogueTriggerSource = "idle", force = false) => {
+    requestRefresh(triggerSource, force);
+  }, [requestRefresh]);
+
   return {
     greeting: dialogueEvent.greeting || DEFAULT_GREETING,
     bondDialogue,
@@ -305,6 +346,7 @@ export function useCompanionDialogue() {
     tonePack: dialogueEvent.tonePack,
     bucketKey: dialogueEvent.bucketKey,
     lineId: dialogueEvent.lineId,
+    refreshDialogue,
     isLoading: templateLoading || careLoading,
   };
 }

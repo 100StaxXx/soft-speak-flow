@@ -681,6 +681,14 @@ All colors MUST be HSL.
       overscroll-behavior: none;
     }
 
+    html.timeline-drag-scroll-locked,
+    body.timeline-drag-scroll-locked {
+      overflow: hidden;
+      height: 100%;
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     letter-spacing: 0.01em;

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { act, fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { OrbMatchGame } from './OrbMatchGame';
 import { GalacticMatchGame } from './GalacticMatchGame';
@@ -52,6 +52,30 @@ const advance = (ms: number) => {
   act(() => {
     vi.advanceTimersByTime(ms);
   });
+};
+
+const getGalacticCards = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll('div.relative.w-full.h-full')) as HTMLDivElement[];
+
+const completeGalacticLevel = (container: HTMLElement) => {
+  const getInteractiveCards = () => getGalacticCards(container).filter((card) => !card.hasAttribute('disabled'));
+
+  // With fake timers, phase transitions need incremental advancement to re-render and reschedule.
+  for (let i = 0; i < 30 && getInteractiveCards().length < 4; i++) {
+    advance(500);
+  }
+
+  const firstMoveCards = getInteractiveCards();
+  expect(firstMoveCards.length).toBeGreaterThanOrEqual(4);
+
+  // Deterministic pairing for level-1 shuffle when Math.random() is stubbed to 0.
+  fireEvent.click(firstMoveCards[0]);
+  fireEvent.click(firstMoveCards[2]);
+  advance(500);
+
+  fireEvent.click(firstMoveCards[1]);
+  fireEvent.click(firstMoveCards[3]);
+  advance(500);
 };
 
 describe('active encounter lifecycle hardening', () => {
@@ -155,6 +179,54 @@ describe('active encounter lifecycle hardening', () => {
 
     advance(10000);
     expect(onComplete.mock.calls.length).toBeLessThanOrEqual(1);
+  });
+
+  it('GalacticMatch auto-advances after level complete overlay without freezing', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const onComplete = vi.fn();
+    const { container } = render(
+      <GalacticMatchGame
+        {...baseProps}
+        difficulty="easy"
+        compact
+        onComplete={onComplete}
+      />,
+    );
+
+    completeGalacticLevel(container);
+    expect(screen.getByText('Level 1 Complete!')).toBeInTheDocument();
+
+    // Auto-advance delay
+    advance(1600);
+
+    expect(screen.queryByText('Level 1 Complete!')).not.toBeInTheDocument();
+    expect(screen.getByText('Lv2')).toBeInTheDocument();
+    expect(onComplete).toHaveBeenCalledTimes(0);
+  });
+
+  it('GalacticMatch Continue button advances immediately from level complete overlay', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const onComplete = vi.fn();
+    const { container } = render(
+      <GalacticMatchGame
+        {...baseProps}
+        difficulty="easy"
+        compact
+        onComplete={onComplete}
+      />,
+    );
+
+    completeGalacticLevel(container);
+    const continueButton = screen.getByRole('button', { name: 'Continue' });
+    fireEvent.click(continueButton);
+
+    expect(screen.queryByText('Level 1 Complete!')).not.toBeInTheDocument();
+    expect(screen.getByText('Lv2')).toBeInTheDocument();
+
+    // Ensure pending auto timer cannot cause an extra advance.
+    advance(2000);
+    expect(screen.getByText('Lv2')).toBeInTheDocument();
+    expect(onComplete).toHaveBeenCalledTimes(0);
   });
 
   it('cleans up timers safely on unmount for all active games', () => {

@@ -7,6 +7,7 @@ import { useAchievements } from "./useAchievements";
 import { playMissionComplete } from "@/utils/soundEffects";
 import { useState, useEffect, useRef } from "react";
 import { getEffectiveMissionDate } from "@/utils/timezone";
+import { logger } from "@/utils/logger";
 import {
   isRetriableFunctionInvokeError,
   parseFunctionInvokeError,
@@ -59,6 +60,8 @@ const getMissionRetryDelayMs = (attemptIndex: number) => {
   return Math.min(500 * 2 ** attemptIndex, 3000);
 };
 
+const log = logger.scope("useDailyMissions");
+
 export const useDailyMissions = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -84,6 +87,44 @@ export const useDailyMissions = () => {
     });
   };
 
+  const generateMissionsForQuery = async (userId: string) => {
+    const { data: generated, error: generationError } = await supabase.functions.invoke('generate-daily-missions', {
+      body: { userId }
+    });
+
+    if (generationError) {
+      const parsedError = await parseFunctionInvokeError(generationError);
+      log.error("Mission generation fallback failed", {
+        userId,
+        missionDate: today,
+        status: parsedError.status,
+        code: parsedError.code ?? parsedError.responsePayload?.code,
+        category: parsedError.category,
+        backendMessage: parsedError.backendMessage,
+      });
+      const message = toUserFacingFunctionError(parsedError, { action: "refresh your missions" });
+      setGenerationErrorMessage(message);
+      throw makeMissionQueryError(message, isRetriableFunctionInvokeError(generationError));
+    }
+
+    const generationPayload = (generated ?? {}) as MissionGenerationResponse;
+    maybeToastFallbackInfo(generationPayload.meta);
+
+    const newMissions = generationPayload.missions || [];
+    if (newMissions.length === 0) {
+      const message = 'No missions available right now. Please try again soon.';
+      setGenerationErrorMessage(message);
+      throw makeMissionQueryError(message, false);
+    }
+    
+    // Capture theme from edge function response
+    if (generationPayload.theme) {
+      setMissionTheme(generationPayload.theme);
+    }
+
+    return newMissions;
+  };
+
   const { data: missions, isLoading, error } = useQuery({
     queryKey: ['daily-missions', today, user?.id],
     queryFn: async () => {
@@ -99,42 +140,37 @@ export const useDailyMissions = () => {
         .eq('mission_date', today);
 
       if (existingError) {
-        throw makeMissionQueryError(
-          "Unable to load daily missions right now. Please try again in a moment.",
-          isRetriableMissionDataError(existingError),
-        );
+        const retriable = isRetriableMissionDataError(existingError);
+        if (retriable) {
+          throw makeMissionQueryError(
+            "Unable to load daily missions right now. Please try again in a moment.",
+            true,
+          );
+        }
+
+        const missionReadError = existingError as {
+          code?: string;
+          message?: string;
+          details?: string;
+          hint?: string;
+          status?: number;
+        };
+        log.error("daily_missions read failed; attempting generation fallback", {
+          userId: user.id,
+          missionDate: today,
+          code: missionReadError.code,
+          message: missionReadError.message,
+          details: missionReadError.details,
+          hint: missionReadError.hint,
+          status: missionReadError.status,
+        });
+
+        return generateMissionsForQuery(user.id);
       }
 
       // If no missions exist, generate them server-side
       if (!existing || existing.length === 0) {
-        const { data: generated, error: generationError } = await supabase.functions.invoke('generate-daily-missions', {
-          body: { userId: user.id }
-        });
-
-        if (generationError) {
-          console.error('Mission generation failed:', generationError);
-          const parsedError = await parseFunctionInvokeError(generationError);
-          const message = toUserFacingFunctionError(parsedError, { action: "refresh your missions" });
-          setGenerationErrorMessage(message);
-          throw makeMissionQueryError(message, isRetriableFunctionInvokeError(generationError));
-        }
-
-        const generationPayload = (generated ?? {}) as MissionGenerationResponse;
-        maybeToastFallbackInfo(generationPayload.meta);
-
-        const newMissions = generationPayload.missions || [];
-        if (newMissions.length === 0) {
-          const message = 'No missions available right now. Please try again soon.';
-          setGenerationErrorMessage(message);
-          throw makeMissionQueryError(message, false);
-        }
-        
-        // Capture theme from edge function response
-        if (generationPayload.theme) {
-          setMissionTheme(generationPayload.theme);
-        }
-        
-        return newMissions;
+        return generateMissionsForQuery(user.id);
       }
 
       setGenerationErrorMessage(null);
