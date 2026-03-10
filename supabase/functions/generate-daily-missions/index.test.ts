@@ -79,6 +79,9 @@ Deno.test("invalid profile timezone normalizes to UTC without throwing", () => {
 
   assert(normalized === "UTC", "Expected invalid timezone to normalize to UTC");
   assert(typeof invalidTzDate === "string" && invalidTzDate.length > 0, "Expected mission date output");
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(invalidTzDate), `Expected YYYY-MM-DD format, got ${invalidTzDate}`);
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(utcDate), `Expected YYYY-MM-DD format, got ${utcDate}`);
+  assert(!invalidTzDate.includes("/"), "Expected mission date to avoid locale slash separators");
   assert(invalidTzDate === utcDate, "Expected invalid timezone mission date to match UTC");
 });
 
