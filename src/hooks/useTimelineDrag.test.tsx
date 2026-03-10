@@ -490,6 +490,73 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-1", "09:45");
   });
 
+  it("allows pointer drag starts from interactive drag-handle targets", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const dragHandle = document.createElement("button");
+    dragHandle.setAttribute("data-interactive", "true");
+    dragHandle.setAttribute("data-drag-handle", "reschedule");
+    const handleIcon = document.createElement("span");
+    dragHandle.appendChild(handleIcon);
+
+    const rowProps = result.current.getRowDragProps("task-handle-pointer", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(100, handleIcon));
+      dispatchPointerMove(120);
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-handle-pointer", "09:10");
+  });
+
+  it("allows touch drag starts from interactive drag-handle targets", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const dragHandle = document.createElement("button");
+    dragHandle.setAttribute("data-interactive", "true");
+    dragHandle.setAttribute("data-drag-handle", "reschedule");
+    const handleIcon = document.createElement("span");
+    dragHandle.appendChild(handleIcon);
+
+    const rowProps = result.current.getRowDragProps("task-handle-touch", "09:00");
+    act(() => {
+      rowProps.onTouchStart(createTouchEvent(100, handleIcon));
+      dispatchTouchMove(120);
+      dispatchTouchEnd();
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-handle-touch", "09:10");
+  });
+
+  it("ignores pointer/touch starts from tap controls without drag-handle intent", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));
+
+    const tapControl = document.createElement("button");
+    tapControl.setAttribute("data-tap-control", "true");
+    const child = document.createElement("span");
+    tapControl.appendChild(child);
+
+    const handleProps = result.current.getRowDragProps("task-tap-control", "09:00");
+
+    act(() => {
+      handleProps.onPointerDown(createPointerDownEvent(100, child));
+      dispatchPointerMove(130);
+      dispatchPointerUp();
+    });
+    expect(result.current.draggingTaskId).toBeNull();
+
+    act(() => {
+      handleProps.onTouchStart(createTouchEvent(100, child));
+      dispatchTouchMove(130);
+      dispatchTouchEnd();
+    });
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
   it("ignores pointer/touch starts from interactive descendants", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() => useTimelineDrag({ containerRef, onDrop }));

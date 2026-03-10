@@ -14,12 +14,13 @@ import {
   snapMinuteByMode,
   time24ToMinute,
 } from "@/components/calendar/dragSnap";
+import { resolveDragStartIntent } from "@/hooks/dragStartIntent";
 
 const DROP_BOUNCE_MS = 300;
-const INTERACTIVE_SELECTOR = '[data-interactive="true"]';
 const DEFAULT_ACTIVATION_THRESHOLD_PX = 8;
 const DEFAULT_TOUCH_LONG_PRESS_MS = 500;
 const POINTER_NUDGE_RELEASE_DEADZONE_PX = 2;
+const TIMELINE_RESCHEDULE_DRAG_HANDLE_ID = "reschedule";
 
 type TouchActivationPolicy = "threshold" | "longPressThenMove";
 
@@ -175,8 +176,8 @@ export function useTimelineDrag({
     scrollSpeed: 8,
   });
 
-  const isInteractiveEventTarget = useCallback((target: EventTarget | null) => {
-    return target instanceof Element && !!target.closest(INTERACTIVE_SELECTOR);
+  const shouldIgnoreDragStartTarget = useCallback((target: EventTarget | null) => {
+    return resolveDragStartIntent(target, TIMELINE_RESCHEDULE_DRAG_HANDLE_ID) === "ignore";
   }, []);
 
   const clearDropResetTimer = useCallback(() => {
@@ -586,13 +587,13 @@ export function useTimelineDrag({
     (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (e.defaultPrevented) return;
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
-      if (isInteractiveEventTarget(e.target)) return;
+      if (shouldIgnoreDragStartTarget(e.target)) return;
       const touch = e.touches[0];
       if (!touch) return;
 
       startPendingDrag(taskId, scheduledTime, touch.clientY, "touch");
     },
-    [isInteractiveEventTarget, startPendingDrag],
+    [shouldIgnoreDragStartTarget, startPendingDrag],
   );
 
   const noopTouchMove = useCallback(
@@ -613,13 +614,13 @@ export function useTimelineDrag({
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (e.defaultPrevented) return;
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
-      if (isInteractiveEventTarget(e.target)) return;
+      if (shouldIgnoreDragStartTarget(e.target)) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
 
       const activationSource = e.pointerType === "touch" ? "touch" : "pointer";
       startPendingDrag(taskId, scheduledTime, e.clientY, "pointer", activationSource);
     },
-    [isInteractiveEventTarget, startPendingDrag],
+    [shouldIgnoreDragStartTarget, startPendingDrag],
   );
 
   const nudgeByFineStep = useCallback(

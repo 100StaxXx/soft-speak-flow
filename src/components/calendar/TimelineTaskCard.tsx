@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import type { PointerEventHandler, TouchEventHandler } from "react";
 import { cn } from "@/lib/utils";
-import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, Sun, GripVertical } from "lucide-react";
+import { Check, RotateCcw, Brain, Dumbbell, Heart, Sparkles, Sun } from "lucide-react";
 import { CalendarTask } from "@/types/quest";
 import { normalizeScheduledTime, parseScheduledTime } from "@/utils/scheduledTime";
 
@@ -11,8 +11,10 @@ interface TimelineTaskCardProps {
   onTaskLongPress?: (taskId: string) => void;
   isDragging?: boolean;
   previewTime?: string | null;
-  dragHandleProps?: {
+  rowDragProps?: {
+    onPointerDownCapture?: PointerEventHandler<HTMLElement>;
     onPointerDown?: PointerEventHandler<HTMLElement>;
+    onTouchStartCapture?: TouchEventHandler<HTMLElement>;
     onTouchStart?: TouchEventHandler<HTMLElement>;
     onTouchMove?: TouchEventHandler<HTMLElement>;
     onTouchEnd?: TouchEventHandler<HTMLElement>;
@@ -55,7 +57,7 @@ export function TimelineTaskCard({
   onTaskLongPress,
   isDragging,
   previewTime,
-  dragHandleProps,
+  rowDragProps,
 }: TimelineTaskCardProps) {
   const categoryConfig = CATEGORY_CONFIG[task.category || "default"] || CATEGORY_CONFIG.default;
   const IconComponent = categoryConfig.icon;
@@ -75,16 +77,18 @@ export function TimelineTaskCard({
 
   return (
     <div
+      {...(rowDragProps ?? {})}
       onClick={handleClick}
       onContextMenu={(e) => {
         e.preventDefault();
         handleLongPress();
       }}
       className={cn(
-        "flex items-center gap-4 py-3 cursor-pointer transition-all select-none touch-none",
+        "flex items-center gap-4 py-3 cursor-pointer transition-all select-none",
         task.completed && "opacity-50",
         isDragging && "scale-[1.02] z-10"
       )}
+      style={{ touchAction: isDragging ? "none" : "pan-y" }}
     >
       {/* Category Icon Circle */}
       <div className={cn(
@@ -129,24 +133,8 @@ export function TimelineTaskCard({
 
       {/* Checkbox */}
       <div className="flex items-center gap-2">
-        {!task.completed && dragHandleProps && (
-          <button
-            type="button"
-            aria-label="Drag to reschedule"
-            title="Drag to reschedule (15-minute snap; hold near start before moving for 5-minute precision)"
-            className={cn(
-              "h-8 w-8 rounded-md flex items-center justify-center touch-none",
-              isDragging ? "cursor-grabbing text-primary" : "cursor-grab text-muted-foreground hover:text-foreground"
-            )}
-            style={{ WebkitTapHighlightColor: "transparent", touchAction: "none" }}
-            onClick={(e) => e.stopPropagation()}
-            {...dragHandleProps}
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
-        )}
-
         <button
+          data-interactive="true"
           onClick={(e) => {
             e.stopPropagation();
             // Toggle will be handled by parent

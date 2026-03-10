@@ -934,7 +934,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(windowScrollToSpy.mock.calls.length + elementScrollToSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
-  it("renders timeline without scheduled category header text", () => {
+  it("renders timeline without scheduled category header text and includes drag handle affordance", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1011,7 +1011,7 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(screen.queryByText("Anytime")).not.toBeInTheDocument();
   });
 
-  it("uses drag handle wiring for scheduled quests", () => {
+  it("uses row drag wiring for scheduled quests", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1039,11 +1039,11 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    expect(mocks.getDragHandlePropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
-    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
+    expect(mocks.getRowDragPropsMock).toHaveBeenCalledWith("task-scheduled-1", "08:00");
+    expect(mocks.getDragHandlePropsMock).not.toHaveBeenCalled();
   });
 
-  it("forwards pointer down from drag handle to drag handler", () => {
+  it("forwards row pointer down to row drag handler", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1071,16 +1071,16 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
-    fireEvent.pointerDown(dragHandle, { pointerType: "mouse", button: 0, clientY: 100 });
+    const row = screen.getByTestId("timeline-row-task-scheduled-1");
+    fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
 
-    expect(mocks.handlePointerDownCaptureSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.handlePointerDownSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
   });
 
-  it("forwards touch start from drag handle to drag handler", () => {
+  it("forwards row touch start to row drag handler", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1108,16 +1108,16 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
       { wrapper: createWrapper(queryClient) },
     );
 
-    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
-    fireEvent.touchStart(dragHandle, { touches: [{ clientX: 0, clientY: 100 }] });
+    const row = screen.getByTestId("timeline-row-task-scheduled-1");
+    fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
-    expect(mocks.handleTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.handleTouchStartSpy).toHaveBeenCalledTimes(1);
-    expect(mocks.rowTouchStartCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowTouchStartSpy).not.toHaveBeenCalled();
+    expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.handleTouchStartCaptureSpy).not.toHaveBeenCalled();
+    expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
   });
 
-  it("does not forward row pointer and touch starts to drag handlers", () => {
+  it("does not forward row pointer and touch starts to handle-only drag handlers", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -1149,14 +1149,14 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     fireEvent.pointerDown(row, { pointerType: "mouse", button: 0, clientY: 100 });
     fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
 
+    expect(mocks.rowPointerDownCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowPointerDownSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowTouchStartCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowTouchStartSpy).toHaveBeenCalledTimes(1);
     expect(mocks.handlePointerDownCaptureSpy).not.toHaveBeenCalled();
     expect(mocks.handlePointerDownSpy).not.toHaveBeenCalled();
     expect(mocks.handleTouchStartCaptureSpy).not.toHaveBeenCalled();
     expect(mocks.handleTouchStartSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowPointerDownSpy).not.toHaveBeenCalled();
-    expect(mocks.rowTouchStartCaptureSpy).not.toHaveBeenCalled();
-    expect(mocks.rowTouchStartSpy).not.toHaveBeenCalled();
   });
 
   it("shows compact overlap copy for conflicting tasks", () => {

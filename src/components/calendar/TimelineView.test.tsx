@@ -88,10 +88,10 @@ describe("TimelineView drag integration", () => {
       />,
     );
 
-    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    const dragRow = screen.getByText("Focus block");
 
     act(() => {
-      fireEvent(dragHandle, createPointerDownEvent(100));
+      fireEvent(dragRow, createPointerDownEvent(100));
 
       dispatchPointerMove(120); // +20px => shared profile preview/drop +20m
       window.dispatchEvent(new Event("pointerup"));
@@ -114,9 +114,9 @@ describe("TimelineView drag integration", () => {
       />,
     );
 
-    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    const dragRow = screen.getByText("Focus block");
     act(() => {
-      fireEvent(dragHandle, createPointerDownEvent(100));
+      fireEvent(dragRow, createPointerDownEvent(100));
 
       dispatchPointerMove(120);
     });
@@ -126,7 +126,7 @@ describe("TimelineView drag integration", () => {
     });
   });
 
-  it("does not reschedule when drag handle is clicked without movement", async () => {
+  it("does not reschedule when row is pressed without movement", async () => {
     const onTaskReschedule = vi.fn();
 
     render(
@@ -138,16 +138,16 @@ describe("TimelineView drag integration", () => {
       />,
     );
 
-    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    const dragRow = screen.getByText("Focus block");
     act(() => {
-      fireEvent(dragHandle, createPointerDownEvent(100));
+      fireEvent(dragRow, createPointerDownEvent(100));
       window.dispatchEvent(new Event("pointerup"));
     });
 
     expect(onTaskReschedule).not.toHaveBeenCalled();
   });
 
-  it("requires touch hold before handle drag reschedules", () => {
+  it("requires touch hold before row drag reschedules", () => {
     vi.useFakeTimers();
     const onTaskReschedule = vi.fn();
 
@@ -160,16 +160,16 @@ describe("TimelineView drag integration", () => {
       />,
     );
 
-    const dragHandle = screen.getByRole("button", { name: /drag to reschedule/i });
+    const dragRow = screen.getByText("Focus block");
     act(() => {
-      fireEvent.touchStart(dragHandle, { touches: [{ clientX: 0, clientY: 100 }] });
+      fireEvent.touchStart(dragRow, { touches: [{ clientX: 0, clientY: 100 }] });
       dispatchTouchMove(130);
       dispatchTouchEnd();
     });
     expect(onTaskReschedule).not.toHaveBeenCalled();
 
     act(() => {
-      fireEvent.touchStart(dragHandle, { touches: [{ clientX: 0, clientY: 100 }] });
+      fireEvent.touchStart(dragRow, { touches: [{ clientX: 0, clientY: 100 }] });
       vi.advanceTimersByTime(500);
       dispatchTouchMove(130);
       vi.advanceTimersByTime(16);

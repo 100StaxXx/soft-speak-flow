@@ -162,8 +162,8 @@ export function TimelineView({
                     onTaskLongPress={onTaskLongPress}
                     isDragging={isThisDragging}
                     previewTime={isThisDragging ? timelineDrag.previewTime : null}
-                    dragHandleProps={task.scheduled_time
-                      ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                    rowDragProps={task.scheduled_time && !task.completed
+                      ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                       : undefined}
                   />
                 </motion.div>

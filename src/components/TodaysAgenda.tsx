@@ -217,9 +217,9 @@ interface TodaysAgendaProps {
 
 interface TimelineRescheduleHandleProps {
   onPointerDown?: React.PointerEventHandler<HTMLElement>;
-  onPointerDownCapture?: React.PointerEventHandler<HTMLElement>;
+  onPointerDownCapture?: (event: React.PointerEvent<HTMLElement>) => void;
   onTouchStart?: React.TouchEventHandler<HTMLElement>;
-  onTouchStartCapture?: React.TouchEventHandler<HTMLElement>;
+  onTouchStartCapture?: (event: React.TouchEvent<HTMLElement>) => void;
   onTouchMove?: React.TouchEventHandler<HTMLElement>;
   onTouchEnd?: React.TouchEventHandler<HTMLElement>;
   onTouchCancel?: React.TouchEventHandler<HTMLElement>;
@@ -1522,7 +1522,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       (task.is_recurring && task.recurrence_pattern)
     );
     const showTimelineDragHandle = !!timelineDragHandleProps && !isComplete && !!task.scheduled_time;
-    
     const handleCheckboxClick = (e: React.MouseEvent) => {
       e.stopPropagation();
       // Don't allow clicks while dragging or during long press
@@ -1577,6 +1576,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
           <div className="relative ml-1 flex flex-col items-center self-start pt-0.5 gap-0">
             <button
               data-interactive="true"
+              data-tap-control="true"
               onClick={handleCheckboxClick}
               onTouchStart={(e) => {
                 touchStartRef.current = { 
@@ -1681,6 +1681,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {showTimelineDragHandle && (
               <button
                 data-interactive="true"
+                data-tap-control="true"
+                data-drag-handle="reschedule"
                 type="button"
                 aria-label="Drag to reschedule"
                 title="Drag to reschedule"
@@ -1701,6 +1703,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                 <DropdownMenuTrigger asChild>
                   <Button
                     data-interactive="true"
+                    data-tap-control="true"
                     aria-label="Quest actions"
                     variant="ghost"
                     size="icon"
@@ -1770,6 +1773,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             {hasDetails && (
               <Button
                 data-interactive="true"
+                data-tap-control="true"
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 -m-1 flex-shrink-0"
@@ -2169,7 +2173,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
                       : 0;
                     const baseTimelineRowDragProps = task.scheduled_time && !task.completed
-                      ? timelineDrag.getDragHandleProps(task.id, task.scheduled_time)
+                      ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                       : undefined;
                     const timelineRowDragProps = baseTimelineRowDragProps
                       ? {
@@ -2258,6 +2262,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                         data-timeline-lane-count={laneCount}
                         data-timeline-overlap={rowFlow?.overlapCount}
                         data-timeline-shift-px={laneOffsetPx}
+                        {...(timelineRowDragProps ?? {})}
                         style={{
                           ...rowStyle,
                           maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
