@@ -85,6 +85,13 @@ describe("EditQuestDialog", () => {
     recurrence_days: [0, 2, 4],
   };
 
+  const legacyRecurringWithoutTimeTask = {
+    ...legacyTask,
+    id: "task-3",
+    recurrence_pattern: "daily",
+    scheduled_time: null,
+  };
+
   it("reopens safely with legacy time values", () => {
     const onOpenChange = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);
@@ -287,5 +294,29 @@ describe("EditQuestDialog", () => {
         image_url: "https://example.com/a.png",
       }),
     );
+  });
+
+  it("requires time before saving recurring quests", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <EditQuestDialog
+        task={legacyRecurringWithoutTimeTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={onSave}
+        isSaving={false}
+      />,
+    );
+
+    const saveButton = screen.getByRole("button", { name: "Save Changes" });
+    expect(saveButton).toBeDisabled();
+    expect(screen.getByText("Set a time before enabling recurrence.")).toBeInTheDocument();
+
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(onSave).not.toHaveBeenCalled();
+    });
   });
 });

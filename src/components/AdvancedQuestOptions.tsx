@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, Calendar, ChevronDown, Repeat, Bell, Info, Sparkles, Loader2, Star, MapPin } from "lucide-react";
 import { FrequencyPicker } from "./FrequencyPicker";
 import { useSmartScheduling } from "@/hooks/useSmartScheduling";
+import { hasScheduledTimeValue } from "@/utils/recurrenceValidation";
 import {
   Popover,
   PopoverContent,
@@ -45,6 +46,7 @@ interface AdvancedQuestOptionsProps {
   hideMoreInformation?: boolean;
   hideReminder?: boolean;
   hideLocation?: boolean;
+  requireScheduledTimeForRecurrence?: boolean;
 }
 
 // Helper to format 24h time to 12h
@@ -101,11 +103,20 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const [showDurationOptions, setShowDurationOptions] = useState(false);
   const [showRecurrenceOptions, setShowRecurrenceOptions] = useState(false);
   const [showReminderOptions, setShowReminderOptions] = useState(false);
+  const recurrenceSelectionDisabled = Boolean(
+    props.requireScheduledTimeForRecurrence && !hasScheduledTimeValue(props.scheduledTime),
+  );
 
   const hasPresetReminder = reminderOptions.some((option) => option.value === props.reminderMinutesBefore);
   const reminderTriggerLabel = hasPresetReminder
     ? reminderOptions.find((option) => option.value === props.reminderMinutesBefore)?.label
     : `${props.reminderMinutesBefore} minutes before (Custom)`;
+
+  useEffect(() => {
+    if (recurrenceSelectionDisabled) {
+      setShowRecurrenceOptions(false);
+    }
+  }, [recurrenceSelectionDisabled]);
 
   useEffect(() => {
     if (!showReminderOptions) {
@@ -210,6 +221,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   };
 
   const handleRecurrenceOptionSelect = useCallback((value: string) => {
+    if (recurrenceSelectionDisabled && value !== "none") {
+      return;
+    }
+
     if (value === "none") {
       props.onRecurrencePatternChange(null);
       props.onRecurrenceDaysChange([]);
@@ -251,7 +266,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
     }
 
     setShowRecurrenceOptions(false);
-  }, [props, selectedAppDay, selectedMonthDay]);
+  }, [props, recurrenceSelectionDisabled, selectedAppDay, selectedMonthDay]);
 
   const handleCustomPeriodChange = useCallback((period: "week" | "month") => {
     props.onRecurrenceCustomPeriodChange(period);
@@ -528,7 +543,12 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             <button
               type="button"
               onClick={() => setShowRecurrenceOptions(!showRecurrenceOptions)}
-              className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+              disabled={recurrenceSelectionDisabled}
+              className={`w-full px-3 py-2 text-sm text-left border rounded-lg transition-colors flex items-center justify-between ${
+                recurrenceSelectionDisabled
+                  ? "bg-muted text-muted-foreground cursor-not-allowed opacity-70"
+                  : "bg-background hover:bg-accent"
+              }`}
             >
               <span>
                 {recurrenceOptions.find(opt => opt.value === (recurrencePatternForEditor || 'none'))?.label || "None"}
@@ -553,6 +573,12 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               </div>
             )}
           </div>
+
+          {recurrenceSelectionDisabled && (
+            <p className="text-xs text-muted-foreground">
+              Set a time to enable recurrence.
+            </p>
+          )}
           
           {recurrencePatternForEditor === 'custom' && (
             <div className="flex gap-2">

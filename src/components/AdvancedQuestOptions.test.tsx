@@ -49,6 +49,34 @@ function RecurrenceHarness({ selectedDate }: { selectedDate?: Date }) {
   );
 }
 
+function RecurrenceDisabledHarness() {
+  return (
+    <AdvancedQuestOptions
+      scheduledTime={null}
+      onScheduledTimeChange={vi.fn()}
+      estimatedDuration={30}
+      onEstimatedDurationChange={vi.fn()}
+      recurrencePattern={null}
+      onRecurrencePatternChange={vi.fn()}
+      recurrenceDays={[]}
+      onRecurrenceDaysChange={vi.fn()}
+      recurrenceMonthDays={[]}
+      onRecurrenceMonthDaysChange={vi.fn()}
+      recurrenceCustomPeriod={null}
+      onRecurrenceCustomPeriodChange={vi.fn()}
+      reminderEnabled={false}
+      onReminderEnabledChange={vi.fn()}
+      reminderMinutesBefore={15}
+      onReminderMinutesBeforeChange={vi.fn()}
+      moreInformation={null}
+      onMoreInformationChange={vi.fn()}
+      location={null}
+      onLocationChange={vi.fn()}
+      requireScheduledTimeForRecurrence
+    />
+  );
+}
+
 function ReminderHarness() {
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(15);
 
@@ -195,6 +223,14 @@ describe("AdvancedQuestOptions recurrence", () => {
     await waitFor(() => {
       expect(screen.getByTestId("recurrence-state")).toHaveTextContent("custom|0|12|month");
     });
+  });
+
+  it("disables recurrence controls when time is required but missing", () => {
+    render(<RecurrenceDisabledHarness />);
+
+    const recurrenceButton = screen.getByRole("button", { name: "None" });
+    expect(recurrenceButton).toBeDisabled();
+    expect(screen.getByText("Set a time to enable recurrence.")).toBeInTheDocument();
   });
 });
 

@@ -40,6 +40,7 @@ import {
 } from "../utils/editQuestDialogNormalization";
 import { parseScheduledTime } from "@/utils/scheduledTime";
 import type { QuestAttachmentInput, TaskAttachment } from "@/types/questAttachments";
+import { recurrenceRequiresScheduledTime } from "@/utils/recurrenceValidation";
 
 interface Task {
   id: string;
@@ -241,9 +242,10 @@ export function EditQuestDialog({
 
   const colors = DIFFICULTY_COLORS[difficulty];
   const dateObj = parsedTaskDate ?? new Date();
+  const hasRecurrenceWithoutTime = recurrenceRequiresScheduledTime(recurrencePattern, scheduledTime);
 
   const handleSave = useCallback(async () => {
-    if (!task || !taskText.trim()) return;
+    if (!task || !taskText.trim() || hasRecurrenceWithoutTime) return;
     await onSave(task.id, {
       task_text: taskText.trim(),
       task_date: normalizeTaskDate(taskDate),
@@ -263,7 +265,7 @@ export function EditQuestDialog({
       attachments,
     });
     onOpenChange(false);
-  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, attachments, location, onSave, onOpenChange]);
+  }, [task, taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, attachments, location, hasRecurrenceWithoutTime, onSave, onOpenChange]);
 
   const handleDelete = async () => {
     if (!task || !onDelete) return;
@@ -604,7 +606,13 @@ export function EditQuestDialog({
                     hideScheduledTime
                     hideDuration
                     hideMoreInformation
+                    requireScheduledTimeForRecurrence
                   />
+                  {hasRecurrenceWithoutTime && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Set a time before enabling recurrence.
+                    </p>
+                  )}
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -615,7 +623,7 @@ export function EditQuestDialog({
         <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
             <Button
               onClick={handleSave}
-              disabled={isSaving || !taskText.trim()}
+              disabled={isSaving || !taskText.trim() || hasRecurrenceWithoutTime}
               className={cn(
                 "w-full text-white",
                 taskText.trim() ? cn(colors.pill, "hover:opacity-90") : ""

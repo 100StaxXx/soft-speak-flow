@@ -16,6 +16,12 @@ import {
   normalizeTaskSchedulingState,
   normalizeTaskSchedulingUpdate,
 } from "@/utils/taskSchedulingRules";
+import {
+  hasRecurrencePattern,
+  recurrenceRequiresScheduledTime,
+  RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR,
+  RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
+} from "@/utils/recurrenceValidation";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
@@ -198,6 +204,18 @@ function normalizeRecurrencePattern(pattern: string | null | undefined): string 
   return trimmedPattern.length > 0 ? trimmedPattern : null;
 }
 
+function buildRecurrenceRequiresScheduledTimeError(): Error {
+  return new Error(RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR);
+}
+
+function getTaskMutationErrorMessage(error: Error): string {
+  if (error.message === RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR) {
+    return RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE;
+  }
+
+  return error.message;
+}
+
 function isMonthBasedRecurrencePayload(payload: Record<string, unknown>): boolean {
   const recurrencePattern = typeof payload.recurrence_pattern === 'string'
     ? payload.recurrence_pattern.toLowerCase()
@@ -295,7 +313,7 @@ export const useTaskMutations = (taskDate: string) => {
 
     const { data: task, error } = await supabase
       .from('daily_tasks')
-      .select('task_date, scheduled_time, habit_source_id, source')
+      .select('task_date, scheduled_time, habit_source_id, source, recurrence_pattern')
       .eq('id', taskId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -374,6 +392,10 @@ export const useTaskMutations = (taskDate: string) => {
         recurrenceCustomPeriod: params.recurrenceCustomPeriod,
         recurrenceEndDate: params.recurrenceEndDate,
       });
+
+      if (recurrenceWrite.hasRecurrence && !normalizedScheduling.scheduled_time) {
+        throw buildRecurrenceRequiresScheduledTimeError();
+      }
 
       const queueCreateTask = async () => {
         const queueId = await queueTaskAction("CREATE_TASK", {
@@ -606,7 +628,11 @@ export const useTaskMutations = (taskDate: string) => {
         });
       }
       reportApiFailure(error, { source: "task_add_onError" });
-      toast({ title: "Failed to add quest", description: error.message, variant: "destructive" });
+      toast({
+        title: "Failed to add quest",
+        description: getTaskMutationErrorMessage(error),
+        variant: "destructive",
+      });
     },
     onSettled: () => {
       // Refetch to sync with server
@@ -1107,6 +1133,15 @@ export const useTaskMutations = (taskDate: string) => {
       let strippedScheduledTime = false;
       let movedFromInboxToScheduled = false;
       let attachmentsSkippedDueToSchema = false;
+      let existingScheduling:
+        | {
+          task_date: string | null;
+          scheduled_time: string | null;
+          habit_source_id: string | null;
+          source?: string | null;
+          recurrence_pattern?: string | null;
+        }
+        | null = null;
 
       // Build update object with only provided fields
       const updateData: Record<string, unknown> = {};
@@ -1173,8 +1208,19 @@ export const useTaskMutations = (taskDate: string) => {
         updateData.location = updates.location;
       }
 
+      if (!shouldQueueWrites && (
+        updates.task_date !== undefined
+        || updates.scheduled_time !== undefined
+        || updates.recurrence_pattern !== undefined
+      )) {
+        existingScheduling = await fetchTaskSchedulingState(taskId);
+      }
+
       if (!shouldQueueWrites && (updates.task_date !== undefined || updates.scheduled_time !== undefined)) {
-        const existingScheduling = await fetchTaskSchedulingState(taskId);
+        if (!existingScheduling) {
+          existingScheduling = await fetchTaskSchedulingState(taskId);
+        }
+
         const normalizedScheduling = normalizeTaskSchedulingUpdate(existingScheduling, {
           task_date: updates.task_date,
           scheduled_time: updates.scheduled_time,
@@ -1190,6 +1236,29 @@ export const useTaskMutations = (taskDate: string) => {
         normalizedToInbox = normalizedScheduling.normalizedToInbox;
         strippedScheduledTime = normalizedScheduling.strippedScheduledTime;
         movedFromInboxToScheduled = normalizedScheduling.movedFromInboxToScheduled;
+      }
+
+      const nextRecurrencePattern = normalizeRecurrencePattern(
+        updates.recurrence_pattern !== undefined
+          ? updates.recurrence_pattern
+          : existingScheduling?.recurrence_pattern ?? null,
+      );
+      const nextScheduledTime = typeof updateData.scheduled_time === 'string' || updateData.scheduled_time === null
+        ? updateData.scheduled_time
+        : existingScheduling?.scheduled_time ?? null;
+
+      if (recurrenceRequiresScheduledTime(nextRecurrencePattern, nextScheduledTime)) {
+        throw buildRecurrenceRequiresScheduledTimeError();
+      }
+
+      if (
+        shouldQueueWrites
+        && updates.recurrence_pattern !== undefined
+        && hasRecurrencePattern(updates.recurrence_pattern)
+        && updates.scheduled_time !== undefined
+        && !updates.scheduled_time
+      ) {
+        throw buildRecurrenceRequiresScheduledTimeError();
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -1295,7 +1364,11 @@ export const useTaskMutations = (taskDate: string) => {
       }
 
       reportApiFailure(error, { source: "task_update_onError_nonqueueable" });
-      toast({ title: "Failed to update quest", description: error.message, variant: "destructive" });
+      toast({
+        title: "Failed to update quest",
+        description: getTaskMutationErrorMessage(error),
+        variant: "destructive",
+      });
     },
   });
 

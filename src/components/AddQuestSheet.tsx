@@ -23,6 +23,7 @@ import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { parseScheduledTime } from "@/utils/scheduledTime";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
+import { hasRecurrencePattern } from "@/utils/recurrenceValidation";
 
 export interface AddQuestData {
   text: string;
@@ -243,7 +244,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const dateObj = taskDate ? new Date(taskDate + "T00:00:00") : selectedDate;
 
   const hasDateAndTime = !!taskDate && !!scheduledTime;
+  const hasRecurrence = hasRecurrencePattern(recurrencePattern);
   const canCreateTask = !!trimmedTaskText && hasDateAndTime;
+  const canAddToInbox = !!trimmedTaskText && !hasRecurrence;
   const reviewDateLabel = taskDate ? format(dateObj, "EEE, MMM d") : "Inbox";
   const reviewTimeLabel = scheduledTime ? formatTime12(scheduledTime) : "Select a time";
   const reviewTitle = trimmedTaskText || "Name your quest";
@@ -336,6 +339,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
   const handleAddToInbox = useCallback(async () => {
     if (!taskText.trim()) return;
+    if (hasRecurrencePattern(recurrencePattern)) return;
     await onAdd({
       text: taskText,
       taskDate: null,
@@ -702,6 +706,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 hideMoreInformation
                 hideReminder
                 hideLocation
+                requireScheduledTimeForRecurrence
               />
             </div>
 
@@ -759,6 +764,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     hideDuration
                     hideMoreInformation
                     hideRecurrence
+                    requireScheduledTimeForRecurrence
                   />
                 </div>
               </CollapsibleContent>
@@ -794,12 +800,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           <Button
             variant="outline"
             onClick={handleAddToInbox}
-            disabled={isAdding || !taskText.trim()}
+            disabled={isAdding || !canAddToInbox}
             className="w-full"
           >
             <Inbox className="mr-2 h-4 w-4" />
             Add to Inbox instead
           </Button>
+          {hasRecurrence && (
+            <p className="text-xs text-muted-foreground text-center">
+              Recurring quests must stay scheduled with a time.
+            </p>
+          )}
           {onCreateCampaign && (
             <button
               onClick={() => {

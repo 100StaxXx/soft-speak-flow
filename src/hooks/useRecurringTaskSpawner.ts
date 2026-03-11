@@ -13,6 +13,7 @@ import {
 } from 'date-fns';
 import { toast } from 'sonner';
 import { getClampedMonthDays } from '@/utils/habitSchedule';
+import { hasScheduledTimeValue } from '@/utils/recurrenceValidation';
 
 export interface RecurringTask {
   id: string;
@@ -40,6 +41,11 @@ type SupabaseLikeError = {
   details?: string | null;
   hint?: string | null;
 };
+
+interface SpawnRecurringResult {
+  data: { id: string }[];
+  skippedMissingTimeCount: number;
+}
 
 const RECURRING_TEMPLATE_SELECT_WITH_MONTH_RECURRENCE = `
   id,
@@ -178,9 +184,21 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
   // Spawn all pending recurring tasks
   const spawnMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.id || !pendingRecurring?.length) return [];
+      if (!user?.id || !pendingRecurring?.length) {
+        return { data: [], skippedMissingTimeCount: 0 } satisfies SpawnRecurringResult;
+      }
 
-      const tasksToCreate = pendingRecurring.map(template => ({
+      const missingTimeTemplates = pendingRecurring.filter((template) => !hasScheduledTimeValue(template.scheduled_time));
+      const templatesToSpawn = pendingRecurring.filter((template) => hasScheduledTimeValue(template.scheduled_time));
+
+      if (templatesToSpawn.length === 0) {
+        return {
+          data: [],
+          skippedMissingTimeCount: missingTimeTemplates.length,
+        } satisfies SpawnRecurringResult;
+      }
+
+      const tasksToCreate = templatesToSpawn.map(template => ({
         user_id: user.id,
         task_text: template.task_text,
         task_date: today,
@@ -207,9 +225,12 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
         .select('id');
 
       if (error) throw error;
-      return data;
+      return {
+        data: data ?? [],
+        skippedMissingTimeCount: missingTimeTemplates.length,
+      } satisfies SpawnRecurringResult;
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, skippedMissingTimeCount }) => {
       queryClient.invalidateQueries({ queryKey: ['recurring-templates'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -217,6 +238,10 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
       
       if (data && data.length > 0) {
         console.log(`[RecurringSpawner] Spawned ${data.length} recurring tasks for ${today}`);
+      }
+
+      if (skippedMissingTimeCount > 0) {
+        toast.error('Set a time on recurring quest templates to resume auto-creation.');
       }
     },
     onError: (error: Error) => {

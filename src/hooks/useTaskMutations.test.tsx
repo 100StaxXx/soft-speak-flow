@@ -107,6 +107,10 @@ import {
   isTaskAttachmentsTableMissingError,
   useTaskMutations,
 } from "./useTaskMutations";
+import {
+  RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR,
+  RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
+} from "@/utils/recurrenceValidation";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -188,10 +192,11 @@ describe("useTaskMutations attachment handling", () => {
     mocks.dailyTasksDeleteExecuteMock.mockResolvedValue({ error: null });
     mocks.dailyTasksFetchSchedulingSingleMock.mockResolvedValue({
       data: {
-        task_date: null,
-        scheduled_time: null,
+        task_date: "2026-02-20",
+        scheduled_time: "09:00",
         habit_source_id: null,
-        source: "inbox",
+        source: "manual",
+        recurrence_pattern: null,
       },
       error: null,
     });
@@ -214,7 +219,7 @@ describe("useTaskMutations attachment handling", () => {
       if (table === "daily_tasks") {
         return {
           select: vi.fn((selection?: string) => {
-            if (selection === "task_date, scheduled_time, habit_source_id, source") {
+            if (selection?.includes("task_date, scheduled_time, habit_source_id, source")) {
               return {
                 eq: vi.fn(() => ({
                   eq: vi.fn(() => ({
@@ -333,6 +338,7 @@ describe("useTaskMutations attachment handling", () => {
       taskText: "Custom week quest",
       difficulty: "medium",
       taskDate: "2026-02-20",
+      scheduledTime: "09:00",
       recurrencePattern: "custom",
       recurrenceDays: [1],
       recurrenceCustomPeriod: "week",
@@ -369,6 +375,7 @@ describe("useTaskMutations attachment handling", () => {
         taskText: "Monthly quest",
         difficulty: "medium",
         taskDate: "2026-02-20",
+        scheduledTime: "09:00",
         recurrencePattern: "custom",
         recurrenceCustomPeriod: "month",
         recurrenceMonthDays: [5],
@@ -437,6 +444,30 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
   });
 
+  it("blocks recurring quest creation when no scheduled time is provided", async () => {
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.addTask({
+        taskText: "Recurring without time",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+        scheduledTime: null,
+        recurrencePattern: "daily",
+      }),
+    ).rejects.toMatchObject({
+      message: RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR,
+    });
+
+    expect(mocks.dailyTasksInsertMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Failed to add quest",
+      description: RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
+    }));
+  });
+
   it("updates quest fields and skips attachment persistence when task_attachments is unavailable", async () => {
     mocks.taskAttachmentsDeleteExecuteMock.mockResolvedValue({
       error: taskAttachmentsMissingTableError,
@@ -496,6 +527,40 @@ describe("useTaskMutations attachment handling", () => {
     );
   });
 
+  it("blocks recurring quest updates when resulting task has no scheduled time", async () => {
+    mocks.dailyTasksFetchSchedulingSingleMock.mockResolvedValue({
+      data: {
+        task_date: null,
+        scheduled_time: null,
+        habit_source_id: null,
+        source: "inbox",
+        recurrence_pattern: null,
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.updateTask({
+        taskId: "task-1",
+        updates: {
+          recurrence_pattern: "daily",
+        },
+      }),
+    ).rejects.toMatchObject({
+      message: RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR,
+    });
+
+    expect(mocks.dailyTasksUpdateMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Failed to update quest",
+      description: RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
+    }));
+  });
+
   it("retries restore for non-month recurrence when recurrence columns are unavailable", async () => {
     mocks.dailyTasksInsertSingleMock
       .mockResolvedValueOnce({
@@ -543,6 +608,16 @@ describe("useTaskMutations attachment handling", () => {
   it("moves timed inbox updates into quests with today's date", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-24T08:25:00"));
+    mocks.dailyTasksFetchSchedulingSingleMock.mockResolvedValue({
+      data: {
+        task_date: null,
+        scheduled_time: null,
+        habit_source_id: null,
+        source: "inbox",
+        recurrence_pattern: null,
+      },
+      error: null,
+    });
 
     const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
       wrapper: createWrapper(),

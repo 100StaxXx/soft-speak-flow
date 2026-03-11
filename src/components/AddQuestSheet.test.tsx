@@ -468,6 +468,50 @@ describe("AddQuestSheet", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("disables recurrence controls until a time is selected", () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "None" })).toBeDisabled();
+    expect(screen.getByText("Set a time to enable recurrence.")).toBeInTheDocument();
+  });
+
+  it("blocks add-to-inbox when recurrence is enabled", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Recurring inbox attempt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "None" }));
+    fireEvent.click(screen.getByRole("button", { name: "Daily" }));
+
+    const inboxButton = screen.getByRole("button", { name: "Add to Inbox instead" });
+    expect(inboxButton).toBeDisabled();
+    expect(screen.getByText("Recurring quests must stay scheduled with a time.")).toBeInTheDocument();
+
+    fireEvent.click(inboxButton);
+
+    await waitFor(() => {
+      expect(onAdd).not.toHaveBeenCalled();
+    });
+  });
+
   it("submits scheduled quest payload when Add Quest is tapped", async () => {
     const onAdd = vi.fn<Parameters<(data: AddQuestData) => Promise<void>>, ReturnType<(data: AddQuestData) => Promise<void>>>()
       .mockResolvedValue(undefined);
