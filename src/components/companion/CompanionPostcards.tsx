@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
+import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
 const storyTypeIcons: Record<StoryTypeSlug, string> = {
   treasure_hunt: "🗺️",
@@ -29,12 +30,17 @@ interface EpicInfo {
   total_chapters: number | null;
 }
 
-export const CompanionPostcards = () => {
+interface CompanionPostcardsProps {
+  layoutMode?: CompanionLayoutMode;
+}
+
+export const CompanionPostcards = ({ layoutMode = "mobile" }: CompanionPostcardsProps) => {
   const { postcards, isLoading } = useCompanionPostcards();
   const [selectedPostcard, setSelectedPostcard] = useState<CompanionPostcard | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const { showModal: showTutorial, dismissModal: dismissTutorial } = useFirstTimeModal("postcards");
   const [manualTutorialOpen, setManualTutorialOpen] = useState(false);
+  const isDesktop = layoutMode === "desktop";
 
   // Fetch epic info for grouping
   const epicIds = useMemo(() => 
@@ -114,7 +120,7 @@ export const CompanionPostcards = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", isDesktop && "pt-1")}>
       {/* Tutorial Modal */}
       <PostcardsTutorialModal 
         open={showTutorial || manualTutorialOpen} 
@@ -125,7 +131,7 @@ export const CompanionPostcards = () => {
       />
 
       {/* Header Stats */}
-      <div className="flex items-center justify-between">
+      <div className={cn("flex items-center justify-between gap-3", isDesktop && "flex-wrap")}>
         <div className="flex items-center gap-2">
           <MapPin className="w-5 h-5 text-primary" />
           <h3 className="font-semibold text-foreground">Cosmic Postcards</h3>
@@ -148,7 +154,7 @@ export const CompanionPostcards = () => {
 
       {/* Filter Pills */}
       {totalPostcards > 0 && totalEpics > 0 && (
-        <div className="flex gap-2">
+        <div className={cn("flex gap-2", isDesktop && "flex-wrap")}>
           {(["all", "active", "completed"] as const).map((f) => (
             <button
               key={f}
@@ -241,7 +247,7 @@ export const CompanionPostcards = () => {
               )}
 
               {/* Postcards Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className={cn("grid gap-3", isDesktop ? "grid-cols-3 xl:grid-cols-4" : "grid-cols-2")}>
                 {group.postcards.map((postcard, index) => (
                   <motion.div
                     key={postcard.id}

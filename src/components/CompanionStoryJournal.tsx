@@ -11,12 +11,19 @@ import { getStageName } from "@/config/companionStages";
 import { toast } from "sonner";
 
 import { StoryJournalInfoTooltip } from "./StoryJournalInfoTooltip";
+import { cn } from "@/lib/utils";
+import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
-export const CompanionStoryJournal = () => {
+interface CompanionStoryJournalProps {
+  layoutMode?: CompanionLayoutMode;
+}
+
+export const CompanionStoryJournal = ({ layoutMode = "mobile" }: CompanionStoryJournalProps) => {
   const { companion, isLoading: companionLoading } = useCompanion();
   const [viewingStage, setViewingStage] = useState(0);
   const [debouncedStage, setDebouncedStage] = useState(0);
   const [showGallery, setShowGallery] = useState(false);
+  const isDesktop = layoutMode === "desktop";
   
   // Debounce stage changes to prevent race conditions
   useEffect(() => {
@@ -123,7 +130,7 @@ export const CompanionStoryJournal = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto p-4">
+    <div className={cn("space-y-6", isDesktop ? "max-w-none p-0" : "max-w-4xl mx-auto p-4")}>
       {showGallery && (
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -132,7 +139,7 @@ export const CompanionStoryJournal = () => {
               Close
             </Button>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          <div className={cn("grid gap-3", isDesktop ? "grid-cols-4 xl:grid-cols-6" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6")}>
             {galleryStages.map((i) => {
               const isUnlocked = canAccessStage(i);
               const hasStory = allStories?.some(s => s.stage === i);
@@ -175,8 +182,8 @@ export const CompanionStoryJournal = () => {
       )}
 
       {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2">
+      <div className={cn("space-y-2", isDesktop ? "text-left" : "text-center")}>
+        <div className={cn("flex items-center gap-2", isDesktop ? "justify-start" : "justify-center")}>
           <h1 className="text-3xl font-heading font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
             Story Journal
           </h1>
@@ -188,7 +195,7 @@ export const CompanionStoryJournal = () => {
       </div>
 
       {/* Progress indicator & Gallery button */}
-      <div className="flex justify-center items-center gap-4">
+      <div className={cn("flex items-center gap-4", isDesktop ? "justify-between" : "justify-center")}>
         <div className="text-sm text-muted-foreground">
           Unlocked: Prologue + {companion.current_stage} Chapters ({allStories?.length || 0} written)
         </div>
@@ -203,7 +210,7 @@ export const CompanionStoryJournal = () => {
       </div>
 
       {/* Navigation */}
-      <Card className="p-6">
+      <Card className={cn(isDesktop ? "p-8" : "p-6")}>
         {/* Companion Image at current stage */}
         {evolutionImage && isStageUnlocked && (
           <div className="flex justify-center mb-6">

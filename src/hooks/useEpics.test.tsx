@@ -35,6 +35,14 @@ vi.mock("@/hooks/useAIInteractionTracker", () => ({
   }),
 }));
 
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueAction: vi.fn(),
+    shouldQueueWrites: false,
+    retryNow: vi.fn(),
+  }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (...args: unknown[]) => mocks.fromMock(...args),

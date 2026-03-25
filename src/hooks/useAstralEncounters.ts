@@ -22,6 +22,7 @@ import {
   calculateXPReward, 
   getResultFromAccuracy 
 } from '@/utils/adversaryGenerator';
+import { isMacSession } from '@/utils/platformTargets';
 import { toast } from 'sonner';
 import { useLivingCompanionSafe } from '@/hooks/useLivingCompanion';
 
@@ -29,6 +30,7 @@ export type EncounterTriggerReason =
   | 'not_authenticated'
   | 'companion_not_ready'
   | 'trigger_in_progress'
+  | 'unsupported_platform'
   | 'pending_lookup_failed'
   | 'start_failed';
 
@@ -41,6 +43,7 @@ export interface EncounterTriggerResult {
 
 const RECENT_ADVERSARY_HISTORY_LIMIT = 10;
 const RECENT_MINIGAME_HISTORY_LIMIT = 2;
+const UNSUPPORTED_PLATFORM_ERROR_CODE = 'unsupported_platform';
 const VALID_MINI_GAME_TYPES = new Set<MiniGameType>([
   'energy_beam',
   'tap_sequence',
@@ -53,6 +56,23 @@ const VALID_MINI_GAME_TYPES = new Set<MiniGameType>([
   'cosmiq_grid',
   'stellar_flow',
 ]);
+
+type EncounterUnsupportedPlatformError = Error & {
+  code: typeof UNSUPPORTED_PLATFORM_ERROR_CODE;
+};
+
+const createUnsupportedPlatformError = (): EncounterUnsupportedPlatformError =>
+  Object.assign(new Error('Astral Encounters are only available on iPhone and iPad.'), {
+    code: UNSUPPORTED_PLATFORM_ERROR_CODE as const,
+  });
+
+const isUnsupportedPlatformError = (error: unknown): error is EncounterUnsupportedPlatformError => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  return (error as { code?: string }).code === UNSUPPORTED_PLATFORM_ERROR_CODE;
+};
 
 export const useAstralEncounters = () => {
   const { user } = useAuth();
@@ -164,6 +184,10 @@ export const useAstralEncounters = () => {
         throw new Error('User or companion not found');
       }
 
+      if (isMacSession()) {
+        throw createUnsupportedPlatformError();
+      }
+
       const recentAdversaryNames = Array.from(
         new Set(
           (encounters ?? [])
@@ -214,6 +238,10 @@ export const useAstralEncounters = () => {
       queryClient.invalidateQueries({ queryKey: ['astral-encounters'] });
     },
     onError: (error) => {
+      if (isUnsupportedPlatformError(error)) {
+        return;
+      }
+
       console.error('Failed to start encounter:', error);
       if (!isDuplicateActiveEncounterError(error)) {
         toast.error('Failed to start encounter');
@@ -539,6 +567,10 @@ export const useAstralEncounters = () => {
       return { ok: false, started: false, resumed: false, reason: 'trigger_in_progress' };
     }
 
+    if (isMacSession()) {
+      return { ok: false, started: false, resumed: false, reason: 'unsupported_platform' };
+    }
+
     triggerInProgressRef.current = true;
     setIsTriggeringEncounter(true);
 
@@ -612,6 +644,10 @@ export const useAstralEncounters = () => {
           setShowEncounterModal(false);
           return { ok: true, started: false, resumed: true };
         }
+      }
+
+      if (isUnsupportedPlatformError(error)) {
+        return { ok: false, started: false, resumed: false, reason: 'unsupported_platform' };
       }
 
       console.error('Failed to trigger encounter:', error);

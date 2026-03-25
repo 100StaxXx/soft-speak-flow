@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { extractErrorMessage } from "@/utils/networkErrors";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
+import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
 
 export type SyncStatus = "idle" | "syncing" | "success" | "error";
 
@@ -105,35 +106,93 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
 
     case "TASK_CREATE": {
       const taskData = action.payload as Record<string, unknown>;
-      const { error } = await supabase
-        .from("daily_tasks")
-        .insert([
-          {
-            task_text: taskData.task_text as string,
-            difficulty: taskData.difficulty as string,
-            xp_reward: taskData.xp_reward as number,
-            task_date: (taskData.task_date as string | null) ?? null,
-            user_id: userId,
-            is_main_quest: (taskData.is_main_quest as boolean | null) ?? false,
-            scheduled_time: (taskData.scheduled_time as string | null) ?? null,
-            estimated_duration: (taskData.estimated_duration as number | null) ?? null,
-            recurrence_pattern: (taskData.recurrence_pattern as string | null) ?? null,
-            recurrence_days: (taskData.recurrence_days as number[] | null) ?? null,
-            recurrence_end_date: (taskData.recurrence_end_date as string | null) ?? null,
-            is_recurring: Boolean(taskData.recurrence_pattern),
-            reminder_enabled: (taskData.reminder_enabled as boolean | null) ?? false,
-            reminder_minutes_before: (taskData.reminder_minutes_before as number | null) ?? 15,
-            category: (taskData.category as string | null) ?? null,
-            notes: (taskData.notes as string | null) ?? null,
-            contact_id: (taskData.contact_id as string | null) ?? null,
-            auto_log_interaction: (taskData.auto_log_interaction as boolean | null) ?? true,
-            image_url: (taskData.image_url as string | null) ?? null,
-            location: (taskData.location as string | null) ?? null,
-            source: (taskData.source as string | null) ?? ((taskData.task_date as string | null) === null ? "inbox" : "manual"),
-          },
-        ]);
+      const insertPayload = {
+        id: (taskData.id as string | undefined) ?? undefined,
+        task_text: taskData.task_text as string,
+        difficulty: (taskData.difficulty as string | null) ?? null,
+        xp_reward: Number(taskData.xp_reward ?? 0),
+        task_date: (taskData.task_date as string | null) ?? null,
+        user_id: userId,
+        completed: (taskData.completed as boolean | null) ?? false,
+        completed_at: (taskData.completed_at as string | null) ?? null,
+        is_main_quest: (taskData.is_main_quest as boolean | null) ?? false,
+        scheduled_time: (taskData.scheduled_time as string | null) ?? null,
+        estimated_duration: (taskData.estimated_duration as number | null) ?? null,
+        recurrence_pattern: (taskData.recurrence_pattern as string | null) ?? null,
+        recurrence_days: (taskData.recurrence_days as number[] | null) ?? null,
+        recurrence_month_days: (taskData.recurrence_month_days as number[] | null) ?? null,
+        recurrence_custom_period: (taskData.recurrence_custom_period as string | null) ?? null,
+        recurrence_end_date: (taskData.recurrence_end_date as string | null) ?? null,
+        is_recurring: (taskData.is_recurring as boolean | null) ?? Boolean(taskData.recurrence_pattern),
+        reminder_enabled: (taskData.reminder_enabled as boolean | null) ?? false,
+        reminder_minutes_before: (taskData.reminder_minutes_before as number | null) ?? 15,
+        category: (taskData.category as string | null) ?? null,
+        notes: (taskData.notes as string | null) ?? null,
+        contact_id: (taskData.contact_id as string | null) ?? null,
+        auto_log_interaction: (taskData.auto_log_interaction as boolean | null) ?? true,
+        image_url: (taskData.image_url as string | null) ?? null,
+        location: (taskData.location as string | null) ?? null,
+        source: (taskData.source as string | null) ?? ((taskData.task_date as string | null) === null ? "inbox" : "manual"),
+        habit_source_id: (taskData.habit_source_id as string | null) ?? null,
+        epic_id: (taskData.epic_id as string | null) ?? null,
+        parent_template_id: (taskData.parent_template_id as string | null) ?? null,
+        sort_order: (taskData.sort_order as number | null) ?? null,
+      };
+
+      const runInsert = async (payload: typeof insertPayload) => {
+        if (payload.parent_template_id) {
+          return supabase
+            .from("daily_tasks")
+            .upsert(payload, {
+              onConflict: "user_id,task_date,parent_template_id",
+              ignoreDuplicates: true,
+            });
+        }
+
+        if (payload.habit_source_id) {
+          return supabase
+            .from("daily_tasks")
+            .upsert(payload, {
+              onConflict: "user_id,task_date,habit_source_id",
+              ignoreDuplicates: true,
+            });
+        }
+
+        return supabase
+          .from("daily_tasks")
+          .insert([payload]);
+      };
+
+      let { error } = await runInsert(insertPayload);
+
+      if (isDailyTasksRecurrenceColumnsMissingError(error)) {
+        if (isMonthBasedRecurrencePayload(insertPayload)) {
+          throw new Error(MONTHLY_RECURRENCE_SCHEMA_MESSAGE);
+        }
+
+        ({ error } = await runInsert(stripUnsupportedRecurrenceColumns(insertPayload) as typeof insertPayload));
+      }
 
       if (error) throw error;
+
+      const subtasks = Array.isArray(taskData.subtasks) ? taskData.subtasks as Array<Record<string, unknown>> : [];
+      if (subtasks.length > 0) {
+        const { error: subtasksError } = await supabase
+          .from("subtasks")
+          .insert(
+            subtasks.map((subtask, index) => ({
+              id: (subtask.id as string | undefined) ?? undefined,
+              task_id: ((taskData.id as string | null) ?? (taskData.task_id as string | null)) as string,
+              user_id: userId,
+              title: subtask.title as string,
+              completed: Boolean(subtask.completed),
+              completed_at: (subtask.completed_at as string | null) ?? null,
+              sort_order: (subtask.sort_order as number | null) ?? index,
+            })),
+          );
+
+        if (subtasksError) throw subtasksError;
+      }
       return;
     }
 
@@ -187,6 +246,262 @@ async function executeQueuedAction(userId: string, action: QueuedAction): Promis
         .eq("user_id", userId);
 
       if (error) throw error;
+      return;
+    }
+
+    case "TASK_SET_MAIN_QUEST": {
+      const { taskId, taskDate } = action.payload as { taskId: string; taskDate: string | null };
+
+      const resetQuery = supabase
+        .from("daily_tasks")
+        .update({ is_main_quest: false })
+        .eq("user_id", userId);
+
+      const { error: resetError } = taskDate === null
+        ? await resetQuery.is("task_date", null)
+        : await resetQuery.eq("task_date", taskDate);
+      if (resetError) throw resetError;
+
+      const { error } = await supabase
+        .from("daily_tasks")
+        .update({ is_main_quest: true })
+        .eq("id", taskId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return;
+    }
+
+    case "SUBTASK_CREATE": {
+      const payload = action.payload as Record<string, unknown>;
+      const { error } = await supabase
+        .from("subtasks")
+        .insert({
+          id: payload.id as string,
+          task_id: payload.task_id as string,
+          user_id: userId,
+          title: payload.title as string,
+          completed: Boolean(payload.completed),
+          completed_at: (payload.completed_at as string | null) ?? null,
+          sort_order: (payload.sort_order as number | null) ?? 0,
+        });
+
+      if (error) throw error;
+      return;
+    }
+
+    case "SUBTASK_UPDATE": {
+      const { subtaskId, updates } = action.payload as {
+        subtaskId: string;
+        updates: Record<string, unknown>;
+      };
+
+      const { error } = await supabase
+        .from("subtasks")
+        .update(updates)
+        .eq("id", subtaskId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return;
+    }
+
+    case "SUBTASK_DELETE": {
+      const { subtaskId } = action.payload as { subtaskId: string };
+
+      const { error } = await supabase
+        .from("subtasks")
+        .delete()
+        .eq("id", subtaskId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return;
+    }
+
+    case "HABIT_CREATE": {
+      const payload = action.payload as Record<string, unknown>;
+      const { error } = await supabase
+        .from("habits")
+        .insert(payload);
+
+      if (error) throw error;
+      return;
+    }
+
+    case "HABIT_UPDATE": {
+      const { habitId, updates } = action.payload as {
+        habitId: string;
+        updates: Record<string, unknown>;
+      };
+
+      const { error } = await supabase
+        .from("habits")
+        .update(updates)
+        .eq("id", habitId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return;
+    }
+
+    case "HABIT_DELETE": {
+      const { habitId } = action.payload as { habitId: string };
+
+      const { error } = await supabase
+        .from("habits")
+        .delete()
+        .eq("id", habitId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return;
+    }
+
+    case "HABIT_COMPLETION_SET": {
+      const {
+        completionId,
+        habitId,
+        date,
+        completed,
+      } = action.payload as {
+        completionId?: string;
+        habitId: string;
+        date: string;
+        completed: boolean;
+      };
+
+      if (!completed) {
+        const { error } = await supabase
+          .from("habit_completions")
+          .delete()
+          .eq("habit_id", habitId)
+          .eq("user_id", userId)
+          .eq("date", date);
+
+        if (error) throw error;
+        return;
+      }
+
+      const { error } = await supabase
+        .from("habit_completions")
+        .upsert({
+          id: completionId,
+          habit_id: habitId,
+          user_id: userId,
+          date,
+        }, { onConflict: "user_id,habit_id,date" });
+
+      if (error) throw error;
+      return;
+    }
+
+    case "EPIC_CREATE": {
+      const payload = action.payload as {
+        epic: Record<string, unknown>;
+        habits: Record<string, unknown>[];
+        epicHabits: Record<string, unknown>[];
+        phases: Record<string, unknown>[];
+        milestones: Record<string, unknown>[];
+      };
+
+      if (payload.habits.length > 0) {
+        const { error } = await supabase
+          .from("habits")
+          .upsert(payload.habits);
+        if (error) throw error;
+      }
+
+      const { error: epicError } = await supabase
+        .from("epics")
+        .upsert(payload.epic);
+      if (epicError) throw epicError;
+
+      if (payload.epicHabits.length > 0) {
+        const { error } = await supabase
+          .from("epic_habits")
+          .upsert(payload.epicHabits);
+        if (error) throw error;
+      }
+
+      if (payload.phases.length > 0) {
+        const { error } = await supabase
+          .from("journey_phases")
+          .upsert(payload.phases);
+        if (error) throw error;
+      }
+
+      if (payload.milestones.length > 0) {
+        const { error } = await supabase
+          .from("epic_milestones")
+          .upsert(payload.milestones);
+        if (error) throw error;
+      }
+
+      return;
+    }
+
+    case "EPIC_STATUS_UPDATE": {
+      const { epicId, status } = action.payload as {
+        epicId: string;
+        status: "completed" | "abandoned";
+      };
+
+      const { error } = await supabase
+        .from("epics")
+        .update({
+          status,
+          completed_at: status === "completed" ? new Date().toISOString() : null,
+        })
+        .eq("id", epicId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      if (status === "abandoned") {
+        const { data: epicHabits } = await supabase
+          .from("epic_habits")
+          .select("id, habit_id")
+          .eq("epic_id", epicId);
+
+        const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
+
+        if (habitIds.length > 0) {
+          const { error: habitsError } = await supabase
+            .from("habits")
+            .update({ is_active: false })
+            .in("id", habitIds)
+            .eq("user_id", userId);
+          if (habitsError) throw habitsError;
+
+          const today = new Date().toISOString().split("T")[0];
+          const { error: tasksError } = await supabase
+            .from("daily_tasks")
+            .delete()
+            .in("habit_source_id", habitIds)
+            .gte("task_date", today)
+            .eq("completed", false)
+            .eq("user_id", userId);
+          if (tasksError) throw tasksError;
+
+          const linkIds = epicHabits?.map((row) => row.id) ?? [];
+          if (linkIds.length > 0) {
+            const { error: linksError } = await supabase
+              .from("epic_habits")
+              .delete()
+              .in("id", linkIds);
+            if (linksError) throw linksError;
+          }
+        }
+
+        const { error: milestonesError } = await supabase
+          .from("epic_milestones")
+          .delete()
+          .eq("epic_id", epicId)
+          .eq("user_id", userId);
+        if (milestonesError) throw milestonesError;
+      }
+
       return;
     }
 
@@ -386,6 +701,7 @@ export function useOfflineQueue() {
           title: "Queued actions synced",
           description: `${successCount} action${successCount > 1 ? "s" : ""} synced successfully`,
         });
+        dispatchPlannerSyncFinished();
       }
 
       window.setTimeout(() => {

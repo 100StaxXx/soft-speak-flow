@@ -1,21 +1,23 @@
 import { memo, useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '@/components/ui/glass-card';
-import { Shield, Flame, Target, Zap } from 'lucide-react';
+import { Shield, Flame, Target, Zap, Smartphone } from 'lucide-react';
 import { HabitResistCard } from './HabitResistCard';
 import { AddBadHabitDialog } from './AddBadHabitDialog';
 import { useResistMode, BadHabit } from '@/hooks/useResistMode';
 import { useAstralEncounterContext } from '@/contexts/AstralEncounterContext';
 import { AdversaryTheme } from '@/types/astralEncounters';
+import { isMacSession } from '@/utils/platformTargets';
 
 export const ResistModePanel = memo(() => {
   const { habits, stats, isLoading, addHabit, removeHabit, isAddingHabit } = useResistMode();
   const { checkEncounterTrigger, isTriggeringEncounter } = useAstralEncounterContext();
   const [resistingHabitId, setResistingHabitId] = useState<string | null>(null);
   const [isStartingEncounter, setIsStartingEncounter] = useState(false);
+  const isMacBlockedSession = isMacSession();
 
   const handleResist = useCallback(async (habit: BadHabit) => {
-    if (isStartingEncounter || isTriggeringEncounter) return;
+    if (isMacBlockedSession || isStartingEncounter || isTriggeringEncounter) return;
 
     setResistingHabitId(habit.id);
     setIsStartingEncounter(true);
@@ -33,7 +35,7 @@ export const ResistModePanel = memo(() => {
       setResistingHabitId(null);
       setIsStartingEncounter(false);
     }
-  }, [checkEncounterTrigger, isStartingEncounter, isTriggeringEncounter]);
+  }, [checkEncounterTrigger, isMacBlockedSession, isStartingEncounter, isTriggeringEncounter]);
 
   const handleAddHabit = useCallback((params: { name: string; icon: string; theme: AdversaryTheme }) => {
     addHabit(params);
@@ -53,9 +55,29 @@ export const ResistModePanel = memo(() => {
           <Shield className="h-5 w-5" />
         </div>
         <p className="text-xs text-muted-foreground">
-          Beat a quick game instead of giving in to bad habits
+          {isMacBlockedSession
+            ? 'Track your habits here, then continue Astral Encounters on iPhone or iPad.'
+            : 'Beat a quick game instead of giving in to bad habits'}
         </p>
       </GlassCard>
+
+      {isMacBlockedSession && (
+        <GlassCard variant="inset" className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-full bg-primary/10 p-2 text-primary">
+              <Smartphone className="h-5 w-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                Astral Encounters are only available on iPhone and iPad.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Open Soft Speak Flow on your iPhone or iPad to play Astral Encounters.
+              </p>
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Stats Row */}
       {(stats.totalResisted > 0 || stats.bestStreak > 0) && (
@@ -94,6 +116,8 @@ export const ResistModePanel = memo(() => {
               onResist={() => handleResist(habit)}
               onRemove={() => handleRemoveHabit(habit.id)}
               isLoading={isStartingEncounter || isTriggeringEncounter || resistingHabitId === habit.id}
+              resistDisabled={isMacBlockedSession}
+              resistLabel={isMacBlockedSession ? 'iPhone/iPad only' : 'Resist'}
             />
           ))}
         </AnimatePresence>

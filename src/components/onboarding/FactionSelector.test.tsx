@@ -1,3 +1,4 @@
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const capacitorMocks = vi.hoisted(() => ({
@@ -12,12 +13,27 @@ vi.mock("@capacitor/core", () => ({
   },
 }));
 
-import {
-  isMacSession,
-  isMacDesignedForIPadIOSApp,
-  isNativeIOS,
-  isNativeIOSHandheld,
-} from "@/utils/platformTargets";
+vi.mock("framer-motion", async () => {
+  const React = await import("react");
+
+  const motion = new Proxy(
+    {},
+    {
+      get: (_target, key) => {
+        const tag = typeof key === "string" ? key : "div";
+        return ({ children, initial, animate, exit, transition, whileHover, whileTap, ...props }: any) =>
+          React.createElement(tag, props, children);
+      },
+    },
+  );
+
+  return {
+    motion,
+    AnimatePresence: ({ children }: { children: unknown }) => <>{children}</>,
+  };
+});
+
+import { FactionSelector } from "./FactionSelector";
 
 const originalUserAgentDescriptor = Object.getOwnPropertyDescriptor(navigator, "userAgent");
 const originalMaxTouchPointsDescriptor = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
@@ -34,7 +50,19 @@ const setNavigatorValues = (userAgent: string, maxTouchPoints: number) => {
   });
 };
 
-describe("platformTargets", () => {
+const renderExpandedVoidFaction = () => {
+  render(<FactionSelector onComplete={vi.fn()} />);
+
+  fireEvent.click(screen.getByRole("button", { name: /Void Collective/i }));
+
+  const joinButton = screen.getByRole("button", { name: /Join Void Collective/i });
+  const ctaWrapper = joinButton.parentElement;
+  expect(ctaWrapper).not.toBeNull();
+
+  return ctaWrapper as HTMLDivElement;
+};
+
+describe("FactionSelector CTA spacing", () => {
   beforeEach(() => {
     capacitorMocks.isNativePlatform.mockReset();
     capacitorMocks.getPlatform.mockReset();
@@ -56,34 +84,34 @@ describe("platformTargets", () => {
     }
   });
 
-  it("treats macOS web as a blocked Mac session without marking it as native iOS", () => {
+  it("adds extra CTA bottom spacing for Mac-hosted iOS", () => {
+    capacitorMocks.isNativePlatform.mockReturnValue(true);
+    capacitorMocks.getPlatform.mockReturnValue("ios");
     setNavigatorValues("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 0);
 
-    expect(isNativeIOS()).toBe(false);
-    expect(isMacDesignedForIPadIOSApp()).toBe(false);
-    expect(isNativeIOSHandheld()).toBe(false);
-    expect(isMacSession()).toBe(true);
+    const ctaWrapper = renderExpandedVoidFaction();
+
+    expect(ctaWrapper.className).toContain("pt-2");
+    expect(ctaWrapper.className).toContain("pb-6");
   });
 
-  it("treats iPhone/iPad native as handheld iOS", () => {
+  it("leaves handheld iOS CTA spacing unchanged", () => {
     capacitorMocks.isNativePlatform.mockReturnValue(true);
     capacitorMocks.getPlatform.mockReturnValue("ios");
     setNavigatorValues("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)", 5);
 
-    expect(isNativeIOS()).toBe(true);
-    expect(isMacDesignedForIPadIOSApp()).toBe(false);
-    expect(isNativeIOSHandheld()).toBe(true);
-    expect(isMacSession()).toBe(false);
+    const ctaWrapper = renderExpandedVoidFaction();
+
+    expect(ctaWrapper.className).toContain("pt-2");
+    expect(ctaWrapper.className).not.toContain("pb-6");
   });
 
-  it("detects Mac-hosted iOS app and excludes it from handheld target", () => {
-    capacitorMocks.isNativePlatform.mockReturnValue(true);
-    capacitorMocks.getPlatform.mockReturnValue("ios");
+  it("leaves web CTA spacing unchanged", () => {
     setNavigatorValues("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)", 0);
 
-    expect(isNativeIOS()).toBe(true);
-    expect(isMacDesignedForIPadIOSApp()).toBe(true);
-    expect(isNativeIOSHandheld()).toBe(false);
-    expect(isMacSession()).toBe(true);
+    const ctaWrapper = renderExpandedVoidFaction();
+
+    expect(ctaWrapper.className).toContain("pt-2");
+    expect(ctaWrapper.className).not.toContain("pb-6");
   });
 });

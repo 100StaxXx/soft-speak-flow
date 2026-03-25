@@ -30,6 +30,7 @@ import { UpdateAvailablePrompt } from "@/components/UpdateAvailablePrompt";
 import { hideSplashScreen } from "@/utils/capacitor";
 import { initializeNativePush, isNativePushSupported, unregisterNativePush } from "@/utils/nativePushNotifications";
 import { logger } from "@/utils/logger";
+import { isReturningProfile } from "@/utils/profileOnboarding";
 import { AstralEncounterProvider } from "@/components/astral-encounters";
 import { WeeklyRecapModal } from "@/components/WeeklyRecapModal";
 import { WeeklyRecapProvider } from "@/contexts/WeeklyRecapContext";
@@ -211,14 +212,14 @@ const AppContent = memo(() => {
     if (typeof window === "undefined") return;
     if (!session?.user) return;
     if (profileLoading) return;
-    if (profile?.onboarding_completed !== true) return;
+    if (!isReturningProfile(profile)) return;
     
     const hasRedirected = safeSessionStorage.getItem("initialRouteRedirected");
     if (!hasRedirected) {
       safeSessionStorage.setItem("initialRouteRedirected", "true");
       navigate("/journeys", { replace: true });
     }
-  }, [location.pathname, navigate, profile?.onboarding_completed, profileLoading, session?.user]);
+  }, [location.pathname, navigate, profile, profileLoading, session?.user]);
   
   // Respond to native push navigation events
   useEffect(() => {

@@ -11,10 +11,20 @@ export type QueueActionKind =
   | "TASK_CREATE"
   | "TASK_UPDATE"
   | "TASK_DELETE"
+  | "TASK_SET_MAIN_QUEST"
+  | "SUBTASK_CREATE"
+  | "SUBTASK_UPDATE"
+  | "SUBTASK_DELETE"
+  | "HABIT_CREATE"
+  | "HABIT_UPDATE"
+  | "HABIT_DELETE"
+  | "HABIT_COMPLETION_SET"
+  | "EPIC_CREATE"
+  | "EPIC_STATUS_UPDATE"
   | "MENTOR_FEEDBACK"
   | "SUPPORT_REPORT";
 
-export type QueueEntityType = "task" | "mentor_feedback" | "support_report" | "unknown";
+export type QueueEntityType = "task" | "subtask" | "habit" | "habit_completion" | "epic" | "mentor_feedback" | "support_report" | "unknown";
 
 export type QueueActionStatus = "queued" | "syncing" | "synced" | "failed" | "dropped";
 
@@ -58,14 +68,40 @@ const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 11)}
 const isString = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 
 const toQueueActionKind = (value: unknown): QueueActionKind | null => {
-  if (value === "TASK_COMPLETE" || value === "TASK_CREATE" || value === "TASK_UPDATE" || value === "TASK_DELETE" || value === "MENTOR_FEEDBACK" || value === "SUPPORT_REPORT") {
+  if (
+    value === "TASK_COMPLETE"
+    || value === "TASK_CREATE"
+    || value === "TASK_UPDATE"
+    || value === "TASK_DELETE"
+    || value === "TASK_SET_MAIN_QUEST"
+    || value === "SUBTASK_CREATE"
+    || value === "SUBTASK_UPDATE"
+    || value === "SUBTASK_DELETE"
+    || value === "HABIT_CREATE"
+    || value === "HABIT_UPDATE"
+    || value === "HABIT_DELETE"
+    || value === "HABIT_COMPLETION_SET"
+    || value === "EPIC_CREATE"
+    || value === "EPIC_STATUS_UPDATE"
+    || value === "MENTOR_FEEDBACK"
+    || value === "SUPPORT_REPORT"
+  ) {
     return value;
   }
   return null;
 };
 
 const toQueueEntityType = (value: unknown): QueueEntityType => {
-  if (value === "task" || value === "mentor_feedback" || value === "support_report" || value === "unknown") {
+  if (
+    value === "task"
+    || value === "subtask"
+    || value === "habit"
+    || value === "habit_completion"
+    || value === "epic"
+    || value === "mentor_feedback"
+    || value === "support_report"
+    || value === "unknown"
+  ) {
     return value;
   }
   return "unknown";
@@ -99,7 +135,21 @@ const defaultEntityTypeForAction = (actionKind: QueueActionKind): QueueEntityTyp
     case "TASK_CREATE":
     case "TASK_UPDATE":
     case "TASK_DELETE":
+    case "TASK_SET_MAIN_QUEST":
       return "task";
+    case "SUBTASK_CREATE":
+    case "SUBTASK_UPDATE":
+    case "SUBTASK_DELETE":
+      return "subtask";
+    case "HABIT_CREATE":
+    case "HABIT_UPDATE":
+    case "HABIT_DELETE":
+      return "habit";
+    case "HABIT_COMPLETION_SET":
+      return "habit_completion";
+    case "EPIC_CREATE":
+    case "EPIC_STATUS_UPDATE":
+      return "epic";
     case "MENTOR_FEEDBACK":
       return "mentor_feedback";
     case "SUPPORT_REPORT":

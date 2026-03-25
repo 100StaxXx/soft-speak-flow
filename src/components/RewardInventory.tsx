@@ -13,9 +13,11 @@ import { cn } from "@/lib/utils";
 import { useEpicRewards } from "@/hooks/useEpicRewards";
 import type { UserEpicReward, RewardType, RewardRarity } from "@/types/epicRewards";
 import { RARITY_CONFIG } from "@/types/epicRewards";
+import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
 interface RewardInventoryProps {
   className?: string;
+  layoutMode?: CompanionLayoutMode;
 }
 
 const REWARD_TYPE_ICONS: Record<RewardType, typeof Image> = {
@@ -45,9 +47,10 @@ const rewardPreviewLocalUrls = Object.fromEntries(
   }),
 ) as Record<string, string>;
 
-export const RewardInventory = memo(({ className }: RewardInventoryProps) => {
+export const RewardInventory = memo(({ className, layoutMode = "mobile" }: RewardInventoryProps) => {
   const { allRewards, userRewards, equipReward, isEquipping, isLoading } = useEpicRewards();
   const [activeTab, setActiveTab] = useState<RewardType>('background');
+  const isDesktop = layoutMode === "desktop";
 
   // Group user rewards by type
   const groupedRewards = userRewards.reduce((acc, reward) => {
@@ -120,7 +123,7 @@ export const RewardInventory = memo(({ className }: RewardInventoryProps) => {
 
         {(Object.keys(REWARD_TYPE_LABELS) as RewardType[]).map((type) => (
           <TabsContent key={type} value={type} className="p-4 mt-0">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className={cn("grid gap-3", isDesktop ? "grid-cols-3 xl:grid-cols-4" : "grid-cols-2 sm:grid-cols-3")}>
               <AnimatePresence mode="popLayout">
                 {/* Unlocked rewards */}
                 {groupedRewards[type]?.map((userReward) => (

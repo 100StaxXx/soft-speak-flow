@@ -7,6 +7,7 @@ import { DisableEncountersDialog } from './DisableEncountersDialog';
 import { AdversaryTier } from '@/types/astralEncounters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { isMacSession } from '@/utils/platformTargets';
 import { toast } from 'sonner';
 
 interface AstralEncounterProviderProps {
@@ -18,6 +19,7 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
   const [showTriggerOverlay, setShowTriggerOverlay] = useState(false);
   const [pendingTier, setPendingTier] = useState<AdversaryTier>('common');
   const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const isMacBlockedSession = isMacSession();
 
   // Prevent replaying overlay for the same encounter id.
   const lastOverlayEncounterIdRef = useRef<string | null>(null);
@@ -34,8 +36,27 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
     passEncounter,
   } = useAstralEncounterContext();
 
+  useEffect(() => {
+    if (!isMacBlockedSession) {
+      return;
+    }
+
+    if (!activeEncounter && !showEncounterModal && !showTriggerOverlay) {
+      return;
+    }
+
+    setShowTriggerOverlay(false);
+    closeEncounter();
+  }, [activeEncounter, closeEncounter, isMacBlockedSession, showEncounterModal, showTriggerOverlay]);
+
   // Watch for activeEncounter changes to show overlay before modal.
   useEffect(() => {
+    if (isMacBlockedSession) {
+      lastOverlayEncounterIdRef.current = null;
+      setShowTriggerOverlay(false);
+      return;
+    }
+
     const encounterId = activeEncounter?.encounter.id ?? null;
 
     if (!encounterId) {
@@ -52,22 +73,33 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
     setPendingTier((activeEncounter?.adversary.tier as AdversaryTier) || 'common');
     setShowEncounterModal(false);
     setShowTriggerOverlay(true);
-  }, [activeEncounter?.encounter.id, activeEncounter?.adversary.tier, setShowEncounterModal]);
+  }, [activeEncounter?.encounter.id, activeEncounter?.adversary.tier, isMacBlockedSession, setShowEncounterModal]);
 
   const handleTriggerOverlayComplete = useCallback(() => {
+    if (isMacBlockedSession) {
+      setShowTriggerOverlay(false);
+      closeEncounter();
+      return;
+    }
+
     setShowTriggerOverlay(false);
     // Now show the actual encounter modal
     setShowEncounterModal(true);
-  }, [setShowEncounterModal]);
+  }, [closeEncounter, isMacBlockedSession, setShowEncounterModal]);
 
   const handleModalOpenChange = useCallback((open: boolean) => {
+    if (isMacBlockedSession) {
+      closeEncounter();
+      return;
+    }
+
     if (!open) {
       closeEncounter();
       return;
     }
 
     setShowEncounterModal(true);
-  }, [closeEncounter, setShowEncounterModal]);
+  }, [closeEncounter, isMacBlockedSession, setShowEncounterModal]);
 
   const handleComplete = useCallback(async (params: {
     encounterId: string;
@@ -129,22 +161,26 @@ const AstralEncounterProviderInner = ({ children }: AstralEncounterProviderProps
       {children}
 
       {/* Epic trigger animation overlay */}
-      <AstralEncounterTriggerOverlay
-        isVisible={showTriggerOverlay}
-        tier={pendingTier}
-        onComplete={handleTriggerOverlayComplete}
-      />
+      {!isMacBlockedSession && (
+        <AstralEncounterTriggerOverlay
+          isVisible={showTriggerOverlay}
+          tier={pendingTier}
+          onComplete={handleTriggerOverlayComplete}
+        />
+      )}
 
       {/* Main encounter modal */}
-      <AstralEncounterModal
-        open={showEncounterModal}
-        onOpenChange={handleModalOpenChange}
-        encounter={activeEncounter?.encounter || null}
-        adversary={activeEncounter?.adversary || null}
-        questInterval={activeEncounter?.questInterval}
-        onComplete={handleComplete}
-        onPass={handlePass}
-      />
+      {!isMacBlockedSession && (
+        <AstralEncounterModal
+          open={showEncounterModal}
+          onOpenChange={handleModalOpenChange}
+          encounter={activeEncounter?.encounter || null}
+          adversary={activeEncounter?.adversary || null}
+          questInterval={activeEncounter?.questInterval}
+          onComplete={handleComplete}
+          onPass={handlePass}
+        />
+      )}
 
       {/* Disable encounters prompt */}
       <DisableEncountersDialog

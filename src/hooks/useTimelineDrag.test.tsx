@@ -215,6 +215,110 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-row", "09:20");
   });
 
+  it("does not start drag when disabled", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        enabled: false,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const rowProps = result.current.getRowDragProps("task-disabled", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(120));
+      dispatchPointerMove(140);
+      dispatchPointerUp();
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(result.current.previewTime).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("cancels active drag when disabled flips to false", () => {
+    const onDrop = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useTimelineDrag({
+          containerRef,
+          onDrop,
+          enabled,
+          snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        }),
+      { initialProps: { enabled: true } },
+    );
+
+    const rowProps = result.current.getRowDragProps("task-disable-mid-drag", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(100));
+      dispatchPointerMove(120);
+    });
+
+    expect(result.current.draggingTaskId).toBe("task-disable-mid-drag");
+    expect(result.current.previewTime).toBe("09:20");
+
+    act(() => {
+      rerender({ enabled: false });
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(result.current.previewTime).toBeNull();
+    expect(result.current.dragOffsetY.get()).toBe(0);
+
+    act(() => {
+      dispatchPointerUp();
+    });
+
+    expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("cancels pending drag when disabled flips to false", () => {
+    vi.useFakeTimers();
+    const onDrop = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useTimelineDrag({
+          containerRef,
+          onDrop,
+          enabled,
+          snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+        }),
+      { initialProps: { enabled: true } },
+    );
+
+    const rowProps = result.current.getRowDragProps("task-disable-pending-drag", "09:00");
+    act(() => {
+      rowProps.onPointerDown(createPointerDownEvent(100));
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(result.current.longPressTaskId).toBeNull();
+
+    act(() => {
+      rerender({ enabled: false });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    act(() => {
+      dispatchPointerMove(140);
+      dispatchPointerUp();
+    });
+
+    expect(result.current.draggingTaskId).toBeNull();
+    expect(result.current.longPressTaskId).toBeNull();
+    expect(result.current.previewTime).toBeNull();
+    expect(onDrop).not.toHaveBeenCalled();
+    expect(mocks.hapticImpactMock).not.toHaveBeenCalled();
+  });
+
   it("does not double-start when capture and bubble handlers receive the same start event", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ArrowLeft } from "lucide-react";
 import { factions, FactionType } from "@/config/factions";
+import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 
 export type { FactionType } from "@/config/factions";
 
@@ -12,6 +13,7 @@ interface FactionSelectorProps {
 
 export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
   const [expandedFaction, setExpandedFaction] = useState<FactionType | null>(null);
+  const isMacHostedIOS = isMacDesignedForIPadIOSApp();
 
   const handleFactionTap = (factionId: FactionType) => {
     setExpandedFaction(factionId);
@@ -195,7 +197,7 @@ export const FactionSelector = ({ onComplete }: FactionSelectorProps) => {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.5 }}
-                    className="pt-2"
+                    className={isMacHostedIOS ? "pt-2 pb-6" : "pt-2"}
                   >
                     <Button
                       onClick={() => handleSelect(expandedData.id)}

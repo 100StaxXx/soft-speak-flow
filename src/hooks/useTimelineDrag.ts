@@ -38,6 +38,7 @@ const triggerHaptic = async (style: ImpactStyle) => {
 interface UseTimelineDragOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   onDrop: (taskId: string, newTime: string) => void;
+  enabled?: boolean;
   snapConfig?: Partial<AdaptiveSnapConfig>;
   activationThresholdPx?: number;
   touchActivationThresholdPx?: number;
@@ -165,6 +166,7 @@ const releaseTimelineDragScrollLock = () => {
 export function useTimelineDrag({
   containerRef,
   onDrop,
+  enabled = true,
   snapConfig,
   activationThresholdPx = DEFAULT_ACTIVATION_THRESHOLD_PX,
   touchActivationThresholdPx,
@@ -217,7 +219,7 @@ export function useTimelineDrag({
   // Autoscroll
   const { updatePosition: updateAutoscroll, stopScroll } = useAutoscroll({
     containerRef,
-    enabled: draggingTaskId !== null,
+    enabled: enabled && draggingTaskId !== null,
     edgeThreshold: 80,
     scrollSpeed: 8,
   });
@@ -392,6 +394,45 @@ export function useTimelineDrag({
     [flushQueuedMove, handleMove],
   );
 
+  const resetDragSession = useCallback(
+    (options?: { clearDropMarker?: boolean }) => {
+      removeWindowListeners();
+      pendingDragRef.current = null;
+      clearLongPressFeedbackTimer();
+      setLongPressTaskId(null);
+      draggingTaskIdRef.current = null;
+      setDraggingTaskId(null);
+      setPreviewTime(null);
+      dragOffsetY.set(0);
+      dragEdgeOffsetY.set(0);
+      clearQueuedMove();
+      stopScroll();
+      scrollContextRef.current = { kind: "window" };
+      dragStartScrollOffsetRef.current = 0;
+      lastPointerClientYRef.current = 0;
+      pointerMinutesRef.current = originalMinutesRef.current;
+      nudgeOffsetMinutesRef.current = 0;
+      dragMovedRef.current = false;
+      activeDragDeadzonePxRef.current = 0;
+      resetSnapState();
+
+      if (options?.clearDropMarker) {
+        clearDropResetTimer();
+        setJustDroppedId(null);
+      }
+    },
+    [
+      clearDropResetTimer,
+      clearLongPressFeedbackTimer,
+      clearQueuedMove,
+      dragEdgeOffsetY,
+      dragOffsetY,
+      removeWindowListeners,
+      resetSnapState,
+      stopScroll,
+    ],
+  );
+
   const attachActiveScrollListener = useCallback(() => {
     const scrollContext = findNearestScrollContext(containerRef.current);
     scrollContextRef.current = scrollContext;
@@ -483,10 +524,6 @@ export function useTimelineDrag({
 
   const finishDrag = useCallback(() => {
     flushQueuedMove({ skipAutoscrollUpdate: true });
-    removeWindowListeners();
-    pendingDragRef.current = null;
-    clearLongPressFeedbackTimer();
-    setLongPressTaskId(null);
 
     const taskId = draggingTaskIdRef.current;
     const finalMinute = snapMinuteByMode(currentRawMinutesRef.current, "fine", resolvedSnapConfig);
@@ -505,34 +542,18 @@ export function useTimelineDrag({
       }, DROP_BOUNCE_MS);
     }
 
-    draggingTaskIdRef.current = null;
-    setDraggingTaskId(null);
-    setPreviewTime(null);
-    dragOffsetY.set(0);
-    dragEdgeOffsetY.set(0);
-    clearQueuedMove();
-    stopScroll();
-    scrollContextRef.current = { kind: "window" };
-    dragStartScrollOffsetRef.current = 0;
-    lastPointerClientYRef.current = 0;
-    pointerMinutesRef.current = originalMinutesRef.current;
-    nudgeOffsetMinutesRef.current = 0;
-    dragMovedRef.current = false;
-    activeDragDeadzonePxRef.current = 0;
-    resetSnapState();
+    resetDragSession();
   }, [
-    clearLongPressFeedbackTimer,
     clearDropResetTimer,
-    clearQueuedMove,
-    dragEdgeOffsetY,
-    dragOffsetY,
     flushQueuedMove,
     onDrop,
-    removeWindowListeners,
-    resetSnapState,
+    resetDragSession,
     resolvedSnapConfig,
-    stopScroll,
   ]);
+
+  const cancelDragSession = useCallback(() => {
+    resetDragSession({ clearDropMarker: true });
+  }, [resetDragSession]);
 
   const startPendingDrag = useCallback(
     (
@@ -542,6 +563,7 @@ export function useTimelineDrag({
       listenerSource: "pointer" | "touch",
       activationSource: "pointer" | "touch" = listenerSource,
     ) => {
+      if (!enabled) return;
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
 
       removeWindowListeners();
@@ -647,6 +669,7 @@ export function useTimelineDrag({
     [
       clearLongPressFeedbackTimer,
       clearQueuedMove,
+      enabled,
       finishDrag,
       maybeActivateDrag,
       queueMove,
@@ -659,6 +682,7 @@ export function useTimelineDrag({
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (e.defaultPrevented) return;
+      if (!enabled) return;
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
       if (shouldIgnoreDragStartTarget(e.target)) return;
       const touch = e.touches[0];
@@ -666,7 +690,7 @@ export function useTimelineDrag({
 
       startPendingDrag(taskId, scheduledTime, touch.clientY, "touch");
     },
-    [shouldIgnoreDragStartTarget, startPendingDrag],
+    [enabled, shouldIgnoreDragStartTarget, startPendingDrag],
   );
 
   const noopTouchMove = useCallback(
@@ -686,6 +710,7 @@ export function useTimelineDrag({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
       if (e.defaultPrevented) return;
+      if (!enabled) return;
       if (draggingTaskIdRef.current || pendingDragRef.current) return;
       if (shouldIgnoreDragStartTarget(e.target)) return;
       if (e.pointerType === "touch" && hasTouchEventSupport()) return;
@@ -694,7 +719,7 @@ export function useTimelineDrag({
       const activationSource = e.pointerType === "touch" ? "touch" : "pointer";
       startPendingDrag(taskId, scheduledTime, e.clientY, "pointer", activationSource);
     },
-    [shouldIgnoreDragStartTarget, startPendingDrag],
+    [enabled, shouldIgnoreDragStartTarget, startPendingDrag],
   );
 
   const nudgeByFineStep = useCallback(
@@ -742,6 +767,11 @@ export function useTimelineDrag({
     }),
     [handlePointerDown, handleTouchStart, noopTouchEnd, noopTouchMove],
   );
+
+  useEffect(() => {
+    if (enabled) return;
+    cancelDragSession();
+  }, [cancelDragSession, enabled]);
 
   useEffect(() => {
     if (draggingTaskId === null && longPressTaskId === null) return;

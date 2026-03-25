@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
 type FilterCategory = 'all' | BadgeCategory;
 
@@ -29,10 +30,15 @@ const badgePreviewLocalUrls = Object.fromEntries(
   }),
 ) as Record<string, string>;
 
-export const BadgesCollectionPanel = () => {
+interface BadgesCollectionPanelProps {
+  layoutMode?: CompanionLayoutMode;
+}
+
+export const BadgesCollectionPanel = ({ layoutMode = "mobile" }: BadgesCollectionPanelProps) => {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [selectedBadge, setSelectedBadge] = useState<{ badge: BadgeDefinition; earned: boolean } | null>(null);
+  const isDesktop = layoutMode === "desktop";
 
   const { data: earnedAchievements, isLoading } = useQuery({
     queryKey: ["achievements", user?.id],
@@ -81,7 +87,7 @@ export const BadgesCollectionPanel = () => {
   }
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className={`space-y-6 ${isDesktop ? "mt-0" : "mt-6"}`}>
       {/* Header Stats */}
       <Card className="p-6 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
         <div className="flex items-center gap-3 mb-2">
@@ -95,7 +101,7 @@ export const BadgesCollectionPanel = () => {
       </Card>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className={`flex gap-2 pb-2 ${isDesktop ? "flex-wrap overflow-visible" : "overflow-x-auto scrollbar-hide"}`}>
         {filterCategories.map((cat) => (
           <button
             key={cat}
@@ -117,7 +123,7 @@ export const BadgesCollectionPanel = () => {
           <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
             <span className="text-primary">✨</span> EARNED ({earnedBadges.length})
           </h4>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <div className={`grid gap-3 ${isDesktop ? "grid-cols-4 xl:grid-cols-5" : "grid-cols-3 sm:grid-cols-4"}`}>
             {earnedBadges.map((badge) => (
               <BadgeCard key={badge.id} badge={badge} earned onSelect={(b) => setSelectedBadge({ badge: b, earned: true })} />
             ))}
@@ -131,7 +137,7 @@ export const BadgesCollectionPanel = () => {
           <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
             <Lock className="h-4 w-4" /> LOCKED ({lockedBadges.length})
           </h4>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <div className={`grid gap-3 ${isDesktop ? "grid-cols-4 xl:grid-cols-5" : "grid-cols-3 sm:grid-cols-4"}`}>
             {lockedBadges.map((badge) => (
               <BadgeCard key={badge.id} badge={badge} earned={false} onSelect={(b) => setSelectedBadge({ badge: b, earned: false })} />
             ))}

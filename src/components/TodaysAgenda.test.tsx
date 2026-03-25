@@ -1091,6 +1091,39 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(mocks.getDragHandlePropsMock).not.toHaveBeenCalled();
   });
 
+  it("does not wire row drag props when timeline drag is disabled", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-scheduled-1",
+            task_text: "Morning focus",
+            completed: false,
+            xp_reward: 25,
+            scheduled_time: "08:00",
+          },
+        ]}
+        selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+        disableTimelineDrag
+        onToggle={vi.fn()}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    expect(screen.getByTestId("timeline-row-task-scheduled-1")).toBeInTheDocument();
+    expect(mocks.getRowDragPropsMock).not.toHaveBeenCalled();
+  });
+
   it("forwards row pointer down to row drag handler", () => {
     const queryClient = new QueryClient({
       defaultOptions: {

@@ -9,7 +9,11 @@ const mocks = vi.hoisted(() => {
   const existingTasksQueryMock = vi.fn();
   const upsertSelectMock = vi.fn();
   const upsertMock = vi.fn();
+  const insertSelectMock = vi.fn();
+  const insertMock = vi.fn();
   const toastErrorMock = vi.fn();
+  const localTasks: Array<Record<string, unknown>> = [];
+  let nextId = 0;
 
   return {
     fromMock,
@@ -17,7 +21,18 @@ const mocks = vi.hoisted(() => {
     existingTasksQueryMock,
     upsertSelectMock,
     upsertMock,
+    insertSelectMock,
+    insertMock,
     toastErrorMock,
+    localTasks,
+    nextIdRef: {
+      get value() {
+        return nextId;
+      },
+      set value(value: number) {
+        nextId = value;
+      },
+    },
   };
 });
 
@@ -39,7 +54,71 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueTaskAction: vi.fn(),
+    shouldQueueWrites: false,
+    retryNow: vi.fn(),
+  }),
+}));
+
+vi.mock("@/utils/plannerLocalStore", () => ({
+  createOfflinePlannerId: (prefix: string) => {
+    mocks.nextIdRef.value += 1;
+    return `${prefix}-${mocks.nextIdRef.value}`;
+  },
+  getAllLocalTasksForUser: async (userId: string) =>
+    mocks.localTasks.filter((task) => task.user_id === userId),
+  removePlannerRecords: async (_storeName: string, ids: string[]) => {
+    const idSet = new Set(ids);
+    const remaining = mocks.localTasks.filter((task) => !idSet.has(String(task.id)));
+    mocks.localTasks.splice(0, mocks.localTasks.length, ...remaining);
+  },
+  upsertPlannerRecords: async (_storeName: string, records: Array<Record<string, unknown>>) => {
+    records.forEach((record) => {
+      const index = mocks.localTasks.findIndex((task) => task.id === record.id);
+      if (index >= 0) {
+        mocks.localTasks[index] = { ...mocks.localTasks[index], ...record };
+      } else {
+        mocks.localTasks.push({ ...record });
+      }
+    });
+  },
+}));
+
+vi.mock("@/utils/plannerSync", () => {
+  return {
+    PLANNER_SYNC_EVENT: "planner-sync-finished",
+    canSyncPlannerFromRemote: vi.fn(async () => true),
+    loadLocalDailyTasks: vi.fn(async (userId: string, taskDate: string) =>
+      mocks.localTasks.filter((task) => task.user_id === userId && task.task_date === taskDate),
+    ),
+    syncLocalDailyTasksFromRemote: vi.fn(async () => []),
+  };
+});
+
 import { useRecurringTaskSpawner } from "./useRecurringTaskSpawner";
+
+const buildTemplate = (overrides: Record<string, unknown> = {}) => ({
+  id: "template-1",
+  task_text: "Recurring template",
+  difficulty: "medium",
+  task_date: "2026-02-01",
+  created_at: "2026-02-01T12:00:00.000Z",
+  scheduled_time: "09:00",
+  estimated_duration: 30,
+  category: null,
+  recurrence_pattern: "daily",
+  recurrence_days: null,
+  recurrence_month_days: null,
+  recurrence_custom_period: null,
+  recurrence_end_date: null,
+  xp_reward: 50,
+  epic_id: null,
+  reminder_enabled: false,
+  reminder_minutes_before: null,
+  ...overrides,
+});
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -56,47 +135,13 @@ const createWrapper = () => {
 describe("useRecurringTaskSpawner spawn behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.localTasks.splice(0, mocks.localTasks.length);
+    mocks.nextIdRef.value = 0;
 
     mocks.templatesQueryMock.mockResolvedValue({
       data: [
-        {
-          id: "template-1",
-          task_text: "No time recurring",
-          difficulty: "medium",
-          task_date: "2026-02-01",
-          created_at: "2026-02-01T12:00:00.000Z",
-          scheduled_time: null,
-          estimated_duration: 30,
-          category: null,
-          recurrence_pattern: "daily",
-          recurrence_days: null,
-          recurrence_month_days: null,
-          recurrence_custom_period: null,
-          recurrence_end_date: null,
-          xp_reward: 50,
-          epic_id: null,
-          reminder_enabled: false,
-          reminder_minutes_before: null,
-        },
-        {
-          id: "template-2",
-          task_text: "Timed recurring",
-          difficulty: "medium",
-          task_date: "2026-02-01",
-          created_at: "2026-02-01T12:00:00.000Z",
-          scheduled_time: "09:00",
-          estimated_duration: 30,
-          category: null,
-          recurrence_pattern: "daily",
-          recurrence_days: null,
-          recurrence_month_days: null,
-          recurrence_custom_period: null,
-          recurrence_end_date: null,
-          xp_reward: 50,
-          epic_id: null,
-          reminder_enabled: false,
-          reminder_minutes_before: null,
-        },
+        buildTemplate({ id: "template-1", task_text: "No time recurring", scheduled_time: null }),
+        buildTemplate({ id: "template-2", task_text: "Timed recurring", scheduled_time: "09:00" }),
       ],
       error: null,
     });
@@ -113,6 +158,13 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
 
     mocks.upsertMock.mockImplementation(() => ({
       select: mocks.upsertSelectMock,
+    }));
+    mocks.insertSelectMock.mockResolvedValue({
+      data: [{ id: "inserted-1" }],
+      error: null,
+    });
+    mocks.insertMock.mockImplementation(() => ({
+      select: mocks.insertSelectMock,
     }));
 
     mocks.fromMock.mockImplementation((table: string) => {
@@ -139,6 +191,7 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
           };
         },
         upsert: mocks.upsertMock,
+        insert: mocks.insertMock,
       };
     });
   });
@@ -172,5 +225,110 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
       "Set a time on recurring quest templates to resume auto-creation.",
     );
     expect(mocks.toastErrorMock).not.toHaveBeenCalledWith("Failed to create recurring quests");
+  });
+
+  it("falls back to row-by-row insert when ON CONFLICT arbiter inference fails", async () => {
+    mocks.templatesQueryMock.mockResolvedValueOnce({
+      data: [buildTemplate({ id: "template-arbiter", task_text: "Arbiter recurring", scheduled_time: "10:00" })],
+      error: null,
+    });
+    mocks.upsertSelectMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "42P10",
+        message: "there is no unique or exclusion constraint matching the ON CONFLICT specification",
+        details: null,
+        hint: null,
+      },
+    });
+    mocks.insertSelectMock.mockResolvedValueOnce({
+      data: [{ id: "spawned-insert-fallback" }],
+      error: null,
+    });
+
+    const { result } = renderHook(
+      () => useRecurringTaskSpawner(new Date("2026-02-09T09:00:00.000Z")),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.pendingRecurringCount).toBe(1);
+    });
+
+    act(() => {
+      result.current.spawnRecurringTasks();
+    });
+
+    await waitFor(() => {
+      expect(mocks.insertMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.upsertMock).toHaveBeenCalledTimes(1);
+    expect(mocks.insertMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      parent_template_id: "template-arbiter",
+      task_text: "Arbiter recurring",
+    }));
+    expect(mocks.toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("retries row-by-row and creates valid templates even when one template write fails", async () => {
+    mocks.templatesQueryMock.mockResolvedValueOnce({
+      data: [
+        buildTemplate({ id: "template-a", task_text: "Template A", scheduled_time: "09:00" }),
+        buildTemplate({ id: "template-b", task_text: "Template B", scheduled_time: "10:00" }),
+      ],
+      error: null,
+    });
+    mocks.upsertSelectMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "23514",
+          message: "new row for relation \"daily_tasks\" violates check constraint",
+          details: null,
+          hint: null,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "spawned-row-1" }],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "23514",
+          message: "new row for relation \"daily_tasks\" violates check constraint",
+          details: null,
+          hint: null,
+        },
+      });
+
+    const { result } = renderHook(
+      () => useRecurringTaskSpawner(new Date("2026-02-09T09:00:00.000Z")),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.pendingRecurringCount).toBe(2);
+    });
+
+    act(() => {
+      result.current.spawnRecurringTasks();
+    });
+
+    await waitFor(() => {
+      expect(mocks.upsertMock).toHaveBeenCalledTimes(3);
+    });
+
+    expect(mocks.upsertMock.mock.calls[0]?.[0]).toHaveLength(2);
+    expect(mocks.upsertMock.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      parent_template_id: "template-a",
+    }));
+    expect(mocks.upsertMock.mock.calls[2]?.[0]).toEqual(expect.objectContaining({
+      parent_template_id: "template-b",
+    }));
+    expect(mocks.toastErrorMock).toHaveBeenCalledWith(
+      "Some recurring quests were not created. Open and re-save those templates.",
+    );
   });
 });

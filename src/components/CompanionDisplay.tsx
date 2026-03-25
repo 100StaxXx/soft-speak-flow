@@ -22,7 +22,7 @@ import { CompanionDialogue } from "@/components/companion/CompanionDialogue";
 import { WakeUpCelebration } from "@/components/companion/WakeUpCelebration";
 import { CompanionAttributes } from "@/components/CompanionAttributes";
 import { AnimatePresence } from "framer-motion";
-import { formatDisplayLabel } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 import { deriveCompanionPalette } from "@/lib/companionPalette";
 import { resolveCompanionName } from "@/lib/companionName";
 import {
@@ -37,6 +37,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { getStageName } from "@/config/companionStages";
+import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
+
+interface CompanionDisplayProps {
+  layoutMode?: CompanionLayoutMode;
+}
 
 const LONG_PRESS_DURATION_MS = 800;
 const MOVE_CANCEL_THRESHOLD_PX = 12;
@@ -92,7 +97,7 @@ const getColorName = (hexColor: string): string => {
   }
 };
 
-export const CompanionDisplay = memo(() => {
+export const CompanionDisplay = memo(({ layoutMode = "mobile" }: CompanionDisplayProps) => {
   const {
     companion,
     nextEvolutionXP,
@@ -141,6 +146,8 @@ export const CompanionDisplay = memo(() => {
   const [welcomeBackDismissed, setWelcomeBackDismissed] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [creatureName, setCreatureName] = useState<string | null>(null);
+  const isDesktop = layoutMode === "desktop";
+  const imageSizeClass = isDesktop ? "h-72 w-72" : "h-64 w-64";
   
   // Long press detection refs
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -411,7 +418,7 @@ export const CompanionDisplay = memo(() => {
           </>
         )}
         
-        <div className="relative p-6 space-y-6">
+        <div className={cn("relative space-y-6", isDesktop ? "p-7" : "p-6")}>
           {/* Stage Badge */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
@@ -444,7 +451,13 @@ export const CompanionDisplay = memo(() => {
           </div>
 
           {/* Companion Name - Centered */}
-          <p className="text-center text-2xl font-semibold tracking-wide -mt-1" style={{ color: companionPalette.accentText }}>
+          <p
+            className={cn(
+              "text-center font-semibold tracking-wide -mt-1",
+              isDesktop ? "text-3xl" : "text-2xl",
+            )}
+            style={{ color: companionPalette.accentText }}
+          >
             {creatureName || 'Companion'}
           </p>
 
@@ -487,13 +500,13 @@ export const CompanionDisplay = memo(() => {
                 </div>
               )}
               {!imageLoaded && !imageError && (
-                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading companion image">
+                <div className={cn("relative rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 animate-pulse flex items-center justify-center", imageSizeClass)} role="status" aria-live="polite" aria-label="Loading companion image">
                   <Sparkles className="h-12 w-12 text-primary/50 animate-spin" aria-hidden="true" />
                   <span className="sr-only">Loading companion image</span>
                 </div>
               )}
               {imageError && (
-                <div className="relative w-64 h-64 rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30" role="alert" aria-live="assertive">
+                <div className={cn("relative rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border-2 border-destructive/30", imageSizeClass)} role="alert" aria-live="assertive">
                   <div className="text-center p-4">
                     <p className="text-sm text-muted-foreground mb-2" id="image-error-message">Image unavailable</p>
                     <button 
@@ -515,7 +528,14 @@ export const CompanionDisplay = memo(() => {
                 key={imageKey}
                 src={effectiveImageUrl}
                 alt={`${stageName} companion at stage ${companion.current_stage}`}
-                className={`relative w-64 h-64 object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'} ${health.isNeglected ? 'ring-destructive/50' : 'ring-primary/30'} ${isRegenerating ? 'animate-pulse' : ''} ${animationClass}`}
+                className={cn(
+                  "relative object-cover rounded-2xl shadow-2xl ring-4 transition-all duration-500 group-hover:scale-105",
+                  imageSizeClass,
+                  imageLoaded ? "opacity-100" : "opacity-0 absolute",
+                  health.isNeglected ? "ring-destructive/50" : "ring-primary/30",
+                  isRegenerating && "animate-pulse",
+                  animationClass,
+                )}
                 style={{ ...skinStyles, ...careStyles, ...equippedCosmeticStyles }}
                 onLoad={() => {
                   setImageLoaded(true);

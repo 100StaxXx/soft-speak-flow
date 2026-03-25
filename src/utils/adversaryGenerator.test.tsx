@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     fromMock,
+    isMacSession: vi.fn(),
     insertPayload: null as Record<string, unknown> | null,
     recentEncounterRows: [] as Array<Record<string, unknown>>,
   };
@@ -52,6 +53,10 @@ vi.mock("@/hooks/useLivingCompanion", () => ({
   }),
 }));
 
+vi.mock("@/utils/platformTargets", () => ({
+  isMacSession: mocks.isMacSession,
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -63,6 +68,7 @@ import * as adversaryGeneratorModule from "@/utils/adversaryGenerator";
 import { useAstralEncounters } from "@/hooks/useAstralEncounters";
 import { generateAdversary } from "@/utils/adversaryGenerator";
 import { RESIST_RANDOM_MINIGAME_POOL, type Adversary } from "@/types/astralEncounters";
+import { toast } from "sonner";
 
 const COMMON_DISTRACTION_POOL = [
   "Riftling Wisp",
@@ -279,6 +285,8 @@ describe("generateAdversary reusable roster", () => {
 describe("useAstralEncounters roster integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isMacSession.mockReset();
+    mocks.isMacSession.mockReturnValue(false);
     mocks.insertPayload = null;
     mocks.recentEncounterRows = [
       createEncounterRow("enc-1", "Enemy 1", "orb_match"),
@@ -347,5 +355,65 @@ describe("useAstralEncounters roster integration", () => {
       adversary_lore: generatedAdversary.lore,
       mini_game_type: generatedAdversary.miniGameType,
     });
+  });
+
+  it("returns unsupported_platform on Mac sessions without querying pending encounters", async () => {
+    mocks.isMacSession.mockReturnValue(true);
+
+    const { result } = renderHook(() => useAstralEncounters(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(mocks.fromMock).toHaveBeenCalledTimes(3);
+    });
+
+    const fromCallCountBefore = mocks.fromMock.mock.calls.length;
+
+    let triggerResult;
+
+    await act(async () => {
+      triggerResult = await result.current.checkEncounterTrigger("quest_milestone");
+    });
+
+    expect(triggerResult).toEqual({
+      ok: false,
+      started: false,
+      resumed: false,
+      reason: "unsupported_platform",
+    });
+    expect(mocks.fromMock).toHaveBeenCalledTimes(fromCallCountBefore);
+    expect(mocks.insertPayload).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("blocks raw encounter starts on Mac sessions", async () => {
+    mocks.isMacSession.mockReturnValue(true);
+
+    const { result } = renderHook(() => useAstralEncounters(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(mocks.fromMock).toHaveBeenCalledTimes(3);
+    });
+
+    const fromCallCountBefore = mocks.fromMock.mock.calls.length;
+    let thrownError: unknown = null;
+
+    await act(async () => {
+      try {
+        await result.current.startEncounterAsync({
+          triggerType: "quest_milestone",
+        });
+      } catch (error) {
+        thrownError = error;
+      }
+    });
+
+    expect(thrownError).toMatchObject({ code: "unsupported_platform" });
+    expect(mocks.fromMock).toHaveBeenCalledTimes(fromCallCountBefore);
+    expect(mocks.insertPayload).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

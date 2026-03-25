@@ -16,6 +16,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthScopedClientState } from "@/services/authScopedClientState";
 import { getUserTimezone } from "@/utils/timezone";
+import { isNetworkLikeError } from "@/utils/networkErrors";
 
 const SESSION_RETRY_DELAYS_MS = [0, 250, 750, 1500] as const;
 const RESUME_REFRESH_COOLDOWN_MS = 4000;
@@ -154,6 +155,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.error("Failed to refresh session:", lastError);
       if (currentSession?.user) {
+        if (isNetworkLikeError(lastError)) {
+          applySessionState(currentSession, "authenticated");
+          return;
+        }
+
         setStatus("recovering");
         return;
       }

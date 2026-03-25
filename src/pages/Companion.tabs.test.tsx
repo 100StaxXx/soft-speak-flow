@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   isTabActive: true,
   useCompanionCalls: [] as Array<Record<string, unknown> | undefined>,
+  layoutMode: "mobile" as "mobile" | "desktop",
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -121,6 +122,10 @@ vi.mock("@/hooks/useCompanion", () => ({
   },
 }));
 
+vi.mock("@/hooks/useCompanionLayoutMode", () => ({
+  useCompanionLayoutMode: () => mocks.layoutMode,
+}));
+
 vi.mock("@/hooks/useCompanionStory", () => ({
   getCompanionStoriesAllQueryKey: (companionId?: string) => ["companion-stories-all", companionId],
   fetchCompanionStoriesAll: vi.fn().mockResolvedValue([]),
@@ -184,7 +189,9 @@ vi.mock("@/components/ui/parallax-card", () => ({
 }));
 
 vi.mock("@/components/CompanionDisplay", () => ({
-  CompanionDisplay: () => <div data-testid="companion-display" />,
+  CompanionDisplay: ({ layoutMode }: { layoutMode?: "mobile" | "desktop" }) => (
+    <div data-testid="companion-display" data-layout-mode={layoutMode ?? "mobile"} />
+  ),
 }));
 
 vi.mock("@/components/NextEvolutionPreview", () => ({
@@ -272,6 +279,7 @@ describe("Companion tabs performance behavior", () => {
     mocks.navigate.mockClear();
     mocks.isTabActive = true;
     mocks.useCompanionCalls = [];
+    mocks.layoutMode = "mobile";
   });
 
   afterEach(() => {
@@ -411,6 +419,16 @@ describe("Companion tabs performance behavior", () => {
 
     fireEvent.click(screen.getByLabelText("Settings"));
     expect(mocks.navigate).toHaveBeenCalledWith("/profile");
+  });
+
+  it("renders the desktop companion dashboard layout when desktop mode is active", () => {
+    mocks.layoutMode = "desktop";
+
+    renderCompanion();
+
+    expect(screen.getByTestId("companion-desktop-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-desktop-workspace")).toBeInTheDocument();
+    expect(screen.getByTestId("companion-display")).toHaveAttribute("data-layout-mode", "desktop");
   });
 
   it("disables companion query and idle prefetch while tab is inactive", async () => {

@@ -37,9 +37,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { DragTimeZoomRail } from "@/components/calendar/DragTimeZoomRail";
-import { CalendarTask, CalendarMilestone } from "@/types/quest";
+import { CalendarTask } from "@/types/quest";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -173,6 +172,7 @@ interface TodaysAgendaProps {
   tasks: Task[];
   selectedDate: Date;
   isVisible?: boolean;
+  disableTimelineDrag?: boolean;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
   onAddQuest: () => void;
   completedCount: number;
@@ -180,9 +180,7 @@ interface TodaysAgendaProps {
   currentStreak?: number;
   onUndoToggle?: (taskId: string, xpReward: number) => void;
   onEditQuest?: (task: Task) => void;
-  calendarTasks?: CalendarTask[];
-  calendarMilestones?: CalendarMilestone[];
-  onDateSelect?: (date: Date) => void;
+  weekTasks?: CalendarTask[];
   activeEpics?: Array<{
     id: string;
     title: string;
@@ -212,6 +210,7 @@ interface TodaysAgendaProps {
   onSendToCalendar?: (taskId: string) => void;
   hasCalendarLink?: (taskId: string) => boolean;
   onTimelineDragPreviewTimeChange?: (time: string | null) => void;
+  onOpenMonthView?: () => void;
 }
 
 type ActiveEpic = NonNullable<TodaysAgendaProps["activeEpics"]>[number];
@@ -226,6 +225,7 @@ const formatTime = (time: string) => {
 };
 
 const COMBO_WINDOW_MS = 8000;
+const DESKTOP_LAYOUT_MIN_WIDTH = 1280;
 const DEFAULT_DAY_START_MINUTE = 6 * 60;
 const DAY_END_MINUTE = (24 * 60) - 1;
 const PLACEHOLDER_INTERVAL_MINUTES = 3 * 60;
@@ -567,6 +567,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
   isVisible = true,
+  disableTimelineDrag = false,
   onToggle,
   onAddQuest,
   completedCount,
@@ -574,9 +575,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   currentStreak = 0,
   onUndoToggle,
   onEditQuest,
-  calendarTasks = [],
-  calendarMilestones = [],
-  onDateSelect,
+  weekTasks = [],
   activeEpics = [],
   isCampaignsLoading = false,
   onDeleteQuest,
@@ -586,9 +585,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   onSendToCalendar,
   hasCalendarLink,
   onTimelineDragPreviewTimeChange,
+  onOpenMonthView,
 }: TodaysAgendaProps) {
   const prefersReducedMotion = useReducedMotion();
   const { capabilities } = useMotionProfile();
+  const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth >= DESKTOP_LAYOUT_MIN_WIDTH;
+  });
   const isNativeIOS = useMemo(() => {
     if (typeof window === "undefined") return false;
     const capacitor = (window as Window & {
@@ -597,6 +601,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return Boolean(capacitor?.isNativePlatform?.() && capacitor?.getPlatform?.() === "ios");
   }, []);
   const useLiteAnimations = isNativeIOS || Boolean(prefersReducedMotion) || !capabilities.allowBackgroundAnimation;
+  const isTimelineDragEnabled = !disableTimelineDrag;
   const { profile } = useProfile();
   const queryClient = useQueryClient();
   const keepInPlace = profile?.completed_tasks_stay_in_place ?? true;
@@ -656,7 +661,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [showMonthView, setShowMonthView] = useState(false);
   const [sortBy, setSortBy] = useState<'custom' | 'time' | 'priority' | 'xp'>('custom');
   const [justCompletedTasks, setJustCompletedTasks] = useState<Set<string>>(new Set());
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<string>>(new Set());
@@ -670,6 +674,28 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   
   // Clean up optimistic state when server confirms completion
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+
+    const mediaQuery = window.matchMedia(`(min-width: ${DESKTOP_LAYOUT_MIN_WIDTH}px)`);
+    const handleDesktopLayoutChange = () => {
+      setIsDesktopLayout(window.innerWidth >= DESKTOP_LAYOUT_MIN_WIDTH);
+    };
+
+    handleDesktopLayoutChange();
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleDesktopLayoutChange);
+      return () => {
+        mediaQuery.removeEventListener("change", handleDesktopLayoutChange);
+      };
+    }
+
+    mediaQuery.addListener(handleDesktopLayoutChange);
+    return () => {
+      mediaQuery.removeListener(handleDesktopLayoutChange);
+    };
+  }, []);
+
   useEffect(() => {
     setOptimisticCompleted(prev => {
       const confirmedIds = tasks.filter(t => t.completed).map(t => t.id);
@@ -814,6 +840,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
   const timelineDrag = useTimelineDrag({
     containerRef: timelineDragContainerRef,
+    enabled: isTimelineDragEnabled,
     snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
     touchActivationThresholdPx: 24,
     touchActivationPolicy: "longPressThenMove",
@@ -1438,17 +1465,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, []);
 
   const hasScheduledTimelineRows = timelineRows.length > 0;
-  const renderCampaignSection = () => (
+  const renderCampaignSection = ({ inDesktopRail = false }: { inDesktopRail?: boolean } = {}) => (
     <>
       {/* Campaign Dropdown Folders with Rituals */}
       {campaignRitualGroups.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-border/30">
+        <div className={cn(inDesktopRail ? "space-y-3" : "mt-6 pt-4 border-t border-border/30")}>
           {/* Campaigns divider */}
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-9 flex-shrink-0" />
+            {!inDesktopRail && <div className="w-9 flex-shrink-0" />}
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <Target className="h-3 w-3" />
-              Campaigns
+              {inDesktopRail ? "Campaigns & rituals" : "Campaigns"}
             </div>
             <div className="flex-1 border-t border-dashed border-border/40" />
           </div>
@@ -1540,14 +1567,14 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       )}
 
       {isCampaignsLoading && campaignRitualGroups.length === 0 && (
-        <div className="mt-4 pt-3 border-t border-border/20">
+        <div className={cn(inDesktopRail ? "rounded-[24px] border border-white/8 bg-white/[0.03] p-4" : "mt-4 pt-3 border-t border-border/20")}>
           <p className="text-xs text-muted-foreground">Loading campaigns...</p>
         </div>
       )}
 
       {/* Campaign Strip (for epics with no rituals today) */}
       {activeEpics.length > 0 && campaignRitualGroups.length === 0 && (
-        <div className="mt-4 pt-3 border-t border-border/20 space-y-2">
+        <div className={cn(inDesktopRail ? "space-y-2" : "mt-4 pt-3 border-t border-border/20 space-y-2")}>
           {activeEpics.map((epic) => {
             const progress = Math.round(epic.progress_percentage ?? 0);
             const daysLeft = getDaysLeft(epic.end_date);
@@ -1595,6 +1622,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   }, 0);
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
   const allComplete = totalCount > 0 && completedCount === totalCount;
+  const weekCompletedCount = weekTasks.filter((task) => task.completed).length;
+  const weekTotalCount = weekTasks.length;
+  const weekScheduledCount = weekTasks.filter((task) => !!task.scheduled_time).length;
+  const weekActiveDays = new Set(weekTasks.map((task) => task.task_date)).size;
+  const weekXP = weekTasks.reduce((sum, task) => {
+    if (!task.completed) return sum;
+    const taskXP = task.is_main_quest
+      ? Math.round(task.xp_reward * MAIN_QUEST_XP_MULTIPLIER)
+      : task.xp_reward;
+    return sum + taskXP;
+  }, 0);
+  const selectedScheduledCount = scheduledItems.length;
+  const selectedAnytimeCount = anytimeItems.length;
+  const selectedRitualCount = ritualTasks.length;
+  const selectedOpenCount = totalCount - completedCount;
+  const nextFocusTask = baseTimelineItems.find((task) => !task.completed)
+    ?? ritualTasks.find((task) => !task.completed)
+    ?? null;
+  const selectedDateHeading = safeFormat(selectedDate, "EEEE", "Day plan");
+  const selectedDateSubheading = safeFormat(selectedDate, "MMMM d, yyyy", "");
+  const isSelectedToday = isSameDay(selectedDate, new Date());
 
   const triggerHaptic = async (style: ImpactStyle) => {
     try {
@@ -2073,24 +2121,178 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return taskContent;
   }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo]);
 
+  const desktopRailCardClass = "rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+  const desktopRail = isDesktopLayout ? (
+    <aside className="hidden xl:flex xl:flex-col xl:gap-4">
+      <section className={desktopRailCardClass}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/75">
+              Selected Day
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+                {selectedDateHeading}
+              </h2>
+              {isSelectedToday ? (
+                <span className="rounded-full bg-celestial-blue/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-celestial-blue">
+                  Today
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {selectedDateSubheading}
+            </p>
+          </div>
+
+          <div className="rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="flex items-center gap-3">
+              <ProgressRing percent={progressPercent} size={40} strokeWidth={3.5} />
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+                  Progress
+                </p>
+                <p className="text-sm font-semibold text-foreground">
+                  {completedCount}/{totalCount || 0} done
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Open</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedOpenCount}</p>
+          </div>
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedScheduledCount}</p>
+          </div>
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Anytime</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedAnytimeCount}</p>
+          </div>
+          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Rituals</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedRitualCount}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/75">
+            Next Focus
+          </p>
+          {nextFocusTask ? (
+            <>
+              <p className="mt-2 text-sm font-semibold text-foreground">{nextFocusTask.task_text}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {nextFocusTask.scheduled_time ? formatTime(nextFocusTask.scheduled_time) : "No time locked yet"}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Nothing is queued yet for this day.
+            </p>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+            onClick={onAddQuest}
+          >
+            <Plus className="h-4 w-4" />
+            Add Quest
+          </Button>
+        </div>
+      </section>
+
+      <section className={desktopRailCardClass}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/75">
+              This Week
+            </p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+              {weekCompletedCount}/{weekTotalCount || 0}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              quests completed across {weekActiveDays || 0} active day{weekActiveDays === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <div className="rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">
+              XP banked
+            </p>
+            <p className="mt-2 text-xl font-semibold text-stardust-gold">{weekXP}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Active</p>
+            <p className="mt-2 text-xl font-semibold text-foreground">{weekActiveDays}</p>
+          </div>
+          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Timed</p>
+            <p className="mt-2 text-xl font-semibold text-foreground">{weekScheduledCount}</p>
+          </div>
+          <div className="rounded-[20px] border border-white/8 bg-white/[0.03] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/75">Streak</p>
+            <p className="mt-2 text-xl font-semibold text-foreground">{currentStreak}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 h-2 rounded-full bg-white/[0.06]">
+          <div
+            className="h-full rounded-full bg-primary/85"
+            style={{ width: `${weekTotalCount > 0 ? (weekCompletedCount / weekTotalCount) * 100 : 0}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {weekTotalCount > 0
+            ? "Desktop now keeps the day plan anchored while the week stays visible above."
+            : "This week is still open. Add your first quest to start shaping it."}
+        </p>
+      </section>
+
+      <section className={desktopRailCardClass}>
+        {campaignRitualGroups.length > 0 || activeEpics.length > 0 || isCampaignsLoading ? (
+          renderCampaignSection({ inDesktopRail: true })
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Target className="h-3 w-3" />
+              Campaigns
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              No campaigns or rituals are attached to this day yet.
+            </p>
+          </>
+        )}
+      </section>
+    </aside>
+  ) : null;
 
   return (
-    <div className="relative">
-      <div className="relative px-2 py-2 overflow-visible">
+    <div className="relative xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start xl:gap-6">
+      <div className="relative px-2 py-2 overflow-visible xl:rounded-[32px] xl:border xl:border-white/10 xl:bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] xl:px-5 xl:py-5 xl:shadow-[0_28px_54px_rgba(0,0,0,0.24)]">
         {/* Compact Header: Date + Progress Ring + XP */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+        <div className="mb-3 flex items-center justify-between gap-3 xl:mb-5">
+          <div className="flex items-center gap-2 xl:gap-3">
             <button 
-              onClick={() => setShowMonthView(true)}
-              className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+              type="button"
+              onClick={() => onOpenMonthView?.()}
+              className="flex items-center gap-1.5 rounded-2xl transition-opacity hover:opacity-80"
             >
-              <span className="text-lg font-bold">
+              <span className="text-lg font-bold xl:text-[1.8rem] xl:tracking-tight">
                 {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
               </span>
             </button>
             {currentStreak > 0 && (
               <div className={cn(
-                "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
                 currentStreak >= 30 
                   ? "bg-stardust-gold/20 text-stardust-gold" 
                   : currentStreak >= 14 
@@ -2103,17 +2305,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 xl:gap-3">
             {/* Compact progress ring */}
             {totalCount > 0 && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 xl:px-3 xl:py-2">
                 <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
                 <span className="text-xs font-medium text-muted-foreground">
                   {completedCount}/{totalCount}
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-sm xl:px-3 xl:py-2">
               <Trophy className={cn(
                 "h-4 w-4",
                 allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
@@ -2163,18 +2365,20 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         {/* Timeline Content */}
         {tasks.length === 0 ? (
-          <div className="text-center py-6">
-            <Circle className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
-            <p className="text-sm text-muted-foreground mb-2">
+          <div className="rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-10 text-center xl:min-h-[420px] xl:flex xl:flex-col xl:items-center xl:justify-center xl:px-8">
+            <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+            <p className="mb-2 text-sm font-medium text-foreground">
               No tasks for this day
             </p>
-            <p className="text-xs text-muted-foreground/70">
-              Tap <Plus className="w-3 h-3 inline" /> to add your first quest
+            <p className="mx-auto max-w-sm text-xs text-muted-foreground/70 xl:text-sm">
+              {isSelectedToday
+                ? "Your day is still open. Add a quest to give the planner some shape."
+                : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
             </p>
             <Button
               variant="outline"
               size="sm"
-              className="mt-3"
+              className="mt-4 rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
               onClick={onAddQuest}
             >
               <Plus className="w-3 h-3 mr-1.5" />
@@ -2299,7 +2503,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                     const laneOffsetPx = rowFlow
                       ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
                       : 0;
-                    const baseTimelineRowDragProps = task.scheduled_time && !task.completed
+                    const baseTimelineRowDragProps = isTimelineDragEnabled && task.scheduled_time && !task.completed
                       ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
                       : undefined;
                     const timelineRowDragProps = baseTimelineRowDragProps
@@ -2401,7 +2605,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
                       </motion.div>
                     );
                   })}
-                  {renderCampaignSection()}
+                  {!isDesktopLayout ? renderCampaignSection() : null}
                 </div>
               </div>
             )}
@@ -2409,8 +2613,10 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         )}
 
         {/* Inbox section removed - now has its own tab */}
-        {!hasScheduledTimelineRows && renderCampaignSection()}
+        {!hasScheduledTimelineRows && !isDesktopLayout ? renderCampaignSection() : null}
       </div>
+
+      {desktopRail}
 
       {shouldRenderDragOverlay && draggedScheduledTask && dragOverlaySnapshot && typeof document !== "undefined"
         ? createPortal(
@@ -2443,19 +2649,6 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             document.body,
           )
         : null}
-
-      <HourlyViewModal
-        open={showMonthView}
-        onOpenChange={setShowMonthView}
-        selectedDate={selectedDate}
-        onDateSelect={(date) => {
-          if (onDateSelect) onDateSelect(date);
-        }}
-        tasks={calendarTasks}
-        milestones={calendarMilestones}
-        onTaskDrop={() => {}}
-        onTimeSlotLongPress={onTimeSlotLongPress}
-      />
 
       <DragTimeZoomRail rail={timelineDrag.zoomRail} />
     </div>

@@ -178,16 +178,37 @@ describe("getProfileAwareAuthFallbackPath", () => {
 
   it("returns /tasks for existing users", async () => {
     mocks.maybeSingleMock.mockResolvedValueOnce({
-      data: { onboarding_completed: true },
+      data: {
+        onboarding_completed: true,
+        selected_mentor_id: null,
+        onboarding_data: {},
+      },
       error: null,
     });
 
     await expect(getProfileAwareAuthFallbackPath("returning-user")).resolves.toBe("/tasks");
   });
 
+  it("returns /tasks for legacy existing users with a mentor and null onboarding_completed", async () => {
+    mocks.maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        onboarding_completed: null,
+        selected_mentor_id: "mentor-legacy",
+        onboarding_data: {},
+      },
+      error: null,
+    });
+
+    await expect(getProfileAwareAuthFallbackPath("legacy-returning-user")).resolves.toBe("/tasks");
+  });
+
   it("returns /onboarding for incomplete users", async () => {
     mocks.maybeSingleMock.mockResolvedValueOnce({
-      data: { onboarding_completed: false },
+      data: {
+        onboarding_completed: false,
+        selected_mentor_id: null,
+        onboarding_data: {},
+      },
       error: null,
     });
 

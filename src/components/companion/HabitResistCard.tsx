@@ -10,9 +10,18 @@ interface HabitResistCardProps {
   onResist: () => void;
   onRemove: () => void;
   isLoading?: boolean;
+  resistDisabled?: boolean;
+  resistLabel?: string;
 }
 
-export const HabitResistCard = memo(({ habit, onResist, onRemove, isLoading }: HabitResistCardProps) => {
+export const HabitResistCard = memo(({
+  habit,
+  onResist,
+  onRemove,
+  isLoading,
+  resistDisabled = false,
+  resistLabel = 'Resist',
+}: HabitResistCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -50,13 +59,15 @@ export const HabitResistCard = memo(({ habit, onResist, onRemove, isLoading }: H
               <Trash2 className="h-4 w-4" />
             </Button>
             <Button
+              variant={resistDisabled ? 'outline' : 'default'}
               size="sm"
               onClick={onResist}
-              disabled={isLoading}
+              disabled={isLoading || resistDisabled}
               className="gap-1.5"
+              title={resistDisabled ? 'Astral Encounters are only available on iPhone and iPad.' : undefined}
             >
               <Shield className="h-4 w-4" />
-              Resist
+              {resistLabel}
             </Button>
           </div>
         </div>

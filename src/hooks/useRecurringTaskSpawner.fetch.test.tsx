@@ -8,12 +8,14 @@ const mocks = vi.hoisted(() => {
   const templateQueryResultMock = vi.fn();
   const existingTasksQueryResultMock = vi.fn();
   const toastErrorMock = vi.fn();
+  const localTasks: Array<Record<string, unknown>> = [];
 
   return {
     fromMock,
     templateQueryResultMock,
     existingTasksQueryResultMock,
     toastErrorMock,
+    localTasks,
   };
 });
 
@@ -34,6 +36,46 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (...args: unknown[]) => mocks.fromMock(...args),
   },
 }));
+
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueTaskAction: vi.fn(),
+    shouldQueueWrites: false,
+    retryNow: vi.fn(),
+  }),
+}));
+
+vi.mock("@/utils/plannerLocalStore", () => ({
+  createOfflinePlannerId: (prefix: string) => `${prefix}-local`,
+  getAllLocalTasksForUser: async (userId: string) =>
+    mocks.localTasks.filter((task) => task.user_id === userId),
+  removePlannerRecords: async (_storeName: string, ids: string[]) => {
+    const idSet = new Set(ids);
+    const remaining = mocks.localTasks.filter((task) => !idSet.has(String(task.id)));
+    mocks.localTasks.splice(0, mocks.localTasks.length, ...remaining);
+  },
+  upsertPlannerRecords: async (_storeName: string, records: Array<Record<string, unknown>>) => {
+    records.forEach((record) => {
+      const index = mocks.localTasks.findIndex((task) => task.id === record.id);
+      if (index >= 0) {
+        mocks.localTasks[index] = { ...mocks.localTasks[index], ...record };
+      } else {
+        mocks.localTasks.push({ ...record });
+      }
+    });
+  },
+}));
+
+vi.mock("@/utils/plannerSync", () => {
+  return {
+    PLANNER_SYNC_EVENT: "planner-sync-finished",
+    canSyncPlannerFromRemote: vi.fn(async () => true),
+    loadLocalDailyTasks: vi.fn(async (userId: string, taskDate: string) =>
+      mocks.localTasks.filter((task) => task.user_id === userId && task.task_date === taskDate),
+    ),
+    syncLocalDailyTasksFromRemote: vi.fn(async () => []),
+  };
+});
 
 import { useRecurringTaskSpawner } from "./useRecurringTaskSpawner";
 
@@ -59,6 +101,7 @@ const createWrapper = () => {
 describe("useRecurringTaskSpawner schema fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.localTasks.splice(0, mocks.localTasks.length);
     mocks.templateQueryResultMock
       .mockResolvedValueOnce({
         data: null,

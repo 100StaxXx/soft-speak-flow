@@ -11,6 +11,7 @@ import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
+import { DesktopWeekStrip } from "@/components/DesktopWeekStrip";
 import { AddQuestSheet, AddQuestData } from "@/components/AddQuestSheet";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { PageInfoButton } from "@/components/PageInfoButton";
@@ -50,6 +51,7 @@ import { useTaskCompletionWithInteraction, type InteractionType } from "@/hooks/
 import { InteractionLogModal } from "@/components/tasks/InteractionLogModal";
 import { useQuestCalendarSync } from "@/hooks/useQuestCalendarSync";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
+import { HourlyViewModal } from "@/components/HourlyViewModal";
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { getTodayIfDateStale, JOURNEYS_ROUTE } from "@/pages/journeysDateSync";
 import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility";
@@ -81,6 +83,7 @@ const Journeys = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showMonthView, setShowMonthView] = useState(false);
   
   const [prefilledTime, setPrefilledTime] = useState<string | null>(null);
   const [showQuickAdjust, setShowQuickAdjust] = useState(false);
@@ -240,6 +243,7 @@ const Journeys = () => {
   // Edit ritual state (for tasks linked to habits)
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
+  const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
   
   // Habit surfacing - auto-surface ALL active habits (not just epic-linked) as daily tasks
   const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
@@ -822,26 +826,31 @@ const Journeys = () => {
   return (
     <PageTransition mode="instant">
       <StarfieldBackground />
-      <div className="min-h-screen pb-nav-safe pt-safe px-4 relative z-10">
-        {/* Hero Header */}
-        <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
-          className="mb-6 text-center relative"
-        >
-          <div className="absolute right-0 top-0">
-            <PageInfoButton 
-              onClick={() => setShowPageInfo(true)} 
-            />
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Quests
-          </h1>
-          <p className="text-sm text-muted-foreground/90">
-            {headerDragTime ? `Dragging to ${formatTime12(headerDragTime)}` : "Daily quests. Your path to progress."}
-          </p>
-        </motion.div>
+      <div className="min-h-screen pb-nav-safe pt-safe px-4 xl:px-6 relative z-10">
+        <div className="mx-auto w-full max-w-[1360px]">
+          {/* Hero Header */}
+          <motion.div
+            initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
+            className="relative mb-6 text-center xl:mb-5 xl:flex xl:items-end xl:justify-between xl:gap-6 xl:text-left"
+          >
+            <div className="absolute right-0 top-0 xl:static xl:flex-shrink-0">
+              <PageInfoButton 
+                onClick={() => setShowPageInfo(true)} 
+              />
+            </div>
+            <div>
+              <h1 className="mb-2 text-3xl font-semibold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent xl:mb-1">
+                Quests
+              </h1>
+              <p className="text-sm text-muted-foreground/90">
+                {headerDragTime
+                  ? `Dragging to ${formatTime12(headerDragTime)}`
+                  : "Daily quests, reframed as a calmer week planner on desktop."}
+              </p>
+            </div>
+          </motion.div>
 
         <QuestsErrorBoundary>
           {/* Date Selector */}
@@ -851,11 +860,19 @@ const Journeys = () => {
             transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
             className="mb-4"
           >
-            <DatePillsScroller
+            <div className="xl:hidden">
+              <DatePillsScroller
+                selectedDate={selectedDate}
+                onDateSelect={handleDatePillClick}
+                tasksPerDay={tasksPerDay}
+                isActive={isTabActive}
+              />
+            </div>
+            <DesktopWeekStrip
               selectedDate={selectedDate}
-              onDateSelect={handleDatePillClick}
-              tasksPerDay={tasksPerDay}
-              isActive={isTabActive}
+              tasks={weekCalendarTasks}
+              onDateSelect={setSelectedDate}
+              onOpenMonthView={() => setShowMonthView(true)}
             />
           </motion.div>
 
@@ -867,36 +884,36 @@ const Journeys = () => {
           >
             {/* Today's Agenda */}
             <TodaysAgenda
-            tasks={dailyTasks}
-            selectedDate={selectedDate}
-            isVisible={location.pathname === JOURNEYS_ROUTE}
-            onToggle={handleToggleTask}
-            onAddQuest={() => {
-              setPrefilledTime(null);
-              setShowAddSheet(true);
-            }}
-            completedCount={completedCount}
-            totalCount={totalCount}
-            currentStreak={currentStreak}
-            onUndoToggle={handleUndoToggle}
-            onEditQuest={handleEditQuest}
-            calendarTasks={allCalendarTasks}
-            calendarMilestones={[]}
-            onDateSelect={setSelectedDate}
-            activeEpics={activeEpics}
-            isCampaignsLoading={epicsLoading}
-            onDeleteQuest={handleSwipeDeleteQuest}
-            onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
-            hasCalendarLink={hasLinkedEvent}
-            onMoveQuestToNextDay={handleSwipeMoveToNextDay}
-            onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
-            onTimeSlotLongPress={(date, time) => {
-              setSelectedDate(date);
-              setPrefilledTime(time);
-              setShowAddSheet(true);
-            }}
-            onTimelineDragPreviewTimeChange={setHeaderDragTime}
-          />
+              tasks={dailyTasks}
+              selectedDate={selectedDate}
+              isVisible={location.pathname === JOURNEYS_ROUTE}
+              disableTimelineDrag={showAddSheet || !!editingTask || !!editingRitual}
+              onToggle={handleToggleTask}
+              onAddQuest={() => {
+                setPrefilledTime(null);
+                setShowAddSheet(true);
+              }}
+              completedCount={completedCount}
+              totalCount={totalCount}
+              currentStreak={currentStreak}
+              onUndoToggle={handleUndoToggle}
+              onEditQuest={handleEditQuest}
+              weekTasks={weekCalendarTasks}
+              activeEpics={activeEpics}
+              isCampaignsLoading={epicsLoading}
+              onDeleteQuest={handleSwipeDeleteQuest}
+              onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
+              hasCalendarLink={hasLinkedEvent}
+              onMoveQuestToNextDay={handleSwipeMoveToNextDay}
+              onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
+              onOpenMonthView={() => setShowMonthView(true)}
+              onTimeSlotLongPress={(date, time) => {
+                setSelectedDate(date);
+                setPrefilledTime(time);
+                setShowAddSheet(true);
+              }}
+              onTimelineDragPreviewTimeChange={setHeaderDragTime}
+            />
           </motion.div>
         </QuestsErrorBoundary>
 
@@ -932,6 +949,21 @@ const Journeys = () => {
           open={!!editingRitual}
           onOpenChange={(open) => !open && setEditingRitual(null)}
           onDelete={handleDeleteRitual}
+        />
+
+        <HourlyViewModal
+          open={showMonthView}
+          onOpenChange={setShowMonthView}
+          selectedDate={selectedDate}
+          onDateSelect={setSelectedDate}
+          tasks={allCalendarTasks}
+          milestones={[]}
+          onTaskDrop={() => {}}
+          onTimeSlotLongPress={(date, time) => {
+            setSelectedDate(date);
+            setPrefilledTime(time);
+            setShowAddSheet(true);
+          }}
         />
 
         <PageInfoModal
@@ -1017,6 +1049,7 @@ const Journeys = () => {
           setPrefilledTime(null);
           setShowAddSheet(true);
         }} />
+      </div>
       </div>
 
     </PageTransition>

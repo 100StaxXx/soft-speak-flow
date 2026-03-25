@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 const mocks = vi.hoisted(() => ({
+  layoutMode: "mobile" as "mobile" | "desktop",
   mentorStatus: "recovering" as "ready" | "recovering" | "missing",
   effectiveMentorId: null as string | null,
   refreshConnection: vi.fn().mockResolvedValue(undefined),
@@ -12,7 +13,11 @@ const mocks = vi.hoisted(() => ({
   companion: null,
   companionLoading: false,
   mentorQuery: {
-    data: null as { mentorImage?: string; todaysQuote?: { text: string; author?: string } } | null,
+    data: null as {
+      mentorImage?: string;
+      mentorName?: string | null;
+      todaysQuote?: { text: string; author?: string };
+    } | null,
     isLoading: false,
     isError: false,
   },
@@ -48,6 +53,10 @@ vi.mock("@/hooks/useCompanion", () => ({
     companion: mocks.companion,
     isLoading: mocks.companionLoading,
   }),
+}));
+
+vi.mock("@/hooks/useMentorLayoutMode", () => ({
+  useMentorLayoutMode: () => mocks.layoutMode,
 }));
 
 vi.mock("@/hooks/useMentorConnectionHealth", () => ({
@@ -134,6 +143,7 @@ const renderIndex = () =>
 describe("Index mentor connection state", () => {
   beforeEach(() => {
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    mocks.layoutMode = "mobile";
     mocks.refreshConnection.mockClear();
     mocks.queryClient.refetchQueries.mockClear();
     mocks.user = { id: "user-1" };
@@ -158,7 +168,50 @@ describe("Index mentor connection state", () => {
     expect(screen.queryByText("Mentor connection lost")).not.toBeInTheDocument();
   });
 
+  it("keeps the stacked mentor dashboard on mobile", () => {
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.mentorQuery = {
+      data: {
+        mentorName: "Atlas",
+        mentorImage: "/mentor.png",
+        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+      },
+      isLoading: false,
+      isError: false,
+    };
+
+    renderIndex();
+
+    expect(screen.getByTestId("mentor-mobile-layout")).toBeInTheDocument();
+    expect(screen.queryByTestId("mentor-desktop-layout")).not.toBeInTheDocument();
+    expect(screen.getByText("MorningCheckIn")).toBeInTheDocument();
+    expect(screen.getByText("MentorQuickChat")).toBeInTheDocument();
+  });
+
+  it("renders the mentor desktop rail and workspace on desktop", () => {
+    mocks.layoutMode = "desktop";
+    mocks.mentorStatus = "ready";
+    mocks.effectiveMentorId = "mentor-1";
+    mocks.mentorQuery = {
+      data: {
+        mentorName: "Atlas",
+        mentorImage: "/mentor.png",
+        todaysQuote: { text: "Stay steady.", author: "Atlas" },
+      },
+      isLoading: false,
+      isError: false,
+    };
+
+    renderIndex();
+
+    expect(screen.getByTestId("mentor-desktop-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("mentor-desktop-workspace")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ask Atlas" })).toBeInTheDocument();
+  });
+
   it("shows mentor connection lost only after recovery fails", () => {
+    mocks.layoutMode = "desktop";
     mocks.mentorStatus = "missing";
 
     renderIndex();
@@ -168,6 +221,7 @@ describe("Index mentor connection state", () => {
   });
 
   it("keeps temporary issue banner behavior unchanged", () => {
+    mocks.layoutMode = "desktop";
     mocks.mentorStatus = "ready";
     mocks.effectiveMentorId = "mentor-1";
     mocks.mentorQuery = {

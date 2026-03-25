@@ -4,6 +4,8 @@ import { Award, Gift, MapPin } from "lucide-react";
 import { BadgesCollectionPanel } from "@/components/BadgesCollectionPanel";
 import { CompanionPostcards } from "@/components/companion/CompanionPostcards";
 import { RewardInventory } from "@/components/RewardInventory";
+import { cn } from "@/lib/utils";
+import type { CompanionLayoutMode } from "@/hooks/useCompanionLayoutMode";
 
 type CollectionSection = "badges" | "postcards" | "loot";
 
@@ -18,12 +20,17 @@ const INITIAL_MOUNTED_SECTIONS: Record<CollectionSection, boolean> = {
 const isCollectionSection = (section: string): section is CollectionSection =>
   COLLECTION_SECTIONS.includes(section as CollectionSection);
 
-export const CollectionTab = memo(() => {
+interface CollectionTabProps {
+  layoutMode?: CompanionLayoutMode;
+}
+
+export const CollectionTab = memo(({ layoutMode = "mobile" }: CollectionTabProps) => {
   const [activeSection, setActiveSection] = useState<CollectionSection>("badges");
   const [mountedSections, setMountedSections] = useState<Record<CollectionSection, boolean>>(
     () => INITIAL_MOUNTED_SECTIONS,
   );
   const prewarmedRef = useRef(false);
+  const isDesktop = layoutMode === "desktop";
 
   const markSectionMounted = useCallback((section: CollectionSection) => {
     setMountedSections((previous) =>
@@ -73,33 +80,38 @@ export const CollectionTab = memo(() => {
   }, []);
 
   return (
-    <div className="space-y-4 mt-4">
+    <div className={cn("space-y-4", isDesktop ? "pt-1" : "mt-4")}>
       <Tabs value={activeSection} onValueChange={handleSectionChange}>
-        <TabsList className="grid w-full grid-cols-3 h-10">
+        <TabsList
+          className={cn(
+            "grid grid-cols-3 h-10",
+            isDesktop ? "inline-grid w-auto min-w-[420px]" : "w-full",
+          )}
+        >
           <TabsTrigger value="badges" className="flex items-center gap-2">
             <Award className="h-4 w-4" />
-            <span className="hidden sm:inline">Badges</span>
+            <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Badges</span>
           </TabsTrigger>
           <TabsTrigger value="postcards" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Postcards</span>
+            <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Postcards</span>
           </TabsTrigger>
           <TabsTrigger value="loot" className="flex items-center gap-2">
             <Gift className="h-4 w-4" />
-            <span className="hidden sm:inline">Loot</span>
+            <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Loot</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="badges" forceMount className="mt-4 data-[state=inactive]:hidden">
-          {mountedSections.badges && <BadgesCollectionPanel />}
+          {mountedSections.badges && <BadgesCollectionPanel layoutMode={layoutMode} />}
         </TabsContent>
 
         <TabsContent value="postcards" forceMount className="mt-4 data-[state=inactive]:hidden">
-          {mountedSections.postcards && <CompanionPostcards />}
+          {mountedSections.postcards && <CompanionPostcards layoutMode={layoutMode} />}
         </TabsContent>
 
         <TabsContent value="loot" forceMount className="mt-4 data-[state=inactive]:hidden">
-          {mountedSections.loot && <RewardInventory />}
+          {mountedSections.loot && <RewardInventory layoutMode={layoutMode} />}
         </TabsContent>
       </Tabs>
     </div>

@@ -13,6 +13,15 @@ const mocks = vi.hoisted(() => {
   const trackTaskCompletionMock = vi.fn();
   const queueTaskActionMock = vi.fn();
   const reportApiFailureMock = vi.fn();
+  const createOfflinePlannerIdMock = vi.fn((prefix: string) => `${prefix}-local`);
+  const getLocalHabitCompletionsForDateMock = vi.fn();
+  const getLocalSubtasksForTaskMock = vi.fn();
+  const getPlannerRecordMock = vi.fn();
+  const getLocalTasksByDateMock = vi.fn();
+  const removePlannerRecordMock = vi.fn();
+  const removePlannerRecordsMock = vi.fn();
+  const upsertPlannerRecordMock = vi.fn();
+  const upsertPlannerRecordsMock = vi.fn();
 
   const dailyTasksCountExecuteMock = vi.fn();
   const dailyTasksInsertMock = vi.fn();
@@ -34,6 +43,15 @@ const mocks = vi.hoisted(() => {
     trackTaskCompletionMock,
     queueTaskActionMock,
     reportApiFailureMock,
+    createOfflinePlannerIdMock,
+    getLocalHabitCompletionsForDateMock,
+    getLocalSubtasksForTaskMock,
+    getPlannerRecordMock,
+    getLocalTasksByDateMock,
+    removePlannerRecordMock,
+    removePlannerRecordsMock,
+    upsertPlannerRecordMock,
+    upsertPlannerRecordsMock,
     dailyTasksCountExecuteMock,
     dailyTasksInsertMock,
     dailyTasksInsertSingleMock,
@@ -98,9 +116,22 @@ vi.mock("@/hooks/useSchedulingLearner", () => ({
 vi.mock("@/contexts/ResilienceContext", () => ({
   useResilience: () => ({
     shouldQueueWrites: false,
+    queueAction: vi.fn(),
     queueTaskAction: mocks.queueTaskActionMock,
     reportApiFailure: mocks.reportApiFailureMock,
   }),
+}));
+
+vi.mock("@/utils/plannerLocalStore", () => ({
+  createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
+  getLocalHabitCompletionsForDate: (...args: unknown[]) => mocks.getLocalHabitCompletionsForDateMock(...args),
+  getLocalSubtasksForTask: (...args: unknown[]) => mocks.getLocalSubtasksForTaskMock(...args),
+  getPlannerRecord: (...args: unknown[]) => mocks.getPlannerRecordMock(...args),
+  getLocalTasksByDate: (...args: unknown[]) => mocks.getLocalTasksByDateMock(...args),
+  removePlannerRecord: (...args: unknown[]) => mocks.removePlannerRecordMock(...args),
+  removePlannerRecords: (...args: unknown[]) => mocks.removePlannerRecordsMock(...args),
+  upsertPlannerRecord: (...args: unknown[]) => mocks.upsertPlannerRecordMock(...args),
+  upsertPlannerRecords: (...args: unknown[]) => mocks.upsertPlannerRecordsMock(...args),
 }));
 
 import {
@@ -172,6 +203,55 @@ describe("useTaskMutations attachment handling", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getLocalHabitCompletionsForDateMock.mockResolvedValue([]);
+    mocks.getLocalSubtasksForTaskMock.mockResolvedValue([]);
+    mocks.getPlannerRecordMock.mockResolvedValue({
+      id: "task-1",
+      user_id: "user-1",
+      task_text: "Ship feature",
+      difficulty: "medium",
+      xp_reward: 16,
+      task_date: "2026-02-20",
+      completed: false,
+      completed_at: null,
+      is_main_quest: false,
+      scheduled_time: "09:00",
+      estimated_duration: 30,
+      recurrence_pattern: null,
+      recurrence_days: null,
+      recurrence_month_days: null,
+      recurrence_custom_period: null,
+      recurrence_end_date: null,
+      is_recurring: false,
+      reminder_enabled: false,
+      reminder_minutes_before: 15,
+      reminder_sent: false,
+      parent_template_id: null,
+      category: "mind",
+      is_bonus: false,
+      created_at: "2026-02-20T00:00:00.000Z",
+      priority: null,
+      is_top_three: null,
+      actual_time_spent: null,
+      ai_generated: null,
+      context_id: null,
+      source: "manual",
+      habit_source_id: null,
+      epic_id: null,
+      sort_order: 0,
+      contact_id: null,
+      auto_log_interaction: true,
+      image_url: null,
+      notes: null,
+      location: null,
+      attachments: [],
+      subtasks: [],
+    });
+    mocks.getLocalTasksByDateMock.mockResolvedValue([]);
+    mocks.removePlannerRecordMock.mockResolvedValue(undefined);
+    mocks.removePlannerRecordsMock.mockResolvedValue(undefined);
+    mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
+    mocks.upsertPlannerRecordsMock.mockResolvedValue(undefined);
 
     mocks.dailyTasksCountExecuteMock.mockResolvedValue({
       data: [],
@@ -525,6 +605,53 @@ describe("useTaskMutations attachment handling", () => {
         recurrence_month_days: expect.anything(),
       }),
     );
+  });
+
+  it("sets is_recurring=true when enabling recurrence in an update", async () => {
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.updateTask({
+      taskId: "task-1",
+      updates: {
+        recurrence_pattern: "daily",
+      },
+    });
+
+    expect(mocks.dailyTasksUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      recurrence_pattern: "daily",
+      is_recurring: true,
+    }));
+  });
+
+  it("sets is_recurring=false when recurrence is cleared in an update", async () => {
+    mocks.dailyTasksFetchSchedulingSingleMock.mockResolvedValue({
+      data: {
+        task_date: "2026-02-20",
+        scheduled_time: "09:00",
+        habit_source_id: null,
+        source: "manual",
+        recurrence_pattern: "daily",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.updateTask({
+      taskId: "task-1",
+      updates: {
+        recurrence_pattern: null,
+      },
+    });
+
+    expect(mocks.dailyTasksUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      recurrence_pattern: null,
+      is_recurring: false,
+    }));
   });
 
   it("blocks recurring quest updates when resulting task has no scheduled time", async () => {

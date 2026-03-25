@@ -7,6 +7,7 @@ import {
   stripOnboardingMentorId,
 } from "./mentor";
 import { logger } from "./logger";
+import { isReturningProfile } from "./profileOnboarding";
 
 const PROFILE_QUERY_TIMEOUT_MS = 5000;
 const RETURNING_USER_QUERY_TIMEOUT_MS = 2000;
@@ -90,14 +91,14 @@ const isReturningUser = async (userId: string): Promise<boolean> => {
       () =>
         supabase
           .from("profiles")
-          .select("onboarding_completed")
+          .select("selected_mentor_id, onboarding_completed, onboarding_data")
           .eq("id", userId)
           .maybeSingle(),
       RETURNING_USER_QUERY_TIMEOUT_MS,
       "Returning user check",
     );
 
-    return data?.onboarding_completed === true;
+    return isReturningProfile(data);
   } catch (error) {
     logger.warn("[isReturningUser] Returning user check failed, defaulting to false", { error });
     return false;
@@ -191,8 +192,7 @@ const resolveAuthRedirectPath = async (userId: string): Promise<string> => {
       );
     }
 
-    // If onboarding is completed, always go to tasks
-    if (profile?.onboarding_completed) {
+    if (isReturningProfile(profile)) {
       logger.debug("[getAuthRedirectPath] Onboarding complete, redirecting to /tasks");
       return RETURNING_USER_REDIRECT_PATH;
     }

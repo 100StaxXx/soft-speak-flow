@@ -37,6 +37,11 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Companion as CompanionData } from "@/hooks/useCompanion";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
+import {
+  useCompanionLayoutMode,
+  type CompanionLayoutMode,
+} from "@/hooks/useCompanionLayoutMode";
+import { cn } from "@/lib/utils";
 
 type CompanionTab = "overview" | "focus" | "stories" | "collection";
 
@@ -58,40 +63,69 @@ const isCompanionTab = (tab: string): tab is CompanionTab =>
   COMPANION_TAB_KEYS.includes(tab as CompanionTab);
 
 // Memoized tab content to prevent unnecessary re-renders
-const OverviewTab = memo(({ 
-  companion, 
-  nextEvolutionXP, 
+const OverviewTab = memo(({
+  companion,
+  nextEvolutionXP,
   progressToNext,
-}: { 
+  layoutMode,
+}: {
   companion: CompanionData | null;
-  nextEvolutionXP: number; 
+  nextEvolutionXP: number;
   progressToNext: number;
-}) => (
-  <div className="space-y-6 mt-6">
-    {/* Memory whisper - occasional floating "remember when" message */}
-    <MemoryWhisper chance={0.2} className="px-2" />
-    
-    <ParallaxCard offset={30}>
-      <CompanionDisplay />
-    </ParallaxCard>
-    <ParallaxCard offset={22}>
-      <div data-tour="companion-progress-area">
-        <NextEvolutionPreview 
-          currentXP={companion?.current_xp || 0}
-          nextEvolutionXP={nextEvolutionXP || 0}
-          currentStage={companion?.current_stage || 0}
-          progressPercent={progressToNext}
-        />
+  layoutMode: CompanionLayoutMode;
+}) => {
+  const isDesktop = layoutMode === "desktop";
+
+  if (isDesktop) {
+    return (
+      <div className="space-y-6 pt-1">
+        <div className="rounded-2xl border border-border/60 bg-card/35 p-4 backdrop-blur-md">
+          <MemoryWhisper chance={0.2} className="px-0" />
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div data-tour="companion-progress-area">
+            <NextEvolutionPreview
+              currentXP={companion?.current_xp || 0}
+              nextEvolutionXP={nextEvolutionXP || 0}
+              currentStage={companion?.current_stage || 0}
+              progressPercent={progressToNext}
+            />
+          </div>
+          <XPBreakdown />
+        </div>
+
+        <DailyMissions />
       </div>
-    </ParallaxCard>
-    <ParallaxCard offset={16}>
-      <DailyMissions />
-    </ParallaxCard>
-    <ParallaxCard offset={12}>
-      <XPBreakdown />
-    </ParallaxCard>
-  </div>
-));
+    );
+  }
+
+  return (
+    <div className="space-y-6 mt-6">
+      <MemoryWhisper chance={0.2} className="px-2" />
+
+      <ParallaxCard offset={30}>
+        <CompanionDisplay />
+      </ParallaxCard>
+      <ParallaxCard offset={22}>
+        <div data-tour="companion-progress-area">
+          <NextEvolutionPreview
+            currentXP={companion?.current_xp || 0}
+            nextEvolutionXP={nextEvolutionXP || 0}
+            currentStage={companion?.current_stage || 0}
+            progressPercent={progressToNext}
+          />
+        </div>
+      </ParallaxCard>
+      <ParallaxCard offset={16}>
+        <DailyMissions />
+      </ParallaxCard>
+      <ParallaxCard offset={12}>
+        <XPBreakdown />
+      </ParallaxCard>
+    </div>
+  );
+});
 OverviewTab.displayName = 'OverviewTab';
 
 // Lazy load heavy tab content
@@ -127,8 +161,60 @@ const OverviewSkeleton = () => (
   </div>
 );
 
+const CompanionTabBar = ({
+  layoutMode,
+  onStoriesPrefetch,
+  onCollectionPrefetch,
+}: {
+  layoutMode: CompanionLayoutMode;
+  onStoriesPrefetch: () => void;
+  onCollectionPrefetch: () => void;
+}) => {
+  const isDesktop = layoutMode === "desktop";
+
+  return (
+    <TabsList
+      className={cn(
+        "bg-card/80 backdrop-blur-md border border-border/60",
+        isDesktop
+          ? "inline-grid h-auto w-auto min-w-[460px] grid-cols-4 justify-start p-1.5"
+          : "grid w-full grid-cols-4",
+      )}
+    >
+      <TabsTrigger value="overview" className="flex items-center gap-2">
+        <TrendingUp className="h-4 w-4" />
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Overview</span>
+      </TabsTrigger>
+      <TabsTrigger value="focus" className="flex items-center gap-2">
+        <Timer className="h-4 w-4" />
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Focus</span>
+      </TabsTrigger>
+      <TabsTrigger
+        value="stories"
+        className="flex items-center gap-2"
+        onPointerDown={onStoriesPrefetch}
+        onFocus={onStoriesPrefetch}
+      >
+        <BookOpen className="h-4 w-4" />
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Stories</span>
+      </TabsTrigger>
+      <TabsTrigger
+        value="collection"
+        className="flex items-center gap-2"
+        onPointerDown={onCollectionPrefetch}
+        onFocus={onCollectionPrefetch}
+      >
+        <Package className="h-4 w-4" />
+        <span className={cn(isDesktop ? "inline" : "hidden sm:inline")}>Collection</span>
+      </TabsTrigger>
+    </TabsList>
+  );
+};
+
 const Companion = () => {
   const prefersReducedMotion = useReducedMotion();
+  const layoutMode = useCompanionLayoutMode();
+  const isDesktop = layoutMode === "desktop";
   const { isTabActive } = useMainTabVisibility();
   const {
     companion,
@@ -269,9 +355,72 @@ const Companion = () => {
     };
   }, [companion?.id, isTabActive, prefetchJourneyTabs, user?.id]);
 
-  // Render persistent layout - header/nav always visible, content swaps smoothly
+  const renderTabPanels = (contentClassName?: string) => (
+    <AnimatePresence mode="wait">
+      {isLoading ? (
+        <motion.div
+          key="skeleton"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.15 }}
+        >
+          <OverviewSkeleton />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="content"
+          initial={prefersReducedMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+        >
+          <TabsContent
+            value="overview"
+            forceMount
+            className={cn("data-[state=inactive]:hidden", contentClassName)}
+          >
+            {mountedTabs.overview && (
+              <OverviewTab
+                companion={companion}
+                nextEvolutionXP={nextEvolutionXP}
+                progressToNext={progressToNext}
+                layoutMode={layoutMode}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent
+            value="focus"
+            forceMount
+            className={cn("data-[state=inactive]:hidden", contentClassName)}
+          >
+            {mountedTabs.focus && <FocusTab layoutMode={layoutMode} />}
+          </TabsContent>
+
+          <TabsContent
+            value="stories"
+            forceMount
+            className={cn("data-[state=inactive]:hidden", contentClassName)}
+          >
+            {mountedTabs.stories && (
+              <Suspense fallback={<TabLoadingFallback />}>
+                <LazyCompanionStoryJournal layoutMode={layoutMode} />
+              </Suspense>
+            )}
+          </TabsContent>
+
+          <TabsContent
+            value="collection"
+            forceMount
+            className={cn("data-[state=inactive]:hidden", contentClassName)}
+          >
+            {mountedTabs.collection && <CollectionTab layoutMode={layoutMode} />}
+          </TabsContent>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   const renderContent = () => {
-    // Error state
     if (error) {
       return (
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -295,7 +444,6 @@ const Companion = () => {
       );
     }
 
-    // No companion state
     if (!isLoading && !companion) {
       return (
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -317,87 +465,73 @@ const Companion = () => {
       );
     }
 
-    // Loading or loaded content with tabs
-    return (
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="container pb-6">
-        <TabsList className="grid w-full grid-cols-4 bg-card/80 backdrop-blur-md border border-border/60">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="focus" className="flex items-center gap-2">
-            <Timer className="h-4 w-4" />
-            <span className="hidden sm:inline">Focus</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="stories"
-            className="flex items-center gap-2"
-            onPointerDown={handleStoriesTriggerPrefetch}
-            onFocus={handleStoriesTriggerPrefetch}
-          >
-            <BookOpen className="h-4 w-4" />
-            <span className="hidden sm:inline">Stories</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="collection"
-            className="flex items-center gap-2"
-            onPointerDown={handleCollectionTriggerPrefetch}
-            onFocus={handleCollectionTriggerPrefetch}
-          >
-            <Package className="h-4 w-4" />
-            <span className="hidden sm:inline">Collection</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <AnimatePresence mode="wait">
-          {isLoading ? (
-            <motion.div
-              key="skeleton"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.15 }}
-            >
-              <OverviewSkeleton />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="content"
-              initial={prefersReducedMotion ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
-            >
-              <TabsContent
-                value="overview"
-                forceMount
-                className="data-[state=inactive]:hidden"
+    if (isDesktop) {
+      return (
+        <Tabs
+          value={activeTab}
+          onValueChange={handleTabChange}
+          className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6"
+          data-testid="companion-desktop-layout"
+        >
+          <div className="grid gap-8 lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
+            <aside data-testid="companion-desktop-rail">
+              <div
+                className="space-y-4 lg:sticky"
+                style={{ top: "calc(env(safe-area-inset-top, 0px) + 96px)" }}
               >
-                {mountedTabs.overview && (
-                  <OverviewTab 
-                    companion={companion} 
-                    nextEvolutionXP={nextEvolutionXP} 
-                    progressToNext={progressToNext}
-                  />
-                )}
-              </TabsContent>
+                <div className="space-y-1 px-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground/70">
+                    Living Companion
+                  </p>
+                  <h2 className="text-3xl font-semibold tracking-tight">
+                    Your companion, anchored
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Keep the creature visible while you track growth, stories, and rewards.
+                  </p>
+                </div>
+                <CompanionDisplay layoutMode={layoutMode} />
+              </div>
+            </aside>
 
-              <TabsContent value="focus" forceMount className="data-[state=inactive]:hidden">
-                {mountedTabs.focus && <FocusTab />}
-              </TabsContent>
+            <div className="min-w-0 space-y-6" data-testid="companion-desktop-workspace">
+              <div className="space-y-3">
+                <div className="space-y-1 px-1">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Companion spaces
+                  </p>
+                  <p className="text-2xl font-semibold tracking-tight">
+                    Switch between growth, focus, story, and collection
+                  </p>
+                </div>
+                <CompanionTabBar
+                  layoutMode={layoutMode}
+                  onStoriesPrefetch={handleStoriesTriggerPrefetch}
+                  onCollectionPrefetch={handleCollectionTriggerPrefetch}
+                />
+              </div>
 
-              <TabsContent value="stories" forceMount className="data-[state=inactive]:hidden">
-                {mountedTabs.stories && (
-                  <Suspense fallback={<TabLoadingFallback />}>
-                    <LazyCompanionStoryJournal />
-                  </Suspense>
-                )}
-              </TabsContent>
+              {renderTabPanels("mt-0")}
+            </div>
+          </div>
+        </Tabs>
+      );
+    }
 
-              <TabsContent value="collection" forceMount className="data-[state=inactive]:hidden">
-                {mountedTabs.collection && <CollectionTab />}
-              </TabsContent>
-            </motion.div>
-          )}
-        </AnimatePresence>
+    return (
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="container pb-6"
+        data-testid="companion-mobile-layout"
+      >
+        <CompanionTabBar
+          layoutMode={layoutMode}
+          onStoriesPrefetch={handleStoriesTriggerPrefetch}
+          onCollectionPrefetch={handleCollectionTriggerPrefetch}
+        />
+
+        {renderTabPanels()}
       </Tabs>
     );
   };
@@ -409,7 +543,12 @@ const Companion = () => {
         <div className="min-h-screen pb-nav-safe relative z-10" data-tour="companion-page">
           {/* Fixed header - won't move on iOS overscroll */}
           <header className="fixed top-0 left-0 right-0 z-40 w-full cosmiq-glass-header safe-area-top">
-            <div className="container flex items-center justify-between py-4">
+            <div
+              className={cn(
+                "flex items-center justify-between py-4",
+                isDesktop ? "mx-auto w-full max-w-7xl px-4 sm:px-6" : "container",
+              )}
+            >
               <h1 className="text-2xl font-semibold tracking-tight">Companion</h1>
               <Button
                 variant="ghost"

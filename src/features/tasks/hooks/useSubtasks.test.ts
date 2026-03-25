@@ -4,20 +4,18 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-  const selectMock = vi.fn();
-  const eqTaskIdMock = vi.fn();
-  const eqUserIdMock = vi.fn();
-  const orderMock = vi.fn();
   const updateMock = vi.fn();
   const updateEqMock = vi.fn();
+  const getLocalSubtasksForTaskMock = vi.fn();
+  const upsertPlannerRecordMock = vi.fn();
+  const removePlannerRecordMock = vi.fn();
 
   return {
-    selectMock,
-    eqTaskIdMock,
-    eqUserIdMock,
-    orderMock,
     updateMock,
     updateEqMock,
+    getLocalSubtasksForTaskMock,
+    upsertPlannerRecordMock,
+    removePlannerRecordMock,
   };
 });
 
@@ -30,10 +28,24 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({
-      select: mocks.selectMock,
       update: mocks.updateMock,
     })),
   },
+}));
+
+vi.mock("@/contexts/ResilienceContext", () => ({
+  useResilience: () => ({
+    queueAction: vi.fn(),
+    shouldQueueWrites: false,
+    retryNow: vi.fn(),
+  }),
+}));
+
+vi.mock("@/utils/plannerLocalStore", () => ({
+  createOfflinePlannerId: () => "subtask-local",
+  getLocalSubtasksForTask: (...args: unknown[]) => mocks.getLocalSubtasksForTaskMock(...args),
+  removePlannerRecord: (...args: unknown[]) => mocks.removePlannerRecordMock(...args),
+  upsertPlannerRecord: (...args: unknown[]) => mocks.upsertPlannerRecordMock(...args),
 }));
 
 import { useSubtasks } from "./useSubtasks";
@@ -46,23 +58,20 @@ const createWrapper = (queryClient: QueryClient) => {
 describe("useSubtasks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mocks.selectMock.mockReturnValue({
-      eq: mocks.eqTaskIdMock,
-    });
-
-    mocks.eqTaskIdMock.mockReturnValue({
-      eq: mocks.eqUserIdMock,
-    });
-
-    mocks.eqUserIdMock.mockReturnValue({
-      order: mocks.orderMock,
-    });
-
-    mocks.orderMock.mockResolvedValue({
-      data: [],
-      error: null,
-    });
+    mocks.getLocalSubtasksForTaskMock.mockResolvedValue([
+      {
+        id: "subtask-1",
+        task_id: "task-1",
+        user_id: "user-1",
+        title: "First subtask",
+        completed: false,
+        completed_at: null,
+        sort_order: 0,
+        created_at: "2026-02-01T00:00:00.000Z",
+      },
+    ]);
+    mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
+    mocks.removePlannerRecordMock.mockResolvedValue(undefined);
 
     mocks.updateMock.mockReturnValue({
       eq: mocks.updateEqMock,

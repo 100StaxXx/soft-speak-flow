@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
@@ -6,74 +7,65 @@ import { useXPRewards } from "@/hooks/useXPRewards";
 import { useAIInteractionTracker } from "@/hooks/useAIInteractionTracker";
 import { format } from "date-fns";
 import type { StoryTypeSlug } from "@/types/narrativeTypes";
-import { EPICS_QUERY_STALE_TIME, fetchEpics, getEpicsQueryKey } from "@/hooks/epicsQuery";
+import type { EpicRecord } from "@/hooks/epicsQuery";
+import { useResilience } from "@/contexts/ResilienceContext";
+import {
+  PLANNER_SYNC_EVENT,
+  loadLocalEpics,
+  syncLocalEpicsFromRemote,
+} from "@/utils/plannerSync";
+import {
+  createOfflinePlannerId,
+  getAllLocalTasksForUser,
+  getLocalEpicHabits,
+  getLocalHabitCompletions,
+  getLocalHabits,
+  getLocalJourneyPhases,
+  getLocalEpicMilestones,
+  removePlannerRecord,
+  removePlannerRecords,
+  upsertPlannerRecord,
+  upsertPlannerRecords,
+} from "@/utils/plannerLocalStore";
 
-// Helper to normalize difficulty values to valid database enum
-const normalizeDifficulty = (value: string): 'easy' | 'medium' | 'hard' => {
-  const lower = value?.toLowerCase()?.trim() || 'medium';
-  if (['easy', 'simple', 'beginner', 'low'].includes(lower)) return 'easy';
-  if (['hard', 'difficult', 'advanced', 'high', 'challenging'].includes(lower)) return 'hard';
-  return 'medium';
+const normalizeDifficulty = (value: string): "easy" | "medium" | "hard" => {
+  const lower = value?.toLowerCase()?.trim() || "medium";
+  if (["easy", "simple", "beginner", "low"].includes(lower)) return "easy";
+  if (["hard", "difficult", "advanced", "high", "challenging"].includes(lower)) return "hard";
+  return "medium";
 };
 
-// Helper to normalize frequency values to valid database enum
-const normalizeFrequency = (value: string): 'daily' | '5x_week' | '3x_week' | 'monthly' | 'custom' => {
-  const lower = value?.toLowerCase()?.trim()?.replace(/\s+/g, '_') || 'daily';
-  if (['daily', 'everyday', 'every_day', '7x_week', '7x'].includes(lower)) return 'daily';
-  if (['5x_week', '5x', 'weekdays', 'five_times', '5_times'].includes(lower)) return '5x_week';
-  if (['3x_week', '3x', 'three_times', '3_times', 'thrice'].includes(lower)) return '3x_week';
-  if (['monthly', 'month', 'every_month'].includes(lower)) return 'monthly';
-  if (['weekly', 'biweekly', 'twice', '2x', '2x_week', 'once', '1x', 'custom', 'twice_daily'].includes(lower)) return 'custom';
-  return 'daily';
+const normalizeFrequency = (value: string): "daily" | "5x_week" | "3x_week" | "monthly" | "custom" => {
+  const lower = value?.toLowerCase()?.trim()?.replace(/\s+/g, "_") || "daily";
+  if (["daily", "everyday", "every_day", "7x_week", "7x"].includes(lower)) return "daily";
+  if (["5x_week", "5x", "weekdays", "five_times", "5_times"].includes(lower)) return "5x_week";
+  if (["3x_week", "3x", "three_times", "3_times", "thrice"].includes(lower)) return "3x_week";
+  if (["monthly", "month", "every_month"].includes(lower)) return "monthly";
+  if (["weekly", "biweekly", "twice", "2x", "2x_week", "once", "1x", "custom", "twice_daily"].includes(lower)) return "custom";
+  return "daily";
 };
 
-// Helper to normalize theme color to valid database constraint values
-const normalizeThemeColor = (value: string | undefined): 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar' => {
-  if (!value) return 'heroic';
+const normalizeThemeColor = (value: string | undefined): "heroic" | "warrior" | "mystic" | "nature" | "solar" => {
+  if (!value) return "heroic";
   const lower = value.toLowerCase().trim();
-  
-  // Direct matches for valid values
-  if (['heroic', 'warrior', 'mystic', 'nature', 'solar'].includes(lower)) {
-    return lower as 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar';
+
+  if (["heroic", "warrior", "mystic", "nature", "solar"].includes(lower)) {
+    return lower as "heroic" | "warrior" | "mystic" | "nature" | "solar";
   }
-  
-  // Map hex values to ids (backward compatibility)
-  const hexMap: Record<string, 'heroic' | 'warrior' | 'mystic' | 'nature' | 'solar'> = {
-    '#f59e0b': 'heroic',
-    '#ef4444': 'warrior',
-    '#10b981': 'nature',
-    '#ec4899': 'mystic',
-    '#f97316': 'solar',
-    '#8b5cf6': 'mystic',  // cosmic -> mystic
-    '#3b82f6': 'heroic',  // ocean -> heroic
-    '#475569': 'warrior', // shadow -> warrior
+
+  const hexMap: Record<string, "heroic" | "warrior" | "mystic" | "nature" | "solar"> = {
+    "#f59e0b": "heroic",
+    "#ef4444": "warrior",
+    "#10b981": "nature",
+    "#ec4899": "mystic",
+    "#f97316": "solar",
+    "#8b5cf6": "mystic",
+    "#3b82f6": "heroic",
+    "#475569": "warrior",
   };
-  
-  return hexMap[lower] || 'heroic';
+
+  return hexMap[lower] || "heroic";
 };
-
-// Type for habits created during epic creation
-interface CreatedHabit {
-  id: string;
-  user_id: string;
-  title: string;
-  difficulty: string;
-  frequency: string;
-  custom_days: number[] | null;
-  custom_month_days: number[] | null;
-}
-
-// Type for epic record
-interface CreatedEpic {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  target_days: number;
-  is_public: boolean;
-  xp_reward: number;
-  invite_code: string;
-}
 
 interface EpicsOptions {
   enabled?: boolean;
@@ -91,9 +83,9 @@ type ErrorLike = {
 };
 
 const toErrorHaystack = (error: unknown): string => {
-  if (!error) return '';
+  if (!error) return "";
 
-  if (typeof error === 'string') {
+  if (typeof error === "string") {
     return error.toLowerCase();
   }
 
@@ -101,21 +93,21 @@ const toErrorHaystack = (error: unknown): string => {
     return error.message.toLowerCase();
   }
 
-  if (typeof error === 'object') {
+  if (typeof error === "object") {
     const candidate = error as ErrorLike;
-    return `${candidate.message ?? ''} ${candidate.details ?? ''} ${candidate.hint ?? ''} ${candidate.code ?? ''}`.toLowerCase();
+    return `${candidate.message ?? ""} ${candidate.details ?? ""} ${candidate.hint ?? ""} ${candidate.code ?? ""}`.toLowerCase();
   }
 
-  return '';
+  return "";
 };
 
 const isLegacyMonthSchemaError = (error: unknown): boolean => {
   const haystack = toErrorHaystack(error);
 
   return (
-    haystack.includes('custom_month_days') ||
-    (haystack.includes('habits_frequency_check') && haystack.includes('monthly')) ||
-    (haystack.includes('frequency') && haystack.includes('monthly') && haystack.includes('check'))
+    haystack.includes("custom_month_days") ||
+    (haystack.includes("habits_frequency_check") && haystack.includes("monthly")) ||
+    (haystack.includes("frequency") && haystack.includes("monthly") && haystack.includes("check"))
   );
 };
 
@@ -123,73 +115,255 @@ export const normalizeCreateCampaignError = (error: unknown): { title: string; d
   const haystack = toErrorHaystack(error);
 
   if (
-    haystack.includes('3 active epics') ||
-    haystack.includes('active epics at a time') ||
-    haystack.includes('active campaigns at a time')
+    haystack.includes("3 active epics") ||
+    haystack.includes("active epics at a time") ||
+    haystack.includes("active campaigns at a time")
   ) {
     return {
-      title: 'Campaign limit reached',
+      title: "Campaign limit reached",
       description: CAMPAIGN_LIMIT_REACHED_MESSAGE,
     };
   }
 
-  if (haystack.includes('not authenticated') || haystack.includes('jwt') || haystack.includes('auth')) {
+  if (haystack.includes("not authenticated") || haystack.includes("jwt") || haystack.includes("auth")) {
     return {
-      title: 'Sign in required',
-      description: 'Please refresh and sign in again before creating a campaign.',
+      title: "Sign in required",
+      description: "Please refresh and sign in again before creating a campaign.",
     };
   }
 
-  if (haystack.includes('maximum active habit limit reached')) {
+  if (haystack.includes("maximum active habit limit reached")) {
     return {
-      title: 'Too many active rituals',
-      description: 'Your account hit a legacy ritual limit. Update your app data and try creating this campaign again.',
+      title: "Too many active rituals",
+      description: "Your account hit a legacy ritual limit. Update your app data and try creating this campaign again.",
     };
   }
 
   if (isLegacyMonthSchemaError(error)) {
     return {
-      title: 'Campaign setup update needed',
-      description: 'Your planner data is missing a recent ritual scheduling update. Please try again shortly.',
+      title: "Campaign setup update needed",
+      description: "Your planner data is missing a recent ritual scheduling update. Please try again shortly.",
     };
   }
 
-  if (haystack.includes('failed to create habits') || haystack.includes('no habits were created')) {
+  if (haystack.includes("failed to create habits") || haystack.includes("no habits were created")) {
     return {
-      title: 'Failed to create campaign',
+      title: "Failed to create campaign",
       description: "We couldn't save your rituals. Please review your plan and try again.",
     };
   }
 
   return {
-    title: 'Failed to create campaign',
-    description: 'Please try again in a moment. If this keeps happening, close and reopen the planner.',
+    title: "Failed to create campaign",
+    description: "Please try again in a moment. If this keeps happening, close and reopen the planner.",
   };
 };
+
+type LocalHabitRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  difficulty: string | null;
+  frequency: string;
+  custom_days: number[] | null;
+  custom_month_days: number[] | null;
+  preferred_time: string | null;
+  reminder_enabled: boolean | null;
+  reminder_minutes_before: number | null;
+  estimated_minutes: number | null;
+  category: string | null;
+  is_active: boolean | null;
+  current_streak: number | null;
+  longest_streak: number | null;
+  created_at: string | null;
+};
+
+type LocalEpicRow = EpicRecord;
+
+type LocalEpicPayload = {
+  epic: LocalEpicRow;
+  habits: LocalHabitRow[];
+  epicHabits: Array<{ id: string; epic_id: string; habit_id: string }>;
+  phases: Array<{ id: string; epic_id: string; user_id: string; name: string; description: string; start_date: string; end_date: string; phase_order: number }>;
+  milestones: Array<{ id: string; epic_id: string; user_id: string; title: string; description: string | null; target_date: string; milestone_percent: number; is_postcard_milestone: boolean; phase_order: number; phase_name: string | null }>;
+};
+
+async function applyLocalEpicPayload(payload: LocalEpicPayload) {
+  await upsertPlannerRecords("habits", payload.habits);
+  await upsertPlannerRecord("epics", payload.epic);
+  await upsertPlannerRecords("epic_habits", payload.epicHabits);
+  await upsertPlannerRecords("journey_phases", payload.phases);
+  await upsertPlannerRecords("epic_milestones", payload.milestones);
+}
+
+async function applyLocalEpicStatusChange(userId: string, epicId: string, status: "completed" | "abandoned") {
+  const localEpics = await loadLocalEpics(userId);
+  const epic = localEpics.find((candidate) => candidate.id === epicId);
+  if (!epic) {
+    throw new Error("Epic not found");
+  }
+
+  await upsertPlannerRecord("epics", {
+    ...epic,
+    status,
+    completed_at: status === "completed" ? new Date().toISOString() : null,
+  });
+
+  if (status !== "abandoned") {
+    return;
+  }
+
+  const [epicHabits, habits, milestones, tasks] = await Promise.all([
+    getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]),
+    getLocalHabits<LocalHabitRow>(userId),
+    getLocalEpicMilestones<Array<{ id: string; epic_id: string; user_id: string }>[number]>(epicId),
+    getAllLocalTasksForUser<Array<{ id: string; habit_source_id: string | null; task_date: string | null; completed: boolean | null }>[number]>(userId),
+  ]);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+  const habitIds = epicHabits.map((link) => link.habit_id);
+
+  await Promise.all(
+    habits
+      .filter((habit) => habitIds.includes(habit.id))
+      .map((habit) =>
+        upsertPlannerRecord("habits", {
+          ...habit,
+          is_active: false,
+        }),
+      ),
+  );
+
+  const tasksToDelete = tasks
+    .filter((task) =>
+      task.habit_source_id
+      && habitIds.includes(task.habit_source_id)
+      && task.task_date
+      && task.task_date >= today
+      && task.completed !== true)
+    .map((task) => task.id);
+
+  if (tasksToDelete.length > 0) {
+    await removePlannerRecords("daily_tasks", tasksToDelete);
+  }
+
+  if (epicHabits.length > 0) {
+    await removePlannerRecords("epic_habits", epicHabits.map((link) => link.id));
+  }
+  if (milestones.length > 0) {
+    await removePlannerRecords("epic_milestones", milestones.map((milestone) => milestone.id));
+  }
+}
+
+async function applyRemoteEpicStatusChange(userId: string, epicId: string, status: "completed" | "abandoned") {
+  const { error } = await supabase
+    .from("epics")
+    .update({
+      status,
+      completed_at: status === "completed" ? new Date().toISOString() : null,
+    })
+    .eq("id", epicId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+
+  if (status !== "abandoned") {
+    return;
+  }
+
+  const { data: epicHabits, error: epicHabitsError } = await supabase
+    .from("epic_habits")
+    .select("id, habit_id")
+    .eq("epic_id", epicId);
+
+  if (epicHabitsError) throw epicHabitsError;
+
+  const habitIds = epicHabits?.map((row) => row.habit_id) ?? [];
+  if (habitIds.length > 0) {
+    const { error: habitsError } = await supabase
+      .from("habits")
+      .update({ is_active: false })
+      .in("id", habitIds)
+      .eq("user_id", userId);
+    if (habitsError) throw habitsError;
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    const { error: tasksError } = await supabase
+      .from("daily_tasks")
+      .delete()
+      .in("habit_source_id", habitIds)
+      .gte("task_date", today)
+      .eq("completed", false)
+      .eq("user_id", userId);
+    if (tasksError) throw tasksError;
+
+    const linkIds = epicHabits?.map((row) => row.id) ?? [];
+    if (linkIds.length > 0) {
+      const { error: linksError } = await supabase
+        .from("epic_habits")
+        .delete()
+        .in("id", linkIds);
+      if (linksError) throw linksError;
+    }
+  }
+
+  const { error: milestonesError } = await supabase
+    .from("epic_milestones")
+    .delete()
+    .eq("epic_id", epicId)
+    .eq("user_id", userId);
+  if (milestonesError) throw milestonesError;
+}
 
 export const useEpics = (options: EpicsOptions = {}) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { awardCustomXP } = useXPRewards();
   const { trackEpicOutcome } = useAIInteractionTracker();
+  const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { enabled = true } = options;
 
-  // Fetch all epics for the user
-  const { data: epics, isLoading, error: epicsError } = useQuery({
-    queryKey: getEpicsQueryKey(user?.id),
+  const epicsQuery = useQuery({
+    queryKey: ["epics", user?.id],
     queryFn: async () => {
-      // Double-check user exists (defensive - enabled should prevent this)
       if (!user?.id) return [];
-
-      return fetchEpics(user.id);
+      return loadLocalEpics(user.id);
     },
     enabled: enabled && !!user?.id,
-    staleTime: EPICS_QUERY_STALE_TIME,
     refetchOnWindowFocus: false,
-    retry: 2, // Retry failed requests up to 2 times
   });
 
-  // Create new epic
+  useEffect(() => {
+    if (!enabled || !user?.id) return;
+
+    let disposed = false;
+
+    const refreshFromRemote = async () => {
+      try {
+        await syncLocalEpicsFromRemote(user.id);
+        if (disposed) return;
+        queryClient.setQueryData(["epics", user.id], await loadLocalEpics(user.id));
+      } catch (error) {
+        console.warn("Failed to sync local epics from remote:", error);
+      }
+    };
+
+    void refreshFromRemote();
+
+    const handlePlannerSync = () => {
+      void refreshFromRemote();
+    };
+
+    window.addEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
+    return () => {
+      disposed = true;
+      window.removeEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
+    };
+  }, [enabled, queryClient, user?.id]);
+
+  const epics = epicsQuery.data ?? [];
+
   const createEpic = useMutation({
     mutationFn: async (epicData: {
       title: string;
@@ -217,7 +391,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         milestone_percent: number;
         is_postcard_milestone: boolean;
         phase_name?: string;
-        phaseName?: string; // camelCase fallback from AI
+        phaseName?: string;
       }>;
       phases?: Array<{
         name: string;
@@ -227,352 +401,164 @@ export const useEpics = (options: EpicsOptions = {}) => {
         phase_order: number;
       }>;
     }) => {
-      // Get fresh session first - don't rely on potentially stale user from closure
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.user?.id) {
+      if (!user?.id) {
         throw new Error("Not authenticated. Please refresh and try again.");
       }
-
-      // Use session.user.id instead of the stale user variable
-      const currentUserId = session.user.id;
 
       if (!epicData.habits || epicData.habits.length === 0) {
         throw new Error("Campaign must have at least one ritual");
       }
 
-      // Validate target_days
-      if (epicData.target_days < 1 || epicData.target_days > 365) {
-        throw new Error("Target days must be between 1 and 365");
+      if (epics.filter((epic) => epic.status === "active").length >= ACTIVE_CAMPAIGN_LIMIT) {
+        throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
       }
 
-      let createdHabits: CreatedHabit[] = [];
-      let createdEpic: CreatedEpic | null = null;
+      const nowIso = new Date().toISOString();
+      const epicId = createOfflinePlannerId("epic");
+      const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      const habits = epicData.habits.map((habit) => ({
+        id: createOfflinePlannerId("habit"),
+        user_id: user.id,
+        title: habit.title,
+        description: habit.description || null,
+        difficulty: normalizeDifficulty(habit.difficulty),
+        frequency: normalizeFrequency(habit.frequency),
+        custom_days: habit.custom_days?.length ? habit.custom_days : null,
+        custom_month_days: habit.custom_month_days?.length ? habit.custom_month_days : null,
+        preferred_time: habit.preferred_time || null,
+        reminder_enabled: habit.reminder_enabled || false,
+        reminder_minutes_before: habit.reminder_minutes_before || 15,
+        estimated_minutes: habit.estimated_minutes || null,
+        category: null,
+        is_active: true,
+        current_streak: 0,
+        longest_streak: 0,
+        created_at: nowIso,
+      })) satisfies LocalHabitRow[];
+
+      const epic: LocalEpicRow = {
+        id: epicId,
+        user_id: user.id,
+        title: epicData.title,
+        description: epicData.description || null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: epicData.target_days,
+        start_date: nowIso.split("T")[0],
+        end_date: null,
+        epic_habits: [],
+        xp_reward: Math.floor(epicData.target_days * 10),
+        invite_code: inviteCode,
+        theme_color: normalizeThemeColor(epicData.theme_color),
+        story_type_slug: epicData.story_type_slug || null,
+        created_at: nowIso,
+        completed_at: null,
+      } as LocalEpicRow;
+
+      const epicHabits = habits.map((habit) => ({
+        id: createOfflinePlannerId("epic-habit"),
+        epic_id: epicId,
+        habit_id: habit.id,
+      }));
+
+      const phases = (epicData.phases ?? []).map((phase) => ({
+        id: createOfflinePlannerId("journey-phase"),
+        epic_id: epicId,
+        user_id: user.id,
+        name: phase.name,
+        description: phase.description,
+        start_date: phase.start_date,
+        end_date: phase.end_date,
+        phase_order: phase.phase_order,
+      }));
+
+      const milestones = (epicData.milestones ?? []).map((milestone, index) => ({
+        id: createOfflinePlannerId("epic-milestone"),
+        epic_id: epicId,
+        user_id: user.id,
+        title: milestone.title,
+        description: milestone.description || null,
+        target_date: milestone.target_date,
+        milestone_percent: milestone.milestone_percent,
+        is_postcard_milestone: milestone.is_postcard_milestone ?? false,
+        phase_order: index + 1,
+        phase_name: milestone.phase_name || milestone.phaseName || null,
+      }));
+
+      const payload: LocalEpicPayload = {
+        epic,
+        habits,
+        epicHabits,
+        phases,
+        milestones,
+      };
+
+      await applyLocalEpicPayload(payload);
+
+      if (shouldQueueWrites) {
+        await queueAction({
+          actionKind: "EPIC_CREATE",
+          entityType: "epic",
+          entityId: epicId,
+          payload,
+        });
+        return { queued: true, epic };
+      }
+
+      const { data: activeCampaignCount, error: countError } = await supabase.rpc("count_user_epics", {
+        p_user_id: user.id,
+      });
+      if (countError) {
+        console.error("Failed to check active campaign limit (continuing):", countError);
+      } else if ((activeCampaignCount ?? 0) >= ACTIVE_CAMPAIGN_LIMIT) {
+        throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
+      }
 
       try {
-        // Preflight capacity check so users get a clear campaign-level message before writes.
-        const { data: activeCampaignCount, error: countError } = await supabase.rpc("count_user_epics", {
-          p_user_id: currentUserId,
-        });
-        if (countError) {
-          console.error("Failed to check active campaign limit (continuing):", countError);
-        } else if ((activeCampaignCount ?? 0) >= ACTIVE_CAMPAIGN_LIMIT) {
-          throw new Error(CAMPAIGN_LIMIT_REACHED_MESSAGE);
+        const { error: habitsError } = await supabase.from("habits").insert(habits);
+        if (habitsError) throw habitsError;
+
+        const { error: epicError } = await supabase.from("epics").insert(epic);
+        if (epicError) throw epicError;
+
+        if (epicHabits.length > 0) {
+          const { error: linkError } = await supabase.from("epic_habits").insert(epicHabits);
+          if (linkError) throw linkError;
         }
 
-        const buildHabitInsertRows = (legacyMonthSchema = false) =>
-          epicData.habits.map(habit => {
-            let normalizedFreq = normalizeFrequency(habit.frequency);
-            // Ensure custom_days has a default for non-daily frequencies
-            let customDays = habit.custom_days?.length > 0 ? habit.custom_days : null;
-            let customMonthDays = habit.custom_month_days?.length ? habit.custom_month_days : null;
-            if (!customDays && normalizedFreq !== 'daily') {
-              // Set default days based on frequency
-              if (normalizedFreq === '5x_week') customDays = [0, 1, 2, 3, 4]; // Mon-Fri
-              else if (normalizedFreq === '3x_week') customDays = [0, 2, 4]; // Mon/Wed/Fri
-              else if (normalizedFreq === 'custom') customDays = [0]; // Default Monday
-            }
-            if (!customMonthDays && normalizedFreq === 'monthly') {
-              customMonthDays = [1];
-            }
-
-            // Legacy environments might not support monthly frequency or custom_month_days yet.
-            if (legacyMonthSchema) {
-              if (normalizedFreq === 'monthly') {
-                normalizedFreq = 'custom';
-                customDays = customDays?.length ? customDays : [0];
-              } else if (normalizedFreq === 'custom' && !customDays?.length) {
-                customDays = [0];
-              }
-              customMonthDays = null;
-            }
-
-            const baseHabit = {
-              user_id: currentUserId,
-              title: habit.title,
-              description: habit.description || null,
-              difficulty: normalizeDifficulty(habit.difficulty),
-              frequency: normalizedFreq,
-              custom_days: customDays,
-              preferred_time: habit.preferred_time || null,
-              reminder_enabled: habit.reminder_enabled || false,
-              reminder_minutes_before: habit.reminder_minutes_before || 15,
-              estimated_minutes: habit.estimated_minutes || null,
-            };
-
-            if (legacyMonthSchema) return baseHabit;
-            return { ...baseHabit, custom_month_days: customMonthDays };
-          });
-
-        // Create habits first with normalized values
-        let { data: habits, error: habitError } = await supabase
-          .from("habits")
-          .insert(buildHabitInsertRows(false))
-          .select();
-
-        if (habitError && isLegacyMonthSchemaError(habitError)) {
-          console.warn("[Campaign Creation] Retrying habits insert with legacy month-schema compatibility mode.");
-          const retryResult = await supabase
-            .from("habits")
-            .insert(buildHabitInsertRows(true))
-            .select();
-          habits = retryResult.data;
-          habitError = retryResult.error;
+        if (phases.length > 0) {
+          const { error: phasesError } = await supabase.from("journey_phases").insert(phases);
+          if (phasesError) throw phasesError;
         }
 
-        if (habitError) {
-          console.error("Failed to create habits:", habitError);
-          throw new Error(`Failed to create habits: ${habitError.message}`);
+        if (milestones.length > 0) {
+          const { error: milestonesError } = await supabase.from("epic_milestones").insert(milestones);
+          if (milestonesError) throw milestonesError;
         }
 
-        if (!habits || habits.length === 0) {
-          throw new Error("No habits were created");
-        }
-
-        createdHabits = habits;
-
-        // Generate unique invite code
-        const inviteCode = `EPIC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-
-        // Create the epic
-        const { data: epic, error: epicError } = await supabase
-          .from("epics")
-          .insert({
-            user_id: currentUserId,
-            title: epicData.title,
-            description: epicData.description,
-            target_days: epicData.target_days,
-            is_public: true,
-            xp_reward: Math.floor(epicData.target_days * 10),
-            invite_code: inviteCode,
-            theme_color: normalizeThemeColor(epicData.theme_color),
-            story_type_slug: epicData.story_type_slug || null,
-          })
-          .select()
-          .single();
-
-        if (epicError) {
-          console.error("Failed to create campaign:", epicError);
-          // Rollback: delete created habits
-          await supabase
-            .from("habits")
-            .delete()
-            .in("id", createdHabits.map(h => h.id));
-          throw new Error(`Failed to create campaign: ${epicError.message}`);
-        }
-
-        if (!epic) {
-          throw new Error("Campaign creation returned no data");
-        }
-
-        createdEpic = epic;
-
-        // Link habits to epic
-        const { error: linkError } = await supabase
-          .from("epic_habits")
-          .insert(
-            createdHabits.map((habit) => ({
-              epic_id: epic.id,
-              habit_id: habit.id,
-            }))
-          );
-
-        if (linkError) {
-          console.error("Failed to link habits:", linkError);
-          // Rollback: delete epic and habits
-          await supabase.from("epics").delete().eq("id", epic.id);
-          await supabase
-            .from("habits")
-            .delete()
-            .in("id", createdHabits.map(h => h.id));
-          throw new Error(`Failed to link habits: ${linkError.message}`);
-        }
-
-        // Create journey phases if provided
-        if (epicData.phases && epicData.phases.length > 0) {
-          const { error: phasesError } = await supabase
-            .from("journey_phases")
-            .insert(
-              epicData.phases.map(phase => ({
-                epic_id: epic.id,
-                user_id: currentUserId,
-                name: phase.name,
-                description: phase.description,
-                start_date: phase.start_date,
-                end_date: phase.end_date,
-                phase_order: phase.phase_order,
-              }))
-            );
-
-          if (phasesError) {
-            console.error("Failed to create journey phases:", phasesError);
-            // Non-blocking - epic still created successfully
-          }
-        }
-
-        // Create milestones with dates if provided, or generate defaults
-        let milestonesToInsert = epicData.milestones;
-        
-        // Fallback: generate default milestones if none provided but we have a story type
-        if ((!milestonesToInsert || milestonesToInsert.length === 0) && epicData.story_type_slug) {
-          console.log('[Epic Creation] No milestones provided, generating defaults for story type:', epicData.story_type_slug);
-          
-          // Calculate chapter count based on duration
-          let chapterCount = 5;
-          if (epicData.target_days <= 14) chapterCount = 3;
-          else if (epicData.target_days <= 30) chapterCount = 4;
-          else if (epicData.target_days <= 60) chapterCount = 5;
-          else chapterCount = 6;
-          
-          const now = new Date();
-          milestonesToInsert = Array.from({ length: chapterCount }, (_, i) => {
-            const percent = Math.round(((i + 1) / chapterCount) * 100);
-            const daysOffset = Math.floor((epicData.target_days * percent) / 100);
-            const targetDate = new Date(now);
-            targetDate.setDate(targetDate.getDate() + daysOffset);
-            
-            return {
-              title: i === chapterCount - 1 ? 'The Finale' : `Chapter ${i + 1}`,
-              description: i === chapterCount - 1 ? 'Complete your epic journey!' : `Reach ${percent}% of your goal`,
-              target_date: targetDate.toISOString().split('T')[0],
-              milestone_percent: percent,
-              is_postcard_milestone: true,
-            };
-          });
-        }
-        
-        if (milestonesToInsert && milestonesToInsert.length > 0) {
-          console.log('[Epic Creation] Inserting milestones:', milestonesToInsert.length, milestonesToInsert);
-          
-          const { data: insertedMilestones, error: milestonesError } = await supabase
-            .from("epic_milestones")
-            .insert(
-              milestonesToInsert.map((milestone, index) => ({
-                epic_id: epic.id,
-                user_id: currentUserId,
-                title: milestone.title,
-                description: milestone.description || null,
-                target_date: milestone.target_date,
-                milestone_percent: milestone.milestone_percent,
-                is_postcard_milestone: milestone.is_postcard_milestone ?? false,
-                phase_order: index + 1,
-                phase_name: milestone.phase_name || milestone.phaseName || null,
-              }))
-            )
-            .select();
-
-          if (milestonesError) {
-            console.error("Failed to create milestones:", milestonesError);
-            toast.error("Milestones couldn't be created", {
-              description: "You can add them manually from the campaign settings",
-            });
-          } else {
-            console.log('[Epic Creation] Successfully created milestones:', insertedMilestones?.length);
-          }
-        } else {
-          console.log('[Epic Creation] No milestones to insert and no story type for fallback');
-        }
-
-        // Trigger narrative seed generation in background if story type selected
-        if (epicData.story_type_slug) {
-          // Fetch companion and mentor data for richer narrative generation
-          const [companionResult, profileResult] = await Promise.all([
-            supabase
-              .from('user_companion')
-              .select('spirit_animal, core_element, favorite_color, fur_color')
-              .eq('user_id', currentUserId)
-              .maybeSingle(),
-            supabase
-              .from('profiles')
-              .select('selected_mentor_id')
-              .eq('id', currentUserId)
-              .maybeSingle(),
-          ]);
-
-          let mentorData: { id?: string; name?: string; slug?: string } | undefined;
-          
-          if (profileResult.data?.selected_mentor_id) {
-            const { data: mentor } = await supabase
-              .from('mentors')
-              .select('id, name, slug')
-              .eq('id', profileResult.data.selected_mentor_id)
-              .maybeSingle();
-            
-            if (mentor) {
-              mentorData = { id: mentor.id, name: mentor.name, slug: mentor.slug || undefined };
-            }
-          }
-
-          // Build milestone data for narrative generation - use the actual postcard milestones
-          const postcardMilestones = epicData.milestones?.filter(m => m.is_postcard_milestone) || [];
-          const totalChapters = postcardMilestones.length || 5;
-          const milestoneData = postcardMilestones.map((m, idx) => ({
-            chapterNumber: idx + 1,
-            title: m.title,
-            targetDate: m.target_date,
-            milestonePercent: m.milestone_percent,
-          }));
-
-          supabase.functions.invoke('generate-epic-narrative-seed', {
-            body: {
-              userId: currentUserId,
-              epicId: epic.id,
-              epicTitle: epicData.title,
-              epicDescription: epicData.description,
-              targetDays: epicData.target_days,
-              storyTypeSlug: epicData.story_type_slug,
-              companionData: companionResult.data || undefined,
-              mentorData,
-              userGoal: epicData.description,
-              totalChapters, // Explicitly pass the count from milestones
-              milestoneData, // Pass the milestone dates for chapter alignment
-            },
-          }).catch(err => {
-            console.error('Narrative seed generation failed:', err);
-            // Non-blocking - epic still created successfully
-          });
-
-          // Generate initial journey path background (milestone 0 = start of journey)
-          supabase.functions.invoke('generate-journey-path', {
-            body: {
-              epicId: epic.id,
-              milestoneIndex: 0,
-              userId: currentUserId,
-            },
-          }).catch(err => {
-            console.error('Initial journey path generation failed:', err);
-            // Non-blocking - path can be generated later
-          });
-        }
-
-        return epic;
+        return { queued: false, epic };
       } catch (error) {
-        // Final cleanup in case of any unexpected error
-        if (createdEpic) {
-          void supabase.from("epics").delete().eq("id", createdEpic.id).then(({ error: delErr }) => {
-            if (delErr) console.error('Failed to cleanup epic:', delErr);
-          });
-        }
-        if (createdHabits.length > 0) {
-          void supabase
-            .from("habits")
-            .delete()
-            .in("id", createdHabits.map(h => h.id))
-            .then(({ error: delErr }) => {
-              if (delErr) console.error('Failed to cleanup habits:', delErr);
-            });
-        }
-        throw error;
+        await queueAction({
+          actionKind: "EPIC_CREATE",
+          entityType: "epic",
+          entityId: epicId,
+          payload,
+        });
+        void retryNow();
+        return { queued: true, epic };
       }
     },
-    onSuccess: () => {
+    onSuccess: ({ queued }) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
       window.dispatchEvent(new CustomEvent("campaign-created"));
-      toast.success("Campaign created! 🎯", {
-        description: "Your companion is excited for this new journey!",
+      toast.success(queued ? "Campaign saved offline" : "Campaign created! 🎯", {
+        description: queued
+          ? "Your campaign will sync when you're back online."
+          : "Your companion is excited for this new journey!",
       });
     },
     onError: (error) => {
@@ -584,7 +570,6 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
   });
 
-  // Complete/abandon epic
   const updateEpicStatus = useMutation({
     mutationFn: async ({
       epicId,
@@ -597,125 +582,69 @@ export const useEpics = (options: EpicsOptions = {}) => {
         throw new Error("User not authenticated");
       }
 
-      // Get epic details for XP reward - verify ownership
-      const { data: epic, error: fetchError } = await supabase
-        .from("epics")
-        .select("xp_reward, title, progress_percentage, status, user_id")
-        .eq("id", epicId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error("Failed to fetch epic:", fetchError);
-        throw new Error(`Failed to fetch epic: ${fetchError.message}`);
-      }
-
+      const epic = epics.find((candidate) => candidate.id === epicId);
       if (!epic) {
         throw new Error("Epic not found or you don't have permission");
       }
 
-      // Prevent double-completion XP award
       if (epic.status === "completed" && status === "completed") {
         throw new Error("Epic is already completed");
       }
 
-      const { error } = await supabase
-        .from("epics")
-        .update({
-          status,
-          completed_at: status === "completed" ? new Date().toISOString() : null,
-        })
-        .eq("id", epicId)
-        .eq("user_id", user.id);
+      await applyLocalEpicStatusChange(user.id, epicId, status);
 
-      if (error) throw error;
-
-      // Clean up rituals and milestones when abandoning
-      if (status === "abandoned") {
-        console.log('[Epic Abandon] Cleaning up rituals and milestones for epic:', epicId);
-        
-        // Get all habit IDs linked to this epic
-        const { data: epicHabits } = await supabase
-          .from("epic_habits")
-          .select("habit_id")
-          .eq("epic_id", epicId);
-
-        if (epicHabits && epicHabits.length > 0) {
-          const habitIds = epicHabits.map(eh => eh.habit_id);
-          console.log('[Epic Abandon] Deactivating habits:', habitIds);
-
-          // Deactivate habits instead of deleting (safer, preserves history)
-          const { error: habitsUpdateError } = await supabase
-            .from("habits")
-            .update({ is_active: false })
-            .in("id", habitIds)
-            .eq("user_id", user.id);
-
-          if (habitsUpdateError) {
-            console.error("Failed to deactivate habits:", habitsUpdateError);
-          }
-
-          // Delete future uncompleted daily_tasks linked to these habits
-          const today = format(new Date(), 'yyyy-MM-dd');
-          const { error: tasksDeleteError } = await supabase
-            .from("daily_tasks")
-            .delete()
-            .in("habit_source_id", habitIds)
-            .gte("task_date", today)
-            .eq("completed", false);
-
-          if (tasksDeleteError) {
-            console.error("Failed to delete future habit tasks:", tasksDeleteError);
-          }
-
-          // Delete epic_habits links
-          const { error: linksDeleteError } = await supabase
-            .from("epic_habits")
-            .delete()
-            .eq("epic_id", epicId);
-
-          if (linksDeleteError) {
-            console.error("Failed to delete epic_habits links:", linksDeleteError);
-          }
-        }
-
-        // Delete milestones
-        const { error: milestonesDeleteError } = await supabase
-          .from("epic_milestones")
-          .delete()
-          .eq("epic_id", epicId)
-          .eq("user_id", user.id);
-
-        if (milestonesDeleteError) {
-          console.error("Failed to delete milestones:", milestonesDeleteError);
-        }
-        
-        console.log('[Epic Abandon] Cleanup complete');
+      if (shouldQueueWrites) {
+        await queueAction({
+          actionKind: "EPIC_STATUS_UPDATE",
+          entityType: "epic",
+          entityId: epicId,
+          payload: { epicId, status },
+        });
+        return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: true };
       }
 
-      return { epic, status, wasAlreadyCompleted: epic.status === "completed" };
+      try {
+        await applyRemoteEpicStatusChange(user.id, epicId, status);
+      } catch (error) {
+        await queueAction({
+          actionKind: "EPIC_STATUS_UPDATE",
+          entityType: "epic",
+          entityId: epicId,
+          payload: { epicId, status },
+        });
+        void retryNow();
+        return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: true };
+      }
+
+      return { epic, status, wasAlreadyCompleted: epic.status === "completed", queued: false };
     },
-    onSuccess: async ({ epic, status, wasAlreadyCompleted }, variables) => {
+    onSuccess: async ({ epic, status, wasAlreadyCompleted, queued }, variables) => {
       queryClient.invalidateQueries({ queryKey: ["epics"] });
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
       queryClient.invalidateQueries({ queryKey: ["daily-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["user-ai-context"] });
-      // Track epic outcome for AI learning
+
       if (status === "completed" || status === "abandoned") {
-        trackEpicOutcome(variables.epicId, status).catch(err => {
-          console.error('Failed to track epic outcome:', err);
+        trackEpicOutcome(variables.epicId, status).catch((err) => {
+          console.error("Failed to track epic outcome:", err);
         });
       }
-      
+
+      if (queued) {
+        toast(status === "abandoned" ? "Campaign abandoned offline" : "Campaign completed offline", {
+          description: "We'll sync this campaign change when you're back online.",
+        });
+        return;
+      }
+
       if (status === "completed" && !wasAlreadyCompleted) {
-        // Only award XP if this is the FIRST time completing
         try {
           await awardCustomXP(
             epic.xp_reward,
             "epic_complete",
             `Epic "${epic.title}" Completed!`,
-            { epic_id: variables?.epicId }
+            { epic_id: variables?.epicId },
           );
         } catch (error) {
           console.error("Failed to award epic completion XP:", error);
@@ -735,7 +664,6 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
   });
 
-  // Add habit to epic
   const addHabitToEpic = useMutation({
     mutationFn: async ({
       epicId,
@@ -745,27 +673,27 @@ export const useEpics = (options: EpicsOptions = {}) => {
       habitId: string;
     }) => {
       if (!epicId || !habitId) {
-        throw new Error('Invalid epic or habit ID');
+        throw new Error("Invalid epic or habit ID");
       }
 
-      // Check if habit is already linked to prevent duplicates
-      const { data: existing } = await supabase
-        .from("epic_habits")
-        .select('id')
-        .eq('epic_id', epicId)
-        .eq('habit_id', habitId)
-        .maybeSingle();
-
-      if (existing) {
-        throw new Error('Habit is already linked to this epic');
+      const existing = await getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]);
+      if (existing.some((row) => row.habit_id === habitId)) {
+        throw new Error("Habit is already linked to this epic");
       }
+
+      const row = {
+        id: createOfflinePlannerId("epic-habit"),
+        epic_id: epicId,
+        habit_id: habitId,
+      };
+      await upsertPlannerRecord("epic_habits", row);
 
       const { error } = await supabase
         .from("epic_habits")
-        .insert({ epic_id: epicId, habit_id: habitId });
+        .insert(row);
 
       if (error) {
-        console.error('Failed to link habit to epic:', error);
+        console.error("Failed to link habit to epic:", error);
         throw error;
       }
     },
@@ -779,7 +707,6 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
   });
 
-  // Remove habit from epic
   const removeHabitFromEpic = useMutation({
     mutationFn: async ({
       epicId,
@@ -789,7 +716,13 @@ export const useEpics = (options: EpicsOptions = {}) => {
       habitId: string;
     }) => {
       if (!epicId || !habitId) {
-        throw new Error('Invalid epic or habit ID');
+        throw new Error("Invalid epic or habit ID");
+      }
+
+      const existing = await getLocalEpicHabits<Array<{ id: string; epic_id: string; habit_id: string }>[number]>([epicId]);
+      const match = existing.find((row) => row.habit_id === habitId);
+      if (match) {
+        await removePlannerRecord("epic_habits", match.id);
       }
 
       const { error } = await supabase
@@ -799,7 +732,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
         .eq("habit_id", habitId);
 
       if (error) {
-        console.error('Failed to remove habit from epic:', error);
+        console.error("Failed to remove habit from epic:", error);
         throw error;
       }
     },
@@ -813,15 +746,15 @@ export const useEpics = (options: EpicsOptions = {}) => {
     },
   });
 
-  const activeEpics = epics?.filter((e) => e.status === "active") || [];
-  const completedEpics = epics?.filter((e) => e.status === "completed") || [];
+  const activeEpics = epics.filter((epic) => epic.status === "active");
+  const completedEpics = epics.filter((epic) => epic.status === "completed");
 
   return {
-    epics: epics || [],
+    epics,
     activeEpics,
     completedEpics,
-    isLoading,
-    error: epicsError,
+    isLoading: epicsQuery.isLoading,
+    error: epicsQuery.error,
     createEpic: createEpic.mutateAsync,
     isCreating: createEpic.isPending,
     isCreateSuccess: createEpic.isSuccess,
