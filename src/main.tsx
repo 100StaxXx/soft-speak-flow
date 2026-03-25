@@ -5,6 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import "./index.css";
 import { initializeCapacitor } from "./utils/capacitor";
 import { logger } from "./utils/logger";
+import { isMacDesignedForIPadIOSApp } from "./utils/platformTargets";
 import App from "./App";
 
 // Initialize Sentry error tracking (only in production with valid DSN)
@@ -46,6 +47,11 @@ document.getElementById('debug-indicator')?.remove();
 if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
   document.documentElement.classList.add("platform-native-ios");
   document.body.classList.add("platform-native-ios");
+
+  if (isMacDesignedForIPadIOSApp()) {
+    document.documentElement.classList.add("platform-mac-hosted-ios");
+    document.body.classList.add("platform-mac-hosted-ios");
+  }
 }
 
 createRoot(document.getElementById("root")!).render(

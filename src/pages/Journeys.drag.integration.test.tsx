@@ -36,8 +36,10 @@ const mocks = vi.hoisted(() => ({
   pendingRecurringCount: 0,
   calendarConnections: [] as Array<{ provider: string; sync_mode: string }>,
   epicsLoading: false,
+  isMacHostedIOSApp: false,
+  draggableFabRenderCount: 0,
   lastDatePillSelectedDate: null as Date | null,
-  lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean },
+  lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean; open?: boolean },
   tutorialGuidance: {
     isActive: false,
     currentStep: null as string | null,
@@ -118,7 +120,7 @@ vi.mock("@/components/DatePillsScroller", () => ({
 }));
 
 vi.mock("@/components/AddQuestSheet", () => ({
-  AddQuestSheet: (props: { autoFillTimeOnFirstTap?: boolean }) => {
+  AddQuestSheet: (props: { autoFillTimeOnFirstTap?: boolean; open?: boolean }) => {
     mocks.lastAddQuestSheetProps = props;
     return null;
   },
@@ -161,7 +163,10 @@ vi.mock("@/components/CampaignCreatedAnimation", () => ({
 }));
 
 vi.mock("@/components/DraggableFAB", () => ({
-  DraggableFAB: () => null,
+  DraggableFAB: () => {
+    mocks.draggableFabRenderCount += 1;
+    return <button type="button" data-testid="draggable-fab">fab</button>;
+  },
 }));
 
 vi.mock("@/components/tasks/InteractionLogModal", () => ({
@@ -331,6 +336,12 @@ vi.mock("@/contexts/DeepLinkContext", () => ({
   }),
 }));
 
+vi.mock("@/utils/platformTargets", () => ({
+  isMacDesignedForIPadIOSApp: () => mocks.isMacHostedIOSApp,
+  isNativeIOSHandheld: () => false,
+  isMacSession: () => mocks.isMacHostedIOSApp,
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({
@@ -401,6 +412,8 @@ describe("Journeys row drag integration", () => {
     mocks.unsurfacedEpicHabitsCount = 0;
     mocks.pendingRecurringCount = 0;
     mocks.calendarConnections = [];
+    mocks.isMacHostedIOSApp = false;
+    mocks.draggableFabRenderCount = 0;
     mocks.lastDatePillSelectedDate = null;
     mocks.lastAddQuestSheetProps = null;
     mocks.tutorialGuidance = {
@@ -481,6 +494,107 @@ describe("Journeys row drag integration", () => {
     expect(mocks.lastAddQuestSheetProps?.autoFillTimeOnFirstTap).toBe(true);
   });
 
+  it("renders the desktop header Add Quest CTA and suppresses the floating FAB on Mac-hosted iOS", async () => {
+    mocks.isMacHostedIOSApp = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 1100,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("button", { name: /add quest/i })).toBeInTheDocument();
+    expect(screen.getByText("⌘N")).toBeInTheDocument();
+    expect(screen.queryByTestId("draggable-fab")).not.toBeInTheDocument();
+    expect(mocks.draggableFabRenderCount).toBe(0);
+  });
+
+  it("opens the add flow with meta+n on Mac-hosted iOS", async () => {
+    mocks.isMacHostedIOSApp = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 1100,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+    });
+
+    fireEvent.keyDown(window, { key: "n", metaKey: true });
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(true);
+    });
+  });
+
+  it("ignores meta+n while typing in an input on Mac-hosted iOS", async () => {
+    mocks.isMacHostedIOSApp = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 1100,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+    });
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+
+    fireEvent.keyDown(input, { key: "n", metaKey: true });
+
+    expect(mocks.lastAddQuestSheetProps?.open).toBe(false);
+
+    input.remove();
+  });
+
   it("reschedules a quest from the timeline row drag path on /journeys", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -497,7 +611,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+    expect(screen.getByText("Daily quests, reframed as a calmer week planner on desktop.")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
@@ -522,7 +636,7 @@ describe("Journeys row drag integration", () => {
     expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
 
     expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
-    expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+    expect(screen.getByText("Daily quests, reframed as a calmer week planner on desktop.")).toBeInTheDocument();
   });
 
   it("waits for the local scheduled-time update before syncing calendar", async () => {
@@ -797,7 +911,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Daily quests. Your path to progress.")).toBeInTheDocument();
+      expect(screen.getByText("Daily quests, reframed as a calmer week planner on desktop.")).toBeInTheDocument();
     });
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();

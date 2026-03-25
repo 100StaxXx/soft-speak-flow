@@ -638,6 +638,12 @@ All colors MUST be HSL.
     text-rendering: optimizeLegibility;
     overscroll-behavior-x: none;
   }
+
+  html.platform-mac-hosted-ios body,
+  body.platform-mac-hosted-ios {
+    -webkit-font-smoothing: auto;
+    text-rendering: auto;
+  }
     
   /* Native iOS hardening: prevent accidental selection/callouts on app chrome. */
   .platform-native-ios :where(
@@ -1955,6 +1961,32 @@ All colors MUST be HSL.
     border-bottom: 1px solid hsl(var(--border) / 0.55);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
   }
+
+  html.platform-mac-hosted-ios .cosmiq-glass-nav,
+  body.platform-mac-hosted-ios .cosmiq-glass-nav {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background) / 0.94),
+      hsl(var(--background) / 0.88)
+    );
+    backdrop-filter: blur(10px) saturate(112%);
+    -webkit-backdrop-filter: blur(10px) saturate(112%);
+    box-shadow:
+      0 -6px 18px rgba(0, 0, 0, 0.16),
+      0 -1px 0 hsl(var(--foreground) / 0.06) inset;
+  }
+
+  html.platform-mac-hosted-ios .cosmiq-glass-header,
+  body.platform-mac-hosted-ios .cosmiq-glass-header {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background) / 0.95),
+      hsl(var(--background) / 0.9)
+    );
+    backdrop-filter: blur(10px) saturate(112%);
+    -webkit-backdrop-filter: blur(10px) saturate(112%);
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12);
+  }
   
   /* Base cosmiq glass effect (updated for more transparency) */
   .cosmiq-glass {
@@ -1985,6 +2017,29 @@ All colors MUST be HSL.
       0 0 24px hsl(var(--primary) / 0.12),
       inset 0 1px 0 hsl(var(--pure-white) / 0.08);
     transform: translateY(-1px);
+  }
+
+  html.platform-mac-hosted-ios .journeys-week-strip,
+  body.platform-mac-hosted-ios .journeys-week-strip {
+    background: linear-gradient(180deg, rgba(24, 21, 39, 0.985), rgba(14, 12, 24, 0.965));
+    border-color: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px) saturate(112%);
+    -webkit-backdrop-filter: blur(8px) saturate(112%);
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.2);
+  }
+
+  html.platform-mac-hosted-ios .journeys-desktop-shell,
+  body.platform-mac-hosted-ios .journeys-desktop-shell {
+    background: linear-gradient(180deg, rgba(24, 21, 39, 0.985), rgba(13, 11, 23, 0.968));
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 22px 42px rgba(0, 0, 0, 0.22);
+  }
+
+  html.platform-mac-hosted-ios .journeys-desktop-rail-card,
+  body.platform-mac-hosted-ios .journeys-desktop-rail-card {
+    background: linear-gradient(180deg, rgba(23, 20, 38, 0.985), rgba(16, 13, 27, 0.965));
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
   }
 
   /* Cosmiq button with glow effect */

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { addDays, addWeeks, format, isSameDay, isToday, startOfWeek, subWeeks } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ interface DesktopWeekStripProps {
   tasks?: CalendarTask[];
   onDateSelect: (date: Date) => void;
   onOpenMonthView: () => void;
+  onAddQuest?: () => void;
 }
 
 interface DayStats {
@@ -24,6 +25,7 @@ export function DesktopWeekStrip({
   tasks = [],
   onDateSelect,
   onOpenMonthView,
+  onAddQuest,
 }: DesktopWeekStripProps) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekEnd = addDays(weekStart, 6);
@@ -54,8 +56,8 @@ export function DesktopWeekStrip({
   const weekTotal = tasks.length;
 
   return (
-    <section className="hidden xl:block">
-      <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.94),rgba(14,12,24,0.88))] p-5 shadow-[0_24px_48px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+    <section>
+      <div className="journeys-week-strip rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.94),rgba(14,12,24,0.88))] p-5 shadow-[0_24px_48px_rgba(0,0,0,0.24)] backdrop-blur-xl">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/80">
@@ -71,42 +73,61 @@ export function DesktopWeekStrip({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
-              onClick={() => onDateSelect(subWeeks(selectedDate, 1))}
-              aria-label="Previous week"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
-              onClick={() => onDateSelect(new Date())}
-            >
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
-              onClick={() => onDateSelect(addWeeks(selectedDate, 1))}
-              aria-label="Next week"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
-              onClick={onOpenMonthView}
-            >
-              <CalendarDays className="h-4 w-4" />
-              Month
-            </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => onDateSelect(subWeeks(selectedDate, 1))}
+                aria-label="Previous week"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => onDateSelect(new Date())}
+              >
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => onDateSelect(addWeeks(selectedDate, 1))}
+                aria-label="Next week"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-2xl border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={onOpenMonthView}
+              >
+                <CalendarDays className="h-4 w-4" />
+                Month
+              </Button>
+            </div>
+
+            {onAddQuest ? (
+              <Button
+                size="sm"
+                className="h-10 rounded-2xl px-4 shadow-[0_14px_28px_rgba(122,61,255,0.2)]"
+                onClick={onAddQuest}
+              >
+                <Plus className="h-4 w-4" />
+                Add Quest
+                <span
+                  aria-hidden="true"
+                  className="rounded-md border border-white/10 bg-black/15 px-1.5 py-0.5 text-[11px] font-medium text-white/75"
+                >
+                  ⌘N
+                </span>
+              </Button>
+            ) : null}
           </div>
         </div>
 

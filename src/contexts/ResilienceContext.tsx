@@ -325,7 +325,7 @@ export function ResilienceProvider({ children }: { children: ReactNode }) {
     setDegradedDismissed(true);
   }, []);
 
-  const shouldQueueWrites = !isOnline || state === "offline" || state === "outage";
+  const shouldQueueWrites = typeof navigator !== "undefined" ? navigator.onLine === false : !isOnline;
 
   const value = useMemo<ResilienceContextValue>(
     () => ({

@@ -56,6 +56,7 @@ import { JourneyPathDrawer } from "@/components/JourneyPathDrawer";
 import { TimelineTaskRow } from "@/components/TimelineTaskRow";
 import { ProgressRing } from "@/features/tasks/components/ProgressRing";
 import { useMotionProfile } from "@/hooks/useMotionProfile";
+import type { JourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { buildTaskConflictMap, getTaskConflictSetForTask } from "@/utils/taskTimeConflicts";
 import { buildTaskTimelineFlow } from "@/utils/taskTimelineFlow";
 import { SHARED_TIMELINE_DRAG_PROFILE } from "@/components/calendar/dragSnap";
@@ -171,6 +172,8 @@ const patchSubtaskCompletionInTaskList = <T extends { id: string; subtasks?: Tas
 interface TodaysAgendaProps {
   tasks: Task[];
   selectedDate: Date;
+  layoutMode?: JourneysLayoutMode;
+  hideDesktopRailAddButton?: boolean;
   isVisible?: boolean;
   disableTimelineDrag?: boolean;
   onToggle: (taskId: string, completed: boolean, xpReward: number) => void;
@@ -566,6 +569,8 @@ const buildPlaceholderEmphasis = (
 export const TodaysAgenda = memo(function TodaysAgenda({
   tasks,
   selectedDate,
+  layoutMode,
+  hideDesktopRailAddButton = false,
   isVisible = true,
   disableTimelineDrag = false,
   onToggle,
@@ -590,6 +595,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const prefersReducedMotion = useReducedMotion();
   const { capabilities } = useMotionProfile();
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => {
+    if (layoutMode) return layoutMode === "desktop";
     if (typeof window === "undefined") return false;
     return window.innerWidth >= DESKTOP_LAYOUT_MIN_WIDTH;
   });
@@ -675,6 +681,11 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   
   // Clean up optimistic state when server confirms completion
   useEffect(() => {
+    if (layoutMode) {
+      setIsDesktopLayout(layoutMode === "desktop");
+      return;
+    }
+
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
 
     const mediaQuery = window.matchMedia(`(min-width: ${DESKTOP_LAYOUT_MIN_WIDTH}px)`);
@@ -694,7 +705,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return () => {
       mediaQuery.removeListener(handleDesktopLayoutChange);
     };
-  }, []);
+  }, [layoutMode]);
 
   useEffect(() => {
     setOptimisticCompleted(prev => {
@@ -2121,9 +2132,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     return taskContent;
   }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo]);
 
-  const desktopRailCardClass = "rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
+  const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
   const desktopRail = isDesktopLayout ? (
-    <aside className="hidden xl:flex xl:flex-col xl:gap-4">
+    <aside className="flex flex-col gap-4">
       <section className={desktopRailCardClass}>
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -2195,15 +2206,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               Nothing is queued yet for this day.
             </p>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4 w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-            onClick={onAddQuest}
-          >
-            <Plus className="h-4 w-4" />
-            Add Quest
-          </Button>
+          {!hideDesktopRailAddButton ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 w-full rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+              onClick={onAddQuest}
+            >
+              <Plus className="h-4 w-4" />
+              Add Quest
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -2276,17 +2289,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   ) : null;
 
   return (
-    <div className="relative xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start xl:gap-6">
-      <div className="relative px-2 py-2 overflow-visible xl:rounded-[32px] xl:border xl:border-white/10 xl:bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] xl:px-5 xl:py-5 xl:shadow-[0_28px_54px_rgba(0,0,0,0.24)]">
+    <div
+      className={cn(
+        "relative",
+        isDesktopLayout && "grid grid-cols-[minmax(0,1fr)_340px] items-start gap-6",
+      )}
+    >
+      <div
+        className={cn(
+          "relative px-2 py-2 overflow-visible",
+          isDesktopLayout && "journeys-desktop-shell rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
+        )}
+      >
         {/* Compact Header: Date + Progress Ring + XP */}
-        <div className="mb-3 flex items-center justify-between gap-3 xl:mb-5">
-          <div className="flex items-center gap-2 xl:gap-3">
+        <div className={cn("mb-3 flex items-center justify-between gap-3", isDesktopLayout && "mb-5")}>
+          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
             <button 
               type="button"
               onClick={() => onOpenMonthView?.()}
               className="flex items-center gap-1.5 rounded-2xl transition-opacity hover:opacity-80"
             >
-              <span className="text-lg font-bold xl:text-[1.8rem] xl:tracking-tight">
+              <span className={cn("text-lg font-bold", isDesktopLayout && "text-[1.8rem] tracking-tight")}>
                 {safeFormat(selectedDate, "MMM d, yyyy", "Invalid date")}
               </span>
             </button>
@@ -2305,17 +2328,27 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             )}
           </div>
 
-          <div className="flex items-center gap-2 xl:gap-3">
+          <div className={cn("flex items-center gap-2", isDesktopLayout && "gap-3")}>
             {/* Compact progress ring */}
             {totalCount > 0 && (
-              <div className="flex items-center gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 xl:px-3 xl:py-2">
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5",
+                  isDesktopLayout && "px-3 py-2",
+                )}
+              >
                 <ProgressRing percent={progressPercent} size={24} strokeWidth={2.5} />
                 <span className="text-xs font-medium text-muted-foreground">
                   {completedCount}/{totalCount}
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-sm xl:px-3 xl:py-2">
+            <div
+              className={cn(
+                "flex items-center gap-1 rounded-2xl border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-sm",
+                isDesktopLayout && "px-3 py-2",
+              )}
+            >
               <Trophy className={cn(
                 "h-4 w-4",
                 allComplete ? "text-stardust-gold" : "text-stardust-gold/70"
@@ -2365,12 +2398,17 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
         {/* Timeline Content */}
         {tasks.length === 0 ? (
-          <div className="rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-10 text-center xl:min-h-[420px] xl:flex xl:flex-col xl:items-center xl:justify-center xl:px-8">
+          <div
+            className={cn(
+              "rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-10 text-center",
+              isDesktopLayout && "min-h-[420px] flex flex-col items-center justify-center px-8",
+            )}
+          >
             <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
             <p className="mb-2 text-sm font-medium text-foreground">
               No tasks for this day
             </p>
-            <p className="mx-auto max-w-sm text-xs text-muted-foreground/70 xl:text-sm">
+            <p className={cn("mx-auto max-w-sm text-xs text-muted-foreground/70", isDesktopLayout && "text-sm")}>
               {isSelectedToday
                 ? "Your day is still open. Add a quest to give the planner some shape."
                 : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}

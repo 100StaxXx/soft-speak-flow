@@ -16,17 +16,19 @@ interface WithTimeoutOptions {
   timeoutMs: number;
   operation: string;
   timeoutCode?: string;
+  onTimeout?: () => void;
 }
 
 export async function withTimeout<T>(
   promiseOrFactory: Promise<T> | (() => Promise<T>),
   options: WithTimeoutOptions,
 ): Promise<T> {
-  const { timeoutMs, operation, timeoutCode } = options;
+  const { timeoutMs, operation, timeoutCode, onTimeout } = options;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = new Promise<T>((_, reject) => {
     timeoutId = setTimeout(() => {
+      onTimeout?.();
       reject(new TimeoutError(operation, timeoutMs, timeoutCode));
     }, timeoutMs);
   });

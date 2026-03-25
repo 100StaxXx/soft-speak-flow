@@ -5,6 +5,7 @@
 import { useHabitsRealtime } from "@/hooks/useHabitsRealtime";
 import { useEpicsRealtime } from "@/hooks/useEpicsRealtime";
 import { useDailyTasksRealtime } from "@/hooks/useDailyTasksRealtime";
+import { useProfileRealtime } from "@/hooks/useProfileRealtime";
 import { ReactNode } from "react";
 
 interface RealtimeSyncProviderProps {
@@ -14,6 +15,7 @@ interface RealtimeSyncProviderProps {
 export const RealtimeSyncProvider = ({ children }: RealtimeSyncProviderProps) => {
   // Only activate realtime subscriptions when user is authenticated
   // These hooks are no-ops when user is null
+  useProfileRealtime();
   useHabitsRealtime();
   useEpicsRealtime();
   useDailyTasksRealtime();

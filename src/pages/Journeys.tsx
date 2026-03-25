@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { TodaysAgenda } from "@/components/TodaysAgenda";
+import { cn } from "@/lib/utils";
 
 import { DatePillsScroller } from "@/components/DatePillsScroller";
 import { DesktopWeekStrip } from "@/components/DesktopWeekStrip";
@@ -58,6 +59,8 @@ import { isOnboardingCleanupEligible } from "@/pages/journeysCleanupEligibility"
 import { formatTime12 } from "@/components/quest-shared";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
+import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
+import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -80,6 +83,9 @@ const Journeys = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isTabActive } = useMainTabVisibility();
+  const journeysLayoutMode = useJourneysLayoutMode();
+  const isDesktopLayout = journeysLayoutMode === "desktop";
+  const isMacHostedIOSApp = useMemo(() => isMacDesignedForIPadIOSApp(), []);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPageInfo, setShowPageInfo] = useState(false);
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -114,6 +120,14 @@ const Journeys = () => {
     resetStreak, 
     isResolving 
   } = useStreakAtRisk();
+
+  const openAddQuestSheet = useCallback((options?: { date?: Date; time?: string | null }) => {
+    if (options?.date) {
+      setSelectedDate(options.date);
+    }
+    setPrefilledTime(options?.time ?? null);
+    setShowAddSheet(true);
+  }, []);
 
   const syncSelectedDateToTodayIfStale = useCallback(() => {
     if (showAddSheet) return;
@@ -172,7 +186,7 @@ const Journeys = () => {
       }
     };
   }, [isTabActive, syncSelectedDateToTodayIfStale]);
-  
+
   // Combo tracking
   
   
@@ -244,6 +258,61 @@ const Journeys = () => {
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
+
+  useEffect(() => {
+    if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
+
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      return !!target.closest('input, textarea, select, [contenteditable="true"]');
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== "n") return;
+      if (
+        showAddSheet
+        || showMonthView
+        || showPageInfo
+        || showQuickAdjust
+        || showPathfinder
+        || !!editingTask
+        || !!editingRitual
+        || needsStreakDecision
+        || isInteractionModalOpen
+      ) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (isEditableTarget(event.target) || isEditableTarget(activeElement)) {
+        return;
+      }
+
+      event.preventDefault();
+      openAddQuestSheet();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    editingRitual,
+    editingTask,
+    isInteractionModalOpen,
+    isMacHostedIOSApp,
+    location.pathname,
+    needsStreakDecision,
+    openAddQuestSheet,
+    showAddSheet,
+    showMonthView,
+    showPageInfo,
+    showPathfinder,
+    showQuickAdjust,
+  ]);
   
   // Habit surfacing - auto-surface ALL active habits (not just epic-linked) as daily tasks
   const { surfaceAllEpicHabits, unsurfacedEpicHabitsCount } = useHabitSurfacing(selectedDate);
@@ -826,22 +895,37 @@ const Journeys = () => {
   return (
     <PageTransition mode="instant">
       <StarfieldBackground />
-      <div className="min-h-screen pb-nav-safe pt-safe px-4 xl:px-6 relative z-10">
+      <div
+        className={cn(
+          "min-h-screen pb-nav-safe pt-safe px-4 relative z-10",
+          isDesktopLayout && "px-6",
+        )}
+      >
         <div className="mx-auto w-full max-w-[1360px]">
           {/* Hero Header */}
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: -14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
-            className="relative mb-6 text-center xl:mb-5 xl:flex xl:items-end xl:justify-between xl:gap-6 xl:text-left"
+            className={cn(
+              "relative mb-6",
+              isDesktopLayout
+                ? "mb-5 flex items-end justify-between gap-6 text-left"
+                : "text-center",
+            )}
           >
-            <div className="absolute right-0 top-0 xl:static xl:flex-shrink-0">
+            <div className={cn(isDesktopLayout ? "static flex-shrink-0" : "absolute right-0 top-0")}>
               <PageInfoButton 
                 onClick={() => setShowPageInfo(true)} 
               />
             </div>
             <div>
-              <h1 className="mb-2 text-3xl font-semibold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent xl:mb-1">
+              <h1
+                className={cn(
+                  "mb-2 text-3xl font-semibold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent",
+                  isDesktopLayout && "mb-1",
+                )}
+              >
                 Quests
               </h1>
               <p className="text-sm text-muted-foreground/90">
@@ -855,25 +939,33 @@ const Journeys = () => {
         <QuestsErrorBoundary>
           {/* Date Selector */}
           <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={
+              prefersReducedMotion
+                ? false
+                : isMacHostedIOSApp && isDesktopLayout
+                ? { opacity: 0, y: 8 }
+                : { opacity: 0, scale: 0.98 }
+            }
+            animate={isMacHostedIOSApp && isDesktopLayout ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1 }}
             transition={{ delay: prefersReducedMotion ? 0 : 0.04, duration: prefersReducedMotion ? 0 : 0.2 }}
             className="mb-4"
           >
-            <div className="xl:hidden">
+            {isDesktopLayout ? (
+              <DesktopWeekStrip
+                selectedDate={selectedDate}
+                tasks={weekCalendarTasks}
+                onDateSelect={setSelectedDate}
+                onOpenMonthView={() => setShowMonthView(true)}
+                onAddQuest={isMacHostedIOSApp ? () => openAddQuestSheet() : undefined}
+              />
+            ) : (
               <DatePillsScroller
                 selectedDate={selectedDate}
                 onDateSelect={handleDatePillClick}
                 tasksPerDay={tasksPerDay}
                 isActive={isTabActive}
               />
-            </div>
-            <DesktopWeekStrip
-              selectedDate={selectedDate}
-              tasks={weekCalendarTasks}
-              onDateSelect={setSelectedDate}
-              onOpenMonthView={() => setShowMonthView(true)}
-            />
+            )}
           </motion.div>
 
           {/* Main Content Area */}
@@ -886,13 +978,12 @@ const Journeys = () => {
             <TodaysAgenda
               tasks={dailyTasks}
               selectedDate={selectedDate}
+              layoutMode={journeysLayoutMode}
+              hideDesktopRailAddButton={isMacHostedIOSApp}
               isVisible={location.pathname === JOURNEYS_ROUTE}
               disableTimelineDrag={showAddSheet || !!editingTask || !!editingRitual}
               onToggle={handleToggleTask}
-              onAddQuest={() => {
-                setPrefilledTime(null);
-                setShowAddSheet(true);
-              }}
+              onAddQuest={() => openAddQuestSheet()}
               completedCount={completedCount}
               totalCount={totalCount}
               currentStreak={currentStreak}
@@ -908,9 +999,7 @@ const Journeys = () => {
               onUpdateScheduledTime={handleTimelineScheduledTimeUpdate}
               onOpenMonthView={() => setShowMonthView(true)}
               onTimeSlotLongPress={(date, time) => {
-                setSelectedDate(date);
-                setPrefilledTime(time);
-                setShowAddSheet(true);
+                openAddQuestSheet({ date, time });
               }}
               onTimelineDragPreviewTimeChange={setHeaderDragTime}
             />
@@ -1045,10 +1134,9 @@ const Journeys = () => {
           onComplete={handleAnimationComplete}
         />
         {/* Draggable FAB */}
-        <DraggableFAB onTap={() => {
-          setPrefilledTime(null);
-          setShowAddSheet(true);
-        }} />
+        {!isMacHostedIOSApp ? (
+          <DraggableFAB onTap={() => openAddQuestSheet()} />
+        ) : null}
       </div>
       </div>
 

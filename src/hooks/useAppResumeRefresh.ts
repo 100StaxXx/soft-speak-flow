@@ -37,9 +37,25 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['mentor-personality'] }),
       queryClient.invalidateQueries({ queryKey: ['mentor'] }),
       queryClient.invalidateQueries({ queryKey: ['selected-mentor'] }),
+      queryClient.invalidateQueries({ queryKey: ['streak-freezes'] }),
     ]);
 
-    // Invalidate habit and epic data for cross-device sync
+    // Invalidate companion-driven UI so backgrounded devices catch up immediately.
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['companion'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-health'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-care-signals'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-attributes'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-story'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-stories-all'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-memories'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-bond'] }),
+      queryClient.invalidateQueries({ queryKey: ['companion-evolution-image'] }),
+      queryClient.invalidateQueries({ queryKey: ['current-evolution-card'] }),
+      queryClient.invalidateQueries({ queryKey: ['evolution-cards'] }),
+    ]);
+
+    // Invalidate habit and epic data for cross-device sync.
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['habits'] }),
       queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] }),

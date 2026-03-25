@@ -7,12 +7,20 @@ export type ErrorWithStatus = {
 const NETWORK_PATTERNS = [
   "load failed",
   "failed to fetch",
+  "fetch failed",
   "network request failed",
   "typeerror: failed to fetch",
   "networkerror",
   "timeout",
-  "connection",
-  "fetch",
+  "timed out",
+  "network error",
+  "network failure",
+  "failed to send a request",
+  "econnreset",
+  "connection reset",
+  "socket hang up",
+  "aborterror",
+  "signal is aborted",
 ];
 
 export function extractErrorMessage(error: unknown): string {

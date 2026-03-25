@@ -28,18 +28,38 @@ export const GlobalEvolutionListener = () => {
   useEffect(() => {
     if (!user) return;
 
+    const invalidateCompanionQueries = () => {
+      queryClient.invalidateQueries({ queryKey: ['companion'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-health'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-care-signals'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-attributes'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-story'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-stories-all'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-memories'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-bond'] });
+      queryClient.invalidateQueries({ queryKey: ['companion-evolution-image'] });
+      queryClient.invalidateQueries({ queryKey: ['current-evolution-card'] });
+      queryClient.invalidateQueries({ queryKey: ['evolution-cards'] });
+    };
+
     // Subscribe to companion updates
     const channel = supabase
-      .channel('companion-evolution')
+      .channel(`companion-evolution-${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'user_companion',
           filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
+          invalidateCompanionQueries();
+
+          if (payload.eventType !== 'UPDATE') {
+            return;
+          }
+
           // Type guard for payload structure
           const newData = payload.new as Record<string, unknown> | null;
           const oldData = payload.old as Record<string, unknown> | null;
@@ -133,11 +153,6 @@ export const GlobalEvolutionListener = () => {
             }).then(({ error }) => {
               if (error) logger.error('Failed to create evolution memory:', error);
             });
-
-            // Invalidate companion query to refresh data
-            if (user?.id) {
-              queryClient.invalidateQueries({ queryKey: ['companion', user.id] });
-            }
           }
         }
       )

@@ -629,7 +629,12 @@ export function useOfflineQueue() {
       return queueAction({
         actionKind,
         entityType: "task",
-        entityId: typeof payload.taskId === "string" ? payload.taskId : null,
+        entityId:
+          typeof payload.taskId === "string"
+            ? payload.taskId
+            : typeof payload.id === "string"
+              ? payload.id
+              : null,
         payload,
       });
     },

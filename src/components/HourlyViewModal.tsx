@@ -101,7 +101,7 @@ export function HourlyViewModal({
 
         {/* Subtitle */}
         <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border/50 shrink-0">
-          Tap any date to view daily schedule
+          Select any date to view daily schedule
         </div>
 
         {/* Content */}

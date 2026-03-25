@@ -201,9 +201,7 @@ export const CalendarMonthView = ({ selectedDate, onDateSelect, onMonthChange, t
                 onClick={() => onDateSelect(day)}
                 onTouchStart={() => handleLongPressStart(day)}
                 onTouchEnd={handleLongPressEnd}
-                onMouseDown={() => handleLongPressStart(day)}
-                onMouseUp={handleLongPressEnd}
-                onMouseLeave={handleLongPressEnd}
+                onTouchCancel={handleLongPressEnd}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className={cn(

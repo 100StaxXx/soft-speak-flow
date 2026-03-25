@@ -11,8 +11,13 @@ const mocks = vi.hoisted(() => {
   const updateDisciplineFromRitualMock = vi.fn();
   const trackTaskCreationMock = vi.fn();
   const trackTaskCompletionMock = vi.fn();
+  const trackResilienceEventMock = vi.fn();
   const queueTaskActionMock = vi.fn();
   const reportApiFailureMock = vi.fn();
+  const resilienceState = {
+    shouldQueueWrites: false,
+    state: "healthy" as "healthy" | "offline" | "degraded" | "outage" | "recovering" | "recovered",
+  };
   const createOfflinePlannerIdMock = vi.fn((prefix: string) => `${prefix}-local`);
   const getLocalHabitCompletionsForDateMock = vi.fn();
   const getLocalSubtasksForTaskMock = vi.fn();
@@ -28,10 +33,13 @@ const mocks = vi.hoisted(() => {
   const dailyTasksInsertSingleMock = vi.fn();
   const dailyTasksDeleteExecuteMock = vi.fn();
   const dailyTasksFetchSchedulingSingleMock = vi.fn();
+  const dailyTasksFetchByIdMaybeSingleMock = vi.fn();
   const dailyTasksUpdateMock = vi.fn();
   const dailyTasksUpdateExecuteMock = vi.fn();
   const taskAttachmentsDeleteExecuteMock = vi.fn();
   const taskAttachmentsInsertExecuteMock = vi.fn();
+  const withTimeoutMock = vi.fn();
+  const pollWithDeadlineMock = vi.fn();
 
   return {
     fromMock,
@@ -41,8 +49,10 @@ const mocks = vi.hoisted(() => {
     updateDisciplineFromRitualMock,
     trackTaskCreationMock,
     trackTaskCompletionMock,
+    trackResilienceEventMock,
     queueTaskActionMock,
     reportApiFailureMock,
+    resilienceState,
     createOfflinePlannerIdMock,
     getLocalHabitCompletionsForDateMock,
     getLocalSubtasksForTaskMock,
@@ -57,10 +67,13 @@ const mocks = vi.hoisted(() => {
     dailyTasksInsertSingleMock,
     dailyTasksDeleteExecuteMock,
     dailyTasksFetchSchedulingSingleMock,
+    dailyTasksFetchByIdMaybeSingleMock,
     dailyTasksUpdateMock,
     dailyTasksUpdateExecuteMock,
     taskAttachmentsDeleteExecuteMock,
     taskAttachmentsInsertExecuteMock,
+    withTimeoutMock,
+    pollWithDeadlineMock,
   };
 });
 
@@ -115,12 +128,27 @@ vi.mock("@/hooks/useSchedulingLearner", () => ({
 
 vi.mock("@/contexts/ResilienceContext", () => ({
   useResilience: () => ({
-    shouldQueueWrites: false,
+    state: mocks.resilienceState.state,
+    shouldQueueWrites: mocks.resilienceState.shouldQueueWrites,
     queueAction: vi.fn(),
     queueTaskAction: mocks.queueTaskActionMock,
     reportApiFailure: mocks.reportApiFailureMock,
   }),
 }));
+
+vi.mock("@/utils/resilienceTelemetry", () => ({
+  trackResilienceEvent: (...args: unknown[]) => mocks.trackResilienceEventMock(...args),
+}));
+
+vi.mock("@/utils/asyncTimeout", async () => {
+  const actual = await vi.importActual<typeof import("@/utils/asyncTimeout")>("@/utils/asyncTimeout");
+
+  return {
+    ...actual,
+    withTimeout: (...args: Parameters<typeof actual.withTimeout>) => mocks.withTimeoutMock(...args),
+    pollWithDeadline: (...args: Parameters<typeof actual.pollWithDeadline>) => mocks.pollWithDeadlineMock(...args),
+  };
+});
 
 vi.mock("@/utils/plannerLocalStore", () => ({
   createOfflinePlannerId: (...args: unknown[]) => mocks.createOfflinePlannerIdMock(...args),
@@ -138,6 +166,7 @@ import {
   isTaskAttachmentsTableMissingError,
   useTaskMutations,
 } from "./useTaskMutations";
+import { TimeoutError } from "@/utils/asyncTimeout";
 import {
   RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR,
   RECURRENCE_REQUIRES_SCHEDULED_TIME_MESSAGE,
@@ -179,6 +208,15 @@ const dailyTasksRecurrenceColumnsMissingError = {
   hint: null,
 };
 
+const originalOnlineDescriptor = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
+
+const setOnline = (online: boolean) => {
+  Object.defineProperty(window.navigator, "onLine", {
+    configurable: true,
+    value: online,
+  });
+};
+
 describe("isTaskAttachmentsTableMissingError", () => {
   it("returns true for missing task_attachments schema-cache errors", () => {
     expect(isTaskAttachmentsTableMissingError(taskAttachmentsMissingTableError)).toBe(true);
@@ -199,10 +237,15 @@ describe("isTaskAttachmentsTableMissingError", () => {
 describe("useTaskMutations attachment handling", () => {
   afterEach(() => {
     vi.useRealTimers();
+    if (originalOnlineDescriptor) {
+      Object.defineProperty(window.navigator, "onLine", originalOnlineDescriptor);
+    }
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resilienceState.shouldQueueWrites = false;
+    mocks.resilienceState.state = "healthy";
     mocks.getLocalHabitCompletionsForDateMock.mockResolvedValue([]);
     mocks.getLocalSubtasksForTaskMock.mockResolvedValue([]);
     mocks.getPlannerRecordMock.mockResolvedValue({
@@ -280,14 +323,28 @@ describe("useTaskMutations attachment handling", () => {
       },
       error: null,
     });
+    mocks.dailyTasksFetchByIdMaybeSingleMock.mockResolvedValue({
+      data: null,
+      error: null,
+    });
     mocks.dailyTasksUpdateExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsDeleteExecuteMock.mockResolvedValue({ error: null });
     mocks.taskAttachmentsInsertExecuteMock.mockResolvedValue({ error: null });
-    mocks.dailyTasksInsertMock.mockImplementation(() => ({
-      select: vi.fn(() => ({
-        single: mocks.dailyTasksInsertSingleMock,
-      })),
-    }));
+    mocks.withTimeoutMock.mockImplementation(async (promiseOrFactory: Promise<unknown> | (() => Promise<unknown>)) => (
+      typeof promiseOrFactory === "function" ? promiseOrFactory() : promiseOrFactory
+    ));
+    mocks.pollWithDeadlineMock.mockResolvedValue(null);
+    mocks.queueTaskActionMock.mockResolvedValue("queued-1");
+    mocks.dailyTasksInsertMock.mockImplementation(() => {
+      const builder = {
+        abortSignal: vi.fn(() => builder),
+        select: vi.fn(() => ({
+          single: mocks.dailyTasksInsertSingleMock,
+        })),
+      };
+
+      return builder;
+    });
 
     mocks.dailyTasksUpdateMock.mockReturnValue({
       eq: vi.fn(() => ({
@@ -304,6 +361,16 @@ describe("useTaskMutations attachment handling", () => {
                 eq: vi.fn(() => ({
                   eq: vi.fn(() => ({
                     maybeSingle: mocks.dailyTasksFetchSchedulingSingleMock,
+                  })),
+                })),
+              };
+            }
+
+            if (selection === "*") {
+              return {
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    maybeSingle: mocks.dailyTasksFetchByIdMaybeSingleMock,
                   })),
                 })),
               };
@@ -363,6 +430,162 @@ describe("useTaskMutations attachment handling", () => {
         })),
       };
     });
+  });
+
+  it("adds a plain quest live when online and healthy", async () => {
+    setOnline(true);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      });
+    });
+
+    expect(createdTask?.id).toBe("task-1");
+    expect(createdTask?.queued).not.toBe(true);
+    expect(mocks.queueTaskActionMock).not.toHaveBeenCalled();
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
+    expect(mocks.trackResilienceEventMock).toHaveBeenCalledWith(
+      "task_create_result",
+      expect.objectContaining({
+        queued: false,
+        queueReason: null,
+      }),
+    );
+  });
+
+  it("prequeues a plain quest immediately when offline", async () => {
+    setOnline(false);
+    mocks.resilienceState.shouldQueueWrites = true;
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      });
+    });
+
+    expect(createdTask).toEqual(expect.objectContaining({
+      id: "task-local",
+      queued: true,
+      queueReason: "offline",
+      syncPending: true,
+    }));
+    expect(mocks.dailyTasksInsertMock).not.toHaveBeenCalled();
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledTimes(1);
+    expect(mocks.queueTaskActionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Quest saved offline",
+      description: "We'll sync it when you're back online.",
+    }));
+  });
+
+  it("still attempts a live quest insert while online during outage state", async () => {
+    setOnline(true);
+    mocks.resilienceState.state = "outage";
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      });
+    });
+
+    expect(createdTask?.queued).not.toBe(true);
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledTimes(1);
+    expect(mocks.queueTaskActionMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
+  });
+
+  it("treats a timed-out insert as successful when the remote row appears during existence check", async () => {
+    setOnline(true);
+    mocks.withTimeoutMock.mockImplementationOnce(async (_promiseOrFactory, options) => {
+      options?.onTimeout?.();
+      throw new TimeoutError("create quest insert", 3000, "TASK_CREATE_TIMEOUT");
+    });
+    mocks.pollWithDeadlineMock.mockResolvedValueOnce({
+      id: "task-local",
+      user_id: "user-1",
+      task_text: "Ship feature",
+      difficulty: "medium",
+      task_date: "2026-02-20",
+      scheduled_time: "13:00",
+      category: "mind",
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      });
+    });
+
+    expect(createdTask?.id).toBe("task-local");
+    expect(createdTask?.scheduled_time).toBe("13:00");
+    expect(createdTask?.queued).not.toBe(true);
+    expect(mocks.pollWithDeadlineMock).toHaveBeenCalledTimes(1);
+    expect(mocks.queueTaskActionMock).not.toHaveBeenCalled();
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest added!" }));
+  });
+
+  it("queues exactly one create action when a timed-out insert never appears remotely", async () => {
+    setOnline(true);
+    mocks.withTimeoutMock.mockImplementationOnce(async (_promiseOrFactory, options) => {
+      options?.onTimeout?.();
+      throw new TimeoutError("create quest insert", 3000, "TASK_CREATE_TIMEOUT");
+    });
+    mocks.pollWithDeadlineMock.mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    let createdTask: any;
+    await act(async () => {
+      createdTask = await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      });
+    });
+
+    expect(createdTask).toEqual(expect.objectContaining({
+      id: "task-local",
+      queued: true,
+      queueReason: "network_timeout",
+      syncPending: true,
+    }));
+    expect(mocks.pollWithDeadlineMock).toHaveBeenCalledTimes(1);
+    expect(mocks.queueTaskActionMock).toHaveBeenCalledTimes(1);
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Quest saved locally. Server sync will retry automatically.",
+    }));
   });
 
   it("creates a quest when task_attachments table is missing and shows warning", async () => {

@@ -34,4 +34,17 @@ describe("isQueueableWriteError", () => {
 
     expect(isQueueableWriteError({ status: 400, message: "Invalid field value" })).toBe(false);
   });
+
+  it("returns false for generic fetch wording without an explicit network failure", () => {
+    setOnline(true);
+
+    expect(isQueueableWriteError(new Error("Fetch quest suggestions before saving"))).toBe(false);
+    expect(isQueueableWriteError(new Error("Connection preferences updated"))).toBe(false);
+  });
+
+  it("returns true for explicit timeout failures while online", () => {
+    setOnline(true);
+
+    expect(isQueueableWriteError(new Error("create quest insert timed out after 3000ms"))).toBe(true);
+  });
 });

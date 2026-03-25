@@ -12,6 +12,7 @@ import { useRef, createElement } from "react";
 import { getEffectiveQuestXP, MAIN_QUEST_XP_MULTIPLIER } from "@/config/xpRewards";
 import { calculateGuildBonus } from "@/utils/guildBonus";
 import { format } from "date-fns";
+import { TimeoutError, pollWithDeadline, withTimeout } from "@/utils/asyncTimeout";
 import {
   normalizeTaskSchedulingState,
   normalizeTaskSchedulingUpdate,
@@ -26,6 +27,8 @@ import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
 import type { DailyTask } from "@/services/dailyTasksRemote";
+import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
+import type { ResilienceState } from "@/types/resilience";
 import {
   createOfflinePlannerId,
   getLocalHabitCompletionsForDate,
@@ -89,6 +92,15 @@ interface TaskAttachmentPersistResult {
   attachmentsSkippedDueToSchema: boolean;
 }
 
+type TaskCreateQueueReason = "offline" | "outage_retry" | "network_timeout" | "network_error";
+
+type TaskCreateMutationResult = Partial<DailyTask> & {
+  attachmentsSkippedDueToSchema: boolean;
+  queued?: boolean;
+  queueReason?: TaskCreateQueueReason;
+  syncPending?: boolean;
+};
+
 type SupabaseLikeError = {
   code?: string | null;
   message?: string | null;
@@ -149,6 +161,9 @@ interface RecurrenceWriteResult {
 }
 
 const MONTHLY_RECURRENCE_SCHEMA_MESSAGE = "Monthly recurrence is temporarily unavailable until backend update completes.";
+const CREATE_TASK_REMOTE_TIMEOUT_MS = 3_000;
+const CREATE_TASK_EXISTENCE_CHECK_MS = 1_500;
+const CREATE_TASK_EXISTENCE_CHECK_INTERVAL_MS = 150;
 
 const buildQueuedTogglePayload = (variables: ToggleTaskVariables) => ({
   taskId: variables.taskId,
@@ -218,6 +233,36 @@ function normalizeRecurrencePattern(pattern: string | null | undefined): string 
 
 function buildRecurrenceRequiresScheduledTimeError(): Error {
   return new Error(RECURRENCE_REQUIRES_SCHEDULED_TIME_ERROR);
+}
+
+function isNavigatorOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+function resolveTaskCreateQueueReason(
+  resilienceState: ResilienceState,
+  error?: unknown,
+): TaskCreateQueueReason {
+  if (isNavigatorOffline()) return "offline";
+  if (resilienceState === "outage") return "outage_retry";
+  if (error instanceof TimeoutError) return "network_timeout";
+  return "network_error";
+}
+
+function getQueuedTaskCreateToastMessage(queueReason?: TaskCreateQueueReason): {
+  title: string;
+  description?: string;
+} {
+  if (queueReason === "offline") {
+    return {
+      title: "Quest saved offline",
+      description: "We'll sync it when you're back online.",
+    };
+  }
+
+  return {
+    title: "Quest saved locally. Server sync will retry automatically.",
+  };
 }
 
 function getTaskMutationErrorMessage(error: Error): string {
@@ -310,7 +355,13 @@ export const useTaskMutations = (taskDate: string) => {
   const { showXPToast } = useXPToast();
   const { awardCustomXP } = useXPRewards();
   const { trackTaskCompletion, trackTaskCreation } = useSchedulingLearner();
-  const { shouldQueueWrites, queueAction, queueTaskAction, reportApiFailure } = useResilience();
+  const {
+    state: resilienceState,
+    shouldQueueWrites,
+    queueAction,
+    queueTaskAction,
+    reportApiFailure,
+  } = useResilience();
 
   const addInProgress = useRef(false);
   const showAttachmentsUnavailableToast = () => {
@@ -464,6 +515,48 @@ export const useTaskMutations = (taskDate: string) => {
     return task;
   };
 
+  const fetchRemoteTaskById = async (taskId: string): Promise<Partial<DailyTask> | null> => {
+    if (!user?.id) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from("daily_tasks")
+      .select("*")
+      .eq("id", taskId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data as Partial<DailyTask> | null;
+  };
+
+  const persistRemoteSubtasks = async (
+    taskId: string,
+    subtasks: NonNullable<DailyTask["subtasks"]>,
+  ): Promise<void> => {
+    if (!user?.id || subtasks.length === 0) return;
+
+    const { error } = await supabase
+      .from("subtasks")
+      .insert(
+        subtasks.map((subtask) => ({
+          id: subtask.id,
+          task_id: taskId,
+          user_id: user.id,
+          title: subtask.title,
+          completed: false,
+          completed_at: null,
+          sort_order: subtask.sort_order ?? 0,
+        })),
+      );
+
+    if (error) {
+      throw error;
+    }
+  };
+
   const persistTaskAttachments = async (
     taskId: string,
     attachments: QuestAttachmentInput[],
@@ -606,56 +699,75 @@ export const useTaskMutations = (taskDate: string) => {
         })),
       };
 
-      const queueCreateTask = async () => {
-        const queueId = await queueTaskAction("CREATE_TASK", {
-          id: localTaskId,
-          task_text: params.taskText,
-          difficulty: params.difficulty,
-          xp_reward: xpReward,
-          task_date: normalizedScheduling.task_date,
-          is_main_quest: params.isMainQuest ?? false,
-          scheduled_time: normalizedScheduling.scheduled_time,
-          estimated_duration: params.estimatedDuration || null,
-          ...recurrenceWrite.fields,
-          is_recurring: recurrenceWrite.hasRecurrence,
-          reminder_enabled: params.reminderEnabled ?? false,
-          reminder_minutes_before: params.reminderMinutesBefore ?? 15,
-          category: detectedCategory,
-          notes: params.notes || null,
-          contact_id: params.contactId || null,
-          auto_log_interaction: params.autoLogInteraction ?? true,
-          image_url: primaryImageUrl,
-          location: params.location || null,
-          source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
-          subtasks: localTaskRow.subtasks?.map((subtask) => ({
-            id: subtask.id,
-            title: subtask.title,
-            completed: false,
-            completed_at: null,
-            sort_order: subtask.sort_order ?? 0,
-          })) ?? [],
-        });
-
-        await persistLocalTaskRow(localTaskRow);
-        await persistLocalSubtasks(localTaskId, cleanedSubtasks, localTaskRow.subtasks?.map((subtask) => ({
+      const queuedCreatePayload = {
+        id: localTaskId,
+        task_text: params.taskText,
+        difficulty: params.difficulty,
+        xp_reward: xpReward,
+        task_date: normalizedScheduling.task_date,
+        is_main_quest: params.isMainQuest ?? false,
+        scheduled_time: normalizedScheduling.scheduled_time,
+        estimated_duration: params.estimatedDuration || null,
+        ...recurrenceWrite.fields,
+        is_recurring: recurrenceWrite.hasRecurrence,
+        reminder_enabled: params.reminderEnabled ?? false,
+        reminder_minutes_before: params.reminderMinutesBefore ?? 15,
+        category: detectedCategory,
+        notes: params.notes || null,
+        contact_id: params.contactId || null,
+        auto_log_interaction: params.autoLogInteraction ?? true,
+        image_url: primaryImageUrl,
+        location: params.location || null,
+        source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? "inbox" : "manual"),
+        subtasks: localTaskRow.subtasks?.map((subtask) => ({
           id: subtask.id,
           title: subtask.title,
-          completed: subtask.completed,
-          sort_order: subtask.sort_order,
-        })));
+          completed: false,
+          completed_at: null,
+          sort_order: subtask.sort_order ?? 0,
+        })) ?? [],
+      };
 
-        return {
-          id: localTaskId,
-          task_date: normalizedScheduling.task_date,
-          scheduled_time: normalizedScheduling.scheduled_time,
-          task_text: params.taskText,
-          difficulty: params.difficulty,
+      const buildTaskCreateResult = (
+        taskData: Partial<DailyTask> | null | undefined,
+        attachmentPersistResult: TaskAttachmentPersistResult,
+      ): TaskCreateMutationResult => ({
+        ...localTaskRow,
+        ...(taskData ?? {}),
+        attachmentsSkippedDueToSchema: attachmentPersistResult.attachmentsSkippedDueToSchema,
+      });
+
+      let localPersistMs: number | null = null;
+      let remoteInsertMs: number | null = null;
+      let existenceCheckMs: number | null = null;
+
+      const trackTaskCreateResult = (result: TaskCreateMutationResult) => {
+        trackResilienceEvent("task_create_result", {
+          queued: result.queued ?? false,
+          queueReason: result.queueReason ?? null,
+          syncPending: result.syncPending ?? false,
+          localPersistMs,
+          remoteInsertMs,
+          existenceCheckMs,
+        });
+      };
+
+      const queueCreateTask = async (queueReason: TaskCreateQueueReason): Promise<TaskCreateMutationResult> => {
+        await queueTaskAction("CREATE_TASK", queuedCreatePayload);
+
+        const queuedResult: TaskCreateMutationResult = {
+          ...localTaskRow,
           queued: true,
+          queueReason,
+          syncPending: true,
           attachmentsSkippedDueToSchema: false,
         };
+        trackTaskCreateResult(queuedResult);
+        return queuedResult;
       };
 
       try {
+        const localPersistStartedAt = Date.now();
         await persistLocalTaskRow(localTaskRow);
         await persistLocalSubtasks(localTaskId, cleanedSubtasks, localTaskRow.subtasks?.map((subtask) => ({
           id: subtask.id,
@@ -663,9 +775,10 @@ export const useTaskMutations = (taskDate: string) => {
           completed: subtask.completed,
           sort_order: subtask.sort_order,
         })));
+        localPersistMs = Date.now() - localPersistStartedAt;
 
         if (shouldQueueWrites) {
-          return queueCreateTask();
+          return queueCreateTask("offline");
         }
 
         const insertPayload = {
@@ -692,72 +805,121 @@ export const useTaskMutations = (taskDate: string) => {
           source: normalizedScheduling.source ?? (normalizedScheduling.task_date === null ? 'inbox' : 'manual'),
         };
 
-        const { data, error, fallbackUsed } = await runDailyTaskWriteWithRecurrenceFallback(
-          insertPayload,
-          (nextPayload) => supabase
-            .from('daily_tasks')
-            .insert(nextPayload)
-            .select()
-            .single(),
-        );
+        let persistedRemoteTask: Partial<DailyTask> | null = null;
+        let fallbackUsed = false;
+        const remoteInsertStartedAt = Date.now();
 
-        if (fallbackUsed) {
-          console.warn('daily_tasks insert retried without month recurrence columns due to schema drift');
+        try {
+          const abortController = new AbortController();
+          const insertResult = await withTimeout(
+            () => runDailyTaskWriteWithRecurrenceFallback(
+              insertPayload,
+              (nextPayload) => {
+                const insertQuery = supabase
+                  .from("daily_tasks")
+                  .insert(nextPayload);
+
+                insertQuery.abortSignal(abortController.signal);
+                return insertQuery.select().single();
+              },
+            ),
+            {
+              timeoutMs: CREATE_TASK_REMOTE_TIMEOUT_MS,
+              operation: "create quest insert",
+              timeoutCode: "TASK_CREATE_TIMEOUT",
+              onTimeout: () => abortController.abort(),
+            },
+          );
+
+          remoteInsertMs = Date.now() - remoteInsertStartedAt;
+          fallbackUsed = insertResult.fallbackUsed;
+          if (insertResult.error) throw insertResult.error;
+          persistedRemoteTask = insertResult.data as Partial<DailyTask> | null;
+        } catch (error) {
+          remoteInsertMs = Date.now() - remoteInsertStartedAt;
+
+          if (error instanceof TimeoutError) {
+            const existenceCheckStartedAt = Date.now();
+            const existingRemoteTask = await pollWithDeadline({
+              task: () => fetchRemoteTaskById(localTaskId),
+              intervalMs: CREATE_TASK_EXISTENCE_CHECK_INTERVAL_MS,
+              deadlineMs: CREATE_TASK_EXISTENCE_CHECK_MS,
+            });
+            existenceCheckMs = Date.now() - existenceCheckStartedAt;
+
+            if (existingRemoteTask) {
+              persistedRemoteTask = existingRemoteTask;
+            } else {
+              const queueReason = resolveTaskCreateQueueReason(resilienceState, error);
+              reportApiFailure(error, {
+                source: "task_add_timeout",
+                queueReason,
+                localPersistMs,
+                remoteInsertMs,
+                existenceCheckMs,
+              });
+              return queueCreateTask(queueReason);
+            }
+          } else if (isQueueableWriteError(error)) {
+            const queueReason = resolveTaskCreateQueueReason(resilienceState, error);
+            reportApiFailure(error, {
+              source: "task_add",
+              queueReason,
+              localPersistMs,
+              remoteInsertMs,
+              existenceCheckMs,
+            });
+            return queueCreateTask(queueReason);
+          } else {
+            throw error;
+          }
         }
 
-        if (error) throw error;
+        if (fallbackUsed) {
+          console.warn("daily_tasks insert retried without month recurrence columns due to schema drift");
+        }
 
         let attachmentPersistResult = emptyAttachmentPersistResult();
-        if (data?.id) {
+        if (persistedRemoteTask?.id) {
           try {
-            attachmentPersistResult = await persistTaskAttachments(data.id, normalizedAttachments);
+            attachmentPersistResult = await persistTaskAttachments(persistedRemoteTask.id, normalizedAttachments);
           } catch (attachmentsError) {
             await supabase
               .from('daily_tasks')
               .delete()
-              .eq('id', data.id)
+              .eq('id', persistedRemoteTask.id)
               .eq('user_id', user.id);
             throw attachmentsError;
           }
         }
 
-        if (cleanedSubtasks.length > 0 && data?.id) {
-          const { error: subtasksError } = await supabase
-            .from('subtasks')
-            .insert(
-              (localTaskRow.subtasks ?? []).map((subtask) => ({
-                id: subtask.id,
-                task_id: data.id,
-                user_id: user.id,
-                title: subtask.title,
-                completed: false,
-                completed_at: null,
-                sort_order: subtask.sort_order ?? 0,
-              }))
+        if (cleanedSubtasks.length > 0 && persistedRemoteTask?.id) {
+          try {
+            await persistRemoteSubtasks(
+              persistedRemoteTask.id,
+              (localTaskRow.subtasks ?? []) as NonNullable<DailyTask["subtasks"]>,
             );
-
-          if (subtasksError) {
+          } catch (subtasksError) {
             // Best-effort rollback to keep create behavior predictable.
             await supabase
               .from('daily_tasks')
               .delete()
-              .eq('id', data.id)
+              .eq('id', persistedRemoteTask.id)
               .eq('user_id', user.id);
             throw subtasksError;
           }
         }
 
-        return {
-          ...(data ?? {}),
-          attachmentsSkippedDueToSchema: attachmentPersistResult.attachmentsSkippedDueToSchema,
-        };
+        const createResult = buildTaskCreateResult(persistedRemoteTask, attachmentPersistResult);
+        trackTaskCreateResult(createResult);
+        return createResult;
       } catch (error) {
-        if (isQueueableWriteError(error)) {
-          reportApiFailure(error, { source: "task_add" });
-          return queueCreateTask();
-        }
-
-        reportApiFailure(error, { source: "task_add_nonqueueable" });
+        reportApiFailure(error, {
+          source: "task_add_nonqueueable",
+          localPersistMs,
+          remoteInsertMs,
+          existenceCheckMs,
+        });
         throw error;
       } finally {
         addInProgress.current = false;
@@ -856,15 +1018,14 @@ export const useTaskMutations = (taskDate: string) => {
       queryClient.invalidateQueries({ queryKey: ['inbox-count'] });
     },
     onSuccess: (data) => {
-      if ((data as { queued?: boolean } | undefined)?.queued) {
-        toast({
-          title: "Quest queued",
-          description: "We'll sync it as soon as connection is restored.",
-        });
+      if ((data as TaskCreateMutationResult | undefined)?.queued) {
+        const queuedToast = getQueuedTaskCreateToastMessage(
+          (data as TaskCreateMutationResult | undefined)?.queueReason,
+        );
+        toast(queuedToast);
         return;
-      } else {
-        toast({ title: "Quest added!" });
       }
+      toast({ title: "Quest added!" });
       if (data?.attachmentsSkippedDueToSchema) {
         showAttachmentsUnavailableToast();
       }
