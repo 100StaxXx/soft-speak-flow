@@ -172,4 +172,17 @@ describe("useInboxTasks", () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["daily-tasks"] });
     });
   });
+
+  it("normalizes legacy prefixed inbox task IDs before delete", async () => {
+    const { wrapper } = createHarness();
+    const { result } = renderHook(() => useInboxTasks({ enabled: false }), { wrapper });
+
+    act(() => {
+      result.current.deleteInboxTask("task-69dc5fc8-f625-4e17-8d71-401ed641124b");
+    });
+
+    await waitFor(() => {
+      expect(mocks.deleteEqMock).toHaveBeenCalledWith("id", "69dc5fc8-f625-4e17-8d71-401ed641124b");
+    });
+  });
 });

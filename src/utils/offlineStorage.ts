@@ -3,6 +3,8 @@
  * Provides persistent storage for offline-first functionality
  */
 
+import { normalizeUuidFields, normalizeUuidLikeId } from "@/utils/offlineId";
+
 const DB_NAME = "cosmiq-offline-db";
 const DB_VERSION = 3;
 
@@ -169,7 +171,7 @@ const normalizeQueuedAction = (row: Partial<QueuedAction> & Record<string, unkno
   const createdAt = typeof row.created_at === "number" ? row.created_at : nowMs();
   const updatedAt = typeof row.updated_at === "number" ? row.updated_at : createdAt;
   const payload = row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)
-    ? (row.payload as Record<string, unknown>)
+    ? normalizeUuidFields(row.payload as Record<string, unknown>)
     : {};
 
   return {
@@ -177,7 +179,7 @@ const normalizeQueuedAction = (row: Partial<QueuedAction> & Record<string, unkno
     user_id: userId,
     action_kind: actionKind,
     entity_type: toQueueEntityType(row.entity_type),
-    entity_id: typeof row.entity_id === "string" ? row.entity_id : null,
+    entity_id: typeof row.entity_id === "string" ? normalizeUuidLikeId(row.entity_id) : null,
     payload,
     retry_count: typeof row.retry_count === "number" ? row.retry_count : 0,
     last_error: typeof row.last_error === "string" ? row.last_error : null,
@@ -193,13 +195,13 @@ const normalizeLegacyRow = (row: Record<string, unknown>): QueuedAction | null =
 
   const actionKind = mapLegacyTypeToActionKind(row.type);
   const payload = row.payload && typeof row.payload === "object" && !Array.isArray(row.payload)
-    ? (row.payload as Record<string, unknown>)
+    ? normalizeUuidFields(row.payload as Record<string, unknown>)
     : {};
   const createdAt = typeof row.timestamp === "number" ? row.timestamp : nowMs();
 
   let entityId: string | null = null;
   const taskId = payload.taskId;
-  if (typeof taskId === "string") entityId = taskId;
+  if (typeof taskId === "string") entityId = normalizeUuidLikeId(taskId);
 
   return {
     id: isString(row.id) ? row.id : createId(),
@@ -214,6 +216,41 @@ const normalizeLegacyRow = (row: Record<string, unknown>): QueuedAction | null =
     created_at: createdAt,
     updated_at: createdAt,
   };
+};
+
+const normalizeAnyQueuedAction = (row: Partial<QueuedAction> & Record<string, unknown>): QueuedAction | null =>
+  normalizeQueuedAction(row) ?? normalizeLegacyRow(row);
+
+const getQueuedActionRowsForUser = async (
+  store: IDBObjectStore,
+  userId?: string,
+): Promise<Array<Record<string, unknown>>> => {
+  if (!userId) {
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve((request.result || []) as Array<Record<string, unknown>>);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  if (store.indexNames.contains("user_id")) {
+    const index = store.index("user_id");
+    return new Promise((resolve, reject) => {
+      const request = index.getAll(userId);
+      request.onsuccess = () => resolve((request.result || []) as Array<Record<string, unknown>>);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const rows = ((request.result || []) as Array<Record<string, unknown>>)
+        .filter((row) => row.user_id === userId);
+      resolve(rows);
+    };
+    request.onerror = () => reject(request.error);
+  });
 };
 
 /**
@@ -395,13 +432,14 @@ export async function enqueueAction(input: EnqueueActionInput): Promise<string> 
     const store = transaction.objectStore("pendingActions");
 
     const timestamp = nowMs();
+    const normalizedPayload = normalizeUuidFields(input.payload);
     const action: QueuedAction = {
       id: createId(),
       user_id: input.userId,
       action_kind: input.actionKind,
       entity_type: input.entityType ?? defaultEntityTypeForAction(input.actionKind),
-      entity_id: input.entityId ?? null,
-      payload: input.payload,
+      entity_id: typeof input.entityId === "string" ? normalizeUuidLikeId(input.entityId) : input.entityId ?? null,
+      payload: normalizedPayload,
       retry_count: 0,
       last_error: null,
       status: input.status ?? "queued",
@@ -431,19 +469,12 @@ export async function getQueuedActions(userId: string): Promise<QueuedAction[]> 
     const database = await getDB();
     const transaction = database.transaction("pendingActions", "readonly");
     const store = transaction.objectStore("pendingActions");
-    const index = store.index("user_id");
-
-    return new Promise((resolve, reject) => {
-      const request = index.getAll(userId);
-      request.onsuccess = () => {
-        const actions = ((request.result || []) as Array<Record<string, unknown>>)
-          .map((row) => normalizeQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
-          .filter((row): row is QueuedAction => row !== null);
-        actions.sort((a, b) => a.created_at - b.created_at);
-        resolve(actions);
-      };
-      request.onerror = () => reject(request.error);
-    });
+    const rows = await getQueuedActionRowsForUser(store, userId);
+    const actions = rows
+      .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
+      .filter((row): row is QueuedAction => row !== null);
+    actions.sort((a, b) => a.created_at - b.created_at);
+    return actions;
   } catch (error) {
     console.error("Failed to get queued actions:", error);
     return [];
@@ -469,27 +500,9 @@ export async function getQueuedActionCount(
     const database = await getDB();
     const transaction = database.transaction("pendingActions", "readonly");
     const store = transaction.objectStore("pendingActions");
-
-    const fetchRows = (): Promise<Array<Record<string, unknown>>> => {
-      if (!userId) {
-        return new Promise((resolve, reject) => {
-          const request = store.getAll();
-          request.onsuccess = () => resolve((request.result || []) as Array<Record<string, unknown>>);
-          request.onerror = () => reject(request.error);
-        });
-      }
-
-      const index = store.index("user_id");
-      return new Promise((resolve, reject) => {
-        const request = index.getAll(userId);
-        request.onsuccess = () => resolve((request.result || []) as Array<Record<string, unknown>>);
-        request.onerror = () => reject(request.error);
-      });
-    };
-
-    const rows = await fetchRows();
+    const rows = await getQueuedActionRowsForUser(store, userId);
     const normalized = rows
-      .map((row) => normalizeQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
+      .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
       .filter((row): row is QueuedAction => row !== null);
 
     return normalized.filter((action) => statuses.includes(action.status)).length;
@@ -514,7 +527,7 @@ export async function updateQueuedAction(
     const existing = await new Promise<QueuedAction | null>((resolve, reject) => {
       const request = store.get(id);
       request.onsuccess = () => {
-        const normalized = normalizeQueuedAction((request.result || null) as Partial<QueuedAction> & Record<string, unknown>);
+        const normalized = normalizeAnyQueuedAction((request.result || null) as Partial<QueuedAction> & Record<string, unknown>);
         resolve(normalized);
       };
       request.onerror = () => reject(request.error);
@@ -525,6 +538,12 @@ export async function updateQueuedAction(
     const updated: QueuedAction = {
       ...existing,
       ...patch,
+      payload: patch.payload ? normalizeUuidFields(patch.payload) : existing.payload,
+      entity_id: typeof patch.entity_id === "string"
+        ? normalizeUuidLikeId(patch.entity_id)
+        : patch.entity_id === undefined
+          ? existing.entity_id
+          : patch.entity_id,
       updated_at: nowMs(),
     };
 
@@ -693,13 +712,37 @@ export async function clearAllPendingActions(userId?: string): Promise<void> {
       return;
     }
 
-    const index = store.index("user_id");
+    if (store.indexNames.contains("user_id")) {
+      const index = store.index("user_id");
+      await new Promise<void>((resolve, reject) => {
+        const request = index.openCursor(IDBKeyRange.only(userId));
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) {
+            resolve();
+            return;
+          }
+
+          const deleteRequest = cursor.delete();
+          deleteRequest.onsuccess = () => cursor.continue();
+          deleteRequest.onerror = () => reject(deleteRequest.error);
+        };
+        request.onerror = () => reject(request.error);
+      });
+      return;
+    }
+
     await new Promise<void>((resolve, reject) => {
-      const request = index.openCursor(IDBKeyRange.only(userId));
+      const request = store.openCursor();
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) {
           resolve();
+          return;
+        }
+
+        if (cursor.value?.user_id !== userId) {
+          cursor.continue();
           return;
         }
 

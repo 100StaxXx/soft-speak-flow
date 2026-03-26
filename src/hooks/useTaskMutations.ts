@@ -29,6 +29,7 @@ import { isQueueableWriteError } from "@/utils/networkErrors";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import { trackResilienceEvent } from "@/utils/resilienceTelemetry";
 import type { ResilienceState } from "@/types/resilience";
+import { normalizeUuidLikeId } from "@/utils/offlineId";
 import {
   createOfflinePlannerId,
   getLocalHabitCompletionsForDate,
@@ -371,6 +372,35 @@ export const useTaskMutations = (taskDate: string) => {
     });
   };
 
+  const getRemoteTaskId = (taskId: string) => normalizeUuidLikeId(taskId);
+
+  const getLocalTaskRecord = async (taskId: string) => {
+    const localTask = await getPlannerRecord<DailyTask>("daily_tasks", taskId);
+    if (localTask) return localTask;
+
+    const normalizedTaskId = getRemoteTaskId(taskId);
+    if (normalizedTaskId === taskId) return null;
+
+    return getPlannerRecord<DailyTask>("daily_tasks", normalizedTaskId);
+  };
+
+  const getLocalSubtasksForAnyTaskId = async <T extends { id: string }>(taskId: string): Promise<T[]> => {
+    const directMatches = await getLocalSubtasksForTask<T>(taskId);
+    const normalizedTaskId = getRemoteTaskId(taskId);
+
+    if (normalizedTaskId === taskId) {
+      return directMatches;
+    }
+
+    const normalizedMatches = await getLocalSubtasksForTask<T>(normalizedTaskId);
+    const seenIds = new Set<string>();
+    return [...directMatches, ...normalizedMatches].filter((subtask) => {
+      if (seenIds.has(subtask.id)) return false;
+      seenIds.add(subtask.id);
+      return true;
+    });
+  };
+
   const persistLocalSubtasks = async (
     taskId: string,
     titles: string[],
@@ -468,8 +498,8 @@ export const useTaskMutations = (taskDate: string) => {
 
   const fetchTaskSchedulingState = async (taskId: string) => {
     if (!user?.id) throw new Error('User not authenticated');
-
-    const localTask = await getPlannerRecord<DailyTask>('daily_tasks', taskId);
+    const remoteTaskId = getRemoteTaskId(taskId);
+    const localTask = await getLocalTaskRecord(taskId);
     if (typeof navigator !== "undefined" && !navigator.onLine && localTask) {
       return {
         task_date: localTask.task_date,
@@ -483,7 +513,7 @@ export const useTaskMutations = (taskDate: string) => {
     const { data: task, error } = await supabase
       .from('daily_tasks')
       .select('task_date, scheduled_time, habit_source_id, source, recurrence_pattern')
-      .eq('id', taskId)
+      .eq('id', remoteTaskId)
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -517,11 +547,12 @@ export const useTaskMutations = (taskDate: string) => {
 
   const fetchRemoteTaskById = async (taskId: string): Promise<Partial<DailyTask> | null> => {
     if (!user?.id) throw new Error("User not authenticated");
+    const remoteTaskId = getRemoteTaskId(taskId);
 
     const { data, error } = await supabase
       .from("daily_tasks")
       .select("*")
-      .eq("id", taskId)
+      .eq("id", remoteTaskId)
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -562,11 +593,12 @@ export const useTaskMutations = (taskDate: string) => {
     attachments: QuestAttachmentInput[],
   ): Promise<TaskAttachmentPersistResult> => {
     if (!user?.id) throw new Error('User not authenticated');
+    const remoteTaskId = getRemoteTaskId(taskId);
 
     const { error: deleteError } = await supabase
       .from('task_attachments' as any)
       .delete()
-      .eq('task_id', taskId)
+      .eq('task_id', remoteTaskId)
       .eq('user_id', user.id);
 
     if (deleteError) {
@@ -579,7 +611,7 @@ export const useTaskMutations = (taskDate: string) => {
     if (attachments.length === 0) return emptyAttachmentPersistResult();
 
     const rows = attachments.map((attachment, index) => ({
-      task_id: taskId,
+      task_id: remoteTaskId,
       user_id: user.id,
       file_url: attachment.fileUrl,
       file_path: attachment.filePath,
@@ -1054,7 +1086,8 @@ export const useTaskMutations = (taskDate: string) => {
     mutationFn: async (variables: ToggleTaskVariables) => {
       const { taskId, completed, xpReward, forceUndo = false } = variables;
       if (!user?.id) throw new Error('User not authenticated');
-      const localTask = await getPlannerRecord<DailyTask>('daily_tasks', taskId);
+      const remoteTaskId = getRemoteTaskId(taskId);
+      const localTask = await getLocalTaskRecord(taskId);
       const intendedCompletedAt = completed ? new Date().toISOString() : null;
 
       if (localTask) {
@@ -1114,7 +1147,7 @@ export const useTaskMutations = (taskDate: string) => {
           contact_id, auto_log_interaction,
           contact:contacts!contact_id(id, name, avatar_url)
         `)
-        .eq('id', taskId)
+        .eq('id', remoteTaskId)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -1141,7 +1174,7 @@ export const useTaskMutations = (taskDate: string) => {
         const { error } = await supabase
           .from('daily_tasks')
           .update({ completed: false, completed_at: null })
-          .eq('id', taskId)
+          .eq('id', remoteTaskId)
           .eq('user_id', user.id);
 
         if (error) throw error;
@@ -1176,7 +1209,7 @@ export const useTaskMutations = (taskDate: string) => {
         const { error } = await supabase
           .from('daily_tasks')
           .update({ completed: false, completed_at: null })
-          .eq('id', taskId)
+          .eq('id', remoteTaskId)
           .eq('user_id', user.id);
 
         if (error) throw error;
@@ -1208,7 +1241,7 @@ export const useTaskMutations = (taskDate: string) => {
       const { data: updateResult, error: updateError } = await supabase
         .from('daily_tasks')
         .update({ completed: true, completed_at: new Date().toISOString() })
-        .eq('id', taskId)
+        .eq('id', remoteTaskId)
         .eq('user_id', user.id)
         .eq('completed', false)
         .select();
@@ -1415,8 +1448,12 @@ export const useTaskMutations = (taskDate: string) => {
     mutationFn: async (taskId: string) => {
       if (!user?.id) throw new Error('User not authenticated');
       if (!taskId) throw new Error('Invalid task ID');
-      const existingSubtasks = await getLocalSubtasksForTask<Array<{ id: string }>[number]>(taskId);
+      const remoteTaskId = getRemoteTaskId(taskId);
+      const existingSubtasks = await getLocalSubtasksForAnyTaskId<Array<{ id: string }>[number]>(taskId);
       await removePlannerRecord("daily_tasks", taskId);
+      if (remoteTaskId !== taskId) {
+        await removePlannerRecord("daily_tasks", remoteTaskId);
+      }
       if (existingSubtasks.length > 0) {
         await removePlannerRecords("subtasks", existingSubtasks.map((subtask) => subtask.id));
       }
@@ -1429,7 +1466,7 @@ export const useTaskMutations = (taskDate: string) => {
       const { error } = await supabase
         .from('daily_tasks')
         .delete()
-        .eq('id', taskId)
+        .eq('id', remoteTaskId)
         .eq('user_id', user.id);
       
       if (error) throw error;
@@ -1580,8 +1617,9 @@ export const useTaskMutations = (taskDate: string) => {
   const setMainQuest = useMutation({
     mutationFn: async (taskId: string) => {
       if (!user?.id) throw new Error('User not authenticated');
+      const remoteTaskId = getRemoteTaskId(taskId);
       const localTasksForDate = await getLocalTasksByDate<DailyTask>(user.id, taskDate);
-      const task = localTasksForDate.find((candidate) => candidate.id === taskId);
+      const task = localTasksForDate.find((candidate) => getRemoteTaskId(candidate.id) === remoteTaskId);
 
       if (!task) throw new Error('Task not found or access denied');
 
@@ -1589,7 +1627,7 @@ export const useTaskMutations = (taskDate: string) => {
         localTasksForDate.map((candidate) =>
           persistLocalTaskRow({
             ...candidate,
-            is_main_quest: candidate.id === taskId,
+            is_main_quest: getRemoteTaskId(candidate.id) === remoteTaskId,
           }),
         ),
       );
@@ -1616,7 +1654,7 @@ export const useTaskMutations = (taskDate: string) => {
       const { error: updateError } = await supabase
         .from('daily_tasks')
         .update({ is_main_quest: true })
-        .eq('id', taskId)
+        .eq('id', remoteTaskId)
         .eq('user_id', user.id);
 
       if (updateError) {
@@ -1650,7 +1688,8 @@ export const useTaskMutations = (taskDate: string) => {
   const updateTask = useMutation({
     mutationFn: async ({ taskId, updates }: TaskUpdateVariables) => {
       if (!user?.id) throw new Error('User not authenticated');
-      const localTask = await getPlannerRecord<DailyTask>('daily_tasks', taskId);
+      const remoteTaskId = getRemoteTaskId(taskId);
+      const localTask = await getLocalTaskRecord(taskId);
       let normalizedToInbox = false;
       let strippedScheduledTime = false;
       let movedFromInboxToScheduled = false;
@@ -1838,7 +1877,7 @@ export const useTaskMutations = (taskDate: string) => {
         (nextPayload) => supabase
           .from('daily_tasks')
           .update(nextPayload)
-          .eq('id', taskId)
+          .eq('id', remoteTaskId)
           .eq('user_id', user.id),
       );
 
@@ -1849,7 +1888,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (error) throw error;
 
       if (hasAttachmentUpdates) {
-        const attachmentPersistResult = await persistTaskAttachments(taskId, updates.attachments ?? []);
+        const attachmentPersistResult = await persistTaskAttachments(remoteTaskId, updates.attachments ?? []);
         attachmentsSkippedDueToSchema = attachmentPersistResult.attachmentsSkippedDueToSchema;
       }
 
@@ -1928,7 +1967,7 @@ export const useTaskMutations = (taskDate: string) => {
       if (!user?.id) throw new Error('User not authenticated');
 
       for (const task of reorderedTasks) {
-        const localTask = await getPlannerRecord<DailyTask>('daily_tasks', task.id);
+        const localTask = await getLocalTaskRecord(task.id);
         if (localTask) {
           await persistLocalTaskRow({
             ...localTask,
@@ -1951,10 +1990,11 @@ export const useTaskMutations = (taskDate: string) => {
 
       // Update all tasks with their new sort order
       for (const task of reorderedTasks) {
+        const remoteTaskId = getRemoteTaskId(task.id);
         const { error } = await supabase
           .from('daily_tasks')
           .update({ sort_order: task.sort_order })
-          .eq('id', task.id)
+          .eq('id', remoteTaskId)
           .eq('user_id', user.id);
 
         if (error) {
@@ -2034,7 +2074,8 @@ export const useTaskMutations = (taskDate: string) => {
       targetSection: 'morning' | 'afternoon' | 'evening' | 'unscheduled';
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
-      const localTask = await getPlannerRecord<DailyTask>('daily_tasks', taskId);
+      const remoteTaskId = getRemoteTaskId(taskId);
+      const localTask = await getLocalTaskRecord(taskId);
       
       // Map section to scheduled_time
       const sectionTimeMap: Record<string, string | null> = {
@@ -2078,7 +2119,7 @@ export const useTaskMutations = (taskDate: string) => {
       const { error } = await supabase
         .from('daily_tasks')
         .update(updateData)
-        .eq('id', taskId)
+        .eq('id', remoteTaskId)
         .eq('user_id', user.id);
 
       if (error) {
@@ -2118,7 +2159,8 @@ export const useTaskMutations = (taskDate: string) => {
       targetDate: string;
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
-      const localTask = await getPlannerRecord<DailyTask>('daily_tasks', taskId);
+      const remoteTaskId = getRemoteTaskId(taskId);
+      const localTask = await getLocalTaskRecord(taskId);
       const existingScheduling = await fetchTaskSchedulingState(taskId);
       const normalizedScheduling = normalizeTaskSchedulingUpdate(existingScheduling, {
         task_date: targetDate,
@@ -2157,7 +2199,7 @@ export const useTaskMutations = (taskDate: string) => {
       const { error } = await supabase
         .from('daily_tasks')
         .update(updateData)
-        .eq('id', taskId)
+        .eq('id', remoteTaskId)
         .eq('user_id', user.id);
 
       if (error) {

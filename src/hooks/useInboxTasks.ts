@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { normalizeTaskSchedulingState } from "@/utils/taskSchedulingRules";
 import { useResilience } from "@/contexts/ResilienceContext";
 import { isQueueableWriteError } from "@/utils/networkErrors";
+import { normalizeUuidLikeId } from "@/utils/offlineId";
 
 export const INBOX_TASKS_QUERY_KEY = "inbox-tasks";
 export const INBOX_COUNT_QUERY_KEY = "inbox-count";
@@ -53,6 +54,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
     queryClient.invalidateQueries({ queryKey: [INBOX_TASKS_QUERY_KEY] });
     queryClient.invalidateQueries({ queryKey: [INBOX_COUNT_QUERY_KEY] });
   }, [queryClient]);
+  const getRemoteTaskId = useCallback((taskId: string) => normalizeUuidLikeId(taskId), []);
 
   const { data: inboxTasks = [], isLoading } = useQuery({
     queryKey: getInboxTasksQueryKey(user?.id),
@@ -69,6 +71,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
 
   const scheduleTask = useMutation({
     mutationFn: async ({ taskId, targetDate }: { taskId: string; targetDate: string }) => {
+      const remoteTaskId = getRemoteTaskId(taskId);
       if (shouldQueueWrites) {
         await queueTaskAction("UPDATE_TASK", {
           taskId,
@@ -82,7 +85,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       const { data: task, error: fetchError } = await supabase
         .from("daily_tasks")
         .select("task_date, scheduled_time, habit_source_id, source")
-        .eq("id", taskId)
+        .eq("id", remoteTaskId)
         .maybeSingle();
       if (fetchError) {
         if (isQueueableWriteError(fetchError)) {
@@ -117,7 +120,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       const { error } = await supabase
         .from("daily_tasks")
         .update(updateData)
-        .eq("id", taskId);
+        .eq("id", remoteTaskId);
       if (error) {
         if (isQueueableWriteError(error)) {
           await queueTaskAction("UPDATE_TASK", { taskId, updates: updateData });
@@ -143,6 +146,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
 
   const toggleInboxTask = useMutation({
     mutationFn: async ({ taskId, completed }: { taskId: string; completed: boolean }) => {
+      const remoteTaskId = getRemoteTaskId(taskId);
       if (shouldQueueWrites) {
         await queueTaskAction("COMPLETE_TASK", {
           taskId,
@@ -155,7 +159,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       const { error } = await supabase
         .from("daily_tasks")
         .update({ completed, completed_at: completed ? new Date().toISOString() : null })
-        .eq("id", taskId);
+        .eq("id", remoteTaskId);
       if (error) {
         if (isQueueableWriteError(error)) {
           await queueTaskAction("COMPLETE_TASK", {
@@ -181,6 +185,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
 
   const deleteInboxTask = useMutation({
     mutationFn: async (taskId: string) => {
+      const remoteTaskId = getRemoteTaskId(taskId);
       if (shouldQueueWrites) {
         await queueTaskAction("DELETE_TASK", { taskId });
         return { queued: true };
@@ -188,7 +193,7 @@ export const useInboxTasks = (options: InboxTasksOptions = {}) => {
       const { error } = await supabase
         .from("daily_tasks")
         .delete()
-        .eq("id", taskId);
+        .eq("id", remoteTaskId);
       if (error) {
         if (isQueueableWriteError(error)) {
           await queueTaskAction("DELETE_TASK", { taskId });

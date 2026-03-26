@@ -797,6 +797,85 @@ describe("useTaskMutations attachment handling", () => {
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Attachments unavailable" }));
   });
 
+  it("normalizes legacy prefixed task IDs before remote quest updates", async () => {
+    const legacyTaskId = "task-e47e5651-7522-4888-a04d-6eff518fa4ba";
+    const normalizedTaskId = "e47e5651-7522-4888-a04d-6eff518fa4ba";
+    const eqUserMock = vi.fn().mockResolvedValue({ error: null });
+    const eqIdMock = vi.fn((column: string, value: string) => {
+      expect(column).toBe("id");
+      expect(value).toBe(normalizedTaskId);
+      return {
+        eq: eqUserMock,
+      };
+    });
+
+    mocks.dailyTasksUpdateMock.mockReturnValue({
+      eq: eqIdMock,
+    });
+    mocks.getPlannerRecordMock.mockImplementation(async (_store: string, id: string) => {
+      if (id !== legacyTaskId) return null;
+      return {
+        id: legacyTaskId,
+        user_id: "user-1",
+        task_text: "Ship feature",
+        difficulty: "medium",
+        xp_reward: 16,
+        task_date: "2026-02-20",
+        completed: false,
+        completed_at: null,
+        is_main_quest: false,
+        scheduled_time: "09:00",
+        estimated_duration: 30,
+        recurrence_pattern: null,
+        recurrence_days: null,
+        recurrence_month_days: null,
+        recurrence_custom_period: null,
+        recurrence_end_date: null,
+        is_recurring: false,
+        reminder_enabled: false,
+        reminder_minutes_before: 15,
+        reminder_sent: false,
+        parent_template_id: null,
+        category: "mind",
+        is_bonus: false,
+        created_at: "2026-02-20T08:00:00.000Z",
+        priority: null,
+        is_top_three: null,
+        actual_time_spent: null,
+        ai_generated: null,
+        context_id: null,
+        source: "manual",
+        habit_source_id: null,
+        epic_id: null,
+        sort_order: 0,
+        contact_id: null,
+        auto_log_interaction: true,
+        image_url: null,
+        notes: null,
+        location: null,
+        attachments: [],
+        subtasks: [],
+      };
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.updateTask({
+        taskId: legacyTaskId,
+        updates: {
+          task_text: "Ship feature update",
+        },
+      });
+    });
+
+    expect(eqIdMock).toHaveBeenCalledTimes(1);
+    expect(eqUserMock).toHaveBeenCalledWith("user_id", "user-1");
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Quest updated!" }));
+  });
+
   it("retries non-month recurrence updates when recurrence columns are unavailable", async () => {
     mocks.dailyTasksUpdateExecuteMock
       .mockResolvedValueOnce({ error: dailyTasksRecurrenceColumnsMissingError })

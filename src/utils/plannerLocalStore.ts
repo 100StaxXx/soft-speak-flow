@@ -1,3 +1,5 @@
+import { createClientUuid, normalizeUuidFields } from "@/utils/offlineId";
+
 const DB_NAME = "cosmiq-planner-db";
 const DB_VERSION = 1;
 
@@ -43,6 +45,18 @@ interface EpicScopedRecord extends UserScopedRecord {
 }
 
 let db: IDBDatabase | null = null;
+let plannerLegacyIdMigrationPromise: Promise<void> | null = null;
+
+const PLANNER_STORE_NAMES: PlannerStoreName[] = [
+  "daily_tasks",
+  "subtasks",
+  "habits",
+  "habit_completions",
+  "epics",
+  "epic_habits",
+  "journey_phases",
+  "epic_milestones",
+];
 
 const requestToPromise = <T>(request: IDBRequest<T>) =>
   new Promise<T>((resolve, reject) => {
@@ -74,8 +88,43 @@ const createStore = (
   });
 };
 
+async function migrateLegacyPlannerIds(database: IDBDatabase): Promise<void> {
+  const transaction = database.transaction(PLANNER_STORE_NAMES, "readwrite");
+
+  for (const storeName of PLANNER_STORE_NAMES) {
+    const store = transaction.objectStore(storeName);
+    const rows = await requestToPromise(store.getAll()) as Array<Record<string, unknown>>;
+
+    for (const row of rows) {
+      const normalizedRow = normalizeUuidFields(row) as Record<string, unknown>;
+      if (JSON.stringify(normalizedRow) === JSON.stringify(row)) {
+        continue;
+      }
+
+      const currentId = typeof row.id === "string" ? row.id : null;
+      const normalizedId = typeof normalizedRow.id === "string" ? normalizedRow.id : currentId;
+      if (!currentId || !normalizedId) {
+        continue;
+      }
+
+      if (currentId !== normalizedId) {
+        await requestToPromise(store.delete(currentId));
+      }
+
+      await requestToPromise(store.put(normalizedRow));
+    }
+  }
+
+  await transactionDone(transaction);
+}
+
 export async function initPlannerLocalDB(): Promise<IDBDatabase> {
-  if (db) return db;
+  if (db) {
+    if (plannerLegacyIdMigrationPromise) {
+      await plannerLegacyIdMigrationPromise;
+    }
+    return db;
+  }
 
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -83,7 +132,11 @@ export async function initPlannerLocalDB(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       db = request.result;
-      resolve(db);
+      plannerLegacyIdMigrationPromise ??= migrateLegacyPlannerIds(db).catch((error) => {
+        console.error("Failed to normalize legacy planner IDs:", error);
+      });
+
+      void plannerLegacyIdMigrationPromise.then(() => resolve(db!)).catch(reject);
     };
     request.onupgradeneeded = () => {
       const database = request.result;
@@ -457,11 +510,8 @@ export async function clearPlannerLocalStateForUser(userId: string): Promise<voi
 }
 
 export function createOfflinePlannerId(prefix: string): string {
-  const randomPart =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return `${prefix}-${randomPart}`;
+  void prefix;
+  return createClientUuid();
 }
 
 export function __resetPlannerLocalDBForTests(): void {
