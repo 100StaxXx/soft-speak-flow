@@ -105,6 +105,9 @@ export const useCalendarTasks = (
           .order("created_at", { ascending: false });
 
         if (error) throw error;
+        if (!(await canSyncPlannerFromRemote(user.id))) {
+          return;
+        }
 
         const tasksByDate = new Map<string, DailyTask[]>();
         (data ?? []).forEach((task) => {
@@ -117,6 +120,9 @@ export const useCalendarTasks = (
 
         const datesInRange = eachDayOfInterval({ start, end }).map((date) => format(date, "yyyy-MM-dd"));
         for (const date of datesInRange) {
+          if (!(await canSyncPlannerFromRemote(user.id))) {
+            return;
+          }
           await replaceLocalTasksForDate(user.id, date, tasksByDate.get(date) ?? []);
         }
 

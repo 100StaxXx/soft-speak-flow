@@ -124,6 +124,25 @@ describe("EditQuestDialog", () => {
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
   });
 
+  it("renders duration below time controls and above subtasks", () => {
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    const timeButton = screen.getByRole("button", { name: "9:30 AM" });
+    const durationButton = screen.getByRole("button", { name: "30 min" });
+    const addSubtaskInput = screen.getByPlaceholderText("Add Subtask");
+
+    expect(timeButton.compareDocumentPosition(durationButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(durationButton.compareDocumentPosition(addSubtaskInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("normalizes legacy values before save", async () => {
     const onOpenChange = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);

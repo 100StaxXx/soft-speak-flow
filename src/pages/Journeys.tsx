@@ -931,7 +931,7 @@ const Journeys = () => {
               <p className="text-sm text-muted-foreground/90">
                 {headerDragTime
                   ? `Dragging to ${formatTime12(headerDragTime)}`
-                  : "Daily quests, reframed as a calmer week planner on desktop."}
+                  : "Plan your quests for the week ahead."}
               </p>
             </div>
           </motion.div>

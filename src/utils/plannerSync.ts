@@ -23,6 +23,8 @@ import { fetchDailyTasksRemote, type DailyTask } from "@/services/dailyTasksRemo
 
 export const PLANNER_SYNC_EVENT = "planner-sync-finished";
 
+const plannerRemoteSyncLockCounts = new Map<string, number>();
+
 interface HabitRemoteRow extends Habit {
   description?: string | null;
   estimated_minutes?: number | null;
@@ -42,8 +44,49 @@ const sortTasks = (tasks: DailyTask[]) =>
       return (b.created_at ?? "").localeCompare(a.created_at ?? "");
     });
 
+function getPlannerRemoteSyncLockCount(userId: string): number {
+  return plannerRemoteSyncLockCounts.get(userId) ?? 0;
+}
+
+export function hasPlannerRemoteSyncLock(userId: string): boolean {
+  return getPlannerRemoteSyncLockCount(userId) > 0;
+}
+
+export function acquirePlannerRemoteSyncLock(userId: string): () => void {
+  plannerRemoteSyncLockCounts.set(userId, getPlannerRemoteSyncLockCount(userId) + 1);
+
+  let released = false;
+
+  return () => {
+    if (released) return;
+    released = true;
+
+    const nextCount = getPlannerRemoteSyncLockCount(userId) - 1;
+    if (nextCount <= 0) {
+      plannerRemoteSyncLockCounts.delete(userId);
+      return;
+    }
+
+    plannerRemoteSyncLockCounts.set(userId, nextCount);
+  };
+}
+
+export async function withPlannerRemoteSyncLock<T>(
+  userId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const release = acquirePlannerRemoteSyncLock(userId);
+
+  try {
+    return await operation();
+  } finally {
+    release();
+  }
+}
+
 export async function canSyncPlannerFromRemote(userId: string): Promise<boolean> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return false;
+  if (hasPlannerRemoteSyncLock(userId)) return false;
   return (await getPendingActionCount(userId)) === 0;
 }
 
@@ -85,6 +128,9 @@ export async function syncLocalDailyTasksFromRemote(userId: string, taskDate: st
   }
 
   const remoteTasks = await fetchDailyTasksRemote(userId, taskDate);
+  if (!(await canSyncPlannerFromRemote(userId))) {
+    return null;
+  }
   await replaceLocalTasksForDate(userId, taskDate, remoteTasks as Array<DailyTask & { subtasks?: Array<{
     id: string;
     task_id: string;

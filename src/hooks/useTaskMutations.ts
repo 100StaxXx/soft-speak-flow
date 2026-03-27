@@ -41,6 +41,7 @@ import {
   upsertPlannerRecord,
   upsertPlannerRecords,
 } from "@/utils/plannerLocalStore";
+import { withPlannerRemoteSyncLock } from "@/utils/plannerSync";
 
 type TaskCategory = 'mind' | 'body' | 'soul';
 const validCategories: TaskCategory[] = ['mind', 'body', 'soul'];
@@ -371,6 +372,12 @@ export const useTaskMutations = (taskDate: string) => {
       description: "Quest saved, but attachments could not be stored. Please try again after the backend migration finishes.",
     });
   };
+  const getRequiredUserId = () => {
+    if (!user?.id) throw new Error("User not authenticated");
+    return user.id;
+  };
+  const withTaskSyncLock = <T>(operation: () => Promise<T>) =>
+    withPlannerRemoteSyncLock(getRequiredUserId(), operation);
 
   const getRemoteTaskId = (taskId: string) => normalizeUuidLikeId(taskId);
 
@@ -399,6 +406,19 @@ export const useTaskMutations = (taskDate: string) => {
       seenIds.add(subtask.id);
       return true;
     });
+  };
+
+  const rollbackLocalTaskCreate = async (taskId: string) => {
+    const candidateTaskIds = Array.from(new Set([taskId, getRemoteTaskId(taskId)]));
+    const localSubtasks = await getLocalSubtasksForAnyTaskId<Array<{ id: string }>[number]>(taskId);
+
+    if (localSubtasks.length > 0) {
+      await removePlannerRecords("subtasks", localSubtasks.map((subtask) => subtask.id));
+    }
+
+    await Promise.all(
+      candidateTaskIds.map((candidateTaskId) => removePlannerRecord("daily_tasks", candidateTaskId)),
+    );
   };
 
   const persistLocalSubtasks = async (
@@ -433,7 +453,7 @@ export const useTaskMutations = (taskDate: string) => {
       .map((title) => title.trim())
       .filter((title) => title.length > 0)
       .map((title, index) => ({
-        id: createOfflinePlannerId("subtask"),
+        id: normalizeUuidLikeId(createOfflinePlannerId("subtask")),
         title,
         completed: false,
         completed_at: null,
@@ -568,13 +588,14 @@ export const useTaskMutations = (taskDate: string) => {
     subtasks: NonNullable<DailyTask["subtasks"]>,
   ): Promise<void> => {
     if (!user?.id || subtasks.length === 0) return;
+    const remoteTaskId = getRemoteTaskId(taskId);
 
     const { error } = await supabase
       .from("subtasks")
       .insert(
         subtasks.map((subtask) => ({
-          id: subtask.id,
-          task_id: taskId,
+          id: normalizeUuidLikeId(subtask.id),
+          task_id: remoteTaskId,
           user_id: user.id,
           title: subtask.title,
           completed: false,
@@ -637,7 +658,7 @@ export const useTaskMutations = (taskDate: string) => {
   };
 
   const addTask = useMutation({
-    mutationFn: async (params: AddTaskParams) => {
+    mutationFn: async (params: AddTaskParams) => withTaskSyncLock(async () => {
       if (addInProgress.current) throw new Error('Please wait...');
       addInProgress.current = true;
 
@@ -673,7 +694,7 @@ export const useTaskMutations = (taskDate: string) => {
         : await getLocalTasksByDate<DailyTask>(user.id, normalizedScheduling.task_date);
       const questPosition = (localExistingTasks?.length || 0) + 1;
       const xpReward = getEffectiveQuestXP(params.difficulty, questPosition);
-      const localTaskId = createOfflinePlannerId("task");
+      const localTaskId = normalizeUuidLikeId(createOfflinePlannerId("task"));
 
       const localTaskRow: DailyTask = {
         id: localTaskId,
@@ -724,7 +745,7 @@ export const useTaskMutations = (taskDate: string) => {
           sortOrder: attachment.sortOrder,
         })),
         subtasks: cleanedSubtasks.map((title, index) => ({
-          id: createOfflinePlannerId("subtask"),
+          id: normalizeUuidLikeId(createOfflinePlannerId("subtask")),
           title,
           completed: false,
           sort_order: index,
@@ -814,7 +835,7 @@ export const useTaskMutations = (taskDate: string) => {
         }
 
         const insertPayload = {
-          id: localTaskId,
+          id: getRemoteTaskId(localTaskId),
           user_id: user.id,
           task_text: params.taskText,
           difficulty: params.difficulty,
@@ -946,6 +967,9 @@ export const useTaskMutations = (taskDate: string) => {
         trackTaskCreateResult(createResult);
         return createResult;
       } catch (error) {
+        await rollbackLocalTaskCreate(localTaskId).catch((rollbackError) => {
+          console.warn("Failed to roll back local quest after create error:", rollbackError);
+        });
         reportApiFailure(error, {
           source: "task_add_nonqueueable",
           localPersistMs,
@@ -956,7 +980,7 @@ export const useTaskMutations = (taskDate: string) => {
       } finally {
         addInProgress.current = false;
       }
-    },
+    }),
     onMutate: async (params: AddTaskParams) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
@@ -1083,7 +1107,7 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const toggleTask = useMutation({
-    mutationFn: async (variables: ToggleTaskVariables) => {
+    mutationFn: async (variables: ToggleTaskVariables) => withTaskSyncLock(async () => {
       const { taskId, completed, xpReward, forceUndo = false } = variables;
       if (!user?.id) throw new Error('User not authenticated');
       const remoteTaskId = getRemoteTaskId(taskId);
@@ -1303,7 +1327,7 @@ export const useTaskMutations = (taskDate: string) => {
         autoLogInteraction,
         contact,
       };
-    },
+    }),
     onSuccess: async (result: any) => {
       const { completed, xpAwarded, toastReason, wasAlreadyCompleted, isUndo, taskId, taskText, habitSourceId, taskDifficulty, taskScheduledTime, taskCategory } = result ?? {};
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
@@ -1445,7 +1469,7 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const deleteTask = useMutation({
-    mutationFn: async (taskId: string) => {
+    mutationFn: async (taskId: string) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
       if (!taskId) throw new Error('Invalid task ID');
       const remoteTaskId = getRemoteTaskId(taskId);
@@ -1471,7 +1495,7 @@ export const useTaskMutations = (taskDate: string) => {
       
       if (error) throw error;
       return { queued: false };
-    },
+    }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -1522,9 +1546,9 @@ export const useTaskMutations = (taskDate: string) => {
       reminder_enabled?: boolean;
       reminder_minutes_before?: number | null;
       source?: string | null;
-    }) => {
+    }) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
-      const restoredTaskId = createOfflinePlannerId("task");
+      const restoredTaskId = normalizeUuidLikeId(createOfflinePlannerId("task"));
 
       const normalizedScheduling = normalizeTaskSchedulingState({
         task_date: taskData.task_date ?? null,
@@ -1540,7 +1564,7 @@ export const useTaskMutations = (taskDate: string) => {
         recurrenceEndDate: taskData.recurrence_end_date,
       });
       const insertPayload = {
-        id: restoredTaskId,
+        id: getRemoteTaskId(restoredTaskId),
         user_id: user.id,
         task_text: taskData.task_text,
         task_date: normalizedScheduling.task_date,
@@ -1564,6 +1588,7 @@ export const useTaskMutations = (taskDate: string) => {
 
       await persistLocalTaskRow({
         ...(insertPayload as DailyTask),
+        id: restoredTaskId,
         completed: false,
         completed_at: null,
         reminder_sent: false,
@@ -1580,31 +1605,42 @@ export const useTaskMutations = (taskDate: string) => {
       });
 
       if (shouldQueueWrites) {
-        await queueTaskAction("CREATE_TASK", insertPayload);
+        await queueTaskAction("CREATE_TASK", {
+          ...insertPayload,
+          id: restoredTaskId,
+        });
         return {
           ...(insertPayload as DailyTask),
+          id: restoredTaskId,
           completed: false,
           completed_at: null,
           queued: true,
         };
       }
-      
-      const { data, error, fallbackUsed } = await runDailyTaskWriteWithRecurrenceFallback(
-        insertPayload,
-        (nextPayload) => supabase
-          .from('daily_tasks')
-          .insert(nextPayload)
-          .select()
-          .single(),
-      );
 
-      if (fallbackUsed) {
-        console.warn('daily_tasks restore retried without month recurrence columns due to schema drift');
+      try {
+        const { data, error, fallbackUsed } = await runDailyTaskWriteWithRecurrenceFallback(
+          insertPayload,
+          (nextPayload) => supabase
+            .from('daily_tasks')
+            .insert(nextPayload)
+            .select()
+            .single(),
+        );
+
+        if (fallbackUsed) {
+          console.warn('daily_tasks restore retried without month recurrence columns due to schema drift');
+        }
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        await rollbackLocalTaskCreate(restoredTaskId).catch((rollbackError) => {
+          console.warn("Failed to roll back local restored quest after error:", rollbackError);
+        });
+        throw error;
       }
-      
-      if (error) throw error;
-      return data;
-    },
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -1615,7 +1651,7 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const setMainQuest = useMutation({
-    mutationFn: async (taskId: string) => {
+    mutationFn: async (taskId: string) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
       const remoteTaskId = getRemoteTaskId(taskId);
       const localTasksForDate = await getLocalTasksByDate<DailyTask>(user.id, taskDate);
@@ -1671,7 +1707,7 @@ export const useTaskMutations = (taskDate: string) => {
       }
 
       return { queued: false };
-    },
+    }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -1686,7 +1722,7 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const updateTask = useMutation({
-    mutationFn: async ({ taskId, updates }: TaskUpdateVariables) => {
+    mutationFn: async ({ taskId, updates }: TaskUpdateVariables) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
       const remoteTaskId = getRemoteTaskId(taskId);
       const localTask = await getLocalTaskRecord(taskId);
@@ -1899,7 +1935,7 @@ export const useTaskMutations = (taskDate: string) => {
         attachmentsSkippedDueToSchema,
         queued: false,
       };
-    },
+    }),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -1963,7 +1999,7 @@ export const useTaskMutations = (taskDate: string) => {
   });
 
   const reorderTasks = useMutation({
-    mutationFn: async (reorderedTasks: { id: string; sort_order: number }[]) => {
+    mutationFn: async (reorderedTasks: { id: string; sort_order: number }[]) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
 
       for (const task of reorderedTasks) {
@@ -2005,7 +2041,7 @@ export const useTaskMutations = (taskDate: string) => {
         }
       }
       return { queued: false };
-    },
+    }),
     onMutate: async (reorderedTasks: { id: string; sort_order: number }[]) => {
       // Cancel outgoing refetches to prevent race conditions
       await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });
@@ -2072,7 +2108,7 @@ export const useTaskMutations = (taskDate: string) => {
     mutationFn: async ({ taskId, targetSection }: {
       taskId: string;
       targetSection: 'morning' | 'afternoon' | 'evening' | 'unscheduled';
-    }) => {
+    }) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
       const remoteTaskId = getRemoteTaskId(taskId);
       const localTask = await getLocalTaskRecord(taskId);
@@ -2130,7 +2166,7 @@ export const useTaskMutations = (taskDate: string) => {
         return { ...normalizedScheduling, queued: true };
       }
       return { ...normalizedScheduling, queued: false };
-    },
+    }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -2157,7 +2193,7 @@ export const useTaskMutations = (taskDate: string) => {
     mutationFn: async ({ taskId, targetDate }: {
       taskId: string;
       targetDate: string;
-    }) => {
+    }) => withTaskSyncLock(async () => {
       if (!user?.id) throw new Error('User not authenticated');
       const remoteTaskId = getRemoteTaskId(taskId);
       const localTask = await getLocalTaskRecord(taskId);
@@ -2220,7 +2256,7 @@ export const useTaskMutations = (taskDate: string) => {
         normalizedToInbox: normalizedScheduling.normalizedToInbox,
         queued: false,
       };
-    },
+    }),
     onMutate: async () => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['daily-tasks'] });

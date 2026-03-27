@@ -296,9 +296,39 @@ interface DragOverlaySnapshot {
   height: number;
 }
 
-const getBottomNavSafeOffsetPx = () => {
+const parsePixelValue = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.endsWith("px")) {
+    const parsed = Number.parseFloat(trimmed);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const parsed = Number.parseFloat(trimmed);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  return null;
+};
+
+const getBottomNavObstructionPx = () => {
   if (typeof window === "undefined" || typeof document === "undefined") {
     return DEFAULT_BOTTOM_NAV_SAFE_OFFSET_PX;
+  }
+
+  const rootStyles = window.getComputedStyle(document.documentElement);
+  const runtimeOffset = parsePixelValue(rootStyles.getPropertyValue("--bottom-nav-runtime-offset"));
+  if (runtimeOffset !== null) {
+    return runtimeOffset;
+  }
+
+  const safeOffset = parsePixelValue(rootStyles.getPropertyValue("--bottom-nav-safe-offset"));
+  if (safeOffset !== null) {
+    return safeOffset;
   }
 
   const probe = document.createElement("div");
@@ -307,7 +337,7 @@ const getBottomNavSafeOffsetPx = () => {
   probe.style.pointerEvents = "none";
   probe.style.top = "0";
   probe.style.left = "0";
-  probe.style.height = "var(--bottom-nav-safe-offset)";
+  probe.style.height = "var(--bottom-nav-runtime-offset, var(--bottom-nav-safe-offset))";
   document.body.appendChild(probe);
   const measured = probe.getBoundingClientRect().height;
   probe.remove();
@@ -660,10 +690,15 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   // Timeline drag-to-reschedule
   const timelineDragContainerRef = useRef<HTMLDivElement>(null);
   const scheduledPaneRef = useRef<HTMLDivElement | null>(null);
-  const [scheduledPaneMaxHeightPx, setScheduledPaneMaxHeightPx] = useState<number | null>(null);
+  const [timelineBodyHeightPx, setTimelineBodyHeightPx] = useState<number | null>(null);
+  const [measuredTimelineBodyNode, setMeasuredTimelineBodyNode] = useState<HTMLDivElement | null>(null);
   const setScheduledPaneNode = useCallback((node: HTMLDivElement | null) => {
     scheduledPaneRef.current = node;
     timelineDragContainerRef.current = node;
+    setMeasuredTimelineBodyNode(node);
+  }, []);
+  const setEmptyStatePaneNode = useCallback((node: HTMLDivElement | null) => {
+    setMeasuredTimelineBodyNode(node);
   }, []);
   
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -905,7 +940,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   const seedDragOverlaySnapshotForTask = useCallback((taskId: string) => {
     seededDragOverlaySnapshotRef.current = captureDragOverlaySnapshotForTask(taskId);
     if (seededDragOverlaySnapshotRef.current) {
-      dragOverlayBottomInsetRef.current = getBottomNavSafeOffsetPx();
+      dragOverlayBottomInsetRef.current = getBottomNavObstructionPx();
     }
   }, [captureDragOverlaySnapshotForTask]);
 
@@ -1042,7 +1077,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     const seededSnapshot = seededDragOverlaySnapshotRef.current;
     if (seededSnapshot && seededSnapshot.taskId === draggingTaskId) {
       setDragOverlaySnapshot(seededSnapshot);
-      dragOverlayBottomInsetRef.current = getBottomNavSafeOffsetPx();
+      dragOverlayBottomInsetRef.current = getBottomNavObstructionPx();
       return;
     }
 
@@ -1053,7 +1088,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       const nextSnapshot = captureDragOverlaySnapshotForTask(draggingTaskId);
       if (!nextSnapshot) return false;
       setDragOverlaySnapshot(nextSnapshot);
-      dragOverlayBottomInsetRef.current = getBottomNavSafeOffsetPx();
+      dragOverlayBottomInsetRef.current = getBottomNavObstructionPx();
       return true;
     };
 
@@ -1318,16 +1353,18 @@ export const TodaysAgenda = memo(function TodaysAgenda({
 
     const updateScheduledPaneBounds = () => {
       const pane = scheduledPaneRef.current;
-      if (!pane) {
-        setScheduledPaneMaxHeightPx(null);
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const measurementTarget = isDesktopLayout ? measuredTimelineBodyNode : pane;
+      if (!measurementTarget) {
+        setTimelineBodyHeightPx(null);
         return;
       }
 
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const bottomOffset = getBottomNavSafeOffsetPx();
-      const available = Math.floor(viewportHeight - pane.getBoundingClientRect().top - bottomOffset);
+      const viewportBottom = (window.visualViewport?.offsetTop ?? 0) + viewportHeight;
+      const bottomOffset = getBottomNavObstructionPx();
+      const available = Math.floor(viewportBottom - measurementTarget.getBoundingClientRect().top - bottomOffset);
       if (!Number.isFinite(available)) return;
-      setScheduledPaneMaxHeightPx(Math.max(120, available));
+      setTimelineBodyHeightPx(Math.max(120, available));
     };
 
     const rafId = window.requestAnimationFrame(updateScheduledPaneBounds);
@@ -1350,7 +1387,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         viewport.removeEventListener("scroll", updateScheduledPaneBounds);
       }
     };
-  }, [comboCount, hasRenderableNowMarker, isTodaySelected, tasks.length, timelineRows.length]);
+  }, [comboCount, hasRenderableNowMarker, isDesktopLayout, isTodaySelected, measuredTimelineBodyNode, tasks.length, timelineRows.length]);
 
   useEffect(() => {
     const isToday = isTodaySelected;
@@ -2298,7 +2335,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       <div
         className={cn(
           "relative px-2 py-2 overflow-visible",
-          isDesktopLayout && "journeys-desktop-shell rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
+          isDesktopLayout && "journeys-desktop-shell flex min-h-0 flex-col rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(24,21,39,0.95),rgba(13,11,23,0.92))] px-5 py-5 shadow-[0_28px_54px_rgba(0,0,0,0.24)]",
         )}
       >
         {/* Compact Header: Date + Progress Ring + XP */}
@@ -2397,258 +2434,270 @@ export const TodaysAgenda = memo(function TodaysAgenda({
         </AnimatePresence>
 
         {/* Timeline Content */}
-        {tasks.length === 0 ? (
-          <div
-            className={cn(
-              "rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-10 text-center",
-              isDesktopLayout && "min-h-[420px] flex flex-col items-center justify-center px-8",
-            )}
-          >
-            <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-            <p className="mb-2 text-sm font-medium text-foreground">
-              No tasks for this day
-            </p>
-            <p className={cn("mx-auto max-w-sm text-xs text-muted-foreground/70", isDesktopLayout && "text-sm")}>
-              {isSelectedToday
-                ? "Your day is still open. Add a quest to give the planner some shape."
-                : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4 rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-              onClick={onAddQuest}
+        <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+          {tasks.length === 0 ? (
+            <div
+              ref={setEmptyStatePaneNode}
+              className={cn(
+                "rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] px-6 py-10 text-center",
+                isDesktopLayout && "flex flex-col items-center justify-center px-8",
+              )}
+              style={isDesktopLayout && timelineBodyHeightPx ? { minHeight: `${timelineBodyHeightPx}px` } : undefined}
+              data-testid="empty-state-pane"
             >
-              <Plus className="w-3 h-3 mr-1.5" />
-              Add Quest
-            </Button>
-          </div>
-        ) : (
-          <div>
-            {/* Sort dropdown */}
-            <div className="flex items-center gap-2 mb-1">
-              {tasks.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-28">
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('custom')}
-                      className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
-                    >
-                      Custom
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('time')}
-                      className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
-                    >
-                      Time
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('priority')}
-                      className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
-                    >
-                      Priority
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setSortBy('xp')}
-                      className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
-                    >
-                      XP
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              <Circle className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+              <p className="mb-2 text-sm font-medium text-foreground">
+                No tasks for this day
+              </p>
+              <p className={cn("mx-auto max-w-sm text-xs text-muted-foreground/70", isDesktopLayout && "text-sm")}>
+                {isSelectedToday
+                  ? "Your day is still open. Add a quest to give the planner some shape."
+                  : `Nothing is planned for ${selectedDateHeading} yet. Add a quest to anchor the day.`}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 rounded-2xl border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                onClick={onAddQuest}
+              >
+                <Plus className="w-3 h-3 mr-1.5" />
+                Add Quest
+              </Button>
+            </div>
+          ) : (
+            <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+              {/* Sort dropdown */}
+              <div className="mb-1 flex items-center gap-2">
+                {tasks.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-1 rounded opacity-40 hover:opacity-70 transition-opacity flex-shrink-0">
+                        <ArrowUpDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-28">
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('custom')}
+                        className={cn("text-xs", sortBy === 'custom' && 'bg-accent/10')}
+                      >
+                        Custom
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('time')}
+                        className={cn("text-xs", sortBy === 'time' && 'bg-accent/10')}
+                      >
+                        Time
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('priority')}
+                        className={cn("text-xs", sortBy === 'priority' && 'bg-accent/10')}
+                      >
+                        Priority
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setSortBy('xp')}
+                        className={cn("text-xs", sortBy === 'xp' && 'bg-accent/10')}
+                      >
+                        XP
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+
+              {/* Scheduled Tasks Timeline */}
+              {timelineRows.length > 0 && (
+                <div className={cn(isDesktopLayout && "flex min-h-0 flex-1 flex-col")}>
+                  <div
+                    ref={setScheduledPaneNode}
+                    className={cn(
+                      "overflow-y-auto overflow-x-hidden overscroll-contain pr-1",
+                      isDesktopLayout && "min-h-0",
+                    )}
+                    style={timelineBodyHeightPx
+                      ? isDesktopLayout
+                        ? { height: `${timelineBodyHeightPx}px` }
+                        : { maxHeight: `${timelineBodyHeightPx}px` }
+                      : undefined}
+                    data-testid="scheduled-timeline-pane"
+                  >
+                    {timelineRows.map((row, index) => {
+                      if (row.kind === "marker") {
+                        const marker = row.marker;
+                        const previousRow = index > 0 ? timelineRows[index - 1] : null;
+                        const nextRow = index < timelineRows.length - 1 ? timelineRows[index + 1] : null;
+                        const previousTaskMinute = previousRow?.kind === "task"
+                          ? parseTimeToMinute(previousRow.task.scheduled_time)
+                          : null;
+                        const nextTaskMinute = nextRow?.kind === "task"
+                          ? parseTimeToMinute(nextRow.task.scheduled_time)
+                          : null;
+                        const isBetweenQuestMarker = previousTaskMinute !== null
+                          && nextTaskMinute !== null
+                          && previousTaskMinute < marker.minute
+                          && marker.minute < nextTaskMinute;
+                        const markerScale = marker.kind === "placeholder"
+                          ? 0.72 + (marker.emphasis * 0.28)
+                          : 1;
+                        const markerOpacity = marker.kind === "placeholder"
+                          ? 0.25 + (marker.emphasis * 0.65)
+                          : 1;
+                        const markerTransform = isBetweenQuestMarker
+                          ? `translateY(-50%) scale(${markerScale})`
+                          : `scale(${markerScale})`;
+                        return (
+                          <div
+                            key={marker.id}
+                            className={cn(
+                              "pointer-events-none select-none",
+                              isBetweenQuestMarker && "h-0 overflow-visible",
+                            )}
+                            data-testid={marker.id}
+                          >
+                            <div
+                              ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
+                              style={{
+                                opacity: markerOpacity,
+                                transform: markerTransform,
+                                transformOrigin: "left center",
+                              }}
+                            >
+                              <TimelineTaskRow
+                                rowKind="marker"
+                                time={marker.time}
+                                tone={marker.kind === "now" ? "now" : "default"}
+                                showLine={index > 0}
+                                isLast={index === timelineRows.length - 1}
+                              >
+                                <div className="h-px" />
+                              </TimelineTaskRow>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const task = row.task;
+                      const isThisDragging = timelineDrag.draggingTaskId === task.id;
+                      const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
+                      const isThisEngaged = isThisDragging || isThisLongPressed;
+                      const isAnyDragging = timelineDrag.isDragging;
+                      const isJustDropped = timelineDrag.justDroppedId === task.id;
+                      const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
+                      const rowFlow = scheduledFlow.byTaskId.get(task.id);
+                      const laneIndex = rowFlow?.laneIndex;
+                      const laneCount = rowFlow?.laneCount;
+                      const laneOffsetPx = rowFlow
+                        ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
+                        : 0;
+                      const baseTimelineRowDragProps = isTimelineDragEnabled && task.scheduled_time && !task.completed
+                        ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
+                        : undefined;
+                      const timelineRowDragProps = baseTimelineRowDragProps
+                        ? {
+                            ...baseTimelineRowDragProps,
+                            onPointerDownCapture: (
+                              event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onPointerDownCapture>>[0],
+                            ) => {
+                              seedDragOverlaySnapshotForTask(task.id);
+                              baseTimelineRowDragProps.onPointerDownCapture?.(event);
+                            },
+                            onTouchStartCapture: (
+                              event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
+                            ) => {
+                              seedDragOverlaySnapshotForTask(task.id);
+                              baseTimelineRowDragProps.onTouchStartCapture?.(event);
+                            },
+                          }
+                        : undefined;
+                      const isRowDraggable = !!timelineRowDragProps;
+                      const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
+
+                      const rowStyle: CSSProperties = {
+                        WebkitUserSelect: 'none',
+                        userSelect: 'none',
+                        WebkitTouchCallout: 'none',
+                        touchAction: isThisEngaged ? 'none' : 'pan-y',
+                        pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
+                        opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
+                        boxShadow: isThisEngaged && !usesOverlayPlaceholder
+                          ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
+                          : "none",
+                        backgroundColor: isThisEngaged && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
+                        borderRadius: isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
+                        transition: 'none',
+                        willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
+                      };
+
+                      const rowContent = (
+                        <TimelineTaskRow
+                          rowKind="task"
+                          time={task.scheduled_time}
+                          overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
+                          showLine={index > 0}
+                          isLast={index === timelineRows.length - 1}
+                          isDragTarget={isThisDragging}
+                          durationMinutes={task.estimated_duration}
+                          laneIndex={laneIndex}
+                          laneCount={laneCount}
+                          overlapCount={rowFlow?.overlapCount}
+                          className={cn(
+                            isRowDraggable && "cursor-default",
+                          )}
+                          data-testid={`timeline-row-${task.id}`}
+                        >
+                          {renderTaskItem(task, undefined, overlapCount)}
+                        </TimelineTaskRow>
+                      );
+
+                      const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
+                        ? {
+                            scale: [1, 1.02, 0.98, 1],
+                            y: [0, -2, 1, 0],
+                          }
+                        : undefined;
+                      return (
+                        <motion.div
+                          ref={(node) => {
+                            if (node) {
+                              timelineRowRefs.current.set(task.id, node);
+                            } else {
+                              timelineRowRefs.current.delete(task.id);
+                            }
+                          }}
+                          key={task.id}
+                          className={cn("relative", isThisEngaged && !usesOverlayPlaceholder && "z-50")}
+                          layout={!isThisDragging || usesOverlayPlaceholder}
+                          animate={bounceAnimation}
+                          transition={bounceAnimation ? {
+                            duration: 0.25,
+                            ease: [0.25, 0.1, 0.25, 1],
+                            layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                          } : {
+                            layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
+                          }}
+                          data-timeline-lane={laneIndex}
+                          data-timeline-lane-count={laneCount}
+                          data-timeline-overlap={rowFlow?.overlapCount}
+                          data-timeline-shift-px={laneOffsetPx}
+                          {...(timelineRowDragProps ?? {})}
+                          style={{
+                            ...rowStyle,
+                            maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
+                            x: laneOffsetPx,
+                            y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
+                          }}
+                        >
+                          {rowContent}
+                        </motion.div>
+                      );
+                    })}
+                    {!isDesktopLayout ? renderCampaignSection() : null}
+                  </div>
+                </div>
               )}
             </div>
-
-            {/* Scheduled Tasks Timeline */}
-            {timelineRows.length > 0 && (
-              <div>
-                <div
-                  ref={setScheduledPaneNode}
-                  className="overflow-y-auto overflow-x-hidden overscroll-contain pr-1"
-                  style={scheduledPaneMaxHeightPx ? { maxHeight: `${scheduledPaneMaxHeightPx}px` } : undefined}
-                  data-testid="scheduled-timeline-pane"
-                >
-                  {timelineRows.map((row, index) => {
-                    if (row.kind === "marker") {
-                      const marker = row.marker;
-                      const previousRow = index > 0 ? timelineRows[index - 1] : null;
-                      const nextRow = index < timelineRows.length - 1 ? timelineRows[index + 1] : null;
-                      const previousTaskMinute = previousRow?.kind === "task"
-                        ? parseTimeToMinute(previousRow.task.scheduled_time)
-                        : null;
-                      const nextTaskMinute = nextRow?.kind === "task"
-                        ? parseTimeToMinute(nextRow.task.scheduled_time)
-                        : null;
-                      const isBetweenQuestMarker = previousTaskMinute !== null
-                        && nextTaskMinute !== null
-                        && previousTaskMinute < marker.minute
-                        && marker.minute < nextTaskMinute;
-                      const markerScale = marker.kind === "placeholder"
-                        ? 0.72 + (marker.emphasis * 0.28)
-                        : 1;
-                      const markerOpacity = marker.kind === "placeholder"
-                        ? 0.25 + (marker.emphasis * 0.65)
-                        : 1;
-                      const markerTransform = isBetweenQuestMarker
-                        ? `translateY(-50%) scale(${markerScale})`
-                        : `scale(${markerScale})`;
-                      return (
-                        <div
-                          key={marker.id}
-                          className={cn(
-                            "pointer-events-none select-none",
-                            isBetweenQuestMarker && "h-0 overflow-visible",
-                          )}
-                          data-testid={marker.id}
-                        >
-                          <div
-                            ref={marker.kind === "now" ? nowMarkerRowRef : undefined}
-                            style={{
-                              opacity: markerOpacity,
-                              transform: markerTransform,
-                              transformOrigin: "left center",
-                            }}
-                          >
-                            <TimelineTaskRow
-                              rowKind="marker"
-                              time={marker.time}
-                              tone={marker.kind === "now" ? "now" : "default"}
-                              showLine={index > 0}
-                              isLast={index === timelineRows.length - 1}
-                            >
-                              <div className="h-px" />
-                            </TimelineTaskRow>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const task = row.task;
-                    const isThisDragging = timelineDrag.draggingTaskId === task.id;
-                    const isThisLongPressed = timelineDrag.longPressTaskId === task.id;
-                    const isThisEngaged = isThisDragging || isThisLongPressed;
-                    const isAnyDragging = timelineDrag.isDragging;
-                    const isJustDropped = timelineDrag.justDroppedId === task.id;
-                    const usesOverlayPlaceholder = isThisDragging && shouldRenderDragOverlay;
-                    const rowFlow = scheduledFlow.byTaskId.get(task.id);
-                    const laneIndex = rowFlow?.laneIndex;
-                    const laneCount = rowFlow?.laneCount;
-                    const laneOffsetPx = rowFlow
-                      ? getLaneOffsetPx(rowFlow.laneIndex, rowFlow.overlapCount)
-                      : 0;
-                    const baseTimelineRowDragProps = isTimelineDragEnabled && task.scheduled_time && !task.completed
-                      ? timelineDrag.getRowDragProps(task.id, task.scheduled_time)
-                      : undefined;
-                    const timelineRowDragProps = baseTimelineRowDragProps
-                      ? {
-                          ...baseTimelineRowDragProps,
-                          onPointerDownCapture: (
-                            event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onPointerDownCapture>>[0],
-                          ) => {
-                            seedDragOverlaySnapshotForTask(task.id);
-                            baseTimelineRowDragProps.onPointerDownCapture?.(event);
-                          },
-                          onTouchStartCapture: (
-                            event: Parameters<NonNullable<typeof baseTimelineRowDragProps.onTouchStartCapture>>[0],
-                          ) => {
-                            seedDragOverlaySnapshotForTask(task.id);
-                            baseTimelineRowDragProps.onTouchStartCapture?.(event);
-                          },
-                        }
-                      : undefined;
-                    const isRowDraggable = !!timelineRowDragProps;
-                    const overlapCount = timelineConflictMap.get(task.id)?.size ?? 0;
-
-                    const rowStyle: CSSProperties = {
-                      WebkitUserSelect: 'none',
-                      userSelect: 'none',
-                      WebkitTouchCallout: 'none',
-                      touchAction: isThisEngaged ? 'none' : 'pan-y',
-                      pointerEvents: isAnyDragging && !isThisDragging ? 'none' : 'auto',
-                      opacity: usesOverlayPlaceholder ? 0 : isAnyDragging && !isThisDragging ? 0.7 : 1,
-                      boxShadow: isThisEngaged && !usesOverlayPlaceholder
-                        ? "0 15px 30px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -4px rgba(0, 0, 0, 0.15)"
-                        : "none",
-                      backgroundColor: isThisEngaged && !usesOverlayPlaceholder ? "hsl(var(--background))" : "transparent",
-                      borderRadius: isThisEngaged && !usesOverlayPlaceholder ? 12 : 0,
-                      transition: 'none',
-                      willChange: isThisDragging && !usesOverlayPlaceholder ? "transform" : undefined,
-                    };
-
-                    const rowContent = (
-                      <TimelineTaskRow
-                        rowKind="task"
-                        time={task.scheduled_time}
-                        overrideTime={isThisDragging ? timelineDrag.previewTime : undefined}
-                        showLine={index > 0}
-                        isLast={index === timelineRows.length - 1}
-                        isDragTarget={isThisDragging}
-                        durationMinutes={task.estimated_duration}
-                        laneIndex={laneIndex}
-                        laneCount={laneCount}
-                        overlapCount={rowFlow?.overlapCount}
-                        className={cn(
-                          isRowDraggable && "cursor-default",
-                        )}
-                        data-testid={`timeline-row-${task.id}`}
-                      >
-                        {renderTaskItem(task, undefined, overlapCount)}
-                      </TimelineTaskRow>
-                    );
-
-                    const bounceAnimation = !useLiteAnimations && isJustDropped && !isThisDragging
-                      ? {
-                          scale: [1, 1.02, 0.98, 1],
-                          y: [0, -2, 1, 0],
-                        }
-                      : undefined;
-                    return (
-                      <motion.div
-                        ref={(node) => {
-                          if (node) {
-                            timelineRowRefs.current.set(task.id, node);
-                          } else {
-                            timelineRowRefs.current.delete(task.id);
-                          }
-                        }}
-                        key={task.id}
-                        className={cn("relative", isThisEngaged && !usesOverlayPlaceholder && "z-50")}
-                        layout={!isThisDragging || usesOverlayPlaceholder}
-                        animate={bounceAnimation}
-                        transition={bounceAnimation ? {
-                          duration: 0.25,
-                          ease: [0.25, 0.1, 0.25, 1],
-                          layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                        } : {
-                          layout: { type: "spring", stiffness: 420, damping: 34, mass: 0.7 },
-                        }}
-                        data-timeline-lane={laneIndex}
-                        data-timeline-lane-count={laneCount}
-                        data-timeline-overlap={rowFlow?.overlapCount}
-                        data-timeline-shift-px={laneOffsetPx}
-                        {...(timelineRowDragProps ?? {})}
-                        style={{
-                          ...rowStyle,
-                          maxWidth: laneOffsetPx > 0 ? `calc(100% - ${laneOffsetPx}px)` : undefined,
-                          x: laneOffsetPx,
-                          y: isThisDragging && !usesOverlayPlaceholder ? dragVisualOffsetY : 0,
-                        }}
-                      >
-                        {rowContent}
-                      </motion.div>
-                    );
-                  })}
-                  {!isDesktopLayout ? renderCampaignSection() : null}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Inbox section removed - now has its own tab */}
         {!hasScheduledTimelineRows && !isDesktopLayout ? renderCampaignSection() : null}

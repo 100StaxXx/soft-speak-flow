@@ -344,76 +344,6 @@ export function EditQuestDialog({
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 py-4 space-y-3">
-
-            {/* Duration Row */}
-            <button
-              onClick={() => setShowDurationChips(!showDurationChips)}
-              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-2.5 text-sm font-medium">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{durationLabel}</span>
-              </div>
-              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
-            </button>
-
-            {showDurationChips && (
-              <div className="space-y-2 px-1">
-                <div className="flex gap-2 flex-wrap">
-                  {DURATION_OPTIONS.map((opt) => {
-                    const isSelected = opt.value === -1
-                      ? isCustomDuration
-                      : estimatedDuration === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          if (opt.value === -1) {
-                            setCustomDurationInput("");
-                            setEstimatedDuration(null);
-                          } else {
-                            setCustomDurationInput("");
-                            setEstimatedDuration(opt.value);
-                          }
-                        }}
-                        className={cn(
-                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
-                          isSelected
-                            ? cn(colors.pill, "text-white shadow-md")
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="Minutes"
-                      value={customDurationInput}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCustomDurationInput(val);
-                        const num = parseInt(val, 10);
-                        if (!isNaN(num) && num > 0) {
-                          setEstimatedDuration(num);
-                        } else {
-                          setEstimatedDuration(null);
-                        }
-                      }}
-                      className="w-28 h-9 text-sm"
-                      autoFocus
-                    />
-                    <span className="text-xs text-muted-foreground">min</span>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Date & Time Chips side by side */}
             <div className="flex gap-2">
               {/* Date Chip */}
@@ -506,6 +436,75 @@ export function EditQuestDialog({
                   </div>
                   <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
                 </div>
+              </div>
+            )}
+
+            {/* Duration Row */}
+            <button
+              onClick={() => setShowDurationChips(!showDurationChips)}
+              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2.5 text-sm font-medium">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>{durationLabel}</span>
+              </div>
+              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
+            </button>
+
+            {showDurationChips && (
+              <div className="space-y-2 px-1">
+                <div className="flex gap-2 flex-wrap">
+                  {DURATION_OPTIONS.map((opt) => {
+                    const isSelected = opt.value === -1
+                      ? isCustomDuration
+                      : estimatedDuration === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          if (opt.value === -1) {
+                            setCustomDurationInput("");
+                            setEstimatedDuration(null);
+                          } else {
+                            setCustomDurationInput("");
+                            setEstimatedDuration(opt.value);
+                          }
+                        }}
+                        className={cn(
+                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
+                          isSelected
+                            ? cn(colors.pill, "text-white shadow-md")
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Minutes"
+                      value={customDurationInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomDurationInput(val);
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num) && num > 0) {
+                          setEstimatedDuration(num);
+                        } else {
+                          setEstimatedDuration(null);
+                        }
+                      }}
+                      className="w-28 h-9 text-sm"
+                      autoFocus
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                )}
               </div>
             )}
 

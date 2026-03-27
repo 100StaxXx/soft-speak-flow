@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { format, isToday, addMinutes } from "date-fns";
-import { Sliders, CalendarIcon, Inbox, Map, X, Zap, Flame, Mountain, Clock, ChevronRight, Trash2 } from "lucide-react";
+import { Sliders, CalendarIcon, Inbox, Map, X, Zap, Flame, Mountain, Clock, ChevronRight, Trash2, Sparkles, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,12 @@ import { parseScheduledTime } from "@/utils/scheduledTime";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import type { QuestAttachmentInput } from "@/types/questAttachments";
 import { hasRecurrencePattern } from "@/utils/recurrenceValidation";
+import { QuestTemplateBrowser } from "@/features/quests/components/QuestTemplateBrowser";
+import { usePersonalQuestTemplates } from "@/features/quests/hooks/usePersonalQuestTemplates";
+import type {
+  QuestTemplateBrowserTab,
+  QuestTemplatePrefill,
+} from "@/features/quests/types";
 
 export interface AddQuestData {
   text: string;
@@ -120,6 +126,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   preventClose = false,
   onPreventedCloseAttempt,
 }: AddQuestSheetProps) {
+  const [sheetView, setSheetView] = useState<"editor" | "templates">("editor");
+  const [templateBrowserInitialTab, setTemplateBrowserInitialTab] = useState<QuestTemplateBrowserTab>("common");
   const [taskText, setTaskText] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -142,6 +150,9 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [isEditingCustomDuration, setIsEditingCustomDuration] = useState(false);
   const [sendToCalendar, setSendToCalendar] = useState(false);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
+  const {
+    templates: personalTemplates,
+  } = usePersonalQuestTemplates({ enabled: open });
 
   const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
   const effectiveProvider = useMemo(() => {
@@ -168,6 +179,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   // Reset when sheet closes
   useEffect(() => {
     if (!open) {
+      setSheetView("editor");
+      setTemplateBrowserInitialTab("common");
       setTaskText("");
       setDifficulty("medium");
       setShowAdvanced(false);
@@ -286,6 +299,33 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setSubtasks(prev => [...prev, ""]);
     setTimeout(() => subtaskInputRefs.current[subtasks.length]?.focus(), 50);
   }, [subtasks.length]);
+
+  const applyTemplatePrefill = useCallback((template: QuestTemplatePrefill) => {
+    setTaskText(template.title);
+    setDifficulty(template.difficulty);
+    setEstimatedDuration(template.estimatedDuration);
+    setMoreInformation(template.notes);
+    setSubtasks(template.subtasks);
+    setCustomDurationInput("");
+    setIsEditingCustomDuration(false);
+    setShowTimePicker(false);
+    setShowDatePicker(false);
+    setShowDurationChips(false);
+    setSheetView("editor");
+  }, []);
+
+  const openTemplateBrowser = useCallback((initialTab: QuestTemplateBrowserTab) => {
+    setTemplateBrowserInitialTab(initialTab);
+    setShowTimePicker(false);
+    setShowDatePicker(false);
+    setShowDurationChips(false);
+    setSheetView("templates");
+  }, []);
+
+  const topPersonalTemplates = useMemo(
+    () => personalTemplates.slice(0, 4),
+    [personalTemplates],
+  );
 
   const requestOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -409,119 +449,103 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             <X className="h-4 w-4" />
           </button>
 
-          <div className="flex flex-col items-center text-center pt-1 text-white">
-            <DifficultyIcon difficulty={difficulty} />
-            <div className="mt-2 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-2.5 py-2 text-left">
-              <Input
-                data-tour="add-quest-title-input"
-                placeholder="Quest Title"
-                value={taskText}
-                onChange={(e) => setTaskText(e.target.value)}
-                disabled={isAdding}
-                className="text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-10"
-              />
-            </div>
-            <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
-          </div>
+          {sheetView === "editor" ? (
+            <>
+              <div className="flex flex-col items-center text-center pt-1 text-white">
+                <DifficultyIcon difficulty={difficulty} />
+                <div className="mt-2 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-2.5 py-2 text-left">
+                  <Input
+                    data-tour="add-quest-title-input"
+                    placeholder="Quest Title"
+                    value={taskText}
+                    onChange={(e) => setTaskText(e.target.value)}
+                    disabled={isAdding}
+                    className="text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-10"
+                  />
+                </div>
+                <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
+                <button
+                  type="button"
+                  onClick={() => openTemplateBrowser("common")}
+                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Browse common quests
+                </button>
+              </div>
 
-          {/* Compact Difficulty Selector */}
-          <div className="flex justify-center gap-2 mt-2">
-            {([
-              { value: "easy" as const, icon: Zap, label: "Easy" },
-              { value: "medium" as const, icon: Flame, label: "Medium" },
-              { value: "hard" as const, icon: Mountain, label: "Hard" },
-            ]).map(({ value, icon: Icon, label }) => (
-              <button
-                key={value}
-                onClick={() => setDifficulty(value)}
-                className={cn(
-                  "w-12 h-10 rounded-xl flex flex-col items-center justify-center gap-0 transition-all border-2",
-                  difficulty === value
-                    ? "bg-white/30 border-white scale-105"
-                    : "bg-white/10 border-transparent hover:bg-white/20"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5 text-white" />
-                <span className="text-[9px] font-medium text-white/80 leading-none">{label}</span>
-              </button>
-            ))}
-          </div>
+              {/* Compact Difficulty Selector */}
+              <div className="flex justify-center gap-2 mt-2">
+                {([
+                  { value: "easy" as const, icon: Zap, label: "Easy" },
+                  { value: "medium" as const, icon: Flame, label: "Medium" },
+                  { value: "hard" as const, icon: Mountain, label: "Hard" },
+                ]).map(({ value, icon: Icon, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setDifficulty(value)}
+                    className={cn(
+                      "w-12 h-10 rounded-xl flex flex-col items-center justify-center gap-0 transition-all border-2",
+                      difficulty === value
+                        ? "bg-white/30 border-white scale-105"
+                        : "bg-white/10 border-transparent hover:bg-white/20"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 text-white" />
+                    <span className="text-[9px] font-medium text-white/80 leading-none">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex min-h-[112px] flex-col items-center justify-center pt-2 text-center text-white">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10">
+                <History className="h-5 w-5" />
+              </div>
+              <p className="mt-3 text-base font-semibold">Quest shortcuts</p>
+              <p className="mt-1 text-xs text-white/70">
+                Pick a common quest or one you already use a lot.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="px-4 py-4 space-y-3">
-            {/* Duration Row (tappable, expands to chips) */}
-            <button
-              onClick={() => setShowDurationChips(!showDurationChips)}
-              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-2.5 text-sm font-medium">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{durationLabel}</span>
-              </div>
-              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
-            </button>
-
-            {showDurationChips && (
-              <div className="space-y-2 px-1">
-                <div className="flex gap-2 flex-wrap">
-                  {DURATION_OPTIONS.map((opt) => {
-                    const isSelected = opt.value === -1
-                      ? showCustomDurationInput
-                      : !showCustomDurationInput && estimatedDuration === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          if (opt.value === -1) {
-                            setCustomDurationInput("");
-                            setEstimatedDuration(null);
-                            setIsEditingCustomDuration(true);
-                          } else {
-                            setCustomDurationInput("");
-                            setEstimatedDuration(opt.value);
-                            setIsEditingCustomDuration(false);
-                          }
-                        }}
-                        className={cn(
-                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
-                          isSelected
-                            ? cn(colors.pill, "text-white shadow-md")
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {showCustomDurationInput && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="Minutes"
-                      value={customDurationFieldValue}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCustomDurationInput(val);
-                        const num = parseInt(val, 10);
-                        if (!isNaN(num) && num > 0) {
-                          setEstimatedDuration(num);
-                        } else {
-                          setEstimatedDuration(null);
-                        }
-                      }}
-                      className="w-28 h-9 text-sm"
-                      autoFocus
-                    />
-                    <span className="text-xs text-muted-foreground">min</span>
+          {sheetView === "editor" ? (
+            <div className="px-4 py-4 space-y-3">
+              {topPersonalTemplates.length > 0 && (
+                <div className="rounded-2xl border border-border/60 bg-card px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Your repeat quests</p>
+                      <p className="text-xs text-muted-foreground">Quick picks based on quests you use often</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openTemplateBrowser("yours")}
+                      className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                    >
+                      See all
+                    </button>
                   </div>
-                )}
-              </div>
-            )}
-
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {topPersonalTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => applyTemplatePrefill(template)}
+                        className="min-w-[148px] shrink-0 rounded-xl border border-border/60 bg-background px-3 py-2 text-left transition-colors hover:bg-muted/40"
+                      >
+                        <span className="line-clamp-2 text-sm font-medium text-foreground">{template.title}</span>
+                        <span className="mt-2 inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary">
+                          {template.frequency}x
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             {/* Date & Time Chips side by side */}
             <div className="flex gap-2">
               {/* Date Chip */}
@@ -625,6 +649,77 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   </div>
                   <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
                 </div>
+              </div>
+            )}
+
+            {/* Duration Row (tappable, expands to chips) */}
+            <button
+              onClick={() => setShowDurationChips(!showDurationChips)}
+              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2.5 text-sm font-medium">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>{durationLabel}</span>
+              </div>
+              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
+            </button>
+
+            {showDurationChips && (
+              <div className="space-y-2 px-1">
+                <div className="flex gap-2 flex-wrap">
+                  {DURATION_OPTIONS.map((opt) => {
+                    const isSelected = opt.value === -1
+                      ? showCustomDurationInput
+                      : !showCustomDurationInput && estimatedDuration === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          if (opt.value === -1) {
+                            setCustomDurationInput("");
+                            setEstimatedDuration(null);
+                            setIsEditingCustomDuration(true);
+                          } else {
+                            setCustomDurationInput("");
+                            setEstimatedDuration(opt.value);
+                            setIsEditingCustomDuration(false);
+                          }
+                        }}
+                        className={cn(
+                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
+                          isSelected
+                            ? cn(colors.pill, "text-white shadow-md")
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {showCustomDurationInput && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Minutes"
+                      value={customDurationFieldValue}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomDurationInput(val);
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num) && num > 0) {
+                          setEstimatedDuration(num);
+                        } else {
+                          setEstimatedDuration(null);
+                        }
+                      }}
+                      className="w-28 h-9 text-sm"
+                      autoFocus
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -769,64 +864,74 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </div>
+            </div>
+          ) : (
+            <QuestTemplateBrowser
+              initialTab={templateBrowserInitialTab}
+              personalTemplates={personalTemplates}
+              onBack={() => setSheetView("editor")}
+              onSelectTemplate={applyTemplatePrefill}
+            />
+          )}
         </div>
 
-        <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
-          <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
-            <p className="text-xs text-muted-foreground">
-              {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
-            </p>
-          </div>
-          {canShowCalendarSendOption && (
-            <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-              <div className="text-xs text-muted-foreground">
-                Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
-              </div>
-              <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
+        {sheetView === "editor" && (
+          <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
+            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+              <p className="text-xs text-muted-foreground">
+                {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
+              </p>
             </div>
-          )}
-          <Button
-            onClick={handleSubmit}
-            data-tour="add-quest-create-button"
-            disabled={isAdding || !canCreateTask}
-            className={cn(
-              "w-full text-white",
-              canCreateTask ? cn(colors.pill, "hover:opacity-90") : ""
+            {canShowCalendarSendOption && (
+              <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                <div className="text-xs text-muted-foreground">
+                  Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
+                </div>
+                <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
+              </div>
             )}
-          >
-            {isAdding ? "Adding..." : "Add Quest"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleAddToInbox}
-            disabled={isAdding || !canAddToInbox}
-            className="w-full"
-          >
-            <Inbox className="mr-2 h-4 w-4" />
-            Add to Inbox instead
-          </Button>
-          {hasRecurrence && (
-            <p className="text-xs text-muted-foreground text-center">
-              Recurring quests must stay scheduled with a time.
-            </p>
-          )}
-          {onCreateCampaign && (
-            <button
-              onClick={() => {
-                onOpenChange(false);
-                onCreateCampaign();
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-1"
+            <Button
+              onClick={handleSubmit}
+              data-tour="add-quest-create-button"
+              disabled={isAdding || !canCreateTask}
+              className={cn(
+                "w-full text-white",
+                canCreateTask ? cn(colors.pill, "hover:opacity-90") : ""
+              )}
             >
-              <Map className="w-3.5 h-3.5" />
-              <span>Or create a Campaign</span>
-              <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] leading-none text-muted-foreground/80">
-                Max 2 active
-              </span>
-            </button>
-          )}
-        </div>
+              {isAdding ? "Adding..." : "Add Quest"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleAddToInbox}
+              disabled={isAdding || !canAddToInbox}
+              className="w-full"
+            >
+              <Inbox className="mr-2 h-4 w-4" />
+              Add to Inbox instead
+            </Button>
+            {hasRecurrence && (
+              <p className="text-xs text-muted-foreground text-center">
+                Recurring quests must stay scheduled with a time.
+              </p>
+            )}
+            {onCreateCampaign && (
+              <button
+                onClick={() => {
+                  onOpenChange(false);
+                  onCreateCampaign();
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-1"
+              >
+                <Map className="w-3.5 h-3.5" />
+                <span>Or create a Campaign</span>
+                <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] leading-none text-muted-foreground/80">
+                  Max 2 active
+                </span>
+              </button>
+            )}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

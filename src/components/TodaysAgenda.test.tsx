@@ -242,6 +242,37 @@ const createDomRect = (overrides: Partial<DOMRect> = {}): DOMRect => ({
   ...overrides,
 }) as DOMRect;
 
+const mockViewport = ({ height, offsetTop = 0 }: { height: number; offsetTop?: number }) => {
+  const originalInnerHeight = window.innerHeight;
+  const originalVisualViewport = window.visualViewport;
+
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    value: height,
+  });
+
+  Object.defineProperty(window, "visualViewport", {
+    configurable: true,
+    value: {
+      height,
+      offsetTop,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    },
+  });
+
+  return () => {
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: originalInnerHeight,
+    });
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: originalVisualViewport,
+    });
+  };
+};
+
 const getRenderedPlaceholderMinutes = (): number[] => {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="timeline-marker-placeholder-"]'))
     .map((element) => element.getAttribute("data-testid"))
@@ -260,6 +291,8 @@ const getRenderedPlaceholderMinutes = (): number[] => {
 beforeEach(() => {
   windowScrollToSpy.mockClear();
   elementScrollToSpy.mockClear();
+  document.documentElement.style.removeProperty("--bottom-nav-runtime-offset");
+  document.documentElement.style.removeProperty("--bottom-nav-safe-offset");
 });
 
 describe("TodaysAgenda subtasks", () => {
@@ -1015,6 +1048,157 @@ describe("TodaysAgenda scheduled timeline behavior", () => {
     expect(scheduledPane).toBeInTheDocument();
     expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
     expect(screen.queryByRole("button", { name: /drag to reschedule/i })).not.toBeInTheDocument();
+  });
+
+  it("uses a fixed desktop pane height above the runtime bottom-nav offset instead of a max-height clamp", async () => {
+    const restoreViewport = mockViewport({ height: 900 });
+    document.documentElement.style.setProperty("--bottom-nav-runtime-offset", "96px");
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    let paneRectSpy: ReturnType<typeof vi.spyOn> | null = null;
+    try {
+      render(
+        <TodaysAgenda
+          tasks={[
+            {
+              id: "task-scheduled-1",
+              task_text: "Morning focus",
+              completed: false,
+              xp_reward: 25,
+              scheduled_time: "08:00",
+            },
+          ]}
+          selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+          layoutMode="desktop"
+          onToggle={vi.fn()}
+          onAddQuest={vi.fn()}
+          completedCount={0}
+          totalCount={1}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+      paneRectSpy = vi
+        .spyOn(scheduledPane, "getBoundingClientRect")
+        .mockReturnValue(createDomRect({ top: 220, bottom: 420, left: 0, right: 800, width: 800, height: 200 }));
+
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      await waitFor(() => {
+        expect(scheduledPane.style.height).toBe("584px");
+      });
+      expect(scheduledPane.style.maxHeight).toBe("");
+      expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
+    } finally {
+      paneRectSpy?.mockRestore();
+      restoreViewport();
+    }
+  });
+
+  it("keeps short desktop quest lists expanded to the available viewport height", async () => {
+    const restoreViewport = mockViewport({ height: 820 });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    let paneRectSpy: ReturnType<typeof vi.spyOn> | null = null;
+    try {
+      render(
+        <TodaysAgenda
+          tasks={[
+            {
+              id: "task-scheduled-1",
+              task_text: "Single desktop quest",
+              completed: false,
+              xp_reward: 16,
+              scheduled_time: "09:00",
+            },
+          ]}
+          selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+          layoutMode="desktop"
+          onToggle={vi.fn()}
+          onAddQuest={vi.fn()}
+          completedCount={0}
+          totalCount={1}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      const scheduledPane = screen.getByTestId("scheduled-timeline-pane");
+      paneRectSpy = vi
+        .spyOn(scheduledPane, "getBoundingClientRect")
+        .mockReturnValue(createDomRect({ top: 310, bottom: 470, left: 0, right: 800, width: 800, height: 160 }));
+
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      await waitFor(() => {
+        expect(scheduledPane.style.height).toBe("406px");
+      });
+      expect(scheduledPane).toHaveClass("overflow-y-auto", "overflow-x-hidden");
+    } finally {
+      paneRectSpy?.mockRestore();
+      restoreViewport();
+    }
+  });
+
+  it("stretches the desktop empty state to the same viewport budget above the bottom nav", async () => {
+    const restoreViewport = mockViewport({ height: 860 });
+    document.documentElement.style.setProperty("--bottom-nav-runtime-offset", "100px");
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    let emptyStateRectSpy: ReturnType<typeof vi.spyOn> | null = null;
+    try {
+      render(
+        <TodaysAgenda
+          tasks={[]}
+          selectedDate={new Date("2026-02-13T09:00:00.000Z")}
+          layoutMode="desktop"
+          onToggle={vi.fn()}
+          onAddQuest={vi.fn()}
+          completedCount={0}
+          totalCount={0}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      const emptyStatePane = screen.getByTestId("empty-state-pane");
+      emptyStateRectSpy = vi
+        .spyOn(emptyStatePane, "getBoundingClientRect")
+        .mockReturnValue(createDomRect({ top: 280, bottom: 520, left: 0, right: 800, width: 800, height: 240 }));
+
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      await waitFor(() => {
+        expect(emptyStatePane.style.minHeight).toBe("480px");
+      });
+      expect(emptyStatePane.style.height).toBe("");
+    } finally {
+      emptyStateRectSpy?.mockRestore();
+      restoreViewport();
+    }
   });
 
   it("keeps quests timeline scheduled-only and excludes unscheduled quests", () => {

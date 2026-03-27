@@ -449,7 +449,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                   {mentorName || "Mentor"}
                 </h1>
                 <p className="mt-2 max-w-xs text-sm text-white/80">
-                  A calmer desktop workspace for check-ins, guidance, and steady momentum.
+                  Check in, get guidance, and keep your momentum steady.
                 </p>
               </div>
             </div>
@@ -460,9 +460,9 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold">Keep your mentor in view</p>
+                  <p className="text-sm font-semibold">Everything from your mentor</p>
                   <p className="text-sm text-muted-foreground">
-                    Daily check-ins, briefings, coach guidance, and chat stay within reach on Mac.
+                    Check-ins, briefings, coach guidance, and chat stay in one place.
                   </p>
                 </div>
               </div>
@@ -504,7 +504,7 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
         <div className="space-y-1 px-1">
           <p className="text-sm font-medium text-muted-foreground">Mentor workspace</p>
           <p className="text-2xl font-semibold tracking-tight">
-            Your daily guidance, laid out for a wider screen
+            Your daily guidance
           </p>
         </div>
 

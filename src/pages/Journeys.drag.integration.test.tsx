@@ -611,7 +611,7 @@ describe("Journeys row drag integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Daily quests, reframed as a calmer week planner on desktop.")).toBeInTheDocument();
+    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
     const row = await screen.findByTestId("timeline-row-task-1");
 
     act(() => {
@@ -636,7 +636,7 @@ describe("Journeys row drag integration", () => {
     expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
 
     expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
-    expect(screen.getByText("Daily quests, reframed as a calmer week planner on desktop.")).toBeInTheDocument();
+    expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
   });
 
   it("waits for the local scheduled-time update before syncing calendar", async () => {
@@ -911,7 +911,7 @@ describe("Journeys row drag integration", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Daily quests, reframed as a calmer week planner on desktop.")).toBeInTheDocument();
+      expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
     });
 
     expect(mocks.surfaceAllEpicHabits).not.toHaveBeenCalled();

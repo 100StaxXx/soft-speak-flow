@@ -15,7 +15,7 @@ const corsHeaders = {
 const MENTOR_VOICES: Record<string, string> = {
   'atlas': 'JBFqnCBsd6RMkjVDRZzb', // George
   'darius': 'rWyjfFeMZ6PxkHqD3wGC', // Brian
-  'eli': 'iP95p4xoKVk53GoZ742B', // Chris
+  'eli': 'mcuuWJIofmzgKEGk3EMA', // Chris
   'nova': 'onwK4e9ZLuTAKqWW03F9', // Daniel
   'sienna': 'XB0fDUnXU5powFXDhCwa', // Charlotte
   'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah

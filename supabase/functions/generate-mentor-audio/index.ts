@@ -29,7 +29,7 @@ const mentorVoices: Record<string, MentorVoiceConfig> = {
     style_exaggeration: 0.5,
   },
   eli: {
-    voiceId: "iP95p4xoKVk53GoZ742B", // Chris
+    voiceId: "mcuuWJIofmzgKEGk3EMA", // Chris
     stability: 0.7,
     similarity_boost: 0.8,
     style_exaggeration: 0.4,

@@ -462,6 +462,46 @@ describe("useTaskMutations attachment handling", () => {
     );
   });
 
+  it("normalizes legacy prefixed task IDs before live quest creation", async () => {
+    setOnline(true);
+    const legacyTaskId = "task-e47e5651-7522-4888-a04d-6eff518fa4ba";
+    const normalizedTaskId = "e47e5651-7522-4888-a04d-6eff518fa4ba";
+
+    mocks.createOfflinePlannerIdMock.mockReturnValueOnce(legacyTaskId);
+    mocks.dailyTasksInsertSingleMock.mockResolvedValueOnce({
+      data: {
+        id: normalizedTaskId,
+        user_id: "user-1",
+        task_text: "Ship feature",
+        difficulty: "medium",
+        task_date: "2026-02-20",
+        scheduled_time: "13:00",
+        category: "mind",
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      });
+    });
+
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledWith(
+      "daily_tasks",
+      expect.objectContaining({ id: normalizedTaskId }),
+    );
+    expect(mocks.dailyTasksInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: normalizedTaskId }),
+    );
+  });
+
   it("prequeues a plain quest immediately when offline", async () => {
     setOnline(false);
     mocks.resilienceState.shouldQueueWrites = true;
@@ -716,6 +756,37 @@ describe("useTaskMutations attachment handling", () => {
       message: "Maximum quest limit reached for this date (limit: 10)",
     });
 
+    expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
+  });
+
+  it("removes the local quest record when live creation fails with a nonqueueable error", async () => {
+    setOnline(true);
+    mocks.dailyTasksInsertSingleMock.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "22P02",
+        message: "invalid input syntax for type uuid: \"task-e47e5651-7522-4888-a04d-6eff518fa4ba\"",
+        details: null,
+        hint: null,
+      },
+    });
+
+    const { result } = renderHook(() => useTaskMutations("2026-02-20"), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.addTask({
+        taskText: "Ship feature",
+        difficulty: "medium",
+        taskDate: "2026-02-20",
+      }),
+    ).rejects.toMatchObject({
+      message: "invalid input syntax for type uuid: \"task-e47e5651-7522-4888-a04d-6eff518fa4ba\"",
+    });
+
+    expect(mocks.removePlannerRecordMock).toHaveBeenCalledWith("daily_tasks", "task-local");
+    expect(mocks.queueTaskActionMock).not.toHaveBeenCalled();
     expect(mocks.toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Failed to add quest" }));
   });
 
