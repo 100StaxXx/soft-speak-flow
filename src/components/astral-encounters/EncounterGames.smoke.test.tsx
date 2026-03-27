@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { AstralFrequencyGame } from './AstralFrequencyGame';
 import { EclipseTimingGame } from './EclipseTimingGame';
 import { EnergyBeamGame } from './EnergyBeamGame';
@@ -131,6 +131,32 @@ describe('active encounter games smoke', () => {
     render(<GalacticMatchGame {...baseProps} compact />);
 
     expect(screen.getByText('Score:')).toBeInTheDocument();
+  });
+
+  it('renders Galactic Match with the fullscreen height shell and inline reveal chip', () => {
+    vi.useFakeTimers();
+
+    try {
+      render(<GalacticMatchGame {...baseProps} compact />);
+
+      const root = screen.getByTestId('galactic-match-root');
+      expect(root.className).toContain('w-full');
+      expect(root.className).toContain('h-full');
+
+      let revealChip: HTMLElement | null = null;
+      for (let i = 0; i < 8 && !revealChip; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1000);
+        });
+        revealChip = screen.queryByTestId('galactic-match-reveal-chip');
+      }
+
+      expect(revealChip).not.toBeNull();
+      expect(revealChip?.className).not.toContain('-top-12');
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it('renders Soul Serpent without crashing', () => {

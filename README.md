@@ -57,7 +57,7 @@ GitHub Actions workflows:
   - pushes DB migrations
   - deploys allow-listed Edge Functions
 - `.github/workflows/scheduled-functions.yml`
-  - replaces DB cron jobs with GitHub-owned schedules
+  - manual fallback for scheduled functions while primary scheduling runs via Supabase `pg_cron`
 - `.github/workflows/backend-smoke.yml`
   - post-deploy backend smoke checks
 - `docs/backend-cutover-checklist.md`

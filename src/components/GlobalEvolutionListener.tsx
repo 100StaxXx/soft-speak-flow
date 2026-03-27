@@ -1,22 +1,20 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
 import { useQueryClient } from "@tanstack/react-query";
 import { CompanionEvolution } from "@/components/CompanionEvolution";
 import { useEvolution } from "@/contexts/EvolutionContext";
 import { useCelebration } from "@/contexts/CelebrationContext";
 import { logger } from "@/utils/logger";
-import { getResolvedMentorId } from "@/utils/mentor";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 export const GlobalEvolutionListener = () => {
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { mentorId: resolvedMentorId } = useMentorConnection();
   const queryClient = useQueryClient();
   const { setIsEvolvingLoading, onEvolutionComplete } = useEvolution();
   const { setEvolutionInProgress } = useCelebration();
   const [isEvolving, setIsEvolving] = useState(false);
-  const resolvedMentorId = getResolvedMentorId(profile);
   const [evolutionData, setEvolutionData] = useState<{ 
     stage: number; 
     imageUrl: string;

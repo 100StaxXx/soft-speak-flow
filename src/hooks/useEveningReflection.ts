@@ -11,6 +11,8 @@ export interface EveningReflection {
   reflection_date: string;
   mood: string;
   wins: string | null;
+  additional_reflection: string | null;
+  tomorrow_adjustment: string | null;
   gratitude: string | null;
   mentor_response: string | null;
   created_at: string;
@@ -52,7 +54,13 @@ export const useEveningReflection = () => {
 
   // Submit reflection mutation
   const submitMutation = useMutation({
-    mutationFn: async (data: { mood: string; wins?: string; gratitude?: string }) => {
+    mutationFn: async (data: {
+      mood: string;
+      wins?: string;
+      additionalReflection?: string;
+      tomorrowAdjustment?: string;
+      gratitude?: string;
+    }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
       const { data: reflection, error } = await supabase
@@ -62,6 +70,8 @@ export const useEveningReflection = () => {
           reflection_date: today,
           mood: data.mood,
           wins: data.wins || null,
+          additional_reflection: data.additionalReflection || null,
+          tomorrow_adjustment: data.tomorrowAdjustment || null,
           gratitude: data.gratitude || null,
         })
         .select()
@@ -91,7 +101,7 @@ export const useEveningReflection = () => {
     isLoading,
     isDrawerOpen,
     setIsDrawerOpen,
-    submitReflection: submitMutation.mutate,
+    submitReflection: submitMutation.mutateAsync,
     isSubmitting: submitMutation.isPending,
   };
 };

@@ -36,6 +36,8 @@ interface ChallengeData {
 interface ReflectionData {
   mood: string;
   wins: string | null;
+  additional_reflection: string | null;
+  tomorrow_adjustment: string | null;
   gratitude: string | null;
   reflection_date: string;
 }
@@ -186,7 +188,7 @@ Deno.serve(async (req) => {
       // Recent reflections
       supabase
         .from('evening_reflections')
-        .select('mood, wins, gratitude, reflection_date')
+        .select('mood, wins, additional_reflection, tomorrow_adjustment, gratitude, reflection_date')
         .eq('user_id', user.id)
         .order('reflection_date', { ascending: false })
         .limit(7),
@@ -265,9 +267,20 @@ const challenges: ChallengeData[] = (challengesResult.data || []).map(c => ({
 
     const formatReflections = () => {
       if (reflections.length === 0) return "No recent reflections.";
-      return reflections.slice(0, 3).map(r => 
-        `- ${r.reflection_date}: Mood: ${r.mood}${r.wins ? `, Wins: "${r.wins}"` : ''}${r.gratitude ? `, Grateful for: "${r.gratitude}"` : ''}`
-      ).join('\n');
+      return reflections
+        .slice(0, 3)
+        .map((r) => {
+          const parts = [
+            `Mood: ${r.mood}`,
+            r.wins ? `What went well: "${r.wins}"` : null,
+            r.additional_reflection ? `Additional reflection: "${r.additional_reflection}"` : null,
+            r.tomorrow_adjustment ? `Tomorrow adjustment: "${r.tomorrow_adjustment}"` : null,
+            r.gratitude ? `Gratitude: "${r.gratitude}"` : null,
+          ].filter(Boolean) as string[];
+
+          return [`- ${r.reflection_date}`, ...parts.map((part) => `  ${part}`)].join('\n');
+        })
+        .join('\n');
     };
 
     const formatCheckIns = () => {

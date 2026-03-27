@@ -12,7 +12,7 @@ import {
 } from "@/utils/mentor";
 import { logger } from "@/utils/logger";
 
-type MentorConnectionStatus = "ready" | "recovering" | "missing";
+export type MentorConnectionStatus = "ready" | "recovering" | "missing";
 
 type LightweightProfile = {
   selected_mentor_id?: string | null;

@@ -1,17 +1,14 @@
 import { memo, useCallback, useEffect, useRef } from "react";
-import { PawPrint, User, Compass, Inbox } from "lucide-react";
+import { PawPrint, User, Compass, Target } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
-import { useProfile } from "@/hooks/useProfile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MentorAvatar } from "@/components/MentorAvatar";
 import { useCompanion } from "@/hooks/useCompanion";
 import { Badge } from "@/components/ui/badge";
-import { getResolvedMentorId } from "@/utils/mentor";
 import { haptics } from "@/utils/haptics";
 import { CompanionNavPresence } from "@/components/companion/CompanionNavPresence";
-import { useInboxCount } from "@/hooks/useInboxTasks";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import {
@@ -20,16 +17,21 @@ import {
   fetchDailyTasks,
   getDailyTasksQueryKey,
 } from "@/hooks/useTasksQuery";
+import {
+  EPICS_QUERY_STALE_TIME,
+  fetchEpics,
+  getEpicsQueryKey,
+} from "@/hooks/epicsQuery";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
-type PrefetchTarget = "mentor" | "inbox" | "journeys" | "companion";
+type PrefetchTarget = "mentor" | "journeys" | "campaigns" | "companion";
 
 export const BottomNav = memo(() => {
   const navRef = useRef<HTMLElement | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { mentorId: resolvedMentorId } = useMentorConnection();
   const { companion, canEvolve } = useCompanion();
-  const { inboxCount } = useInboxCount();
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -77,14 +79,27 @@ export const BottomNav = memo(() => {
     }).catch(() => undefined);
   }, [queryClient, user?.id]);
 
+  const prefetchCampaigns = useCallback(() => {
+    if (!user?.id) return;
+
+    void queryClient.prefetchQuery({
+      queryKey: getEpicsQueryKey(user.id),
+      queryFn: () => fetchEpics(user.id),
+      staleTime: EPICS_QUERY_STALE_TIME,
+    }).catch(() => undefined);
+  }, [queryClient, user?.id]);
+
   // Prefetch on hover/focus for even faster perceived navigation
   const handlePrefetch = useCallback((page: PrefetchTarget) => {
     if (page === "journeys") {
       prefetchJourneysTasks();
+      return;
     }
-  }, [prefetchJourneysTasks]);
 
-  const resolvedMentorId = getResolvedMentorId(profile);
+    if (page === "campaigns") {
+      prefetchCampaigns();
+    }
+  }, [prefetchCampaigns, prefetchJourneysTasks]);
 
   const { data: selectedMentor, isLoading: mentorLoading } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],
@@ -148,31 +163,6 @@ export const BottomNav = memo(() => {
           </NavLink>
 
           <NavLink
-            to="/inbox"
-            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px] relative"
-            activeClassName="bg-celestial-blue/12"
-            onClick={() => haptics.light()}
-            onMouseEnter={() => handlePrefetch('inbox')}
-            onFocus={() => handlePrefetch('inbox')}
-          >
-            {({ isActive }) => (
-              <>
-                <div className="relative">
-                  <Inbox className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground'}`} />
-                  {inboxCount > 0 && (
-                    <Badge className="absolute -top-1 -right-2 h-4 min-w-[16px] px-1 p-0 flex items-center justify-center text-[9px] bg-celestial-blue text-white border-0">
-                      {inboxCount > 9 ? '9+' : inboxCount}
-                    </Badge>
-                  )}
-                </div>
-                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/85'}`}>
-                  Inbox
-                </span>
-              </>
-            )}
-          </NavLink>
-
-          <NavLink
             to="/journeys"
             className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
             activeClassName="bg-cosmiq-glow/12"
@@ -187,6 +177,26 @@ export const BottomNav = memo(() => {
                 <Compass className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground'}`} />
                 <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-cosmiq-glow' : 'text-muted-foreground/85'}`}>
                   Quests
+                </span>
+              </>
+            )}
+          </NavLink>
+
+          <NavLink
+            to="/campaigns"
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation min-w-[58px] min-h-[56px]"
+            activeClassName="bg-celestial-blue/12"
+            data-tour="campaigns-tab"
+            onClick={() => haptics.light()}
+            onPointerDown={prefetchCampaigns}
+            onMouseEnter={() => handlePrefetch('campaigns')}
+            onFocus={() => handlePrefetch('campaigns')}
+          >
+            {({ isActive }) => (
+              <>
+                <Target className={`h-6 w-6 transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground'}`} />
+                <span className={`text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-celestial-blue' : 'text-muted-foreground/85'}`}>
+                  Campaigns
                 </span>
               </>
             )}

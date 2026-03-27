@@ -12,6 +12,7 @@ import {
   minutesBetween,
   normalizeTimezone,
   parseIntEnv,
+  resolveDispatchMode,
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
 
@@ -104,6 +105,11 @@ async function acknowledgeSourceDelivery(
 
   if (sourceTable === "user_daily_pushes") {
     await supabase.from("user_daily_pushes").update({ delivered_at: deliveredAtIso }).eq("id", sourceId);
+    return;
+  }
+
+  if (sourceTable === "user_daily_quote_pushes") {
+    await supabase.from("user_daily_quote_pushes").update({ delivered_at: deliveredAtIso }).eq("id", sourceId);
     return;
   }
 
@@ -240,9 +246,9 @@ serve(async (req) => {
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     }
 
-    const mode = (Deno.env.get("NOTIFICATIONS_V2_MODE") ?? "shadow").toLowerCase();
+    const mode = resolveDispatchMode(Deno.env.get("NOTIFICATIONS_V2_MODE"));
     const rollbackEnabled = (Deno.env.get("NOTIFICATIONS_V2_ROLLBACK_TO_LEGACY") ?? "false").toLowerCase() === "true";
-    const rolloutPercent = Math.max(0, Math.min(100, parseIntEnv("NOTIFICATIONS_V2_ROLLOUT_PERCENT", 0)));
+    const rolloutPercent = Math.max(0, Math.min(100, parseIntEnv("NOTIFICATIONS_V2_ROLLOUT_PERCENT", 100)));
     const maxAttempts = Math.max(1, parseIntEnv("NOTIFICATIONS_V2_MAX_ATTEMPTS", 5));
     const batchSize = Math.max(1, parseIntEnv("NOTIFICATIONS_V2_DISPATCH_BATCH_SIZE", 100));
     const tokenFanoutMode = (Deno.env.get("NOTIFICATIONS_V2_TOKEN_FANOUT") ?? "latest").toLowerCase();
@@ -302,19 +308,6 @@ serve(async (req) => {
           delivered_at: nowIso,
           attempt_count: attemptCount,
           last_error: "shadow_mode",
-          next_retry_at: null,
-        });
-        continue;
-      }
-
-      if (mode !== "send") {
-        skippedRollout += 1;
-        await updateQueueStatus(supabase, row.id, {
-          status: "skipped_rollout",
-          delivered: true,
-          delivered_at: nowIso,
-          attempt_count: attemptCount,
-          last_error: `unknown_mode:${mode}`,
           next_retry_at: null,
         });
         continue;
@@ -489,6 +482,7 @@ serve(async (req) => {
         skipped_rollout: skippedRollout,
         shadowed,
         token_fanout_mode: tokenFanoutMode,
+        mode,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

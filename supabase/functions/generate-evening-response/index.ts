@@ -61,9 +61,11 @@ serve(async (req) => {
 A user has completed their evening reflection:
 - Mood: ${reflection.mood}
 ${reflection.wins ? `- What went well: ${reflection.wins}` : ""}
+${reflection.additional_reflection ? `- Additional reflection: ${reflection.additional_reflection}` : ""}
+${reflection.tomorrow_adjustment ? `- Tomorrow adjustment: ${reflection.tomorrow_adjustment}` : ""}
 ${reflection.gratitude ? `- Gratitude: ${reflection.gratitude}` : ""}
 
-Write a brief, warm acknowledgment (2-3 sentences max). Be encouraging and validate their feelings. If they shared wins or gratitude, acknowledge those specifically. Keep it personal and caring.`;
+Write a brief, warm acknowledgment (2-3 sentences max). Be encouraging and validate their feelings. If they shared wins, extra reflection, a tomorrow adjustment, or gratitude, acknowledge those specifically. If they named a tomorrow adjustment, gently reinforce it without sounding prescriptive. Keep it personal and caring.`;
 
     // Call OpenAI
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");

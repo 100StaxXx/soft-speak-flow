@@ -57,6 +57,9 @@ const advance = (ms: number) => {
 const getGalacticCards = (container: HTMLElement) =>
   Array.from(container.querySelectorAll('div.relative.w-full.h-full')) as HTMLDivElement[];
 
+const getPlayableGalacticButtons = (container: HTMLElement) =>
+  getGalacticCards(container).filter((card) => !card.hasAttribute('disabled'));
+
 const completeGalacticLevel = (container: HTMLElement) => {
   const getInteractiveCards = () => getGalacticCards(container).filter((card) => !card.hasAttribute('disabled'));
 
@@ -201,6 +204,14 @@ describe('active encounter lifecycle hardening', () => {
 
     expect(screen.queryByText('Level 1 Complete!')).not.toBeInTheDocument();
     expect(screen.getByText('Lv2')).toBeInTheDocument();
+    for (let i = 0; i < 20 && getPlayableGalacticButtons(container).length === 0; i++) {
+      advance(500);
+    }
+    const levelTwoButtons = getPlayableGalacticButtons(container);
+    expect(levelTwoButtons.length).toBeGreaterThan(0);
+    const enabledBeforeTap = levelTwoButtons.length;
+    fireEvent.click(levelTwoButtons[0]);
+    expect(getPlayableGalacticButtons(container).length).toBeLessThan(enabledBeforeTap);
     expect(onComplete).toHaveBeenCalledTimes(0);
   });
 

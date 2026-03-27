@@ -3,8 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import Mentor from "@/pages/Mentor";
 import Companion from "@/pages/Companion";
-import Inbox from "@/pages/Inbox";
 import Journeys from "@/pages/Journeys";
+import Campaigns from "@/pages/Campaigns";
 import { useAuth } from "@/hooks/useAuth";
 import { MainTabVisibilityProvider } from "@/contexts/MainTabVisibilityContext";
 import { logger } from "@/utils/logger";
@@ -20,14 +20,14 @@ import {
   getEpicsQueryKey,
 } from "@/hooks/epicsQuery";
 
-type MainTabPath = "/mentor" | "/inbox" | "/journeys" | "/companion";
+type MainTabPath = "/mentor" | "/journeys" | "/campaigns" | "/companion";
 
-const TAB_ORDER: MainTabPath[] = ["/mentor", "/inbox", "/journeys", "/companion"];
+const TAB_ORDER: MainTabPath[] = ["/mentor", "/journeys", "/campaigns", "/companion"];
 
 const TAB_COMPONENTS: Record<MainTabPath, ComponentType> = {
   "/mentor": Mentor,
-  "/inbox": Inbox,
   "/journeys": Journeys,
+  "/campaigns": Campaigns,
   "/companion": Companion,
 };
 
@@ -36,8 +36,8 @@ export const isMainTabPath = (pathname: string): pathname is MainTabPath =>
 
 const initialScrollPositions: Record<MainTabPath, number> = {
   "/mentor": 0,
-  "/inbox": 0,
   "/journeys": 0,
+  "/campaigns": 0,
   "/companion": 0,
 };
 

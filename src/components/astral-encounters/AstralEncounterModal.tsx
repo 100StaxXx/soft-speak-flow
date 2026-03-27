@@ -30,6 +30,7 @@ import { AdversaryTier } from '@/types/astralEncounters';
 import { MiniGameSkeleton } from '@/components/skeletons';
 import type { BossBattleContext } from '@/types/narrativeTypes';
 import { X } from 'lucide-react';
+import { isFullscreenEncounterGame } from './fullscreenGames';
 
 // Lazy load mini-games for bundle optimization
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
@@ -434,17 +435,8 @@ export const AstralEncounterModal = ({
 
   if (!encounter || !adversary) return null;
 
-  // Active encounter games should use bounded fullscreen layout in battle/practice
-  const FULLSCREEN_GAMES: MiniGameType[] = [
-    'energy_beam',
-    'tap_sequence',
-    'orb_match',
-    'galactic_match',
-    'astral_frequency',
-    'starfall_dodge',
-  ];
   const currentGameType = getCurrentGameType();
-  const needsFullscreen = (phase === 'battle' || phase === 'practice') && FULLSCREEN_GAMES.includes(currentGameType);
+  const needsFullscreen = (phase === 'battle' || phase === 'practice') && isFullscreenEncounterGame(currentGameType);
   const showPersistentExit = open && phase !== 'result' && !isExitConfirmOpen;
 
   return (

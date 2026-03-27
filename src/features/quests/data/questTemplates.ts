@@ -8,7 +8,7 @@ export const QUEST_TEMPLATE_CATEGORY_LABELS: Record<QuestTemplateCategory, strin
   personal: "Personal",
 };
 
-export const COMMON_QUEST_TEMPLATES: CommonQuestTemplate[] = [
+const COMMON_QUEST_TEMPLATE_SEEDS: Array<Omit<CommonQuestTemplate, "templateOrigin" | "sourceCommonTemplateId">> = [
   {
     id: "work-respond-to-emails",
     title: "Respond to emails",
@@ -262,3 +262,9 @@ export const COMMON_QUEST_TEMPLATES: CommonQuestTemplate[] = [
     featured: true,
   },
 ];
+
+export const COMMON_QUEST_TEMPLATES: CommonQuestTemplate[] = COMMON_QUEST_TEMPLATE_SEEDS.map((template) => ({
+  ...template,
+  templateOrigin: "common",
+  sourceCommonTemplateId: template.id,
+}));

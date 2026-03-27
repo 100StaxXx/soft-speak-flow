@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   connections: [] as Array<{ provider: "apple" | "google" | "outlook" }>,
   personalTemplates: [] as PersonalQuestTemplate[],
   refreshPersonalTemplates: vi.fn(),
+  saveTemplateMock: vi.fn(),
+  toastMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCalendarIntegrations", () => ({
@@ -40,6 +42,8 @@ const buildPersonalTemplate = (overrides: Partial<PersonalQuestTemplate> = {}): 
   estimatedDuration: 90,
   notes: "Protect focus and silence notifications.",
   subtasks: ["Choose one priority", "Silence notifications"],
+  templateOrigin: "personal_derived",
+  sourceCommonTemplateId: null,
   ...overrides,
 });
 
@@ -60,8 +64,16 @@ vi.mock("@/features/quests/hooks/usePersonalQuestTemplates", () => ({
   usePersonalQuestTemplates: () => ({
     templates: mocks.personalTemplates,
     isLoading: false,
+    isSavingTemplate: false,
     error: null,
     refresh: mocks.refreshPersonalTemplates,
+    saveTemplate: mocks.saveTemplateMock,
+  }),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({
+    toast: mocks.toastMock,
   }),
 }));
 
@@ -74,6 +86,16 @@ describe("AddQuestSheet", () => {
     mocks.defaultProvider = null;
     mocks.connections = [];
     mocks.personalTemplates = [];
+    mocks.saveTemplateMock.mockResolvedValue(buildPersonalTemplate({
+      id: "explicit-template-1",
+      title: "Deep work sprint",
+      difficulty: "hard",
+      estimatedDuration: 75,
+      notes: "Save the personalized version",
+      subtasks: ["Choose one priority", "Block distractions"],
+      templateOrigin: "personal_explicit",
+      sourceCommonTemplateId: "work-deep-work-block",
+    }));
   });
 
   it("renders simplified add quest controls without step instructions", () => {
@@ -96,6 +118,9 @@ describe("AddQuestSheet", () => {
     expect(screen.getByRole("button", { name: "Time" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Quest" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to Inbox instead" })).toBeInTheDocument();
+    expect(screen.getByTestId("add-quest-editor-header").firstElementChild).toContainElement(
+      screen.getByPlaceholderText("Quest Title"),
+    );
     expect(screen.queryByText("Link to Contact")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
@@ -134,7 +159,7 @@ describe("AddQuestSheet", () => {
     expect(durationButton.compareDocumentPosition(addSubtaskButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("only shows Early Reminder after a time is selected", () => {
+  it("shows Early Reminder above Advanced Settings after a time is selected", () => {
     render(
       <AddQuestSheet
         open
@@ -144,11 +169,15 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Advanced Settings/i }));
     expect(screen.queryByText("Early Reminder")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Time" }));
-    expect(screen.getByText("Early Reminder")).toBeInTheDocument();
+    const reminderLabel = screen.getByText("Early Reminder");
+    const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
+    const relation = advancedTrigger.compareDocumentPosition(reminderLabel);
+
+    expect(reminderLabel).toBeInTheDocument();
+    expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it("does not auto-focus the title on open and still allows manual focus", () => {
@@ -279,7 +308,7 @@ describe("AddQuestSheet", () => {
     expect(screen.queryByRole("button", { name: "Review roadmap for 30 minutes" })).not.toBeInTheDocument();
   });
 
-  it("hides repeat quest quick picks when the user has no repeated templates", () => {
+  it("hides personal template quick picks when the user has no templates", () => {
     render(
       <AddQuestSheet
         open
@@ -289,11 +318,11 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.queryByText("Your repeat quests")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your templates")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "See all" })).not.toBeInTheDocument();
   });
 
-  it("renders repeat quest quick picks when personal templates exist", () => {
+  it("renders personal template quick picks when templates exist", () => {
     mocks.personalTemplates = [
       buildPersonalTemplate(),
       buildPersonalTemplate({ id: "personal-emails", title: "Respond to emails", frequency: 2 }),
@@ -308,12 +337,12 @@ describe("AddQuestSheet", () => {
       />
     );
 
-    expect(screen.getByText("Your repeat quests")).toBeInTheDocument();
+    expect(screen.getByText("Your templates")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "See all" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deep work block/i })).toBeInTheDocument();
   });
 
-  it("prefills the draft when a repeat quest quick pick is selected", () => {
+  it("prefills the draft when a personal template quick pick is selected", () => {
     mocks.personalTemplates = [buildPersonalTemplate()];
 
     render(
@@ -349,7 +378,7 @@ describe("AddQuestSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "See all" }));
 
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Search your repeat quests")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search your templates")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Deep work block/i })).toBeInTheDocument();
   });
 
@@ -388,7 +417,7 @@ describe("AddQuestSheet", () => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Yours" }));
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Search your repeat quests")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search your templates")).toBeInTheDocument();
     });
 
     expect(screen.getByRole("button", { name: /Deep work block/i })).toBeInTheDocument();
@@ -428,7 +457,7 @@ describe("AddQuestSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "See all" }));
-    fireEvent.change(screen.getByPlaceholderText("Search your repeat quests"), {
+    fireEvent.change(screen.getByPlaceholderText("Search your templates"), {
       target: { value: "weekly" },
     });
 
@@ -477,6 +506,199 @@ describe("AddQuestSheet", () => {
     expect(screen.getByRole("button", { name: "9:00 AM" })).toBeInTheDocument();
   });
 
+  it("submits without prompting when a selected template is unchanged", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.queryByText("Save these changes to My Templates?")).not.toBeInTheDocument();
+    expect(mocks.saveTemplateMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the save-template prompt when a common template is customized", async () => {
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Respond to priority emails" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    expect(await screen.findByText("Save these changes to My Templates?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save to My Templates" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Just this time" })).toBeInTheDocument();
+  });
+
+  it("shows the update-template prompt when an explicit personal template is customized", async () => {
+    mocks.personalTemplates = [buildPersonalTemplate({
+      id: "explicit-template-1",
+      templateOrigin: "personal_explicit",
+      sourceCommonTemplateId: "work-deep-work-block",
+    })];
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Deep work block/i }));
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Deep work sprint" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    expect(await screen.findByText("Update your template?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update Template" })).toBeInTheDocument();
+  });
+
+  it("continues with a one-off quest when Just this time is selected", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Respond to priority emails" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Just this time" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.saveTemplateMock).not.toHaveBeenCalled();
+  });
+
+  it("saves the customized template before creating the quest", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Respond to priority emails" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save to My Templates" }));
+
+    await waitFor(() => {
+      expect(mocks.saveTemplateMock).toHaveBeenCalledTimes(1);
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mocks.saveTemplateMock.mock.invocationCallOrder[0]).toBeLessThan(onAdd.mock.invocationCallOrder[0] ?? Infinity);
+    expect(mocks.saveTemplateMock).toHaveBeenCalledWith(expect.objectContaining({
+      sourceCommonTemplateId: "work-respond-to-emails",
+      title: "Respond to priority emails",
+    }));
+  });
+
+  it("does not prompt when only schedule fields change after selecting a template", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        prefilledTime="09:00"
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    fireEvent.click(screen.getByRole("button", { name: "9:00 AM" }));
+    fireEvent.click(screen.getByRole("button", { name: "9:30 AM" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Quest" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.queryByText("Save these changes to My Templates?")).not.toBeInTheDocument();
+  });
+
+  it("applies the same template prompt flow when adding a customized template quest to inbox", async () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <AddQuestSheet
+        open
+        onOpenChange={vi.fn()}
+        selectedDate={selectedDate}
+        onAdd={onAdd}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse common quests" }));
+    fireEvent.click(screen.getByRole("button", { name: /Respond to emails/i }));
+    fireEvent.change(screen.getByPlaceholderText("Quest Title"), {
+      target: { value: "Respond to priority emails" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add to Inbox instead" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Just this time" }));
+
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onAdd.mock.calls[0]?.[0]).toMatchObject({
+      sendToInbox: true,
+      taskDate: null,
+      scheduledTime: null,
+    });
+  });
+
   it("resets the template browser state after close and reopen", () => {
     mocks.personalTemplates = [buildPersonalTemplate()];
     const onAdd = vi.fn().mockResolvedValue(undefined);
@@ -492,7 +714,7 @@ describe("AddQuestSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "See all" }));
-    fireEvent.change(screen.getByPlaceholderText("Search your repeat quests"), {
+    fireEvent.change(screen.getByPlaceholderText("Search your templates"), {
       target: { value: "deep" },
     });
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Common" }));
@@ -516,7 +738,7 @@ describe("AddQuestSheet", () => {
 
     expect(screen.getByPlaceholderText("Quest Title")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "See all" }));
-    expect(screen.getByPlaceholderText("Search your repeat quests")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Search your templates")).toHaveValue("");
     expect(screen.getByRole("button", { name: /Deep work block/i })).toBeInTheDocument();
   });
 

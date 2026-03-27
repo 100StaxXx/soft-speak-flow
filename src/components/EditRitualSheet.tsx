@@ -131,7 +131,6 @@ export const EditRitualSheet = memo(function EditRitualSheet({
       // Auto-expand advanced if any advanced fields are set
       setShowAdvanced(
         !!ritual.recurrence_pattern || 
-        !!ritual.reminder_enabled ||
         !!ritual.category
       );
     }
@@ -384,6 +383,36 @@ export const EditRitualSheet = memo(function EditRitualSheet({
               </p>
             </div>
 
+            {preferredTime && (
+              <AdvancedQuestOptions
+                scheduledTime={preferredTime || null}
+                estimatedDuration={estimatedMinutes}
+                recurrencePattern={recurrencePattern}
+                recurrenceDays={recurrenceDays}
+                recurrenceMonthDays={recurrenceMonthDays}
+                recurrenceCustomPeriod={null}
+                reminderEnabled={reminderEnabled}
+                reminderMinutesBefore={reminderMinutesBefore}
+                moreInformation={null}
+                onScheduledTimeChange={setPreferredTime}
+                onEstimatedDurationChange={setEstimatedMinutes}
+                onRecurrencePatternChange={setRecurrencePattern}
+                onRecurrenceDaysChange={setRecurrenceDays}
+                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                onRecurrenceCustomPeriodChange={() => {}}
+                onReminderEnabledChange={setReminderEnabled}
+                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                onMoreInformationChange={() => {}}
+                location={null}
+                onLocationChange={() => {}}
+                hideScheduledTime
+                hideDuration
+                hideRecurrence
+                hideLocation
+                hideMoreInformation
+              />
+            )}
+
             {/* Advanced Options Toggle */}
             <div className="pt-2">
               <Button
@@ -419,7 +448,10 @@ export const EditRitualSheet = memo(function EditRitualSheet({
                     onMoreInformationChange={() => {}}
                     location={null}
                     onLocationChange={() => {}}
+                    hideReminder={true}
                     hideRecurrence={true}
+                    hideLocation={true}
+                    hideMoreInformation={true}
                   />
                 </div>
               )}

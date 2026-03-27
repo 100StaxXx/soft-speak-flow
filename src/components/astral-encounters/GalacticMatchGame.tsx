@@ -276,6 +276,12 @@ export const GalacticMatchGame = ({
     setCombo(0);
   }, [config.pairs, level]);
 
+  const resetTransientBoardState = useCallback(() => {
+    setIsLocked(false);
+    setFlippedCards([]);
+    setMatchEffects([]);
+  }, []);
+
   const advanceFromLevelComplete = useCallback((snapshot: LevelCompleteSnapshot) => {
     if (!mountedRef.current || phaseRef.current !== 'levelComplete') return;
 
@@ -284,6 +290,7 @@ export const GalacticMatchGame = ({
 
     // Invalidate token immediately to avoid timer+button double-advance races.
     pendingLevelCompleteRef.current = null;
+    resetTransientBoardState();
 
     // In practice mode, end after completing 2 levels
     if (isPractice && snapshot.level >= 2) {
@@ -335,7 +342,7 @@ export const GalacticMatchGame = ({
     setRound(nextRound);
     setPhase('revealing');
     setRevealCountdown(Math.ceil(nextConfig.revealTime));
-  }, [completeOnce, diffConfig.revealTimeMultiplier, diffConfig.startPairs, isPractice, mountedRef]);
+  }, [completeOnce, diffConfig.revealTimeMultiplier, diffConfig.startPairs, isPractice, mountedRef, resetTransientBoardState]);
 
   const handleContinueFromLevelComplete = useCallback(() => {
     const pending = pendingLevelCompleteRef.current;
@@ -574,7 +581,10 @@ export const GalacticMatchGame = ({
   }), [config.cols, config.rows]);
 
   return (
-    <div className={`flex flex-col items-center flex-1 min-h-0 ${compact ? 'gap-1 p-1' : 'gap-2 p-3'} select-none touch-none`}>
+    <div
+      data-testid="galactic-match-root"
+      className={`w-full h-full flex flex-col items-center flex-1 min-h-0 ${compact ? 'gap-1 p-1' : 'gap-2 p-3'} select-none touch-none`}
+    >
       {/* Header with level, lives, and score - compact mode support */}
       <div className="w-full flex items-center justify-between text-xs">
         <div className="flex items-center gap-1">
@@ -654,6 +664,26 @@ export const GalacticMatchGame = ({
         <span className="text-[10px] text-muted-foreground">{matchedPairs}/{config.pairs}</span>
       </div>
 
+      <AnimatePresence>
+        {phase === 'revealing' && (
+          <motion.div
+            data-testid="galactic-match-reveal-chip"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex w-full justify-center"
+          >
+            <motion.div
+              className="rounded-full bg-cyan-500/90 px-4 py-1.5 text-xs font-bold text-white shadow-lg"
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+            >
+              MEMORIZE! {revealCountdown}s
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Card grid */}
       <div ref={boardHostRef} className="w-full flex-1 min-h-0 flex items-center justify-center px-2 pb-2">
         <div 
@@ -678,26 +708,6 @@ export const GalacticMatchGame = ({
               >
                 {countdown}
               </motion.span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Reveal phase overlay - positioned above the grid */}
-        <AnimatePresence>
-          {phase === 'revealing' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-x-0 -top-12 z-20 flex flex-col items-center"
-            >
-              <motion.div
-                className="px-4 py-2 bg-cyan-500/90 rounded-full text-white font-bold shadow-lg"
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 0.5, repeat: Infinity }}
-              >
-                MEMORIZE! {revealCountdown}s
-              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

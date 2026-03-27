@@ -82,7 +82,7 @@ serve(async (req) => {
     // Fetch evening reflections
     const { data: reflections } = await supabase
       .from("evening_reflections")
-      .select("reflection_date, mood, wins, gratitude")
+      .select("reflection_date, mood, wins, additional_reflection, tomorrow_adjustment, gratitude")
       .eq("user_id", userId)
       .gte("reflection_date", weekStartStr)
       .lte("reflection_date", weekEndStr);
@@ -250,6 +250,20 @@ serve(async (req) => {
       const gratitudeTextFull = fullGratitudeEntries.length > 0 
         ? fullGratitudeEntries.join("; ") 
         : null;
+
+      const additionalReflectionEntries = (reflections || [])
+        .filter(r => r.additional_reflection)
+        .map(r => r.additional_reflection as string);
+      const additionalReflectionText = additionalReflectionEntries.length > 0
+        ? additionalReflectionEntries.join("; ")
+        : null;
+
+      const tomorrowAdjustmentEntries = (reflections || [])
+        .filter(r => r.tomorrow_adjustment)
+        .map(r => r.tomorrow_adjustment as string);
+      const tomorrowAdjustmentText = tomorrowAdjustmentEntries.length > 0
+        ? tomorrowAdjustmentEntries.join("; ")
+        : null;
       
       // Get all wins
       const allWins = wins.length > 0 ? wins.join("; ") : null;
@@ -283,6 +297,12 @@ ${intentionsText || "No intentions logged"}
 
 Wins shared:
 ${allWins || "No wins logged"}
+
+Other reflections shared:
+${additionalReflectionText || "No additional reflections logged"}
+
+Tomorrow adjustments named:
+${tomorrowAdjustmentText || "No tomorrow adjustments logged"}
 
 Gratitude shared:
 ${gratitudeTextFull || "No gratitude logged"}

@@ -140,7 +140,7 @@ export default function SharedEpics() {
       toast.success('Guild joined! 🎯', {
         description: "You're now part of this guild and can compete on the leaderboard!"
       });
-      navigate('/journeys');
+      navigate('/campaigns');
     },
     onError: (error: Error) => {
       toast.error(error.message);

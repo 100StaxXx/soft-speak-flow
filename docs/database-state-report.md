@@ -1,6 +1,6 @@
 # Database State Report
 
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-03-27
 **Status:** Backend ownership migrated to self-managed hosted Supabase workflow
 
 ## Current Source of Truth
@@ -20,14 +20,15 @@ Before deployment, set real values for:
 
 ## Scheduling Ownership
 
-Legacy DB cron scheduling has been removed from runtime ownership.
+Notification scheduling now runs from Supabase `pg_cron`.
 
 - Historical migration: `supabase/migrations/20251127174517_49eb8abb-f580-4245-958c-ded03fd9168c.sql`
 - Cleanup migration: `supabase/migrations/20260212090000_remove_legacy_hardcoded_cron_jobs.sql`
-- Active scheduler: `.github/workflows/scheduled-functions.yml`
+- Active scheduler migration: `supabase/migrations/20260225190000_notifications_v2_pipeline.sql`
+- GitHub fallback: `.github/workflows/scheduled-functions.yml`
 
-Scheduled functions:
+Active scheduled functions:
 
 - `generate-daily-mentor-pep-talks`
-- `schedule-daily-mentor-pushes`
-- `dispatch-daily-pushes`
+- `notifications-enqueue-v2`
+- `notifications-dispatch-v2`

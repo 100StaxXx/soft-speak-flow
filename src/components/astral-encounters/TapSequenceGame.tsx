@@ -487,7 +487,7 @@ export const TapSequenceGame = ({
   }, [gameState, currentOrder, orbCount]);
 
   return (
-    <div className={`flex flex-col items-center relative flex-1 min-h-0 ${shake ? 'animate-shake' : ''}`}>
+    <div className={`w-full h-full flex flex-col items-center relative flex-1 min-h-0 ${shake ? 'animate-shake' : ''}`}>
       {/* Countdown Overlay */}
       {gameState === 'countdown' && (
         <CountdownOverlay count={3} onComplete={handleCountdownComplete} />

@@ -1,7 +1,6 @@
-import { useProfile } from "./useProfile";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getResolvedMentorId } from "@/utils/mentor";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 interface MentorPersonality {
   name: string;
@@ -50,8 +49,7 @@ const personalityTemplates: Record<string, Partial<MentorPersonality>> = {
 };
 
 export const useMentorPersonality = (): MentorPersonality | null => {
-  const { profile } = useProfile();
-  const resolvedMentorId = getResolvedMentorId(profile);
+  const { mentorId: resolvedMentorId } = useMentorConnection();
 
   const { data: mentor } = useQuery({
     queryKey: ['mentor-personality', resolvedMentorId],

@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
+import { dispatchPlannerSyncFinished } from "@/utils/plannerSync";
 
 export const useDailyTasksRealtime = () => {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export const useDailyTasksRealtime = () => {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
+          dispatchPlannerSyncFinished();
           queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
           queryClient.invalidateQueries({ queryKey: ['tasks'] });
           queryClient.invalidateQueries({ queryKey: ['calendar-tasks'] });
@@ -41,6 +43,7 @@ export const useDailyTasksRealtime = () => {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
+          dispatchPlannerSyncFinished();
           queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
         }
       )

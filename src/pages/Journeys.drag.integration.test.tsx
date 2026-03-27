@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { isSameDay } from "date-fns";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   addTask: vi.fn(),
@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   deleteTask: vi.fn(),
   restoreTask: vi.fn(),
   moveTaskToDate: vi.fn(),
+  toggleInboxTask: vi.fn(),
+  deleteInboxTask: vi.fn(),
   syncTaskUpdateMutate: vi.fn(),
   syncTaskUpdateMutateAsync: vi.fn().mockResolvedValue(undefined),
   syncTaskDeleteMutateAsync: vi.fn().mockResolvedValue(undefined),
@@ -38,6 +40,12 @@ const mocks = vi.hoisted(() => ({
   epicsLoading: false,
   isMacHostedIOSApp: false,
   draggableFabRenderCount: 0,
+  inboxTasks: [] as Array<{
+    id: string;
+    task_text: string;
+    completed: boolean;
+    task_date: string | null;
+  }>,
   lastDatePillSelectedDate: null as Date | null,
   lastAddQuestSheetProps: null as null | { autoFillTimeOnFirstTap?: boolean; open?: boolean },
   tutorialGuidance: {
@@ -52,6 +60,16 @@ const mocks = vi.hoisted(() => ({
     xp_reward: number;
     task_date: string;
     scheduled_time: string;
+    difficulty: string;
+    is_main_quest: boolean;
+  }>,
+  inboxTasks: [] as Array<{
+    id: string;
+    task_text: string;
+    completed: boolean;
+    xp_reward: number;
+    task_date: string | null;
+    scheduled_time: string | null;
     difficulty: string;
     is_main_quest: boolean;
   }>,
@@ -128,6 +146,16 @@ vi.mock("@/components/AddQuestSheet", () => ({
 
 vi.mock("@/hooks/usePostOnboardingMentorGuidance", () => ({
   usePostOnboardingMentorGuidance: () => mocks.tutorialGuidance,
+}));
+
+vi.mock("@/hooks/useInboxTasks", () => ({
+  useInboxTasks: () => ({
+    inboxTasks: mocks.inboxTasks,
+    inboxCount: mocks.inboxTasks.length,
+    isLoading: false,
+    toggleInboxTask: vi.fn(),
+    deleteInboxTask: vi.fn(),
+  }),
 }));
 
 vi.mock("@/components/PageInfoButton", () => ({
@@ -299,6 +327,16 @@ vi.mock("@/hooks/useDailyTasks", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useInboxTasks", () => ({
+  useInboxTasks: () => ({
+    inboxTasks: mocks.inboxTasks,
+    inboxCount: mocks.inboxTasks.length,
+    isLoading: false,
+    toggleInboxTask: mocks.toggleInboxTask,
+    deleteInboxTask: mocks.deleteInboxTask,
+  }),
+}));
+
 vi.mock("@/hooks/useCalendarTasks", () => ({
   useCalendarTasks: () => ({
     tasks: [],
@@ -384,6 +422,25 @@ const dispatchPointerMove = (clientY: number) => {
   window.dispatchEvent(event);
 };
 
+const dispatchTouchMove = (
+  clientY: number,
+  target: EventTarget = typeof document !== "undefined" ? document : window,
+) => {
+  const event = new Event("touchmove", { bubbles: true, cancelable: true }) as TouchEvent;
+  Object.defineProperty(event, "touches", { value: [{ clientX: 0, clientY }] });
+  target.dispatchEvent(event);
+  return event;
+};
+
+const dispatchTouchEnd = (
+  target: EventTarget = typeof document !== "undefined" ? document : window,
+) => {
+  const event = new Event("touchend", { bubbles: true, cancelable: true }) as TouchEvent;
+  Object.defineProperty(event, "changedTouches", { value: [{ clientX: 0, clientY: 0 }] });
+  target.dispatchEvent(event);
+  return event;
+};
+
 const createPointerDownEvent = (clientY: number) => {
   const event = new Event("pointerdown", { bubbles: true, cancelable: true }) as PointerEvent;
   Object.defineProperty(event, "pointerType", { value: "mouse" });
@@ -405,6 +462,10 @@ const createDeferred = <T,>() => {
 import Journeys from "./Journeys";
 
 describe("Journeys row drag integration", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isTabActive = true;
@@ -433,6 +494,7 @@ describe("Journeys row drag integration", () => {
         is_main_quest: false,
       },
     ];
+    mocks.inboxTasks = [];
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
       writable: true,
@@ -637,6 +699,42 @@ describe("Journeys row drag integration", () => {
 
     expect(mocks.syncTaskUpdateMutateAsync).toHaveBeenCalledWith({ taskId: "task-1" });
     expect(screen.getByText("Plan your quests for the week ahead.")).toBeInTheDocument();
+  });
+
+  it("reschedules a quest from the timeline row touch drag path on /journeys", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/journeys"]}>
+          <Journeys />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const row = await screen.findByTestId("timeline-row-task-1");
+
+    vi.useFakeTimers();
+    act(() => {
+      fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 100 }] });
+      vi.advanceTimersByTime(500);
+      dispatchTouchMove(820);
+      dispatchTouchEnd();
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(mocks.updateTask).toHaveBeenCalledTimes(1);
+    });
+    const firstUpdate = mocks.updateTask.mock.calls[0]?.[0];
+    expect(firstUpdate?.taskId).toBe("task-1");
+    expect(firstUpdate?.updates?.scheduled_time).toMatch(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    expect(firstUpdate?.updates?.scheduled_time).not.toBe("08:00");
   });
 
   it("waits for the local scheduled-time update before syncing calendar", async () => {

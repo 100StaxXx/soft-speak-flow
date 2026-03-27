@@ -1325,7 +1325,7 @@ export function EnergyBeamGame({
       <div
         className={`absolute top-0 left-0 right-0 z-30 ${
           compact
-            ? 'px-2 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]'
+            ? 'px-2 pb-2 pt-2'
             : 'px-3 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]'
         }`}
       >

@@ -5,8 +5,8 @@ const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   mountCounts: {
     mentor: 0,
-    inbox: 0,
     journeys: 0,
+    campaigns: 0,
     companion: 0,
   },
 }));
@@ -53,19 +53,19 @@ vi.mock("@/pages/Mentor", async () => {
   return { default: MentorPageMock };
 });
 
-vi.mock("@/pages/Inbox", async () => {
+vi.mock("@/pages/Campaigns", async () => {
   const React = await import("react");
   const { useMainTabVisibility } = await import("@/contexts/MainTabVisibilityContext");
-  const InboxPageMock = () => {
+  const CampaignsPageMock = () => {
     const { isTabActive } = useMainTabVisibility();
     React.useEffect(() => {
-      mocks.mountCounts.inbox += 1;
+      mocks.mountCounts.campaigns += 1;
     }, []);
 
-    return <div data-testid="inbox-visibility">{isTabActive ? "active" : "inactive"}</div>;
+    return <div data-testid="campaigns-visibility">{isTabActive ? "active" : "inactive"}</div>;
   };
 
-  return { default: InboxPageMock };
+  return { default: CampaignsPageMock };
 });
 
 vi.mock("@/pages/Journeys", async () => {
@@ -105,8 +105,8 @@ describe("MainTabsKeepAlive", () => {
     mocks.prefetchQuery.mockReset();
     mocks.prefetchQuery.mockResolvedValue(undefined);
     mocks.mountCounts.mentor = 0;
-    mocks.mountCounts.inbox = 0;
     mocks.mountCounts.journeys = 0;
+    mocks.mountCounts.campaigns = 0;
     mocks.mountCounts.companion = 0;
 
     let rafId = 0;
@@ -127,10 +127,10 @@ describe("MainTabsKeepAlive", () => {
 
     expect(screen.getByTestId("mentor-visibility")).toHaveTextContent("active");
 
-    rerender(<MainTabsKeepAlive activePath="/inbox" />);
+    rerender(<MainTabsKeepAlive activePath="/campaigns" />);
 
     expect(screen.getByTestId("mentor-visibility")).toHaveTextContent("inactive");
-    expect(screen.getByTestId("inbox-visibility")).toHaveTextContent("active");
+    expect(screen.getByTestId("campaigns-visibility")).toHaveTextContent("active");
   });
 
   it("prefetches journeys tasks and epics on mount", () => {
@@ -153,7 +153,7 @@ describe("MainTabsKeepAlive", () => {
     expect(screen.getByTestId("mentor-counter")).toHaveTextContent("1");
     expect(mocks.mountCounts.mentor).toBe(1);
 
-    rerender(<MainTabsKeepAlive activePath="/inbox" />);
+    rerender(<MainTabsKeepAlive activePath="/campaigns" />);
     rerender(<MainTabsKeepAlive activePath="/mentor" />);
 
     expect(screen.getByTestId("mentor-counter")).toHaveTextContent("1");
@@ -168,7 +168,7 @@ describe("MainTabsKeepAlive", () => {
     expect(scrollToSpy).not.toHaveBeenCalled();
 
     (window as Window & { scrollY: number }).scrollY = 150;
-    rerender(<MainTabsKeepAlive activePath="/inbox" />);
+    rerender(<MainTabsKeepAlive activePath="/campaigns" />);
     expect(scrollToSpy).toHaveBeenCalled();
 
     scrollToSpy.mockClear();

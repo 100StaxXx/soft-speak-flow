@@ -84,15 +84,23 @@ const dispatchScroll = () => {
   window.dispatchEvent(new Event("scroll"));
 };
 
-const dispatchTouchMove = (clientY: number) => {
-  const event = new Event("touchmove", { cancelable: true }) as TouchEvent;
+const dispatchTouchMove = (
+  clientY: number,
+  target: EventTarget = typeof document !== "undefined" ? document : window,
+) => {
+  const event = new Event("touchmove", { bubbles: true, cancelable: true }) as TouchEvent;
   Object.defineProperty(event, "touches", { value: [{ clientY }] });
-  window.dispatchEvent(event);
+  target.dispatchEvent(event);
   return event;
 };
 
-const dispatchTouchEnd = () => {
-  window.dispatchEvent(new Event("touchend"));
+const dispatchTouchEnd = (
+  target: EventTarget = typeof document !== "undefined" ? document : window,
+) => {
+  const event = new Event("touchend", { bubbles: true, cancelable: true }) as TouchEvent;
+  Object.defineProperty(event, "changedTouches", { value: [{ clientX: 0, clientY: 0 }] });
+  target.dispatchEvent(event);
+  return event;
 };
 
 const resetTimelineDragScrollLock = () => {
@@ -213,6 +221,30 @@ describe("useTimelineDrag", () => {
     });
 
     expect(onDrop).toHaveBeenCalledWith("task-row", "09:20");
+  });
+
+  it("keeps returned touch move and end handlers inert", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const handleProps = result.current.getRowDragProps("task-touch-inert", "09:00");
+    const touchMoveEvent = createTouchEvent(120);
+    const touchEndEvent = createTouchEvent(120);
+
+    act(() => {
+      handleProps.onTouchMove(touchMoveEvent);
+      handleProps.onTouchEnd(touchEndEvent);
+      handleProps.onTouchCancel(touchEndEvent);
+    });
+
+    expect(touchMoveEvent.stopPropagation).not.toHaveBeenCalled();
+    expect(touchEndEvent.stopPropagation).not.toHaveBeenCalled();
   });
 
   it("does not start drag when disabled", () => {
@@ -408,6 +440,34 @@ describe("useTimelineDrag", () => {
     expect(onDrop).toHaveBeenCalledWith("task-touch-events-priority", "09:25");
     expect(document.documentElement.classList.contains("timeline-drag-scroll-locked")).toBe(false);
     expect(document.body.classList.contains("timeline-drag-scroll-locked")).toBe(false);
+  });
+
+  it("keeps touch drag active when descendant touch handlers stop propagation", () => {
+    const onDrop = vi.fn();
+    const { result } = renderHook(() =>
+      useTimelineDrag({
+        containerRef,
+        onDrop,
+        snapConfig: SHARED_TIMELINE_DRAG_PROFILE,
+      }),
+    );
+
+    const descendant = document.createElement("div");
+    descendant.addEventListener("touchmove", (event) => event.stopPropagation());
+    descendant.addEventListener("touchend", (event) => event.stopPropagation());
+    document.body.appendChild(descendant);
+
+    const rowProps = result.current.getRowDragProps("task-touch-capture", "09:00");
+
+    act(() => {
+      rowProps.onTouchStart(createTouchEvent(100, descendant));
+      dispatchTouchMove(120, descendant);
+      dispatchTouchEnd(descendant);
+    });
+
+    expect(onDrop).toHaveBeenCalledWith("task-touch-capture", "09:20");
+
+    descendant.remove();
   });
 
   it("does not activate touch drag when movement stays below configured touch threshold", () => {

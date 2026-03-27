@@ -2952,32 +2952,38 @@ export type Database = {
       }
       evening_reflections: {
         Row: {
+          additional_reflection: string | null
           created_at: string
           gratitude: string | null
           id: string
           mentor_response: string | null
           mood: string
           reflection_date: string
+          tomorrow_adjustment: string | null
           user_id: string
           wins: string | null
         }
         Insert: {
+          additional_reflection?: string | null
           created_at?: string
           gratitude?: string | null
           id?: string
           mentor_response?: string | null
           mood: string
           reflection_date?: string
+          tomorrow_adjustment?: string | null
           user_id: string
           wins?: string | null
         }
         Update: {
+          additional_reflection?: string | null
           created_at?: string
           gratitude?: string | null
           id?: string
           mentor_response?: string | null
           mood?: string
           reflection_date?: string
+          tomorrow_adjustment?: string | null
           user_id?: string
           wins?: string | null
         }
@@ -5026,6 +5032,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      personal_quest_templates: {
+        Row: {
+          created_at: string
+          difficulty: string
+          estimated_duration: number | null
+          id: string
+          normalized_title: string
+          notes: string | null
+          source_common_template_id: string | null
+          subtasks: string[]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty: string
+          estimated_duration?: number | null
+          id?: string
+          normalized_title: string
+          notes?: string | null
+          source_common_template_id?: string | null
+          subtasks?: string[]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          estimated_duration?: number | null
+          id?: string
+          normalized_title?: string
+          notes?: string | null
+          source_common_template_id?: string | null
+          subtasks?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       playlist_items: {
         Row: {

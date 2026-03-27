@@ -494,7 +494,7 @@ const pathIsHidden = (pathname: string) =>
   pathname.startsWith("/auth") ||
   pathname.startsWith("/onboarding");
 
-const ROUTE_RESTORE_PATH_SET = new Set(["/", "/mentor", "/inbox", "/journeys", "/companion"]);
+const ROUTE_RESTORE_PATH_SET = new Set(["/", "/mentor", "/journeys", "/campaigns", "/companion"]);
 
 export const shouldRestoreTutorialRoute = ({
   pathname,

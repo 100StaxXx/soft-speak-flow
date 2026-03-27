@@ -61,6 +61,15 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
       };
     }
 
+    case "daily_quote": {
+      const quoteText = asString(payload.quote_text, "A fresh quote is ready for you.");
+      const author = asString(payload.author).trim();
+      return {
+        title: "Daily quote",
+        body: author ? `"${quoteText}" - ${author}` : `"${quoteText}"`,
+      };
+    }
+
     case "mentor_nudge": {
       const companionName = getCompanionName(input.companion);
       const message = asString(payload.message, "Your mentor left you a quick nudge.");
@@ -119,7 +128,7 @@ export function composeNotificationCopy(input: NotificationComposeInput): Notifi
     case "checkin_evening_reminder": {
       return {
         title: "Evening reflection reminder",
-        body: "Close the day with a quick reflection and one gratitude.",
+        body: "Close the day with a quick reflection and a small reset for tomorrow.",
       };
     }
 

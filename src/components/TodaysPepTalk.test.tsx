@@ -111,6 +111,14 @@ vi.mock("@/hooks/useProfile", () => ({
   }),
 }));
 
+vi.mock("@/contexts/MentorConnectionContext", () => ({
+  useMentorConnection: () => ({
+    mentorId: "mentor-1",
+    status: "ready",
+    refreshConnection: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/useMentorPersonality", () => ({
   useMentorPersonality: () => ({
     name: "Carmen",

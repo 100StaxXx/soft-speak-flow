@@ -22,6 +22,7 @@ import {
   canSyncPlannerFromRemote,
   loadLocalDailyTasks,
   syncLocalDailyTasksFromRemote,
+  withPlannerRemoteSyncLock,
 } from "@/utils/plannerSync";
 import {
   createOfflinePlannerId,
@@ -450,145 +451,51 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
           queuedCount: 0,
         } satisfies SpawnRecurringResult;
       }
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const missingTimeTemplates = pendingRecurring.filter((template) => !hasScheduledTimeValue(template.scheduled_time));
+        const templatesToSpawn = pendingRecurring.filter((template) => hasScheduledTimeValue(template.scheduled_time));
 
-      const missingTimeTemplates = pendingRecurring.filter((template) => !hasScheduledTimeValue(template.scheduled_time));
-      const templatesToSpawn = pendingRecurring.filter((template) => hasScheduledTimeValue(template.scheduled_time));
-
-      if (templatesToSpawn.length === 0) {
-        return {
-          data: [],
-          skippedMissingTimeCount: missingTimeTemplates.length,
-          attemptedTemplateCount: 0,
-          failedTemplateCount: 0,
-          usedRowByRowFallback: false,
-          usedArbiterInsertFallback: false,
-          queuedCount: 0,
-        } satisfies SpawnRecurringResult;
-      }
-
-      const existingTasks = await loadLocalDailyTasks(user.id, today);
-      const localTasksToCreate = templatesToSpawn.map((template, index) =>
-        buildSpawnedTaskRow(user.id, today, template, existingTasks.length + index),
-      );
-
-      await upsertPlannerRecords("daily_tasks", localTasksToCreate);
-
-      const tasksToCreate: RecurringTaskInsertPayload[] = localTasksToCreate.map((task) => ({
-        id: task.id,
-        user_id: user.id,
-        task_text: task.task_text,
-        task_date: today,
-        difficulty: task.difficulty,
-        scheduled_time: task.scheduled_time,
-        estimated_duration: task.estimated_duration,
-        category: task.category,
-        xp_reward: task.xp_reward,
-        epic_id: task.epic_id,
-        reminder_enabled: task.reminder_enabled,
-        reminder_minutes_before: task.reminder_minutes_before,
-        parent_template_id: task.parent_template_id as string,
-        source: "recurring",
-        is_recurring: false,
-        sort_order: task.sort_order ?? null,
-      }));
-
-      if (shouldQueueWrites) {
-        await Promise.all(
-          tasksToCreate.map((task) =>
-            queueTaskAction("CREATE_TASK", {
-              id: task.id,
-              task_text: task.task_text,
-              difficulty: task.difficulty,
-              xp_reward: task.xp_reward,
-              task_date: task.task_date,
-              scheduled_time: task.scheduled_time,
-              estimated_duration: task.estimated_duration,
-              category: task.category,
-              reminder_enabled: task.reminder_enabled,
-              reminder_minutes_before: task.reminder_minutes_before,
-              parent_template_id: task.parent_template_id,
-              epic_id: task.epic_id,
-              source: task.source,
-              is_recurring: task.is_recurring,
-              sort_order: task.sort_order,
-            }),
-          ),
-        );
-
-        return {
-          data: localTasksToCreate.map((task) => ({ id: task.id })),
-          skippedMissingTimeCount: missingTimeTemplates.length,
-          attemptedTemplateCount: templatesToSpawn.length,
-          failedTemplateCount: 0,
-          usedRowByRowFallback: false,
-          usedArbiterInsertFallback: false,
-          queuedCount: localTasksToCreate.length,
-        } satisfies SpawnRecurringResult;
-      }
-
-      const runBulkUpsert = () => supabase
-        .from("daily_tasks")
-        .upsert(tasksToCreate, {
-          onConflict: "user_id,task_date,parent_template_id",
-          ignoreDuplicates: true,
-        })
-        .select("id");
-
-      const runRowByRow = async (mode: "upsert" | "insert") => {
-        const spawnedIds: { id: string }[] = [];
-        const failures: SpawnFailure[] = [];
-
-        for (const task of tasksToCreate) {
-          const result = mode === "insert"
-            ? await supabase.from("daily_tasks").insert(task).select("id")
-            : await supabase
-              .from("daily_tasks")
-              .upsert(task, {
-                onConflict: "user_id,task_date,parent_template_id",
-                ignoreDuplicates: true,
-              })
-              .select("id");
-
-          if (result.error) {
-            if (mode === "insert" && isUniqueViolationError(result.error)) continue;
-
-            failures.push({
-              templateId: task.parent_template_id,
-              code: result.error.code ?? null,
-              message: result.error.message ?? null,
-            });
-            continue;
-          }
-
-          if (result.data && result.data.length > 0) {
-            spawnedIds.push(...result.data.map((row) => ({ id: row.id })));
-          }
+        if (templatesToSpawn.length === 0) {
+          return {
+            data: [],
+            skippedMissingTimeCount: missingTimeTemplates.length,
+            attemptedTemplateCount: 0,
+            failedTemplateCount: 0,
+            usedRowByRowFallback: false,
+            usedArbiterInsertFallback: false,
+            queuedCount: 0,
+          } satisfies SpawnRecurringResult;
         }
 
-        return { spawnedIds, failures };
-      };
+        const existingTasks = await loadLocalDailyTasks(user.id, today);
+        const localTasksToCreate = templatesToSpawn.map((template, index) =>
+          buildSpawnedTaskRow(user.id, today, template, existingTasks.length + index),
+        );
 
-      const { data, error } = await runBulkUpsert();
-      if (!error) {
-        return {
-          data: data ?? localTasksToCreate.map((task) => ({ id: task.id })),
-          skippedMissingTimeCount: missingTimeTemplates.length,
-          attemptedTemplateCount: templatesToSpawn.length,
-          failedTemplateCount: 0,
-          usedRowByRowFallback: false,
-          usedArbiterInsertFallback: false,
-          queuedCount: 0,
-        } satisfies SpawnRecurringResult;
-      }
+        await upsertPlannerRecords("daily_tasks", localTasksToCreate);
 
-      const useArbiterInsertFallback = isOnConflictArbiterError(error);
-      const rowResult = await runRowByRow(useArbiterInsertFallback ? "insert" : "upsert");
+        const tasksToCreate: RecurringTaskInsertPayload[] = localTasksToCreate.map((task) => ({
+          id: task.id,
+          user_id: user.id,
+          task_text: task.task_text,
+          task_date: today,
+          difficulty: task.difficulty,
+          scheduled_time: task.scheduled_time,
+          estimated_duration: task.estimated_duration,
+          category: task.category,
+          xp_reward: task.xp_reward,
+          epic_id: task.epic_id,
+          reminder_enabled: task.reminder_enabled,
+          reminder_minutes_before: task.reminder_minutes_before,
+          parent_template_id: task.parent_template_id as string,
+          source: "recurring",
+          is_recurring: false,
+          sort_order: task.sort_order ?? null,
+        }));
 
-      if (rowResult.failures.length > 0) {
-        await Promise.all(
-          tasksToCreate
-            .filter((task) => rowResult.failures.some((failure) => failure.templateId === task.parent_template_id))
-            .map((task) =>
+        if (shouldQueueWrites) {
+          await Promise.all(
+            tasksToCreate.map((task) =>
               queueTaskAction("CREATE_TASK", {
                 id: task.id,
                 task_text: task.task_text,
@@ -607,19 +514,114 @@ export function useRecurringTaskSpawner(selectedDate?: Date) {
                 sort_order: task.sort_order,
               }),
             ),
-        );
-        void retryNow();
-      }
+          );
 
-      return {
-        data: rowResult.spawnedIds.length > 0 ? rowResult.spawnedIds : localTasksToCreate.map((task) => ({ id: task.id })),
-        skippedMissingTimeCount: missingTimeTemplates.length,
-        attemptedTemplateCount: templatesToSpawn.length,
-        failedTemplateCount: rowResult.failures.length,
-        usedRowByRowFallback: true,
-        usedArbiterInsertFallback: useArbiterInsertFallback,
-        queuedCount: rowResult.failures.length,
-      } satisfies SpawnRecurringResult;
+          return {
+            data: localTasksToCreate.map((task) => ({ id: task.id })),
+            skippedMissingTimeCount: missingTimeTemplates.length,
+            attemptedTemplateCount: templatesToSpawn.length,
+            failedTemplateCount: 0,
+            usedRowByRowFallback: false,
+            usedArbiterInsertFallback: false,
+            queuedCount: localTasksToCreate.length,
+          } satisfies SpawnRecurringResult;
+        }
+
+        const runBulkUpsert = () => supabase
+          .from("daily_tasks")
+          .upsert(tasksToCreate, {
+            onConflict: "user_id,task_date,parent_template_id",
+            ignoreDuplicates: true,
+          })
+          .select("id");
+
+        const runRowByRow = async (mode: "upsert" | "insert") => {
+          const spawnedIds: { id: string }[] = [];
+          const failures: SpawnFailure[] = [];
+
+          for (const task of tasksToCreate) {
+            const result = mode === "insert"
+              ? await supabase.from("daily_tasks").insert(task).select("id")
+              : await supabase
+                .from("daily_tasks")
+                .upsert(task, {
+                  onConflict: "user_id,task_date,parent_template_id",
+                  ignoreDuplicates: true,
+                })
+                .select("id");
+
+            if (result.error) {
+              if (mode === "insert" && isUniqueViolationError(result.error)) continue;
+
+              failures.push({
+                templateId: task.parent_template_id,
+                code: result.error.code ?? null,
+                message: result.error.message ?? null,
+              });
+              continue;
+            }
+
+            if (result.data && result.data.length > 0) {
+              spawnedIds.push(...result.data.map((row) => ({ id: row.id })));
+            }
+          }
+
+          return { spawnedIds, failures };
+        };
+
+        const { data, error } = await runBulkUpsert();
+        if (!error) {
+          return {
+            data: data ?? localTasksToCreate.map((task) => ({ id: task.id })),
+            skippedMissingTimeCount: missingTimeTemplates.length,
+            attemptedTemplateCount: templatesToSpawn.length,
+            failedTemplateCount: 0,
+            usedRowByRowFallback: false,
+            usedArbiterInsertFallback: false,
+            queuedCount: 0,
+          } satisfies SpawnRecurringResult;
+        }
+
+        const useArbiterInsertFallback = isOnConflictArbiterError(error);
+        const rowResult = await runRowByRow(useArbiterInsertFallback ? "insert" : "upsert");
+
+        if (rowResult.failures.length > 0) {
+          await Promise.all(
+            tasksToCreate
+              .filter((task) => rowResult.failures.some((failure) => failure.templateId === task.parent_template_id))
+              .map((task) =>
+                queueTaskAction("CREATE_TASK", {
+                  id: task.id,
+                  task_text: task.task_text,
+                  difficulty: task.difficulty,
+                  xp_reward: task.xp_reward,
+                  task_date: task.task_date,
+                  scheduled_time: task.scheduled_time,
+                  estimated_duration: task.estimated_duration,
+                  category: task.category,
+                  reminder_enabled: task.reminder_enabled,
+                  reminder_minutes_before: task.reminder_minutes_before,
+                  parent_template_id: task.parent_template_id,
+                  epic_id: task.epic_id,
+                  source: task.source,
+                  is_recurring: task.is_recurring,
+                  sort_order: task.sort_order,
+                }),
+              ),
+          );
+          void retryNow();
+        }
+
+        return {
+          data: rowResult.spawnedIds.length > 0 ? rowResult.spawnedIds : localTasksToCreate.map((task) => ({ id: task.id })),
+          skippedMissingTimeCount: missingTimeTemplates.length,
+          attemptedTemplateCount: templatesToSpawn.length,
+          failedTemplateCount: rowResult.failures.length,
+          usedRowByRowFallback: true,
+          usedArbiterInsertFallback: useArbiterInsertFallback,
+          queuedCount: rowResult.failures.length,
+        } satisfies SpawnRecurringResult;
+      });
     },
     onSuccess: ({
       data,

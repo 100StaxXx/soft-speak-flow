@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   const invalidateQueriesMock = vi.fn().mockResolvedValue(undefined);
   const addListenerMock = vi.fn();
   const removeListenerMock = vi.fn().mockResolvedValue(undefined);
+  const dispatchPlannerSyncFinishedMock = vi.fn();
   const loggerDebugMock = vi.fn();
   const loggerWarnMock = vi.fn();
   const state = {
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => {
     invalidateQueriesMock,
     addListenerMock,
     removeListenerMock,
+    dispatchPlannerSyncFinishedMock,
     loggerDebugMock,
     loggerWarnMock,
     state,
@@ -48,6 +50,10 @@ vi.mock("@/utils/logger", () => ({
     debug: mocks.loggerDebugMock,
     warn: mocks.loggerWarnMock,
   },
+}));
+
+vi.mock("@/utils/plannerSync", () => ({
+  dispatchPlannerSyncFinished: mocks.dispatchPlannerSyncFinishedMock,
 }));
 
 import { useAppResumeRefresh } from "./useAppResumeRefresh";
@@ -84,5 +90,6 @@ describe("useAppResumeRefresh", () => {
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion-care-signals"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["current-evolution-card"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
+    expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
   });
 });

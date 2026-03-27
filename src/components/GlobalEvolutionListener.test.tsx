@@ -43,14 +43,12 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useProfile", () => ({
-  useProfile: () => ({
-    profile: null,
+vi.mock("@/contexts/MentorConnectionContext", () => ({
+  useMentorConnection: () => ({
+    mentorId: null,
+    status: "ready",
+    refreshConnection: vi.fn(),
   }),
-}));
-
-vi.mock("@/utils/mentor", () => ({
-  getResolvedMentorId: () => null,
 }));
 
 vi.mock("@/contexts/EvolutionContext", () => ({

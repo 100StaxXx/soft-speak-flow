@@ -12,7 +12,7 @@ import { MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import { PageTransition } from "@/components/PageTransition";
-import { useMentorConnectionHealth } from "@/hooks/useMentorConnectionHealth";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 
 export default function MentorChat() {
@@ -25,10 +25,10 @@ export default function MentorChat() {
   const [isRetrying, setIsRetrying] = useState(false);
   const haptics = useHapticFeedback();
   const {
-    effectiveMentorId: resolvedMentorId,
+    mentorId: resolvedMentorId,
     status: mentorConnectionStatus,
     refreshConnection,
-  } = useMentorConnectionHealth();
+  } = useMentorConnection();
 
   // Get briefing context from navigation state
   const briefingContext = location.state?.briefingContext;

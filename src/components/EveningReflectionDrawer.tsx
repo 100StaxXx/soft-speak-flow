@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Moon, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronDown, Moon, Sparkles } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -9,8 +9,10 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useEveningReflection } from "@/hooks/useEveningReflection";
 import { useIOSKeyboardAvoidance } from "@/hooks/useIOSKeyboardAvoidance";
+import { useToast } from "@/hooks/use-toast";
 
 const MOOD_OPTIONS = [
   { emoji: "😊", label: "Great", value: "great" },
@@ -25,39 +27,61 @@ interface EveningReflectionDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const MAX_REFLECTION_LENGTH = 800;
+
 export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectionDrawerProps) => {
   const { submitReflection, isSubmitting } = useEveningReflection();
+  const { toast } = useToast();
   const [mood, setMood] = useState<string>("");
   const [wins, setWins] = useState("");
+  const [additionalReflection, setAdditionalReflection] = useState("");
+  const [tomorrowAdjustment, setTomorrowAdjustment] = useState("");
   const [gratitude, setGratitude] = useState("");
+  const [isDeeperOpen, setIsDeeperOpen] = useState(false);
   
   const winsRef = useRef<HTMLTextAreaElement>(null);
+  const additionalReflectionRef = useRef<HTMLTextAreaElement>(null);
+  const tomorrowAdjustmentRef = useRef<HTMLTextAreaElement>(null);
   const gratitudeRef = useRef<HTMLTextAreaElement>(null);
   const { containerStyle, inputStyle, scrollInputIntoView } = useIOSKeyboardAvoidance({ offsetBuffer: 10 });
+
+  const resetForm = () => {
+    setMood("");
+    setWins("");
+    setAdditionalReflection("");
+    setTomorrowAdjustment("");
+    setGratitude("");
+    setIsDeeperOpen(false);
+  };
 
   // Reset form when drawer closes
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
-      setMood("");
-      setWins("");
-      setGratitude("");
+      resetForm();
     }
     onOpenChange(isOpen);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!mood) return;
-    
-    submitReflection({
-      mood,
-      wins: wins.trim() || undefined,
-      gratitude: gratitude.trim() || undefined,
-    });
 
-    // Reset form
-    setMood("");
-    setWins("");
-    setGratitude("");
+    try {
+      await submitReflection({
+        mood,
+        wins: wins.trim() || undefined,
+        additionalReflection: additionalReflection.trim() || undefined,
+        tomorrowAdjustment: tomorrowAdjustment.trim() || undefined,
+        gratitude: gratitude.trim() || undefined,
+      });
+
+      resetForm();
+    } catch (error) {
+      toast({
+        title: "Unable to save reflection",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const isValid = mood.length > 0;
@@ -114,15 +138,79 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
               </label>
               <Textarea
                 ref={winsRef}
-                placeholder="A small win, a moment of joy, something you accomplished..."
+                placeholder="A small win, a moment of joy, something you appreciated about today..."
                 value={wins}
-                onChange={(e) => setWins(e.target.value.slice(0, 280))}
+                maxLength={MAX_REFLECTION_LENGTH}
+                onChange={(e) => setWins(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
                 onFocus={() => scrollInputIntoView(winsRef)}
-                className="resize-none h-20 bg-muted/30 border-border/50"
+                className="resize-none min-h-24 bg-muted/30 border-border/50"
                 style={inputStyle}
               />
-              <p className="text-xs text-muted-foreground text-right">{wins.length}/280</p>
+              <p className="text-xs text-muted-foreground text-right">{wins.length}/{MAX_REFLECTION_LENGTH}</p>
             </div>
+
+            <Collapsible open={isDeeperOpen} onOpenChange={setIsDeeperOpen} data-vaul-no-drag>
+              <div className="rounded-2xl border border-border/50 bg-muted/20">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-muted/20"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-foreground">Go a little deeper</p>
+                      <p className="text-xs text-muted-foreground">
+                        Optional space for anything else on your mind tonight.
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                        isDeeperOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="space-y-4 px-4 pb-4">
+                  <div className="space-y-2" data-vaul-no-drag>
+                    <label className="text-sm font-medium text-foreground">
+                      Anything else you'd like to reflect on from today? <span className="text-muted-foreground">(optional)</span>
+                    </label>
+                    <Textarea
+                      ref={additionalReflectionRef}
+                      placeholder="Anything else that feels worth naming tonight..."
+                      value={additionalReflection}
+                      maxLength={MAX_REFLECTION_LENGTH}
+                      onChange={(e) => setAdditionalReflection(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
+                      onFocus={() => scrollInputIntoView(additionalReflectionRef)}
+                      className="resize-none min-h-24 bg-muted/30 border-border/50"
+                      style={inputStyle}
+                    />
+                    <p className="text-xs text-muted-foreground text-right">
+                      {additionalReflection.length}/{MAX_REFLECTION_LENGTH}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2" data-vaul-no-drag>
+                    <label className="text-sm font-medium text-foreground">
+                      What's one small adjustment you'd like to make tomorrow? <span className="text-muted-foreground">(optional)</span>
+                    </label>
+                    <Textarea
+                      ref={tomorrowAdjustmentRef}
+                      placeholder="One small shift, boundary, or choice you'd like to try tomorrow..."
+                      value={tomorrowAdjustment}
+                      maxLength={MAX_REFLECTION_LENGTH}
+                      onChange={(e) => setTomorrowAdjustment(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
+                      onFocus={() => scrollInputIntoView(tomorrowAdjustmentRef)}
+                      className="resize-none min-h-24 bg-muted/30 border-border/50"
+                      style={inputStyle}
+                    />
+                    <p className="text-xs text-muted-foreground text-right">
+                      {tomorrowAdjustment.length}/{MAX_REFLECTION_LENGTH}
+                    </p>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
 
             {/* Gratitude */}
             <div className="space-y-2" data-vaul-no-drag>
@@ -133,12 +221,13 @@ export const EveningReflectionDrawer = ({ open, onOpenChange }: EveningReflectio
                 ref={gratitudeRef}
                 placeholder="Something or someone you appreciate today..."
                 value={gratitude}
-                onChange={(e) => setGratitude(e.target.value.slice(0, 280))}
+                maxLength={MAX_REFLECTION_LENGTH}
+                onChange={(e) => setGratitude(e.target.value.slice(0, MAX_REFLECTION_LENGTH))}
                 onFocus={() => scrollInputIntoView(gratitudeRef)}
-                className="resize-none h-20 bg-muted/30 border-border/50"
+                className="resize-none min-h-24 bg-muted/30 border-border/50"
                 style={inputStyle}
               />
-              <p className="text-xs text-muted-foreground text-right">{gratitude.length}/280</p>
+              <p className="text-xs text-muted-foreground text-right">{gratitude.length}/{MAX_REFLECTION_LENGTH}</p>
             </div>
 
             {/* Submit Button */}

@@ -74,7 +74,7 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
     mentorSlug: "carmen",
     mentorName: "Carmen",
     voiceName: "Domi",
-    voiceId: "AZnzlk1XvdvUeBnXmlld",
+    voiceId: "bD9maNcCuQQS75DGuteM",
     defaultIntensity: "high",
     categories: ["discipline", "business", "confidence"],
     voiceSettings: {
@@ -87,8 +87,8 @@ export const mentorVoices: Record<string, MentorVoiceConfig> = {
   reign: {
     mentorSlug: "reign",
     mentorName: "Reign",
-    voiceName: "Sarah",
-    voiceId: "EXAVITQu4vr4xnSDxMaL",
+    voiceName: "Reign Custom",
+    voiceId: "GTQ4ImqrRljZAa9VJX6B",
     defaultIntensity: "high",
     categories: ["physique", "business", "momentum"],
     voiceSettings: {

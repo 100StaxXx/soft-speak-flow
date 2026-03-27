@@ -26,10 +26,14 @@ import { useSubtasks } from "@/features/tasks/hooks/useSubtasks";
 import {
   centerSelectedTimeInWheel,
   DIFFICULTY_COLORS,
+  QUEST_FORM_STYLES,
   formatTime12,
   TIME_SLOTS,
   DURATION_OPTIONS,
   getNextHalfHourTime,
+  getQuestDifficultyIconClasses,
+  getQuestDifficultyOptionClasses,
+  getQuestOptionPillClasses,
 } from "@/components/quest-shared";
 import type { QuestDifficulty } from "../types";
 import {
@@ -195,7 +199,6 @@ export function EditQuestDialog({
       setShowTimePicker(false);
       setShowAdvanced(
         !!task.recurrence_pattern ||
-        !!task.reminder_enabled ||
         !!task.location
       );
     }
@@ -283,34 +286,47 @@ export function EditQuestDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden">
+      <SheetContent
+        side="bottom"
+        className={cn(
+          "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
+          QUEST_FORM_STYLES.sheet,
+        )}
+      >
         <SheetTitle className="sr-only">Edit Quest</SheetTitle>
         <SheetDescription className="sr-only">
           Update this quest details, schedule, and reminders.
         </SheetDescription>
 
         {/* Header Banner - difficulty colored, editable title */}
-        <div className={cn("relative px-5 pt-3 pb-3 flex-shrink-0", colors.bg)}>
-          <div className="flex items-center gap-3">
+        <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
+          <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
+          <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => onOpenChange(false)}
-              className="p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white"
+              className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
               aria-label="Close"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="flex-1 min-w-0">
-              <Input
-                value={taskText}
-                onChange={(e) => setTaskText(e.target.value)}
-                className="text-base font-bold bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/30 h-9"
-                placeholder="Quest title"
-              />
-              <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
+              <div className={QUEST_FORM_STYLES.titleFieldShell}>
+                <div className={QUEST_FORM_STYLES.titleFieldInner}>
+                  <Input
+                    value={taskText}
+                    onChange={(e) => setTaskText(e.target.value)}
+                    className={QUEST_FORM_STYLES.titleInput}
+                    placeholder="Quest title"
+                  />
+                </div>
+              </div>
+              <p className="mt-1.5 text-sm text-white/80">{summaryLine}</p>
             </div>
             <button
               onClick={() => onOpenChange(false)}
-              className="p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white"
+              className="rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
@@ -318,7 +334,7 @@ export function EditQuestDialog({
           </div>
 
           {/* Compact Difficulty Selector */}
-          <div className="flex justify-center gap-3 mt-2">
+          <div className="mt-3 flex justify-center gap-2">
             {([
               { value: "easy" as const, icon: Zap, label: "Easy" },
               { value: "medium" as const, icon: Flame, label: "Medium" },
@@ -327,39 +343,37 @@ export function EditQuestDialog({
               <button
                 key={value}
                 onClick={() => setDifficulty(value)}
-                className={cn(
-                  "w-14 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all border-2",
-                  difficulty === value
-                    ? "bg-white/30 border-white scale-110"
-                    : "bg-white/10 border-transparent hover:bg-white/20"
-                )}
+                className={getQuestDifficultyOptionClasses(value, difficulty === value)}
               >
-                <Icon className="h-4 w-4 text-white" />
-                <span className="text-[10px] font-medium text-white/80 leading-none">{label}</span>
+                <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <span className="font-fredoka text-[12px] leading-none">{label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="px-4 py-4 space-y-3">
+        <div className={cn("flex-1 overflow-y-auto", QUEST_FORM_STYLES.body)}>
+          <div className="px-4 py-4 space-y-4">
             {/* Date & Time Chips side by side */}
             <div className="flex gap-2">
               {/* Date Chip */}
               <Popover>
                 <PopoverTrigger asChild>
                   <button className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
+                    "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                    QUEST_FORM_STYLES.selectorChip,
                     taskDate
-                      ? "bg-card border-border/50 text-foreground"
-                      : "bg-muted/30 border-dashed border-border/50 text-muted-foreground"
+                      ? ""
+                      : QUEST_FORM_STYLES.selectorChipMuted
                   )}>
                     <CalendarIcon className="h-4 w-4" />
                     {taskDate ? format(dateObj, "MMM d") : "Date"}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                <PopoverContent className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)} align="start">
                   <Calendar
                     mode="single"
                     selected={dateObj}
@@ -378,10 +392,11 @@ export function EditQuestDialog({
                   setShowTimePicker(!showTimePicker);
                 }}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
+                  "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                  QUEST_FORM_STYLES.selectorChip,
                   scheduledTime
-                    ? "bg-card border-border/50 text-foreground"
-                    : "bg-muted/30 border-dashed border-border/50 text-muted-foreground"
+                    ? ""
+                    : QUEST_FORM_STYLES.selectorChipMuted
                 )}
               >
                 <Clock className="h-4 w-4" />
@@ -398,14 +413,14 @@ export function EditQuestDialog({
                   step={60}
                   value={scheduledTime || ""}
                   onChange={(event) => setScheduledTime(event.target.value || null)}
-                  className="h-10 text-base"
+                  className="h-11 rounded-[20px] border-white/10 bg-white/[0.08] text-base text-white"
                 />
                 <div
                   ref={timeWheelRef}
-                  className="relative h-[180px] overflow-y-auto rounded-xl bg-card border border-border/50 snap-y snap-mandatory scrollbar-none"
+                  className={QUEST_FORM_STYLES.timeWheel}
                   style={{ scrollbarWidth: "none" }}
                 >
-                  <div className="sticky top-0 h-12 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none" />
+                  <div className={QUEST_FORM_STYLES.timeWheelFadeTop} />
                   <div className="flex flex-col items-center py-1">
                     {TIME_SLOTS.map((slot) => {
                       const isSelected = scheduledTime === slot;
@@ -420,10 +435,10 @@ export function EditQuestDialog({
                           data-time-slot={slot}
                           onClick={() => setScheduledTime(slot)}
                           className={cn(
-                            "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",
+                            "my-0.5 w-[85%] rounded-[20px] py-2.5 text-center text-sm font-semibold snap-center transition-all duration-150 motion-reduce:transition-none",
                             isSelected
-                              ? cn(colors.pill, "text-white shadow-lg scale-[1.02]")
-                              : "text-foreground hover:bg-muted/50"
+                              ? cn(getQuestOptionPillClasses(true, colors.pill), "scale-[1.02]")
+                              : "text-white/74 hover:bg-white/[0.08]"
                           )}
                           style={{ opacity: isSelected ? 1 : opacity }}
                         >
@@ -431,10 +446,10 @@ export function EditQuestDialog({
                             ? `${formatTime12(slot)} – ${formatTime12(endTime)}`
                             : formatTime12(slot)}
                         </button>
-                      );
+                        );
                     })}
                   </div>
-                  <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
+                  <div className={QUEST_FORM_STYLES.timeWheelFadeBottom} />
                 </div>
               </div>
             )}
@@ -442,13 +457,16 @@ export function EditQuestDialog({
             {/* Duration Row */}
             <button
               onClick={() => setShowDurationChips(!showDurationChips)}
-              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
+              className={cn(
+                "w-full flex items-center justify-between text-white",
+                QUEST_FORM_STYLES.selectorChip,
+              )}
             >
-              <div className="flex items-center gap-2.5 text-sm font-medium">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2.5 text-sm font-semibold">
+                <Clock className="h-4 w-4 text-white/58" />
                 <span>{durationLabel}</span>
               </div>
-              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
+              <ChevronRight className={cn("h-4 w-4 text-white/52 transition-transform", showDurationChips && "rotate-90")} />
             </button>
 
             {showDurationChips && (
@@ -470,12 +488,7 @@ export function EditQuestDialog({
                             setEstimatedDuration(opt.value);
                           }
                         }}
-                        className={cn(
-                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
-                          isSelected
-                            ? cn(colors.pill, "text-white shadow-md")
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
+                        className={getQuestOptionPillClasses(isSelected, colors.pill)}
                       >
                         {opt.label}
                       </button>
@@ -483,7 +496,7 @@ export function EditQuestDialog({
                   })}
                 </div>
                 {(isCustomDuration || (estimatedDuration === null && customDurationInput !== undefined)) && (
-                  <div className="flex items-center gap-2">
+                  <div className={cn("flex items-center gap-2 rounded-[20px] px-3 py-2", QUEST_FORM_STYLES.insetPanel)}>
                     <Input
                       type="number"
                       inputMode="numeric"
@@ -499,28 +512,28 @@ export function EditQuestDialog({
                           setEstimatedDuration(null);
                         }
                       }}
-                      className="w-28 h-9 text-sm"
+                      className="h-10 w-28 border-white/10 bg-white/[0.08] text-sm text-white"
                       autoFocus
                     />
-                    <span className="text-xs text-muted-foreground">min</span>
+                    <span className="text-xs text-white/58">min</span>
                   </div>
                 )}
               </div>
             )}
 
             {/* Subtasks + Notes Card */}
-            <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
+            <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
               {subtasks.map((st) => (
-                <div key={st.id} className="flex items-center gap-2 px-3 py-2 border-b border-border/30 group">
+                <div key={st.id} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
                   <Checkbox
                     checked={st.completed}
                     onCheckedChange={(checked) => toggleSubtask({ subtaskId: st.id, completed: !!checked })}
-                    className="h-4 w-4"
+                    className="h-4 w-4 border-white/18"
                   />
-                  <span className={cn("flex-1 text-sm", st.completed && "line-through text-muted-foreground")}>{st.title}</span>
+                  <span className={cn("flex-1 text-sm text-white", st.completed && "line-through text-white/42")}>{st.title}</span>
                   <button
                     onClick={() => deleteSubtask(st.id)}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
+                    className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -528,8 +541,8 @@ export function EditQuestDialog({
               ))}
 
               {/* Add subtask row */}
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
-                <Checkbox disabled className="h-4 w-4 opacity-30" />
+              <div className={cn("flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
+                <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
                 <input
                   value={newSubtaskText}
                   onChange={(e) => setNewSubtaskText(e.target.value)}
@@ -540,7 +553,7 @@ export function EditQuestDialog({
                     }
                   }}
                   placeholder="Add Subtask"
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+                  className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
                 />
               </div>
 
@@ -548,20 +561,54 @@ export function EditQuestDialog({
                 value={moreInformation || ""}
                 onChange={(e) => setMoreInformation(e.target.value || null)}
                 placeholder="Add notes, meeting links or phone numbers..."
-                className="min-h-[70px] border-0 rounded-none bg-transparent resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
                 style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
                 data-vaul-no-drag
               />
             </div>
 
             {/* Attachments Section */}
-            <div className="space-y-2 px-1">
-              <p className="text-sm font-medium text-muted-foreground">Photo / Files</p>
+            <div className={cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 px-4 py-4")}>
+              <p className={cn("text-sm font-semibold", QUEST_FORM_STYLES.label)}>Photo / Files</p>
               <QuestAttachmentPicker
                 attachments={attachments}
                 onAttachmentsChange={setAttachments}
+                visualStyle="quest-soft"
               />
             </div>
+
+            {scheduledTime && (
+              <AdvancedQuestOptions
+                scheduledTime={scheduledTime}
+                estimatedDuration={estimatedDuration}
+                recurrencePattern={recurrencePattern}
+                recurrenceDays={recurrenceDays}
+                recurrenceMonthDays={recurrenceMonthDays}
+                recurrenceCustomPeriod={recurrenceCustomPeriod}
+                reminderEnabled={reminderEnabled}
+                reminderMinutesBefore={reminderMinutesBefore}
+                onScheduledTimeChange={setScheduledTime}
+                onEstimatedDurationChange={setEstimatedDuration}
+                onRecurrencePatternChange={setRecurrencePattern}
+                onRecurrenceDaysChange={setRecurrenceDays}
+                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                onReminderEnabledChange={setReminderEnabled}
+                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                moreInformation={moreInformation}
+                onMoreInformationChange={setMoreInformation}
+                location={location}
+                onLocationChange={setLocation}
+                selectedDate={parsedTaskDate ?? new Date()}
+                hideScheduledTime
+                hideDuration
+                hideMoreInformation
+                hideRecurrence
+                hideLocation
+                requireScheduledTimeForRecurrence
+                visualStyle="quest-soft"
+              />
+            )}
 
             {/* Advanced Settings */}
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
@@ -569,7 +616,7 @@ export function EditQuestDialog({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-between text-muted-foreground"
+                  className={QUEST_FORM_STYLES.advancedTrigger}
                 >
                   <span className="flex items-center gap-2">
                     <Sliders className="w-4 h-4" />
@@ -605,10 +652,12 @@ export function EditQuestDialog({
                     hideScheduledTime
                     hideDuration
                     hideMoreInformation
+                    hideReminder
                     requireScheduledTimeForRecurrence
+                    visualStyle="quest-soft"
                   />
                   {hasRecurrenceWithoutTime && (
-                    <p className="mt-2 text-xs text-muted-foreground">
+                    <p className={cn("mt-2", QUEST_FORM_STYLES.helperText)}>
                       Set a time before enabling recurrence.
                     </p>
                   )}
@@ -619,13 +668,13 @@ export function EditQuestDialog({
         </div>
 
         {/* Footer */}
-        <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
+        <div className="flex-shrink-0 flex flex-col gap-3 border-t border-white/8 px-5 pt-4 pb-6">
             <Button
               onClick={handleSave}
               disabled={isSaving || !taskText.trim() || hasRecurrenceWithoutTime}
               className={cn(
-                "w-full text-white",
-                taskText.trim() ? cn(colors.pill, "hover:opacity-90") : ""
+                "h-14 w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
+                taskText.trim() && !hasRecurrenceWithoutTime ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
               {isSaving ? "Saving..." : "Save Changes"}
@@ -635,7 +684,7 @@ export function EditQuestDialog({
               variant="outline"
               onClick={() => onSendToCalendar(task?.id || "")}
               disabled={isSendingToCalendar || !task?.id}
-              className="w-full"
+              className={cn("h-12 w-full rounded-[26px] border font-semibold disabled:opacity-45", QUEST_FORM_STYLES.secondaryButton)}
             >
               <CalendarPlus className="w-4 h-4 mr-2" />
               {isSendingToCalendar
@@ -650,7 +699,7 @@ export function EditQuestDialog({
               variant="ghost"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isDeleting}
-              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="w-full rounded-[24px] text-white/72 hover:bg-white/[0.06] hover:text-white"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete

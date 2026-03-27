@@ -21,6 +21,8 @@ const MENTOR_VOICES: Record<string, string> = {
   'lumi': 'EXAVITQu4vr4xnSDxMaL', // Sarah
   'kai': 'N2lVS1w4EtoT3dr4eOWO', // Callum
   'stryker': 'pNInz6obpgDQGcFmaJgB', // Rich
+  'carmen': 'bD9maNcCuQQS75DGuteM', // Carmen
+  'reign': 'GTQ4ImqrRljZAa9VJX6B', // Reign custom voice
   'solace': 'pFZP5JQG7iQjIQuC4Bku', // Lily
 };
 

@@ -2,12 +2,24 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import type { DailyTask } from "@/services/dailyTasksRemote";
 import type { PersonalQuestTemplate, QuestDifficulty } from "@/features/quests/types";
+import {
+  fetchExplicitPersonalQuestTemplates,
+  mapExplicitPersonalQuestTemplate,
+  savePersonalQuestTemplate,
+  type UpsertPersonalQuestTemplateInput,
+} from "@/features/quests/services/personalQuestTemplates";
 import { isValidDifficulty } from "@/types/quest";
 import {
   getAllLocalTasksForUser,
   getLocalSubtasksForTask,
 } from "@/utils/plannerLocalStore";
 import { PLANNER_SYNC_EVENT } from "@/utils/plannerSync";
+import {
+  normalizeQuestTemplateSubtasks,
+  normalizeQuestTemplateTextField,
+  normalizeQuestTemplateTitleForDisplay,
+  normalizeQuestTemplateTitleForIdentity,
+} from "@/features/quests/utils/questTemplateNormalization";
 
 type AllowedPersonalQuestSource = "manual" | "inbox" | "voice" | "nlp";
 
@@ -33,9 +45,6 @@ const ALLOWED_PERSONAL_QUEST_SOURCES = new Set<AllowedPersonalQuestSource>([
 
 const MIN_PERSONAL_TEMPLATE_FREQUENCY = 2;
 
-const normalizeQuestTitle = (taskText: string) => taskText.trim().replace(/\s+/g, " ").toLowerCase();
-const normalizeQuestDisplayTitle = (taskText: string) => taskText.trim().replace(/\s+/g, " ");
-
 const getTaskRecencyTimestamp = (task: DailyTask): number => {
   const candidates = [
     task.created_at,
@@ -52,11 +61,17 @@ const getTaskRecencyTimestamp = (task: DailyTask): number => {
   return 0;
 };
 
+const getTemplateRecencyTimestamp = (template: Pick<PersonalQuestTemplate, "lastUsedAt">) => {
+  if (!template.lastUsedAt) return 0;
+  const timestamp = Date.parse(template.lastUsedAt);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
 const normalizeDifficulty = (difficulty: string | null): QuestDifficulty =>
   isValidDifficulty(difficulty) ? difficulty : "medium";
 
 export const isEligiblePersonalQuestTask = (task: DailyTask): boolean => {
-  const normalizedTitle = normalizeQuestTitle(task.task_text);
+  const normalizedTitle = normalizeQuestTemplateTitleForIdentity(task.task_text);
   if (!normalizedTitle) return false;
   if (task.habit_source_id !== null) return false;
   if (task.ai_generated === true) return false;
@@ -69,7 +84,7 @@ export const derivePersonalQuestTemplateGroups = (tasks: DailyTask[]): PersonalQ
   tasks.forEach((task) => {
     if (!isEligiblePersonalQuestTask(task)) return;
 
-    const normalizedTitle = normalizeQuestTitle(task.task_text);
+    const normalizedTitle = normalizeQuestTemplateTitleForIdentity(task.task_text);
     const currentTaskTimestamp = getTaskRecencyTimestamp(task);
     const existing = groups.get(normalizedTitle);
 
@@ -108,10 +123,9 @@ export const derivePersonalQuestTemplateGroups = (tasks: DailyTask[]): PersonalQ
     });
 };
 
-export async function buildPersonalQuestTemplates(userId: string): Promise<PersonalQuestTemplate[]> {
+export async function buildDerivedPersonalQuestTemplates(userId: string): Promise<PersonalQuestTemplate[]> {
   const tasks = await getAllLocalTasksForUser<DailyTask>(userId);
   const groups = derivePersonalQuestTemplateGroups(tasks);
-
   const subtasksByTemplateId = new Map<string, string[]>();
 
   await Promise.all(groups.map(async (group) => {
@@ -126,25 +140,80 @@ export async function buildPersonalQuestTemplates(userId: string): Promise<Perso
   }));
 
   return groups.map((group) => ({
-    id: `personal-${group.normalizedTitle}`,
-    title: normalizeQuestDisplayTitle(group.representativeTask.task_text),
+    id: `derived-${group.normalizedTitle}`,
+    title: normalizeQuestTemplateTitleForDisplay(group.representativeTask.task_text),
     frequency: group.frequency,
     lastUsedAt: group.lastUsedAt,
     difficulty: normalizeDifficulty(group.representativeTask.difficulty),
     estimatedDuration: group.representativeTask.estimated_duration ?? null,
-    notes: group.representativeTask.notes ?? null,
-    subtasks: subtasksByTemplateId.get(group.normalizedTitle) ?? [],
+    notes: normalizeQuestTemplateTextField(group.representativeTask.notes),
+    subtasks: normalizeQuestTemplateSubtasks(subtasksByTemplateId.get(group.normalizedTitle) ?? []),
+    templateOrigin: "personal_derived",
+    sourceCommonTemplateId: null,
   }));
+}
+
+const mergePersonalQuestTemplates = (
+  explicitTemplates: Awaited<ReturnType<typeof fetchExplicitPersonalQuestTemplates>>,
+  derivedTemplates: PersonalQuestTemplate[],
+): PersonalQuestTemplate[] => {
+  const derivedByTitle = new Map(
+    derivedTemplates.map((template) => [normalizeQuestTemplateTitleForIdentity(template.title), template]),
+  );
+  const explicitResults = explicitTemplates.map((template) => {
+    const matchingDerived = derivedByTitle.get(template.normalized_title);
+    if (matchingDerived) {
+      derivedByTitle.delete(template.normalized_title);
+    }
+
+    return mapExplicitPersonalQuestTemplate(template, {
+      frequency: matchingDerived?.frequency ?? 1,
+      lastUsedAt: matchingDerived?.lastUsedAt ?? template.updated_at ?? template.created_at,
+    });
+  });
+
+  return [
+    ...explicitResults,
+    ...Array.from(derivedByTitle.values()),
+  ].sort((left, right) => {
+    if (right.frequency !== left.frequency) {
+      return right.frequency - left.frequency;
+    }
+    return getTemplateRecencyTimestamp(right) - getTemplateRecencyTimestamp(left);
+  });
+};
+
+export async function buildPersonalQuestTemplates(userId: string): Promise<PersonalQuestTemplate[]> {
+  const [derivedResult, explicitResult] = await Promise.allSettled([
+    buildDerivedPersonalQuestTemplates(userId),
+    fetchExplicitPersonalQuestTemplates(userId),
+  ]);
+
+  const derivedTemplates = derivedResult.status === "fulfilled" ? derivedResult.value : [];
+  const explicitTemplates = explicitResult.status === "fulfilled" ? explicitResult.value : [];
+
+  if (derivedResult.status === "rejected" && explicitResult.status === "rejected") {
+    throw derivedResult.reason instanceof Error
+      ? derivedResult.reason
+      : (explicitResult.reason instanceof Error
+        ? explicitResult.reason
+        : new Error("Failed to build personal quest templates"));
+  }
+
+  return mergePersonalQuestTemplates(explicitTemplates, derivedTemplates);
 }
 
 interface UsePersonalQuestTemplatesOptions {
   enabled?: boolean;
 }
 
+type SaveTemplateInput = Omit<UpsertPersonalQuestTemplateInput, "userId">;
+
 export const usePersonalQuestTemplates = ({ enabled = true }: UsePersonalQuestTemplatesOptions = {}) => {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<PersonalQuestTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const refresh = useCallback(async () => {
@@ -152,7 +221,7 @@ export const usePersonalQuestTemplates = ({ enabled = true }: UsePersonalQuestTe
       setTemplates([]);
       setError(null);
       setIsLoading(false);
-      return;
+      return [];
     }
 
     setIsLoading(true);
@@ -161,26 +230,47 @@ export const usePersonalQuestTemplates = ({ enabled = true }: UsePersonalQuestTe
     try {
       const nextTemplates = await buildPersonalQuestTemplates(user.id);
       setTemplates(nextTemplates);
+      return nextTemplates;
     } catch (caughtError) {
       const nextError = caughtError instanceof Error
         ? caughtError
         : new Error("Failed to build personal quest templates");
       setError(nextError);
       setTemplates([]);
+      throw nextError;
     } finally {
       setIsLoading(false);
     }
   }, [enabled, user?.id]);
 
+  const saveTemplate = useCallback(async (input: SaveTemplateInput) => {
+    if (!user?.id) {
+      throw new Error("You must be signed in to save quest templates.");
+    }
+
+    setIsSavingTemplate(true);
+
+    try {
+      const savedTemplate = await savePersonalQuestTemplate({
+        ...input,
+        userId: user.id,
+      });
+      await refresh().catch(() => undefined);
+      return mapExplicitPersonalQuestTemplate(savedTemplate);
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  }, [refresh, user?.id]);
+
   useEffect(() => {
-    void refresh();
+    void refresh().catch(() => undefined);
   }, [refresh]);
 
   useEffect(() => {
     if (!enabled || !user?.id) return;
 
     const handlePlannerSync = () => {
-      void refresh();
+      void refresh().catch(() => undefined);
     };
 
     window.addEventListener(PLANNER_SYNC_EVENT, handlePlannerSync);
@@ -192,7 +282,9 @@ export const usePersonalQuestTemplates = ({ enabled = true }: UsePersonalQuestTe
   return {
     templates,
     isLoading,
+    isSavingTemplate,
     error,
     refresh,
+    saveTemplate,
   };
 };

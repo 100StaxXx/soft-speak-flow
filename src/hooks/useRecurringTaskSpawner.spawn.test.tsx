@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
   const insertSelectMock = vi.fn();
   const insertMock = vi.fn();
   const toastErrorMock = vi.fn();
+  const withPlannerRemoteSyncLockMock = vi.fn(async (_userId: string, operation: () => Promise<unknown>) => operation());
   const localTasks: Array<Record<string, unknown>> = [];
   let nextId = 0;
 
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => {
     insertSelectMock,
     insertMock,
     toastErrorMock,
+    withPlannerRemoteSyncLockMock,
     localTasks,
     nextIdRef: {
       get value() {
@@ -94,6 +96,7 @@ vi.mock("@/utils/plannerSync", () => {
       mocks.localTasks.filter((task) => task.user_id === userId && task.task_date === taskDate),
     ),
     syncLocalDailyTasksFromRemote: vi.fn(async () => []),
+    withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
   };
 });
 
@@ -137,6 +140,7 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
     vi.clearAllMocks();
     mocks.localTasks.splice(0, mocks.localTasks.length);
     mocks.nextIdRef.value = 0;
+    mocks.withPlannerRemoteSyncLockMock.mockImplementation(async (_userId: string, operation: () => Promise<unknown>) => operation());
 
     mocks.templatesQueryMock.mockResolvedValue({
       data: [
@@ -225,6 +229,10 @@ describe("useRecurringTaskSpawner spawn behavior", () => {
       "Set a time on recurring quest templates to resume auto-creation.",
     );
     expect(mocks.toastErrorMock).not.toHaveBeenCalledWith("Failed to create recurring quests");
+    expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(Function),
+    );
   });
 
   it("falls back to row-by-row insert when ON CONFLICT arbiter inference fails", async () => {

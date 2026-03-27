@@ -22,7 +22,6 @@ import { FactionBadge } from "@/components/FactionBadge";
 
 import { PageTransition } from "@/components/PageTransition";
 import { ResetCompanionButton } from "@/components/ResetCompanionButton";
-import { getResolvedMentorId } from "@/utils/mentor";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 import { SoundSettings } from "@/components/SoundSettings";
 import { LegalDocumentViewer } from "@/components/LegalDocumentViewer";
@@ -44,6 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 // Quick Action Card Component - memoized to prevent unnecessary re-renders
 const QuickActionCard = memo(({ 
@@ -120,6 +120,7 @@ DevTriggerHeader.displayName = 'DevTriggerHeader';
 const Profile = () => {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
+  const { mentorId: resolvedMentorId } = useMentorConnection();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -169,8 +170,6 @@ const Profile = () => {
       return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
-
-  const resolvedMentorId = getResolvedMentorId(profile);
 
   const { data: selectedMentor } = useQuery({
     queryKey: ["selected-mentor", resolvedMentorId],

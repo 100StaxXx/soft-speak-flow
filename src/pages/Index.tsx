@@ -23,10 +23,10 @@ import { isReturningProfile } from "@/utils/profileOnboarding";
 import { StarfieldBackground } from "@/components/StarfieldBackground";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
-import { useMentorConnectionHealth } from "@/hooks/useMentorConnectionHealth";
 import { useMentorLayoutMode } from "@/hooks/useMentorLayoutMode";
 import { MessageCircle, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 type IndexProps = {
   enableOnboardingGuard?: boolean;
@@ -124,10 +124,10 @@ const Index = ({ enableOnboardingGuard = false }: IndexProps) => {
   }, []);
 
   const {
-    effectiveMentorId,
+    mentorId: effectiveMentorId,
     status: mentorConnectionStatus,
     refreshConnection,
-  } = useMentorConnectionHealth();
+  } = useMentorConnection();
 
   // Use React Query for mentor data with proper caching
   const {

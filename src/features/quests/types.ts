@@ -5,17 +5,20 @@
 export type QuestDifficulty = "easy" | "medium" | "hard";
 export type QuestTemplateCategory = "work" | "health" | "home" | "admin" | "personal";
 export type QuestTemplateBrowserTab = "common" | "yours";
+export type QuestTemplateOrigin = "common" | "personal_explicit" | "personal_derived";
 
 export interface QuestTemplatePrefill {
+  id: string;
   title: string;
   difficulty: QuestDifficulty;
   estimatedDuration: number | null;
   notes: string | null;
   subtasks: string[];
+  templateOrigin: QuestTemplateOrigin;
+  sourceCommonTemplateId: string | null;
 }
 
 export interface CommonQuestTemplate extends QuestTemplatePrefill {
-  id: string;
   description: string;
   category: QuestTemplateCategory;
   keywords: string[];
@@ -23,7 +26,6 @@ export interface CommonQuestTemplate extends QuestTemplatePrefill {
 }
 
 export interface PersonalQuestTemplate extends QuestTemplatePrefill {
-  id: string;
   frequency: number;
   lastUsedAt: string | null;
 }

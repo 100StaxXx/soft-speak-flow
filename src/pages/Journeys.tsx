@@ -35,6 +35,7 @@ import { useStreakAtRisk } from "@/hooks/useStreakAtRisk";
 
 import { useOnboardingTaskCleanup } from "@/hooks/useOnboardingTaskCleanup";
 import { useEpics } from "@/hooks/useEpics";
+import { useInboxTasks } from "@/hooks/useInboxTasks";
 import { useDeepLink } from "@/contexts/DeepLinkContext";
 import { logger } from "@/utils/logger";
 
@@ -61,6 +62,7 @@ import { useMainTabVisibility } from "@/contexts/MainTabVisibilityContext";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
 import { useJourneysLayoutMode } from "@/hooks/useJourneysLayoutMode";
 import { isMacDesignedForIPadIOSApp } from "@/utils/platformTargets";
+import { QuestInboxSection } from "@/components/QuestInboxSection";
 
 const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -99,12 +101,19 @@ const Journeys = () => {
   const [showCreatedAnimation, setShowCreatedAnimation] = useState(false);
   const [createdCampaignData, setCreatedCampaignData] = useState<CreatedCampaignData | null>(null);
   const [headerDragTime, setHeaderDragTime] = useState<string | null>(null);
+  const [isInboxExpanded, setIsInboxExpanded] = useState(false);
   const previousIsTabActiveRef = useRef(isTabActive);
   const scheduledTimeUpdateQueueRef = useRef<Map<string, Promise<void>>>(new Map());
+  const inboxSectionRef = useRef<HTMLDivElement | null>(null);
+  const hasInitializedInboxVisibilityRef = useRef(false);
   const { isActive: tutorialActive, currentStep: tutorialStep, currentSubstep: tutorialSubstep } =
     usePostOnboardingMentorGuidance();
   const shouldAutoFillTutorialTime =
     tutorialActive && tutorialStep === "create_quest" && tutorialSubstep === "select_time";
+  const isInboxRequested = useMemo(
+    () => new URLSearchParams(location.search).get("section") === "inbox",
+    [location.search],
+  );
   
   // Auth and profile for onboarding
   const { user } = useAuth();
@@ -231,6 +240,13 @@ const Journeys = () => {
     isUpdating,
     isDeleting
   } = useDailyTasks(selectedDate, { enabled: isTabActive });
+  const {
+    inboxTasks,
+    inboxCount,
+    isLoading: inboxLoading,
+    toggleInboxTask,
+    deleteInboxTask,
+  } = useInboxTasks({ enabled: isTabActive });
   
   
   // Edit quest state (for regular quests)
@@ -258,6 +274,27 @@ const Journeys = () => {
   const [editingRitual, setEditingRitual] = useState<RitualData | null>(null);
   const { tasks: allCalendarTasks } = useCalendarTasks(selectedDate, "month", { enabled: isTabActive });
   const { tasks: weekCalendarTasks } = useCalendarTasks(selectedDate, "week", { enabled: isTabActive });
+
+  useEffect(() => {
+    if (hasInitializedInboxVisibilityRef.current) return;
+    if (inboxLoading && !isInboxRequested && inboxCount === 0) return;
+
+    setIsInboxExpanded(isInboxRequested || inboxCount > 0);
+    hasInitializedInboxVisibilityRef.current = true;
+  }, [inboxCount, inboxLoading, isInboxRequested]);
+
+  useEffect(() => {
+    if (!isInboxRequested) return;
+
+    setIsInboxExpanded(true);
+    const frameId = window.requestAnimationFrame(() => {
+      inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [isInboxRequested]);
 
   useEffect(() => {
     if (!isMacHostedIOSApp || location.pathname !== JOURNEYS_ROUTE) return;
@@ -605,6 +642,12 @@ const Journeys = () => {
     if (SEND_TO_CALENDAR_ENABLED && data.sendToCalendar && createdTask?.id) {
       await handleSendTaskToCalendar(createdTask.id);
     }
+    if (data.sendToInbox) {
+      setIsInboxExpanded(true);
+      window.requestAnimationFrame(() => {
+        inboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
     setShowAddSheet(false);
   }, [selectedDate, addTask, handleSendTaskToCalendar]);
 
@@ -668,14 +711,14 @@ const Journeys = () => {
         toast.error("Saved quest, but failed to sync linked calendar event");
       });
     }
+    queryClient.invalidateQueries({ queryKey: ["inbox-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["inbox-count"] });
     setEditingTask(null);
-  }, [updateTask, syncTaskUpdate]);
+  }, [queryClient, updateTask, syncTaskUpdate]);
 
   const handleTimelineScheduledTimeUpdate = useCallback((taskId: string, newTime: string) => {
     const previousTaskUpdate = scheduledTimeUpdateQueueRef.current.get(taskId) ?? Promise.resolve();
-    let nextTaskUpdate: Promise<void>;
-
-    nextTaskUpdate = previousTaskUpdate
+    const nextTaskUpdate = previousTaskUpdate
       .catch(() => undefined)
       .then(async () => {
         const updateResult = await updateTask({ taskId, updates: { scheduled_time: newTime } });
@@ -717,6 +760,27 @@ const Journeys = () => {
     toast.success("Quest deleted");
     setEditingTask(null);
   }, [deleteTask, trackDailyPlanOutcome, syncTaskDelete]);
+
+  const handleToggleInboxQuest = useCallback((taskId: string, completed: boolean) => {
+    toggleInboxTask({ taskId, completed });
+  }, [toggleInboxTask]);
+
+  const handleDeleteInboxQuest = useCallback(async (taskId: string) => {
+    await syncTaskDelete.mutateAsync({ taskId }).catch(() => {
+      toast.error("Failed to remove linked calendar event");
+    });
+    deleteInboxTask(taskId);
+    setEditingTask((currentTask) => (currentTask?.id === taskId ? null : currentTask));
+  }, [deleteInboxTask, syncTaskDelete]);
+
+  const handleDeleteEditingQuest = useCallback(async (taskId: string) => {
+    if (editingTask?.task_date == null) {
+      await handleDeleteInboxQuest(taskId);
+      return;
+    }
+
+    await handleDeleteQuest(taskId);
+  }, [editingTask?.task_date, handleDeleteInboxQuest, handleDeleteQuest]);
 
   const handleDeleteRitual = useCallback(async (habitId: string) => {
     if (!user?.id) return;
@@ -968,6 +1032,27 @@ const Journeys = () => {
             )}
           </motion.div>
 
+          {isInboxRequested || inboxCount > 0 ? (
+            <motion.div
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: prefersReducedMotion ? 0 : 0.08, duration: prefersReducedMotion ? 0 : 0.2 }}
+              className="mb-4"
+            >
+              <QuestInboxSection
+                tasks={inboxTasks}
+                isLoading={inboxLoading}
+                isExpanded={isInboxExpanded}
+                onExpandedChange={setIsInboxExpanded}
+                onAddQuest={() => openAddQuestSheet()}
+                onToggleQuest={handleToggleInboxQuest}
+                onEditQuest={handleEditQuest}
+                onDeleteQuest={handleDeleteInboxQuest}
+                sectionRef={inboxSectionRef}
+              />
+            </motion.div>
+          ) : null}
+
           {/* Main Content Area */}
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
@@ -1028,7 +1113,7 @@ const Journeys = () => {
           onSendToCalendar={SEND_TO_CALENDAR_ENABLED ? handleSendTaskToCalendar : undefined}
           hasCalendarLink={editingTask ? hasLinkedEvent(editingTask.id) : false}
           isSendingToCalendar={sendTaskToCalendar.isPending}
-          onDelete={handleDeleteQuest}
+          onDelete={handleDeleteEditingQuest}
           isDeleting={isDeleting}
         />
         

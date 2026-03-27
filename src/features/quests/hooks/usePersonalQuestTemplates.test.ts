@@ -1,9 +1,11 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getAllLocalTasksForUserMock: vi.fn(),
   getLocalSubtasksForTaskMock: vi.fn(),
+  fetchExplicitPersonalQuestTemplatesMock: vi.fn(),
+  savePersonalQuestTemplateMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -20,6 +22,18 @@ vi.mock("@/utils/plannerLocalStore", () => ({
 vi.mock("@/utils/plannerSync", () => ({
   PLANNER_SYNC_EVENT: "planner-sync-finished",
 }));
+
+vi.mock("@/features/quests/services/personalQuestTemplates", async () => {
+  const actual = await vi.importActual<typeof import("@/features/quests/services/personalQuestTemplates")>(
+    "@/features/quests/services/personalQuestTemplates",
+  );
+
+  return {
+    ...actual,
+    fetchExplicitPersonalQuestTemplates: (...args: unknown[]) => mocks.fetchExplicitPersonalQuestTemplatesMock(...args),
+    savePersonalQuestTemplate: (...args: unknown[]) => mocks.savePersonalQuestTemplateMock(...args),
+  };
+});
 
 import { usePersonalQuestTemplates } from "./usePersonalQuestTemplates";
 
@@ -73,6 +87,20 @@ describe("usePersonalQuestTemplates", () => {
     vi.clearAllMocks();
     mocks.getAllLocalTasksForUserMock.mockResolvedValue([]);
     mocks.getLocalSubtasksForTaskMock.mockResolvedValue([]);
+    mocks.fetchExplicitPersonalQuestTemplatesMock.mockResolvedValue([]);
+    mocks.savePersonalQuestTemplateMock.mockResolvedValue({
+      id: "explicit-template-1",
+      user_id: "user-1",
+      source_common_template_id: "work-deep-work-block",
+      normalized_title: "deep work sprint",
+      title: "Deep Work Sprint",
+      difficulty: "hard",
+      estimated_duration: 75,
+      notes: "Save the customized version",
+      subtasks: ["Choose one priority", "Block distractions"],
+      created_at: "2026-01-20T09:00:00.000Z",
+      updated_at: "2026-01-20T09:00:00.000Z",
+    });
   });
 
   it("groups repeated titles case-insensitively and requires a minimum frequency of two", async () => {
@@ -91,6 +119,7 @@ describe("usePersonalQuestTemplates", () => {
     expect(result.current.templates[0]).toMatchObject({
       title: "deep work block",
       frequency: 2,
+      templateOrigin: "personal_derived",
     });
   });
 
@@ -117,9 +146,10 @@ describe("usePersonalQuestTemplates", () => {
     });
 
     expect(result.current.templates[0].title).toBe("Weekly review");
+    expect(result.current.templates[0].templateOrigin).toBe("personal_derived");
   });
 
-  it("sorts by frequency, then recency, and prefers the most recent matching task for prefill details", async () => {
+  it("merges explicit templates and lets them override derived templates with the same normalized title", async () => {
     mocks.getAllLocalTasksForUserMock.mockResolvedValue([
       buildTask({
         id: "deep-old",
@@ -154,6 +184,22 @@ describe("usePersonalQuestTemplates", () => {
       }),
     ]);
 
+    mocks.fetchExplicitPersonalQuestTemplatesMock.mockResolvedValue([
+      {
+        id: "explicit-deep-work",
+        user_id: "user-1",
+        source_common_template_id: "work-deep-work-block",
+        normalized_title: "deep work block",
+        title: "Deep Work Sprint",
+        difficulty: "hard",
+        estimated_duration: 75,
+        notes: "Customized note",
+        subtasks: ["Choose one priority", "Shut the door"],
+        created_at: "2026-01-18T09:00:00.000Z",
+        updated_at: "2026-01-19T09:00:00.000Z",
+      },
+    ]);
+
     mocks.getLocalSubtasksForTaskMock.mockImplementation(async (taskId: string) => {
       if (taskId === "deep-new") {
         return [
@@ -173,14 +219,66 @@ describe("usePersonalQuestTemplates", () => {
 
     expect(result.current.templates.map((template) => template.title)).toEqual([
       "Weekly review",
-      "Deep work block",
+      "Deep Work Sprint",
     ]);
 
     expect(result.current.templates[1]).toMatchObject({
+      id: "explicit-deep-work",
+      templateOrigin: "personal_explicit",
       difficulty: "hard",
-      estimatedDuration: 120,
-      notes: "Newest note",
-      subtasks: ["Choose one priority", "Silence notifications"],
+      estimatedDuration: 75,
+      notes: "Customized note",
+      subtasks: ["Choose one priority", "Shut the door"],
+      frequency: 2,
+      sourceCommonTemplateId: "work-deep-work-block",
+    });
+  });
+
+  it("saves an explicit personal template and refreshes the merged list", async () => {
+    const { result } = renderHook(() => usePersonalQuestTemplates());
+
+    await waitFor(() => {
+      expect(result.current.templates).toEqual([]);
+    });
+
+    mocks.fetchExplicitPersonalQuestTemplatesMock.mockResolvedValue([
+      {
+        id: "explicit-template-1",
+        user_id: "user-1",
+        source_common_template_id: "work-deep-work-block",
+        normalized_title: "deep work sprint",
+        title: "Deep Work Sprint",
+        difficulty: "hard",
+        estimated_duration: 75,
+        notes: "Save the customized version",
+        subtasks: ["Choose one priority", "Block distractions"],
+        created_at: "2026-01-20T09:00:00.000Z",
+        updated_at: "2026-01-20T09:00:00.000Z",
+      },
+    ]);
+
+    await act(async () => {
+      await result.current.saveTemplate({
+        sourceCommonTemplateId: "work-deep-work-block",
+        title: "Deep Work Sprint",
+        difficulty: "hard",
+        estimatedDuration: 75,
+        notes: "Save the customized version",
+        subtasks: ["Choose one priority", "Block distractions"],
+      });
+    });
+
+    expect(mocks.savePersonalQuestTemplateMock).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      title: "Deep Work Sprint",
+    }));
+
+    await waitFor(() => {
+      expect(result.current.templates[0]).toMatchObject({
+        id: "explicit-template-1",
+        templateOrigin: "personal_explicit",
+        title: "Deep Work Sprint",
+      });
     });
   });
 });

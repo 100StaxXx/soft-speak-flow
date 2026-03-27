@@ -64,6 +64,7 @@ jobs:
           check_service_function() {
             local fn="$1"
             local body="$2"
+            local expected_mode="${3:-}"
             local status
 
             status=$(curl -sS -o /tmp/scheduled.json -w "%{http_code}" \
@@ -79,8 +80,16 @@ jobs:
             if [ "$status" -ge 300 ]; then
               exit 1
             fi
+
+            if [ -n "$expected_mode" ]; then
+              actual_mode=$(jq -r '.mode // ""' /tmp/scheduled.json)
+              if [ "$actual_mode" != "$expected_mode" ]; then
+                echo "Expected ${fn} mode=${expected_mode}, got ${actual_mode}" >&2
+                exit 1
+              fi
+            fi
           }
 
           check_service_function "notifications-enqueue-v2" '{}'
-          check_service_function "notifications-dispatch-v2" '{}'
+          check_service_function "notifications-dispatch-v2" '{}' 'send'
           check_service_function "retry-missing-pep-talk-transcripts" '{"mode":"scheduled","limit":5}'

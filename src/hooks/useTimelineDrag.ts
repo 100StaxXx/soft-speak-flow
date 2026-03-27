@@ -64,6 +64,7 @@ interface WindowListeners {
   touchmove?: (e: TouchEvent) => void;
   touchend?: () => void;
   touchcancel?: () => void;
+  touchTarget?: Document | Window;
   scroll?: () => void;
   scrollContext?: ScrollContext;
 }
@@ -132,6 +133,12 @@ const hasTouchEventSupport = () => {
     || (navigator.msMaxTouchPoints ?? 0) > 0
     || typeof window.ontouchstart !== "undefined"
   );
+};
+
+const getTouchListenerTarget = (): Document | Window | null => {
+  if (typeof document !== "undefined") return document;
+  if (typeof window !== "undefined") return window;
+  return null;
 };
 
 const applyTimelineDragScrollLock = () => {
@@ -247,9 +254,12 @@ export function useTimelineDrag({
     if (listeners.pointermove) window.removeEventListener("pointermove", listeners.pointermove);
     if (listeners.pointerup) window.removeEventListener("pointerup", listeners.pointerup);
     if (listeners.pointercancel) window.removeEventListener("pointercancel", listeners.pointercancel);
-    if (listeners.touchmove) window.removeEventListener("touchmove", listeners.touchmove);
-    if (listeners.touchend) window.removeEventListener("touchend", listeners.touchend);
-    if (listeners.touchcancel) window.removeEventListener("touchcancel", listeners.touchcancel);
+    const touchTarget = listeners.touchTarget ?? getTouchListenerTarget();
+    if (touchTarget) {
+      if (listeners.touchmove) touchTarget.removeEventListener("touchmove", listeners.touchmove, true);
+      if (listeners.touchend) touchTarget.removeEventListener("touchend", listeners.touchend, true);
+      if (listeners.touchcancel) touchTarget.removeEventListener("touchcancel", listeners.touchcancel, true);
+    }
     if (listeners.scroll) {
       if (listeners.scrollContext?.kind === "element") {
         listeners.scrollContext.element.removeEventListener("scroll", listeners.scroll);
@@ -651,12 +661,16 @@ export function useTimelineDrag({
       windowListenersRef.current = {};
 
       if (listenerSource === "touch") {
+        const touchTarget = getTouchListenerTarget();
         windowListenersRef.current.touchmove = touchMove;
         windowListenersRef.current.touchend = touchEnd;
         windowListenersRef.current.touchcancel = touchEnd;
-        window.addEventListener("touchmove", touchMove, { passive: false });
-        window.addEventListener("touchend", touchEnd);
-        window.addEventListener("touchcancel", touchEnd);
+        if (touchTarget) {
+          windowListenersRef.current.touchTarget = touchTarget;
+          touchTarget.addEventListener("touchmove", touchMove, { capture: true, passive: false });
+          touchTarget.addEventListener("touchend", touchEnd, true);
+          touchTarget.addEventListener("touchcancel", touchEnd, true);
+        }
       } else {
         windowListenersRef.current.pointermove = pointerMove;
         windowListenersRef.current.pointerup = pointerEnd;
@@ -693,19 +707,7 @@ export function useTimelineDrag({
     [enabled, shouldIgnoreDragStartTarget, startPendingDrag],
   );
 
-  const noopTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLElement>) => {
-      e.stopPropagation();
-    },
-    [],
-  );
-
-  const noopTouchEnd = useCallback(
-    (e: React.TouchEvent<HTMLElement>) => {
-      e.stopPropagation();
-    },
-    [],
-  );
+  const noopTouchEvent = useCallback(() => {}, []);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>, taskId: string, scheduledTime: string) => {
@@ -748,11 +750,11 @@ export function useTimelineDrag({
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
       onTouchStartCapture: (e) => handleTouchStart(e, taskId, scheduledTime),
       onTouchStart: (e) => handleTouchStart(e, taskId, scheduledTime),
-      onTouchMove: noopTouchMove,
-      onTouchEnd: noopTouchEnd,
-      onTouchCancel: noopTouchEnd,
+      onTouchMove: noopTouchEvent,
+      onTouchEnd: noopTouchEvent,
+      onTouchCancel: noopTouchEvent,
     }),
-    [handlePointerDown, handleTouchStart, noopTouchEnd, noopTouchMove],
+    [handlePointerDown, handleTouchStart, noopTouchEvent],
   );
 
   const getRowDragProps = useCallback(
@@ -761,11 +763,11 @@ export function useTimelineDrag({
       onPointerDown: (e) => handlePointerDown(e, taskId, scheduledTime),
       onTouchStartCapture: (e) => handleTouchStart(e, taskId, scheduledTime),
       onTouchStart: (e) => handleTouchStart(e, taskId, scheduledTime),
-      onTouchMove: noopTouchMove,
-      onTouchEnd: noopTouchEnd,
-      onTouchCancel: noopTouchEnd,
+      onTouchMove: noopTouchEvent,
+      onTouchEnd: noopTouchEvent,
+      onTouchCancel: noopTouchEvent,
     }),
-    [handlePointerDown, handleTouchStart, noopTouchEnd, noopTouchMove],
+    [handlePointerDown, handleTouchStart, noopTouchEvent],
   );
 
   useEffect(() => {

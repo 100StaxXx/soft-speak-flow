@@ -17,6 +17,7 @@ import {
   syncLocalDailyTasksFromRemote,
   syncLocalEpicsFromRemote,
   syncLocalHabitsFromRemote,
+  withPlannerRemoteSyncLock,
 } from "@/utils/plannerSync";
 import {
   createOfflinePlannerId,
@@ -257,80 +258,81 @@ export function useHabitSurfacing(selectedDate?: Date) {
   const surfaceHabitMutation = useMutation({
     mutationFn: async (habitId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const habit = surfacedHabits.find((candidate) => candidate.habit_id === habitId);
+        if (!habit) throw new Error("Habit not found");
+        if (habit.task_id) {
+          return { id: habit.task_id, queued: false };
+        }
 
-      const habit = surfacedHabits.find((candidate) => candidate.habit_id === habitId);
-      if (!habit) throw new Error("Habit not found");
-      if (habit.task_id) {
-        return { id: habit.task_id, queued: false };
-      }
+        const existingTasks = await loadLocalDailyTasks(user.id, taskDate);
+        const localTask = buildSurfacedTaskRow(user.id, taskDate, habit, existingTasks.length);
+        await upsertPlannerRecord("daily_tasks", localTask);
 
-      const existingTasks = await loadLocalDailyTasks(user.id, taskDate);
-      const localTask = buildSurfacedTaskRow(user.id, taskDate, habit, existingTasks.length);
-      await upsertPlannerRecord("daily_tasks", localTask);
+        if (shouldQueueWrites) {
+          await queueTaskAction("CREATE_TASK", {
+            id: localTask.id,
+            task_text: localTask.task_text,
+            difficulty: localTask.difficulty,
+            xp_reward: localTask.xp_reward,
+            task_date: localTask.task_date,
+            scheduled_time: localTask.scheduled_time,
+            estimated_duration: localTask.estimated_duration,
+            category: localTask.category,
+            source: localTask.source,
+            habit_source_id: localTask.habit_source_id,
+            epic_id: localTask.epic_id,
+            sort_order: localTask.sort_order,
+          });
 
-      if (shouldQueueWrites) {
-        await queueTaskAction("CREATE_TASK", {
-          id: localTask.id,
-          task_text: localTask.task_text,
-          difficulty: localTask.difficulty,
-          xp_reward: localTask.xp_reward,
-          task_date: localTask.task_date,
-          scheduled_time: localTask.scheduled_time,
-          estimated_duration: localTask.estimated_duration,
-          category: localTask.category,
-          source: localTask.source,
-          habit_source_id: localTask.habit_source_id,
-          epic_id: localTask.epic_id,
-          sort_order: localTask.sort_order,
-        });
+          return { id: localTask.id, queued: true };
+        }
 
-        return { id: localTask.id, queued: true };
-      }
+        const { error } = await supabase
+          .from("daily_tasks")
+          .upsert({
+            id: localTask.id,
+            user_id: user.id,
+            task_text: localTask.task_text,
+            difficulty: localTask.difficulty,
+            xp_reward: localTask.xp_reward,
+            task_date: localTask.task_date,
+            completed: false,
+            completed_at: null,
+            is_main_quest: false,
+            scheduled_time: localTask.scheduled_time,
+            estimated_duration: localTask.estimated_duration,
+            category: localTask.category,
+            source: localTask.source,
+            habit_source_id: localTask.habit_source_id,
+            epic_id: localTask.epic_id,
+            sort_order: localTask.sort_order,
+          }, {
+            onConflict: "user_id,task_date,habit_source_id",
+            ignoreDuplicates: true,
+          });
 
-      const { error } = await supabase
-        .from("daily_tasks")
-        .upsert({
-          id: localTask.id,
-          user_id: user.id,
-          task_text: localTask.task_text,
-          difficulty: localTask.difficulty,
-          xp_reward: localTask.xp_reward,
-          task_date: localTask.task_date,
-          completed: false,
-          completed_at: null,
-          is_main_quest: false,
-          scheduled_time: localTask.scheduled_time,
-          estimated_duration: localTask.estimated_duration,
-          category: localTask.category,
-          source: localTask.source,
-          habit_source_id: localTask.habit_source_id,
-          epic_id: localTask.epic_id,
-          sort_order: localTask.sort_order,
-        }, {
-          onConflict: "user_id,task_date,habit_source_id",
-          ignoreDuplicates: true,
-        });
+        if (error) {
+          await queueTaskAction("CREATE_TASK", {
+            id: localTask.id,
+            task_text: localTask.task_text,
+            difficulty: localTask.difficulty,
+            xp_reward: localTask.xp_reward,
+            task_date: localTask.task_date,
+            scheduled_time: localTask.scheduled_time,
+            estimated_duration: localTask.estimated_duration,
+            category: localTask.category,
+            source: localTask.source,
+            habit_source_id: localTask.habit_source_id,
+            epic_id: localTask.epic_id,
+            sort_order: localTask.sort_order,
+          });
+          void retryNow();
+          return { id: localTask.id, queued: true };
+        }
 
-      if (error) {
-        await queueTaskAction("CREATE_TASK", {
-          id: localTask.id,
-          task_text: localTask.task_text,
-          difficulty: localTask.difficulty,
-          xp_reward: localTask.xp_reward,
-          task_date: localTask.task_date,
-          scheduled_time: localTask.scheduled_time,
-          estimated_duration: localTask.estimated_duration,
-          category: localTask.category,
-          source: localTask.source,
-          habit_source_id: localTask.habit_source_id,
-          epic_id: localTask.epic_id,
-          sort_order: localTask.sort_order,
-        });
-        void retryNow();
-        return { id: localTask.id, queued: true };
-      }
-
-      return { id: localTask.id, queued: false };
+        return { id: localTask.id, queued: false };
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });
@@ -343,41 +345,67 @@ export function useHabitSurfacing(selectedDate?: Date) {
   const surfaceAllHabitsMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error("Not authenticated");
+      return withPlannerRemoteSyncLock(user.id, async () => {
+        const habitsToSurface = surfacedHabits.filter(
+          (habit) => !habit.task_id && shouldSurfaceToday(habit, dayOfWeek, effectiveDate),
+        );
 
-      const habitsToSurface = surfacedHabits.filter(
-        (habit) => !habit.task_id && shouldSurfaceToday(habit, dayOfWeek, effectiveDate),
-      );
+        if (habitsToSurface.length === 0) {
+          return [];
+        }
 
-      if (habitsToSurface.length === 0) {
-        return [];
-      }
+        const existingTasks = await loadLocalDailyTasks(user.id, taskDate);
+        const existingHabitIds = new Set(
+          existingTasks
+            .map((task) => task.habit_source_id)
+            .filter((habitId): habitId is string => typeof habitId === "string" && habitId.length > 0),
+        );
 
-      const existingTasks = await loadLocalDailyTasks(user.id, taskDate);
-      const existingHabitIds = new Set(
-        existingTasks
-          .map((task) => task.habit_source_id)
-          .filter((habitId): habitId is string => typeof habitId === "string" && habitId.length > 0),
-      );
+        const localTasks = habitsToSurface
+          .filter((habit) => !existingHabitIds.has(habit.habit_id))
+          .map((habit, index) => buildSurfacedTaskRow(user.id, taskDate, habit, existingTasks.length + index));
 
-      const localTasks = habitsToSurface
-        .filter((habit) => !existingHabitIds.has(habit.habit_id))
-        .map((habit, index) => buildSurfacedTaskRow(user.id, taskDate, habit, existingTasks.length + index));
+        if (localTasks.length === 0) {
+          return [];
+        }
 
-      if (localTasks.length === 0) {
-        return [];
-      }
+        await Promise.all(localTasks.map((task) => upsertPlannerRecord("daily_tasks", task)));
 
-      await Promise.all(localTasks.map((task) => upsertPlannerRecord("daily_tasks", task)));
+        if (shouldQueueWrites) {
+          await Promise.all(
+            localTasks.map((task) =>
+              queueTaskAction("CREATE_TASK", {
+                id: task.id,
+                task_text: task.task_text,
+                difficulty: task.difficulty,
+                xp_reward: task.xp_reward,
+                task_date: task.task_date,
+                scheduled_time: task.scheduled_time,
+                estimated_duration: task.estimated_duration,
+                category: task.category,
+                source: task.source,
+                habit_source_id: task.habit_source_id,
+                epic_id: task.epic_id,
+                sort_order: task.sort_order,
+              }),
+            ),
+          );
+          return localTasks.map((task) => ({ id: task.id, queued: true }));
+        }
 
-      if (shouldQueueWrites) {
-        await Promise.all(
-          localTasks.map((task) =>
-            queueTaskAction("CREATE_TASK", {
+        const { error } = await supabase
+          .from("daily_tasks")
+          .upsert(
+            localTasks.map((task) => ({
               id: task.id,
+              user_id: user.id,
               task_text: task.task_text,
               difficulty: task.difficulty,
               xp_reward: task.xp_reward,
               task_date: task.task_date,
+              completed: false,
+              completed_at: null,
+              is_main_quest: false,
               scheduled_time: task.scheduled_time,
               estimated_duration: task.estimated_duration,
               category: task.category,
@@ -385,63 +413,38 @@ export function useHabitSurfacing(selectedDate?: Date) {
               habit_source_id: task.habit_source_id,
               epic_id: task.epic_id,
               sort_order: task.sort_order,
-            }),
-          ),
-        );
-        return localTasks.map((task) => ({ id: task.id, queued: true }));
-      }
+            })),
+            {
+              onConflict: "user_id,task_date,habit_source_id",
+              ignoreDuplicates: true,
+            },
+          );
 
-      const { error } = await supabase
-        .from("daily_tasks")
-        .upsert(
-          localTasks.map((task) => ({
-            id: task.id,
-            user_id: user.id,
-            task_text: task.task_text,
-            difficulty: task.difficulty,
-            xp_reward: task.xp_reward,
-            task_date: task.task_date,
-            completed: false,
-            completed_at: null,
-            is_main_quest: false,
-            scheduled_time: task.scheduled_time,
-            estimated_duration: task.estimated_duration,
-            category: task.category,
-            source: task.source,
-            habit_source_id: task.habit_source_id,
-            epic_id: task.epic_id,
-            sort_order: task.sort_order,
-          })),
-          {
-            onConflict: "user_id,task_date,habit_source_id",
-            ignoreDuplicates: true,
-          },
-        );
+        if (error) {
+          await Promise.all(
+            localTasks.map((task) =>
+              queueTaskAction("CREATE_TASK", {
+                id: task.id,
+                task_text: task.task_text,
+                difficulty: task.difficulty,
+                xp_reward: task.xp_reward,
+                task_date: task.task_date,
+                scheduled_time: task.scheduled_time,
+                estimated_duration: task.estimated_duration,
+                category: task.category,
+                source: task.source,
+                habit_source_id: task.habit_source_id,
+                epic_id: task.epic_id,
+                sort_order: task.sort_order,
+              }),
+            ),
+          );
+          void retryNow();
+          return localTasks.map((task) => ({ id: task.id, queued: true }));
+        }
 
-      if (error) {
-        await Promise.all(
-          localTasks.map((task) =>
-            queueTaskAction("CREATE_TASK", {
-              id: task.id,
-              task_text: task.task_text,
-              difficulty: task.difficulty,
-              xp_reward: task.xp_reward,
-              task_date: task.task_date,
-              scheduled_time: task.scheduled_time,
-              estimated_duration: task.estimated_duration,
-              category: task.category,
-              source: task.source,
-              habit_source_id: task.habit_source_id,
-              epic_id: task.epic_id,
-              sort_order: task.sort_order,
-            }),
-          ),
-        );
-        void retryNow();
-        return localTasks.map((task) => ({ id: task.id, queued: true }));
-      }
-
-      return localTasks.map((task) => ({ id: task.id, queued: false }));
+        return localTasks.map((task) => ({ id: task.id, queued: false }));
+      });
     },
     onSuccess: (rows) => {
       queryClient.invalidateQueries({ queryKey: ["habit-surfacing"] });

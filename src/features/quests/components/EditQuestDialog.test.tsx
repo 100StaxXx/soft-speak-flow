@@ -143,6 +143,30 @@ describe("EditQuestDialog", () => {
     expect(durationButton.compareDocumentPosition(addSubtaskInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("shows Early Reminder above Advanced Settings without duplicating it", () => {
+    render(
+      <EditQuestDialog
+        task={legacyTask}
+        open
+        onOpenChange={vi.fn()}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+        isSaving={false}
+      />,
+    );
+
+    const reminderLabel = screen.getByText("Early Reminder");
+    const advancedTrigger = screen.getByRole("button", { name: /Advanced Settings/i });
+    const relation = advancedTrigger.compareDocumentPosition(reminderLabel);
+
+    expect(relation & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(screen.queryByText("Recurrence")).not.toBeInTheDocument();
+
+    fireEvent.click(advancedTrigger);
+
+    expect(screen.getAllByText("Early Reminder")).toHaveLength(1);
+    expect(screen.getByText("Recurrence")).toBeInTheDocument();
+  });
+
   it("normalizes legacy values before save", async () => {
     const onOpenChange = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);

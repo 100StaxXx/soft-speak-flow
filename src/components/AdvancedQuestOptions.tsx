@@ -1,4 +1,5 @@
 import { KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { DIFFICULTY_COLORS, QUEST_FORM_STYLES, getQuestOptionPillClasses } from "@/components/quest-shared";
 
 interface AdvancedQuestOptionsProps {
   scheduledTime: string | null;
@@ -47,6 +49,7 @@ interface AdvancedQuestOptionsProps {
   hideReminder?: boolean;
   hideLocation?: boolean;
   requireScheduledTimeForRecurrence?: boolean;
+  visualStyle?: "default" | "quest-soft";
 }
 
 // Helper to format 24h time to 12h
@@ -111,6 +114,49 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   const reminderTriggerLabel = hasPresetReminder
     ? reminderOptions.find((option) => option.value === props.reminderMinutesBefore)?.label
     : `${props.reminderMinutesBefore} minutes before (Custom)`;
+  const isQuestSoft = props.visualStyle === "quest-soft";
+  const tone = props.taskDifficulty ?? "medium";
+  const toneColors = DIFFICULTY_COLORS[tone];
+  const rootClassName = isQuestSoft ? "space-y-3" : "space-y-4 border-t pt-4";
+  const sectionClassName = isQuestSoft
+    ? cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 p-4")
+    : "space-y-2";
+  const blockClassName = isQuestSoft
+    ? cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 p-4")
+    : "space-y-3";
+  const labelClassName = isQuestSoft ? QUEST_FORM_STYLES.label : "text-sm font-medium";
+  const helperClassName = isQuestSoft ? QUEST_FORM_STYLES.helperText : "text-xs text-muted-foreground";
+  const triggerClassName = isQuestSoft
+    ? cn("w-full px-4 py-3 text-sm text-left font-semibold text-white flex items-center justify-between", QUEST_FORM_STYLES.selectorChip)
+    : "w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between";
+  const disabledTriggerClassName = isQuestSoft
+    ? cn(
+      "w-full cursor-not-allowed px-4 py-3 text-sm text-left font-semibold text-white/50 flex items-center justify-between opacity-70",
+      QUEST_FORM_STYLES.selectorChip,
+      "border-dashed",
+    )
+    : "w-full px-3 py-2 text-sm text-left border rounded-lg transition-colors flex items-center justify-between bg-muted text-muted-foreground cursor-not-allowed opacity-70";
+  const inputClassName = isQuestSoft
+    ? "border-white/10 bg-white/[0.08] text-white placeholder:text-white/42"
+    : "";
+  const popoverClassName = isQuestSoft
+    ? cn("w-[min(24rem,var(--radix-popover-trigger-width))] p-2", QUEST_FORM_STYLES.popover)
+    : "w-[min(24rem,var(--radix-popover-trigger-width))] p-1";
+  const dropdownClassName = isQuestSoft
+    ? cn("absolute z-10 mt-2 w-full max-h-60 overflow-y-auto", QUEST_FORM_STYLES.popover)
+    : "absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto";
+  const dropdownItemClassName = (selected: boolean) => cn(
+    isQuestSoft
+      ? "w-full rounded-[18px] px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 motion-reduce:transition-none"
+      : "w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors",
+    isQuestSoft
+      ? selected
+        ? cn(toneColors.pill, "text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)]")
+        : "text-white/76 hover:bg-white/[0.08]"
+      : selected
+        ? "bg-accent"
+        : "",
+  );
 
   useEffect(() => {
     if (recurrenceSelectionDisabled) {
@@ -309,13 +355,13 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
   }, [applyCustomReminder]);
 
   return (
-    <div className="space-y-4 border-t pt-4">
+    <div className={rootClassName}>
       {/* Scheduled Time with Suggest Button */}
       {!props.hideScheduledTime && (
-      <div className="space-y-2">
+      <div className={sectionClassName}>
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Scheduled Time</Label>
+          <Clock className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+          <Label className={labelClassName}>Scheduled Time</Label>
         </div>
         <div className="flex gap-2">
           <Input
@@ -323,7 +369,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             step={300}
             value={props.scheduledTime || ''}
             onChange={(e) => props.onScheduledTimeChange(e.target.value || null)}
-            className="flex-1"
+            className={cn("flex-1", inputClassName)}
           />
           {props.selectedDate && (
             <Popover open={showSuggestions} onOpenChange={setShowSuggestions}>
@@ -334,22 +380,22 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                   size="icon"
                   onClick={handleSuggestClick}
                   disabled={isSuggestLoading}
-                  className="shrink-0"
+                  className={cn("shrink-0", isQuestSoft && QUEST_FORM_STYLES.secondaryButton)}
                 >
                   {isSuggestLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Sparkles className="h-4 w-4 text-primary" />
+                    <Sparkles className={cn("h-4 w-4", isQuestSoft ? "text-white" : "text-primary")} />
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-2" align="end">
+              <PopoverContent className={cn(isQuestSoft ? popoverClassName : "w-64 p-2", !isQuestSoft && "")} align="end">
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                  <p className={cn("px-2 py-1 text-xs font-medium", isQuestSoft ? "text-white/58" : "text-muted-foreground")}>
                     Suggested Times
                   </p>
                   {suggestions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground px-2 py-2">
+                    <p className={cn("px-2 py-2 text-sm", isQuestSoft ? "text-white/58" : "text-muted-foreground")}>
                       No suggestions available
                     </p>
                   ) : (
@@ -358,18 +404,21 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         key={slot.time}
                         type="button"
                         onClick={() => handleSelectSuggestion(slot.time)}
-                        className="w-full flex items-start gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
+                        className={cn(
+                          "w-full flex items-start gap-2 px-2 py-2 text-left transition-colors",
+                          isQuestSoft ? "rounded-[18px] hover:bg-white/[0.08]" : "rounded-md hover:bg-accent",
+                        )}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
                             {index === 0 && (
                               <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
                             )}
-                            <span className="font-medium text-sm">
+                            <span className={cn("text-sm font-medium", isQuestSoft && "text-white")}>
                               {formatTime(slot.time)}
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className={cn("mt-0.5 text-xs", isQuestSoft ? "text-white/56" : "text-muted-foreground")}>
                             {slot.reason}
                           </p>
                         </div>
@@ -386,27 +435,27 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
       {/* Estimated Duration */}
       {!props.hideDuration && (
-      <div className="space-y-2">
+      <div className={sectionClassName}>
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Estimated Duration</Label>
+          <Calendar className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+          <Label className={labelClassName}>Estimated Duration</Label>
         </div>
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowDurationOptions(!showDurationOptions)}
-            className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+            className={triggerClassName}
           >
             <span>
               {props.estimatedDuration 
                 ? durationOptions.find(opt => opt.value === props.estimatedDuration)?.label || `${props.estimatedDuration} min`
                 : "Select duration"}
             </span>
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
           </button>
           
           {showDurationOptions && (
-            <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+            <div className={dropdownClassName}>
               {durationOptions.map((option) => (
                 <button
                   key={option.value}
@@ -415,9 +464,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                     props.onEstimatedDurationChange(option.value);
                     setShowDurationOptions(false);
                   }}
-                  className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
-                    props.estimatedDuration === option.value ? 'bg-accent' : ''
-                  }`}
+                  className={dropdownItemClassName(props.estimatedDuration === option.value)}
                 >
                   {option.label}
                 </button>
@@ -430,19 +477,19 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
       {/* Reminder Section - Only show if scheduled time is set */}
       {!props.hideReminder && props.scheduledTime && (
-        <div className="space-y-3">
+        <div className={blockClassName}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">Early Reminder</Label>
+              <Bell className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+              <Label className={labelClassName}>Early Reminder</Label>
             </div>
             <Switch
               checked={props.reminderEnabled}
               onCheckedChange={props.onReminderEnabledChange}
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            You'll be notified when the quest starts. Add an early reminder to prepare ahead.
+          <p className={helperClassName}>
+            You'll be notified when the quest starts. Add an early reminder for a little breathing room.
           </p>
         
           {props.reminderEnabled && (
@@ -450,10 +497,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-sm text-left border rounded-lg bg-background hover:bg-accent transition-colors flex items-center justify-between"
+                  className={triggerClassName}
                 >
                   <span>{reminderTriggerLabel || "Select time"}</span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
                 </button>
               </PopoverTrigger>
 
@@ -461,7 +508,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                 align="start"
                 side="bottom"
                 sideOffset={6}
-                className="w-[min(24rem,var(--radix-popover-trigger-width))] p-1"
+                className={popoverClassName}
               >
                 <div className="max-h-72 overflow-y-auto">
                   {reminderOptions.map((option) => (
@@ -473,9 +520,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         setShowReminderOptions(false);
                         setIsEditingCustomReminder(false);
                       }}
-                      className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors rounded-md ${
-                        props.reminderMinutesBefore === option.value ? 'bg-accent' : ''
-                      }`}
+                      className={dropdownItemClassName(props.reminderMinutesBefore === option.value)}
                     >
                       {option.label}
                     </button>
@@ -489,17 +534,15 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         hasPresetReminder ? "" : String(props.reminderMinutesBefore || "")
                       );
                     }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors rounded-md ${
-                      !hasPresetReminder ? 'bg-accent' : ''
-                    }`}
+                    className={dropdownItemClassName(!hasPresetReminder)}
                   >
                     Custom
                   </button>
                 </div>
 
                 {isEditingCustomReminder && (
-                  <div className="border-t border-border/60 mt-1 pt-3 px-2 pb-2 space-y-2">
-                    <Label htmlFor="custom-reminder-minutes" className="text-xs font-medium text-muted-foreground">
+                  <div className={cn("mt-1 space-y-2 border-t pt-3 px-2 pb-2", isQuestSoft ? "border-white/10" : "border-border/60")}>
+                    <Label htmlFor="custom-reminder-minutes" className={cn("text-xs font-medium", isQuestSoft ? "text-white/58" : "text-muted-foreground")}>
                       Minutes before
                     </Label>
                     <div className="flex items-center gap-2">
@@ -512,13 +555,14 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                         onChange={(event) => setCustomReminderInput(event.target.value)}
                         onKeyDown={handleCustomReminderKeyDown}
                         placeholder="e.g. 180"
-                        className="h-10 text-sm"
+                        className={cn("h-10 text-sm", inputClassName)}
                       />
                       <Button
                         type="button"
                         size="sm"
                         onClick={applyCustomReminder}
                         disabled={!customReminderInput.trim() || Number.parseInt(customReminderInput, 10) <= 0}
+                        className={isQuestSoft ? cn("font-fredoka", toneColors.primaryButton) : undefined}
                       >
                         Apply
                       </Button>
@@ -533,10 +577,10 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
       {/* Recurrence Section - hide for rituals */}
       {!props.hideRecurrence && (
-        <div className="space-y-3">
+        <div className={blockClassName}>
           <div className="flex items-center gap-2">
-            <Repeat className="w-4 h-4 text-muted-foreground" />
-            <Label className="text-sm font-medium">Recurrence</Label>
+            <Repeat className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+            <Label className={labelClassName}>Recurrence</Label>
           </div>
           
           <div className="relative">
@@ -544,28 +588,22 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               type="button"
               onClick={() => setShowRecurrenceOptions(!showRecurrenceOptions)}
               disabled={recurrenceSelectionDisabled}
-              className={`w-full px-3 py-2 text-sm text-left border rounded-lg transition-colors flex items-center justify-between ${
-                recurrenceSelectionDisabled
-                  ? "bg-muted text-muted-foreground cursor-not-allowed opacity-70"
-                  : "bg-background hover:bg-accent"
-              }`}
+              className={recurrenceSelectionDisabled ? disabledTriggerClassName : triggerClassName}
             >
               <span>
                 {recurrenceOptions.find(opt => opt.value === (recurrencePatternForEditor || 'none'))?.label || "None"}
               </span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <ChevronDown className={cn("w-4 h-4", isQuestSoft ? "text-white/52" : "text-muted-foreground")} />
             </button>
             
             {showRecurrenceOptions && (
-              <div className="absolute z-10 w-full mt-1 bg-popover border rounded-lg shadow-lg">
+              <div className={cn(dropdownClassName, !isQuestSoft && "max-h-none")}>
                 {recurrenceOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => handleRecurrenceOptionSelect(option.value)}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors ${
-                      (recurrencePatternForEditor || 'none') === option.value ? 'bg-accent' : ''
-                    }`}
+                    className={dropdownItemClassName((recurrencePatternForEditor || 'none') === option.value)}
                   >
                     {option.label}
                   </button>
@@ -575,7 +613,7 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
           </div>
 
           {recurrenceSelectionDisabled && (
-            <p className="text-xs text-muted-foreground">
+            <p className={helperClassName}>
               Set a time to enable recurrence.
             </p>
           )}
@@ -584,17 +622,19 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
             <div className="flex gap-2">
               <Button
                 type="button"
-                variant={resolvedCustomPeriod === "week" ? "default" : "outline"}
+                variant={isQuestSoft ? "outline" : resolvedCustomPeriod === "week" ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleCustomPeriodChange("week")}
+                className={isQuestSoft ? getQuestOptionPillClasses(resolvedCustomPeriod === "week", toneColors.pill, true) : undefined}
               >
                 Week
               </Button>
               <Button
                 type="button"
-                variant={resolvedCustomPeriod === "month" ? "default" : "outline"}
+                variant={isQuestSoft ? "outline" : resolvedCustomPeriod === "month" ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleCustomPeriodChange("month")}
+                className={isQuestSoft ? getQuestOptionPillClasses(resolvedCustomPeriod === "month", toneColors.pill, true) : undefined}
               >
                 Month
               </Button>
@@ -608,6 +648,8 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
               selectedDays={props.recurrenceDays}
               onDaysChange={handleRecurrenceDaysChange}
               selectionMode={recurrencePatternForEditor === 'custom' ? 'multiple' : 'single'}
+              variant={isQuestSoft ? "quest-soft" : "default"}
+              activeTone={toneColors.pill}
             />
           )}
 
@@ -619,17 +661,22 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
                     key={dayOfMonth}
                     type="button"
                     onClick={() => toggleMonthDay(dayOfMonth)}
-                    className={`h-8 rounded-md text-xs font-medium border transition-colors ${
-                      props.recurrenceMonthDays.includes(dayOfMonth)
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "bg-background border-border hover:bg-accent"
-                    }`}
+                    className={cn(
+                      "h-8 rounded-md text-xs font-medium border transition-colors",
+                      isQuestSoft
+                        ? props.recurrenceMonthDays.includes(dayOfMonth)
+                          ? cn(toneColors.pill, "border-transparent text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)]")
+                          : "border-white/8 bg-white/[0.06] text-white/74 hover:bg-white/[0.10]"
+                        : props.recurrenceMonthDays.includes(dayOfMonth)
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "bg-background border-border hover:bg-accent",
+                    )}
                   >
                     {dayOfMonth}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className={helperClassName}>
                 Short months run on the last valid day.
               </p>
             </div>
@@ -639,32 +686,37 @@ export const AdvancedQuestOptions = (props: AdvancedQuestOptionsProps) => {
 
       {/* Location */}
       {!props.hideLocation && (
-        <div className="space-y-2">
+        <div className={sectionClassName}>
           <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-            <Label className="text-sm font-medium">Location</Label>
+            <MapPin className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+            <Label className={labelClassName}>Location</Label>
           </div>
           <Input
             value={props.location || ''}
             onChange={(e) => props.onLocationChange(e.target.value || null)}
             placeholder="Where will this happen? (optional)"
-            className="bg-muted/30 border-border/50"
+            className={cn(isQuestSoft ? inputClassName : "bg-muted/30 border-border/50")}
           />
         </div>
       )}
 
       {/* More Information */}
       {!props.hideMoreInformation && (
-      <div className="space-y-3">
+      <div className={blockClassName}>
         <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">More Information</Label>
+          <Info className={cn("w-4 h-4", isQuestSoft ? "text-white/58" : "text-muted-foreground")} />
+          <Label className={labelClassName}>More Information</Label>
         </div>
         <Textarea
           value={props.moreInformation || ''}
           onChange={(e) => props.onMoreInformationChange(e.target.value || null)}
           placeholder="Add extra context, notes, or details (optional)"
-          className="min-h-[100px] resize-none bg-muted/30 border-border/50"
+          className={cn(
+            "min-h-[100px] resize-none",
+            isQuestSoft
+              ? "border-white/10 bg-white/[0.08] text-white placeholder:text-white/42"
+              : "bg-muted/30 border-border/50",
+          )}
           style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
           data-vaul-no-drag
         />

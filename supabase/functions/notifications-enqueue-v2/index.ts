@@ -9,6 +9,9 @@ import {
   getNotificationPriority,
   normalizeTimezone,
   parseIntEnv,
+  pickDeterministicDailyQuote,
+  toDailyScheduledDateTime,
+  toScheduledDateTime,
   type NotificationType,
 } from "../_shared/notificationsV2.ts";
 import { composeNotificationCopy, type CompanionNotificationContext } from "../_shared/notificationComposer.ts";
@@ -32,10 +35,21 @@ interface QueueInsertRow {
 interface ProfileRow {
   id: string;
   timezone: string | null;
+  selected_mentor_id?: string | null;
   daily_push_enabled?: boolean | null;
+  daily_push_window?: string | null;
+  daily_push_time?: string | null;
+  daily_quote_push_enabled?: boolean | null;
+  daily_quote_push_window?: string | null;
+  daily_quote_push_time?: string | null;
   task_reminders_enabled?: boolean | null;
   habit_reminders_enabled?: boolean | null;
   checkin_reminders_enabled?: boolean | null;
+}
+
+interface MentorRow {
+  id: string;
+  slug: string;
 }
 
 interface CompanionRow {
@@ -46,143 +60,50 @@ interface CompanionRow {
   inactive_days: number | null;
 }
 
-const timezoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
-
-interface DateParts {
-  year: number;
-  month: number;
-  day: number;
+interface DailyPepTalkRow {
+  id: string;
+  mentor_slug: string;
+  title: string;
+  summary: string;
+  for_date: string;
 }
 
-interface TimeParts {
-  hour: number;
-  minute: number;
-  second: number;
+interface DailyQuoteRow {
+  id: string;
+  mentor_slug: string;
+  quote_id: string;
+  for_date: string;
 }
 
-function parseDateParts(taskDate: string | null): DateParts | null {
-  if (!taskDate) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(taskDate.trim());
-  if (!match) return null;
-
-  const year = Number.parseInt(match[1], 10);
-  const month = Number.parseInt(match[2], 10);
-  const day = Number.parseInt(match[3], 10);
-
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-
-  return { year, month, day };
+interface QuoteRow {
+  id: string;
+  mentor_id: string | null;
+  text: string;
+  author: string | null;
 }
 
-function parseTimeParts(scheduledTime: string | null): TimeParts | null {
-  if (!scheduledTime) return null;
-  const [timePart] = scheduledTime.split(".");
-  const pieces = timePart.split(":");
-  if (pieces.length < 2) return null;
-
-  const hour = Number.parseInt(pieces[0], 10);
-  const minute = Number.parseInt(pieces[1], 10);
-  const second = pieces.length > 2 ? Number.parseInt(pieces[2], 10) : 0;
-
-  if (!Number.isFinite(hour) || !Number.isFinite(minute) || !Number.isFinite(second)) {
-    return null;
-  }
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
-    return null;
-  }
-
-  return { hour, minute, second };
+interface DailySourceProfile {
+  profile: ProfileRow;
+  mentorId: string;
+  mentorSlug: string;
+  localDate: string;
+  timezone: string;
 }
 
-function getTimezoneFormatter(timezone: string): Intl.DateTimeFormat {
-  let formatter = timezoneFormatterCache.get(timezone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hourCycle: "h23",
-    });
-    timezoneFormatterCache.set(timezone, formatter);
-  }
-  return formatter;
+interface DailyPepSourceRow {
+  user_id: string;
+  daily_pep_talk_id: string;
+  scheduled_at: string;
 }
 
-function timezoneOffsetMs(utcGuessMs: number, timezone: string): number | null {
-  const formatter = getTimezoneFormatter(timezone);
-  const parts = formatter.formatToParts(new Date(utcGuessMs));
-  const map = new Map(parts.map((part) => [part.type, part.value]));
-
-  const year = Number.parseInt(map.get("year") ?? "", 10);
-  const month = Number.parseInt(map.get("month") ?? "", 10);
-  const day = Number.parseInt(map.get("day") ?? "", 10);
-  const hour = Number.parseInt(map.get("hour") ?? "", 10);
-  const minute = Number.parseInt(map.get("minute") ?? "", 10);
-  const second = Number.parseInt(map.get("second") ?? "", 10);
-
-  if (
-    !Number.isFinite(year) ||
-    !Number.isFinite(month) ||
-    !Number.isFinite(day) ||
-    !Number.isFinite(hour) ||
-    !Number.isFinite(minute) ||
-    !Number.isFinite(second)
-  ) {
-    return null;
-  }
-
-  const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  return localAsUtc - utcGuessMs;
+interface DailyQuoteSourceRow {
+  user_id: string;
+  daily_quote_id: string;
+  scheduled_at: string;
 }
 
-function toScheduledDateTime(
-  taskDate: string | null,
-  scheduledTime: string | null,
-  timezoneRaw: string | null | undefined,
-): Date | null {
-  const dateParts = parseDateParts(taskDate);
-  const timeParts = parseTimeParts(scheduledTime);
-  if (!dateParts || !timeParts) return null;
-
-  const timezone = normalizeTimezone(timezoneRaw);
-  const baselineUtc = Date.UTC(
-    dateParts.year,
-    dateParts.month - 1,
-    dateParts.day,
-    timeParts.hour,
-    timeParts.minute,
-    timeParts.second,
-  );
-
-  let utcGuess = baselineUtc;
-  for (let i = 0; i < 4; i += 1) {
-    const offsetMs = timezoneOffsetMs(utcGuess, timezone);
-    if (offsetMs === null) return null;
-    const nextGuess = baselineUtc - offsetMs;
-    if (Math.abs(nextGuess - utcGuess) < 1000) {
-      utcGuess = nextGuess;
-      break;
-    }
-    utcGuess = nextGuess;
-  }
-
-  const value = new Date(utcGuess);
-  if (Number.isNaN(value.getTime())) return null;
-
-  const local = getLocalDateTimeParts(value, timezone);
-  const expectedDate = `${String(dateParts.year).padStart(4, "0")}-${String(dateParts.month).padStart(2, "0")}-${String(dateParts.day).padStart(2, "0")}`;
-  if (local.localDate !== expectedDate || local.hour !== timeParts.hour || local.minute !== timeParts.minute) {
-    // Skip impossible local times (e.g. DST spring-forward gaps).
-    return null;
-  }
-
-  return value;
+function dailyContentKey(mentorSlug: string, localDate: string): string {
+  return `${mentorSlug}:${localDate}`;
 }
 
 function toCompanionMap(rows: CompanionRow[] | null): Map<string, CompanionNotificationContext> {
@@ -261,6 +182,7 @@ serve(async (req) => {
     }
 
     const maxPep = parseIntEnv("NOTIFICATIONS_V2_PEP_SCAN_LIMIT", 300);
+    const maxQuote = parseIntEnv("NOTIFICATIONS_V2_QUOTE_SCAN_LIMIT", 300);
     const maxTask = parseIntEnv("NOTIFICATIONS_V2_TASK_SCAN_LIMIT", 400);
     const maxHabit = parseIntEnv("NOTIFICATIONS_V2_HABIT_SCAN_LIMIT", 200);
     const maxContact = parseIntEnv("NOTIFICATIONS_V2_CONTACT_SCAN_LIMIT", 200);
@@ -275,6 +197,246 @@ serve(async (req) => {
     const tomorrowIso = new Date(now.getTime() + 24 * 60 * 60_000).toISOString().slice(0, 10);
 
     const inserts: QueueInsertRow[] = [];
+    const createdSources = {
+      daily_pep: 0,
+      daily_quote: 0,
+    };
+    const missingContent = {
+      daily_pep: 0,
+      daily_quote: 0,
+    };
+    let generatedDailyQuotes = 0;
+
+    const { data: dailyProfiles, error: dailyProfilesError } = await supabase
+      .from("profiles")
+      .select(`
+        id,
+        selected_mentor_id,
+        timezone,
+        daily_push_enabled,
+        daily_push_window,
+        daily_push_time,
+        daily_quote_push_enabled,
+        daily_quote_push_window,
+        daily_quote_push_time
+      `)
+      .not("selected_mentor_id", "is", null)
+      .or("daily_push_enabled.eq.true,daily_quote_push_enabled.eq.true")
+      .limit(maxProfiles);
+
+    if (dailyProfilesError) throw dailyProfilesError;
+
+    const mentorIds = [...new Set((dailyProfiles ?? []).map((row) => row.selected_mentor_id).filter((value): value is string => typeof value === "string"))];
+    const mentors = mentorIds.length > 0
+      ? (await supabase
+        .from("mentors")
+        .select("id, slug")
+        .in("id", mentorIds)).data as MentorRow[] | null
+      : [];
+    const mentorSlugById = new Map((mentors ?? []).map((row) => [row.id, row.slug]));
+
+    const dailySourceProfiles: DailySourceProfile[] = [];
+    for (const profile of (dailyProfiles as ProfileRow[] | null) ?? []) {
+      const mentorId = profile.selected_mentor_id;
+      if (!mentorId) continue;
+
+      const mentorSlug = mentorSlugById.get(mentorId);
+      if (!mentorSlug) {
+        if (profile.daily_push_enabled === true) missingContent.daily_pep += 1;
+        if (profile.daily_quote_push_enabled === true) missingContent.daily_quote += 1;
+        continue;
+      }
+
+      const timezone = normalizeTimezone(profile.timezone);
+      const localDate = getLocalDateTimeParts(now, timezone).localDate;
+      dailySourceProfiles.push({ profile, mentorId, mentorSlug, localDate, timezone });
+    }
+
+    const dailyMentorSlugs = [...new Set(dailySourceProfiles.map((row) => row.mentorSlug))];
+    const dailyLocalDates = [...new Set(dailySourceProfiles.map((row) => row.localDate))];
+
+    const dailyPepTalks = dailyMentorSlugs.length > 0 && dailyLocalDates.length > 0
+      ? (await supabase
+        .from("daily_pep_talks")
+        .select("id, mentor_slug, title, summary, for_date")
+        .in("mentor_slug", dailyMentorSlugs)
+        .in("for_date", dailyLocalDates)).data as DailyPepTalkRow[] | null
+      : [];
+    const dailyPepByKey = new Map((dailyPepTalks ?? []).map((row) => [dailyContentKey(row.mentor_slug, row.for_date), row]));
+
+    let dailyQuotes = dailyMentorSlugs.length > 0 && dailyLocalDates.length > 0
+      ? (await supabase
+        .from("daily_quotes")
+        .select("id, mentor_slug, quote_id, for_date")
+        .in("mentor_slug", dailyMentorSlugs)
+        .in("for_date", dailyLocalDates)).data as DailyQuoteRow[] | null
+      : [];
+    let dailyQuoteByKey = new Map((dailyQuotes ?? []).map((row) => [dailyContentKey(row.mentor_slug, row.for_date), row]));
+
+    const missingDailyQuoteKeys = new Map<string, { mentorId: string; mentorSlug: string; localDate: string }>();
+    for (const sourceProfile of dailySourceProfiles) {
+      if (sourceProfile.profile.daily_quote_push_enabled !== true) continue;
+      const key = dailyContentKey(sourceProfile.mentorSlug, sourceProfile.localDate);
+      if (!dailyQuoteByKey.has(key)) {
+        missingDailyQuoteKeys.set(key, {
+          mentorId: sourceProfile.mentorId,
+          mentorSlug: sourceProfile.mentorSlug,
+          localDate: sourceProfile.localDate,
+        });
+      }
+    }
+
+    if (missingDailyQuoteKeys.size > 0) {
+      const missingQuoteMentorIds = [...new Set([...missingDailyQuoteKeys.values()].map((value) => value.mentorId))];
+      const candidateQuotes = missingQuoteMentorIds.length > 0
+        ? (await supabase
+          .from("quotes")
+          .select("id, mentor_id, text, author")
+          .in("mentor_id", missingQuoteMentorIds)
+          .order("id", { ascending: true })).data as QuoteRow[] | null
+        : [];
+      const quoteCandidatesByMentor = new Map<string, QuoteRow[]>();
+
+      for (const quote of candidateQuotes ?? []) {
+        const mentorId = quote.mentor_id;
+        if (!mentorId) continue;
+        const rows = quoteCandidatesByMentor.get(mentorId) ?? [];
+        rows.push(quote);
+        quoteCandidatesByMentor.set(mentorId, rows);
+      }
+
+      const dailyQuoteInserts: Array<Pick<DailyQuoteRow, "mentor_slug" | "for_date" | "quote_id">> = [];
+      for (const request of missingDailyQuoteKeys.values()) {
+        const quoteCandidates = quoteCandidatesByMentor.get(request.mentorId) ?? [];
+        const selectedQuote = await pickDeterministicDailyQuote(
+          quoteCandidates,
+          request.mentorSlug,
+          request.localDate,
+        );
+        if (!selectedQuote) continue;
+
+        dailyQuoteInserts.push({
+          mentor_slug: request.mentorSlug,
+          for_date: request.localDate,
+          quote_id: selectedQuote.id,
+        });
+      }
+
+      if (dailyQuoteInserts.length > 0) {
+        const { error: insertDailyQuotesError } = await supabase
+          .from("daily_quotes")
+          .upsert(dailyQuoteInserts, { onConflict: "mentor_slug,for_date", ignoreDuplicates: true });
+
+        if (insertDailyQuotesError) throw insertDailyQuotesError;
+        generatedDailyQuotes = dailyQuoteInserts.length;
+
+        dailyQuotes = (await supabase
+          .from("daily_quotes")
+          .select("id, mentor_slug, quote_id, for_date")
+          .in("mentor_slug", dailyMentorSlugs)
+          .in("for_date", dailyLocalDates)).data as DailyQuoteRow[] | null;
+        dailyQuoteByKey = new Map((dailyQuotes ?? []).map((row) => [dailyContentKey(row.mentor_slug, row.for_date), row]));
+      }
+    }
+
+    const pepSourceRows: DailyPepSourceRow[] = [];
+    const quoteSourceRows: DailyQuoteSourceRow[] = [];
+
+    for (const sourceProfile of dailySourceProfiles) {
+      const { profile, mentorSlug, localDate, timezone } = sourceProfile;
+
+      if (profile.daily_push_enabled === true) {
+        const dailyPep = dailyPepByKey.get(dailyContentKey(mentorSlug, localDate));
+        if (!dailyPep) {
+          missingContent.daily_pep += 1;
+        } else {
+          const scheduledAt = toDailyScheduledDateTime(
+            localDate,
+            profile.daily_push_time,
+            profile.daily_push_window,
+            timezone,
+            "morning",
+          );
+
+          if (scheduledAt) {
+            pepSourceRows.push({
+              user_id: profile.id,
+              daily_pep_talk_id: dailyPep.id,
+              scheduled_at: scheduledAt.toISOString(),
+            });
+          }
+        }
+      }
+
+      if (profile.daily_quote_push_enabled === true) {
+        const dailyQuote = dailyQuoteByKey.get(dailyContentKey(mentorSlug, localDate));
+        if (!dailyQuote) {
+          missingContent.daily_quote += 1;
+        } else {
+          const scheduledAt = toDailyScheduledDateTime(
+            localDate,
+            profile.daily_quote_push_time,
+            profile.daily_quote_push_window,
+            timezone,
+            "afternoon",
+          );
+
+          if (scheduledAt) {
+            quoteSourceRows.push({
+              user_id: profile.id,
+              daily_quote_id: dailyQuote.id,
+              scheduled_at: scheduledAt.toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    if (pepSourceRows.length > 0) {
+      const pepUserIds = [...new Set(pepSourceRows.map((row) => row.user_id))];
+      const pepTalkIds = [...new Set(pepSourceRows.map((row) => row.daily_pep_talk_id))];
+      const existingPepSources = pepUserIds.length > 0 && pepTalkIds.length > 0
+        ? (await supabase
+          .from("user_daily_pushes")
+          .select("user_id, daily_pep_talk_id")
+          .in("user_id", pepUserIds)
+          .in("daily_pep_talk_id", pepTalkIds)).data as Array<Pick<DailyPepSourceRow, "user_id" | "daily_pep_talk_id">> | null
+        : [];
+      const existingPepSourceKeys = new Set((existingPepSources ?? []).map((row) => `${row.user_id}:${row.daily_pep_talk_id}`));
+      const pepRowsToInsert = pepSourceRows.filter((row) => !existingPepSourceKeys.has(`${row.user_id}:${row.daily_pep_talk_id}`));
+
+      if (pepRowsToInsert.length > 0) {
+        const { error: insertPepSourcesError } = await supabase
+          .from("user_daily_pushes")
+          .upsert(pepRowsToInsert, { onConflict: "user_id,daily_pep_talk_id", ignoreDuplicates: true });
+
+        if (insertPepSourcesError) throw insertPepSourcesError;
+        createdSources.daily_pep = pepRowsToInsert.length;
+      }
+    }
+
+    if (quoteSourceRows.length > 0) {
+      const quoteUserIds = [...new Set(quoteSourceRows.map((row) => row.user_id))];
+      const dailyQuoteIds = [...new Set(quoteSourceRows.map((row) => row.daily_quote_id))];
+      const existingQuoteSources = quoteUserIds.length > 0 && dailyQuoteIds.length > 0
+        ? (await supabase
+          .from("user_daily_quote_pushes")
+          .select("user_id, daily_quote_id")
+          .in("user_id", quoteUserIds)
+          .in("daily_quote_id", dailyQuoteIds)).data as Array<Pick<DailyQuoteSourceRow, "user_id" | "daily_quote_id">> | null
+        : [];
+      const existingQuoteSourceKeys = new Set((existingQuoteSources ?? []).map((row) => `${row.user_id}:${row.daily_quote_id}`));
+      const quoteRowsToInsert = quoteSourceRows.filter((row) => !existingQuoteSourceKeys.has(`${row.user_id}:${row.daily_quote_id}`));
+
+      if (quoteRowsToInsert.length > 0) {
+        const { error: insertQuoteSourcesError } = await supabase
+          .from("user_daily_quote_pushes")
+          .upsert(quoteRowsToInsert, { onConflict: "user_id,daily_quote_id", ignoreDuplicates: true });
+
+        if (insertQuoteSourcesError) throw insertQuoteSourcesError;
+        createdSources.daily_quote = quoteRowsToInsert.length;
+      }
+    }
 
     // 1) Daily pep talk notifications
     const { data: duePepPushes, error: pepError } = await supabase
@@ -325,7 +487,61 @@ serve(async (req) => {
       }));
     }
 
-    // 2) Task start + reminder notifications
+    // 2) Daily quote notifications
+    const { data: dueQuotePushes, error: dueQuoteError } = await supabase
+      .from("user_daily_quote_pushes")
+      .select("id, user_id, daily_quote_id, scheduled_at")
+      .is("delivered_at", null)
+      .lte("scheduled_at", nowIso)
+      .limit(maxQuote);
+
+    if (dueQuoteError) throw dueQuoteError;
+
+    const dueDailyQuoteIds = [...new Set((dueQuotePushes ?? []).map((row) => row.daily_quote_id as string))];
+    const dueDailyQuotes = dueDailyQuoteIds.length > 0
+      ? (await supabase
+        .from("daily_quotes")
+        .select("id, mentor_slug, quote_id, for_date")
+        .in("id", dueDailyQuoteIds)).data as DailyQuoteRow[] | null
+      : [];
+    const dueDailyQuoteById = new Map((dueDailyQuotes ?? []).map((row) => [row.id, row]));
+
+    const dueQuoteIds = [...new Set((dueDailyQuotes ?? []).map((row) => row.quote_id))];
+    const dueQuotes = dueQuoteIds.length > 0
+      ? (await supabase
+        .from("quotes")
+        .select("id, text, author, mentor_id")
+        .in("id", dueQuoteIds)).data as QuoteRow[] | null
+      : [];
+    const dueQuoteById = new Map((dueQuotes ?? []).map((row) => [row.id, row]));
+
+    for (const push of dueQuotePushes ?? []) {
+      const dailyQuote = dueDailyQuoteById.get(push.daily_quote_id);
+      if (!dailyQuote) continue;
+
+      const quote = dueQuoteById.get(dailyQuote.quote_id);
+      if (!quote) continue;
+
+      inserts.push(rowForQueue({
+        userId: push.user_id,
+        type: "daily_quote",
+        sourceTable: "user_daily_quote_pushes",
+        sourceId: push.id,
+        dedupeKey: `daily_quote:${push.id}`,
+        scheduledFor: push.scheduled_at ?? nowIso,
+        payload: {
+          daily_quote_id: dailyQuote.id,
+          quote_id: quote.id,
+          quote_text: quote.text,
+          author: quote.author,
+          mentor_slug: dailyQuote.mentor_slug,
+          type: "daily_quote",
+          url: "/inspire?tab=quotes",
+        },
+      }));
+    }
+
+    // 3) Task start + reminder notifications
     const { data: taskCandidates, error: taskError } = await supabase
       .from("daily_tasks")
       .select("id, user_id, task_text, xp_reward, task_date, scheduled_time, start_notification_sent, reminder_enabled, reminder_sent, reminder_minutes_before, completed")
@@ -396,7 +612,7 @@ serve(async (req) => {
       }
     }
 
-    // 3) Habit reminders
+    // 4) Habit reminders
     const { data: habitCandidates, error: habitError } = await supabase
       .from("habits")
       .select("id, user_id, title, preferred_time, reminder_minutes_before, frequency, custom_days, reminder_sent_today")
@@ -468,7 +684,7 @@ serve(async (req) => {
       }));
     }
 
-    // 4) Contact reminders
+    // 5) Contact reminders
     const { data: dueContacts, error: contactError } = await supabase
       .from("contact_reminders")
       .select(`
@@ -510,7 +726,7 @@ serve(async (req) => {
       }));
     }
 
-    // 5) Mentor nudges
+    // 6) Mentor nudges
     const { data: pendingNudges, error: nudgeError } = await supabase
       .from("mentor_nudges")
       .select("id, user_id, message, nudge_type, context")
@@ -554,7 +770,7 @@ serve(async (req) => {
       }));
     }
 
-    // 6) Check-in reminders
+    // 7) Check-in reminders
     const { data: checkinProfiles, error: profileError } = await supabase
       .from("profiles")
       .select("id, timezone, checkin_reminders_enabled")
@@ -649,8 +865,15 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         queued: inserts.length,
+        created_sources: createdSources,
+        generated_content: {
+          daily_quote: generatedDailyQuotes,
+        },
+        missing_content: missingContent,
         scanned: {
+          daily_profiles: dailySourceProfiles.length,
           daily_pep: duePepPushes?.length ?? 0,
+          daily_quote: dueQuotePushes?.length ?? 0,
           tasks: taskCandidates?.length ?? 0,
           habits: habitCandidates?.length ?? 0,
           contact_reminders: dueContacts?.length ?? 0,

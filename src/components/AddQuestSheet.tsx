@@ -10,6 +10,7 @@ import { AdvancedQuestOptions } from "@/components/AdvancedQuestOptions";
 import { QuestAttachmentPicker } from "@/components/QuestAttachmentPicker";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -19,6 +20,14 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useCalendarIntegrations } from "@/hooks/useCalendarIntegrations";
 import { parseScheduledTime } from "@/utils/scheduledTime";
 import { SEND_TO_CALENDAR_ENABLED } from "@/utils/calendarFeatureFlags";
@@ -30,6 +39,7 @@ import type {
   QuestTemplateBrowserTab,
   QuestTemplatePrefill,
 } from "@/features/quests/types";
+import { hasQuestTemplateCustomization } from "@/features/quests/utils/templateDraftDiff";
 
 export interface AddQuestData {
   text: string;
@@ -69,20 +79,19 @@ interface AddQuestSheetProps {
 
 import {
   DIFFICULTY_COLORS,
-  DifficultyIconMap,
+  QUEST_FORM_STYLES,
   centerSelectedTimeInWheel,
   formatTime12,
   TIME_SLOTS,
   DURATION_OPTIONS,
   getNextHalfHourTime,
+  getQuestDifficultyIconClasses,
+  getQuestDifficultyOptionClasses,
+  getQuestOptionPillClasses,
 } from "@/components/quest-shared";
 
-const DifficultyIcon = ({ difficulty }: { difficulty: "easy" | "medium" | "hard" }) => {
-  const Icon = DifficultyIconMap[difficulty];
-  return <Icon className="h-5 w-5" />;
-};
-
 const MINUTES_PER_DAY = 24 * 60;
+type SubmitIntent = "scheduled" | "inbox";
 
 const parseTimeToMinutes = (time: string): number | null => {
   const match = time.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
@@ -150,9 +159,16 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const [isEditingCustomDuration, setIsEditingCustomDuration] = useState(false);
   const [sendToCalendar, setSendToCalendar] = useState(false);
   const [attachments, setAttachments] = useState<QuestAttachmentInput[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<QuestTemplatePrefill | null>(null);
+  const [showTemplateUpdatePrompt, setShowTemplateUpdatePrompt] = useState(false);
+  const [pendingSubmitIntent, setPendingSubmitIntent] = useState<SubmitIntent | null>(null);
+  const [isHandlingTemplatePrompt, setIsHandlingTemplatePrompt] = useState(false);
   const {
     templates: personalTemplates,
+    isSavingTemplate,
+    saveTemplate,
   } = usePersonalQuestTemplates({ enabled: open });
+  const { toast } = useToast();
 
   const { integrationVisible, defaultProvider, connections } = useCalendarIntegrations();
   const effectiveProvider = useMemo(() => {
@@ -202,6 +218,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       setIsEditingCustomDuration(false);
       setSendToCalendar(false);
       setAttachments([]);
+      setSelectedTemplate(null);
+      setShowTemplateUpdatePrompt(false);
+      setPendingSubmitIntent(null);
+      setIsHandlingTemplatePrompt(false);
       hasEmittedTitleEnteredRef.current = false;
     } else {
       setTaskDate(format(selectedDate, "yyyy-MM-dd"));
@@ -263,6 +283,37 @@ export const AddQuestSheet = memo(function AddQuestSheet({
   const reviewDateLabel = taskDate ? format(dateObj, "EEE, MMM d") : "Inbox";
   const reviewTimeLabel = scheduledTime ? formatTime12(scheduledTime) : "Select a time";
   const reviewTitle = trimmedTaskText || "Name your quest";
+  const currentTemplateDraft = useMemo(() => ({
+    title: taskText,
+    difficulty,
+    estimatedDuration,
+    notes: moreInformation,
+    subtasks,
+  }), [taskText, difficulty, estimatedDuration, moreInformation, subtasks]);
+  const hasTemplateCustomizations = useMemo(
+    () => selectedTemplate
+      ? hasQuestTemplateCustomization(selectedTemplate, currentTemplateDraft)
+      : false,
+    [currentTemplateDraft, selectedTemplate],
+  );
+  const templatePromptConfig = useMemo(() => {
+    if (!selectedTemplate) return null;
+
+    if (selectedTemplate.templateOrigin === "personal_explicit") {
+      return {
+        title: "Update your template?",
+        description: "This quest started from one of your saved templates. Update that template with these changes too?",
+        actionLabel: "Update Template",
+      };
+    }
+
+    return {
+      title: "Save these changes to My Templates?",
+      description: "This quest started from a template. Save this customized version to My Templates so it is ready next time?",
+      actionLabel: "Save to My Templates",
+    };
+  }, [selectedTemplate]);
+  const isTemplatePromptBusy = isHandlingTemplatePrompt || isSavingTemplate || isAdding;
 
   // --- Subtask helpers ---
   const handleSubtaskChange = useCallback((index: number, value: string) => {
@@ -305,7 +356,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     setDifficulty(template.difficulty);
     setEstimatedDuration(template.estimatedDuration);
     setMoreInformation(template.notes);
-    setSubtasks(template.subtasks);
+    setSubtasks([...template.subtasks]);
+    setSelectedTemplate({
+      ...template,
+      subtasks: [...template.subtasks],
+    });
+    setShowTemplateUpdatePrompt(false);
+    setPendingSubmitIntent(null);
     setCustomDurationInput("");
     setIsEditingCustomDuration(false);
     setShowTimePicker(false);
@@ -345,18 +402,26 @@ export const AddQuestSheet = memo(function AddQuestSheet({
     [onOpenChange, onPreventedCloseAttempt, preventClose]
   );
 
-  const handleSubmit = useCallback(async () => {
+  const executeSubmit = useCallback(async (intent: SubmitIntent) => {
     if (!taskText.trim()) return;
-    const snappedScheduledTime = snapTimeToClosestSlot(scheduledTime);
-    if (snappedScheduledTime !== scheduledTime) {
-      setScheduledTime(snappedScheduledTime);
+    if (intent === "inbox" && hasRecurrencePattern(recurrencePattern)) return;
+
+    const snappedScheduledTime = intent === "scheduled"
+      ? snapTimeToClosestSlot(scheduledTime)
+      : null;
+
+    if (intent === "scheduled") {
+      if (snappedScheduledTime !== scheduledTime) {
+        setScheduledTime(snappedScheduledTime);
+      }
+      window.dispatchEvent(new CustomEvent("add-quest-create-attempted"));
     }
-    window.dispatchEvent(new CustomEvent("add-quest-create-attempted"));
+
     await onAdd({
       text: taskText,
-      taskDate,
+      taskDate: intent === "inbox" ? null : taskDate,
       difficulty,
-      scheduledTime: snappedScheduledTime,
+      scheduledTime: intent === "inbox" ? null : snappedScheduledTime,
       estimatedDuration,
       recurrencePattern,
       recurrenceDays,
@@ -368,42 +433,83 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       location,
       contactId: null,
       autoLogInteraction: true,
-      sendToInbox: false,
-      sendToCalendar: sendToCalendar && canShowCalendarSendOption,
+      sendToInbox: intent === "inbox",
+      sendToCalendar: intent === "scheduled" && sendToCalendar && canShowCalendarSendOption,
       subtasks: subtasks.filter(s => s.trim()),
       imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
       attachments,
     });
     onOpenChange(false);
-  }, [taskText, taskDate, difficulty, scheduledTime, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onAdd, onOpenChange]);
+  }, [taskText, recurrencePattern, scheduledTime, onAdd, taskDate, difficulty, estimatedDuration, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, sendToCalendar, canShowCalendarSendOption, subtasks, attachments, onOpenChange]);
+
+  const submitWithTemplateHandling = useCallback(async (intent: SubmitIntent) => {
+    if (selectedTemplate && hasTemplateCustomizations) {
+      setPendingSubmitIntent(intent);
+      setShowTemplateUpdatePrompt(true);
+      return;
+    }
+
+    await executeSubmit(intent);
+  }, [executeSubmit, hasTemplateCustomizations, selectedTemplate]);
+
+  const handleSubmit = useCallback(async () => {
+    await submitWithTemplateHandling("scheduled");
+  }, [submitWithTemplateHandling]);
 
   const handleAddToInbox = useCallback(async () => {
-    if (!taskText.trim()) return;
-    if (hasRecurrencePattern(recurrencePattern)) return;
-    await onAdd({
-      text: taskText,
-      taskDate: null,
-      difficulty,
-      scheduledTime: null,
-      estimatedDuration,
-      recurrencePattern,
-      recurrenceDays,
-      recurrenceMonthDays,
-      recurrenceCustomPeriod,
-      reminderEnabled,
-      reminderMinutesBefore,
-      moreInformation,
-      location,
-      contactId: null,
-      autoLogInteraction: true,
-      sendToInbox: true,
-      sendToCalendar: false,
-      subtasks: subtasks.filter(s => s.trim()),
-      imageUrl: attachments.find((attachment) => attachment.isImage)?.fileUrl ?? null,
-      attachments,
-    });
-    onOpenChange(false);
-  }, [taskText, difficulty, estimatedDuration, recurrencePattern, recurrenceDays, recurrenceMonthDays, recurrenceCustomPeriod, reminderEnabled, reminderMinutesBefore, moreInformation, location, subtasks, attachments, onAdd, onOpenChange]);
+    await submitWithTemplateHandling("inbox");
+  }, [submitWithTemplateHandling]);
+
+  const handleContinueWithoutTemplateUpdate = useCallback(async () => {
+    if (!pendingSubmitIntent) return;
+
+    const nextIntent = pendingSubmitIntent;
+    setShowTemplateUpdatePrompt(false);
+    setPendingSubmitIntent(null);
+    await executeSubmit(nextIntent);
+  }, [executeSubmit, pendingSubmitIntent]);
+
+  const handleSaveTemplateAndContinue = useCallback(async () => {
+    if (!selectedTemplate || !pendingSubmitIntent) return;
+
+    setIsHandlingTemplatePrompt(true);
+
+    try {
+      const savedTemplate = await saveTemplate({
+        templateId: selectedTemplate.templateOrigin === "personal_explicit"
+          ? selectedTemplate.id
+          : undefined,
+        sourceCommonTemplateId: selectedTemplate.templateOrigin === "common"
+          ? selectedTemplate.id
+          : selectedTemplate.sourceCommonTemplateId,
+        title: currentTemplateDraft.title,
+        difficulty: currentTemplateDraft.difficulty,
+        estimatedDuration: currentTemplateDraft.estimatedDuration,
+        notes: currentTemplateDraft.notes,
+        subtasks: currentTemplateDraft.subtasks,
+      });
+
+      const nextIntent = pendingSubmitIntent;
+      setSelectedTemplate({
+        ...savedTemplate,
+        subtasks: [...savedTemplate.subtasks],
+      });
+      setShowTemplateUpdatePrompt(false);
+      setPendingSubmitIntent(null);
+      await executeSubmit(nextIntent);
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Failed to save your quest template.";
+      toast({
+        title: "Failed to save template",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsHandlingTemplatePrompt(false);
+    }
+  }, [currentTemplateDraft, executeSubmit, pendingSubmitIntent, saveTemplate, selectedTemplate, toast]);
 
   useEffect(() => {
     if (!open) return;
@@ -433,17 +539,23 @@ export const AddQuestSheet = memo(function AddQuestSheet({
       <SheetContent
         side="bottom"
         data-tour="add-quest-sheet"
-        className="h-[92vh] rounded-t-2xl flex flex-col p-0 gap-0 overflow-hidden"
+        className={cn(
+          "h-[92vh] rounded-t-[34px] flex flex-col p-0 gap-0 overflow-hidden",
+          QUEST_FORM_STYLES.sheet,
+        )}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <SheetTitle className="sr-only">Add Quest</SheetTitle>
         <SheetDescription className="sr-only">
           Create a new quest with schedule, subtasks, and optional details.
         </SheetDescription>
-        <div className={cn("relative px-4 pt-2.5 pb-3 flex-shrink-0", colors.bg)}>
+        <div className={cn("relative isolate overflow-hidden px-4 pt-3 pb-4 flex-shrink-0", colors.bg)}>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.26),transparent_72%)] opacity-80" />
+          <div className="pointer-events-none absolute -left-10 top-10 h-24 w-24 rounded-full bg-white/[0.10] blur-2xl" />
+          <div className="pointer-events-none absolute -right-8 bottom-5 h-28 w-28 rounded-full bg-black/10 blur-2xl" />
           <button
             onClick={() => requestOpenChange(false)}
-            className="absolute top-3 right-3 p-1.5 rounded-full bg-black/20 hover:bg-black/30 transition-colors text-white z-10"
+            className="absolute top-4 right-4 z-10 rounded-full border border-white/22 bg-black/10 p-2 text-white shadow-[0_10px_18px_rgba(0,0,0,0.14)] backdrop-blur-md transition-all duration-200 ease-out hover:bg-black/18 active:scale-[0.97] motion-reduce:transition-none"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -451,23 +563,26 @@ export const AddQuestSheet = memo(function AddQuestSheet({
 
           {sheetView === "editor" ? (
             <>
-              <div className="flex flex-col items-center text-center pt-1 text-white">
-                <DifficultyIcon difficulty={difficulty} />
-                <div className="mt-2 w-full max-w-md rounded-xl border border-white/25 bg-white/10 px-2.5 py-2 text-left">
-                  <Input
-                    data-tour="add-quest-title-input"
-                    placeholder="Quest Title"
-                    value={taskText}
-                    onChange={(e) => setTaskText(e.target.value)}
-                    disabled={isAdding}
-                    className="text-sm font-semibold bg-white/10 border-white/20 text-white placeholder:text-white/55 focus-visible:ring-white/30 h-10"
-                  />
+              <div data-testid="add-quest-editor-header" className="flex flex-col items-center text-center pt-1 text-white">
+                <div className="w-full max-w-md pr-12 text-left">
+                  <div className={QUEST_FORM_STYLES.titleFieldShell}>
+                    <div className={QUEST_FORM_STYLES.titleFieldInner}>
+                      <Input
+                        data-tour="add-quest-title-input"
+                        placeholder="Quest Title"
+                        value={taskText}
+                        onChange={(e) => setTaskText(e.target.value)}
+                        disabled={isAdding}
+                        className={QUEST_FORM_STYLES.titleInput}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <p className="text-white/70 text-xs mt-1">{summaryLine}</p>
+                <p className="mt-1.5 text-sm text-white/80">{summaryLine}</p>
                 <button
                   type="button"
                   onClick={() => openTemplateBrowser("common")}
-                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/20"
+                  className={cn("mt-2.5 font-fredoka", QUEST_FORM_STYLES.heroAction)}
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   Browse common quests
@@ -475,7 +590,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               </div>
 
               {/* Compact Difficulty Selector */}
-              <div className="flex justify-center gap-2 mt-2">
+              <div className="mt-3 flex justify-center gap-2">
                 {([
                   { value: "easy" as const, icon: Zap, label: "Easy" },
                   { value: "medium" as const, icon: Flame, label: "Medium" },
@@ -484,26 +599,23 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   <button
                     key={value}
                     onClick={() => setDifficulty(value)}
-                    className={cn(
-                      "w-12 h-10 rounded-xl flex flex-col items-center justify-center gap-0 transition-all border-2",
-                      difficulty === value
-                        ? "bg-white/30 border-white scale-105"
-                        : "bg-white/10 border-transparent hover:bg-white/20"
-                    )}
+                    className={getQuestDifficultyOptionClasses(value, difficulty === value)}
                   >
-                    <Icon className="h-3.5 w-3.5 text-white" />
-                    <span className="text-[9px] font-medium text-white/80 leading-none">{label}</span>
+                    <span className={getQuestDifficultyIconClasses(value, difficulty === value)}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="font-fredoka text-[12px] leading-none">{label}</span>
                   </button>
                 ))}
               </div>
             </>
           ) : (
-            <div className="flex min-h-[112px] flex-col items-center justify-center pt-2 text-center text-white">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10">
+            <div className="flex min-h-[128px] flex-col items-center justify-center pt-2 text-center text-white">
+              <div className={QUEST_FORM_STYLES.heroIcon}>
                 <History className="h-5 w-5" />
               </div>
-              <p className="mt-3 text-base font-semibold">Quest shortcuts</p>
-              <p className="mt-1 text-xs text-white/70">
+              <p className="mt-3 font-fredoka text-[1.15rem]">Quest shortcuts</p>
+              <p className="mt-1 max-w-[16rem] text-sm text-white/74">
                 Pick a common quest or one you already use a lot.
               </p>
             </div>
@@ -511,20 +623,20 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className={cn("flex-1 overflow-y-auto overflow-x-hidden", QUEST_FORM_STYLES.body)}>
           {sheetView === "editor" ? (
-            <div className="px-4 py-4 space-y-3">
+            <div className="px-4 py-4 space-y-4">
               {topPersonalTemplates.length > 0 && (
-                <div className="rounded-2xl border border-border/60 bg-card px-4 py-3">
+                <div className={cn(QUEST_FORM_STYLES.sectionCard, "px-4 py-4")}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Your repeat quests</p>
-                      <p className="text-xs text-muted-foreground">Quick picks based on quests you use often</p>
+                      <p className="font-fredoka text-[1.05rem] text-white">Your templates</p>
+                      <p className="text-xs text-white/60">Saved templates and repeat quests you can reuse fast</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => openTemplateBrowser("yours")}
-                      className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                      className="text-xs font-semibold text-white/72 transition-colors hover:text-white"
                     >
                       See all
                     </button>
@@ -535,11 +647,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                         key={template.id}
                         type="button"
                         onClick={() => applyTemplatePrefill(template)}
-                        className="min-w-[148px] shrink-0 rounded-xl border border-border/60 bg-background px-3 py-2 text-left transition-colors hover:bg-muted/40"
+                        className={cn(
+                          "min-w-[156px] shrink-0 px-4 py-3 text-left",
+                          QUEST_FORM_STYLES.sectionCardSoft,
+                        )}
                       >
-                        <span className="line-clamp-2 text-sm font-medium text-foreground">{template.title}</span>
-                        <span className="mt-2 inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary">
-                          {template.frequency}x
+                        <span className="line-clamp-2 text-sm font-semibold text-white">{template.title}</span>
+                        <span className={cn("mt-2", QUEST_FORM_STYLES.subtleBadge)}>
+                          {template.templateOrigin === "personal_explicit" ? "Saved" : `${template.frequency}x`}
                         </span>
                       </button>
                     ))}
@@ -552,16 +667,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
                 <PopoverTrigger asChild>
                   <button className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
+                    "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                    QUEST_FORM_STYLES.selectorChip,
                     taskDate
-                      ? "bg-card border-border/50 text-foreground"
-                      : "bg-muted/30 border-dashed border-border/50 text-muted-foreground"
+                      ? ""
+                      : QUEST_FORM_STYLES.selectorChipMuted
                   )}>
                     <CalendarIcon className="h-4 w-4" />
                     {taskDate ? format(dateObj, "MMM d") : "Date"}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                <PopoverContent className={cn("w-auto p-1 z-[100]", QUEST_FORM_STYLES.popover)} align="start">
                   <Calendar
                     mode="single"
                     selected={dateObj}
@@ -586,10 +702,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 }}
                 data-tour="add-quest-time-chip"
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-colors",
+                  "flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-white",
+                  QUEST_FORM_STYLES.selectorChip,
                   scheduledTime
-                    ? "bg-card border-border/50 text-foreground"
-                    : "bg-muted/30 border-dashed border-border/50 text-muted-foreground"
+                    ? ""
+                    : QUEST_FORM_STYLES.selectorChipMuted
                 )}
               >
                 <Clock className="h-4 w-4" />
@@ -610,14 +727,14 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   onBlur={() => {
                     setScheduledTime((current) => snapTimeToClosestSlot(current));
                   }}
-                  className="h-10 text-base"
+                  className="h-11 rounded-[20px] border-white/10 bg-white/[0.08] text-base text-white"
                 />
                 <div
                   ref={timeWheelRef}
-                  className="relative h-[180px] overflow-y-auto rounded-xl bg-card border border-border/50 snap-y snap-mandatory scrollbar-none"
+                  className={QUEST_FORM_STYLES.timeWheel}
                   style={{ scrollbarWidth: "none" }}
                 >
-                  <div className="sticky top-0 h-12 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none" />
+                  <div className={QUEST_FORM_STYLES.timeWheelFadeTop} />
                   <div className="flex flex-col items-center py-1">
                     {TIME_SLOTS.map((slot) => {
                       const isSelected = scheduledTime === slot;
@@ -633,10 +750,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                           data-time-slot={slot}
                           onClick={() => setScheduledTime(slot)}
                           className={cn(
-                            "w-[85%] py-2.5 rounded-xl text-center text-sm font-semibold snap-center transition-all duration-150 my-0.5",
+                            "my-0.5 w-[85%] rounded-[20px] py-2.5 text-center text-sm font-semibold snap-center transition-all duration-150 motion-reduce:transition-none",
                             isSelected
-                              ? cn(colors.pill, "text-white shadow-lg scale-[1.02]")
-                              : "text-foreground hover:bg-muted/50"
+                              ? cn(getQuestOptionPillClasses(true, colors.pill), "scale-[1.02]")
+                              : "text-white/74 hover:bg-white/[0.08]"
                           )}
                           style={{ opacity: isSelected ? 1 : opacity }}
                         >
@@ -644,10 +761,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                             ? `${formatTime12(slot)} – ${formatTime12(endTime)}`
                             : formatTime12(slot)}
                         </button>
-                      );
+                        );
                     })}
                   </div>
-                  <div className="sticky bottom-0 h-12 bg-gradient-to-t from-card to-transparent z-10 pointer-events-none" />
+                  <div className={QUEST_FORM_STYLES.timeWheelFadeBottom} />
                 </div>
               </div>
             )}
@@ -655,13 +772,16 @@ export const AddQuestSheet = memo(function AddQuestSheet({
             {/* Duration Row (tappable, expands to chips) */}
             <button
               onClick={() => setShowDurationChips(!showDurationChips)}
-              className="w-full flex items-center justify-between bg-card rounded-xl px-4 py-3 border border-border/50 hover:bg-muted/30 transition-colors"
+              className={cn(
+                "w-full flex items-center justify-between text-white",
+                QUEST_FORM_STYLES.selectorChip,
+              )}
             >
-              <div className="flex items-center gap-2.5 text-sm font-medium">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2.5 text-sm font-semibold">
+                <Clock className="h-4 w-4 text-white/58" />
                 <span>{durationLabel}</span>
               </div>
-              <ChevronRight className={cn("h-4 w-4 text-muted-foreground transition-transform", showDurationChips && "rotate-90")} />
+              <ChevronRight className={cn("h-4 w-4 text-white/52 transition-transform", showDurationChips && "rotate-90")} />
             </button>
 
             {showDurationChips && (
@@ -685,12 +805,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                             setIsEditingCustomDuration(false);
                           }
                         }}
-                        className={cn(
-                          "px-4 py-2 rounded-lg text-sm font-bold transition-all duration-150",
-                          isSelected
-                            ? cn(colors.pill, "text-white shadow-md")
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                        )}
+                        className={getQuestOptionPillClasses(isSelected, colors.pill)}
                       >
                         {opt.label}
                       </button>
@@ -698,7 +813,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   })}
                 </div>
                 {showCustomDurationInput && (
-                  <div className="flex items-center gap-2">
+                  <div className={cn("flex items-center gap-2 rounded-[20px] px-3 py-2", QUEST_FORM_STYLES.insetPanel)}>
                     <Input
                       type="number"
                       inputMode="numeric"
@@ -714,31 +829,31 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                           setEstimatedDuration(null);
                         }
                       }}
-                      className="w-28 h-9 text-sm"
+                      className="h-10 w-28 border-white/10 bg-white/[0.08] text-sm text-white"
                       autoFocus
                     />
-                    <span className="text-xs text-muted-foreground">min</span>
+                    <span className="text-xs text-white/58">min</span>
                   </div>
                 )}
               </div>
             )}
 
             {/* Subtasks + Notes Card */}
-            <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
+            <div className={cn(QUEST_FORM_STYLES.sectionCard, "overflow-hidden")}>
               {subtasks.map((st, idx) => (
-                <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-border/30 group">
-                  <Checkbox disabled className="h-4 w-4 opacity-50" />
+                <div key={idx} className={cn("group flex items-center gap-2 px-4 py-3", `border-b ${QUEST_FORM_STYLES.divider}`)}>
+                  <Checkbox disabled className="h-4 w-4 border-white/18 opacity-60" />
                   <input
                     ref={(el) => { subtaskInputRefs.current[idx] = el; }}
                     value={st}
                     onChange={(e) => handleSubtaskChange(idx, e.target.value)}
                     onKeyDown={(e) => handleSubtaskKeyDown(idx, e)}
                     placeholder="Subtask"
-                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                    className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
                   />
                   <button
                     onClick={() => handleDeleteSubtask(idx)}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
+                    className="rounded-full p-1 opacity-0 transition-all hover:bg-white/[0.08] text-white/44 hover:text-white group-hover:opacity-100"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -755,17 +870,17 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     handleAddSubtaskRow();
                   }
                 }}
-                className="flex items-center gap-2 px-3 py-2.5 w-full text-left hover:bg-muted/30 transition-colors border-b border-border/30 cursor-pointer"
+                className={cn("flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-white/[0.05]", `border-b ${QUEST_FORM_STYLES.divider}`)}
               >
-                <Checkbox disabled className="h-4 w-4 opacity-30" />
-                <span className="text-sm text-muted-foreground/60">Add Subtask</span>
+                <Checkbox disabled className="h-4 w-4 border-white/14 opacity-40" />
+                <span className="text-sm text-white/48">Add Subtask</span>
               </div>
 
               <Textarea
                 value={moreInformation || ""}
                 onChange={(e) => setMoreInformation(e.target.value || null)}
                 placeholder="Add notes, meeting links or phone numbers..."
-                className="min-h-[70px] border-0 rounded-none bg-transparent resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                className="min-h-[88px] border-0 rounded-none bg-transparent resize-none px-4 py-4 text-sm text-white placeholder:text-white/42 focus-visible:ring-0 focus-visible:ring-offset-0"
                 style={{ touchAction: "pan-y", WebkitTapHighlightColor: "transparent" }}
                 data-vaul-no-drag
               />
@@ -802,16 +917,52 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 hideReminder
                 hideLocation
                 requireScheduledTimeForRecurrence
+                visualStyle="quest-soft"
               />
             </div>
 
-            <div className="space-y-2 px-1">
-              <Label className="text-sm font-medium text-muted-foreground">Photo / Files</Label>
+            <div className={cn(QUEST_FORM_STYLES.sectionCard, "space-y-3 px-4 py-4")}>
+              <Label className={cn("text-sm font-semibold", QUEST_FORM_STYLES.label)}>Photo / Files</Label>
               <QuestAttachmentPicker
                 attachments={attachments}
                 onAttachmentsChange={setAttachments}
+                visualStyle="quest-soft"
               />
             </div>
+
+            {scheduledTime && (
+              <AdvancedQuestOptions
+                scheduledTime={scheduledTime}
+                estimatedDuration={estimatedDuration}
+                recurrencePattern={recurrencePattern}
+                recurrenceDays={recurrenceDays}
+                recurrenceMonthDays={recurrenceMonthDays}
+                recurrenceCustomPeriod={recurrenceCustomPeriod}
+                reminderEnabled={reminderEnabled}
+                reminderMinutesBefore={reminderMinutesBefore}
+                onScheduledTimeChange={setScheduledTime}
+                onEstimatedDurationChange={setEstimatedDuration}
+                onRecurrencePatternChange={setRecurrencePattern}
+                onRecurrenceDaysChange={setRecurrenceDays}
+                onRecurrenceMonthDaysChange={setRecurrenceMonthDays}
+                onRecurrenceCustomPeriodChange={setRecurrenceCustomPeriod}
+                onReminderEnabledChange={setReminderEnabled}
+                onReminderMinutesBeforeChange={setReminderMinutesBefore}
+                moreInformation={moreInformation}
+                onMoreInformationChange={setMoreInformation}
+                location={location}
+                onLocationChange={setLocation}
+                selectedDate={dateObj}
+                taskDifficulty={difficulty}
+                hideScheduledTime
+                hideDuration
+                hideMoreInformation
+                hideRecurrence
+                hideLocation
+                requireScheduledTimeForRecurrence
+                visualStyle="quest-soft"
+              />
+            )}
 
             {/* Advanced Settings (collapsible) */}
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
@@ -819,7 +970,7 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-between text-muted-foreground"
+                  className={QUEST_FORM_STYLES.advancedTrigger}
                 >
                   <span className="flex items-center gap-2">
                     <Sliders className="w-4 h-4" />
@@ -858,8 +1009,10 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                     hideScheduledTime
                     hideDuration
                     hideMoreInformation
+                    hideReminder
                     hideRecurrence
                     requireScheduledTimeForRecurrence
+                    visualStyle="quest-soft"
                   />
                 </div>
               </CollapsibleContent>
@@ -876,15 +1029,15 @@ export const AddQuestSheet = memo(function AddQuestSheet({
         </div>
 
         {sheetView === "editor" && (
-          <div className="px-5 pt-4 pb-6 flex-shrink-0 flex flex-col gap-3 border-t border-border/50">
-            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
-              <p className="text-xs text-muted-foreground">
+          <div className="flex-shrink-0 flex flex-col gap-3 border-t border-white/8 px-5 pt-4 pb-6">
+            <div className={QUEST_FORM_STYLES.footerReview}>
+              <p className="text-xs text-white/74">
                 {reviewTitle} · {reviewTimeLabel} · {reviewDateLabel}
               </p>
             </div>
             {canShowCalendarSendOption && (
-              <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-                <div className="text-xs text-muted-foreground">
+              <div className={cn(QUEST_FORM_STYLES.sectionCardSoft, "flex items-center justify-between px-4 py-3")}>
+                <div className="text-xs text-white/62">
                   Send to {effectiveProvider === "apple" ? "Apple" : effectiveProvider === "google" ? "Google" : "Outlook"} Calendar after create
                 </div>
                 <Switch checked={sendToCalendar} onCheckedChange={setSendToCalendar} />
@@ -895,8 +1048,8 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               data-tour="add-quest-create-button"
               disabled={isAdding || !canCreateTask}
               className={cn(
-                "w-full text-white",
-                canCreateTask ? cn(colors.pill, "hover:opacity-90") : ""
+                "h-14 w-full rounded-[28px] font-fredoka text-[1.05rem] tracking-[0.01em] disabled:opacity-100",
+                canCreateTask ? colors.primaryButton : colors.primaryButtonDisabled,
               )}
             >
               {isAdding ? "Adding..." : "Add Quest"}
@@ -905,13 +1058,13 @@ export const AddQuestSheet = memo(function AddQuestSheet({
               variant="outline"
               onClick={handleAddToInbox}
               disabled={isAdding || !canAddToInbox}
-              className="w-full"
+              className={cn("h-12 w-full rounded-[26px] border font-semibold disabled:opacity-45", QUEST_FORM_STYLES.secondaryButton)}
             >
               <Inbox className="mr-2 h-4 w-4" />
               Add to Inbox instead
             </Button>
             {hasRecurrence && (
-              <p className="text-xs text-muted-foreground text-center">
+              <p className={cn("text-center", QUEST_FORM_STYLES.helperText)}>
                 Recurring quests must stay scheduled with a time.
               </p>
             )}
@@ -921,11 +1074,11 @@ export const AddQuestSheet = memo(function AddQuestSheet({
                   onOpenChange(false);
                   onCreateCampaign();
                 }}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 py-1"
+                className={cn("flex items-center justify-center gap-1.5 py-1 text-sm", QUEST_FORM_STYLES.footerLink)}
               >
                 <Map className="w-3.5 h-3.5" />
                 <span>Or create a Campaign</span>
-                <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] leading-none text-muted-foreground/80">
+                <span className={QUEST_FORM_STYLES.subtleBadge}>
                   Max 2 active
                 </span>
               </button>
@@ -933,6 +1086,42 @@ export const AddQuestSheet = memo(function AddQuestSheet({
           </div>
         )}
       </SheetContent>
+      <AlertDialog
+        open={showTemplateUpdatePrompt}
+        onOpenChange={(nextOpen) => {
+          if (isTemplatePromptBusy) return;
+          setShowTemplateUpdatePrompt(nextOpen);
+          if (!nextOpen) {
+            setPendingSubmitIntent(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{templatePromptConfig?.title ?? "Save template changes?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {templatePromptConfig?.description ?? "Save this customized version for next time, or keep it as a one-off quest."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleContinueWithoutTemplateUpdate()}
+              disabled={isTemplatePromptBusy}
+            >
+              Just this time
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSaveTemplateAndContinue()}
+              disabled={isTemplatePromptBusy}
+            >
+              {templatePromptConfig?.actionLabel ?? "Save to My Templates"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 });

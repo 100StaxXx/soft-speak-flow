@@ -23,6 +23,7 @@ import type {
   QuestTemplatePrefill,
 } from "@/features/quests/types";
 import { cn } from "@/lib/utils";
+import { DIFFICULTY_COLORS, QUEST_TEMPLATE_BROWSER_STYLES } from "@/components/quest-shared";
 
 interface QuestTemplateBrowserProps {
   initialTab?: QuestTemplateBrowserTab;
@@ -37,17 +38,17 @@ const difficultyConfig: Record<QuestDifficulty, { icon: typeof Zap; label: strin
   easy: {
     icon: Zap,
     label: "Easy",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+    className: cn(DIFFICULTY_COLORS.easy.pill, "border-transparent text-white"),
   },
   medium: {
     icon: Flame,
     label: "Medium",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+    className: cn(DIFFICULTY_COLORS.medium.pill, "border-transparent text-white"),
   },
   hard: {
     icon: Mountain,
     label: "Hard",
-    className: "border-rose-500/30 bg-rose-500/10 text-rose-600",
+    className: cn(DIFFICULTY_COLORS.hard.pill, "border-transparent text-white"),
   },
 };
 
@@ -123,25 +124,25 @@ export function QuestTemplateBrowser({
 
   const searchPlaceholder = activeTab === "common"
     ? "Search common quests"
-    : "Search your repeat quests";
+    : "Search your templates";
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-4 pt-4 pb-3 border-b border-border/50 bg-background/95">
+      <div className={cn("px-4 pt-4 pb-3", QUEST_TEMPLATE_BROWSER_STYLES.header)}>
         <div className="flex items-center justify-between gap-3">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={onBack}
-            className="gap-1.5 px-2 text-muted-foreground"
+            className="gap-1.5 px-2 text-white/72 hover:text-white hover:bg-white/[0.08]"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
           <div className="min-w-0 text-center">
-            <p className="text-sm font-semibold text-foreground">Quest shortcuts</p>
-            <p className="text-xs text-muted-foreground">Pick one to prefill your draft</p>
+            <p className="font-fredoka text-[1.05rem] text-white">Quest shortcuts</p>
+            <p className="text-xs text-white/60">Pick one to prefill your draft</p>
           </div>
           <div className="w-14" aria-hidden="true" />
         </div>
@@ -154,19 +155,19 @@ export function QuestTemplateBrowser({
           }}
           className="mt-4"
         >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="common">Common</TabsTrigger>
-            <TabsTrigger value="yours">Yours</TabsTrigger>
+          <TabsList className={QUEST_TEMPLATE_BROWSER_STYLES.tabList}>
+            <TabsTrigger value="common" className={QUEST_TEMPLATE_BROWSER_STYLES.tabTrigger}>Common</TabsTrigger>
+            <TabsTrigger value="yours" className={QUEST_TEMPLATE_BROWSER_STYLES.tabTrigger}>Yours</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <div className="mt-3 relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/44" />
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={searchPlaceholder}
-            className="pl-9"
+            className={cn("pl-9", QUEST_TEMPLATE_BROWSER_STYLES.searchInput)}
           />
         </div>
 
@@ -182,10 +183,10 @@ export function QuestTemplateBrowser({
                   type="button"
                   onClick={() => setCommonCategory(category)}
                   className={cn(
-                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    QUEST_TEMPLATE_BROWSER_STYLES.filterChip,
                     isActive
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                      ? QUEST_TEMPLATE_BROWSER_STYLES.filterChipActive
+                      : QUEST_TEMPLATE_BROWSER_STYLES.filterChipInactive,
                   )}
                 >
                   {label}
@@ -226,10 +227,10 @@ export function QuestTemplateBrowser({
               <TemplateRow
                 key={template.id}
                 title={template.title}
-                description={buildPersonalDescription(template.lastUsedAt)}
+                description={buildPersonalDescription(template)}
                 difficulty={template.difficulty}
                 duration={template.estimatedDuration}
-                metaBadge={`${template.frequency}x`}
+                metaBadge={template.templateOrigin === "personal_explicit" ? "Saved" : `${template.frequency}x`}
                 highlighted={template.frequency >= 3}
                 onSelect={() => onSelectTemplate(template)}
               />
@@ -238,8 +239,8 @@ export function QuestTemplateBrowser({
         ) : (
           <TemplateEmptyState
             icon={History}
-            title="Your repeat quests will show up here"
-            description="Create the same quest a couple of times and we will surface it for quick re-use."
+            title="Your templates will show up here"
+            description="Save a customized template or repeat a quest a couple of times and it will show up here."
           />
         )}
       </div>
@@ -274,29 +275,29 @@ function TemplateRow({
       type="button"
       onClick={onSelect}
       className={cn(
-        "w-full rounded-2xl border px-4 py-3 text-left transition-all",
+        QUEST_TEMPLATE_BROWSER_STYLES.row,
         highlighted
-          ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
-          : "border-border/60 bg-card hover:bg-muted/30",
+          ? QUEST_TEMPLATE_BROWSER_STYLES.rowHighlighted
+          : QUEST_TEMPLATE_BROWSER_STYLES.rowDefault,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-foreground">{title}</span>
-            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+            <span className="text-sm font-semibold text-white">{title}</span>
+            <Badge variant="outline" className="border-white/10 bg-white/[0.06] text-[10px] text-white/64">
               {metaBadge}
             </Badge>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+          <p className="mt-1 text-xs text-white/58">{description}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge variant="outline" className={cn("gap-1 border", config.className)}>
+          <Badge variant="outline" className={cn("gap-1 border shadow-[0_8px_14px_rgba(0,0,0,0.12)]", config.className)}>
             <DifficultyIcon className="h-3 w-3" />
             {config.label}
           </Badge>
           {duration !== null && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-[11px] text-white/54">
               <Clock3 className="h-3 w-3" />
               {formatDuration(duration)}
             </span>
@@ -317,15 +318,20 @@ function TemplateEmptyState({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border/70 bg-muted/15 px-5 py-10 text-center">
-      <Icon className="mx-auto h-10 w-10 text-muted-foreground/70" />
-      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+    <div className={QUEST_TEMPLATE_BROWSER_STYLES.emptyState}>
+      <Icon className="mx-auto h-10 w-10 text-white/44" />
+      <p className="mt-3 text-sm font-semibold text-white">{title}</p>
+      <p className="mt-1 text-xs text-white/58">{description}</p>
     </div>
   );
 }
 
-function buildPersonalDescription(lastUsedAt: string | null) {
+function buildPersonalDescription(template: PersonalQuestTemplate) {
+  if (template.templateOrigin === "personal_explicit") {
+    return "Saved to your personal template library.";
+  }
+
+  const { lastUsedAt } = template;
   if (!lastUsedAt) return "A quest you have used before.";
 
   const timestamp = Date.parse(lastUsedAt);

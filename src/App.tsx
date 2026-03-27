@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { useEffect, Suspense, lazy, memo, useRef, useState } from "react";
+import { useEffect, Suspense, lazy, memo, useRef, useState, type ReactNode } from "react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { TimeProvider } from "@/contexts/TimeContext";
@@ -16,7 +16,6 @@ import { CompanionPresenceProvider } from "@/contexts/CompanionPresenceContext";
 import { DeepLinkProvider } from "@/contexts/DeepLinkContext";
 
 import { useProfile } from "@/hooks/useProfile";
-import { getResolvedMentorId } from "@/utils/mentor";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -47,6 +46,7 @@ import { MentorSpotlightGuard } from "@/components/tutorial/MentorSpotlightGuard
 import { usePostOnboardingMentorGuidance } from "@/hooks/usePostOnboardingMentorGuidance";
 import { ResilienceProvider } from "@/contexts/ResilienceContext";
 import { ResilienceStatusBanner } from "@/components/resilience/ResilienceStatusBanner";
+import { MentorConnectionProvider, useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 // Lazy load pages for code splitting
 const Home = lazy(() => import("./pages/Home"));
@@ -183,6 +183,18 @@ const MentorTutorialLayer = memo(() => {
 
 MentorTutorialLayer.displayName = "MentorTutorialLayer";
 
+const MentorConnectedThemeProvider = memo(({ children }: { children: ReactNode }) => {
+  const { mentorId } = useMentorConnection();
+
+  return (
+    <ThemeProvider mentorId={mentorId}>
+      {children}
+    </ThemeProvider>
+  );
+});
+
+MentorConnectedThemeProvider.displayName = "MentorConnectedThemeProvider";
+
 const AppContent = memo(() => {
   const { profile, loading: profileLoading } = useProfile();
   const { session, status } = useAuth();
@@ -306,31 +318,31 @@ const AppContent = memo(() => {
     return <LoadingFallback />;
   }
   
-  const resolvedMentorId = getResolvedMentorId(profile);
   const activeMainTabPath = isMainTabPath(location.pathname) ? location.pathname : null;
   const showBottomNav = shouldShowBottomNav(location.pathname, Boolean(session?.user));
 
   return (
     <ResilienceProvider>
-      <ThemeProvider mentorId={resolvedMentorId}>
-        <ResilienceStatusBanner />
-        <ViewModeProvider>
-          <XPProvider>
-            <PostOnboardingMentorGuidanceProvider>
-              <WeeklyRecapProvider>
-                <CompanionPresenceProvider>
-                  <TalkPopupProvider>
-                    <RealtimeSyncProvider>
-                    <AstralEncounterProvider>
-                    <Suspense fallback={<LoadingFallback />}>
-                    <EvolutionAwareContent />
-                    {activeMainTabPath ? (
-                      <ProtectedRoute>
-                        <MainTabsKeepAlive activePath={activeMainTabPath} />
-                      </ProtectedRoute>
-                    ) : (
-                    <AnimatePresence mode="sync" initial={false}>
-                      <Routes location={location} key={location.pathname}>
+      <MentorConnectionProvider>
+        <MentorConnectedThemeProvider>
+          <ResilienceStatusBanner />
+          <ViewModeProvider>
+            <XPProvider>
+              <PostOnboardingMentorGuidanceProvider>
+                <WeeklyRecapProvider>
+                  <CompanionPresenceProvider>
+                    <TalkPopupProvider>
+                      <RealtimeSyncProvider>
+                      <AstralEncounterProvider>
+                      <Suspense fallback={<LoadingFallback />}>
+                      <EvolutionAwareContent />
+                      {activeMainTabPath ? (
+                        <ProtectedRoute>
+                          <MainTabsKeepAlive activePath={activeMainTabPath} />
+                        </ProtectedRoute>
+                      ) : (
+                      <AnimatePresence mode="sync" initial={false}>
+                        <Routes location={location} key={location.pathname}>
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/preview" element={<Preview />} />
                   <Route path="/auth" element={<Auth />} />
@@ -365,7 +377,7 @@ const AppContent = memo(() => {
                   <Route path="/account-deletion" element={<AccountDeletionHelp />} />
                   <Route path="/recaps" element={<ProtectedRoute><Recaps /></ProtectedRoute>} />
                   <Route path="/help" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
-                  <Route path="/campaigns" element={<Navigate to="/journeys" replace />} />
+                  <Route path="/inbox" element={<Navigate to="/journeys?section=inbox" replace />} />
                   <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
                   <Route path="/iap-test" element={<IAPTest />} />
                   <Route path="/support/report" element={<ProtectedRoute><SupportReport /></ProtectedRoute>} />
@@ -376,20 +388,21 @@ const AppContent = memo(() => {
                   <Route path="/test-day-planner" element={<TestDayPlanner />} />
                   <Route path="*" element={<NotFound />} />
                       </Routes>
-                    </AnimatePresence>
-                    )}
-                    {showBottomNav && <BottomNav />}
-                    <MentorTutorialLayer />
-                    </Suspense>
-                    </AstralEncounterProvider>
-                    </RealtimeSyncProvider>
-                  </TalkPopupProvider>
-                </CompanionPresenceProvider>
-              </WeeklyRecapProvider>
-            </PostOnboardingMentorGuidanceProvider>
-          </XPProvider>
-        </ViewModeProvider>
-      </ThemeProvider>
+                      </AnimatePresence>
+                      )}
+                      {showBottomNav && <BottomNav />}
+                      <MentorTutorialLayer />
+                      </Suspense>
+                      </AstralEncounterProvider>
+                      </RealtimeSyncProvider>
+                    </TalkPopupProvider>
+                  </CompanionPresenceProvider>
+                </WeeklyRecapProvider>
+              </PostOnboardingMentorGuidanceProvider>
+            </XPProvider>
+          </ViewModeProvider>
+        </MentorConnectedThemeProvider>
+      </MentorConnectionProvider>
     </ResilienceProvider>
   );
 });

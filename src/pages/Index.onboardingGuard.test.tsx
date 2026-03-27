@@ -71,9 +71,9 @@ vi.mock("@/hooks/useMentorLayoutMode", () => ({
   useMentorLayoutMode: () => "mobile",
 }));
 
-vi.mock("@/hooks/useMentorConnectionHealth", () => ({
-  useMentorConnectionHealth: () => ({
-    effectiveMentorId: mocks.effectiveMentorId,
+vi.mock("@/contexts/MentorConnectionContext", () => ({
+  useMentorConnection: () => ({
+    mentorId: mocks.effectiveMentorId,
     status: mocks.mentorStatus,
     refreshConnection: mocks.refreshConnection,
   }),

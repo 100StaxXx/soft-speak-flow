@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MiniGameResult, MiniGameType } from '@/types/astralEncounters';
 import { Button } from '@/components/ui/button';
 import { Play, SkipForward } from 'lucide-react';
+import { isFullscreenEncounterGame, usesFlowLayoutFullscreenShell } from './fullscreenGames';
 
 const EnergyBeamGame = lazy(() => import('./EnergyBeamGame').then(m => ({ default: m.EnergyBeamGame })));
 const TapSequenceGame = lazy(() => import('./TapSequenceGame').then(m => ({ default: m.TapSequenceGame })));
@@ -20,9 +21,6 @@ interface PracticeRoundWrapperProps {
   onSkipPractice: () => void;
   isFullscreen?: boolean;
 }
-
-// Games that need fullscreen rendering
-const FULLSCREEN_GAMES: MiniGameType[] = ['starfall_dodge', 'astral_frequency'];
 
 // Practice duration - short rounds for all games
 const PRACTICE_TIMER = 12; // 12 seconds for all practice rounds
@@ -58,6 +56,22 @@ const PracticeBanner = memo(() => (
   </motion.div>
 ));
 PracticeBanner.displayName = 'PracticeBanner';
+
+const PracticeChip = memo(({ inline = false }: { inline?: boolean }) => (
+  <motion.div
+    data-testid={inline ? 'practice-inline-chip' : 'practice-overlay-chip'}
+    className={inline ? 'flex justify-center' : 'absolute top-0 left-0 right-0 z-50 flex justify-center pt-safe-top'}
+    initial={{ y: -20, opacity: 0 }}
+    animate={{ y: 0, opacity: 1 }}
+    transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+  >
+    <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-300 shadow-[0_8px_24px_rgba(245,158,11,0.18)] backdrop-blur-sm">
+      <span className="text-xs">🎯</span>
+      <span>Practice</span>
+    </div>
+  </motion.div>
+));
+PracticeChip.displayName = 'PracticeChip';
 
 const PracticeIntro = memo(({ 
   gameType, 
@@ -208,7 +222,8 @@ export const PracticeRoundWrapper = ({
   const [practicePhase, setPracticePhase] = useState<'intro' | 'playing' | 'complete'>('intro');
   
   // Check if this game needs fullscreen rendering
-  const isFullscreenGame = isFullscreen || FULLSCREEN_GAMES.includes(gameType);
+  const isFullscreenGame = isFullscreen || isFullscreenEncounterGame(gameType);
+  const usesFlowLayoutShell = isFullscreenGame && usesFlowLayoutFullscreenShell(gameType);
 
   const handleStartPractice = useCallback(() => {
     setPracticePhase('playing');
@@ -228,6 +243,7 @@ export const PracticeRoundWrapper = ({
       questIntervalScale: 0,
       isPractice: true,
       maxTimer: PRACTICE_TIMER, // Short practice duration
+      compact: isFullscreenGame,
     };
 
     switch (gameType) {
@@ -270,20 +286,42 @@ export const PracticeRoundWrapper = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={isFullscreenGame ? "relative h-full" : "relative"}
+            className={
+              usesFlowLayoutShell
+                ? 'relative flex h-full min-h-0 flex-col'
+                : isFullscreenGame
+                  ? 'relative h-full'
+                  : 'relative'
+            }
           >
-            <PracticeBanner />
-            <Suspense fallback={<PracticeLoadingFallback />}>
-              {isFullscreenGame ? (
-                // Fullscreen games render without constraints
-                renderPracticeGame()
-              ) : (
-                // Non-fullscreen games keep the scroll container
-                <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
-                  {renderPracticeGame()}
+            {usesFlowLayoutShell ? (
+              <>
+                <div
+                  data-testid="practice-fullscreen-shell"
+                  className="shrink-0 px-3 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]"
+                >
+                  <PracticeChip inline />
                 </div>
-              )}
-            </Suspense>
+                <div className="min-h-0 flex-1">
+                  <Suspense fallback={<PracticeLoadingFallback />}>
+                    {renderPracticeGame()}
+                  </Suspense>
+                </div>
+              </>
+            ) : (
+              <>
+                {isFullscreenGame ? <PracticeChip /> : <PracticeBanner />}
+                <Suspense fallback={<PracticeLoadingFallback />}>
+                  {isFullscreenGame ? (
+                    renderPracticeGame()
+                  ) : (
+                    <div className="pt-2 min-h-[400px] max-h-[calc(100vh-120px)] overflow-y-auto">
+                      {renderPracticeGame()}
+                    </div>
+                  )}
+                </Suspense>
+              </>
+            )}
           </motion.div>
         )}
 

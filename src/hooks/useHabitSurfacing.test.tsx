@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
   const syncLocalHabitsFromRemoteMock = vi.fn();
   const syncLocalEpicsFromRemoteMock = vi.fn();
   const syncLocalDailyTasksFromRemoteMock = vi.fn();
+  const withPlannerRemoteSyncLockMock = vi.fn(async (_userId: string, operation: () => Promise<unknown>) => operation());
   const createOfflinePlannerIdMock = vi.fn(() => "task-local-queued");
   const supabaseUpsertMock = vi.fn();
   const state = {
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => {
     syncLocalHabitsFromRemoteMock,
     syncLocalEpicsFromRemoteMock,
     syncLocalDailyTasksFromRemoteMock,
+    withPlannerRemoteSyncLockMock,
     createOfflinePlannerIdMock,
     supabaseUpsertMock,
     state,
@@ -62,6 +64,7 @@ vi.mock("@/utils/plannerSync", () => ({
   syncLocalHabitsFromRemote: (...args: unknown[]) => mocks.syncLocalHabitsFromRemoteMock(...args),
   syncLocalEpicsFromRemote: (...args: unknown[]) => mocks.syncLocalEpicsFromRemoteMock(...args),
   syncLocalDailyTasksFromRemote: (...args: unknown[]) => mocks.syncLocalDailyTasksFromRemoteMock(...args),
+  withPlannerRemoteSyncLock: (...args: unknown[]) => mocks.withPlannerRemoteSyncLockMock(...args),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -141,6 +144,7 @@ describe("useHabitSurfacing", () => {
     mocks.syncLocalHabitsFromRemoteMock.mockResolvedValue(undefined);
     mocks.syncLocalEpicsFromRemoteMock.mockResolvedValue(undefined);
     mocks.syncLocalDailyTasksFromRemoteMock.mockResolvedValue(undefined);
+    mocks.withPlannerRemoteSyncLockMock.mockImplementation(async (_userId: string, operation: () => Promise<unknown>) => operation());
     mocks.upsertPlannerRecordMock.mockResolvedValue(undefined);
     mocks.queueTaskActionMock.mockResolvedValue("queued-1");
     mocks.retryNowMock.mockResolvedValue(undefined);
@@ -292,6 +296,10 @@ describe("useHabitSurfacing", () => {
         habit_source_id: "habit-standalone",
         source: "recurring",
       }),
+    );
+    expect(mocks.withPlannerRemoteSyncLockMock).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(Function),
     );
   });
 });

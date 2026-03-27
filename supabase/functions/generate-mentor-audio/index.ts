@@ -66,13 +66,13 @@ const mentorVoices: Record<string, MentorVoiceConfig> = {
     use_speaker_boost: true,
   },
   carmen: {
-    voiceId: "AZnzlk1XvdvUeBnXmlld", // Domi - Strong, assertive female
+    voiceId: "bD9maNcCuQQS75DGuteM", // Carmen
     stability: 0.75,
     similarity_boost: 0.85,
     style_exaggeration: 0.7,
   },
   reign: {
-    voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah - Commanding, high-energy
+    voiceId: "GTQ4ImqrRljZAa9VJX6B", // Reign custom voice
     stability: 0.52,
     similarity_boost: 0.97,
     style_exaggeration: 1.0,

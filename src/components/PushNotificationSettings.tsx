@@ -8,6 +8,7 @@ import { Bell, AlertCircle, MapPin, Bug, CheckCircle, XCircle, Loader2, ChevronD
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationPreview } from "@/components/NotificationPreview";
@@ -32,6 +33,11 @@ const timeOptions = [
   { value: "19:00", label: "7:00 PM" },
   { value: "20:00", label: "8:00 PM" },
 ];
+
+type QueueDebugRow = Pick<
+  Database["public"]["Tables"]["push_notification_queue"]["Row"],
+  "id" | "notification_type" | "status" | "scheduled_for" | "delivered_at" | "last_error"
+>;
 
 export const PushNotificationSettings = memo(() => {
   const { profile } = useProfile();
@@ -434,6 +440,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
     tokenCount: number;
     latestTokenUpdatedAt: string | null;
     latestTokenPreview: string | null;
+    recentQueueRows: QueueDebugRow[];
     error?: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -451,14 +458,25 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
           tokenCount: 0,
           latestTokenUpdatedAt: null,
           latestTokenPreview: null,
+          recentQueueRows: [],
         });
         return;
       }
 
-      const [hasToken, tokenSnapshot] = await Promise.all([
+      const [hasToken, tokenSnapshot, queueResult] = await Promise.all([
         hasActiveNativePushSubscription(userId),
         getNativePushTokenDebugSnapshot(userId),
+        supabase
+          .from("push_notification_queue")
+          .select("id, notification_type, status, scheduled_for, delivered_at, last_error")
+          .eq("user_id", userId)
+          .order("scheduled_for", { ascending: false })
+          .limit(8),
       ]);
+
+      if (queueResult.error) {
+        throw queueResult.error;
+      }
 
       setDebugInfo({
         ...info,
@@ -466,6 +484,7 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
         tokenCount: tokenSnapshot.tokenCount,
         latestTokenUpdatedAt: tokenSnapshot.latestUpdatedAt,
         latestTokenPreview: tokenSnapshot.latestTokenPreview,
+        recentQueueRows: (queueResult.data ?? []) as QueueDebugRow[],
       });
     } catch (error) {
       console.error('Debug info error:', error);
@@ -615,6 +634,39 @@ const PushDebugPanel = memo(({ userId }: { userId?: string }) => {
                   'Test Registration'
                 )}
               </Button>
+            </div>
+
+            <div className="space-y-2 pt-3 border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Recent Queue Rows</span>
+                <span className="text-foreground">{debugInfo.recentQueueRows.length}</span>
+              </div>
+
+              {debugInfo.recentQueueRows.length > 0 ? (
+                <div className="space-y-2">
+                  {debugInfo.recentQueueRows.map((row) => (
+                    <div key={row.id} className="rounded-lg border border-border p-3 space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-foreground font-medium">{row.notification_type}</span>
+                        <span className="text-muted-foreground font-mono text-xs">{row.status}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Scheduled: {new Date(row.scheduled_for).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Delivered: {row.delivered_at ? new Date(row.delivered_at).toLocaleString() : "Not yet"}
+                      </div>
+                      {row.last_error && (
+                        <div className="text-xs text-destructive break-all">
+                          Error: {row.last_error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No recent notification queue activity</p>
+              )}
             </div>
           </div>
         ) : (

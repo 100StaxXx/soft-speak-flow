@@ -9,12 +9,12 @@ import { Play, Pause, Sparkles, SkipBack, SkipForward, ChevronDown, ChevronUp, W
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useMentorPersonality } from "@/hooks/useMentorPersonality";
-import { getResolvedMentorId } from "@/utils/mentor";
 import { safeLocalStorage } from "@/utils/storage";
 import { getActiveWordIndex } from "@/utils/captionTiming";
 import { parseFunctionInvokeError, toUserFacingFunctionError } from "@/utils/supabaseFunctionErrors";
 import { Capacitor } from "@capacitor/core";
 import { applyScriptPunctuationToTranscript } from "@/utils/transcriptPunctuation";
+import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 import { logger } from "@/utils/logger";
 import { toast } from "sonner";
@@ -126,6 +126,7 @@ function wait(ms: number): Promise<void> {
 
 export const TodaysPepTalk = memo(() => {
   const { profile } = useProfile();
+  const { mentorId: resolvedMentorId } = useMentorConnection();
   const personality = useMentorPersonality();
   const navigate = useNavigate();
   const { awardPepTalkListened } = useXPRewards();
@@ -178,8 +179,6 @@ export const TodaysPepTalk = memo(() => {
 
   // Removed walkthrough tracking - was causing play button to be permanently disabled
 
-
-  const resolvedMentorId = getResolvedMentorId(profile);
   const timedTranscript = useMemo(
     () => sanitizeTranscript(pepTalk?.transcript),
     [pepTalk?.transcript],

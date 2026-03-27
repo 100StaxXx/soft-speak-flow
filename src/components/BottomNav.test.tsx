@@ -5,7 +5,6 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 const mocks = vi.hoisted(() => ({
   prefetchQuery: vi.fn().mockResolvedValue(undefined),
   hapticsLight: vi.fn(),
-  inboxCount: 0,
   companion: null as { id: string } | null,
   canEvolve: false,
 }));
@@ -26,12 +25,6 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useProfile", () => ({
-  useProfile: () => ({
-    profile: null,
-  }),
-}));
-
 vi.mock("@/hooks/useCompanion", () => ({
   useCompanion: () => ({
     companion: mocks.companion,
@@ -39,9 +32,9 @@ vi.mock("@/hooks/useCompanion", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useInboxTasks", () => ({
-  useInboxCount: () => ({
-    inboxCount: mocks.inboxCount,
+vi.mock("@/contexts/MentorConnectionContext", () => ({
+  useMentorConnection: () => ({
+    mentorId: "mentor-1",
   }),
 }));
 
@@ -90,7 +83,6 @@ describe("BottomNav", () => {
   beforeEach(() => {
     mocks.prefetchQuery.mockClear();
     mocks.hapticsLight.mockClear();
-    mocks.inboxCount = 0;
     mocks.companion = null;
     mocks.canEvolve = false;
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
@@ -117,22 +109,24 @@ describe("BottomNav", () => {
     renderBottomNav("/mentor");
     scrollToSpy.mockClear();
 
-    fireEvent.click(screen.getByText("Inbox"));
+    fireEvent.click(screen.getByText("Campaigns"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("pathname")).toHaveTextContent("/inbox");
+      expect(screen.getByTestId("pathname")).toHaveTextContent("/campaigns");
     });
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
     expect(scrollToSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps inbox badge accurate while viewing a different tab", () => {
-    mocks.inboxCount = 5;
-
+  it("renders the reordered main tabs", () => {
     renderBottomNav("/mentor");
 
-    expect(screen.getByTestId("pathname")).toHaveTextContent("/mentor");
-    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Mentor",
+      "Quests",
+      "Campaigns",
+      "Companion",
+    ]);
   });
 
   it("does not show companion ready badge when companion is not evolvable", () => {

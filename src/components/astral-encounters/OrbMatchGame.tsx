@@ -1353,7 +1353,7 @@ export const OrbMatchGame = ({
   const isUrgent = timeLeft <= 5 && gameState === 'playing';
 
   return (
-    <div className="flex flex-col items-center relative flex-1 min-h-0">
+    <div className="w-full h-full flex flex-col items-center relative flex-1 min-h-0">
       {gameState === 'countdown' && <CountdownOverlay count={3} onComplete={handleCountdownComplete} />}
       <AnimatePresence>{gameState === 'paused' && <PauseOverlay onResume={() => setGameState('playing')} />}</AnimatePresence>
       <AnimatePresence>

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { logger } from '@/utils/logger';
+import { dispatchPlannerSyncFinished } from '@/utils/plannerSync';
 
 const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
 
@@ -62,6 +63,8 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['epics'] }),
       queryClient.invalidateQueries({ queryKey: ['epic-progress'] }),
     ]);
+
+    dispatchPlannerSyncFinished();
   }, [enabled, queryClient]);
 
   // Native iOS/Android: Listen for app state changes
