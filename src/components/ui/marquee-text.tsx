@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface MarqueeTextProps {
   text: string;
   className?: string;
+  textClassName?: string;
   speed?: number; // pixels per second
   pauseDuration?: number; // ms to pause at start/end
   initialDelay?: number; // ms to pause before first scroll
@@ -13,6 +14,7 @@ interface MarqueeTextProps {
 export function MarqueeText({ 
   text, 
   className,
+  textClassName,
   speed = 30,
   pauseDuration = 2000,
   initialDelay = 3000
@@ -63,7 +65,7 @@ export function MarqueeText({
     <div ref={containerRef} className={cn("overflow-hidden", className)}>
       <motion.span
         ref={textRef}
-        className="whitespace-nowrap inline-block"
+        className={cn("whitespace-nowrap inline-block", textClassName)}
         animate={isOverflowing ? {
           x: [0, 0, -scrollDistance, -scrollDistance, 0, 0],
         } : { x: 0 }}

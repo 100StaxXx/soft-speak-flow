@@ -34,6 +34,7 @@ interface Habit {
 }
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+const TOUCH_CLICK_GUARD_MS = 750;
 
 // Format days for display - show day chips or readable text
 const formatDaysDisplay = (
@@ -114,6 +115,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
   // Toggle state and refs for iOS-optimized touch handling
   const [togglingHabitId, setTogglingHabitId] = useState<string | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTouchToggleAtRef = useRef(0);
   
   // Get habit surfacing data and mutations for syncing with Quests tab
   const taskDate = format(new Date(), 'yyyy-MM-dd');
@@ -407,6 +409,10 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                             data-interactive="true"
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (Date.now() - lastTouchToggleAtRef.current < TOUCH_CLICK_GUARD_MS) {
+                                e.preventDefault();
+                                return;
+                              }
                               if (!isCompleted && !isTogglingThis) {
                                 handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
                               }
@@ -424,6 +430,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                 const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
                                 const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
                                 if (dx < 5 && dy < 5) {
+                                  lastTouchToggleAtRef.current = Date.now();
                                   handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
                                 }
                               }
@@ -653,6 +660,10 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                     data-interactive="true"
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (Date.now() - lastTouchToggleAtRef.current < TOUCH_CLICK_GUARD_MS) {
+                                        e.preventDefault();
+                                        return;
+                                      }
                                       if (!isCompleted && !isTogglingThis) {
                                         handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
                                       }
@@ -670,6 +681,7 @@ export const EpicCheckInDrawer = memo(function EpicCheckInDrawer({ epicId, habit
                                         const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
                                         const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
                                         if (dx < 5 && dy < 5) {
+                                          lastTouchToggleAtRef.current = Date.now();
                                           handleToggleRitual(habit.id, habitState?.task_id || null, isCompleted);
                                         }
                                       }

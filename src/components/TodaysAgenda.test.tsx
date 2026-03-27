@@ -211,8 +211,18 @@ vi.mock("@/components/TimelineTaskRow", () => ({
 }));
 
 vi.mock("@/components/ui/marquee-text", () => ({
-  MarqueeText: ({ text, className }: { text: string; className?: string }) => (
-    <span className={className}>{text}</span>
+  MarqueeText: ({
+    text,
+    className,
+    textClassName,
+  }: {
+    text: string;
+    className?: string;
+    textClassName?: string;
+  }) => (
+    <span className={className}>
+      <span className={textClassName}>{text}</span>
+    </span>
   ),
 }));
 
@@ -386,6 +396,148 @@ describe("TodaysAgenda subtasks", () => {
     });
 
     expect(mocks.subtaskEqMock).toHaveBeenCalledWith("id", "subtask-1");
+  });
+});
+
+describe("TodaysAgenda quest completion styling", () => {
+  it("keeps completed quest text struck through after the completion animation ends", () => {
+    vi.useFakeTimers();
+
+    try {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+          mutations: { retry: false },
+        },
+      });
+      const onToggle = vi.fn();
+
+      render(
+        <TodaysAgenda
+          tasks={[
+            {
+              id: "task-strike-1",
+              task_text: "Walk 800 w 6th",
+              completed: false,
+              xp_reward: 16,
+              scheduled_time: "10:00",
+            },
+          ]}
+          selectedDate={new Date("2026-03-27T10:00:00.000Z")}
+          onToggle={onToggle}
+          onAddQuest={vi.fn()}
+          completedCount={0}
+          totalCount={1}
+        />,
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      fireEvent.click(screen.getByRole("checkbox", { name: "Mark task as complete" }));
+
+      expect(screen.getByText("Walk 800 w 6th")).toHaveClass("animate-strikethrough");
+
+      act(() => {
+        vi.advanceTimersByTime(601);
+      });
+
+      expect(screen.getByText("Walk 800 w 6th")).toHaveClass("line-through", "text-muted-foreground");
+      expect(screen.getByText("Walk 800 w 6th")).not.toHaveClass("animate-strikethrough");
+      expect(onToggle).toHaveBeenCalledTimes(1);
+      expect(onToggle).toHaveBeenCalledWith("task-strike-1", true, 16);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("TodaysAgenda touch toggles", () => {
+  it("ignores the follow-up click after a touch completion tap", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onToggle = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-touch-1",
+            task_text: "Walk 800 w 6th",
+            completed: false,
+            xp_reward: 16,
+            scheduled_time: "10:00",
+          },
+        ]}
+        selectedDate={new Date("2026-03-27T10:00:00.000Z")}
+        onToggle={onToggle}
+        onAddQuest={vi.fn()}
+        completedCount={0}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: "Mark task as complete" });
+
+    fireEvent.touchStart(checkbox, {
+      touches: [{ clientX: 24, clientY: 24 }],
+    });
+    fireEvent.touchEnd(checkbox, {
+      changedTouches: [{ clientX: 25, clientY: 24 }],
+    });
+    fireEvent.click(checkbox);
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith("task-touch-1", true, 16);
+  });
+
+  it("ignores the follow-up click after a touch undo tap", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const onToggle = vi.fn();
+    const onUndoToggle = vi.fn();
+
+    render(
+      <TodaysAgenda
+        tasks={[
+          {
+            id: "task-touch-2",
+            task_text: "Call uncle Derrick",
+            completed: true,
+            xp_reward: 22,
+            scheduled_time: "09:30",
+          },
+        ]}
+        selectedDate={new Date("2026-03-27T09:30:00.000Z")}
+        onToggle={onToggle}
+        onUndoToggle={onUndoToggle}
+        onAddQuest={vi.fn()}
+        completedCount={1}
+        totalCount={1}
+      />,
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    const checkbox = screen.getByRole("checkbox", { name: "Mark task as incomplete" });
+
+    fireEvent.touchStart(checkbox, {
+      touches: [{ clientX: 24, clientY: 24 }],
+    });
+    fireEvent.touchEnd(checkbox, {
+      changedTouches: [{ clientX: 24, clientY: 24 }],
+    });
+    fireEvent.click(checkbox);
+
+    expect(onUndoToggle).toHaveBeenCalledTimes(1);
+    expect(onUndoToggle).toHaveBeenCalledWith("task-touch-2", 22);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
 

@@ -218,8 +218,18 @@ vi.mock("../components/SwipeableTaskItem", () => ({
 }));
 
 vi.mock("@/components/ui/marquee-text", () => ({
-  MarqueeText: ({ text, className }: { text: string; className?: string }) => (
-    <span className={className}>{text}</span>
+  MarqueeText: ({
+    text,
+    className,
+    textClassName,
+  }: {
+    text: string;
+    className?: string;
+    textClassName?: string;
+  }) => (
+    <span className={className}>
+      <span className={textClassName}>{text}</span>
+    </span>
   ),
 }));
 

@@ -59,6 +59,7 @@ vi.mock("@/utils/plannerLocalStore", () => ({
 
 vi.mock("@/utils/plannerSync", () => ({
   PLANNER_SYNC_EVENT: "planner-sync-finished",
+  getDailyTasksQueryKey: (userId: string | undefined, taskDate: string) => ["daily-tasks", userId, taskDate],
   loadLocalEpics: (...args: unknown[]) => mocks.loadLocalEpicsMock(...args),
   loadLocalDailyTasks: (...args: unknown[]) => mocks.loadLocalDailyTasksMock(...args),
   syncLocalHabitsFromRemote: (...args: unknown[]) => mocks.syncLocalHabitsFromRemoteMock(...args),
@@ -189,10 +190,10 @@ describe("useHabitSurfacing", () => {
         description: null,
         difficulty: "easy",
         category: "soul",
-        frequency: "daily",
+        frequency: "custom",
         estimated_minutes: 10,
         preferred_time: "20:00",
-        custom_days: null,
+        custom_days: [0],
         custom_month_days: null,
         is_active: true,
       },
@@ -241,10 +242,10 @@ describe("useHabitSurfacing", () => {
       "habit-standalone",
     ]);
     expect(result.current.surfacedHabits[0]?.task_id).toBe("task-1");
-    expect(result.current.unsurfacedHabitsCount).toBe(1);
+    expect(result.current.unsurfacedHabitsCount).toBe(0);
   });
 
-  it("surfaces habits offline by writing local tasks first and queueing task creation", async () => {
+  it("surfaces a manually selected habit offline by writing local tasks first and queueing task creation", async () => {
     mocks.state.shouldQueueWrites = true;
     mocks.getLocalHabitsMock.mockResolvedValue([
       {
@@ -254,26 +255,26 @@ describe("useHabitSurfacing", () => {
         description: null,
         difficulty: "easy",
         category: "soul",
-        frequency: "daily",
+        frequency: "custom",
         estimated_minutes: 10,
         preferred_time: "20:00",
-        custom_days: null,
+        custom_days: [0],
         custom_month_days: null,
         is_active: true,
       },
     ]);
 
     const { result } = renderHook(
-      () => useHabitSurfacing(new Date("2026-02-10T10:00:00.000Z")),
+      () => useHabitSurfacing(new Date("2026-02-11T10:00:00.000Z")),
       { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
-      expect(result.current.unsurfacedHabitsCount).toBe(1);
+      expect(result.current.surfacedHabits).toHaveLength(1);
     });
 
-    act(() => {
-      result.current.surfaceAllHabits();
+    await act(async () => {
+      await result.current.surfaceHabit("habit-standalone");
     });
 
     await waitFor(() => {
@@ -301,5 +302,264 @@ describe("useHabitSurfacing", () => {
       "user-1",
       expect.any(Function),
     );
+  });
+
+  it("materializes missing due campaign rituals during refresh for the March 27 account shape", async () => {
+    let localTasks = [
+      {
+        id: "manual-1",
+        user_id: "user-1",
+        task_text: "Morning Routine",
+        difficulty: "hard",
+        xp_reward: 10,
+        task_date: "2026-03-27",
+        completed: true,
+        completed_at: null,
+        is_main_quest: false,
+        scheduled_time: "04:30:00",
+        estimated_duration: 10,
+        recurrence_pattern: null,
+        recurrence_days: null,
+        recurrence_month_days: null,
+        recurrence_custom_period: null,
+        recurrence_end_date: null,
+        is_recurring: false,
+        reminder_enabled: false,
+        reminder_minutes_before: 15,
+        reminder_sent: false,
+        parent_template_id: null,
+        category: "mind",
+        is_bonus: false,
+        created_at: "2026-03-27T08:20:17.346976Z",
+        priority: null,
+        is_top_three: null,
+        actual_time_spent: null,
+        ai_generated: null,
+        context_id: null,
+        source: "manual",
+        habit_source_id: null,
+        epic_id: null,
+        sort_order: 0,
+        contact_id: null,
+        auto_log_interaction: true,
+        contact: null,
+        image_url: null,
+        attachments: [],
+        notes: null,
+        location: null,
+        subtasks: [],
+      },
+      buildTask({
+        id: "manual-2",
+        task_text: "Bids for Next week",
+        task_date: "2026-03-27",
+        scheduled_time: "16:00:00",
+        source: "manual",
+        habit_source_id: null,
+        epic_id: null,
+      }),
+      buildTask({
+        id: "manual-3",
+        task_text: "Walk 800 w 6th",
+        task_date: "2026-03-27",
+        scheduled_time: "10:00:00",
+        completed: true,
+        source: "manual",
+        habit_source_id: null,
+        epic_id: null,
+      }),
+      buildTask({
+        id: "manual-4",
+        task_text: "Evening reset",
+        task_date: "2026-03-27",
+        scheduled_time: "19:00:00",
+        source: "manual",
+        habit_source_id: null,
+        epic_id: null,
+      }),
+    ];
+
+    const activeHabits = [
+      {
+        id: "crm",
+        user_id: "user-1",
+        title: "Daily CRM Update",
+        description: null,
+        difficulty: "medium",
+        category: "mind",
+        frequency: "daily",
+        estimated_minutes: 20,
+        preferred_time: null,
+        custom_days: [0, 1, 2, 3, 4, 5, 6],
+        custom_month_days: null,
+        is_active: true,
+      },
+      {
+        id: "workout",
+        user_id: "user-1",
+        title: "Daily Workout Routine",
+        description: null,
+        difficulty: "medium",
+        category: "body",
+        frequency: "daily",
+        estimated_minutes: 45,
+        preferred_time: null,
+        custom_days: [0, 1, 2, 3, 4, 5, 6],
+        custom_month_days: null,
+        is_active: true,
+      },
+      {
+        id: "nutrition",
+        user_id: "user-1",
+        title: "Nutrition Tracking",
+        description: null,
+        difficulty: "medium",
+        category: "body",
+        frequency: "daily",
+        estimated_minutes: 15,
+        preferred_time: null,
+        custom_days: [0, 1, 2, 3, 4, 5, 6],
+        custom_month_days: null,
+        is_active: true,
+      },
+      {
+        id: "networking",
+        user_id: "user-1",
+        title: "Weekly Networking Events",
+        description: null,
+        difficulty: "medium",
+        category: "mind",
+        frequency: "custom",
+        estimated_minutes: 30,
+        preferred_time: null,
+        custom_days: [0],
+        custom_month_days: null,
+        is_active: true,
+      },
+      {
+        id: "review",
+        user_id: "user-1",
+        title: "Weekly Review and Planning",
+        description: null,
+        difficulty: "medium",
+        category: "mind",
+        frequency: "custom",
+        estimated_minutes: 30,
+        preferred_time: null,
+        custom_days: [0],
+        custom_month_days: null,
+        is_active: true,
+      },
+      {
+        id: "flexibility",
+        user_id: "user-1",
+        title: "Weekly Flexibility Assessment",
+        description: null,
+        difficulty: "medium",
+        category: "body",
+        frequency: "custom",
+        estimated_minutes: 20,
+        preferred_time: null,
+        custom_days: [0],
+        custom_month_days: null,
+        is_active: true,
+      },
+    ];
+
+    mocks.getLocalHabitsMock.mockImplementation(async () => activeHabits);
+    mocks.loadLocalEpicsMock.mockImplementation(async () => [
+      {
+        id: "epic-money",
+        user_id: "user-1",
+        title: "Get Money",
+        description: null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: 304,
+        start_date: "2026-03-03",
+        end_date: "2027-01-01",
+        epic_habits: [
+          { habit_id: "crm", habits: null },
+          { habit_id: "networking", habits: null },
+          { habit_id: "review", habits: null },
+        ],
+      },
+      {
+        id: "epic-summer",
+        user_id: "user-1",
+        title: "Summer Gains",
+        description: null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: 91,
+        start_date: "2026-03-03",
+        end_date: "2026-06-02",
+        epic_habits: [
+          { habit_id: "workout", habits: null },
+          { habit_id: "nutrition", habits: null },
+          { habit_id: "flexibility", habits: null },
+        ],
+      },
+    ]);
+    mocks.loadLocalDailyTasksMock.mockImplementation(async (_userId: string, taskDate: string) => (
+      taskDate === "2026-03-27" ? localTasks : []
+    ));
+    mocks.upsertPlannerRecordMock.mockImplementation(async (store: string, record: Record<string, unknown>) => {
+      if (store === "daily_tasks") {
+        localTasks = [...localTasks, record as typeof localTasks[number]];
+      }
+    });
+    mocks.createOfflinePlannerIdMock
+      .mockReturnValueOnce("ritual-task-1")
+      .mockReturnValueOnce("ritual-task-2")
+      .mockReturnValueOnce("ritual-task-3");
+
+    const { result } = renderHook(
+      () => useHabitSurfacing(new Date("2026-03-27T12:00:00.000Z")),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.unsurfacedHabitsCount).toBe(0);
+    });
+
+    expect(mocks.upsertPlannerRecordMock).toHaveBeenCalledTimes(3);
+    expect(mocks.supabaseUpsertMock).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          task_text: "Daily CRM Update",
+          task_date: "2026-03-27",
+          habit_source_id: "crm",
+          source: "recurring",
+          epic_id: "epic-money",
+          scheduled_time: null,
+        }),
+        expect.objectContaining({
+          task_text: "Daily Workout Routine",
+          task_date: "2026-03-27",
+          habit_source_id: "workout",
+          source: "recurring",
+          epic_id: "epic-summer",
+          scheduled_time: null,
+        }),
+        expect.objectContaining({
+          task_text: "Nutrition Tracking",
+          task_date: "2026-03-27",
+          habit_source_id: "nutrition",
+          source: "recurring",
+          epic_id: "epic-summer",
+          scheduled_time: null,
+        }),
+      ]),
+      expect.objectContaining({
+        onConflict: "user_id,task_date,habit_source_id",
+        ignoreDuplicates: true,
+      }),
+    );
+    expect(
+      result.current.surfacedHabits
+        .filter((habit) => ["crm", "workout", "nutrition"].includes(habit.habit_id))
+        .every((habit) => typeof habit.task_id === "string" && habit.task_id.length > 0),
+    ).toBe(true);
   });
 });

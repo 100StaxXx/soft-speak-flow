@@ -181,6 +181,71 @@ describe("useEpics", () => {
       expect(result.current.completedEpics).toHaveLength(1);
     });
   });
+
+  it("holds the empty state behind loading until the first remote hydration completes", async () => {
+    const hydratedEpics = [
+      {
+        id: "epic-1",
+        user_id: "user-1",
+        title: "Summer Gains",
+        description: null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: 91,
+        start_date: "2026-03-03",
+        end_date: "2026-06-02",
+        created_at: "2026-03-03T06:04:39.896094Z",
+        epic_habits: [],
+      },
+      {
+        id: "epic-2",
+        user_id: "user-1",
+        title: "Get Money",
+        description: null,
+        status: "active",
+        progress_percentage: 0,
+        target_days: 304,
+        start_date: "2026-03-03",
+        end_date: "2027-01-01",
+        created_at: "2026-03-03T05:59:36.751961Z",
+        epic_habits: [],
+      },
+    ];
+
+    let resolveHydration: (() => void) | null = null;
+    const hydrationPending = new Promise<void>((resolve) => {
+      resolveHydration = resolve;
+    });
+
+    mocks.loadLocalEpicsMock.mockResolvedValue([]);
+    mocks.warmEpicsQueryFromRemoteMock.mockImplementationOnce(async (queryClient: QueryClient, userId: string) => {
+      await hydrationPending;
+      queryClient.setQueryData(["epics", userId], hydratedEpics);
+      return hydratedEpics;
+    });
+
+    const { result } = renderHook(() => useEpics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(true);
+    });
+    expect(result.current.epics).toEqual([]);
+
+    await act(async () => {
+      resolveHydration?.();
+      await hydrationPending;
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(result.current.activeEpics.map((epic) => epic.title)).toEqual([
+      "Summer Gains",
+      "Get Money",
+    ]);
+  });
 });
 
 describe("normalizeCreateCampaignError", () => {

@@ -205,6 +205,31 @@ describe("useOnboardingSchedule (cleanup compatibility wrapper)", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["calendar-tasks"] });
   });
 
+  it("does not target surfaced campaign rituals during the legacy-title cleanup pass", async () => {
+    const userId = "user-campaign-ritual-safe";
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderHook(() => useOnboardingSchedule(userId, true, false), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(mocks.deleteCallMock).toHaveBeenCalledTimes(2));
+
+    const secondPassFilters = mocks.deleteCallMock.mock.calls[1]?.[0]?.filters as
+      | Record<string, unknown>
+      | undefined;
+    const legacyTitles = secondPassFilters?.task_text as string[] | undefined;
+
+    expect(legacyTitles).toBeDefined();
+    expect(legacyTitles).not.toContain("Daily CRM Update");
+    expect(legacyTitles).not.toContain("Daily Workout Routine");
+    expect(legacyTitles).not.toContain("Nutrition Tracking");
+    expect(secondPassFilters?.difficulty).toBe("easy");
+    expect(secondPassFilters?.xp_reward).toEqual([2, 3, 4]);
+  });
+
   it("does not run cleanup when cleanup eligibility is false", async () => {
     const userId = "user-ineligible";
     const queryClient = new QueryClient({

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -323,6 +323,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
   const { trackEpicOutcome } = useAIInteractionTracker();
   const { queueAction, shouldQueueWrites, retryNow } = useResilience();
   const { enabled = true } = options;
+  const [hasHydratedFromRemote, setHasHydratedFromRemote] = useState(() => !enabled || !user?.id);
 
   const epicsQuery = useQuery({
     queryKey: ["epics", user?.id],
@@ -336,9 +337,13 @@ export const useEpics = (options: EpicsOptions = {}) => {
   });
 
   useEffect(() => {
-    if (!enabled || !user?.id) return;
+    if (!enabled || !user?.id) {
+      setHasHydratedFromRemote(true);
+      return;
+    }
 
     let disposed = false;
+    setHasHydratedFromRemote(false);
 
     const refreshFromRemote = async () => {
       try {
@@ -346,6 +351,10 @@ export const useEpics = (options: EpicsOptions = {}) => {
         if (disposed) return;
       } catch (error) {
         console.warn("Failed to sync local epics from remote:", error);
+      } finally {
+        if (!disposed) {
+          setHasHydratedFromRemote(true);
+        }
       }
     };
 
@@ -748,12 +757,13 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
   const activeEpics = epics.filter((epic) => epic.status === "active");
   const completedEpics = epics.filter((epic) => epic.status === "completed");
+  const isAwaitingInitialHydration = enabled && !!user?.id && !hasHydratedFromRemote && epics.length === 0;
 
   return {
     epics,
     activeEpics,
     completedEpics,
-    isLoading: epicsQuery.isLoading && epics.length === 0,
+    isLoading: (epicsQuery.isLoading && epics.length === 0) || isAwaitingInitialHydration,
     error: epicsQuery.error,
     createEpic: createEpic.mutateAsync,
     isCreating: createEpic.isPending,

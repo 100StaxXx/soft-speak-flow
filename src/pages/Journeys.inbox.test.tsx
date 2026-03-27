@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
     scheduled_time: string | null;
     difficulty: string;
     is_main_quest: boolean;
+    habit_source_id?: string | null;
+    epic_id?: string | null;
   }>,
   addTask: vi.fn(async (params: { taskText: string; taskDate: string | null; difficulty: string }) => {
     if (params.taskDate === null) {
@@ -70,6 +72,16 @@ const mocks = vi.hoisted(() => ({
   surfaceAllEpicHabits: vi.fn(),
   spawnRecurringTasks: vi.fn(),
   scrollIntoView: vi.fn(),
+  activeEpics: [] as Array<{
+    id: string;
+    title: string;
+    status: string;
+    progress_percentage?: number | null;
+    target_days?: number;
+    start_date?: string;
+    end_date?: string | null;
+    epic_habits?: Array<{ habit_id: string }>;
+  }>,
 }));
 
 vi.mock("@/components/PageTransition", () => ({
@@ -89,7 +101,30 @@ vi.mock("@/components/DesktopWeekStrip", () => ({
 }));
 
 vi.mock("@/components/TodaysAgenda", () => ({
-  TodaysAgenda: () => <div data-testid="todays-agenda">agenda</div>,
+  TodaysAgenda: ({
+    tasks,
+    activeEpics,
+  }: {
+    tasks: Array<{ id: string; task_text: string; habit_source_id?: string | null }>;
+    activeEpics: Array<{ id: string; title: string }>;
+  }) => (
+    <div data-testid="todays-agenda">
+      <div>agenda</div>
+      <div data-testid="agenda-task-list">
+        {tasks.map((task) => (
+          <div key={task.id}>
+            {task.task_text}
+            {task.habit_source_id ? " (ritual)" : " (quest)"}
+          </div>
+        ))}
+      </div>
+      <div data-testid="agenda-campaign-list">
+        {activeEpics.map((epic) => (
+          <div key={epic.id}>{epic.title}</div>
+        ))}
+      </div>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/AddQuestSheet", () => ({
@@ -273,8 +308,8 @@ vi.mock("@/hooks/useOnboardingTaskCleanup", () => ({
 
 vi.mock("@/hooks/useEpics", () => ({
   useEpics: () => ({
-    epics: [],
-    activeEpics: [],
+    epics: mocks.activeEpics,
+    activeEpics: mocks.activeEpics,
     completedEpics: [],
     isLoading: false,
     createEpic: mocks.createEpic,
@@ -390,6 +425,7 @@ describe("Journeys inbox integration", () => {
     mocks.toggleInboxTask.mockClear();
     mocks.deleteInboxTask.mockClear();
     mocks.scrollIntoView.mockClear();
+    mocks.activeEpics = [];
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
       callback(0);
@@ -450,5 +486,124 @@ describe("Journeys inbox integration", () => {
       expect(screen.getByTestId("journeys-inbox-section")).toBeInTheDocument();
       expect(screen.getByText("Draft roadmap")).toBeInTheDocument();
     });
+  });
+
+  it("shows the March 27 quests and active campaigns for Darryl's account shape", async () => {
+    mocks.dailyTasks = [
+      {
+        id: "manual-1",
+        task_text: "Morning Routine",
+        completed: true,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: "04:30:00",
+        difficulty: "hard",
+        is_main_quest: false,
+      },
+      {
+        id: "manual-2",
+        task_text: "Bids for Next week",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: "16:00:00",
+        difficulty: "medium",
+        is_main_quest: false,
+      },
+      {
+        id: "manual-3",
+        task_text: "Walk 800 w 6th",
+        completed: true,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: "10:00:00",
+        difficulty: "medium",
+        is_main_quest: false,
+      },
+      {
+        id: "manual-4",
+        task_text: "Evening reset",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: "19:00:00",
+        difficulty: "easy",
+        is_main_quest: false,
+      },
+      {
+        id: "ritual-1",
+        task_text: "Daily CRM Update",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: null,
+        difficulty: "medium",
+        is_main_quest: false,
+        habit_source_id: "crm-habit",
+        epic_id: "epic-money",
+      },
+      {
+        id: "ritual-2",
+        task_text: "Daily Workout Routine",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: null,
+        difficulty: "medium",
+        is_main_quest: false,
+        habit_source_id: "workout-habit",
+        epic_id: "epic-summer",
+      },
+      {
+        id: "ritual-3",
+        task_text: "Nutrition Tracking",
+        completed: false,
+        xp_reward: 20,
+        task_date: "2026-03-27",
+        scheduled_time: null,
+        difficulty: "medium",
+        is_main_quest: false,
+        habit_source_id: "nutrition-habit",
+        epic_id: "epic-summer",
+      },
+    ];
+    mocks.activeEpics = [
+      {
+        id: "epic-summer",
+        title: "Summer Gains",
+        status: "active",
+        progress_percentage: 0,
+        target_days: 91,
+        start_date: "2026-03-03",
+        end_date: "2026-06-02",
+        epic_habits: [],
+      },
+      {
+        id: "epic-money",
+        title: "Get Money",
+        status: "active",
+        progress_percentage: 0,
+        target_days: 304,
+        start_date: "2026-03-03",
+        end_date: "2027-01-01",
+        epic_habits: [],
+      },
+    ];
+
+    renderJourneys();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("agenda-task-list")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Morning Routine (quest)")).toBeInTheDocument();
+    expect(screen.getByText("Bids for Next week (quest)")).toBeInTheDocument();
+    expect(screen.getByText("Walk 800 w 6th (quest)")).toBeInTheDocument();
+    expect(screen.getByText("Evening reset (quest)")).toBeInTheDocument();
+    expect(screen.getByText("Daily CRM Update (ritual)")).toBeInTheDocument();
+    expect(screen.getByText("Daily Workout Routine (ritual)")).toBeInTheDocument();
+    expect(screen.getByText("Nutrition Tracking (ritual)")).toBeInTheDocument();
+    expect(screen.getByText("Summer Gains")).toBeInTheDocument();
+    expect(screen.getByText("Get Money")).toBeInTheDocument();
   });
 });

@@ -83,6 +83,8 @@ const safeFormat = (date: Date, fmt: string, fallback = "") => {
   }
 };
 
+const TOUCH_CLICK_SUPPRESSION_RESET_MS = 750;
+
 interface Task {
   id: string;
   task_text: string;
@@ -713,6 +715,8 @@ export const TodaysAgenda = memo(function TodaysAgenda({
   
   // Track touch start position to distinguish taps from scrolls
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextCheckboxClickRef = useRef(false);
+  const suppressNextCheckboxClickTimeoutRef = useRef<number | null>(null);
   
   // Clean up optimistic state when server confirms completion
   useEffect(() => {
@@ -750,6 +754,34 @@ export const TodaysAgenda = memo(function TodaysAgenda({
       return next.size !== prev.size ? next : prev;
     });
   }, [tasks]);
+
+  const clearTouchCheckboxClickSuppression = useCallback(() => {
+    suppressNextCheckboxClickRef.current = false;
+
+    if (suppressNextCheckboxClickTimeoutRef.current !== null) {
+      window.clearTimeout(suppressNextCheckboxClickTimeoutRef.current);
+      suppressNextCheckboxClickTimeoutRef.current = null;
+    }
+  }, []);
+
+  const armTouchCheckboxClickSuppression = useCallback(() => {
+    suppressNextCheckboxClickRef.current = true;
+
+    if (suppressNextCheckboxClickTimeoutRef.current !== null) {
+      window.clearTimeout(suppressNextCheckboxClickTimeoutRef.current);
+    }
+
+    suppressNextCheckboxClickTimeoutRef.current = window.setTimeout(() => {
+      suppressNextCheckboxClickRef.current = false;
+      suppressNextCheckboxClickTimeoutRef.current = null;
+    }, TOUCH_CLICK_SUPPRESSION_RESET_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearTouchCheckboxClickSuppression();
+    };
+  }, [clearTouchCheckboxClickSuppression]);
 
   const scheduleComboReset = useCallback(() => {
     if (comboResetTimerRef.current !== null) {
@@ -1819,7 +1851,16 @@ export const TodaysAgenda = memo(function TodaysAgenda({
             <button
               data-interactive="true"
               data-tap-control="true"
-              onClick={handleCheckboxClick}
+              onClick={(e) => {
+                if (suppressNextCheckboxClickRef.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  clearTouchCheckboxClickSuppression();
+                  return;
+                }
+
+                handleCheckboxClick(e);
+              }}
               onTouchStart={(e) => {
                 touchStartRef.current = { 
                   x: e.touches[0].clientX, 
@@ -1829,6 +1870,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               onTouchEnd={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                armTouchCheckboxClickSuppression();
                 // Only trigger if finger moved less than 5px (not scrolling)
                 if (touchStartRef.current) {
                   const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
@@ -1899,8 +1941,9 @@ export const TodaysAgenda = memo(function TodaysAgenda({
               )}
               <MarqueeText
                 text={task.task_text}
-                className={cn(
-                  "text-sm flex-1",
+                className="flex-1"
+                textClassName={cn(
+                  "text-sm",
                   isComplete && "text-muted-foreground",
                   isComplete && (justCompletedTasks.has(task.id) ? "animate-strikethrough" : "line-through")
                 )}
@@ -2167,7 +2210,7 @@ export const TodaysAgenda = memo(function TodaysAgenda({
     );
 
     return taskContent;
-  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo]);
+  }, [onToggle, onUndoToggle, onEditQuest, onSendToCalendar, hasCalendarLink, onDeleteQuest, onMoveQuestToNextDay, expandedTasks, hasExpandableDetails, toggleTaskExpanded, justCompletedTasks, optimisticCompleted, toggleSubtask, useLiteAnimations, registerCompletionCombo, resetCombo, armTouchCheckboxClickSuppression, clearTouchCheckboxClickSuppression]);
 
   const desktopRailCardClass = "journeys-desktop-rail-card rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(23,20,38,0.94),rgba(16,13,27,0.9))] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.2)]";
   const desktopRail = isDesktopLayout ? (
