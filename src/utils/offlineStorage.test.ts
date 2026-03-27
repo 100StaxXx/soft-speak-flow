@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createIndexedDbReconnectMock } from "@/test/indexedDbReconnectMock";
 import {
   __resetOfflineDBForTests,
   addPendingAction,
@@ -9,6 +10,7 @@ import {
 } from "./offlineStorage";
 
 const DB_NAME = "cosmiq-offline-db";
+const originalIndexedDb = globalThis.indexedDB;
 
 const supportsIndexedDb = typeof indexedDB !== "undefined";
 
@@ -49,6 +51,16 @@ const seedLegacyV1Database = async (rows: Array<Record<string, unknown>>) => {
 };
 
 const maybeDescribe = supportsIndexedDb ? describe : describe.skip;
+
+const installIndexedDb = (throwOnTransactionCall: number) => {
+  Object.defineProperty(globalThis, "indexedDB", {
+    configurable: true,
+    value: createIndexedDbReconnectMock([
+      { throwOnTransactionCall },
+      {},
+    ]),
+  });
+};
 
 maybeDescribe("offlineStorage user scoping", () => {
   beforeEach(async () => {
@@ -110,5 +122,35 @@ maybeDescribe("offlineStorage user scoping", () => {
 
     expect(await getPendingActionCount("user-a")).toBe(0);
     expect(await getPendingActionCount("user-b")).toBe(1);
+  });
+});
+
+maybeDescribe("offlineStorage reconnect handling", () => {
+  afterEach(() => {
+    vi.resetModules();
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      value: originalIndexedDb,
+    });
+  });
+
+  it("reopens and retries a queued write when the cached database starts closing", async () => {
+    installIndexedDb(1);
+    const offlineStorage = await import("./offlineStorage");
+
+    await offlineStorage.addPendingAction("CREATE_TASK", { task_text: "write retry" }, "user-a");
+
+    expect(await offlineStorage.getPendingActionCount("user-a")).toBe(1);
+  });
+
+  it("reopens and retries a queued read when the cached database starts closing", async () => {
+    installIndexedDb(2);
+    const offlineStorage = await import("./offlineStorage");
+
+    await offlineStorage.addPendingAction("CREATE_TASK", { task_text: "read retry" }, "user-a");
+    const actions = await offlineStorage.getPendingActions("user-a");
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0].payload).toEqual(expect.objectContaining({ task_text: "read retry" }));
   });
 });

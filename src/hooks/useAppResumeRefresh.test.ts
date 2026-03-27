@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => {
   const addListenerMock = vi.fn();
   const removeListenerMock = vi.fn().mockResolvedValue(undefined);
   const dispatchPlannerSyncFinishedMock = vi.fn();
+  const warmDailyTasksQueryFromRemoteMock = vi.fn().mockResolvedValue([]);
+  const warmEpicsQueryFromRemoteMock = vi.fn().mockResolvedValue([]);
   const loggerDebugMock = vi.fn();
   const loggerWarnMock = vi.fn();
   const state = {
@@ -20,6 +22,8 @@ const mocks = vi.hoisted(() => {
     addListenerMock,
     removeListenerMock,
     dispatchPlannerSyncFinishedMock,
+    warmDailyTasksQueryFromRemoteMock,
+    warmEpicsQueryFromRemoteMock,
     loggerDebugMock,
     loggerWarnMock,
     state,
@@ -52,8 +56,16 @@ vi.mock("@/utils/logger", () => ({
   },
 }));
 
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+  }),
+}));
+
 vi.mock("@/utils/plannerSync", () => ({
   dispatchPlannerSyncFinished: mocks.dispatchPlannerSyncFinishedMock,
+  warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemoteMock(...args),
+  warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemoteMock(...args),
 }));
 
 import { useAppResumeRefresh } from "./useAppResumeRefresh";
@@ -90,6 +102,8 @@ describe("useAppResumeRefresh", () => {
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["companion-care-signals"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["current-evolution-card"] });
     expect(mocks.invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["evolution-cards"] });
+    expect(mocks.warmEpicsQueryFromRemoteMock).toHaveBeenCalledWith(expect.any(Object), "user-1");
+    expect(mocks.warmDailyTasksQueryFromRemoteMock).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
     expect(mocks.dispatchPlannerSyncFinishedMock).toHaveBeenCalledTimes(1);
   });
 });

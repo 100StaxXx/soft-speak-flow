@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { toast } from 'sonner';
+import { warmDailyTasksQueryFromRemote } from "@/utils/plannerSync";
 
 export type EnergyLevel = 'low' | 'medium' | 'high';
 export type DayShape = 'front_load' | 'spread' | 'back_load' | 'auto';
@@ -109,6 +111,7 @@ const DEFAULT_CONTEXT: PlanContext = {
 
 export function useSmartDayPlanner(planDate: Date = new Date()) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { success, medium } = useHapticFeedback();
   
   const [step, setStep] = useState<WizardStep>('quick_start');
@@ -618,6 +621,8 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
 
       if (insertError) throw insertError;
 
+      await warmDailyTasksQueryFromRemote(queryClient, user.id, dateStr);
+
       // Save the planning session
       await supabase.from('daily_plan_sessions').insert([{
         user_id: user.id,
@@ -662,7 +667,7 @@ export function useSmartDayPlanner(planDate: Date = new Date()) {
       toast.error('Failed to save your plan');
       return false;
     }
-  }, [user?.id, dateStr, generatedPlan, context, success]);
+  }, [context, dateStr, generatedPlan, queryClient, success, user?.id]);
 
   // Local plan mutation functions for in-place editing
   const updateTaskInPlan = useCallback((index: number, updates: Partial<GeneratedTask>) => {

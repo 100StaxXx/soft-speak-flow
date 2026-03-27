@@ -4,6 +4,10 @@
  */
 
 import { normalizeUuidFields, normalizeUuidLikeId } from "@/utils/offlineId";
+import {
+  bindIndexedDbLifecycle,
+  withReopenedIndexedDb,
+} from "@/utils/indexedDbReconnect";
 
 const DB_NAME = "cosmiq-offline-db";
 const DB_VERSION = 3;
@@ -59,13 +63,30 @@ interface CacheEntry {
   timestamp: number;
 }
 
+type OfflineStoreName = "tasks" | "pendingActions" | "cache";
+type StoreMode = IDBTransactionMode;
+
 const ACTIVE_QUEUE_STATUSES: QueueActionStatus[] = ["queued", "syncing", "failed"];
 
 let db: IDBDatabase | null = null;
+let openPromise: Promise<IDBDatabase> | null = null;
 
 const nowMs = () => Date.now();
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+const requestToPromise = <T>(request: IDBRequest<T>) =>
+  new Promise<T>((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+const transactionDone = (transaction: IDBTransaction) =>
+  new Promise<void>((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error);
+    transaction.onerror = () => reject(transaction.error);
+  });
 
 const isString = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 
@@ -221,6 +242,15 @@ const normalizeLegacyRow = (row: Record<string, unknown>): QueuedAction | null =
 const normalizeAnyQueuedAction = (row: Partial<QueuedAction> & Record<string, unknown>): QueuedAction | null =>
   normalizeQueuedAction(row) ?? normalizeLegacyRow(row);
 
+function resetOfflineDB(database?: IDBDatabase | null): void {
+  if (database && db !== database) {
+    return;
+  }
+
+  db = null;
+  openPromise = null;
+}
+
 const getQueuedActionRowsForUser = async (
   store: IDBObjectStore,
   userId?: string,
@@ -259,78 +289,91 @@ const getQueuedActionRowsForUser = async (
 export async function initOfflineDB(): Promise<IDBDatabase> {
   if (db) return db;
 
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  if (!openPromise) {
+    const pendingOpen = new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => {
-      console.error("Failed to open offline database:", request.error);
-      reject(request.error);
-    };
-
-    request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const database = (event.target as IDBOpenDBRequest).result;
-
-      if (!database.objectStoreNames.contains("tasks")) {
-        database.createObjectStore("tasks", { keyPath: "id" });
-      }
-
-      const actionStore = database.objectStoreNames.contains("pendingActions")
-        ? (event.target as IDBOpenDBRequest).transaction!.objectStore("pendingActions")
-        : database.createObjectStore("pendingActions", { keyPath: "id" });
-
-      if (!actionStore.indexNames.contains("timestamp")) {
-        actionStore.createIndex("timestamp", "timestamp");
-      }
-      if (!actionStore.indexNames.contains("user_id")) {
-        actionStore.createIndex("user_id", "user_id");
-      }
-      if (!actionStore.indexNames.contains("status")) {
-        actionStore.createIndex("status", "status");
-      }
-      if (!actionStore.indexNames.contains("created_at")) {
-        actionStore.createIndex("created_at", "created_at");
-      }
-      if (!actionStore.indexNames.contains("action_kind")) {
-        actionStore.createIndex("action_kind", "action_kind");
-      }
-      if (!actionStore.indexNames.contains("entity_type")) {
-        actionStore.createIndex("entity_type", "entity_type");
-      }
-
-      if (!database.objectStoreNames.contains("cache")) {
-        database.createObjectStore("cache", { keyPath: "key" });
-      }
-
-      // Migration safety: remove unscoped entries and convert v2 legacy shape to v3 queue shape.
-      const cursorRequest = actionStore.openCursor();
-      cursorRequest.onsuccess = () => {
-        const cursor = cursorRequest.result;
-        if (!cursor) return;
-
-        const value = cursor.value as Record<string, unknown>;
-        const asQueue = normalizeQueuedAction(value);
-
-        if (asQueue) {
-          cursor.update(asQueue);
-          cursor.continue();
-          return;
-        }
-
-        const asLegacy = normalizeLegacyRow(value);
-        if (asLegacy) {
-          cursor.update(asLegacy);
-        } else {
-          cursor.delete();
-        }
-        cursor.continue();
+      request.onerror = () => {
+        console.error("Failed to open offline database:", request.error);
+        resetOfflineDB();
+        reject(request.error);
       };
-    };
-  });
+
+      request.onsuccess = () => {
+        const database = request.result;
+        bindIndexedDbLifecycle(database, resetOfflineDB);
+        db = database;
+        resolve(database);
+      };
+
+      request.onupgradeneeded = (event) => {
+        const database = (event.target as IDBOpenDBRequest).result;
+
+        if (!database.objectStoreNames.contains("tasks")) {
+          database.createObjectStore("tasks", { keyPath: "id" });
+        }
+
+        const actionStore = database.objectStoreNames.contains("pendingActions")
+          ? (event.target as IDBOpenDBRequest).transaction!.objectStore("pendingActions")
+          : database.createObjectStore("pendingActions", { keyPath: "id" });
+
+        if (!actionStore.indexNames.contains("timestamp")) {
+          actionStore.createIndex("timestamp", "timestamp");
+        }
+        if (!actionStore.indexNames.contains("user_id")) {
+          actionStore.createIndex("user_id", "user_id");
+        }
+        if (!actionStore.indexNames.contains("status")) {
+          actionStore.createIndex("status", "status");
+        }
+        if (!actionStore.indexNames.contains("created_at")) {
+          actionStore.createIndex("created_at", "created_at");
+        }
+        if (!actionStore.indexNames.contains("action_kind")) {
+          actionStore.createIndex("action_kind", "action_kind");
+        }
+        if (!actionStore.indexNames.contains("entity_type")) {
+          actionStore.createIndex("entity_type", "entity_type");
+        }
+
+        if (!database.objectStoreNames.contains("cache")) {
+          database.createObjectStore("cache", { keyPath: "key" });
+        }
+
+        // Migration safety: remove unscoped entries and convert v2 legacy shape to v3 queue shape.
+        const cursorRequest = actionStore.openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+
+          const value = cursor.value as Record<string, unknown>;
+          const asQueue = normalizeQueuedAction(value);
+
+          if (asQueue) {
+            cursor.update(asQueue);
+            cursor.continue();
+            return;
+          }
+
+          const asLegacy = normalizeLegacyRow(value);
+          if (asLegacy) {
+            cursor.update(asLegacy);
+          } else {
+            cursor.delete();
+          }
+          cursor.continue();
+        };
+      };
+    }).finally(() => {
+      if (openPromise === pendingOpen) {
+        openPromise = null;
+      }
+    });
+
+    openPromise = pendingOpen;
+  }
+
+  return openPromise;
 }
 
 /**
@@ -341,25 +384,40 @@ async function getDB(): Promise<IDBDatabase> {
   return initOfflineDB();
 }
 
+async function withStore<T>(
+  storeName: OfflineStoreName,
+  mode: StoreMode,
+  handler: (store: IDBObjectStore, transaction: IDBTransaction) => Promise<T>,
+): Promise<T> {
+  return withReopenedIndexedDb({
+    openDatabase: getDB,
+    resetDatabase: resetOfflineDB,
+    operation: async (database) => {
+      const transaction = database.transaction(storeName, mode);
+      const done = mode !== "readonly" ? transactionDone(transaction) : null;
+      const store = transaction.objectStore(storeName);
+      const result = await handler(store, transaction);
+      if (done) {
+        await done;
+      }
+      return result;
+    },
+  });
+}
+
 /**
  * Save data to a cache store
  */
 export async function saveToCache(key: string, data: unknown): Promise<void> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("cache", "readwrite");
-    const store = transaction.objectStore("cache");
-
     const entry: CacheEntry = {
       key,
       data,
       timestamp: Date.now(),
     };
 
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(entry);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+    await withStore("cache", "readwrite", async (store) => {
+      await requestToPromise(store.put(entry));
     });
   } catch (error) {
     console.error("Failed to save to cache:", error);
@@ -371,17 +429,9 @@ export async function saveToCache(key: string, data: unknown): Promise<void> {
  */
 export async function getFromCache<T>(key: string): Promise<T | null> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("cache", "readonly");
-    const store = transaction.objectStore("cache");
-
-    return new Promise((resolve, reject) => {
-      const request = store.get(key);
-      request.onsuccess = () => {
-        const entry = request.result as CacheEntry | undefined;
-        resolve((entry?.data as T) ?? null);
-      };
-      request.onerror = () => reject(request.error);
+    return withStore("cache", "readonly", async (store) => {
+      const entry = await requestToPromise(store.get(key)) as CacheEntry | undefined;
+      return (entry?.data as T) ?? null;
     });
   } catch (error) {
     console.error("Failed to get from cache:", error);
@@ -394,17 +444,9 @@ export async function getFromCache<T>(key: string): Promise<T | null> {
  */
 export async function getCacheTimestamp(key: string): Promise<number | null> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("cache", "readonly");
-    const store = transaction.objectStore("cache");
-
-    return new Promise((resolve, reject) => {
-      const request = store.get(key);
-      request.onsuccess = () => {
-        const entry = request.result as CacheEntry | undefined;
-        resolve(entry?.timestamp ?? null);
-      };
-      request.onerror = () => reject(request.error);
+    return withStore("cache", "readonly", async (store) => {
+      const entry = await requestToPromise(store.get(key)) as CacheEntry | undefined;
+      return entry?.timestamp ?? null;
     });
   } catch (error) {
     console.error("Failed to get cache timestamp:", error);
@@ -427,10 +469,6 @@ interface EnqueueActionInput {
 export async function enqueueAction(input: EnqueueActionInput): Promise<string> {
   try {
     if (!input.userId) throw new Error("User ID is required for queued actions");
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readwrite");
-    const store = transaction.objectStore("pendingActions");
-
     const timestamp = nowMs();
     const normalizedPayload = normalizeUuidFields(input.payload);
     const action: QueuedAction = {
@@ -447,10 +485,8 @@ export async function enqueueAction(input: EnqueueActionInput): Promise<string> 
       updated_at: timestamp,
     };
 
-    await new Promise<void>((resolve, reject) => {
-      const request = store.add(action);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+    await withStore("pendingActions", "readwrite", async (store) => {
+      await requestToPromise(store.add(action));
     });
 
     return action.id;
@@ -466,15 +502,14 @@ export async function enqueueAction(input: EnqueueActionInput): Promise<string> 
 export async function getQueuedActions(userId: string): Promise<QueuedAction[]> {
   try {
     if (!userId) return [];
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readonly");
-    const store = transaction.objectStore("pendingActions");
-    const rows = await getQueuedActionRowsForUser(store, userId);
-    const actions = rows
-      .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
-      .filter((row): row is QueuedAction => row !== null);
-    actions.sort((a, b) => a.created_at - b.created_at);
-    return actions;
+    return withStore("pendingActions", "readonly", async (store) => {
+      const rows = await getQueuedActionRowsForUser(store, userId);
+      const actions = rows
+        .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
+        .filter((row): row is QueuedAction => row !== null);
+      actions.sort((a, b) => a.created_at - b.created_at);
+      return actions;
+    });
   } catch (error) {
     console.error("Failed to get queued actions:", error);
     return [];
@@ -497,15 +532,14 @@ export async function getQueuedActionCount(
   statuses: QueueActionStatus[] = ACTIVE_QUEUE_STATUSES,
 ): Promise<number> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readonly");
-    const store = transaction.objectStore("pendingActions");
-    const rows = await getQueuedActionRowsForUser(store, userId);
-    const normalized = rows
-      .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
-      .filter((row): row is QueuedAction => row !== null);
+    return withStore("pendingActions", "readonly", async (store) => {
+      const rows = await getQueuedActionRowsForUser(store, userId);
+      const normalized = rows
+        .map((row) => normalizeAnyQueuedAction(row as Partial<QueuedAction> & Record<string, unknown>))
+        .filter((row): row is QueuedAction => row !== null);
 
-    return normalized.filter((action) => statuses.includes(action.status)).length;
+      return normalized.filter((action) => statuses.includes(action.status)).length;
+    });
   } catch (error) {
     console.error("Failed to get queued action count:", error);
     return 0;
@@ -520,37 +554,25 @@ export async function updateQueuedAction(
   patch: Partial<Pick<QueuedAction, "status" | "retry_count" | "last_error" | "payload" | "entity_id">>,
 ): Promise<void> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readwrite");
-    const store = transaction.objectStore("pendingActions");
+    await withStore("pendingActions", "readwrite", async (store) => {
+      const rawExisting = await requestToPromise(store.get(id)) as Partial<QueuedAction> & Record<string, unknown> | undefined;
+      const existing = rawExisting ? normalizeAnyQueuedAction(rawExisting) : null;
 
-    const existing = await new Promise<QueuedAction | null>((resolve, reject) => {
-      const request = store.get(id);
-      request.onsuccess = () => {
-        const normalized = normalizeAnyQueuedAction((request.result || null) as Partial<QueuedAction> & Record<string, unknown>);
-        resolve(normalized);
+      if (!existing) return;
+
+      const updated: QueuedAction = {
+        ...existing,
+        ...patch,
+        payload: patch.payload ? normalizeUuidFields(patch.payload) : existing.payload,
+        entity_id: typeof patch.entity_id === "string"
+          ? normalizeUuidLikeId(patch.entity_id)
+          : patch.entity_id === undefined
+            ? existing.entity_id
+            : patch.entity_id,
+        updated_at: nowMs(),
       };
-      request.onerror = () => reject(request.error);
-    });
 
-    if (!existing) return;
-
-    const updated: QueuedAction = {
-      ...existing,
-      ...patch,
-      payload: patch.payload ? normalizeUuidFields(patch.payload) : existing.payload,
-      entity_id: typeof patch.entity_id === "string"
-        ? normalizeUuidLikeId(patch.entity_id)
-        : patch.entity_id === undefined
-          ? existing.entity_id
-          : patch.entity_id,
-      updated_at: nowMs(),
-    };
-
-    await new Promise<void>((resolve, reject) => {
-      const request = store.put(updated);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      await requestToPromise(store.put(updated));
     });
   } catch (error) {
     console.error("Failed to update queued action:", error);
@@ -562,14 +584,8 @@ export async function updateQueuedAction(
  */
 export async function removeQueuedAction(id: string): Promise<void> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readwrite");
-    const store = transaction.objectStore("pendingActions");
-
-    await new Promise<void>((resolve, reject) => {
-      const request = store.delete(id);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+    await withStore("pendingActions", "readwrite", async (store) => {
+      await requestToPromise(store.delete(id));
     });
   } catch (error) {
     console.error("Failed to remove queued action:", error);
@@ -670,24 +686,18 @@ export async function clearPendingAction(id: string): Promise<void> {
  */
 export async function incrementRetryCount(id: string): Promise<void> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readwrite");
-    const store = transaction.objectStore("pendingActions");
+    await withStore("pendingActions", "readwrite", async (store) => {
+      const rawAction = await requestToPromise(store.get(id)) as Partial<QueuedAction> & Record<string, unknown> | undefined;
+      const action = rawAction ? normalizeQueuedAction(rawAction) : null;
 
-    const action = await new Promise<QueuedAction | null>((resolve, reject) => {
-      const request = store.get(id);
-      request.onsuccess = () => {
-        const normalized = normalizeQueuedAction((request.result || null) as Partial<QueuedAction> & Record<string, unknown>);
-        resolve(normalized);
-      };
-      request.onerror = () => reject(request.error);
-    });
+      if (!action) return;
 
-    if (!action) return;
-
-    await updateQueuedAction(id, {
-      retry_count: action.retry_count + 1,
-      status: "failed",
+      await requestToPromise(store.put({
+        ...action,
+        retry_count: action.retry_count + 1,
+        status: "failed",
+        updated_at: nowMs(),
+      }));
     });
   } catch (error) {
     console.error("Failed to increment retry count:", error);
@@ -699,27 +709,43 @@ export async function incrementRetryCount(id: string): Promise<void> {
  */
 export async function clearAllPendingActions(userId?: string): Promise<void> {
   try {
-    const database = await getDB();
-    const transaction = database.transaction("pendingActions", "readwrite");
-    const store = transaction.objectStore("pendingActions");
+    await withStore("pendingActions", "readwrite", async (store) => {
+      if (!userId) {
+        await requestToPromise(store.clear());
+        return;
+      }
 
-    if (!userId) {
-      await new Promise<void>((resolve, reject) => {
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-      return;
-    }
+      if (store.indexNames.contains("user_id")) {
+        const index = store.index("user_id");
+        await new Promise<void>((resolve, reject) => {
+          const request = index.openCursor(IDBKeyRange.only(userId));
+          request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) {
+              resolve();
+              return;
+            }
 
-    if (store.indexNames.contains("user_id")) {
-      const index = store.index("user_id");
+            const deleteRequest = cursor.delete();
+            deleteRequest.onsuccess = () => cursor.continue();
+            deleteRequest.onerror = () => reject(deleteRequest.error);
+          };
+          request.onerror = () => reject(request.error);
+        });
+        return;
+      }
+
       await new Promise<void>((resolve, reject) => {
-        const request = index.openCursor(IDBKeyRange.only(userId));
+        const request = store.openCursor();
         request.onsuccess = () => {
           const cursor = request.result;
           if (!cursor) {
             resolve();
+            return;
+          }
+
+          if (cursor.value?.user_id !== userId) {
+            cursor.continue();
             return;
           }
 
@@ -729,28 +755,6 @@ export async function clearAllPendingActions(userId?: string): Promise<void> {
         };
         request.onerror = () => reject(request.error);
       });
-      return;
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const request = store.openCursor();
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) {
-          resolve();
-          return;
-        }
-
-        if (cursor.value?.user_id !== userId) {
-          cursor.continue();
-          return;
-        }
-
-        const deleteRequest = cursor.delete();
-        deleteRequest.onsuccess = () => cursor.continue();
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      };
-      request.onerror = () => reject(request.error);
     });
   } catch (error) {
     console.error("Failed to clear all pending actions:", error);
@@ -772,5 +776,5 @@ export function __resetOfflineDBForTests(): void {
   if (db) {
     db.close();
   }
-  db = null;
+  resetOfflineDB();
 }

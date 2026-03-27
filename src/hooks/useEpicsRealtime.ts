@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { logger } from "@/utils/logger";
+import { warmEpicsQueryFromRemote } from "@/utils/plannerSync";
 
 export const useEpicsRealtime = () => {
   const { user } = useAuth();
@@ -25,8 +26,12 @@ export const useEpicsRealtime = () => {
           table: 'epics',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['epics', user.id] });
+        async () => {
+          await warmEpicsQueryFromRemote(queryClient, user.id).catch((error) => {
+            logger.warn("Failed to warm epics query from realtime update", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
           queryClient.invalidateQueries({ queryKey: ['epics'] });
           queryClient.invalidateQueries({ queryKey: ['epic-progress'] });
           queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] });

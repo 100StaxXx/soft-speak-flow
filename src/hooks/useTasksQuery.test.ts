@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
   const eqTaskDateMock = vi.fn();
   const orderSortOrderMock = vi.fn();
   const orderCreatedAtMock = vi.fn();
+  const loadLocalDailyTasksMock = vi.fn();
+  const warmDailyTasksQueryFromRemoteMock = vi.fn();
 
   return {
     selectMock,
@@ -16,6 +18,8 @@ const mocks = vi.hoisted(() => {
     eqTaskDateMock,
     orderSortOrderMock,
     orderCreatedAtMock,
+    loadLocalDailyTasksMock,
+    warmDailyTasksQueryFromRemoteMock,
   };
 });
 
@@ -31,6 +35,13 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { id: "user-1" },
   }),
+}));
+
+vi.mock("@/utils/plannerSync", () => ({
+  PLANNER_SYNC_EVENT: "planner-sync-finished",
+  getDailyTasksQueryKey: (userId: string | undefined, taskDate: string) => ["daily-tasks", userId, taskDate],
+  loadLocalDailyTasks: (...args: unknown[]) => mocks.loadLocalDailyTasksMock(...args),
+  warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemoteMock(...args),
 }));
 
 import { fetchDailyTasks, useTasksQuery } from "./useTasksQuery";
@@ -243,6 +254,8 @@ describe("fetchDailyTasks", () => {
 describe("useTasksQuery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.loadLocalDailyTasksMock.mockResolvedValue([]);
+    mocks.warmDailyTasksQueryFromRemoteMock.mockResolvedValue([]);
   });
 
   it("does not fetch when disabled", () => {
@@ -253,5 +266,105 @@ describe("useTasksQuery", () => {
 
     expect(result.current.tasks).toEqual([]);
     expect(mocks.selectMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps visible ai-generated quests stable while a planner sync refresh is in flight", async () => {
+    const initialTasks = [
+      {
+        id: "task-1",
+        user_id: "user-1",
+        task_text: "Ship generated quest",
+        difficulty: "medium",
+        xp_reward: 30,
+        task_date: "2026-02-13",
+        completed: false,
+        completed_at: null,
+        is_main_quest: false,
+        scheduled_time: "09:00",
+        estimated_duration: 45,
+        recurrence_pattern: null,
+        recurrence_days: null,
+        recurrence_month_days: null,
+        recurrence_custom_period: null,
+        is_recurring: false,
+        reminder_enabled: false,
+        reminder_minutes_before: 15,
+        reminder_sent: false,
+        parent_template_id: null,
+        category: "mind",
+        is_bonus: false,
+        created_at: "2026-02-13T00:00:00.000Z",
+        priority: "high",
+        is_top_three: null,
+        actual_time_spent: null,
+        ai_generated: true,
+        context_id: null,
+        source: "smart_planner",
+        habit_source_id: null,
+        epic_id: null,
+        epic_title: null,
+        sort_order: 0,
+        contact_id: null,
+        auto_log_interaction: null,
+        contact: null,
+        image_url: null,
+        attachments: [],
+        notes: null,
+        location: null,
+        subtasks: [],
+      },
+    ];
+    const refreshedTasks = [
+      ...initialTasks,
+      {
+        ...initialTasks[0],
+        id: "task-2",
+        task_text: "Second generated quest",
+        scheduled_time: "11:00",
+        sort_order: 1,
+      },
+    ];
+
+    let resolveRefresh: (() => void) | null = null;
+    const refreshPending = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    mocks.loadLocalDailyTasksMock.mockResolvedValue(initialTasks);
+    mocks.warmDailyTasksQueryFromRemoteMock
+      .mockImplementationOnce(async (queryClient: QueryClient, userId: string, taskDate: string) => {
+        queryClient.setQueryData(["daily-tasks", userId, taskDate], initialTasks);
+        return initialTasks;
+      })
+      .mockImplementationOnce(async (queryClient: QueryClient, userId: string, taskDate: string) => {
+        await refreshPending;
+        queryClient.setQueryData(["daily-tasks", userId, taskDate], refreshedTasks);
+        return refreshedTasks;
+      });
+
+    const { result } = renderHook(
+      () => useTasksQuery(new Date("2026-02-13T00:00:00.000Z")),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.tasks).toHaveLength(1);
+    });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("planner-sync-finished"));
+    });
+
+    expect(result.current.tasks).toHaveLength(1);
+    expect(result.current.tasks[0]?.task_text).toBe("Ship generated quest");
+
+    await act(async () => {
+      resolveRefresh?.();
+      await refreshPending;
+    });
+
+    await waitFor(() => {
+      expect(result.current.tasks).toHaveLength(2);
+    });
   });
 });

@@ -2,8 +2,14 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 import { logger } from '@/utils/logger';
-import { dispatchPlannerSyncFinished } from '@/utils/plannerSync';
+import {
+  dispatchPlannerSyncFinished,
+  warmDailyTasksQueryFromRemote,
+  warmEpicsQueryFromRemote,
+} from '@/utils/plannerSync';
 
 const RESUME_COOLDOWN_MS = 10000; // 10 second cooldown to prevent spam
 
@@ -23,6 +29,7 @@ interface UseAppResumeRefreshOptions {
  */
 export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptions = {}) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const lastResumeRef = useRef<number>(0);
 
   const refreshCriticalData = useCallback(async (source: string) => {
@@ -56,16 +63,23 @@ export const useAppResumeRefresh = ({ enabled = true }: UseAppResumeRefreshOptio
       queryClient.invalidateQueries({ queryKey: ['evolution-cards'] }),
     ]);
 
-    // Invalidate habit and epic data for cross-device sync.
+    if (user?.id) {
+      const today = format(new Date(), "yyyy-MM-dd");
+      await Promise.all([
+        warmEpicsQueryFromRemote(queryClient, user.id),
+        warmDailyTasksQueryFromRemote(queryClient, user.id, today),
+      ]);
+    }
+
+    // Invalidate planner-derived UI after local caches are warmed.
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['habits'] }),
       queryClient.invalidateQueries({ queryKey: ['habit-surfacing'] }),
-      queryClient.invalidateQueries({ queryKey: ['epics'] }),
       queryClient.invalidateQueries({ queryKey: ['epic-progress'] }),
     ]);
 
     dispatchPlannerSyncFinished();
-  }, [enabled, queryClient]);
+  }, [enabled, queryClient, user?.id]);
 
   // Native iOS/Android: Listen for app state changes
   useEffect(() => {

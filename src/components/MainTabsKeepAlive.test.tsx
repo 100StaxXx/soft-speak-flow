@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  prefetchQuery: vi.fn().mockResolvedValue(undefined),
+  warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
+  warmEpicsQueryFromRemote: vi.fn().mockResolvedValue([]),
   mountCounts: {
     mentor: 0,
     journeys: 0,
@@ -12,9 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    prefetchQuery: mocks.prefetchQuery,
-  }),
+  useQueryClient: () => ({}),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -23,11 +22,9 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useTasksQuery", () => ({
-  DAILY_TASKS_GC_TIME: 1,
-  DAILY_TASKS_STALE_TIME: 1,
-  fetchDailyTasks: vi.fn().mockResolvedValue([]),
-  getDailyTasksQueryKey: (_userId: string, taskDate: string) => ["daily-tasks", taskDate],
+vi.mock("@/utils/plannerSync", () => ({
+  warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
+  warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemote(...args),
 }));
 
 vi.mock("@/pages/Mentor", async () => {
@@ -102,8 +99,10 @@ import { MainTabsKeepAlive } from "@/components/MainTabsKeepAlive";
 
 describe("MainTabsKeepAlive", () => {
   beforeEach(() => {
-    mocks.prefetchQuery.mockReset();
-    mocks.prefetchQuery.mockResolvedValue(undefined);
+    mocks.warmDailyTasksQueryFromRemote.mockReset();
+    mocks.warmDailyTasksQueryFromRemote.mockResolvedValue([]);
+    mocks.warmEpicsQueryFromRemote.mockReset();
+    mocks.warmEpicsQueryFromRemote.mockResolvedValue([]);
     mocks.mountCounts.mentor = 0;
     mocks.mountCounts.journeys = 0;
     mocks.mountCounts.campaigns = 0;
@@ -136,14 +135,10 @@ describe("MainTabsKeepAlive", () => {
   it("prefetches journeys tasks and epics on mount", () => {
     render(<MainTabsKeepAlive activePath="/mentor" />);
 
-    expect(mocks.prefetchQuery).toHaveBeenCalledTimes(2);
-    const queryKeys = mocks.prefetchQuery.mock.calls.map(([config]) => config.queryKey);
-    expect(queryKeys).toEqual(
-      expect.arrayContaining([
-        ["epics", "user-1"],
-      ]),
-    );
-    expect(queryKeys.some((key) => Array.isArray(key) && key[0] === "daily-tasks")).toBe(true);
+    expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledTimes(1);
+    expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
+    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledTimes(1);
+    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
   });
 
   it("preserves tab state and avoids remounting visited tabs", () => {

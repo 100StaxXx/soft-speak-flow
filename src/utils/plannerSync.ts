@@ -1,5 +1,6 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchEpics, type EpicRecord } from "@/hooks/epicsQuery";
+import { fetchEpics, getEpicsQueryKey, type EpicRecord } from "@/hooks/epicsQuery";
 import type { Habit, HabitCompletion } from "@/features/habits/types";
 import {
   getAllLocalTasksForUser,
@@ -22,6 +23,9 @@ import { getPendingActionCount } from "@/utils/offlineStorage";
 import { fetchDailyTasksRemote, type DailyTask } from "@/services/dailyTasksRemote";
 
 export const PLANNER_SYNC_EVENT = "planner-sync-finished";
+
+export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: string) =>
+  ["daily-tasks", userId, taskDate] as const;
 
 const plannerRemoteSyncLockCounts = new Map<string, number>();
 
@@ -141,6 +145,17 @@ export async function syncLocalDailyTasksFromRemote(userId: string, taskDate: st
   }> }>);
 
   return remoteTasks;
+}
+
+export async function warmDailyTasksQueryFromRemote(
+  queryClient: QueryClient,
+  userId: string,
+  taskDate: string,
+): Promise<DailyTask[]> {
+  await syncLocalDailyTasksFromRemote(userId, taskDate);
+  const tasks = await loadLocalDailyTasks(userId, taskDate);
+  queryClient.setQueryData(getDailyTasksQueryKey(userId, taskDate), tasks);
+  return tasks;
 }
 
 export async function loadLocalHabits(userId: string): Promise<Habit[]> {
@@ -299,6 +314,16 @@ export async function syncLocalEpicsFromRemote(userId: string): Promise<void> {
   if (habitsToUpsert.length > 0) {
     await upsertPlannerRecords("habits", habitsToUpsert);
   }
+}
+
+export async function warmEpicsQueryFromRemote(
+  queryClient: QueryClient,
+  userId: string,
+): Promise<EpicRecord[]> {
+  await syncLocalEpicsFromRemote(userId);
+  const epics = await loadLocalEpics(userId);
+  queryClient.setQueryData(getEpicsQueryKey(userId), epics);
+  return epics;
 }
 
 export function dispatchPlannerSyncFinished(): void {

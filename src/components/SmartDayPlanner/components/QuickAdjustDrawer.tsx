@@ -23,6 +23,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from "@/hooks/useAuth";
+import { warmDailyTasksQueryFromRemote } from "@/utils/plannerSync";
 import {
   normalizeTaskSchedulingState,
   normalizeTaskSchedulingUpdate,
@@ -60,6 +62,7 @@ export function QuickAdjustDrawer({
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const incompleteTasks = useMemo(() => 
     tasks.filter(t => !t.completed),
@@ -112,6 +115,7 @@ export function QuickAdjustDrawer({
     setIsProcessing(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const affectedDates = new Set<string>([dateStr]);
       
       const { data, error } = await supabase.functions.invoke('adjust-saved-daily-plan', {
         body: {
@@ -150,6 +154,9 @@ export function QuickAdjustDrawer({
                 });
                 updatePayload.task_date = normalized.task_date;
                 updatePayload.scheduled_time = normalized.scheduled_time;
+                if (typeof normalized.task_date === "string" && normalized.task_date.length > 0) {
+                  affectedDates.add(normalized.task_date);
+                }
                 if (normalized.source !== existing.source) {
                   updatePayload.source = normalized.source;
                 }
@@ -183,6 +190,9 @@ export function QuickAdjustDrawer({
               habit_source_id: existing.habit_source_id,
               source: existing.source,
             });
+            if (typeof normalized.task_date === "string" && normalized.task_date.length > 0) {
+              affectedDates.add(normalized.task_date);
+            }
             if (normalized.normalizedToInbox) normalizedToInboxCount += 1;
 
             const updatePayload: Record<string, unknown> = {
@@ -205,7 +215,13 @@ export function QuickAdjustDrawer({
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      if (user?.id) {
+        await Promise.all(
+          Array.from(affectedDates).map((taskDate) =>
+            warmDailyTasksQueryFromRemote(queryClient, user.id, taskDate),
+          ),
+        );
+      }
       toast.success(data?.message || 'Plan adjusted!');
       setInput('');
       onComplete();

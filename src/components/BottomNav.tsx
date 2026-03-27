@@ -12,16 +12,9 @@ import { CompanionNavPresence } from "@/components/companion/CompanionNavPresenc
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import {
-  DAILY_TASKS_GC_TIME,
-  DAILY_TASKS_STALE_TIME,
-  fetchDailyTasks,
-  getDailyTasksQueryKey,
-} from "@/hooks/useTasksQuery";
-import {
-  EPICS_QUERY_STALE_TIME,
-  fetchEpics,
-  getEpicsQueryKey,
-} from "@/hooks/epicsQuery";
+  warmDailyTasksQueryFromRemote,
+  warmEpicsQueryFromRemote,
+} from "@/utils/plannerSync";
 import { useMentorConnection } from "@/contexts/MentorConnectionContext";
 
 type PrefetchTarget = "mentor" | "journeys" | "campaigns" | "companion";
@@ -71,22 +64,13 @@ export const BottomNav = memo(() => {
     if (!user?.id) return;
 
     const today = format(new Date(), "yyyy-MM-dd");
-    void queryClient.prefetchQuery({
-      queryKey: getDailyTasksQueryKey(user.id, today),
-      queryFn: () => fetchDailyTasks(user.id, today),
-      staleTime: DAILY_TASKS_STALE_TIME,
-      gcTime: DAILY_TASKS_GC_TIME,
-    }).catch(() => undefined);
+    void Promise.resolve(warmDailyTasksQueryFromRemote(queryClient, user.id, today)).catch(() => undefined);
   }, [queryClient, user?.id]);
 
   const prefetchCampaigns = useCallback(() => {
     if (!user?.id) return;
 
-    void queryClient.prefetchQuery({
-      queryKey: getEpicsQueryKey(user.id),
-      queryFn: () => fetchEpics(user.id),
-      staleTime: EPICS_QUERY_STALE_TIME,
-    }).catch(() => undefined);
+    void Promise.resolve(warmEpicsQueryFromRemote(queryClient, user.id)).catch(() => undefined);
   }, [queryClient, user?.id]);
 
   // Prefetch on hover/focus for even faster perceived navigation

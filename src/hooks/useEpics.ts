@@ -12,7 +12,7 @@ import { useResilience } from "@/contexts/ResilienceContext";
 import {
   PLANNER_SYNC_EVENT,
   loadLocalEpics,
-  syncLocalEpicsFromRemote,
+  warmEpicsQueryFromRemote,
 } from "@/utils/plannerSync";
 import {
   createOfflinePlannerId,
@@ -331,6 +331,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
       return loadLocalEpics(user.id);
     },
     enabled: enabled && !!user?.id,
+    placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
 
@@ -341,9 +342,8 @@ export const useEpics = (options: EpicsOptions = {}) => {
 
     const refreshFromRemote = async () => {
       try {
-        await syncLocalEpicsFromRemote(user.id);
+        await warmEpicsQueryFromRemote(queryClient, user.id);
         if (disposed) return;
-        queryClient.setQueryData(["epics", user.id], await loadLocalEpics(user.id));
       } catch (error) {
         console.warn("Failed to sync local epics from remote:", error);
       }
@@ -753,7 +753,7 @@ export const useEpics = (options: EpicsOptions = {}) => {
     epics,
     activeEpics,
     completedEpics,
-    isLoading: epicsQuery.isLoading,
+    isLoading: epicsQuery.isLoading && epics.length === 0,
     error: epicsQuery.error,
     createEpic: createEpic.mutateAsync,
     isCreating: createEpic.isPending,

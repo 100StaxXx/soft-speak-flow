@@ -1,4 +1,8 @@
 import { createClientUuid, normalizeUuidFields } from "@/utils/offlineId";
+import {
+  bindIndexedDbLifecycle,
+  withReopenedIndexedDb,
+} from "@/utils/indexedDbReconnect";
 
 const DB_NAME = "cosmiq-planner-db";
 const DB_VERSION = 1;
@@ -45,6 +49,7 @@ interface EpicScopedRecord extends UserScopedRecord {
 }
 
 let db: IDBDatabase | null = null;
+let openPromise: Promise<IDBDatabase> | null = null;
 let plannerLegacyIdMigrationPromise: Promise<void> | null = null;
 
 const PLANNER_STORE_NAMES: PlannerStoreName[] = [
@@ -90,6 +95,7 @@ const createStore = (
 
 async function migrateLegacyPlannerIds(database: IDBDatabase): Promise<void> {
   const transaction = database.transaction(PLANNER_STORE_NAMES, "readwrite");
+  const done = transactionDone(transaction);
 
   for (const storeName of PLANNER_STORE_NAMES) {
     const store = transaction.objectStore(storeName);
@@ -115,7 +121,16 @@ async function migrateLegacyPlannerIds(database: IDBDatabase): Promise<void> {
     }
   }
 
-  await transactionDone(transaction);
+  await done;
+}
+
+function resetPlannerLocalDB(database?: IDBDatabase | null): void {
+  if (database && db !== database) {
+    return;
+  }
+
+  db = null;
+  openPromise = null;
 }
 
 export async function initPlannerLocalDB(): Promise<IDBDatabase> {
@@ -126,55 +141,70 @@ export async function initPlannerLocalDB(): Promise<IDBDatabase> {
     return db;
   }
 
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  if (!openPromise) {
+    const pendingOpen = new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      db = request.result;
-      plannerLegacyIdMigrationPromise ??= migrateLegacyPlannerIds(db).catch((error) => {
-        console.error("Failed to normalize legacy planner IDs:", error);
-      });
+      request.onerror = () => {
+        resetPlannerLocalDB();
+        reject(request.error);
+      };
+      request.onsuccess = () => {
+        const database = request.result;
+        bindIndexedDbLifecycle(database, resetPlannerLocalDB);
+        db = database;
+        plannerLegacyIdMigrationPromise ??= migrateLegacyPlannerIds(database).catch((error) => {
+          console.error("Failed to normalize legacy planner IDs:", error);
+        });
 
-      void plannerLegacyIdMigrationPromise.then(() => resolve(db!)).catch(reject);
-    };
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      createStore(database, "daily_tasks", [
-        { name: "user_id", keyPath: "user_id" },
-        { name: "user_task_date", keyPath: ["user_id", "task_date"] },
-        { name: "parent_template_id", keyPath: "parent_template_id" },
-        { name: "habit_source_id", keyPath: "habit_source_id" },
-      ]);
-      createStore(database, "subtasks", [
-        { name: "user_id", keyPath: "user_id" },
-        { name: "task_id", keyPath: "task_id" },
-      ]);
-      createStore(database, "habits", [
-        { name: "user_id", keyPath: "user_id" },
-      ]);
-      createStore(database, "habit_completions", [
-        { name: "user_id", keyPath: "user_id" },
-        { name: "user_date", keyPath: ["user_id", "date"] },
-        { name: "habit_id", keyPath: "habit_id" },
-      ]);
-      createStore(database, "epics", [
-        { name: "user_id", keyPath: "user_id" },
-      ]);
-      createStore(database, "epic_habits", [
-        { name: "epic_id", keyPath: "epic_id" },
-        { name: "habit_id", keyPath: "habit_id" },
-      ]);
-      createStore(database, "journey_phases", [
-        { name: "user_id", keyPath: "user_id" },
-        { name: "epic_id", keyPath: "epic_id" },
-      ]);
-      createStore(database, "epic_milestones", [
-        { name: "user_id", keyPath: "user_id" },
-        { name: "epic_id", keyPath: "epic_id" },
-      ]);
-    };
-  });
+        void plannerLegacyIdMigrationPromise.then(() => resolve(database)).catch(reject);
+      };
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        createStore(database, "daily_tasks", [
+          { name: "user_id", keyPath: "user_id" },
+          { name: "user_task_date", keyPath: ["user_id", "task_date"] },
+          { name: "parent_template_id", keyPath: "parent_template_id" },
+          { name: "habit_source_id", keyPath: "habit_source_id" },
+        ]);
+        createStore(database, "subtasks", [
+          { name: "user_id", keyPath: "user_id" },
+          { name: "task_id", keyPath: "task_id" },
+        ]);
+        createStore(database, "habits", [
+          { name: "user_id", keyPath: "user_id" },
+        ]);
+        createStore(database, "habit_completions", [
+          { name: "user_id", keyPath: "user_id" },
+          { name: "user_date", keyPath: ["user_id", "date"] },
+          { name: "habit_id", keyPath: "habit_id" },
+        ]);
+        createStore(database, "epics", [
+          { name: "user_id", keyPath: "user_id" },
+        ]);
+        createStore(database, "epic_habits", [
+          { name: "epic_id", keyPath: "epic_id" },
+          { name: "habit_id", keyPath: "habit_id" },
+        ]);
+        createStore(database, "journey_phases", [
+          { name: "user_id", keyPath: "user_id" },
+          { name: "epic_id", keyPath: "epic_id" },
+        ]);
+        createStore(database, "epic_milestones", [
+          { name: "user_id", keyPath: "user_id" },
+          { name: "epic_id", keyPath: "epic_id" },
+        ]);
+      };
+    }).finally(() => {
+      if (openPromise === pendingOpen) {
+        openPromise = null;
+      }
+    });
+
+    openPromise = pendingOpen;
+  }
+
+  return openPromise;
 }
 
 async function getDB(): Promise<IDBDatabase> {
@@ -187,14 +217,20 @@ async function withStore<T>(
   mode: StoreMode,
   handler: (store: IDBObjectStore, transaction: IDBTransaction) => Promise<T>,
 ): Promise<T> {
-  const database = await getDB();
-  const transaction = database.transaction(storeName, mode);
-  const store = transaction.objectStore(storeName);
-  const result = await handler(store, transaction);
-  if (mode !== "readonly") {
-    await transactionDone(transaction);
-  }
-  return result;
+  return withReopenedIndexedDb({
+    openDatabase: getDB,
+    resetDatabase: resetPlannerLocalDB,
+    operation: async (database) => {
+      const transaction = database.transaction(storeName, mode);
+      const done = mode !== "readonly" ? transactionDone(transaction) : null;
+      const store = transaction.objectStore(storeName);
+      const result = await handler(store, transaction);
+      if (done) {
+        await done;
+      }
+      return result;
+    },
+  });
 }
 
 async function getAllByIndex<T>(
@@ -518,5 +554,5 @@ export function __resetPlannerLocalDBForTests(): void {
   if (db) {
     db.close();
   }
-  db = null;
+  resetPlannerLocalDB();
 }

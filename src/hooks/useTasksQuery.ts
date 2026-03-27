@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import {
   PLANNER_SYNC_EVENT,
+  getDailyTasksQueryKey,
   loadLocalDailyTasks,
-  syncLocalDailyTasksFromRemote,
+  warmDailyTasksQueryFromRemote,
 } from "@/utils/plannerSync";
 import { type DailyTask, fetchDailyTasksRemote } from "@/services/dailyTasksRemote";
 
@@ -14,10 +15,8 @@ export type { DailyTask } from "@/services/dailyTasksRemote";
 export const DAILY_TASKS_STALE_TIME = 2 * 60 * 1000;
 export const DAILY_TASKS_GC_TIME = 30 * 60 * 1000;
 
-export const getDailyTasksQueryKey = (userId: string | undefined, taskDate: string) =>
-  ["daily-tasks", userId, taskDate] as const;
-
 export const fetchDailyTasks = fetchDailyTasksRemote;
+export { getDailyTasksQueryKey };
 
 interface TasksQueryOptions {
   enabled?: boolean;
@@ -55,10 +54,8 @@ export const useTasksQuery = (selectedDate?: Date, options: TasksQueryOptions = 
 
     const refreshFromRemote = async () => {
       try {
-        const synced = await syncLocalDailyTasksFromRemote(user.id, taskDate);
-        if (disposed || !synced) return;
-
-        queryClient.setQueryData(getDailyTasksQueryKey(user.id, taskDate), await loadLocalDailyTasks(user.id, taskDate));
+        await warmDailyTasksQueryFromRemote(queryClient, user.id, taskDate);
+        if (disposed) return;
       } catch (error) {
         console.warn("Failed to refresh local daily tasks from remote:", error);
       }

@@ -1197,7 +1197,6 @@ const Journeys = () => {
           tasks={dailyTasks}
           selectedDate={selectedDate}
           onComplete={() => {
-            queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
             setShowQuickAdjust(false);
           }}
         />

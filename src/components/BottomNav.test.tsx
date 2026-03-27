@@ -3,20 +3,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 
 const mocks = vi.hoisted(() => ({
-  prefetchQuery: vi.fn().mockResolvedValue(undefined),
+  warmDailyTasksQueryFromRemote: vi.fn().mockResolvedValue([]),
+  warmEpicsQueryFromRemote: vi.fn().mockResolvedValue([]),
   hapticsLight: vi.fn(),
   companion: null as { id: string } | null,
   canEvolve: false,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    prefetchQuery: mocks.prefetchQuery,
-  }),
+  useQueryClient: () => ({}),
   useQuery: () => ({
     data: null,
     isLoading: false,
   }),
+}));
+
+vi.mock("@/utils/plannerSync", () => ({
+  warmDailyTasksQueryFromRemote: (...args: unknown[]) => mocks.warmDailyTasksQueryFromRemote(...args),
+  warmEpicsQueryFromRemote: (...args: unknown[]) => mocks.warmEpicsQueryFromRemote(...args),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -81,7 +85,8 @@ const renderBottomNav = (initialPath: string) =>
 
 describe("BottomNav", () => {
   beforeEach(() => {
-    mocks.prefetchQuery.mockClear();
+    mocks.warmDailyTasksQueryFromRemote.mockClear();
+    mocks.warmEpicsQueryFromRemote.mockClear();
     mocks.hapticsLight.mockClear();
     mocks.companion = null;
     mocks.canEvolve = false;
@@ -116,6 +121,16 @@ describe("BottomNav", () => {
     });
     expect(mocks.hapticsLight).toHaveBeenCalledTimes(1);
     expect(scrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("warms local-first journeys and campaigns caches on tab prefetch interactions", () => {
+    renderBottomNav("/mentor");
+
+    fireEvent.pointerDown(screen.getByText("Quests"));
+    fireEvent.pointerDown(screen.getByText("Campaigns"));
+
+    expect(mocks.warmDailyTasksQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1", expect.any(String));
+    expect(mocks.warmEpicsQueryFromRemote).toHaveBeenCalledWith(expect.any(Object), "user-1");
   });
 
   it("renders the reordered main tabs", () => {
